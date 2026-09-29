@@ -212,7 +212,9 @@ export default function FinancialDashboardPage() {
               )}
             </div>
             <div style={{ display: 'flex', gap: '2rem', marginTop: '0.5rem' }}>
-              <div>Current: {summary.receivables.totals.current}</div>
+              <div>
+                {t('commonCurrentLabel')} {summary.receivables.totals.current}
+              </div>
               <div>1-30d: {summary.receivables.totals.d1_30}</div>
               <div>31-60d: {summary.receivables.totals.d31_60}</div>
               <div>61-90d: {summary.receivables.totals.d61_90}</div>

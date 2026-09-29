@@ -73,7 +73,10 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
           aria-label={t('iprogOpenProgramAria', { id: program.id })}
           onClick={() => router.push(`/insurance-programs/${program.id}`)}
         >
-          <strong>Status: {t(ENUM_LABEL.InsuranceProgramStatus[program.status])}</strong>
+          <strong>
+            {t('commonStatusLabel')}{' '}
+            {t(ENUM_LABEL.InsuranceProgramStatus[program.status])}
+          </strong>
           <div style={cardMetaStyle}>
             {tPlural('iprogLineCount', program.lines.length)}
           </div>
@@ -121,9 +124,7 @@ export default function InsuranceProgramsPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('iprogHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('iprogIntro')}
-      </p>
+      <p style={{ opacity: 0.8 }}>{t('iprogIntro')}</p>
       <Suspense fallback={null}>
         <InsuranceProgramsFlow />
       </Suspense>

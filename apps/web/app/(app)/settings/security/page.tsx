@@ -96,7 +96,9 @@ export default function SecuritySettingsPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setDeviceError(err instanceof ApiError ? err.message : t('authGenericError'));
+        setDeviceError(
+          err instanceof ApiError ? err.message : t('authGenericError'),
+        );
         // null would render the loading state forever; an empty list beside
         // the error line says "we tried, and could not".
         setDevices([]);
@@ -133,7 +135,10 @@ export default function SecuritySettingsPage() {
     // server-side, and reporting a later failure as an invalid code tells the
     // user the opposite of what happened.
     try {
-      await verifyTotpEnrollment({ credentialId: enrollment.credentialId, code });
+      await verifyTotpEnrollment({
+        credentialId: enrollment.credentialId,
+        code,
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('secInvalidCode'));
       setIsBusy(false);
@@ -194,7 +199,9 @@ export default function SecuritySettingsPage() {
       // should disappear on the same refresh.
       setDevices(await listTrustedDevices());
     } catch (err) {
-      setDeviceError(err instanceof ApiError ? err.message : t('authGenericError'));
+      setDeviceError(
+        err instanceof ApiError ? err.message : t('authGenericError'),
+      );
     } finally {
       setRevoking(null);
     }
@@ -213,7 +220,10 @@ export default function SecuritySettingsPage() {
       <section style={{ marginTop: '2rem' }}>
         <h2>{t('secMfaHeading')}</h2>
         <p>
-          Status: <strong>{user.mfaEnabled ? t('secEnabled') : t('secNotEnrolled')}</strong>
+          {t('commonStatusLabel')}{' '}
+          <strong>
+            {user.mfaEnabled ? t('secEnabled') : t('secNotEnrolled')}
+          </strong>
         </p>
         {!user.mfaPolicySatisfied && user.mfaEnabled ? (
           <p style={{ fontSize: '0.85rem', opacity: 0.8 }}>
@@ -229,7 +239,13 @@ export default function SecuritySettingsPage() {
         {user.mfaEnabled ? null : enrollment ? (
           <div>
             <p>{t('secScanInstruction')}</p>
-            <Image src={enrollment.qrCodeDataUrl} alt={t('secQrAlt')} width={200} height={200} unoptimized />
+            <Image
+              src={enrollment.qrCodeDataUrl}
+              alt={t('secQrAlt')}
+              width={200}
+              height={200}
+              unoptimized
+            />
             {/* The same secret the QR encodes, in a form a person can type. A screen whose ONLY
                 route is a camera locks out anyone whose authenticator lives on this device, and
                 leaves nothing to fall back on if the image does not render. The secret is already
@@ -237,8 +253,12 @@ export default function SecuritySettingsPage() {
             {manualKey ? (
               <p style={{ marginTop: '0.75rem' }}>
                 <span style={labelStyle}>{t('secManualKeyLabel')}</span>
-                <code data-mfa-manual-key style={manualKeyStyle}>{manualKey}</code>
-                <span style={{ display: 'block', fontSize: '0.8rem', opacity: 0.8 }}>
+                <code data-mfa-manual-key style={manualKeyStyle}>
+                  {manualKey}
+                </code>
+                <span
+                  style={{ display: 'block', fontSize: '0.8rem', opacity: 0.8 }}
+                >
                   {t('secManualKeyHint')}
                 </span>
               </p>
@@ -268,7 +288,12 @@ export default function SecuritySettingsPage() {
             </form>
           </div>
         ) : (
-          <button type="button" onClick={() => void handleStartEnrollment()} disabled={isBusy} style={buttonStyle}>
+          <button
+            type="button"
+            onClick={() => void handleStartEnrollment()}
+            disabled={isBusy}
+            style={buttonStyle}
+          >
             {isBusy ? t('secStartingButton') : t('secEnrollButton')}
           </button>
         )}
@@ -316,7 +341,9 @@ export default function SecuritySettingsPage() {
             autoComplete="new-password"
             required
             minLength={12}
-            aria-invalid={confirmPassword.length > 0 && newPassword !== confirmPassword}
+            aria-invalid={
+              confirmPassword.length > 0 && newPassword !== confirmPassword
+            }
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             style={inputStyle}
@@ -354,7 +381,14 @@ export default function SecuritySettingsPage() {
         ) : devices.length === 0 ? (
           <p>{t('secNoTrustedDevices')}</p>
         ) : (
-          <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 'var(--space-2)' }}>
+          <ul
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              display: 'grid',
+              gap: 'var(--space-2)',
+            }}
+          >
             {devices.map((d) => (
               <li
                 key={d.id}
@@ -370,10 +404,17 @@ export default function SecuritySettingsPage() {
               >
                 <span style={{ display: 'grid', minWidth: 0 }}>
                   <strong>{d.label ?? t('secUnnamedDevice')}</strong>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--ink-secondary)' }}>
-                    {t('secDeviceTrustedOn')} {formatDateTime(d.trustedAt, language)}
+                  <span
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--ink-secondary)',
+                    }}
+                  >
+                    {t('secDeviceTrustedOn')}{' '}
+                    {formatDateTime(d.trustedAt, language)}
                     {' · '}
-                    {t('secDeviceExpires')} {formatDateTime(d.expiresAt, language)}
+                    {t('secDeviceExpires')}{' '}
+                    {formatDateTime(d.expiresAt, language)}
                   </span>
                 </span>
                 <button
@@ -388,7 +429,9 @@ export default function SecuritySettingsPage() {
                   })}
                   style={revoking === d.id ? buttonDisabledStyle : buttonStyle}
                 >
-                  {revoking === d.id ? t('secRevokingDevice') : t('secRevokeDevice')}
+                  {revoking === d.id
+                    ? t('secRevokingDevice')
+                    : t('secRevokeDevice')}
                 </button>
               </li>
             ))}
@@ -412,12 +455,16 @@ export default function SecuritySettingsPage() {
       </section>
 
       {/* Renders only for a holder of `encryption-key.read`. A gated SECTION on an
-        * ungated page: this route is the only way through the MFA enrolment guard, so
-        * gating the PAGE would lock ten of eleven roles out of pairing an
-        * authenticator. */}
+       * ungated page: this route is the only way through the MFA enrolment guard, so
+       * gating the PAGE would lock ten of eleven roles out of pairing an
+       * authenticator. */}
       <EncryptionKeyInventory />
 
-      <button type="button" onClick={() => void handleLogout()} style={{ ...buttonStyle, marginTop: '2rem' }}>
+      <button
+        type="button"
+        onClick={() => void handleLogout()}
+        style={{ ...buttonStyle, marginTop: '2rem' }}
+      >
         {t('signOut')}
       </button>
     </main>

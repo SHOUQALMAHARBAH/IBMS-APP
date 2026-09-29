@@ -1,38 +1,38 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useState } from "react";
-import { CombinedDutyOnRecord } from "../../../../components/ui/CombinedDutyOnRecord";
-import { ENUM_LABEL } from "../../../../lib/i18n/enum-labels";
-import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "../../../../lib/auth/auth-context";
+import { useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../../../../components/ui/CombinedDutyOnRecord';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   getNeedsAssessment,
   getQuestionnaire,
   submitNeedsAssessment,
   type NeedsAssessment,
   type NeedsAssessmentQuestion,
-} from "../../../../lib/needs-assessment/needs-assessment-api";
-import { NeedsAssessmentForm } from "../../../../components/needs-assessment/NeedsAssessmentForm";
-import { NeedsAssessmentReviewPanel } from "../../../../components/needs-assessment/NeedsAssessmentReviewPanel";
-import { ApiError } from "../../../../lib/auth/api-client";
+} from '../../../../lib/needs-assessment/needs-assessment-api';
+import { NeedsAssessmentForm } from '../../../../components/needs-assessment/NeedsAssessmentForm';
+import { NeedsAssessmentReviewPanel } from '../../../../components/needs-assessment/NeedsAssessmentReviewPanel';
+import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
   errorStyle,
-} from "../../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../../components/lead/lead.styles";
+} from '../../../../components/auth/auth-form.styles';
+import { pageStyle } from '../../../../components/lead/lead.styles';
 import {
   coveragePreviewStyle,
   coverageTagListStyle,
   coverageTagStyle,
-} from "../../../../components/needs-assessment/needs-assessment.styles";
+} from '../../../../components/needs-assessment/needs-assessment.styles';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
-} from "../../../../components/prospect/prospect.styles";
-import { ConsentCaptureWidget } from "../../../../components/pdpl/ConsentCaptureWidget";
-import { PrivacyNoticeDisplay } from "../../../../components/pdpl/PrivacyNoticeDisplay";
-import { hasPermission } from "../../../../lib/auth/permissions";
-import { useLanguage } from "../../../../lib/i18n/language-context";
+} from '../../../../components/prospect/prospect.styles';
+import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { hasPermission } from '../../../../lib/auth/permissions';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 export default function NeedsAssessmentDetailPage() {
   const { t } = useLanguage();
@@ -58,16 +58,16 @@ export default function NeedsAssessmentDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? t("nadNotFound")
+          ? t('nadNotFound')
           : err instanceof ApiError
             ? err.message
-            : t("nadLoadError"),
+            : t('nadLoadError'),
       );
     }
   }, [params.id, t]);
 
   useEffect(() => {
-    if (!isLoading && !user) router.push("/login");
+    if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router, t]);
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function NeedsAssessmentDetailPage() {
       setAssessment(await submitNeedsAssessment(assessment.id));
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t("nadSubmitError"),
+        err instanceof ApiError ? err.message : t('nadSubmitError'),
       );
     } finally {
       setSubmitting(false);
@@ -95,20 +95,20 @@ export default function NeedsAssessmentDetailPage() {
   if (isLoading || !user) return null;
 
   const isCreator = assessment?.createdByUserId === user.id;
-  const isManager = hasPermission(user, "needs-assessment.approve");
-  const isPlacement = hasPermission(user, "program.assemble");
+  const isManager = hasPermission(user, 'needs-assessment.approve');
+  const isPlacement = hasPermission(user, 'program.assemble');
   const inReview =
-    assessment?.status === "PENDING_REVIEW" ||
-    assessment?.status === "REVIEWED";
+    assessment?.status === 'PENDING_REVIEW' ||
+    assessment?.status === 'REVIEWED';
 
   return (
     <main style={pageStyle}>
       <button
         type="button"
-        onClick={() => router.push("/needs-assessments")}
-        style={{ cursor: "pointer" }}
+        onClick={() => router.push('/needs-assessments')}
+        style={{ cursor: 'pointer' }}
       >
-        {t("nadBackToList")}
+        {t('nadBackToList')}
       </button>
 
       {loadError ? (
@@ -119,29 +119,30 @@ export default function NeedsAssessmentDetailPage() {
 
       {assessment ? (
         <>
-          <h1>{t("nadHeading")}</h1>
+          <h1>{t('nadHeading')}</h1>
           <p style={{ opacity: 0.8 }}>
-            Status: {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}
+            {t('commonStatusLabel')}{' '}
+            {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}
           </p>
 
           <ConsentCaptureWidget
             customerId={assessment.customerId}
             purpose="UNDERWRITING"
-            label={t("nadConsent")}
+            label={t('nadConsent')}
             defaultConsentTextVersion="underwriting-notice-v1"
           />
           <PrivacyNoticeDisplay
             touchpoint="needs_risk_assessment"
-            canRead={hasPermission(user, "privacy-notice.read")}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div style={coveragePreviewStyle}>
-            <strong>{t("nadRecommendedCoverage")}</strong>
+            <strong>{t('nadRecommendedCoverage')}</strong>
             {assessment.recommendedCoverageLines.length === 0 ? (
               <p
-                style={{ color: "var(--ink-secondary)", margin: "0.5rem 0 0" }}
+                style={{ color: 'var(--ink-secondary)', margin: '0.5rem 0 0' }}
               >
-                {t("nadNoCoverageLines")}
+                {t('nadNoCoverageLines')}
               </p>
             ) : (
               <ul style={coverageTagListStyle}>
@@ -156,16 +157,16 @@ export default function NeedsAssessmentDetailPage() {
 
           <div
             style={{
-              display: "flex",
-              gap: "2rem",
-              flexWrap: "wrap",
-              marginTop: "1.5rem",
+              display: 'flex',
+              gap: '2rem',
+              flexWrap: 'wrap',
+              marginTop: '1.5rem',
             }}
           >
             <div>
-              <div style={profileFieldLabelStyle}>{t("nadReviewedBy")}</div>
+              <div style={profileFieldLabelStyle}>{t('nadReviewedBy')}</div>
               <div style={profileFieldValueStyle}>
-                {assessment.reviewedByUserId ?? "—"}
+                {assessment.reviewedByUserId ?? '—'}
                 {/*
                   Part 4 step 5. The row names a reviewer whether that was a second person or the
                   capturer herself. Under the REVIEWER row specifically, because the approval below has
@@ -178,9 +179,9 @@ export default function NeedsAssessmentDetailPage() {
               </div>
             </div>
             <div>
-              <div style={profileFieldLabelStyle}>{t("nadApprovedBy")}</div>
+              <div style={profileFieldLabelStyle}>{t('nadApprovedBy')}</div>
               <div style={profileFieldValueStyle}>
-                {assessment.approvedByUserId ?? "—"}
+                {assessment.approvedByUserId ?? '—'}
                 <CombinedDutyOnRecord
                   act={assessment.approverCombinedDutyAct}
                   testId="combined-duty-assessment-approver"
@@ -189,7 +190,7 @@ export default function NeedsAssessmentDetailPage() {
             </div>
           </div>
 
-          {assessment.status === "DRAFT" && isCreator ? (
+          {assessment.status === 'DRAFT' && isCreator ? (
             <>
               <NeedsAssessmentForm
                 mode="edit"
@@ -203,7 +204,7 @@ export default function NeedsAssessmentDetailPage() {
                 style={buttonStyle}
                 onClick={() => void handleSubmitForReview()}
               >
-                {submitting ? t("nadSubmitting") : t("nadSubmitButton")}
+                {submitting ? t('nadSubmitting') : t('nadSubmitButton')}
               </button>
               {actionError ? (
                 <p role="alert" style={errorStyle}>
@@ -221,43 +222,43 @@ export default function NeedsAssessmentDetailPage() {
           ) : null}
 
           {inReview && !isManager ? (
-            <p style={{ opacity: 0.7, marginTop: "1.5rem" }}>
-              {t("nadAwaitingManager")}
+            <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
+              {t('nadAwaitingManager')}
             </p>
           ) : null}
 
-          {assessment.status === "APPROVED" && isPlacement ? (
+          {assessment.status === 'APPROVED' && isPlacement ? (
             <button
               type="button"
-              style={{ ...buttonStyle, marginTop: "1.5rem" }}
+              style={{ ...buttonStyle, marginTop: '1.5rem' }}
               onClick={() =>
                 router.push(
                   `/insurance-programs/new?needsAssessmentId=${assessment.id}`,
                 )
               }
             >
-              {t("nadAssembleProgramButton")}
+              {t('nadAssembleProgramButton')}
             </button>
           ) : null}
 
-          {assessment.status === "APPROVED" && !isPlacement ? (
-            <p style={{ opacity: 0.7, marginTop: "1.5rem" }}>
-              {t("nadApprovedPlacementNote")}
+          {assessment.status === 'APPROVED' && !isPlacement ? (
+            <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
+              {t('nadApprovedPlacementNote')}
             </p>
           ) : null}
 
-          <section style={{ marginTop: "2rem" }}>
-            <h2>{t("nadAnswers")}</h2>
+          <section style={{ marginTop: '2rem' }}>
+            <h2>{t('nadAnswers')}</h2>
             <ul>
               {questions.map((q) => (
                 <li key={q.id}>
-                  {q.prompt}{" "}
+                  {q.prompt}{' '}
                   <strong>
-                    {q.type === "number"
+                    {q.type === 'number'
                       ? String(assessment.questionnaireAnswers[q.id] ?? 0)
                       : assessment.questionnaireAnswers[q.id]
-                        ? "Yes"
-                        : "No"}
+                        ? 'Yes'
+                        : 'No'}
                   </strong>
                 </li>
               ))}

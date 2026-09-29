@@ -202,13 +202,22 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             <bdi>{view.customer.legalName}</bdi>
           </h2>
           <p style={{ opacity: 0.8, marginTop: '0.2rem' }}>
-            {view.customer.customerType} — Status: {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
+            {view.customer.customerType} — Status:{' '}
+            {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
           </p>
           <div style={crmCountRowStyle}>
-            <span>Interactions: {view.counts.interactions}</span>
-            <span>Policies: {view.counts.policies}</span>
-            <span>Claims: {view.counts.claims}</span>
-            <span>Complaints: {view.counts.complaints}</span>
+            <span>
+              {t('crmCountInteractions')} {view.counts.interactions}
+            </span>
+            <span>
+              {t('crmCountPolicies')} {view.counts.policies}
+            </span>
+            <span>
+              {t('crmCountClaims')} {view.counts.claims}
+            </span>
+            <span>
+              {t('crmCountComplaints')} {view.counts.complaints}
+            </span>
           </div>
         </>
       ) : null}
@@ -332,9 +341,7 @@ export default function CrmPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('crmHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('crmIntro')}
-      </p>
+      <p style={{ opacity: 0.8 }}>{t('crmIntro')}</p>
       <Suspense fallback={null}>
         <CrmFlow />
       </Suspense>

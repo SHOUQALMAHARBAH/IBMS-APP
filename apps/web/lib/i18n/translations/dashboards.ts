@@ -34,6 +34,8 @@ export const DASHBOARDS = {
     dashDatePlaceholder: 'سنة-شهر-يوم',
     dashMonthPlaceholder: 'سنة-شهر',
     dashLoading: 'جارٍ التحميل…',
+    commonStatusLabel: 'الحالة:',
+    commonCurrentLabel: 'الحالي:',
     // Item 5 batch 1, violation 1 — the provenance line, previously hardcoded ENGLISH on eight of the
     // sixteen reporting screens. `provGeneratedAt` is when the report was COMPUTED; `provAsOf` is the date
     // the figures are measured TO. Different claims, deliberately different sentences.
@@ -370,6 +372,8 @@ export const DASHBOARDS = {
     dashDatePlaceholder: 'YYYY-MM-DD',
     dashMonthPlaceholder: 'YYYY-MM',
     dashLoading: 'Loading…',
+    commonStatusLabel: 'Status:',
+    commonCurrentLabel: 'Current:',
     // Item 5 batch 1, violation 1 — see the Arabic block for why these are two sentences and not one.
     provGeneratedAt: 'Generated {at}.',
     dcmpSelfApprovalViolations: 'Self-approval violations',

@@ -49,6 +49,19 @@ ALLOW = re.compile(r'^(?:JOD|OK|PDF|CSV|Claude|Next|React|TypeScript|Prisma)\b')
 # backticks. Narrow on purpose. A route template (`/customers/${id}`) has no spaces and cannot match; a
 # sentence does. Anything wider started reporting style strings, which is the cry-wolf direction.
 TEMPLATE_PROSE = re.compile(r'`[^`]*?\b([a-z]{2,}(?:\s+[a-z]{2,}){1,})\b[^`]*?`')
+# FAILURE MODE 5, found while reading two aria-labels rather than by running anything: a ONE-WORD LABEL
+# followed by a colon. `<strong>Status: {t(…)}</strong>` survives every pattern above — the `t()` strip
+# leaves `<strong>Status: </strong>`, and PROSE needs two words. Thirteen of these existed on eight
+# screens while this script reported 0/102, including a THIRD miss on `/dashboards/financial`.
+#
+# Narrow deliberately: a capitalised word of 3+ letters immediately before a colon. `Status:`, `Current:`,
+# `Withdrawn:` are labels; `http:` and `Record<` are not, and the exclusions below carry the rest.
+ONE_WORD_LABEL = re.compile(r'(?:^|[>`]|\}\s)\s*([A-Z][a-z]{2,})\s*:')
+# Type names and switch syntax that a colon-based pattern would otherwise read as labels.
+NOT_A_LABEL = {
+    'Record', 'Object', 'Promise', 'String', 'Number', 'Boolean', 'Partial',
+    'Array', 'Date', 'Math', 'JSON', 'Omit', 'Pick', 'Exclude', 'Readonly',
+}
 
 
 def mask_comments(src):
@@ -88,6 +101,11 @@ def findings(src):
             text = m.group(1).strip()
             if len(text) > 4 and not any(text == t for _, t in out):
                 out.append((i, text[:60]))
+        if not re.search(r'(case |switch|\bextends\b|\bimplements\b)', s):
+            for m in ONE_WORD_LABEL.finditer(stripped):
+                text = m.group(1)
+                if text not in NOT_A_LABEL and not any(text == t for _, t in out):
+                    out.append((i, text + ':'))
     return out
 
 
@@ -128,6 +146,21 @@ def self_test():
             'an untranslated currency label IS a finding',
             '        <span>Current asset value (JOD): {rec.currentAssetValue}</span>\n',
             True,
+        ),
+        (
+            'failure mode 5 — a ONE-WORD label beside a translated value',
+            "          <strong>Status: {t(ENUM_LABEL.X[y.status])}</strong>\n",
+            True,
+        ),
+        (
+            'a TypeScript type before a colon is not a label',
+            '  const byId: Record<string, Thing> = {};\n',
+            False,
+        ),
+        (
+            'a switch case is not a label',
+            "      case 'Active':\n",
+            False,
         ),
     ]
     failures = 0

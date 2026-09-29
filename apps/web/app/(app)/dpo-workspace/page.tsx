@@ -14,9 +14,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 
-const ROLES = [
-  'dpo-workspace.view',
-];
+const ROLES = ['dpo-workspace.view'];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -24,9 +22,12 @@ const cell: CSSProperties = {
   textAlign: 'start',
   verticalAlign: 'top',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: '2px solid var(--border-default)',
+};
 const sectionStyle: CSSProperties = { margin: '2rem 0' };
-
 
 export default function DpoWorkspacePage() {
   const router = useRouter();
@@ -68,9 +69,7 @@ export default function DpoWorkspacePage() {
   return (
     <main style={pageStyle}>
       <h1>{t('dpowHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('dpowIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dpowIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -87,19 +86,30 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowConsentStatus')}</h2>
             <div style={{ display: 'flex', gap: '1.5rem' }}>
-              <span>Active: {summary.consentStatus.activeCount}</span>
-              <span>Withdrawn: {summary.consentStatus.withdrawnCount}</span>
-              <span>Declined: {summary.consentStatus.declinedCount}</span>
+              <span>
+                {t('dpowConsentActive')} {summary.consentStatus.activeCount}
+              </span>
+              <span>
+                {t('dpowConsentWithdrawn')}{' '}
+                {summary.consentStatus.withdrawnCount}
+              </span>
+              <span>
+                {t('dpowConsentDeclined')} {summary.consentStatus.declinedCount}
+              </span>
             </div>
           </section>
 
           <section style={sectionStyle}>
             <h2>{t('dpowDsrQueue')}</h2>
             {summary.dsrQueue.length === 0 ? (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoOpenDsr')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>
+                {t('dpowNoOpenDsr')}
+              </p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '48rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={head}>{t('dpowColType')}</th>
@@ -112,7 +122,9 @@ export default function DpoWorkspacePage() {
                     {summary.dsrQueue.map((d) => (
                       <tr key={d.id}>
                         <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
-                        <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
+                        <td style={cell}>
+                          {t(ENUM_LABEL.DsrStatus[d.status])}
+                        </td>
                         <td style={cell}>{d.slaDueAt.slice(0, 10)}</td>
                         <td style={cell}>
                           {d.daysUntilDue < 0
@@ -132,10 +144,14 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowIncidentRegister')}</h2>
             {summary.incidentRegister.length === 0 ? (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoOpenIncidents')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>
+                {t('dpowNoOpenIncidents')}
+              </p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '40rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={head}>{t('dpowColTitle')}</th>
@@ -147,8 +163,12 @@ export default function DpoWorkspacePage() {
                     {summary.incidentRegister.map((i) => (
                       <tr key={i.id}>
                         <td style={cell}>{i.title}</td>
-                        <td style={cell}>{t(ENUM_LABEL.IncidentSeverity[i.severity])}</td>
-                        <td style={cell}>{t(ENUM_LABEL.IncidentStatus[i.status])}</td>
+                        <td style={cell}>
+                          {t(ENUM_LABEL.IncidentSeverity[i.severity])}
+                        </td>
+                        <td style={cell}>
+                          {t(ENUM_LABEL.IncidentStatus[i.status])}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -160,10 +180,14 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowDpiaRegister')}</h2>
             {summary.dpiaRegister.length === 0 ? (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoDpiaAwaiting')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>
+                {t('dpowNoDpiaAwaiting')}
+              </p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '40rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={head}>{t('dpowColSubject')}</th>
@@ -175,8 +199,14 @@ export default function DpoWorkspacePage() {
                     {summary.dpiaRegister.map((d) => (
                       <tr key={d.id}>
                         <td style={cell}>{d.subjectDescription}</td>
-                        <td style={cell}>{t(ENUM_LABEL.DpiaOutcome[d.outcome])}</td>
-                        <td style={cell}>{d.dpoReviewDueAt ? d.dpoReviewDueAt.slice(0, 10) : '—'}</td>
+                        <td style={cell}>
+                          {t(ENUM_LABEL.DpiaOutcome[d.outcome])}
+                        </td>
+                        <td style={cell}>
+                          {d.dpoReviewDueAt
+                            ? d.dpoReviewDueAt.slice(0, 10)
+                            : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -188,10 +218,14 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowHoldRegister')}</h2>
             {summary.legalHoldRegister.length === 0 ? (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoHolds')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>
+                {t('dpowNoHolds')}
+              </p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '40rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={head}>{t('dpowColScope')}</th>
@@ -217,7 +251,9 @@ export default function DpoWorkspacePage() {
               <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoCbt')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '40rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={head}>{t('dpowColDestination')}</th>
