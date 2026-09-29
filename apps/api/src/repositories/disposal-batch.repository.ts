@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type {
   CertificateOfDestruction,
-  DisposalBatch,
   DisposalBatchStatus,
   Prisma,
 } from '@ibms/db';

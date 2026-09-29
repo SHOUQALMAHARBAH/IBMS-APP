@@ -69,6 +69,9 @@ BY_CALL_SITE = {
     ('kyc.controller.ts', 'row.combinedDutyAct'): 'KYCRecord',
     ('data-sharing-approval.config.ts', 'row.combinedDutyAct'): 'DataSharingApproval',
     ('disposal-batch.config.ts', 'row.combinedDutyAct'): 'DisposalBatch',
+    # Two entries for ONE pair: this module has no view layer, so the controller projects — once for the
+    # single-row handlers and once for the list. KYC is the other module shaped this way (§ 1.80).
+    ('data-processing-agreement.controller.ts', 'row.combinedDutyAct'): 'DataProcessingAgreement',
 }
 
 

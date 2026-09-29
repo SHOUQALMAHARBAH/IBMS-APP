@@ -4,8 +4,10 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import type { DataProcessingAgreement } from '@ibms/db';
-import { DataProcessingAgreementRepository } from '../../repositories/data-processing-agreement.repository';
+import {
+  DataProcessingAgreementRepository,
+  type DataProcessingAgreementWithAct,
+} from '../../repositories/data-processing-agreement.repository';
 import { VendorRepository } from '../../repositories/vendor.repository';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
@@ -31,7 +33,7 @@ export class DataProcessingAgreementService {
   async create(
     vendorId: string,
     actorUserId: string,
-  ): Promise<DataProcessingAgreement> {
+  ): Promise<DataProcessingAgreementWithAct> {
     const vendor = await this.vendors.findById(vendorId);
     if (!vendor) throw new NotFoundException('Vendor not found');
 
@@ -51,7 +53,9 @@ export class DataProcessingAgreementService {
     return dpa;
   }
 
-  async listByVendor(vendorId: string): Promise<DataProcessingAgreement[]> {
+  async listByVendor(
+    vendorId: string,
+  ): Promise<DataProcessingAgreementWithAct[]> {
     const vendor = await this.vendors.findById(vendorId);
     if (!vendor) throw new NotFoundException('Vendor not found');
     return this.dpas.findByVendorId(vendorId);
@@ -60,7 +64,7 @@ export class DataProcessingAgreementService {
   async sign(
     id: string,
     actorUserId: string,
-  ): Promise<DataProcessingAgreement> {
+  ): Promise<DataProcessingAgreementWithAct> {
     const existing = await this.dpas.findById(id);
     if (!existing)
       throw new NotFoundException('Data Processing Agreement not found');
@@ -92,7 +96,7 @@ export class DataProcessingAgreementService {
     actorUserId: string,
     /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
     combinedDutyReason?: string,
-  ): Promise<DataProcessingAgreement> {
+  ): Promise<DataProcessingAgreementWithAct> {
     const existing = await this.dpas.findById(id);
     if (!existing)
       throw new NotFoundException('Data Processing Agreement not found');

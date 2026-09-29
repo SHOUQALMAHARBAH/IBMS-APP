@@ -609,6 +609,111 @@ describe('duty segregation — a declared combined act through the API (e2e)', (
     expect(act.grantingRoleNames).not.toContain('SALES_RELATIONSHIP_OFFICER');
   }, 600_000);
 
+  /*
+   * A THIRD PAIR, AND THE FIRST TEST OF THE WIRE SHAPE ITSELF (§ 1.80's rule).
+   *
+   * The two tests above prove the act reaches its own DATABASE column. This one proves what the act looks
+   * like coming back out over HTTP, and it exists because the KYC pair shipped with the act crossing the
+   * wire in the RAW Prisma shape — `actedAt` / `grantingRoleNames` / `multipleGrantingRoles` where the
+   * shared component reads `at` / `roles` / `hatAmbiguous`. Every field rendered `undefined`, and neither
+   * the typecheck nor a mocked Playwright test could see it, because the mock sent the shape the component
+   * wanted. **A shape that crosses the wire is proven against the real producer, never against a mock.**
+   *
+   * `DataProcessingAgreement` is projected in its CONTROLLER rather than in a view layer (this module has
+   * none), which is exactly the arrangement that went wrong on KYC — so this is the pair to pin it on.
+   */
+  it('the act crosses the wire in the VIEW shape, not the raw Prisma shape', async () => {
+    const app = sharedApp as INestApplication<App>;
+    // One person who assesses a processor (`vendor.update`) AND DPO-approves the agreement
+    // (`dpa.approve`) — two roles, because no single seeded role grants both.
+    const one = await makeUser(
+      app,
+      'cd-dpa',
+      'COMPLIANCE_OFFICER',
+      'DATA_PROTECTION_OFFICER',
+    );
+
+    const vendor = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(one.accessToken))
+        .send({
+          name: `Combined duty DPA vendor ${RUN}`,
+          vendorType: 'it_cloud',
+        })
+        .expect(201)
+    ).body as { id: string };
+
+    const dpa = (
+      await request(app.getHttpServer())
+        .post(`/vendors/${vendor.id}/data-processing-agreements`)
+        .set(bearer(one.accessToken))
+        .expect(201)
+    ).body as { id: string; assessedByUserId: string };
+    expect(dpa.assessedByUserId).toBe(one.userId);
+
+    // SEGREGATED: the assessor cannot DPO-approve her own assessment, exactly as before Part 4.
+    await request(app.getHttpServer())
+      .post(`/data-processing-agreements/${dpa.id}/dpo-approve`)
+      .set(bearer(one.accessToken))
+      .send({})
+      .expect(403);
+
+    const REASON =
+      'Sole compliance officer in this office; the processor go-live fell inside the review window.';
+    const approved = await inCombinedMode(async () => {
+      await request(app.getHttpServer())
+        .post(`/data-processing-agreements/${dpa.id}/dpo-approve`)
+        .set(bearer(one.accessToken))
+        .send({})
+        .expect(422);
+      return (
+        await request(app.getHttpServer())
+          .post(`/data-processing-agreements/${dpa.id}/dpo-approve`)
+          .set(bearer(one.accessToken))
+          .send({ combinedDutyReason: REASON })
+          .expect(201)
+      ).body as Record<string, unknown>;
+    });
+
+    // THE WIRE SHAPE. Every field the screen reads, asserted on the real response body.
+    const act = approved.combinedDutyAct as Record<string, unknown>;
+    expect(act).not.toBeNull();
+    expect(act.pair).toBe('DataProcessingAgreement_maker_checker_distinct');
+    expect(act.actorUserId).toBe(one.userId);
+    expect(act.reason).toBe(REASON);
+    expect(act.roles).toContain('DATA_PROTECTION_OFFICER');
+    expect(act.hatAmbiguous).toBe(false);
+    expect(typeof act.at).toBe('string');
+
+    // AND THE RAW FIELD NAMES ARE ABSENT. This half is the actual guard: without it the assertions above
+    // would all still pass on a body that ALSO carried the raw relation, and a pair could regress to
+    // sending both. Named one at a time, so a failure says which spelling leaked.
+    expect(act).not.toHaveProperty('actedAt');
+    expect(act).not.toHaveProperty('grantingRoleNames');
+    expect(act).not.toHaveProperty('multipleGrantingRoles');
+    expect(act).not.toHaveProperty('constraintName');
+
+    // The hat is `dpa.approve`, which the DPO role grants and Compliance does not — so the act must not
+    // claim she wore the assessor's hat to approve it.
+    const stored = await rawPrisma.dataProcessingAgreement.findUniqueOrThrow({
+      where: { id: dpa.id },
+      select: {
+        assessedByUserId: true,
+        dpoApprovedByUserId: true,
+        combinedDutyActId: true,
+      },
+    });
+    expect(stored.assessedByUserId).toBe(one.userId);
+    expect(stored.dpoApprovedByUserId).toBe(one.userId);
+    expect(stored.combinedDutyActId).not.toBeNull();
+    const row = await rawPrisma.combinedDutyAct.findUniqueOrThrow({
+      where: { id: stored.combinedDutyActId as string },
+    });
+    expect(row.grantingRoleNames).toContain('DATA_PROTECTION_OFFICER');
+    expect(row.grantingRoleNames).not.toContain('COMPLIANCE_OFFICER');
+  }, 600_000);
+
   it('the office is SEGREGATED again once this file is done', async () => {
     // Explicit rather than trusted. Every other spec in the run reads this office, and one left in COMBINED
     // mode would make a self-approval legitimate for all of them — a failure that would surface as an

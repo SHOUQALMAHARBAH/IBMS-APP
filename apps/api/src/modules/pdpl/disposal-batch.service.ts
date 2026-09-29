@@ -5,13 +5,15 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { DisposalBatch } from '@ibms/db';
 import { Prisma } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { DisposalBatchRepository , type DisposalBatchWithAct } from '../../repositories/disposal-batch.repository';
+import {
+  DisposalBatchRepository,
+  type DisposalBatchWithAct,
+} from '../../repositories/disposal-batch.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
   DISPOSAL_BATCH_SLA_WORKFLOW,

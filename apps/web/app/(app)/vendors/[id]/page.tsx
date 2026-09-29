@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
-import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '../../../../lib/auth/auth-context';
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { ENUM_LABEL } from "../../../../lib/i18n/enum-labels";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "../../../../lib/auth/auth-context";
 import {
   CombinedDutyReasonField,
   combinedDutyTooShort,
   needsCombinedDutyDeclaration,
-} from '../../../../components/ui/CombinedDutyReasonField';
+} from "../../../../components/ui/CombinedDutyReasonField";
 import {
   createVendorDpa,
   dpoApproveDpa,
@@ -25,19 +25,24 @@ import {
   type DataShareReadiness,
   type RiskTier,
   type Vendor,
-} from '../../../../lib/supporting-operations/vendor-api';
-import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
-import { useLanguage } from '../../../../lib/i18n/language-context';
+} from "../../../../lib/supporting-operations/vendor-api";
+import { ApiError } from "../../../../lib/auth/api-client";
+import { CombinedDutyOnRecord } from "../../../../components/ui/CombinedDutyOnRecord";
+import { errorStyle } from "../../../../components/auth/auth-form.styles";
+import { pageStyle } from "../../../../components/lead/lead.styles";
+import { useLanguage } from "../../../../lib/i18n/language-context";
 
 const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
+  padding: "0.35rem 0.75rem",
+  borderBottom: "1px solid var(--border-subtle)",
+  textAlign: "start",
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: "2px solid var(--border-default)",
+};
+const sectionStyle: CSSProperties = { margin: "1.75rem 0" };
 
 export default function VendorDetailPage() {
   const { t } = useLanguage();
@@ -52,12 +57,12 @@ export default function VendorDetailPage() {
   // Part 4 — the combined-duty reason, keyed by agreement so two rows cannot share one box.
   const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
-  const [riskTier, setRiskTierValue] = useState<RiskTier>('low');
+  const [riskTier, setRiskTierValue] = useState<RiskTier>("low");
   const [readiness, setReadiness] = useState<DataShareReadiness | null>(null);
   const [dpas, setDpas] = useState<DataProcessingAgreement[] | null>(null);
 
   useEffect(() => {
-    if (!isLoading && !user) router.push('/login');
+    if (!isLoading && !user) router.push("/login");
   }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
@@ -70,10 +75,10 @@ export default function VendorDetailPage() {
       setVendor(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('vendNoPermission')
+          ? t("vendNoPermission")
           : err instanceof ApiError
             ? err.message
-            : t('vendLoadError'),
+            : t("vendLoadError"),
       );
     }
   }, [vendorId, t]);
@@ -99,7 +104,9 @@ export default function VendorDetailPage() {
     try {
       setVendor(await setVendorRiskTier(vendorId, riskTier));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('vendTierError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("vendTierError"),
+      );
     }
   }
 
@@ -108,7 +115,9 @@ export default function VendorDetailPage() {
     try {
       setVendor(await recordVendorAnnualReview(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('vendReviewError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("vendReviewError"),
+      );
     }
   }
 
@@ -117,7 +126,9 @@ export default function VendorDetailPage() {
     try {
       setVendor(await terminateVendor(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('vendTerminateError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("vendTerminateError"),
+      );
     }
   }
 
@@ -126,7 +137,9 @@ export default function VendorDetailPage() {
     try {
       setVendor(await revokeVendorAccess(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('vendRevokeError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("vendRevokeError"),
+      );
     }
   }
 
@@ -135,7 +148,9 @@ export default function VendorDetailPage() {
     try {
       setReadiness(await getVendorDataShareReadiness(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('vendReadinessError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("vendReadinessError"),
+      );
     }
   }
 
@@ -145,7 +160,9 @@ export default function VendorDetailPage() {
       await createVendorDpa(vendorId);
       await loadDpas();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('vendDpaCreateError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("vendDpaCreateError"),
+      );
     }
   }
 
@@ -155,7 +172,9 @@ export default function VendorDetailPage() {
       await signDpa(id);
       await loadDpas();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('vendDpaSignError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("vendDpaSignError"),
+      );
     }
   }
 
@@ -166,9 +185,7 @@ export default function VendorDetailPage() {
       await loadDpas();
     } catch (err) {
       setActionError(
-        err instanceof ApiError
-          ? err.message
-          : t('vendDpaApproveError'),
+        err instanceof ApiError ? err.message : t("vendDpaApproveError"),
       );
     }
   }
@@ -177,7 +194,7 @@ export default function VendorDetailPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>{t('vendHeading')}</h1>
+      <h1>{t("vendHeading")}</h1>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -196,35 +213,39 @@ export default function VendorDetailPage() {
             <h2>
               <bdi>{vendor.name}</bdi>
             </h2>
-            <p>{t('vendTypeLabel')} {vendor.vendorType}</p>
             <p>
-              {t('vendRiskTierLabel')}{' '}
-              <strong>{vendor.riskTier ?? t('vendUnassigned')}</strong>
+              {t("vendTypeLabel")} {vendor.vendorType}
             </p>
             <p>
-              {t('vendAnnualReviewDue')}{' '}
+              {t("vendRiskTierLabel")}{" "}
+              <strong>{vendor.riskTier ?? t("vendUnassigned")}</strong>
+            </p>
+            <p>
+              {t("vendAnnualReviewDue")}{" "}
               {vendor.annualReviewDueAt
-                ? vendor.annualReviewDueAt.replace('T', ' ').slice(0, 16)
-                : t('vendNotScheduled')}
+                ? vendor.annualReviewDueAt.replace("T", " ").slice(0, 16)
+                : t("vendNotScheduled")}
             </p>
             <p>
-              {t('vendTerminationConfirmed')}{' '}
+              {t("vendTerminationConfirmed")}{" "}
               {vendor.terminationDataReturnConfirmedAt
-                ? vendor.terminationDataReturnConfirmedAt.replace('T', ' ').slice(0, 16)
-                : t('vendNotTerminated')}
+                ? vendor.terminationDataReturnConfirmedAt
+                    .replace("T", " ")
+                    .slice(0, 16)
+                : t("vendNotTerminated")}
             </p>
             <p>
-              {t('vendAccessRevoked')}{' '}
+              {t("vendAccessRevoked")}{" "}
               {vendor.accessRevokedAt
-                ? vendor.accessRevokedAt.replace('T', ' ').slice(0, 16)
-                : t('vendNotRevoked')}
+                ? vendor.accessRevokedAt.replace("T", " ").slice(0, 16)
+                : t("vendNotRevoked")}
             </p>
           </section>
 
           <section style={sectionStyle}>
-            <h2>{t('vendRiskTiering')}</h2>
+            <h2>{t("vendRiskTiering")}</h2>
             <label>
-              {t('vendRiskTierField')}
+              {t("vendRiskTierField")}
               <select
                 value={riskTier}
                 onChange={(e) => setRiskTierValue(e.target.value as RiskTier)}
@@ -235,58 +256,80 @@ export default function VendorDetailPage() {
                   </option>
                 ))}
               </select>
-            </label>{' '}
+            </label>{" "}
             <button type="button" onClick={onSetRiskTier}>
-              {t('vendSetTierButton')}
-            </button>{' '}
+              {t("vendSetTierButton")}
+            </button>{" "}
             <button type="button" onClick={onRecordAnnualReview}>
-              {t('vendRecordAnnualReviewButton')}
+              {t("vendRecordAnnualReviewButton")}
             </button>
           </section>
 
           <section style={sectionStyle}>
-            <h2>{t('vendDataShareReadiness')}</h2>
+            <h2>{t("vendDataShareReadiness")}</h2>
             <button type="button" onClick={onCheckReadiness}>
-              {t('vendCheckReadinessButton')}
+              {t("vendCheckReadinessButton")}
             </button>
             {readiness ? (
               <p>
                 {readiness.ready ? (
-                  t('vendReady')
+                  t("vendReady")
                 ) : (
-                  <>
-                    Not ready: {readiness.reasons.join(' ')}
-                  </>
+                  <>Not ready: {readiness.reasons.join(" ")}</>
                 )}
               </p>
             ) : null}
           </section>
 
           <section style={sectionStyle}>
-            <h2>{t('vendDpaHeading')}</h2>
+            <h2>{t("vendDpaHeading")}</h2>
             <button type="button" onClick={onCreateDpa}>
-              {t('vendCreateDpaButton')}
+              {t("vendCreateDpaButton")}
             </button>
             {dpas && dpas.length > 0 ? (
-              <table style={{ borderCollapse: 'collapse', minWidth: '30rem', marginTop: '0.5rem' }}>
+              <table
+                style={{
+                  borderCollapse: "collapse",
+                  minWidth: "30rem",
+                  marginTop: "0.5rem",
+                }}
+              >
                 <thead>
                   <tr>
-                    <th style={head}>{t('vendColSigned')}</th>
-                    <th style={head}>{t('vendColDpoApproved')}</th>
+                    <th style={head}>{t("vendColSigned")}</th>
+                    <th style={head}>{t("vendColDpoApproved")}</th>
                     <th style={head} />
                   </tr>
                 </thead>
                 <tbody>
                   {dpas.map((dpa) => (
                     <tr key={dpa.id}>
-                      <td style={cell}>{dpa.signedAt ? dpa.signedAt.slice(0, 10) : t('vendUnsigned')}</td>
-                      <td style={cell}>{dpa.dpoApprovedByUserId ? t('vendYes') : t('vendNo')}</td>
+                      <td style={cell}>
+                        {dpa.signedAt
+                          ? dpa.signedAt.slice(0, 10)
+                          : t("vendUnsigned")}
+                      </td>
+                      <td style={cell}>
+                        {dpa.dpoApprovedByUserId ? t("vendYes") : t("vendNo")}
+                        {/*
+                          Part 4 step 5. "Yes" is true of a self-approved agreement and of a two-person one
+                          alike, so without this the cell cannot distinguish them — and a DPA is the record
+                          that makes sending personal data to a third party lawful at all.
+                        */}
+                        <CombinedDutyOnRecord
+                          act={dpa.combinedDutyAct}
+                          testId={`combined-duty-dpa-${dpa.id}`}
+                        />
+                      </td>
                       <td style={cell}>
                         {!dpa.signedAt ? (
-                          <button type="button" onClick={() => onSignDpa(dpa.id)}>
-                            {t('vendSignButton')}
+                          <button
+                            type="button"
+                            onClick={() => onSignDpa(dpa.id)}
+                          >
+                            {t("vendSignButton")}
                           </button>
-                        ) : null}{' '}
+                        ) : null}{" "}
                         {dpa.signedAt && !dpa.dpoApprovedByUserId
                           ? (() => {
                               // Part 4 — the assessor may DPO-approve their own assessment in an office that
@@ -297,7 +340,7 @@ export default function VendorDetailPage() {
                                 currentUserId: user.id,
                                 alreadyDecided: dpa.dpoApprovedByUserId != null,
                               });
-                              const declaration = declarations[dpa.id] ?? '';
+                              const declaration = declarations[dpa.id] ?? "";
                               return (
                                 <>
                                   {needs ? (
@@ -315,19 +358,16 @@ export default function VendorDetailPage() {
                                   <button
                                     type="button"
                                     disabled={
-                                      needs &&
-                                      combinedDutyTooShort(declaration)
+                                      needs && combinedDutyTooShort(declaration)
                                     }
                                     onClick={() =>
                                       onDpoApprove(
                                         dpa.id,
-                                        needs
-                                          ? declaration.trim()
-                                          : undefined,
+                                        needs ? declaration.trim() : undefined,
                                       )
                                     }
                                   >
-                                    {t('vendDpoApproveButton')}
+                                    {t("vendDpoApproveButton")}
                                   </button>
                                 </>
                               );
@@ -339,22 +379,22 @@ export default function VendorDetailPage() {
                 </tbody>
               </table>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('vendNoDpas')}</p>
+              <p style={{ color: "var(--ink-secondary)" }}>{t("vendNoDpas")}</p>
             )}
           </section>
 
           <section style={sectionStyle}>
-            <h2>{t('vendTermination')}</h2>
+            <h2>{t("vendTermination")}</h2>
             <button type="button" onClick={onTerminate}>
-              {t('vendTerminateButton')}
-            </button>{' '}
+              {t("vendTerminateButton")}
+            </button>{" "}
             <button type="button" onClick={onRevokeAccess}>
-              {t('vendRevokeAccessButton')}
+              {t("vendRevokeAccessButton")}
             </button>
           </section>
         </>
       ) : loadError ? null : (
-        <p>{t('vendLoading')}</p>
+        <p>{t("vendLoading")}</p>
       )}
     </main>
   );
