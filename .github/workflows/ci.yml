@@ -204,10 +204,19 @@ jobs:
         run: npm run db:seed
 
       - name: Install Chromium for PdfRendererService (Part F item #7)
-        # apps/api depends on playwright-core (document generation) but has
-        # no browser of its own the way apps/web's Playwright install does
-        # — complaint.e2e-spec.ts's acknowledgement test launches a real
-        # browser and will fail without this.
+        # `!cancelled()` for the same reason as the seed step above, and it was MISSING here while
+        # every neighbouring step had it — which is not a symmetry point but a measured defect.
+        #
+        # On decbcad the dependency-audit step went red, so this step SKIPPED while "Integration
+        # tests" still ran (it has the guard). The suite then reported three failures —
+        #   browserType.launch: Executable doesn't exist at .../chromium_headless_shell-1234/...
+        # — on the invoice, policy-schedule-summary and certificate-of-insurance PDF tests. All three
+        # were a CASCADE from an unrelated advisory, and all three passed locally, so the red named
+        # three document tests and the actual cause was a dependency bump.
+        #
+        # That is exactly the failure mode the comment on the seed step describes, one step along: a
+        # red gate changing what a LATER gate reports rather than merely stopping the job.
+        if: ${{ !cancelled() }}
         run: npx playwright-core install --with-deps chromium
 
       # `!cancelled()` for the reason given on the seed step above.

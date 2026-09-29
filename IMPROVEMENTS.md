@@ -5276,6 +5276,38 @@ to remember harder to run a command that rewrites the tree. Recorded here rather
 commit as a projection: changing a package's lint script affects every future run and belongs on its
 own.
 
+#### AND A FOURTH RED, WITH TWO CAUSES AND ONE OF THEM A CASCADE
+
+`decbcad` was red too — **not on lint**, and I would have reported "fixed" without checking. Two
+separate things:
+
+**(1) A real new advisory.** `fast-uri` 3.0.0–3.1.6, two high-severity CVEs
+(`GHSA-qw65-cvwx-89v3`, `GHSA-58mr-gqgx-xq4g`). Nothing to do with this work — a published advisory
+arriving in the tree. **Measured before deciding anything: it is NOT in the production dependency
+tree** (`npm ls fast-uri --omit=dev` is empty); it reaches us only through `@nestjs/cli` and
+`webpack` → `ajv`, which is build tooling. Fixed rather than acknowledged, because a patched **3.1.8**
+exists inside the same major. A root `overrides` entry alone did NOT take — npm kept resolving 3.1.6
+through several install variants — and `npm update fast-uri` is what moved it, in **6 lockfile lines**
+rather than a regeneration.
+
+**(2) Three PDF failures that were a CASCADE, and named the wrong thing.** The suite reported the
+invoice, policy-schedule-summary and certificate-of-insurance PDF tests failing with 500s. All three
+passed locally. The cause, from the step list rather than the test names:
+
+    20  Seed database                      success
+    21  Install Chromium for PdfRenderer   SKIPPED
+    22  Integration tests                  failure
+
+**The Chromium install step was the only one in that sequence without `if: ${{ !cancelled() }}`.** So
+the red audit step skipped the browser install while the integration tests still ran, and
+`browserType.launch: Executable doesn't exist` surfaced as three document-generation failures. Guard
+added, with the measurement in the workflow comment.
+
+That is the failure mode the comment on the seed step already describes — *a red gate hiding a later
+one* — one step further along and in a worse form: **the later gate did not disappear, it reported
+three failures that were not real.** A skipped setup step is more dangerous than a skipped test step,
+because the test still runs and produces a confident wrong answer.
+
 #### The reporting rule, restated because the failure was in the reporting
 
 **Every report states where CI stands, on which commit, per job — green, red, or running.** Not because
