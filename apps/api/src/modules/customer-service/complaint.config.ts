@@ -1,3 +1,8 @@
+import type { CombinedDutyAct } from '@ibms/db';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 import { Prisma } from '@ibms/db';
 
 /**
@@ -98,6 +103,7 @@ export interface ComplaintRow {
   resolvedByUserId: string | null;
   resolvedAt: Date | null;
   closureApprovedByUserId: string | null;
+  closureCombinedDutyAct: CombinedDutyAct | null;
   closedAt: Date | null;
   createdAt: Date;
   actions: ComplaintActionRow[];
@@ -128,6 +134,11 @@ export interface ComplaintView {
   resolvedByUserId: string | null;
   resolvedAt: string | null;
   closureApprovedByUserId: string | null;
+  /**
+   * Part 4 step 5 — present when ONE person both resolved the complaint and approved its closure, in an
+   * office that declared COMBINED. The status reads CLOSED either way.
+   */
+  closureCombinedDutyAct: CombinedDutyActView | null;
   closedAt: string | null;
   sla: ComplaintSlaView | null;
   actions: Array<{
@@ -164,6 +175,7 @@ export function deriveComplaintView(
     resolvedByUserId: row.resolvedByUserId,
     resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
     closureApprovedByUserId: row.closureApprovedByUserId,
+    closureCombinedDutyAct: combinedDutyActView(row.closureCombinedDutyAct),
     closedAt: row.closedAt ? row.closedAt.toISOString() : null,
     sla: row.slaTimer
       ? {
