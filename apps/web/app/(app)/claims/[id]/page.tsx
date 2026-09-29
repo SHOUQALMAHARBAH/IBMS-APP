@@ -10,6 +10,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { ClaimCard } from '../../../../components/claim/ClaimCard';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDate } from '../../../../lib/i18n/format';
 
 /**
  * One claim, on a route the Claims desk can actually reach.
@@ -45,7 +46,7 @@ export default function ClaimDetailPage() {
   // every other dynamic route in this app already reads the hook.
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [claim, setClaim] = useState<Claim | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -99,13 +100,23 @@ export default function ClaimDetailPage() {
 
       {claim ? (
         <>
+          {/*
+            Was `claim.id.slice(0, 8)` as the last fallback — a uuid fragment in a page HEADING. Rule 2:
+            what identifies a record to a person must be something the person recognises.
+            
+            This state is REACHABLE, unlike the risk-profile one: a claim that has been notified but not
+            yet registered has neither a claim number nor an insurer reference. So the field could not
+            simply be required — the heading needed a readable answer for that state, and the loss date is
+            it. There is nothing to disambiguate against on a detail page, and a person recognises a date.
+          */}
           <h1>
-            {t('claimsDetailHeading', {
-              name:
-                claim.claimNumber ??
-                claim.insurerClaimReference ??
-                claim.id.slice(0, 8),
-            })}
+            {(claim.claimNumber ?? claim.insurerClaimReference)
+              ? t('claimsDetailHeading', {
+                  name: claim.claimNumber ?? claim.insurerClaimReference ?? '',
+                })
+              : t('claimsDetailHeadingByLoss', {
+                  at: formatDate(claim.lossDate, language),
+                })}
           </h1>
           <ClaimCard
             claim={claim}

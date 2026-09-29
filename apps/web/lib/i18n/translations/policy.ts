@@ -176,6 +176,7 @@ export const POLICY = {
     claimsDetailNotFound:
       'لا توجد مطالبة بهذا المعرّف ضمن نطاق عملك.',
     claimsDetailHeading: 'المطالبة {name}',
+    claimsDetailHeadingByLoss: 'مطالبة عن خسارة بتاريخ {at}',
     claimLossOnLabel: 'الخسارة بتاريخ',
     claimLargeClaimSuffix: 'مطالبة كبيرة',
     claimDeductibleShort: 'التحمّل',
@@ -498,6 +499,7 @@ export const POLICY = {
     claimsDetailNotFound:
       'No claim with that id is in your book.',
     claimsDetailHeading: 'Claim {name}',
+    claimsDetailHeadingByLoss: 'Claim for a loss on {at}',
     claimLossOnLabel: 'Loss',
     claimLargeClaimSuffix: 'large claim',
     claimDeductibleShort: 'deductible',

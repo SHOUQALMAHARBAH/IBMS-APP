@@ -77,6 +77,59 @@ describe('every screen speaks both languages (rule 6)', () => {
   });
 });
 
+/*
+ * RULE 2 — no identifier reaches a reader.
+ *
+ * This guard exists because the RULE 6 guard above could not stand in for it, and the reason is the
+ * finding: `hardcoded-ui-english.py` STRIPS `t(...)` calls before looking at a line, because a key is not
+ * prose. So an identifier passed as a translation PARAMETER was invisible to it — which is exactly where
+ * an identifier ends up, because it is being put INTO a sentence.
+ *
+ * Found on `/claims/[id]`, whose page heading read
+ * `t('claimsDetailHeading', { name: … ?? claim.id.slice(0, 8) })`. Rule 6's guard reported that screen
+ * clean, correctly, and rule 2 had nothing looking at it at all — it had only ever been swept by hand.
+ *
+ * The threshold is CURRENT, not zero: 44 sites exist and each needs a decision about what identifies that
+ * record to a person, several needing a name the API does not yet return. So this pins the count so it
+ * cannot GROW while those are settled, and the number comes down as they are.
+ */
+const RENDERED_IDENTIFIER_BUDGET = 44;
+
+describe('no identifier reaches a reader (rule 2)', () => {
+  it('does not render more identifiers than the recorded budget', () => {
+    let output = '';
+    try {
+      output = execFileSync(
+        'python',
+        ['scripts/measurements/rendered-identifiers.py'],
+        { cwd: REPO, encoding: 'utf8' },
+      );
+    } catch (err) {
+      output = String((err as { stdout?: string }).stdout ?? err);
+    }
+    const m = /identifiers reaching a reader\s+(\d+)/.exec(output);
+    expect(
+      m,
+      `The rendered-identifier scan produced no total — it did not run. Output:
+${output.slice(-1200)}`,
+    ).not.toBeNull();
+    const count = Number(m?.[1]);
+    expect(
+      count,
+      `Rendered identifiers went UP (${count} > ${RENDERED_IDENTIFIER_BUDGET}). A uuid identifies nothing ` +
+        'to a person: rule 2. Give the record something readable — a name, a reference, a date — and if ' +
+        'the payload has none, that is an API change and a decision, not a display fix.',
+    ).toBeLessThanOrEqual(RENDERED_IDENTIFIER_BUDGET);
+    // And the budget must come DOWN as sites are fixed, never quietly stay high: if the real count has
+    // dropped, this fails until the budget is lowered to match.
+    expect(
+      count,
+      `The budget is stale — only ${count} identifiers remain, so lower RENDERED_IDENTIFIER_BUDGET to ` +
+        'that number. A budget that stays above the real count stops being a ratchet.',
+    ).toBe(RENDERED_IDENTIFIER_BUDGET);
+  });
+});
+
 describe('a load error announces itself (rule 3)', () => {
   it('no screen renders a load error without an alert role', () => {
     const offenders: string[] = [];

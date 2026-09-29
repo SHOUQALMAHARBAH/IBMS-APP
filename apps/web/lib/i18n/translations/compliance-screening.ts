@@ -147,7 +147,7 @@ export const COMPLIANCE_SCREENING = {
     slapCustom: 'مخصّص',
     slapJordanWorkingDays: 'أيام العمل (الأردن)',
     slapSave: 'حفظ',
-    slapDeactivate: 'إيقاف',
+    slapDeactivate: 'تعطيل',
     slapActivate: 'تفعيل',
     slapReadOnly: 'للاطلاع فقط',
     slapDurationAria: 'المدة لـ {name}',
