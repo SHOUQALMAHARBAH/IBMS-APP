@@ -20,32 +20,45 @@ import { execFileSync } from 'node:child_process';
 
 /** @type {{name: string, why: string, reviewBy: string}[]} */
 const ACKNOWLEDGED = [
-  {
-    name: 'multer',
-    why:
-      'GHSA-wc9g-mqfw-jrwm / -qfvm-cv95-jqjf / -qvfw-j98x-7q72 / -535w-7cp7-47q4 — all four are DoS via crafted MULTIPART input. ' +
-      'No upgrade path: multer is hard-pinned to 2.2.0 by @nestjs/platform-express, and @nestjs/platform-express@12.0.1 (the latest major) ' +
-      'pins the identical 2.2.0, so upgrading Nest does not clear it. npm `overrides` cannot rewrite that edge (npm 10.8, four syntaxes tried); ' +
-      'removing the package makes @nestjs/platform-express fail at import. ' +
-      '~~UNREACHABLE here: this API exposes no multipart route — there is no FileInterceptor, no @UploadedFile and no upload endpoint ' +
-      'anywhere in apps/api/src~~ — THIS HALF IS FALSE AND HAS BEEN SINCE 2026-09-13. Corrected in place rather than rewritten, because ' +
-      'the original reasoning is what explains why four high advisories were accepted. ' +
-      'MEASURED 2026-09-29: apps/api/src/modules/customer/legacy-import.controller.ts has a FileInterceptor, an @UploadedFile AND an ' +
-      'upload endpoint. It was added on 2026-09-13 (e6eec0e), four days after this acknowledgement was written, and nothing re-checked ' +
-      'the claim. It then had no WEB CALLER until 2026-09-28 (403b8e7), which is when it became reachable from the UI — so the route ' +
-      'existed unreachable for fifteen days and has been reachable since. ' +
-      'THE OTHER HALF STILL HOLDS, re-verified rather than assumed: multer 2.4.0 exists, and `npm update multer` leaves 2.2.0 in place ' +
-      'because @nestjs/platform-express hard-pins it — so there is still no upgrade path. (`npm update` is worth trying: it moved ' +
-      'fast-uri where a root `overrides` entry would not. It does not move this one.) ' +
-      'WHAT THE RISK ACTUALLY IS NOW, measured so the owner can decide rather than infer: the route is gated on ' +
-      '`customer.bulk-import` (two administrator roles), requires an authenticated session, and caps the upload at ' +
-      '`limits: { fileSize: LEGACY_IMPORT_MAX_BYTES, files: 1 }`. So the exposure is a DoS by an authenticated administrator against ' +
-      'a size-bounded single-file endpoint — not an unauthenticated one. ' +
-      'WHETHER THAT IS STILL ACCEPTABLE IS THE OWNER\'S DECISION, NOT A DEVELOPER\'S. This acknowledgement is deliberately left in ' +
-      'force and unchanged: removing it would turn a security judgement into a side effect of a documentation fix, and re-justifying it ' +
-      'on a new basis would be making that judgement without being asked. Raised for decision 2026-09-29.',
-    reviewBy: '2026-12-31',
-  },
+  /*
+   * EMPTY, and that is the intended steady state — every advisory at `high` or above fails this gate.
+   *
+   * ## What was here, and why it is gone rather than corrected
+   *
+   * Four high-severity multer DoS advisories (`GHSA-wc9g-mqfw-jrwm` and three siblings) were accepted
+   * from 2026-09-09 to 2026-09-29 on two grounds: no upgrade path, and the vulnerable code being
+   * unreachable. The reachability half had been FALSE for sixteen days — a bulk-import route with a
+   * `FileInterceptor` landed four days after the acknowledgement was written, and a web caller made it
+   * reachable from the UI on 2026-09-28. That history is recorded in `IMPROVEMENTS.md` § 1.82 with the
+   * original wording struck through in place, because the original reasoning is what explains why four
+   * high advisories were ever accepted.
+   *
+   * The owner declined to accept it on corrected grounds: the system goes in front of a regulator, and it
+   * does not ship with a known accepted vulnerability. **So the fix was found instead**, and the entry is
+   * removed because RULE 1 ABOVE NO LONGER HOLDS — there IS an upgrade path:
+   *
+   *   `@nestjs/platform-express@11.2.6` pins `multer: 2.4.0`, which is fixed. A PATCH bump inside the
+   *   11.x line, no Nest major involved. `apps/api/package.json` states `^11.2.6` as a FLOOR so the fixed
+   *   multer is a requirement rather than a lucky resolution.
+   *
+   * ## An `overrides` entry does NOT work here, proven rather than assumed
+   *
+   * `overrides: { multer: '2.4.0' }` was tried five ways — flat against the existing lockfile, flat with
+   * the lockfile recomputed, the nested `@nestjs/platform-express` form, a `^2.4.0` range, and a
+   * from-scratch lockfile regeneration after deleting the installed package. **Every one resolved 2.2.0**,
+   * with `npm ls` marking its own tree `invalid: "2.4.0" ... overridden` — npm 10.8.0 records the override
+   * and installs the pinned version anyway, because `platform-express` pins an EXACT version rather than a
+   * range. The two overrides that remain in `package.json` (`fast-uri`, `deepmerge-ts`) only ever chose
+   * WITHIN their parents' ranges, which is why they appeared to work.
+   *
+   * So: do not reach for an override to escape an exact pin in this repo. Raise the pinning package.
+   *
+   * ## Adding an entry here
+   *
+   * All four rules above must hold and the entry must say so. Rule 1 means "no upgrade path" — check the
+   * PATCH line of whatever pins it, not only the latest major: 11.2.6 was five patches ahead of the
+   * version installed, and the last five of them still pinned the vulnerable multer.
+   */
 ];
 
 const acknowledgedByName = new Map(ACKNOWLEDGED.map((a) => [a.name, a]));
