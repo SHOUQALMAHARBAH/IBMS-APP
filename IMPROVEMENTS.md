@@ -3976,15 +3976,58 @@ byte-identical — because it is the only form that catches all three: a rollove
 invalid date has none. A NaN check catches two of the three and misses the one that matters, which is
 exactly the state the commission service was in.
 
-#### Recorded, not fixed: the six remaining sites
+#### ~~Recorded, not fixed: the six remaining sites~~ — CLOSED 2026-09-29, and ONE OF THE TWO GROUNDS BELOW WAS FALSE
 
 `asOf` on `financial-report-query`, `insurer-payables-query`, `receivables-ageing-query`,
-`claims-dashboard-query`, `executive-dashboard-query`, `financial-dashboard-query`. All are **query
+`claims-dashboard-query`, `executive-dashboard-query`, `financial-dashboard-query`. ~~All are **query
 parameters on read-only reports**, so the consequence is a report window silently shifted by a day or two,
-or a 500 — bad, and not the same as a stored compliance or commission fact. Changing six report endpoints'
+or a 500 — bad, and not the same as a stored compliance or commission fact.~~ Changing six report endpoints'
 refusal behaviour is a separate decision from fixing the two writers, and bundling them would have put a
 behaviour change to the finance and executive dashboards inside a commit about the holiday calendar.
 **`isCalendarDate` is exported and one decorator away from each of them.**
+
+**RE-DERIVED BEFORE BUILDING, on the owner's instruction, and the two grounds came apart.**
+
+**The "not a stored fact" ground is FALSE for four of the six.** Measured: `/financial-report/summary`,
+`/dashboards/claims`, `/dashboards/executive` and `/dashboards/financial` all write the normalised `asOf`
+into an `AuditLogEntry` — and the claims dashboard puts it in `entityId`, which is indexed. That table is
+append-only and trigger-protected, so a rolled-over date could never be corrected, only explained. The
+ground holds for exactly two: `/client-accounting/ageing` and `/insurer-accounting/payables` say
+*"**Not audit-logged**"* in their own headers, deliberately.
+
+**The scoping ground SURVIVES, and is the whole case.** Six finance and executive endpoints' refusal
+behaviour did not belong in a commit about the holiday calendar. That was a judgement about what to put in
+one commit, not a claim about consequence — and it was right.
+
+**AND THE CONSEQUENCE WAS SMALLER THAN THIS ENTRY IMPLIED, in the direction that matters.** Of the three
+non-dates the shape regex admits, `parseHistoricalInstant`'s `Number.isNaN` check **already refused two**
+with a 422 (`2026-04-00`, `2026-13-01`). Only `2026-02-30` got through, silently, as 2 March — the one a
+NaN check structurally cannot catch, and the only one that can reach an audit row. So these six were never
+three-ways broken; they were one-way broken, in the dangerous way.
+
+**No stored row came from a rollover, settled by ARITHMETIC rather than by a scan.** A `Date()` rollover
+from a shape-valid input can land on only seven dates — Mar 1/2/3 (from Feb 29/30/31 in a non-leap year),
+May 1, Jul 1, Oct 1, Dec 1. Queried both databases for audit rows on those views: **64 rows, 64 carrying a
+parseable `asOf`, ZERO on any candidate date.** Counting the possible landing dates is what makes this
+provable; a heuristic looking for "suspicious" values could have missed one.
+
+**Built as SIX DELIBERATE DECORATORS, not inside `parseHistoricalInstant`** — the owner's ruling. That
+function has 30 call sites across 18 services, several of them financial, and moving the check inside it
+would have changed all thirty by inheritance to gain a tidier status code. Six sites you can read beats
+thirty you inherit.
+
+**Each is PAIRED with the existing `@Matches`, never replacing it**, so "that is not a date" and "that day
+does not exist" stay two messages — the thing that actually helps whoever hits one.
+
+**The two 422 -> 400 moves were TAKEN, having been measured first**: no test asserts 422 for those two
+inputs (the existing dashboard specs assert 400 for a malformed date and 422 for a FUTURE one, and a
+future date is both shape- and calendar-valid so the new decorator never sees it), and no screen can emit
+them because every web caller builds `asOf` from a native date input.
+
+Proven by `apps/api/test/asof-calendar-date.e2e-spec.ts`: every refusal is paired with a REAL date
+accepted on the same endpoint with the same token, so an endpoint that 400s everything cannot satisfy it.
+Six plants, one per decorator, each killing a test — `drop-financial-report` kills both, because the
+second test drives its two already-refused inputs through that endpoint.
 
 #### The two lessons, and one is about my own test
 
