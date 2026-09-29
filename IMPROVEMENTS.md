@@ -5742,6 +5742,31 @@ the broker's knowledge and not ours; it is question 12 on `docs/broker-session-m
 **Do not build any of the six, and do not "just fix the read" as an interim** — widening
 Finance's view is the fix that was explicitly rejected, and doing it temporarily is doing it.
 
+**THE ZERO-PREMIUM ISSUANCE — added 2026-09-29, and it is a CONTRADICTION TO CLOSE rather than
+data to repair.** Found while implementing item 5 batch 1's rate convention. Two sibling writes on
+one concept disagree:
+
+    quotation   `normalizeQuotationTerms` REFUSES a zero premium — "a quotation with no premium
+                is not a quote"
+    issuance    `recordIssuance` refuses only a NEGATIVE `issuedPremium`; ZERO is accepted
+
+The zero is load-bearing rather than inert: `LossRatio.periodPremium` is
+`issuedPremium ?? requestedPremium`, so a zero ISSUED premium **wins** through `??` instead of
+falling back — and `computeLossRatio` would store `ratio = 0` standing in for "no ratio".
+
+**MEASURED, so whoever picks this up knows the scope**: representable by that one path; and
+**0 stored rows are in that state** — 3 `LossRatio` rows on db-test, 0 on dev, `periodPremium = 0`
+on none, the substituted state on none. Counted by enumerating the state rather than inspecting
+values, the same method as the `asOf` rollover check. `LossRatio` also stores `periodClaims` and
+`periodPremium` on the SAME ROW as `ratio`, so even one appearing would still be readable as 0/0
+rather than a real zero. **No migration is owed and the column does not change.**
+
+**WHICH SIDE IS WRONG IS A DOMAIN FACT NOBODY HERE HAS**, so it is question 14 on
+`docs/broker-session-money-questions.md`: does a policy ever get issued at a zero premium — a
+courtesy, an endorsement with no premium of its own, a cover note while pricing is settled? If yes
+the quotation path must permit it; if no the issuance path must refuse it. **Do not build either
+side before that answer** — guessing changes a premium rule.
+
 **`conflict-of-interest.disclose` (COMPLIANCE_OFFICER) — INSIDE THIS DEFERRAL, by the owner's
 ruling of 2026-09-29.** It is unreachable for the same reason (only surface is
 `/opportunities/[id]`; Compliance holds no `opportunity.read`, while PLACEMENT does and

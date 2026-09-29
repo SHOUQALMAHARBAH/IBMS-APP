@@ -203,3 +203,35 @@ same failure one level up. Ask what he opens first each morning and what he has 
 when he takes a payment.
 
 Raised from measurement 2026-09-29, deferred with the money work by the owner.
+
+### ١٤. هل تُصدَر وثيقة بقسط صفر أحيانًا؟ / Does a policy ever get issued with a ZERO premium?
+
+**ما الذي يقرره / What it decides.** **Two sibling writes on one concept disagree, and which one is
+wrong is a domain fact neither of us has.** Measured 2026-09-29 (item 5 batch 1):
+
+    quotation   `normalizeQuotationTerms` REFUSES a zero premium —
+                "premium must be greater than zero — a quotation with no premium is not a quote"
+    issuance    `recordIssuance` refuses only a NEGATIVE `issuedPremium`. Zero is accepted.
+
+And the zero does not merely sit there: `LossRatio.periodPremium` is
+`issuedPremium ?? requestedPremium`, so a zero ISSUED premium **wins** through `??` rather than falling
+back to the requested one — and `computeLossRatio` would then store `ratio = 0` standing in for "there is
+no ratio".
+
+**His answer decides which side changes.** Is a zero-premium issuance a real thing —
+a courtesy, an endorsement carrying no premium of its own, a temporary cover note issued while pricing is
+still being settled?
+
+  * **If YES** — the ISSUANCE path is right and the QUOTATION path is wrong: it must permit a zero premium,
+    and the loss-ratio computation needs to say "no ratio" rather than zero for that case.
+  * **If NO** — the issuance path is wrong and must refuse zero exactly as the quotation does, with the
+    same sentence, so the two stop disagreeing.
+
+**NOTHING IS BROKEN TODAY, and that is why this is a question rather than a defect.** Counted rather than
+inspected: **0 of 3 `LossRatio` rows on db-test and 0 on dev have `periodPremium = 0`**, and none is in
+the substituted state (premium 0 AND ratio 0). So this is a contradiction to close, **not data to repair**.
+`LossRatio` also stores `periodClaims` and `periodPremium` on the same row as `ratio`, so even if one
+appeared, a reader of the stored data could still tell 0/0 from a real zero.
+
+Raised from measurement 2026-09-29, deferred with the money work by the owner. Do not build either side
+before his answer — one of the two paths is wrong and guessing which changes a premium rule.
