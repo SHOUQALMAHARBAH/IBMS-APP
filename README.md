@@ -4357,15 +4357,28 @@ deliberately deferred.~~ **RESOLVED by the owner's rulings above** — `sla.poli
 `retention-case.manage` and `risk-register.manage` are measured NOT to need splitting; see `CLAUDE.md`
 for why. **Four-action has nothing open.**
 
-**Part 4 step 5 completed (2026-09-26): all twelve approve screens can carry a combined-duty reason.**
+**Part 4 step 5 COMPLETE (2026-09-29): all fifteen pairs show the declared act ON THE RECORD, and all twelve
+approve screens can carry a combined-duty reason.** The second half landed on 2026-09-29: a declared
+self-approval used to be visible only in the report at `/internal-controls`, so every record read as an ordinary
+two-person approval — the DPO-approved column said `yes`, the complaint said `CLOSED`, the classification said
+`MATERIAL`. `components/ui/CombinedDutyOnRecord.tsx` is the one renderer for all fifteen; the count is measured
+by `python scripts/measurements/combined-duty-projection.py` (15 of 15, 0 writing-and-showing-nobody) and that
+script keys on the CONSTRAINT rather than the table, because two tables carry two of these.
+Two tables need care: `NeedsAssessment` has two PAIRS (reviewer, approver) and `AccessRecertificationItem` has
+two RELATIONS for one pair (the arrangement and the decision) — neither may ever be collapsed into one field.
+
+**Part 4 step 5 first half (2026-09-26): all twelve approve screens can carry a combined-duty reason.**
 `components/ui/CombinedDutyReasonField.tsx` is ONE control for every pair — the field, the ten-character floor,
 and `needsCombinedDutyDeclaration`, the condition that decides whether to ask at all. It asks only when the
 office has declared COMBINED, the approver is the maker, and the second half is still unrecorded; what differs
 per screen is only which column names the maker. An ordinary two-person approval sends the body it always sent.
 `e2e/combined-duty-declaration.spec.ts` asserts both halves on the same row, and two plants
 (`never-asks-for-a-declaration`, `always-asks-for-a-declaration`) kill them independently. **This closes the
-window in which the mode was declarable and the screens could not carry a reason.** The one pair still unwired
-is `AccessRecertificationItem`, pending an owner decision; see `docs/duty-segregation-mode.md` step 5.
+window in which the mode was declarable and the screens could not carry a reason.** ~~The one pair still
+unwired is `AccessRecertificationItem`, pending an owner decision~~ — **FALSE SINCE 2026-09-27**, when the owner
+ruled Decision 1 Option 2: it is wired, with TWO records rather than one — the act on the ARRANGEMENT (she was
+set to review her own access, written when the cycle opened) and the act on the DECISION (she did, dated to the
+review). See `docs/decision-reviewing-your-own-access.md`.
 
 **Part 4 steps 4-5 (2026-09-26): `/settings/duty-segregation` is where an office declares whether it separates
 the two halves of an approval.** `duty-segregation.mode.declare` (OFFICE_ADMINISTRATOR alone) declares it;
@@ -4381,8 +4394,9 @@ approve screen knows whether to ask for a reason.
 The field is required only when the actor is also the maker AND the office has declared COMBINED mode, which no
 endpoint can set yet. Three pairs are enforced in application code with no database backstop
 (`PolicyChecking`'s issuing-officer belt, `ConflictOfInterestDisclosure.acknowledge`, and
-`NeedsAssessment.reject`), and `AccessRecertificationItem` is deliberately unwired pending an owner decision —
-all four stated in `docs/duty-segregation-mode.md`.
+`NeedsAssessment.reject`), ~~and `AccessRecertificationItem` is deliberately unwired pending an owner
+decision~~ — **that last clause is FALSE SINCE 2026-09-27**: the owner ruled, and it is wired. The three
+application-only pairs are still three, and all of them are stated in `docs/duty-segregation-mode.md`.
 
 - **`POST /refunds/:id/approve`** (`refund.approve`/**Manager or Finance** — seed row
   widened to `[MANAGER, FINANCE_COLLECTIONS_OFFICER]` per a `@code-reviewer` MINOR, since
