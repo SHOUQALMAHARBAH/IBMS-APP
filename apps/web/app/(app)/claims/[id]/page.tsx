@@ -24,6 +24,20 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
  * starts from the policy it is being raised against, and a notify form with no
  * policy in hand would have to make the user find one first. Notification
  * stays where the policy already is.
+ *
+ * ~~Notification stays where the policy already is.~~ **THAT SENTENCE POINTS AT A SCREEN THAT DOES NOT
+ * HAVE THE CONTROL.** Measured 2026-09-29 by `scripts/measurements/permission-reachability.py`: the only
+ * surface offering `claim.notify` is `/opportunities/[id]`, behind an `opportunity.read` a CLAIMS_OFFICER
+ * does not hold — and neither `/policies` nor `/policies/[id]` offers it either. So **a Claims Officer
+ * cannot raise a claim from anywhere they can navigate to**, and the reasoning above described an
+ * intention rather than a state.
+ *
+ * Left as a stated defect rather than fixed here, because the fix is not a line: `ClaimSection` is keyed
+ * on `opportunityId` and carries the whole claim lifecycle in nine capability props, so putting
+ * notification on the policy screen means either re-keying that component or extracting a notify-only
+ * control — and the form collects `estimatedLoss`, a monetary figure. Both are decisions. Raised for the
+ * owner with the measurement attached; do not quietly duplicate the claims UI on a second screen, which
+ * is the thing the paragraph above this one exists to prevent.
  */
 export default function ClaimDetailPage() {
   const router = useRouter();

@@ -86,7 +86,13 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
     labelKey: 'navGroupClients',
     items: [
       { href: '/customers', labelKey: 'navCustomers', permissions: ['customer.360-view.read'] },
-      { href: '/crm', labelKey: 'navCrm', permissions: ['customer.360-view.read'] },
+      // EITHER code, because the screen serves two audiences and already says so: `crm/page.tsx`
+      // deliberately tolerates a 403 on the 360° view — "a role that holds `interaction.log` but not
+      // `customer.360-view.read` still logs interactions here". Gated on the read alone, the nav hid the
+      // screen from the three roles it was WRITTEN for (Claims, Finance, Placement officers), who hold
+      // `interaction.log` and not the 360° read. `hasAnyPermission` is an OR, so this is one line.
+      // Measured by `scripts/measurements/permission-reachability.py`.
+      { href: '/crm', labelKey: 'navCrm', permissions: ['customer.360-view.read', 'interaction.log'] },
       { href: '/customers/kyc-queue', labelKey: 'navKycQueue', permissions: ['customer.360-view.read'] },
       { href: '/cross-sell', labelKey: 'navCrossSell', permissions: ['cross-sell.read'] },
       { href: '/up-sell', labelKey: 'navUpSell', permissions: ['up-sell.read'] },
