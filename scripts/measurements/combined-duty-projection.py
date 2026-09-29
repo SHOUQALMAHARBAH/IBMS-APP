@@ -59,6 +59,7 @@ BY_ARGUMENT = {
     'policy.checking.combinedDutyAct': 'PolicyChecking',
     'row.closureCombinedDutyAct': 'DataSubjectRequest',
     'row.combinedDutyAct': 'CommissionLedgerEntry',
+    's.combinedDutyAct': 'Settlement',
 }
 
 

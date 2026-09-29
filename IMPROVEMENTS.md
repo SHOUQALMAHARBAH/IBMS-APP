@@ -20,10 +20,34 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Reading `setting \|\| unit` and spotting `"5242888kB"` (§ 1.32) | `SHOW`, or separate columns, which cannot concatenate |
 | Reading a character class to check its ranges (§ 1.34) | Decoding it and diffing against the intended set |
 | Remembering that a guard covers only one directory (§ 1.34) | A sanity test that fails when a root moves |
+| Believing a published count because it was carefully derived | A `--self-test` that plants each column's condition and fails unless the number moves (§ 1.79) |
 
 The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
 THE SAME, and only care separates them. Care is not a control — it is the thing that was
 already being applied when the defect got in.
+
+## The standing rule for every number this file publishes
+
+> **A figure that cannot be moved by a plant is published as an ESTIMATE, and says so.**
+
+Owner's rule, 2026-09-29, after "writes the column" was read as "reads the relation" three times
+and writing the lesson down had not worked. Before a count goes in a report, plant the condition
+it claims to detect and confirm it moves — the instrument already used on guards (the
+nav-reachability check reported 0 findings until a plant proved it vacuous), turned on published
+columns.
+
+Two things learned implementing it, both worth more than the rule itself:
+
+- **The report and the self-test must share ONE measurement seam.** A self-test over a parallel
+  implementation certifies the parallel implementation: it looks like rigour and proves nothing.
+  `combined-duty-projection.py` routes both through `measure(sources)` for that reason, and
+  mutates sources IN MEMORY so a failing self-test cannot leave the tree dirty.
+- **The plant must assert its own anchor.** `planted()` refuses when the text it expects is
+  absent, so a self-test cannot pass quietly against code that moved — § 1.51(a)'s shape, one
+  level up.
+
+**An estimate labelled as an estimate costs nothing. A count that was never planted, presented as
+a count, is what this file has repeatedly paid for.**
 
 ---
 

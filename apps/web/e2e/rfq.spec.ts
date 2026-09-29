@@ -1051,6 +1051,9 @@ async function mockRfqApi(
           brokerProcessedPayment: broker,
           approvedByUserId: "user-1",
           secondApproverUserId: null,
+          // The endpoint returns this now. Null through this whole flow: `user-1` records the
+          // settlement and `user-2` gives the second approval, which is the ordinary two-person case.
+          combinedDutyAct: null,
         };
         if (!broker && approved < 25000) {
           const from = row.status as string;

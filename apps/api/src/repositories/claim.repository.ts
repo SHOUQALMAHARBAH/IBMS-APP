@@ -49,7 +49,12 @@ const CLAIM_INCLUDE = {
   // Process 27 — the insurer non-response follow-up alerts, newest first.
   followUpAlerts: { orderBy: { triggeredAt: 'desc' } },
   // Process 28 — the one settlement record (four figures + maker/checker), or null.
-  settlement: true,
+  //
+  // With its combined-duty act, so a reader of the claim can see that ONE person both recorded the
+  // settlement and gave the mandatory second approval. Part 4 step 5. The WRITE side was already
+  // wired here — `ClaimCard.tsx` renders a `CombinedDutyReasonField` for that approval — so this is
+  // the read half alone.
+  settlement: { include: { combinedDutyAct: true } },
   policy: {
     select: {
       id: true,

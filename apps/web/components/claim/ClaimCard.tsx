@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   attachClaimDocuments,
@@ -655,6 +656,15 @@ function ClaimSettlement({
           {s.settled ? ' · settled' : ''}
         </p>
       ) : null}
+
+      {/* Part 4 step 5 — the line above prints ` · second-approved`, which is only true of a
+          TWO-person approval. Without this a settlement approved twice by the same person read as
+          two people. Shared renderer, so the sentence matches the refund, the policy check, the DSR
+          and the commission override. */}
+      <CombinedDutyOnRecord
+        act={s?.combinedDutyAct}
+        testId={`combined-duty-settlement-${claim.id}`}
+      />
 
       {!s &&
       canSettle &&

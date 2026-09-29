@@ -1,4 +1,9 @@
 import { Prisma } from '@ibms/db';
+import type { CombinedDutyAct } from '@ibms/db';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 import type { ClaimStatus } from '@ibms/db';
 import {
   compareMoney,
@@ -756,6 +761,16 @@ export interface SettlementView {
   brokerProcessedPayment: boolean;
   approvedByUserId: string | null;
   secondApproverUserId: string | null;
+  /**
+   * Set when ONE person both recorded this settlement and gave the mandatory second approval, in an
+   * office that declared COMBINED duty segregation and stated why. Null on every ordinary settlement.
+   *
+   * `Settlement_maker_checker_distinct` normally forbids it, and the second approval exists at all
+   * because this is where a claim payment leaves the office. `approvedByUserId` and
+   * `secondApproverUserId` being equal is visible only to somebody who compares two uuids — Part 4
+   * step 5 puts it on the record instead.
+   */
+  combinedDutyAct: CombinedDutyActView | null;
   /** Re-derived from `approvedAmount` + `brokerProcessedPayment` (NOT
    * `Claim.isLargeClaim`). */
   secondApproverRequired: boolean;
@@ -781,6 +796,9 @@ export function deriveSettlementView(input: {
     brokerProcessedPayment: boolean;
     approvedByUserId: string | null;
     secondApproverUserId: string | null;
+    /** The relation is `combinedDutyAct` here — but the name is per CONSTRAINT and not uniform across
+     *  the fifteen (the DSR's is `closureCombinedDutyAct`). Read it off the schema per pair. */
+    combinedDutyAct: CombinedDutyAct | null;
     clientPaymentConfirmedAt: Date | null;
     createdAt: Date;
   } | null;
@@ -795,6 +813,7 @@ export function deriveSettlementView(input: {
     brokerProcessedPayment: s.brokerProcessedPayment,
     approvedByUserId: s.approvedByUserId,
     secondApproverUserId: s.secondApproverUserId,
+    combinedDutyAct: combinedDutyActView(s.combinedDutyAct),
     secondApproverRequired: s.approvedAmount
       ? isSecondApproverRequired({
           approvedAmount: s.approvedAmount,

@@ -13,6 +13,7 @@
 // receipt is confirmed (-> CLOSED, triggering a Loss Ratio recompute).
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 import type { Paginated } from '../api/paginated';
 import type { DiscardBlock } from '../discard/discard-api';
 
@@ -139,6 +140,14 @@ export interface Claim {
     brokerProcessedPayment: boolean;
     approvedByUserId: string | null;
     secondApproverUserId: string | null;
+    /**
+     * Set when ONE person both recorded this settlement and gave the mandatory second approval, in an
+     * office that declared COMBINED duty segregation and stated why. Null on every ordinary one.
+     *
+     * The card prints ` · second-approved` once an approver exists, and that claim is only true of a
+     * two-person approval — the same half-truth the commission override had.
+     */
+    combinedDutyAct: CombinedDutyActOnRecord | null;
     secondApproverRequired: boolean;
     settled: boolean;
     clientPaymentConfirmedAt: string | null;
