@@ -5270,11 +5270,23 @@ session: **`apps/api`'s lint script is `eslint … --fix`, so running it MUTATES
 had just had to split a prettier sweep out of a feature commit because of exactly that. So I became wary
 of a gate that edits, and the gate I avoided is the only one that could see the error.
 
-**A verification gate that has a side effect will be avoided, and then it is not a gate.** The honest
-fix is to give the api a non-mutating lint for verification and keep `--fix` as a separate script — not
-to remember harder to run a command that rewrites the tree. Recorded here rather than done in the same
-commit as a projection: changing a package's lint script affects every future run and belongs on its
-own.
+**A verification gate that has a side effect will be avoided, and then it is not a gate.**
+
+**DONE 2026-09-29**, on the owner's instruction that it goes before any further feature work — because
+until the gate stops mutating, it keeps being skipped, and that was the root of what got through in two
+consecutive stretches. `apps/api` now has:
+
+    "lint":     eslint "{src,apps,libs,test}/**/*.ts"          <- verification, no --fix
+    "lint:fix": eslint "{src,apps,libs,test}/**/*.ts" --fix    <- the mutating one, named as such
+
+`apps/web`'s was already non-mutating and `packages/db` has none, so `api` was the only one. CI calls
+`turbo run lint --filter=api...` and `verify.sh` calls `npm run lint`, both of which resolve to the
+verifying script now — neither needed changing.
+
+**PROVEN BOTH WAYS, rather than assumed**: a formatting violation was planted that `--fix` repairs,
+then the file's md5 was compared before and after each script. `lint` left it byte-identical; `lint:fix`
+changed it and restored the file exactly. **The complement matters as much as the property** — a split
+that made `lint` safe by making `lint:fix` useless would have passed a one-sided check.
 
 #### AND A FOURTH RED, WITH TWO CAUSES AND ONE OF THEM A CASCADE
 
