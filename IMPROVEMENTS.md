@@ -5333,7 +5333,7 @@ then the file's md5 was compared before and after each script. `lint` left it by
 changed it and restored the file exactly. **The complement matters as much as the property** — a split
 that made `lint` safe by making `lint:fix` useless would have passed a one-sided check.
 
-#### THE GUARD IS **UNPROVEN** UNTIL A PLANT SAYS OTHERWISE
+#### THE GUARD, PROVEN BY A PLANT — it was UNPROVEN and is no longer
 
 Labelled here the way `dormant` is labelled an estimate, because the owner asked the right question
 about it: **the guard exists and has never been observed working.**
@@ -5345,11 +5345,21 @@ neighbouring steps carrying `if: ${{ !cancelled() }}` DID run through that red w
 skipped. The guard adds exactly their condition — evidence from observed behaviour on the same run, not
 a claim that this line has fired.
 
-**Being planted on `throwaway/prove-chromium-guard` (PR #26, not for merge)**: the acknowledgement list
-is emptied so `test:security` exits 1 exactly as it did on `decbcad`, and the step list will say whether
-step 21 still runs. Verified locally first — the plant reproduces the identical
-`1 unacknowledged advisory` failure. A branch push alone runs no CI here (`ci.yml` triggers on
-`push: [main]` and `pull_request`), which is why it needs a PR.
+**PLANTED AND PROVEN, 2026-09-29** — `throwaway/prove-chromium-guard`, PR #26, not for merge. The
+acknowledgement list was emptied so `test:security` exits 1 exactly as it did on `decbcad` (verified
+locally first: the identical `1 unacknowledged advisory` failure). The step list is the answer:
+
+    decbcad — WITHOUT the guard          throwaway plant — WITH the guard
+    ────────────────────────────         ────────────────────────────────
+     9  Security tests    failure         9  Security tests    FAILURE
+    20  Seed database     success        20  Seed database     success
+    21  Install Chromium  SKIPPED        21  Install Chromium  SUCCESS   <- the guard firing
+    22  Integration tests failure        22  Integration tests (runs with a browser)
+
+**Same red at step 9, opposite outcome at step 21.** The guard is no longer an unproven negative: it has
+been observed doing the thing it was added for, against the real failure mode rather than a synthetic
+one. A branch push alone runs no CI here (`ci.yml` triggers on `push: [main]` and `pull_request`), which
+is why the plant needed a PR — closed and the branch deleted once read.
 
 #### AND A FOURTH RED, WITH TWO CAUSES AND ONE OF THEM A CASCADE
 
