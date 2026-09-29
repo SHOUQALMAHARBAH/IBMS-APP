@@ -1,15 +1,16 @@
-'use client';
+"use client";
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import type { IncidentSeverity } from '../../../lib/compliance-risk/incident-api';
-import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../lib/auth/auth-context';
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import type { IncidentSeverity } from "../../../lib/compliance-risk/incident-api";
+import { ENUM_LABEL } from "../../../lib/i18n/enum-labels";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../../../lib/auth/auth-context";
+import { CombinedDutyOnRecord } from "../../../components/ui/CombinedDutyOnRecord";
 import {
   CombinedDutyReasonField,
   combinedDutyTooShort,
   needsCombinedDutyDeclaration,
-} from '../../../components/ui/CombinedDutyReasonField';
+} from "../../../components/ui/CombinedDutyReasonField";
 import {
   assessIncidentImpact,
   classifyIncident,
@@ -25,42 +26,42 @@ import {
   notifyIncidentSeniorManagement,
   recoverIncident,
   type IncidentReport,
-} from '../../../lib/compliance-risk/incident-api';
-import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
-import { hasAnyPermission } from '../../../lib/auth/permissions';
-import { useLanguage } from '../../../lib/i18n/language-context';
+} from "../../../lib/compliance-risk/incident-api";
+import { ApiError } from "../../../lib/auth/api-client";
+import { errorStyle } from "../../../components/auth/auth-form.styles";
+import { pageStyle } from "../../../components/lead/lead.styles";
+import { hasAnyPermission } from "../../../lib/auth/permissions";
+import { useLanguage } from "../../../lib/i18n/language-context";
 
-const REPORT_ROLES = [
-  'incident.report',
-];
-const CONTAIN_ROLES = [
-  'incident.contain',
-];
-const CLASSIFY_ROLES = [
-  'incident.classify',
-];
-const CO_SIGN_ROLES = [
-  'incident.classification.co-sign',
-];
-const NOTIFY_SENIOR_ROLES = [
-  'incident.senior-management.notify',
-];
-const NOTIFY_REGULATOR_ROLES = [
-  'incident.notify-regulator',
-];
+const REPORT_ROLES = ["incident.report"];
+const CONTAIN_ROLES = ["incident.contain"];
+const CLASSIFY_ROLES = ["incident.classify"];
+const CO_SIGN_ROLES = ["incident.classification.co-sign"];
+const NOTIFY_SENIOR_ROLES = ["incident.senior-management.notify"];
+const NOTIFY_REGULATOR_ROLES = ["incident.notify-regulator"];
 
 const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
+  padding: "0.4rem 0.75rem",
+  borderBottom: "1px solid var(--border-subtle)",
+  textAlign: "start",
+  verticalAlign: "top",
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
-
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: "2px solid var(--border-default)",
+};
+const formStyle: CSSProperties = {
+  margin: "1rem 0",
+  display: "grid",
+  gap: "0.4rem",
+  maxWidth: "30rem",
+};
+const labelStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.2rem",
+};
 
 export default function IncidentsPage() {
   const router = useRouter();
@@ -90,14 +91,18 @@ export default function IncidentsPage() {
   // Part 4 — the combined-duty reason, keyed by incident so two rows cannot share one box.
   const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [severity, setSeverity] = useState<IncidentSeverity>(
     INCIDENT_SEVERITIES[2],
   );
 
-  const [rootCauseDrafts, setRootCauseDrafts] = useState<Record<string, string>>({});
-  const [regulatorDrafts, setRegulatorDrafts] = useState<Record<string, string[]>>({});
+  const [rootCauseDrafts, setRootCauseDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [regulatorDrafts, setRegulatorDrafts] = useState<
+    Record<string, string[]>
+  >({});
 
   const load = useCallback(async () => {
     try {
@@ -107,16 +112,16 @@ export default function IncidentsPage() {
       setIncidents(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('incNoPermission')
+          ? t("incNoPermission")
           : err instanceof ApiError
             ? err.message
-            : t('incLoadError'),
+            : t("incLoadError"),
       );
     }
   }, [t]);
 
   useEffect(() => {
-    if (!isLoading && !user) router.push('/login');
+    if (!isLoading && !user) router.push("/login");
   }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
@@ -132,7 +137,9 @@ export default function IncidentsPage() {
       await fn();
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('incActionError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t("incActionError"),
+      );
     } finally {
       setBusy(false);
     }
@@ -142,8 +149,8 @@ export default function IncidentsPage() {
     ev.preventDefault();
     await run(async () => {
       await createIncident({ title, description, severity });
-      setTitle('');
-      setDescription('');
+      setTitle("");
+      setDescription("");
     });
   }
 
@@ -161,10 +168,8 @@ export default function IncidentsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>{t('incHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('incIntro')}
-      </p>
+      <h1>{t("incHeading")}</h1>
+      <p style={{ opacity: 0.75, maxWidth: "46rem" }}>{t("incIntro")}</p>
 
       {actionError ? (
         <p role="alert" style={errorStyle}>
@@ -180,27 +185,27 @@ export default function IncidentsPage() {
       {canReport ? (
         <form onSubmit={submit} style={formStyle}>
           <label style={labelStyle}>
-            {t('incTitleFieldLabel')}
+            {t("incTitleFieldLabel")}
             <input
-              aria-label={t('incTitleLabel')}
+              aria-label={t("incTitleLabel")}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
             />
           </label>
           <label style={labelStyle}>
-            {t('incDescriptionLabel')}
+            {t("incDescriptionLabel")}
             <input
-              aria-label={t('incDescriptionLabel')}
+              aria-label={t("incDescriptionLabel")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
             />
           </label>
           <label style={labelStyle}>
-            {t('incColSeverity')}
+            {t("incColSeverity")}
             <select
-              aria-label={t('incColSeverity')}
+              aria-label={t("incColSeverity")}
               value={severity}
               onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
             >
@@ -212,21 +217,21 @@ export default function IncidentsPage() {
             </select>
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? t('incSavingButton') : t('incReportButton')}
+            {busy ? t("incSavingButton") : t("incReportButton")}
           </button>
         </form>
       ) : null}
 
       {incidents ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', minWidth: '70rem' }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", minWidth: "70rem" }}>
             <thead>
               <tr>
-                <th style={head}>{t('incColTitle')}</th>
-                <th style={head}>{t('incColSeverity')}</th>
-                <th style={head}>{t('incColStatus')}</th>
-                <th style={head}>{t('incColClassification')}</th>
-                <th style={head}>{t('incColAction')}</th>
+                <th style={head}>{t("incColTitle")}</th>
+                <th style={head}>{t("incColSeverity")}</th>
+                <th style={head}>{t("incColStatus")}</th>
+                <th style={head}>{t("incColClassification")}</th>
+                <th style={head}>{t("incColAction")}</th>
               </tr>
             </thead>
             <tbody>
@@ -235,111 +240,173 @@ export default function IncidentsPage() {
                   <td style={cell}>{inc.title}</td>
                   <td style={cell}>
                     {t(ENUM_LABEL.IncidentSeverity[inc.severity])}
-                    {inc.isContainmentOverdue ? ' (containment overdue)' : ''}
+                    {inc.isContainmentOverdue ? " (containment overdue)" : ""}
                   </td>
-                  <td style={cell}>{t(ENUM_LABEL.IncidentStatus[inc.status])}</td>
-                  <td style={cell}>{t(ENUM_LABEL.IncidentClassification[inc.classification])}</td>
                   <td style={cell}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '20rem' }}>
-                      {canContain && inc.status === 'REPORTED' ? (
-                        <button type="button" disabled={busy} onClick={() => void run(() => containIncident(inc.id))}>
-                          {t('incContainButton')}
+                    {t(ENUM_LABEL.IncidentStatus[inc.status])}
+                  </td>
+                  <td style={cell}>
+                    {t(ENUM_LABEL.IncidentClassification[inc.classification])}
+                    {/*
+                      Part 4 step 5. The classification reads MATERIAL whether the DPO's judgement was
+                      co-signed by somebody else or by the DPO herself, so without this the cell cannot
+                      distinguish them — on the decision that starts the statutory notification clock.
+                    */}
+                    <CombinedDutyOnRecord
+                      act={inc.classificationCombinedDutyAct}
+                      testId={`combined-duty-incident-${inc.id}`}
+                    />
+                  </td>
+                  <td style={cell}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.3rem",
+                        minWidth: "20rem",
+                      }}
+                    >
+                      {canContain && inc.status === "REPORTED" ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => containIncident(inc.id))
+                          }
+                        >
+                          {t("incContainButton")}
                         </button>
                       ) : null}
-                      {canContain && inc.status === 'CONTAINED' ? (
-                        <button type="button" disabled={busy} onClick={() => void run(() => assessIncidentImpact(inc.id))}>
-                          {t('incAssessButton')}
+                      {canContain && inc.status === "CONTAINED" ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => assessIncidentImpact(inc.id))
+                          }
+                        >
+                          {t("incAssessButton")}
                         </button>
                       ) : null}
-                      {canClassify && inc.status === 'IMPACT_ASSESSED' ? (
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                      {canClassify && inc.status === "IMPACT_ASSESSED" ? (
+                        <div style={{ display: "flex", gap: "0.3rem" }}>
                           <button
                             type="button"
                             disabled={busy}
-                            onClick={() => void run(() => classifyIncident(inc.id, 'MATERIAL'))}
+                            onClick={() =>
+                              void run(() =>
+                                classifyIncident(inc.id, "MATERIAL"),
+                              )
+                            }
                           >
-                            {t('incClassifyMaterialButton')}
+                            {t("incClassifyMaterialButton")}
                           </button>
                           <button
                             type="button"
                             disabled={busy}
-                            onClick={() => void run(() => classifyIncident(inc.id, 'NON_MATERIAL'))}
+                            onClick={() =>
+                              void run(() =>
+                                classifyIncident(inc.id, "NON_MATERIAL"),
+                              )
+                            }
                           >
-                            {t('incClassifyNonMaterialButton')}
+                            {t("incClassifyNonMaterialButton")}
                           </button>
                         </div>
                       ) : null}
                       {canCoSign &&
-                      inc.status === 'CLASSIFIED' &&
-                      inc.classification === 'MATERIAL' &&
-                      !inc.seniorManagementCoSignUserId ? (
-                        (() => {
-                          // Part 4 — the DPO who classified it may also co-sign, in an office that has
-                          // declared COMBINED, only by saying why. Every other case is unchanged: no field,
-                          // no extra click.
-                          const needs = needsCombinedDutyDeclaration({
-                            mode: user.dutySegregationMode,
-                            makerUserId: inc.classifiedByDpoUserId,
-                            currentUserId: user.id,
-                            alreadyDecided: Boolean(
-                              inc.seniorManagementCoSignUserId,
-                            ),
-                          });
-                          const declaration = declarations[inc.id] ?? '';
-                          return (
-                            <>
-                              {needs ? (
-                                <CombinedDutyReasonField
-                                  id={inc.id}
-                                  value={declaration}
-                                  onChange={(next) =>
-                                    setDeclarations((prev) => ({
-                                      ...prev,
-                                      [inc.id]: next,
-                                    }))
+                      inc.status === "CLASSIFIED" &&
+                      inc.classification === "MATERIAL" &&
+                      !inc.seniorManagementCoSignUserId
+                        ? (() => {
+                            // Part 4 — the DPO who classified it may also co-sign, in an office that has
+                            // declared COMBINED, only by saying why. Every other case is unchanged: no field,
+                            // no extra click.
+                            const needs = needsCombinedDutyDeclaration({
+                              mode: user.dutySegregationMode,
+                              makerUserId: inc.classifiedByDpoUserId,
+                              currentUserId: user.id,
+                              alreadyDecided: Boolean(
+                                inc.seniorManagementCoSignUserId,
+                              ),
+                            });
+                            const declaration = declarations[inc.id] ?? "";
+                            return (
+                              <>
+                                {needs ? (
+                                  <CombinedDutyReasonField
+                                    id={inc.id}
+                                    value={declaration}
+                                    onChange={(next) =>
+                                      setDeclarations((prev) => ({
+                                        ...prev,
+                                        [inc.id]: next,
+                                      }))
+                                    }
+                                  />
+                                ) : null}
+                                <button
+                                  type="button"
+                                  disabled={
+                                    busy ||
+                                    (needs && combinedDutyTooShort(declaration))
                                   }
-                                />
-                              ) : null}
-                              <button
-                                type="button"
-                                disabled={
-                                  busy ||
-                                  (needs && combinedDutyTooShort(declaration))
-                                }
-                                onClick={() =>
-                                  void run(() =>
-                                    coSignIncident(
-                                      inc.id,
-                                      needs ? declaration.trim() : undefined,
-                                    ),
-                                  )
-                                }
-                              >
-                                {t('incCoSignButton')}
-                              </button>
-                            </>
-                          );
-                        })()
-                      ) : null}
+                                  onClick={() =>
+                                    void run(() =>
+                                      coSignIncident(
+                                        inc.id,
+                                        needs ? declaration.trim() : undefined,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  {t("incCoSignButton")}
+                                </button>
+                              </>
+                            );
+                          })()
+                        : null}
                       {canNotifySenior &&
-                      inc.classification === 'MATERIAL' &&
+                      inc.classification === "MATERIAL" &&
                       !inc.seniorManagementNotifiedAt ? (
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => void run(() => notifyIncidentSeniorManagement(inc.id))}
+                          onClick={() =>
+                            void run(() =>
+                              notifyIncidentSeniorManagement(inc.id),
+                            )
+                          }
                         >
-                          {t('incNotifySeniorButton')}
+                          {t("incNotifySeniorButton")}
                         </button>
                       ) : null}
-                      {canNotifyRegulators && inc.status === 'CLASSIFIED' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {canNotifyRegulators && inc.status === "CLASSIFIED" ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.2rem",
+                          }}
+                        >
                           {INCIDENT_REGULATORS.map((r) => (
-                            <label key={r} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                            <label
+                              key={r}
+                              style={{
+                                display: "flex",
+                                gap: "0.3rem",
+                                alignItems: "center",
+                              }}
+                            >
                               <input
                                 type="checkbox"
-                                aria-label={t('incNotifyRoleAria', { role: r, id: inc.id })}
-                                checked={(regulatorDrafts[inc.id] ?? []).includes(r)}
+                                aria-label={t("incNotifyRoleAria", {
+                                  role: r,
+                                  id: inc.id,
+                                })}
+                                checked={(
+                                  regulatorDrafts[inc.id] ?? []
+                                ).includes(r)}
                                 onChange={() => toggleRegulator(inc.id, r)}
                               />
                               {r}
@@ -347,57 +414,81 @@ export default function IncidentsPage() {
                           ))}
                           <button
                             type="button"
-                            disabled={busy || (regulatorDrafts[inc.id] ?? []).length === 0}
+                            disabled={
+                              busy ||
+                              (regulatorDrafts[inc.id] ?? []).length === 0
+                            }
                             onClick={() =>
                               void run(() =>
-                                notifyIncidentRegulators(inc.id, regulatorDrafts[inc.id] ?? []),
+                                notifyIncidentRegulators(
+                                  inc.id,
+                                  regulatorDrafts[inc.id] ?? [],
+                                ),
                               )
                             }
                           >
-                            {t('incNotifyRegulatorsButton')}
+                            {t("incNotifyRegulatorsButton")}
                           </button>
                         </div>
                       ) : null}
                       {canNotifyRegulators &&
-                      inc.classification !== 'NOT_YET_CLASSIFIED' &&
+                      inc.classification !== "NOT_YET_CLASSIFIED" &&
                       !inc.affectedDataSubjectsNotifiedAt ? (
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => void run(() => notifyIncidentAffectedSubjects(inc.id))}
+                          onClick={() =>
+                            void run(() =>
+                              notifyIncidentAffectedSubjects(inc.id),
+                            )
+                          }
                         >
-                          {t('incNotifySubjectsButton')}
+                          {t("incNotifySubjectsButton")}
                         </button>
                       ) : null}
-                      {canContain && inc.status === 'NOTIFIED' ? (
-                        <button type="button" disabled={busy} onClick={() => void run(() => recoverIncident(inc.id))}>
-                          {t('incRecoverButton')}
+                      {canContain && inc.status === "NOTIFIED" ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => recoverIncident(inc.id))
+                          }
+                        >
+                          {t("incRecoverButton")}
                         </button>
                       ) : null}
-                      {canContain && inc.status === 'RECOVERED' ? (
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                      {canContain && inc.status === "RECOVERED" ? (
+                        <div style={{ display: "flex", gap: "0.3rem" }}>
                           <input
-                            aria-label={t('incRootCauseAria', { id: inc.id })}
-                            placeholder={t('incRootCauseLabel')}
-                            value={rootCauseDrafts[inc.id] ?? ''}
+                            aria-label={t("incRootCauseAria", { id: inc.id })}
+                            placeholder={t("incRootCauseLabel")}
+                            value={rootCauseDrafts[inc.id] ?? ""}
                             onChange={(e) =>
-                              setRootCauseDrafts((d) => ({ ...d, [inc.id]: e.target.value }))
+                              setRootCauseDrafts((d) => ({
+                                ...d,
+                                [inc.id]: e.target.value,
+                              }))
                             }
                           />
                           <button
                             type="button"
-                            disabled={busy || !(rootCauseDrafts[inc.id] ?? '').trim()}
+                            disabled={
+                              busy || !(rootCauseDrafts[inc.id] ?? "").trim()
+                            }
                             onClick={() =>
                               void run(() =>
-                                closeIncident(inc.id, (rootCauseDrafts[inc.id] ?? '').trim()),
+                                closeIncident(
+                                  inc.id,
+                                  (rootCauseDrafts[inc.id] ?? "").trim(),
+                                ),
                               )
                             }
                           >
-                            {t('incCloseButton')}
+                            {t("incCloseButton")}
                           </button>
                         </div>
                       ) : null}
-                      {inc.status === 'CLOSED' ? '—' : null}
+                      {inc.status === "CLOSED" ? "—" : null}
                     </div>
                   </td>
                 </tr>
@@ -409,7 +500,7 @@ export default function IncidentsPage() {
         // The loading state directive §2 requires; this page rendered
         // nothing at all while fetching. Guarded on loadError so an error
         // and a "Loading…" line never appear together.
-        <p>{t('incLoading')}</p>
+        <p>{t("incLoading")}</p>
       )}
     </main>
   );

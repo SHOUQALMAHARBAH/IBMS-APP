@@ -31,6 +31,7 @@ function row(overrides: Partial<IncidentReportRow> = {}): IncidentReportRow {
     rootCauseAnalysis: null,
     recoveredAt: null,
     closedAt: null,
+    classificationCombinedDutyAct: null,
     ...overrides,
   };
 }

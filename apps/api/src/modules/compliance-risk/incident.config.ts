@@ -1,3 +1,8 @@
+import type { CombinedDutyAct } from '@ibms/db';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 import type { IncidentClassification, IncidentStatus, Prisma } from '@ibms/db';
 
 /**
@@ -99,6 +104,7 @@ export interface IncidentReportRow {
   rootCauseAnalysis: string | null;
   recoveredAt: Date | null;
   closedAt: Date | null;
+  classificationCombinedDutyAct: CombinedDutyAct | null;
 }
 
 export interface IncidentReportView {
@@ -113,6 +119,11 @@ export interface IncidentReportView {
   classification: string;
   classifiedByDpoUserId: string | null;
   seniorManagementCoSignUserId: string | null;
+  /**
+   * Part 4 step 5 — present when ONE person both classified the incident and co-signed that
+   * classification, in an office that declared COMBINED. The co-sign stamp reads as filled either way.
+   */
+  classificationCombinedDutyAct: CombinedDutyActView | null;
   seniorManagementNotifiedAt: string | null;
   notifiedRegulators: string[];
   notifiedAt: string | null;
@@ -142,6 +153,9 @@ export function deriveIncidentReportView(
     classification: row.classification,
     classifiedByDpoUserId: row.classifiedByDpoUserId,
     seniorManagementCoSignUserId: row.seniorManagementCoSignUserId,
+    classificationCombinedDutyAct: combinedDutyActView(
+      row.classificationCombinedDutyAct,
+    ),
     seniorManagementNotifiedAt: row.seniorManagementNotifiedAt
       ? row.seniorManagementNotifiedAt.toISOString()
       : null,

@@ -5,12 +5,14 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { IncidentReport } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { IncidentRepository } from '../../repositories/incident.repository';
+import {
+  IncidentRepository,
+  type IncidentReportWithAct,
+} from '../../repositories/incident.repository';
 import {
   deriveIncidentReportView,
   incidentReportAuditSnapshot,
@@ -553,7 +555,7 @@ export class IncidentService {
 
   // --- helpers -------------------------------------------------
 
-  private async load(id: string): Promise<IncidentReport> {
+  private async load(id: string): Promise<IncidentReportWithAct> {
     const incident = await this.repo.findById(id);
     if (!incident) {
       throw new NotFoundException(`Incident report ${id} not found.`);

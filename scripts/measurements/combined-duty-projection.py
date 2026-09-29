@@ -73,6 +73,10 @@ BY_CALL_SITE = {
     # single-row handlers and once for the list. KYC is the other module shaped this way (§ 1.80).
     ('data-processing-agreement.controller.ts', 'row.combinedDutyAct'): 'DataProcessingAgreement',
     ('complaint.config.ts', 'row.closureCombinedDutyAct'): 'Complaint',
+    (
+        'incident.config.ts',
+        'row.classificationCombinedDutyAct',
+    ): 'IncidentReport',
 }
 
 
