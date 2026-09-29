@@ -5243,6 +5243,51 @@ model any more.
 **Projecting: 6 of 15.**
 
 
+### 1.82 `P1` — A SECURITY ACKNOWLEDGEMENT RESTED ON A REACHABILITY CLAIM THAT MY OWN WORK MADE FALSE
+
+> **FOR THE OWNER'S DECISION. The acknowledgement is deliberately left IN FORCE and unchanged** —
+> removing it would turn a security judgement into a side effect of a documentation fix, and
+> re-justifying it on a new basis would be making that judgement without being asked.
+
+`scripts/audit-check.mjs` accepts four high-severity **multer** DoS advisories
+(`GHSA-wc9g-mqfw-jrwm` and three siblings) on two stated grounds. One holds. The other has been false
+for sixteen days, and **my own work is what made it consequential.**
+
+    2026-09-09  ac8e8d4  acknowledgement written: "no FileInterceptor, no @UploadedFile and no upload
+                         endpoint anywhere in apps/api/src"  — TRUE when written
+    2026-09-13  e6eec0e  the bulk-import route added, WITH a FileInterceptor — the claim became false
+                         four days later, and nothing re-checked it
+    2026-09-28  403b8e7  I GAVE THAT ROUTE A WEB CALLER — existing-but-unreachable became reachable
+                         from the UI by two administrator roles
+
+**The other half still holds, re-verified rather than assumed**: multer 2.4.0 exists, and
+`npm update multer` leaves 2.2.0 in place because `@nestjs/platform-express` hard-pins it. Worth trying,
+because `npm update` moved `fast-uri` where a root `overrides` entry would not — **it does not move this
+one**, so "no upgrade path" is still an accurate statement.
+
+**What the risk actually is now**, measured so the owner can decide rather than infer: the route is gated
+on `customer.bulk-import` (two administrator roles), requires an authenticated session, and caps the
+upload at `limits: { fileSize: LEGACY_IMPORT_MAX_BYTES, files: 1 }`. So the exposure is a DoS **by an
+authenticated administrator** against a size-bounded single-file endpoint — not an unauthenticated one.
+That is a materially smaller claim than the advisories' own, and a materially larger one than
+"unreachable".
+
+**Corrected in place with the original struck through**, per the doc-currency rule: the original
+reasoning is what explains why four high advisories were accepted, so deleting it would remove the
+evidence along with the error.
+
+#### Why this is the doc-rot class at its highest stakes
+
+A claim true when written, invalidated by a later commit, nothing re-checking it — and the thing it
+justifies is **accepting four security advisories**. The acknowledgement even carries its own
+re-check instruction (*"Re-check the moment a real document-upload endpoint is built"*), and that
+instruction was not followed when exactly that happened four days later. **A re-check condition written
+into a comment is not a control**; what would have caught it is a test asserting that the reachability
+claim is still true — `grep -r 'FileInterceptor' apps/api/src` returning nothing is one line.
+
+**And it was found by accident**: the CI-guard plant needed a way to force the audit step red, which
+meant reading the acknowledgement the plant would have to defeat. Nothing was looking for it.
+
 ### 1.81 — THREE CONSECUTIVE RED CI RUNS, ONE CAUSE, AND I REPORTED NONE OF THEM
 
 The owner asked where CI stood after two reports that did not say. She had seen the backend red on her
@@ -5287,6 +5332,24 @@ verifying script now — neither needed changing.
 then the file's md5 was compared before and after each script. `lint` left it byte-identical; `lint:fix`
 changed it and restored the file exactly. **The complement matters as much as the property** — a split
 that made `lint` safe by making `lint:fix` useless would have passed a one-sided check.
+
+#### THE GUARD IS **UNPROVEN** UNTIL A PLANT SAYS OTHERWISE
+
+Labelled here the way `dormant` is labelled an estimate, because the owner asked the right question
+about it: **the guard exists and has never been observed working.**
+
+No red commit carries it — measured per commit, it is in `ce40b5b` alone, and every commit since has had
+a GREEN audit step, so the condition it guards never arose. Saying "a guard was added" was **true and
+useless as reassurance**. What can be shown without a plant is the MECHANISM, from `decbcad` itself: the
+neighbouring steps carrying `if: ${{ !cancelled() }}` DID run through that red while the unguarded one
+skipped. The guard adds exactly their condition — evidence from observed behaviour on the same run, not
+a claim that this line has fired.
+
+**Being planted on `throwaway/prove-chromium-guard` (PR #26, not for merge)**: the acknowledgement list
+is emptied so `test:security` exits 1 exactly as it did on `decbcad`, and the step list will say whether
+step 21 still runs. Verified locally first — the plant reproduces the identical
+`1 unacknowledged advisory` failure. A branch push alone runs no CI here (`ci.yml` triggers on
+`push: [main]` and `pull_request`), which is why it needs a PR.
 
 #### AND A FOURTH RED, WITH TWO CAUSES AND ONE OF THEM A CASCADE
 
