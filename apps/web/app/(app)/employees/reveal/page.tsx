@@ -209,7 +209,12 @@ export default function EmployeeRevealPage() {
       {results && results.length > 0 ? (
         <ul
           data-testid="emp-reveal-results"
-          style={{ listStyle: 'none', padding: 0, margin: 0, maxWidth: '40rem' }}
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            maxWidth: '40rem',
+          }}
         >
           {results.map((r) => (
             <li key={r.id} style={row} data-testid={`emp-reveal-row-${r.id}`}>
