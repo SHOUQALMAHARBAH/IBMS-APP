@@ -24,6 +24,17 @@ const RECOMMENDATION_INCLUDE = {
     },
   },
   conflictOfInterestDisclosure: true,
+  /**
+   * Part 4 step 5 — the combined-duty act.
+   *
+   * `Recommendation_maker_checker_distinct` requires that whoever DRAFTS the broker's recommendation is not
+   * whoever approves it for sending. **This is the advice the client acts on when buying insurance** — the
+   * professional-indemnity exposure of the whole product sits on it — so whether a second person agreed
+   * with the advice before it went out is what the record is for.
+   *
+   * `RecommendationWithContext` derives from this object, so the type widens with it and names every site.
+   */
+  combinedDutyAct: true,
   opportunity: {
     select: {
       id: true,

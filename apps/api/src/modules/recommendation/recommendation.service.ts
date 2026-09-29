@@ -1,4 +1,8 @@
 import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
+import {
   ConflictException,
   Injectable,
   Logger,
@@ -66,6 +70,12 @@ export interface RecommendationView {
   approvalRequired: boolean;
   approvedByUserId: string | null;
   approvedAt: Date | null;
+  /**
+   * Part 4 step 5 — present when ONE person both drafted this recommendation and approved it for sending,
+   * in an office that declared COMBINED. `approvedByUserId` is filled either way, and this is the advice
+   * the client acts on when buying insurance.
+   */
+  combinedDutyAct: CombinedDutyActView | null;
   conflictOfInterestFlagged: boolean;
   coiCompetingQuotationId: string | null;
   coiCommissionDiffPercent: string | null;
@@ -435,6 +445,7 @@ export class RecommendationService {
       approvalRequired: gates.approvalRequired,
       approvedByUserId: rec.approvedByUserId,
       approvedAt: rec.approvedAt,
+      combinedDutyAct: combinedDutyActView(rec.combinedDutyAct),
       conflictOfInterestFlagged: gates.conflictOfInterestFlagged,
       coiCompetingQuotationId: gates.coiCompetingQuotationId,
       coiCommissionDiffPercent: gates.coiCommissionDiffPercent,

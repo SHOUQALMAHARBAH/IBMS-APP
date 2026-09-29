@@ -77,6 +77,7 @@ BY_CALL_SITE = {
         'incident.config.ts',
         'row.classificationCombinedDutyAct',
     ): 'IncidentReport',
+    ('recommendation.service.ts', 'rec.combinedDutyAct'): 'Recommendation',
 }
 
 

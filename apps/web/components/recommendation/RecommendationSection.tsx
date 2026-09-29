@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 import {
   approveRecommendation,
   discloseConflictOfInterest,
@@ -11,41 +11,42 @@ import {
   RATIONALE_FACTOR_FIELDS,
   type RationaleFactors,
   type Recommendation,
-} from '../../lib/recommendation/recommendation-api';
+} from "../../lib/recommendation/recommendation-api";
 import {
   listQuotationsForOpportunity,
   type QuotationChain,
-} from '../../lib/quotation/quotation-api';
+} from "../../lib/quotation/quotation-api";
 import {
   setTargetPremiumThreshold,
   type OpportunityWithContext,
-} from '../../lib/opportunity/opportunity-api';
-import { ApiError } from '../../lib/auth/api-client';
-import {
-  DiscardControl,
-  DiscardedNotice,
-} from '../ui/DiscardControl';
-import { useAuth } from '../../lib/auth/auth-context';
+} from "../../lib/opportunity/opportunity-api";
+import { ApiError } from "../../lib/auth/api-client";
+import { DiscardControl, DiscardedNotice } from "../ui/DiscardControl";
+import { useAuth } from "../../lib/auth/auth-context";
+import { CombinedDutyOnRecord } from "../ui/CombinedDutyOnRecord";
 import {
   CombinedDutyReasonField,
   combinedDutyTooShort,
   needsCombinedDutyDeclaration,
-} from '../ui/CombinedDutyReasonField';
-import { useLanguage } from '../../lib/i18n/language-context';
-import { formatMoney } from '../../lib/i18n/format';
-import type { TranslationKey } from '../../lib/i18n/translations';
-import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
-import { rfqBadgeStyle } from '../rfq/rfq.styles';
-import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
-import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
+} from "../ui/CombinedDutyReasonField";
+import { useLanguage } from "../../lib/i18n/language-context";
+import { formatMoney } from "../../lib/i18n/format";
+import type { TranslationKey } from "../../lib/i18n/translations";
+import { buttonStyle, errorStyle } from "../auth/auth-form.styles";
+import { rfqBadgeStyle } from "../rfq/rfq.styles";
+import {
+  quoteChainCardStyle,
+  quoteFieldStyle,
+} from "../quotation/quotation.styles";
+import { DeactivatedInsurerBadge } from "../insurer/DeactivatedInsurerBadge";
 
 const FACTOR_LABEL_KEY: Record<keyof RationaleFactors, TranslationKey> = {
-  coverage: 'recFactorCoverage',
-  price: 'recFactorPrice',
-  financialStrength: 'recFactorFinancialStrength',
-  claimsService: 'recFactorClaimsService',
-  deductible: 'recFactorDeductible',
-  policyConditions: 'recFactorPolicyConditions',
+  coverage: "recFactorCoverage",
+  price: "recFactorPrice",
+  financialStrength: "recFactorFinancialStrength",
+  claimsService: "recFactorClaimsService",
+  deductible: "recFactorDeductible",
+  policyConditions: "recFactorPolicyConditions",
 };
 
 interface Props {
@@ -59,12 +60,12 @@ interface Props {
 }
 
 const EMPTY_FACTORS: RationaleFactors = {
-  coverage: '',
-  price: '',
-  financialStrength: '',
-  claimsService: '',
-  deductible: '',
-  policyConditions: '',
+  coverage: "",
+  price: "",
+  financialStrength: "",
+  claimsService: "",
+  deductible: "",
+  policyConditions: "",
 };
 
 export function RecommendationSection({
@@ -83,20 +84,20 @@ export function RecommendationSection({
   const needsDeclaration = needsCombinedDutyDeclaration({
     mode: user?.dutySegregationMode,
     makerUserId: rec?.draftedByUserId,
-    currentUserId: user?.id ?? '',
+    currentUserId: user?.id ?? "",
     alreadyDecided: rec?.approvedByUserId != null,
   });
   const [chains, setChains] = useState<QuotationChain[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dutyReason, setDutyReason] = useState('');
+  const [dutyReason, setDutyReason] = useState("");
 
-  const [quotationId, setQuotationId] = useState('');
-  const [rationale, setRationale] = useState('');
+  const [quotationId, setQuotationId] = useState("");
+  const [rationale, setRationale] = useState("");
   const [factors, setFactors] = useState<RationaleFactors>(EMPTY_FACTORS);
-  const [thresholdInput, setThresholdInput] = useState('');
-  const [disclosureText, setDisclosureText] = useState('');
+  const [thresholdInput, setThresholdInput] = useState("");
+  const [disclosureText, setDisclosureText] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -109,11 +110,7 @@ export function RecommendationSection({
       setLoadError(null);
     } catch (err) {
       setRec(null);
-      setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('recLoadError'),
-      );
+      setLoadError(err instanceof ApiError ? err.message : t("recLoadError"));
     }
   }, [opportunity.id, t]);
 
@@ -134,7 +131,7 @@ export function RecommendationSection({
     try {
       const blob = await downloadRecommendationDocument(id);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `recommendation-report-${id}.pdf`;
       document.body.appendChild(a);
@@ -143,9 +140,7 @@ export function RecommendationSection({
       URL.revokeObjectURL(url);
     } catch (err) {
       setFormError(
-        err instanceof ApiError
-          ? err.message
-          : t('recDownloadError'),
+        err instanceof ApiError ? err.message : t("recDownloadError"),
       );
     }
   }
@@ -157,11 +152,7 @@ export function RecommendationSection({
       await fn();
       await load();
     } catch (err) {
-      setFormError(
-        err instanceof ApiError
-          ? err.message
-          : t('recActionError'),
-      );
+      setFormError(err instanceof ApiError ? err.message : t("recActionError"));
     } finally {
       setBusy(false);
     }
@@ -171,8 +162,10 @@ export function RecommendationSection({
 
   return (
     <section>
-      <h2 style={{ marginTop: '2.5rem' }}>{t('recSectionHeading')}</h2>
-      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('recSectionIntro')}</p>
+      <h2 style={{ marginTop: "2.5rem" }}>{t("recSectionHeading")}</h2>
+      <p style={{ opacity: 0.7, margin: "0.25rem 0 0" }}>
+        {t("recSectionIntro")}
+      </p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -181,12 +174,17 @@ export function RecommendationSection({
       ) : null}
 
       {isManager ? (
-        <div style={{ ...quoteFieldStyle, maxWidth: '22rem', marginTop: '1rem' }}>
+        <div
+          style={{ ...quoteFieldStyle, maxWidth: "22rem", marginTop: "1rem" }}
+        >
           <label htmlFor="rec-threshold">
-            {t('recThresholdLabel')}{' '}
-            <span style={{ color: 'var(--ink-secondary)' }}>
-              {t('recThresholdCurrent', {
-                amount: formatMoney(opportunity.targetPremiumThreshold, language),
+            {t("recThresholdLabel")}{" "}
+            <span style={{ color: "var(--ink-secondary)" }}>
+              {t("recThresholdCurrent", {
+                amount: formatMoney(
+                  opportunity.targetPremiumThreshold,
+                  language,
+                ),
               })}
             </span>
           </label>
@@ -197,28 +195,28 @@ export function RecommendationSection({
             placeholder="250000.000"
             onChange={(e) => setThresholdInput(e.target.value)}
           />
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
             <button
               type="button"
               disabled={busy || thresholdInput.trim().length === 0}
-              style={{ ...buttonStyle, width: 'auto' }}
+              style={{ ...buttonStyle, width: "auto" }}
               onClick={() =>
                 void run(async () => {
                   await setTargetPremiumThreshold(
                     opportunity.id,
                     thresholdInput.trim(),
                   );
-                  setThresholdInput('');
+                  setThresholdInput("");
                   onOpportunityChanged();
                 })
               }
             >
-              {t('recSetButton')}
+              {t("recSetButton")}
             </button>
             <button
               type="button"
               disabled={busy}
-              style={{ ...buttonStyle, width: 'auto' }}
+              style={{ ...buttonStyle, width: "auto" }}
               onClick={() =>
                 void run(async () => {
                   await setTargetPremiumThreshold(opportunity.id, null);
@@ -226,7 +224,7 @@ export function RecommendationSection({
                 })
               }
             >
-              {t('recClearButton')}
+              {t("recClearButton")}
             </button>
           </div>
         </div>
@@ -239,36 +237,41 @@ export function RecommendationSection({
       ) : null}
 
       {rec === undefined ? (
-        <p>{t('commonLoading')}</p>
+        <p>{t("commonLoading")}</p>
       ) : rec === null ? (
         isPlacement ? (
-          <div style={{ marginTop: '1rem', maxWidth: '40rem' }}>
-            <strong>{t('recDraftHeading')}</strong>
+          <div style={{ marginTop: "1rem", maxWidth: "40rem" }}>
+            <strong>{t("recDraftHeading")}</strong>
             <div style={quoteFieldStyle}>
-              <label htmlFor="rec-quote">{t('recQuoteLabel')}</label>
+              <label htmlFor="rec-quote">{t("recQuoteLabel")}</label>
               <select
                 id="rec-quote"
                 value={quotationId}
                 onChange={(e) => setQuotationId(e.target.value)}
               >
-                <option value="">{t('recSelectQuoteOption')}</option>
+                <option value="">{t("recSelectQuoteOption")}</option>
                 {currentQuotes.map((q) => (
                   <option key={q.id} value={q.id}>
-                    {q.insurer.name} — {formatMoney(q.premium, language, q.currency)}
+                    {q.insurer.name} —{" "}
+                    {formatMoney(q.premium, language, q.currency)}
                     {q.commissionRatePercent
-                      ? t('recCommissionSuffix', { percent: q.commissionRatePercent })
-                      : ''}
+                      ? t("recCommissionSuffix", {
+                          percent: q.commissionRatePercent,
+                        })
+                      : ""}
                   </option>
                 ))}
               </select>
               {currentQuotes.length === 0 ? (
-                <span style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-                  {t('recNoCurrentQuotes')}
+                <span
+                  style={{ color: "var(--ink-secondary)", fontSize: "0.85rem" }}
+                >
+                  {t("recNoCurrentQuotes")}
                 </span>
               ) : null}
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="rec-rationale">{t('recRationaleLabel')}</label>
+              <label htmlFor="rec-rationale">{t("recRationaleLabel")}</label>
               <textarea
                 id="rec-rationale"
                 value={rationale}
@@ -279,7 +282,9 @@ export function RecommendationSection({
             </div>
             {RATIONALE_FACTOR_FIELDS.map(({ key }) => (
               <div key={key} style={quoteFieldStyle}>
-                <label htmlFor={`rec-f-${key}`}>{t(FACTOR_LABEL_KEY[key])}</label>
+                <label htmlFor={`rec-f-${key}`}>
+                  {t(FACTOR_LABEL_KEY[key])}
+                </label>
                 <textarea
                   id={`rec-f-${key}`}
                   value={factors[key]}
@@ -294,7 +299,7 @@ export function RecommendationSection({
             <button
               type="button"
               disabled={busy || !quotationId || rationale.trim().length < 10}
-              style={{ ...buttonStyle, width: 'auto' }}
+              style={{ ...buttonStyle, width: "auto" }}
               onClick={() =>
                 void run(() =>
                   draftRecommendation({
@@ -306,22 +311,22 @@ export function RecommendationSection({
                 )
               }
             >
-              {busy ? t('recDraftingButton') : t('recDraftButton')}
+              {busy ? t("recDraftingButton") : t("recDraftButton")}
             </button>
           </div>
         ) : (
-          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
-            {t('recNoneYet')}
+          <p style={{ color: "var(--ink-secondary)", marginTop: "1rem" }}>
+            {t("recNoneYet")}
           </p>
         )
       ) : (
-        <div style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
+        <div style={{ ...quoteChainCardStyle, marginTop: "1rem" }}>
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: '1rem',
-              flexWrap: 'wrap',
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "1rem",
+              flexWrap: "wrap",
             }}
           >
             <strong>{rec.recommendedQuotation.insurer.name}</strong>
@@ -330,32 +335,36 @@ export function RecommendationSection({
             />
             <span style={rfqBadgeStyle}>
               {rec.discard
-                ? t('discardedBadge')
+                ? t("discardedBadge")
                 : rec.sentToClientAt
-                  ? t('recSentToClientBadge')
+                  ? t("recSentToClientBadge")
                   : rec.blockedFromSend.length === 0
-                    ? t('recReadyToSendBadge')
-                    : t('recBlockedBadge')}
+                    ? t("recReadyToSendBadge")
+                    : t("recBlockedBadge")}
             </span>
           </div>
-          <p style={{ margin: '0.4rem 0' }}>
-            {rec.recommendedQuotation.insuranceLine} ·{' '}
+          <p style={{ margin: "0.4rem 0" }}>
+            {rec.recommendedQuotation.insuranceLine} ·{" "}
             {formatMoney(
               rec.recommendedQuotation.premium,
               language,
               rec.recommendedQuotation.currency,
             )}
             {rec.recommendedQuotation.commissionRatePercent
-              ? t('recCommissionSuffix', { percent: rec.recommendedQuotation.commissionRatePercent })
-              : ''}
+              ? t("recCommissionSuffix", {
+                  percent: rec.recommendedQuotation.commissionRatePercent,
+                })
+              : ""}
           </p>
-          <p style={{ whiteSpace: 'pre-wrap', margin: '0.4rem 0' }}>
+          <p style={{ whiteSpace: "pre-wrap", margin: "0.4rem 0" }}>
             {rec.rationale}
           </p>
-          <dl style={{ margin: '0.4rem 0' }}>
+          <dl style={{ margin: "0.4rem 0" }}>
             {RATIONALE_FACTOR_FIELDS.map(({ key }) => (
-              <div key={key} style={{ marginBottom: '0.3rem' }}>
-                <dt style={{ fontWeight: 600, fontSize: '0.8rem', opacity: 0.7 }}>
+              <div key={key} style={{ marginBottom: "0.3rem" }}>
+                <dt
+                  style={{ fontWeight: 600, fontSize: "0.8rem", opacity: 0.7 }}
+                >
                   {t(FACTOR_LABEL_KEY[key])}
                 </dt>
                 <dd style={{ margin: 0 }}>{rec.rationaleFactors[key]}</dd>
@@ -363,25 +372,36 @@ export function RecommendationSection({
             ))}
           </dl>
 
-          <p style={{ margin: '0.4rem 0' }}>
-            {t('recApprovalLabel')}{' '}
+          <p style={{ margin: "0.4rem 0" }}>
+            {t("recApprovalLabel")}{" "}
             {!rec.approvalRequired
-              ? t('recApprovalNotRequired')
+              ? t("recApprovalNotRequired")
               : rec.approvedByUserId
-                ? t('recApprovalApproved')
-                : t('recApprovalRequiredAwaiting')}
+                ? t("recApprovalApproved")
+                : t("recApprovalRequiredAwaiting")}
+            {/*
+              Part 4 step 5. The line reads "Approved" whether a second person agreed with the advice or
+              the drafter approved her own, so without this it cannot distinguish them — on the advice the
+              client acts on, which is where this product's professional-indemnity exposure sits.
+            */}
+            <CombinedDutyOnRecord
+              act={rec.combinedDutyAct}
+              testId={`combined-duty-recommendation-${rec.id}`}
+            />
           </p>
-          <p style={{ margin: '0.4rem 0' }}>
-            {t('recCoiLabel')}{' '}
+          <p style={{ margin: "0.4rem 0" }}>
+            {t("recCoiLabel")}{" "}
             {!rec.conflictOfInterestFlagged
-              ? t('recCoiNone')
+              ? t("recCoiNone")
               : rec.conflictOfInterestDisclosure
-                ? t('recCoiDisclosed')
-                : t('recCoiFlagged', { percent: rec.coiCommissionDiffPercent ?? '' })}
+                ? t("recCoiDisclosed")
+                : t("recCoiFlagged", {
+                    percent: rec.coiCommissionDiffPercent ?? "",
+                  })}
           </p>
 
           {rec.blockedFromSend.length > 0 ? (
-            <ul style={{ color: 'var(--error, #c00)', margin: '0.4rem 0' }}>
+            <ul style={{ color: "var(--error, #c00)", margin: "0.4rem 0" }}>
               {rec.blockedFromSend.map((b) => (
                 <li key={b}>{b}</li>
               ))}
@@ -390,10 +410,10 @@ export function RecommendationSection({
 
           <div
             style={{
-              display: 'flex',
-              gap: '0.6rem',
-              flexWrap: 'wrap',
-              marginTop: '0.6rem',
+              display: "flex",
+              gap: "0.6rem",
+              flexWrap: "wrap",
+              marginTop: "0.6rem",
             }}
           >
             {isManager &&
@@ -417,9 +437,10 @@ export function RecommendationSection({
                 <button
                   type="button"
                   disabled={
-                    busy || (needsDeclaration && combinedDutyTooShort(dutyReason))
+                    busy ||
+                    (needsDeclaration && combinedDutyTooShort(dutyReason))
                   }
-                  style={{ ...buttonStyle, width: 'auto' }}
+                  style={{ ...buttonStyle, width: "auto" }}
                   onClick={() =>
                     void run(() =>
                       approveRecommendation(
@@ -429,7 +450,7 @@ export function RecommendationSection({
                     )
                   }
                 >
-                  {t('recApproveButton')}
+                  {t("recApproveButton")}
                 </button>
               </>
             ) : null}
@@ -440,7 +461,7 @@ export function RecommendationSection({
               <button
                 type="button"
                 disabled={busy}
-                style={{ ...buttonStyle, width: 'auto' }}
+                style={{ ...buttonStyle, width: "auto" }}
                 onClick={() =>
                   void run(async () => {
                     await sendRecommendation(rec.id);
@@ -448,16 +469,16 @@ export function RecommendationSection({
                   })
                 }
               >
-                {t('recSendButton')}
+                {t("recSendButton")}
               </button>
             ) : null}
             {rec.blockedFromSend.length === 0 ? (
               <button
                 type="button"
                 onClick={() => void downloadDocument(rec.id)}
-                style={{ ...buttonStyle, width: 'auto' }}
+                style={{ ...buttonStyle, width: "auto" }}
               >
-                {t('recDownloadReportButton')}
+                {t("recDownloadReportButton")}
               </button>
             ) : null}
             <DiscardControl
@@ -477,30 +498,27 @@ export function RecommendationSection({
           !rec.conflictOfInterestDisclosure &&
           !rec.sentToClientAt &&
           !rec.discard ? (
-            <div style={{ ...quoteFieldStyle, marginTop: '0.8rem' }}>
-              <label htmlFor="rec-coi">{t('recCoiDisclosureLabel')}</label>
+            <div style={{ ...quoteFieldStyle, marginTop: "0.8rem" }}>
+              <label htmlFor="rec-coi">{t("recCoiDisclosureLabel")}</label>
               <textarea
                 id="rec-coi"
                 value={disclosureText}
                 rows={3}
                 maxLength={8000}
-                placeholder={t('recCoiDisclosurePlaceholder')}
+                placeholder={t("recCoiDisclosurePlaceholder")}
                 onChange={(e) => setDisclosureText(e.target.value)}
               />
               <button
                 type="button"
                 disabled={busy || disclosureText.trim().length < 20}
-                style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
+                style={{ ...buttonStyle, width: "auto", marginTop: "0.4rem" }}
                 onClick={() =>
                   void run(() =>
-                    discloseConflictOfInterest(
-                      rec.id,
-                      disclosureText.trim(),
-                    ),
+                    discloseConflictOfInterest(rec.id, disclosureText.trim()),
                   )
                 }
               >
-                {t('recRecordDisclosureButton')}
+                {t("recRecordDisclosureButton")}
               </button>
             </div>
           ) : null}
@@ -508,13 +526,13 @@ export function RecommendationSection({
           {rec.conflictOfInterestDisclosure ? (
             <p
               style={{
-                whiteSpace: 'pre-wrap',
-                marginTop: '0.6rem',
+                whiteSpace: "pre-wrap",
+                marginTop: "0.6rem",
                 opacity: 0.8,
-                fontSize: '0.9rem',
+                fontSize: "0.9rem",
               }}
             >
-              <strong>{t('recDisclosedLabel')}</strong>{' '}
+              <strong>{t("recDisclosedLabel")}</strong>{" "}
               {rec.conflictOfInterestDisclosure.disclosureText}
             </p>
           ) : null}

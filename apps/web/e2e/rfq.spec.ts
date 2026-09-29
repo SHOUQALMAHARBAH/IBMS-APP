@@ -20,7 +20,10 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
+    }),
   );
 }
 
@@ -38,8 +41,18 @@ const OPPORTUNITY = {
 };
 
 const INSURERS = [
-  { id: "ins-1", name: "Jordan Insurance Co", nameAr: null, financialStrengthRating: "A-" },
-  { id: "ins-2", name: "Middle East Assurance", nameAr: null, financialStrengthRating: null },
+  {
+    id: "ins-1",
+    name: "Jordan Insurance Co",
+    nameAr: null,
+    financialStrengthRating: "A-",
+  },
+  {
+    id: "ins-2",
+    name: "Middle East Assurance",
+    nameAr: null,
+    financialStrengthRating: null,
+  },
 ];
 
 const RFQ = {
@@ -108,7 +121,11 @@ function quoteVersion(over: Record<string, unknown> = {}) {
     receivedAt: "2026-03-05T00:00:00.000Z",
     capturedByUserId: "user-1",
     insurer: INSURER_IDENTITY,
-    rfq: { id: "rfq-1", opportunityId: "opp-1", insuranceLine: "Property All Risks" },
+    rfq: {
+      id: "rfq-1",
+      opportunityId: "opp-1",
+      insuranceLine: "Property All Risks",
+    },
     ...over,
   };
 }
@@ -153,7 +170,10 @@ async function mockRfqApi(
     onTransition?: (status: string) => void;
     onLogComm?: (body: { direction: string; body: string }) => void;
     onCaptureQuote?: (body: { insurerId: string; premium: string }) => void;
-    onReviseQuote?: (body: { premium: string; negotiationNotes?: string }) => void;
+    onReviseQuote?: (body: {
+      premium: string;
+      negotiationNotes?: string;
+    }) => void;
     onBuildComparison?: (body: {
       rfqId: string;
       scores?: { insurerId: string }[];
@@ -166,7 +186,10 @@ async function mockRfqApi(
       decision: string;
       evidenceRef: string;
     }) => void;
-    onPlacePolicy?: (body: { opportunityId: string; inceptionDate: string }) => void;
+    onPlacePolicy?: (body: {
+      opportunityId: string;
+      inceptionDate: string;
+    }) => void;
     onRecordIssuance?: (body: {
       policyNumber: string;
       issuedPremium: string;
@@ -218,6 +241,22 @@ async function mockRfqApi(
       roles: string[];
       hatAmbiguous: boolean;
     } | null;
+    /**
+     * A declared combined-duty act on the seeded RECOMMENDATION's approval — Part 4 step 5, a
+     * different pair on a different record. Passing this also pre-seeds an APPROVED recommendation,
+     * because an act without an approval is a state the server cannot produce.
+     */
+    seedRecommendationCombinedDutyAct?: {
+      id: string;
+      at: string;
+      actorUserId: string;
+      reason: string;
+      pair: string;
+      roles: string[];
+      hatAmbiguous: boolean;
+    } | null;
+    /** pre-seed an APPROVED recommendation with no declaration — the ordinary two-person case. */
+    seedApprovedRecommendation?: boolean;
     opportunityStatus?: string;
   } = {},
 ) {
@@ -326,32 +365,34 @@ async function mockRfqApi(
     declinedInsurers: [] as { id: string; name: string }[],
   });
 
-  await page.route(
-    "http://localhost:4000/comparison-matrices**",
-    (route) => {
-      const method = route.request().method();
-      if (method === "POST") {
-        const b = route.request().postDataJSON() as {
-          rfqId: string;
-          scores?: { insurerId: string }[];
-        };
-        opts.onBuildComparison?.(b);
-        matrix = buildMatrix();
-        return route.fulfill({ status: 201, json: matrix });
-      }
-      if (matrix === null) {
-        return route.fulfill({
-          status: 404,
-          json: { message: "No comparison matrix has been built for this RFQ yet." },
-        });
-      }
-      return route.fulfill({ status: 200, json: matrix });
-    },
-  );
+  await page.route("http://localhost:4000/comparison-matrices**", (route) => {
+    const method = route.request().method();
+    if (method === "POST") {
+      const b = route.request().postDataJSON() as {
+        rfqId: string;
+        scores?: { insurerId: string }[];
+      };
+      opts.onBuildComparison?.(b);
+      matrix = buildMatrix();
+      return route.fulfill({ status: 201, json: matrix });
+    }
+    if (matrix === null) {
+      return route.fulfill({
+        status: 404,
+        json: {
+          message: "No comparison matrix has been built for this RFQ yet.",
+        },
+      });
+    }
+    return route.fulfill({ status: 200, json: matrix });
+  });
 
   // Opportunity — the detail GET reflects the current threshold; a PATCH
   // (Part C #16) updates it in place.
-  const opp = { ...OPPORTUNITY, status: opts.opportunityStatus ?? OPPORTUNITY.status };
+  const opp = {
+    ...OPPORTUNITY,
+    status: opts.opportunityStatus ?? OPPORTUNITY.status,
+  };
   await page.route("http://localhost:4000/opportunities**", (route) => {
     const url = route.request().url();
     const method = route.request().method();
@@ -371,6 +412,45 @@ async function mockRfqApi(
   // Broker recommendation (Part C #16) — starts empty; a POST drafts it, and
   // approve / disclose / send each mutate the single row in place.
   let recommendation: Record<string, unknown> | null = null;
+  if (
+    opts.seedApprovedRecommendation ||
+    opts.seedRecommendationCombinedDutyAct
+  ) {
+    // An act without an approval is a state the server cannot produce, so both options seed the SAME
+    // approved row and differ only in whether a declaration sits on it.
+    recommendation = {
+      id: "rec-1",
+      opportunityId: "opp-1",
+      customerId: "cust-1",
+      recommendedQuotation: {
+        id: "q-1",
+        insurerId: "ins-1",
+        insurer,
+        insuranceLine: "Property All Risks",
+        premium: "12000.000",
+        currency: "JOD",
+        commissionRatePercent: "17.5",
+      },
+      rationale:
+        "Widest cover for the price, and the insurer settles claims fastest of the three.",
+      rationaleFactors: {},
+      approvalRequired: true,
+      approvedByUserId: opts.seedRecommendationCombinedDutyAct
+        ? "user-1"
+        : "mgr-1",
+      approvedAt: "2026-03-09T00:00:00.000Z",
+      conflictOfInterestFlagged: false,
+      coiCompetingQuotationId: null,
+      coiCommissionDiffPercent: null,
+      conflictOfInterestDisclosure: null,
+      sentToClientAt: null,
+      sentByUserId: null,
+      draftedByUserId: "user-1",
+      createdAt: "2026-03-08T00:00:00.000Z",
+      combinedDutyAct: opts.seedRecommendationCombinedDutyAct ?? null,
+      blockedFromSend: [] as string[],
+    };
+  }
   const recBlocked = () => {
     const blocked: string[] = [];
     if (
@@ -399,10 +479,7 @@ async function mockRfqApi(
       recommendation.blockedFromSend = recBlocked();
       return route.fulfill({ status: 201, json: recommendation });
     }
-    if (
-      method === "POST" &&
-      /\/conflict-of-interest-disclosure/.test(url)
-    ) {
+    if (method === "POST" && /\/conflict-of-interest-disclosure/.test(url)) {
       recommendation = {
         ...recommendation,
         conflictOfInterestDisclosure: {
@@ -459,6 +536,8 @@ async function mockRfqApi(
         sentByUserId: null,
         draftedByUserId: "user-1",
         createdAt: "2026-03-08T00:00:00.000Z",
+        // The endpoint returns this now. Null on a freshly drafted row: nothing has approved it.
+        combinedDutyAct: null,
         blockedFromSend: [] as string[],
       };
       recommendation.blockedFromSend = recBlocked();
@@ -627,7 +706,10 @@ async function mockRfqApi(
       }
       return route.fulfill({ status: 200, json: endorsements });
     }
-    if (method === "POST" && /\/policies\/[^/]+\/cancellation(\?|$)/.test(url)) {
+    if (
+      method === "POST" &&
+      /\/policies\/[^/]+\/cancellation(\?|$)/.test(url)
+    ) {
       const b = route.request().postDataJSON() as {
         reason: string;
         basis: string;
@@ -670,7 +752,11 @@ async function mockRfqApi(
           namedPerils?: string[];
           extensions?: string[];
         };
-        documents: { category: string; classification: string; fileName: string }[];
+        documents: {
+          category: string;
+          classification: string;
+          fileName: string;
+        }[];
       };
       opts.onRecordIssuance?.(b);
       policy = {
@@ -720,7 +806,8 @@ async function mockRfqApi(
         ((policy?.schedules as { limits?: Record<string, unknown> }[]) ?? [])[0]
           ?.limits ?? {};
       const mismatch =
-        JSON.stringify(b.requestedCoverage.limits) !== JSON.stringify(issuedLimits);
+        JSON.stringify(b.requestedCoverage.limits) !==
+        JSON.stringify(issuedLimits);
       policy = {
         ...(policy ?? {}),
         status: mismatch ? "DISCREPANCY" : "VERIFIED",
@@ -777,7 +864,11 @@ async function mockRfqApi(
     }
     if (method === "POST" && /\/policies\/[^/]+\/documents(\?|$)/.test(url)) {
       const b = route.request().postDataJSON() as {
-        documents: { category: string; classification: string; fileName: string }[];
+        documents: {
+          category: string;
+          classification: string;
+          fileName: string;
+        }[];
       };
       const existing = (policy?.documents as unknown[]) ?? [];
       policy = {
@@ -907,7 +998,9 @@ async function mockRfqApi(
       if (invoiceRows.length > 0) {
         return route.fulfill({
           status: 409,
-          json: { message: "A premium invoice already exists for this policy." },
+          json: {
+            message: "A premium invoice already exists for this policy.",
+          },
         });
       }
       const tax = Number(b.taxAmount) || 0;
@@ -1016,7 +1109,11 @@ async function mockRfqApi(
 
     // Process 27 — the follow-up sub-view + a synthetic "overdue" flag the
     // sweep branch uses (the real due-check is business-day date math).
-    const AWAITING = ["REGISTERED", "DOCUMENTATION_IN_PROGRESS", "UNDER_ASSESSMENT"];
+    const AWAITING = [
+      "REGISTERED",
+      "DOCUMENTATION_IN_PROGRESS",
+      "UNDER_ASSESSMENT",
+    ];
     const applyFollowUp = (row: Record<string, unknown>) => {
       const alerts = (row.followUpAlerts as Record<string, unknown>[]) ?? [];
       row.followUpAlerts = alerts;
@@ -1241,7 +1338,10 @@ async function mockRfqApi(
           });
         if (step === "adjuster-progress") {
           const adj = row.adjuster as Record<string, unknown>;
-          if (typeof b.surveyCompletedAt === "string" && !adj.surveyCompletedAt) {
+          if (
+            typeof b.surveyCompletedAt === "string" &&
+            !adj.surveyCompletedAt
+          ) {
             adj.surveyCompletedAt = b.surveyCompletedAt;
           }
           if (
@@ -1376,7 +1476,12 @@ async function mockRfqApi(
     // (scoped or queue), so the mock has to carry it too.
     return route.fulfill({
       status: 200,
-      json: { items: claimRows, total: claimRows.length, page: 0, pageSize: 50 },
+      json: {
+        items: claimRows,
+        total: claimRows.length,
+        page: 0,
+        pageSize: 50,
+      },
     });
   });
 
@@ -1431,7 +1536,11 @@ async function mockRfqApi(
     opts.onTransition?.(body.toStatus);
     return route.fulfill({
       status: 201,
-      json: { ...RFQ.insurerSubmissions[0], status: body.toStatus, respondedAt: "2026-03-05T00:00:00.000Z" },
+      json: {
+        ...RFQ.insurerSubmissions[0],
+        status: body.toStatus,
+        respondedAt: "2026-03-05T00:00:00.000Z",
+      },
     });
   });
   // Part D §5.1 touchpoint #4 (RFQ) and the claims touchpoint (both on
@@ -1505,7 +1614,9 @@ async function driveClaimToVerdict(
   },
 ) {
   await page.getByLabel("Loss date").fill("2026-11-15");
-  await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
+  await page
+    .getByLabel("Cause of loss")
+    .fill("Storm ripped the roof sheeting.");
   await page.getByLabel("Estimated loss").fill(opts.estimatedLoss);
   await page.getByRole("button", { name: "Notify claim" }).click();
   await expect(page.getByText("Notified", { exact: true })).toBeVisible();
@@ -1557,18 +1668,26 @@ test("opens an opportunity and lists its RFQs", async ({ page }) => {
   await mockRfqApi(page);
 
   await page.goto("/opportunities?customerId=cust-1");
-  await expect(page.getByRole("heading", { name: "RFQ / market" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "RFQ / market" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /Opportunity opp-1/ }).click();
 
   await expect(page).toHaveURL("/opportunities/opp-1");
   await expect(page.getByText("Status: Needs confirmed")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Property All Risks/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Property All Risks/ }),
+  ).toBeVisible();
 });
 
 test("creates an RFQ with an insurer shortlist", async ({ page }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   let created = false;
-  await mockRfqApi(page, { onCreateRfq: () => { created = true; } });
+  await mockRfqApi(page, {
+    onCreateRfq: () => {
+      created = true;
+    },
+  });
 
   await page.goto("/rfqs/new?opportunityId=opp-1");
   await expect(page.getByRole("heading", { name: "New RFQ" })).toBeVisible();
@@ -1578,16 +1697,26 @@ test("creates an RFQ with an insurer shortlist", async ({ page }) => {
 
   await expect.poll(() => created).toBe(true);
   await expect(page).toHaveURL("/rfqs/rfq-1");
-  await expect(page.getByRole("heading", { name: "RFQ — Property All Risks" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "RFQ — Property All Risks" }),
+  ).toBeVisible();
 });
 
-test("records an insurer response status from the RFQ detail screen", async ({ page }) => {
+test("records an insurer response status from the RFQ detail screen", async ({
+  page,
+}) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   let transitionedTo: string | null = null;
-  await mockRfqApi(page, { onTransition: (s) => { transitionedTo = s; } });
+  await mockRfqApi(page, {
+    onTransition: (s) => {
+      transitionedTo = s;
+    },
+  });
 
   await page.goto("/rfqs/rfq-1");
-  await expect(page.getByRole("cell", { name: "Jordan Insurance Co" })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "Jordan Insurance Co" }),
+  ).toBeVisible();
   await page
     .getByLabel("Set status for Jordan Insurance Co")
     .selectOption("QUOTED");
@@ -1595,16 +1724,26 @@ test("records an insurer response status from the RFQ detail screen", async ({ p
   await expect.poll(() => transitionedTo).toBe("QUOTED");
 });
 
-test("logs a broker<->insurer exchange on the RFQ detail screen", async ({ page }) => {
+test("logs a broker<->insurer exchange on the RFQ detail screen", async ({
+  page,
+}) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   let logged: { direction: string; body: string } | null = null;
-  await mockRfqApi(page, { onLogComm: (b) => { logged = b; } });
+  await mockRfqApi(page, {
+    onLogComm: (b) => {
+      logged = b;
+    },
+  });
 
   await page.goto("/rfqs/rfq-1");
-  await expect(page.getByRole("heading", { name: "Correspondence" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Correspondence" }),
+  ).toBeVisible();
   await page.getByLabel("Direction").selectOption("INBOUND");
   await page.getByLabel("Channel").selectOption("CALL");
-  await page.getByLabel("Exchange").fill("Please send 3 years of loss history for site 2.");
+  await page
+    .getByLabel("Exchange")
+    .fill("Please send 3 years of loss history for site 2.");
   await page.getByRole("button", { name: "Log exchange" }).click();
 
   await expect.poll(() => logged?.direction).toBe("INBOUND");
@@ -1618,19 +1757,25 @@ test("logs a broker<->insurer exchange on the RFQ detail screen", async ({ page 
   // row rendered "Phone call" and "Customer portal" instead. `exact` matters:
   // a substring match on "Call" is satisfied by "Phone call" and would have
   // passed against the bug.
-  const logRow = page.getByRole("row").filter({ hasText: "Please send 3 years" });
+  const logRow = page
+    .getByRole("row")
+    .filter({ hasText: "Please send 3 years" });
   await expect(logRow.getByText("Call", { exact: true })).toBeVisible();
   await expect(logRow.getByText("Phone call")).toHaveCount(0);
   await expect(logRow.getByText("Inbound", { exact: true })).toBeVisible();
 });
 
-test("a non-Placement user sees the list but no create controls", async ({ page }) => {
+test("a non-Placement user sees the list but no create controls", async ({
+  page,
+}) => {
   await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
   await mockRfqApi(page);
 
   await page.goto("/opportunities/opp-1");
   await expect(page.getByText("Status: Needs confirmed")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create RFQ for a line" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Create RFQ for a line" }),
+  ).toHaveCount(0);
 });
 
 test("captures a quotation for a shortlisted insurer on the RFQ detail screen", async ({
@@ -1638,7 +1783,11 @@ test("captures a quotation for a shortlisted insurer on the RFQ detail screen", 
 }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   let captured: { insurerId: string; premium: string } | null = null;
-  await mockRfqApi(page, { onCaptureQuote: (b) => { captured = b; } });
+  await mockRfqApi(page, {
+    onCaptureQuote: (b) => {
+      captured = b;
+    },
+  });
 
   await page.goto("/rfqs/rfq-1");
   await expect(page.getByRole("heading", { name: "Quotations" })).toBeVisible();
@@ -1659,8 +1808,12 @@ test("revises a captured quotation into a new version", async ({ page }) => {
   let captured = false;
   let revised: { premium: string; negotiationNotes?: string } | null = null;
   await mockRfqApi(page, {
-    onCaptureQuote: () => { captured = true; },
-    onReviseQuote: (b) => { revised = b; },
+    onCaptureQuote: () => {
+      captured = true;
+    },
+    onReviseQuote: (b) => {
+      revised = b;
+    },
   });
 
   await page.goto("/rfqs/rfq-1");
@@ -1694,12 +1847,14 @@ test("builds the comparison matrix and shows the missing-insurer flag", async ({
 }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   let built: { rfqId: string } | null = null;
-  await mockRfqApi(page, { onBuildComparison: (b) => { built = b; } });
+  await mockRfqApi(page, {
+    onBuildComparison: (b) => {
+      built = b;
+    },
+  });
 
   await page.goto("/rfqs/rfq-1");
-  await expect(
-    page.getByRole("heading", { name: "Comparison" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Comparison" })).toBeVisible();
   await expect(page.getByText("No comparison built yet.")).toBeVisible();
 
   await page.getByRole("button", { name: "Build comparison" }).click();
@@ -1809,9 +1964,7 @@ test("downloads a bilingual quotation-comparison PDF once a comparison exists", 
   ).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Download comparison (PDF)" })
-    .click();
+  await page.getByRole("button", { name: "Download comparison (PDF)" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("quotation-comparison-cm-1.pdf");
 });
@@ -1823,9 +1976,7 @@ test("a non-Placement user sees the comparison but no build control", async ({
   await mockRfqApi(page);
 
   await page.goto("/rfqs/rfq-1");
-  await expect(
-    page.getByRole("heading", { name: "Comparison" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Comparison" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Build comparison|Rebuild comparison/ }),
   ).toHaveCount(0);
@@ -1885,7 +2036,9 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
     "Deductible",
     "Policy conditions",
   ]) {
-    await page.getByLabel(label, { exact: true }).fill(`${label} reasoning here.`);
+    await page
+      .getByLabel(label, { exact: true })
+      .fill(`${label} reasoning here.`);
   }
   await page.getByRole("button", { name: "Draft recommendation" }).click();
 
@@ -1973,23 +2126,19 @@ test("places a policy from an accepted opportunity and records its issuance", as
   // Playwright runs routes in reverse-registration order, so these more
   // specific ones win for the document endpoints while the general one
   // still handles place/issuance/checking/delivery/read.
-  await page.route(
-    "http://localhost:4000/policies/*/document**",
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/pdf",
-        body: Buffer.from("%PDF-1.4 fake"),
-      }),
+  await page.route("http://localhost:4000/policies/*/document**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/pdf",
+      body: Buffer.from("%PDF-1.4 fake"),
+    }),
   );
-  await page.route(
-    "http://localhost:4000/policies/*/certificate**",
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/pdf",
-        body: Buffer.from("%PDF-1.4 fake certificate"),
-      }),
+  await page.route("http://localhost:4000/policies/*/certificate**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/pdf",
+      body: Buffer.from("%PDF-1.4 fake certificate"),
+    }),
   );
 
   await page.goto("/opportunities/opp-1");
@@ -2077,7 +2226,11 @@ test("a Policy Checking Officer runs the QC check and sees a discrepancy block D
   await page.getByRole("button", { name: "Run check" }).click();
 
   await expect
-    .poll(() => (checked?.requestedCoverage.limits as { buildings?: string })?.buildings)
+    .poll(
+      () =>
+        (checked?.requestedCoverage.limits as { buildings?: string })
+          ?.buildings,
+    )
     .toBe("8000000.000");
   await expect(page.getByText("DISCREPANCY — Delivery blocked")).toBeVisible();
   await expect(
@@ -2117,7 +2270,9 @@ test("records policy delivery and the client receipt acknowledgement", async ({
     .fill('{ "total": "5000000.000" }');
   await page.getByRole("button", { name: "Run check" }).click();
 
-  await expect(page.getByRole("button", { name: "Record delivery" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Record delivery" }),
+  ).toBeVisible();
   await page.getByLabel("Method").selectOption("courier");
   await page.getByLabel("Recipient").fill("Acme Risk Dept");
   await page.getByRole("button", { name: "Record delivery" }).click();
@@ -2150,12 +2305,12 @@ test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
   ).toBeVisible();
 
   await page.getByLabel("Type", { exact: true }).selectOption("POSITIVE");
-  await page.getByLabel("Change", { exact: true }).selectOption("sum_insured_increase");
+  await page
+    .getByLabel("Change", { exact: true })
+    .selectOption("sum_insured_increase");
   await page.getByLabel("Premium amount (unsigned)").fill("2500.000");
   await page.getByLabel("Effective from").fill("2026-12-01");
-  await page
-    .getByRole("button", { name: "Request endorsement" })
-    .click();
+  await page.getByRole("button", { name: "Request endorsement" }).click();
 
   await expect.poll(() => requested?.premiumAmount).toBe("2500.000");
   await expect(page.getByText("Requested", { exact: true })).toBeVisible();
@@ -2188,14 +2343,12 @@ test("raises a premium invoice from the Billing block — commission netted, tot
   // "invoices**" route, so this more specific one wins for the document
   // endpoint (same reverse-registration-order precedent the policy
   // schedule-summary/certificate routes already use).
-  await page.route(
-    "http://localhost:4000/invoices/*/document**",
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/pdf",
-        body: Buffer.from("%PDF-1.4 fake invoice"),
-      }),
+  await page.route("http://localhost:4000/invoices/*/document**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/pdf",
+      body: Buffer.from("%PDF-1.4 fake invoice"),
+    }),
   );
 
   await page.goto("/opportunities/opp-1");
@@ -2224,9 +2377,7 @@ test("raises a premium invoice from the Billing block — commission netted, tot
   // Part F item #7 — an invoice now exists, so the download button
   // appears and produces a real bilingual PDF download.
   const downloadPromise = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Download invoice (PDF)" })
-    .click();
+  await page.getByRole("button", { name: "Download invoice (PDF)" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("invoice-inv-1.pdf");
 });
@@ -2277,7 +2428,9 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   // 1a. Process 32 — a PART payment. The money is booked, but the invoice
   //     stays Invoiced: only the instalment that completes it moves it on,
   //     which is what keeps it on the #33 ageing report for the remainder.
-  await page.getByLabel("Instalment amount").fill("15,350.000".replace(",", ""));
+  await page
+    .getByLabel("Instalment amount")
+    .fill("15,350.000".replace(",", ""));
   // The payment reference is MANDATORY — it is the idempotency key, and the
   // submit button stays disabled without one. While it was optional the cash
   // path had no duplicate protection at all: a double-click booked the
@@ -2305,9 +2458,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await expect(page.getByText("Outstanding balance")).toBeHidden();
 
   // 2. reconcile
-  await page
-    .getByRole("button", { name: "Reconcile collected funds" })
-    .click();
+  await page.getByRole("button", { name: "Reconcile collected funds" }).click();
   await expect(page.getByTestId("invoice-status")).toHaveText("Reconciled");
 
   // 3. remit the net premium (120000 - 14400)
@@ -2318,12 +2469,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await expect(page.getByText("Remitted to insurer")).toBeVisible();
   await expect(page.getByText(/JOD 105,600.000 on/)).toBeVisible();
 
-  expect(steps).toEqual([
-    "receipt",
-    "receipt",
-    "reconcile",
-    "remittance",
-  ]);
+  expect(steps).toEqual(["receipt", "receipt", "reconcile", "remittance"]);
 });
 
 test("notifies a claim against an issued policy", async ({ page }) => {
@@ -2432,7 +2578,9 @@ test("registers a NOTIFIED claim with the insurer and assigns the adjuster", asy
 
   // notify first
   await page.getByLabel("Loss date").fill("2026-11-15");
-  await page.getByLabel("Cause of loss").fill("Burst riser main flooded unit 4.");
+  await page
+    .getByLabel("Cause of loss")
+    .fill("Burst riser main flooded unit 4.");
   await page.getByLabel("Estimated loss").fill("14000.000");
   await page.getByRole("button", { name: "Notify claim" }).click();
   await expect(page.getByText("Notified", { exact: true })).toBeVisible();
@@ -2477,7 +2625,9 @@ test("files claim documentation and tracks the mandatory checklist", async ({
 
   // notify + register
   await page.getByLabel("Loss date").fill("2026-11-15");
-  await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
+  await page
+    .getByLabel("Cause of loss")
+    .fill("Storm ripped the roof sheeting.");
   await page.getByLabel("Estimated loss").fill("14000.000");
   await page.getByRole("button", { name: "Notify claim" }).click();
   await expect(page.getByText("Notified", { exact: true })).toBeVisible();
@@ -2490,7 +2640,9 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // the documentation checklist shows the missing mandatory docs
-  await expect(page.getByText("missing claim_form, photo, repair_estimate")).toBeVisible();
+  await expect(
+    page.getByText("missing claim_form, photo, repair_estimate"),
+  ).toBeVisible();
 
   await page.getByLabel("Document type").selectOption("claim_form");
   await page.getByLabel("File name").fill("claim-form.pdf");
@@ -2498,7 +2650,9 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await page.getByRole("button", { name: "File document" }).click();
 
   await expect.poll(() => attached?.documents[0].docType).toBe("claim_form");
-  await expect(page.getByText("Documentation in progress", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Documentation in progress", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("missing photo, repair_estimate")).toBeVisible();
 });
 
@@ -2522,7 +2676,9 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
 
   // notify + register
   await page.getByLabel("Loss date").fill("2026-11-15");
-  await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
+  await page
+    .getByLabel("Cause of loss")
+    .fill("Storm ripped the roof sheeting.");
   await page.getByLabel("Estimated loss").fill("14000.000");
   await page.getByRole("button", { name: "Notify claim" }).click();
   await page.getByLabel("Insurer claim reference").fill("INS-ASMT-1");
@@ -2543,11 +2699,15 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
   await page
     .getByRole("button", { name: "Mark investigation complete" })
     .click();
-  await expect.poll(() => steps.filter((s) => s === "adjuster-progress").length).toBe(2);
+  await expect
+    .poll(() => steps.filter((s) => s === "adjuster-progress").length)
+    .toBe(2);
 
   // submit for assessment, then record the verdict
   await page.getByRole("button", { name: "Submit for assessment" }).click();
-  await expect(page.getByText("Under assessment", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Under assessment", { exact: true }),
+  ).toBeVisible();
   await page
     .getByLabel("Assessment verdict")
     .selectOption("PARTIALLY_APPROVED");
@@ -2694,14 +2854,10 @@ test("a large claim settlement blocks on a mandatory distinct second approver", 
   ).toBeVisible();
   await expect(page.getByText(/· settled/)).toHaveCount(0);
 
-  await page
-    .getByRole("button", { name: "Second-approve settlement" })
-    .click();
+  await page.getByRole("button", { name: "Second-approve settlement" }).click();
 
   // the second approval settles it
-  await expect(
-    page.getByText(/· second-approved · settled/),
-  ).toBeVisible();
+  await expect(page.getByText(/· second-approved · settled/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Second-approve settlement" }),
   ).toHaveCount(0);
@@ -2752,22 +2908,30 @@ test("closes a settled claim once the client payment receipt is confirmed", asyn
   await expect.poll(() => closure?.clientPaymentConfirmedAt).toBe("2026-12-01");
 });
 
-test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {
+test("RFQ screens have no serious/critical accessibility violations @a11y", async ({
+  page,
+}) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   await mockRfqApi(page);
 
   await page.goto("/opportunities/opp-1");
-  await expect(page.getByRole("heading", { name: /Opportunity opp-1/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Opportunity opp-1/ }),
+  ).toBeVisible();
   const oppResults = await new AxeBuilder({ page }).analyze();
   expect(
-    oppResults.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),
+    oppResults.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    ),
   ).toEqual([]);
 
   await page.goto("/rfqs/rfq-1");
   await expect(page.getByText("Insurer submissions")).toBeVisible();
   const rfqResults = await new AxeBuilder({ page }).analyze();
   expect(
-    rfqResults.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),
+    rfqResults.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    ),
   ).toEqual([]);
 });
 
@@ -2847,5 +3011,69 @@ test("says nothing on an ordinary two-person check", async ({ page }) => {
   // Anchored on the quality-check block itself, from the SAME read that would carry the act — so the
   // absence cannot pass while that read is still in flight.
   await expect(page.getByText("Checked by", { exact: false })).toBeVisible();
-  await expect(page.getByTestId("combined-duty-policy-checking")).toHaveCount(0);
+  await expect(page.getByTestId("combined-duty-policy-checking")).toHaveCount(
+    0,
+  );
+});
+
+/*
+ * THE COMBINED-DUTY ACT ON THE BROKER'S RECOMMENDATION — Part 4 step 5.
+ *
+ * `Recommendation_maker_checker_distinct` requires that whoever DRAFTS the recommendation is not whoever
+ * approves it for sending. **This is the advice the client acts on when buying insurance** — this
+ * product's whole professional-indemnity exposure sits on it, which is why `ProfessionalIndemnityPolicy`
+ * exists as a model at all — so whether a second person agreed with the advice before it went out is what
+ * the record is for.
+ *
+ * The approval line reads "Approved" whether a second person agreed or the drafter approved her own,
+ * which is why the ordinary-case test asserts that line IS shown rather than asserting silence alone.
+ */
+
+const SELF_APPROVED_RECOMMENDATION_ACT = {
+  id: "cda-rec-1",
+  at: "2026-03-09T00:00:00.000Z",
+  actorUserId: "user-1",
+  reason:
+    "Sole senior officer in this branch; the client's cover incepted the following Monday.",
+  pair: "Recommendation_maker_checker_distinct",
+  roles: ["BRANCH_DEPARTMENT_MANAGER"],
+  hatAmbiguous: false,
+};
+
+test("shows on the recommendation that one person both drafted and approved it, and why", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, {
+    seedRecommendationCombinedDutyAct: SELF_APPROVED_RECOMMENDATION_ACT,
+  });
+  await page.goto("/opportunities/opp-1");
+
+  const declared = page.getByTestId("combined-duty-recommendation-rec-1");
+  // The hat and the reason. A bare "self-approved" says nothing about whether it was reasonable.
+  await expect(declared).toContainText("BRANCH_DEPARTMENT_MANAGER");
+  await expect(declared).toContainText("Sole senior officer in this branch");
+  // Tied to the database rule it excuses, so the record and the constraint cannot drift apart.
+  await expect(declared).toHaveAttribute(
+    "data-combined-duty-pair",
+    "Recommendation_maker_checker_distinct",
+  );
+});
+
+test("the recommendation declares nothing when two people agreed with the advice", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, { seedApprovedRecommendation: true });
+  await page.goto("/opportunities/opp-1");
+
+  // Anchored on the approval line itself, from the SAME read that would carry the act — so the absence
+  // cannot pass while that read is still in flight, and cannot pass on a line that stopped rendering the
+  // declaration at all.
+  await expect(
+    page.getByText("Approved", { exact: false }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("combined-duty-recommendation-rec-1"),
+  ).toHaveCount(0);
 });
