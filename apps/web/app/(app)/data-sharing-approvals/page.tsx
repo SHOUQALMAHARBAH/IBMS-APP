@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -232,6 +233,12 @@ export default function DataSharingApprovalsPage() {
                     <td style={cell}>{r.slaDueAt.slice(0, 10)}</td>
                     <td style={cell}>
                       {r.isApproved ? 'Approved' : r.isDeclined ? 'Declined' : 'Pending'}
+                      {/* Part 4 step 5 — in the STATUS cell, because "Approved" is the claim being
+                          made and it is only true of a TWO-person decision. Shared renderer. */}
+                      <CombinedDutyOnRecord
+                        act={r.combinedDutyAct}
+                        testId={`combined-duty-sharing-${r.id}`}
+                      />
                     </td>
                     <td style={cell}>
                       {canApprove && r.isPending ? (

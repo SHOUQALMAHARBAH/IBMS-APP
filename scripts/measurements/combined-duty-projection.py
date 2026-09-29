@@ -67,6 +67,7 @@ BY_CALL_SITE = {
     ('commission.config.ts', 'row.combinedDutyAct'): 'CommissionLedgerEntry',
     ('claim.config.ts', 's.combinedDutyAct'): 'Settlement',
     ('kyc.controller.ts', 'row.combinedDutyAct'): 'KYCRecord',
+    ('data-sharing-approval.config.ts', 'row.combinedDutyAct'): 'DataSharingApproval',
 }
 
 
@@ -103,7 +104,11 @@ def measure(sources):
             continue
         base = os.path.basename(path)
         for m in re.finditer(re.escape(VIEW) + r'\s*\(([^)]*)\)', text):
-            call_args.append((base, m.group(1).strip()))
+            # `.rstrip(',')` because prettier may wrap a long call so the argument sits on its own
+            # line WITH a trailing comma — which changed the captured text without changing the code,
+            # and the assertion below correctly refused the unrecognised key rather than silently
+            # dropping a real projection. Normalising is the fix; loosening the assertion is not.
+            call_args.append((base, m.group(1).strip().rstrip(',').strip()))
 
     unmapped = [a for a in call_args if a not in BY_CALL_SITE]
     assert not unmapped, (

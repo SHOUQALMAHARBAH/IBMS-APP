@@ -5242,6 +5242,46 @@ model any more.
 
 **Projecting: 6 of 15.**
 
+
+### 1.81 — THREE CONSECUTIVE RED CI RUNS, ONE CAUSE, AND I REPORTED NONE OF THEM
+
+The owner asked where CI stood after two reports that did not say. She had seen the backend red on her
+own dashboard and told the owner's side it was normal for work in progress — which was right, **and she
+could only say it because she was looking. The report should have told her.**
+
+    8c2c7b3  backend FAILURE   frontend ok  docker ok   1 lint error
+    7ef401a  backend FAILURE   frontend ok  docker ok   3 lint errors
+    506a6c0  backend FAILURE   frontend ok  docker ok   3 lint errors
+    decbcad  backend running   frontend ok  docker ok   (the fix)
+
+**One cause, accumulating.** Widening nine service signatures from the bare Prisma model to the
+`…WithAct` payload type left the bare-model imports unreferenced, and `@typescript-eslint/no-unused-vars`
+is an ERROR in this repo. `DataSubjectRequest` from the DSR commit, then two `CommissionLedgerEntry`
+from the commission one, then the same three carried through the settlement commit. Every one was fixed
+during the KYC work — before the owner asked — but three pushes had already gone out red.
+
+#### Why the local gates missed it, which is the part worth keeping
+
+I ran `npm run -w web lint` after each of those commits and **not `npm run -w api lint`**, on commits
+whose changes were almost entirely api-side. CI runs both, filtered per app.
+
+And the reason I had stopped reaching for the api one is recorded two commits earlier in this same
+session: **`apps/api`'s lint script is `eslint … --fix`, so running it MUTATES the working tree** — I
+had just had to split a prettier sweep out of a feature commit because of exactly that. So I became wary
+of a gate that edits, and the gate I avoided is the only one that could see the error.
+
+**A verification gate that has a side effect will be avoided, and then it is not a gate.** The honest
+fix is to give the api a non-mutating lint for verification and keep `--fix` as a separate script — not
+to remember harder to run a command that rewrites the tree. Recorded here rather than done in the same
+commit as a projection: changing a package's lint script affects every future run and belongs on its
+own.
+
+#### The reporting rule, restated because the failure was in the reporting
+
+**Every report states where CI stands, on which commit, per job — green, red, or running.** Not because
+red is a failure; this session has been red and recovered several times and said so. Because **a rule
+followed only while the news is good is not a rule, and nobody outside can tell the difference.**
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

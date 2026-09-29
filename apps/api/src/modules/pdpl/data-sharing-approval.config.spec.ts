@@ -10,6 +10,8 @@ const row = (
 ): DataSharingApprovalRow => ({
   id: 'dsa-1',
   vendorId: 'vendor-1',
+  // The read includes this relation now, so the fixture carries it.
+  combinedDutyAct: null,
   description:
     'Claims documents shared with a loss adjuster for a large fire claim.',
   classification: 'CONFIDENTIAL',

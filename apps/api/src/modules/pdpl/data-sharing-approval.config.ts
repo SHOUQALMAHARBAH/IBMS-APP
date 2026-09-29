@@ -1,4 +1,9 @@
 import type { Prisma } from '@ibms/db';
+import type { CombinedDutyAct } from '@ibms/db';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 
 export const DATA_SHARING_SLA_WORKFLOW = 'data_sharing_decision';
 
@@ -63,6 +68,8 @@ export interface DataSharingApprovalRow {
   slaDueAt: Date;
   decidedAt: Date | null;
   createdAt: Date;
+  /** This pair's escape column relation — named per CONSTRAINT, so read it off the schema. */
+  combinedDutyAct: CombinedDutyAct | null;
 }
 
 export interface DataSharingApprovalView {
@@ -74,6 +81,15 @@ export interface DataSharingApprovalView {
   isRegulatoryChannel: boolean;
   requestedByUserId: string;
   approvedByUserId: string | null;
+  /**
+   * Set when ONE person both requested and decided this data-sharing approval, in an office that
+   * declared COMBINED duty segregation and stated why. Null on every ordinary decision.
+   *
+   * This pair guards PERSONAL DATA LEAVING THE OFFICE to a third party, so a reader of the record is
+   * entitled to know whether two people agreed to it. `requestedByUserId` equalling `approvedByUserId`
+   * is visible only to somebody comparing two uuids — Part 4 step 5.
+   */
+  combinedDutyAct: CombinedDutyActView | null;
   slaDueAt: string;
   decidedAt: string | null;
   createdAt: string;
@@ -89,8 +105,10 @@ export function deriveDataSharingApprovalView(
   row: DataSharingApprovalRow,
 ): DataSharingApprovalView {
   const decided = row.decidedAt !== null;
+  const combinedDutyAct = combinedDutyActView(row.combinedDutyAct);
   const approved = decided && row.approvedByUserId !== null;
   return {
+    combinedDutyAct,
     id: row.id,
     vendorId: row.vendorId,
     description: row.description,

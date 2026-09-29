@@ -3,6 +3,7 @@
 // checker) gates approve/decline.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
 export const DATA_CLASSIFICATIONS = [
   'PUBLIC',
@@ -43,6 +44,14 @@ export interface DataSharingApproval {
   isRegulatoryChannel: boolean;
   requestedByUserId: string;
   approvedByUserId: string | null;
+  /**
+   * Set when ONE person both requested and decided this approval, in an office that declared COMBINED
+   * duty segregation and stated why. Null on every ordinary decision.
+   *
+   * This pair guards personal data LEAVING THE OFFICE to a third party, and the status cell asserts
+   * "Approved" — a claim only true of a two-person decision.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
   slaDueAt: string;
   decidedAt: string | null;
   createdAt: string;
