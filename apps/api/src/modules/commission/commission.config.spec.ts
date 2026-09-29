@@ -212,6 +212,9 @@ describe('deriveLedgerEntryView', () => {
     id: 'cle-1',
     policyId: 'pol-1',
     commissionAgreementId: 'ag-1',
+    // The read includes this relation now, so the fixture carries it. Null is the ordinary override:
+    // one person requested it and another approved it.
+    combinedDutyAct: null,
     amount: d('18000'),
     vatRatePercent: d('16'),
     vatAmount: d('2880'),

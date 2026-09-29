@@ -1,24 +1,41 @@
 # -*- coding: utf-8 -*-
 """Which maker/checker pairs SHOW a declared combined-duty act on the record?
 
-When an office declares COMBINED mode, one person may perform both halves of an approval by stating
-why. The act is recorded in `CombinedDutyAct` and pointed at from the record's own escape column, and
-step 5 of the duty-segregation plan put it ON THE RECORD so a reader sees that nobody else signed
-this without going to find a report.
+When an office declares COMBINED duty segregation, one person may perform both halves of an approval
+by stating why. The act is recorded in `CombinedDutyAct`, pointed at from the record's own escape
+column, and Part 4 step 5 put it ON THE RECORD so a reader sees that nobody else signed this without
+going to find the report at `/internal-controls`.
 
-That was built for ONE pair. This counts the rest.
+    python scripts/measurements/combined-duty-projection.py              # the report
+    python scripts/measurements/combined-duty-projection.py --self-test  # prove the columns move
 
-  registered pairs        the 15 in MAKER_CHECKER_REGISTRY, which a test pins against pg_constraint
-  dormant                 no application code writes the model at all (M06/M07/M08) — nothing to show
-  live                    the remainder: a real act can exist on these
-  projecting              the record's own read renders the act via `combinedDutyActView`
-  writing only            the service sets the escape column and no reader ever surfaces it
+## EVERY COLUMN HERE IS PLANTED BEFORE IT IS PUBLISHED
 
-A pair that WRITES the act and never shows it is not broken — the act is in the report at
-`/internal-controls` — but the record itself then looks like an ordinary two-person approval, which
-is the thing step 5 exists to prevent.
+The owner's instruction, after "writes the column" was read as "reads the relation" three times and
+writing the lesson down had not worked: **before a number goes in a report, plant the condition it
+claims to detect and confirm the number moves. A column that cannot be made to move is not a
+measurement.** That is the discipline already applied to guards — the nav-reachability check reported
+0 findings until a plant proved it vacuous — turned on published columns.
 
-Run:  python scripts/measurements/combined-duty-projection.py
+`--self-test` does it: it mutates the real sources IN MEMORY, re-runs the measurement, and asserts
+each figure changed. In memory rather than on disk, so a failing self-test cannot leave the tree
+dirty.
+
+**What cannot be planted, stated rather than left implied**: `dormant` is 0 for every pair today, so
+planting a `dormant: true` would prove the parser reads a flag and not that the flag is true of
+anything. It is labelled an ESTIMATE in the output. Everything else is planted.
+
+## Two earlier versions of this script were wrong, both by loose matching
+
+1. Asking whether a file mentioning a pair's model also mentioned the view ANYWHERE reported
+   `Recommendation` as projecting, because the one file that calls the view happens to contain that
+   word — the same substring weakness that produced 69 false positives on the permission-reachability
+   check.
+2. Attributing a call site by the pair's `modelProperty` (`policyChecking`) missed a projection I had
+   just added, because the Prisma relation on the parent is named `checking`.
+
+So attribution is an EXPLICIT map from call-site argument to pair, and an argument no row claims is a
+loud assertion rather than a silent "not projecting".
 """
 import io
 import os
@@ -31,11 +48,33 @@ VIEW = 'combinedDutyActView'
 
 FIELD = re.compile(r"(\w+):\s*(?:'([^']*)'|(true|false))")
 
+# Which pair each call site of the view belongs to.
+#
+# MAINTAINED BY HAND AND ASSERTED. Neither automatic key works: the model property is not the Prisma
+# relation name on the parent, and matching loosely on the entity name is what produced the
+# `Recommendation` false positive. An argument no row claims raises — the same discipline as the i18n
+# dictionary registry, which has caught a real omission twice.
+BY_ARGUMENT = {
+    'e.refund.combinedDutyAct': 'Refund',
+    'policy.checking.combinedDutyAct': 'PolicyChecking',
+    'row.closureCombinedDutyAct': 'DataSubjectRequest',
+    'row.combinedDutyAct': 'CommissionLedgerEntry',
+}
 
-def pairs():
-    src = io.open(REGISTRY, encoding='utf-8').read()
-    start = src.index('export const MAKER_CHECKER_REGISTRY')
-    body = src[start:]
+
+def read_sources():
+    """{path: text} for the registry and every non-spec module file."""
+    out = {REGISTRY: io.open(REGISTRY, encoding='utf-8', errors='replace').read()}
+    for root, _, files in os.walk(MODULES):
+        for name in files:
+            if name.endswith('.ts') and '.spec.' not in name:
+                path = os.path.join(root, name)
+                out[path] = io.open(path, encoding='utf-8', errors='replace').read()
+    return out
+
+
+def parse_pairs(registry_text):
+    body = registry_text[registry_text.index('export const MAKER_CHECKER_REGISTRY'):]
     out = []
     for block in re.findall(r'\{([^{}]*?)\}', body, re.S):
         got = {}
@@ -43,95 +82,121 @@ def pairs():
             got[m.group(1)] = m.group(2) if m.group(2) is not None else m.group(3)
         if 'entityType' in got and 'dbCheckConstraint' in got:
             out.append(got)
-    # Pinned against the registry's own documented count, so a parser that silently matches fewer
-    # blocks cannot report that everything is fine.
-    assert len(out) == 15, 'expected 15 registered pairs, parsed %d' % len(out)
     return out
 
 
-def service_files():
-    for root, _, files in os.walk(MODULES):
-        for name in files:
-            if name.endswith('.ts') and '.spec.' not in name:
-                yield os.path.join(root, name)
+def measure(sources):
+    """The whole measurement, from a {path: text} map. The report and the self-test share this."""
+    pairs = parse_pairs(sources[REGISTRY])
 
-
-def main():
-    all_pairs = pairs()
-    sources = {p: io.open(p, encoding='utf-8', errors='replace').read() for p in service_files()}
-
-    # Every argument passed to the view, across the whole api. This is the authoritative set: a pair
-    # projects the act only if one of these names its own relation.
     call_args = []
-    for path, src in sources.items():
+    for path, text in sources.items():
         if path.endswith('duty-segregation.view.ts'):
             continue
-        for m in re.finditer(re.escape(VIEW) + r'\s*\(([^)]*)\)', src):
-            call_args.append(m.group(1))
+        for m in re.finditer(re.escape(VIEW) + r'\s*\(([^)]*)\)', text):
+            call_args.append(m.group(1).strip())
 
-    # Every argument the view is called with, and which PAIR each one belongs to.
-    #
-    # An EXPLICIT map, because neither automatic key works. The model property (`policyChecking`) is
-    # not the Prisma relation name on the parent (`policy.checking`), so matching on it silently
-    # missed a projection I had just added and reported 1 where the answer was 2. Matching loosely on
-    # the entity name is what produced the `Recommendation` false positive in the first version.
-    #
-    # So the mapping is maintained by hand and ASSERTED: an argument no row claims is a loud error,
-    # not a silent miss. Same discipline as the i18n dictionary registry, which has caught a real
-    # omission twice.
-    BY_ARGUMENT = {
-        'e.refund.combinedDutyAct': 'Refund',
-        'policy.checking.combinedDutyAct': 'PolicyChecking',
-        'row.closureCombinedDutyAct': 'DataSubjectRequest',
-    }
-
-    unmapped = [a.strip() for a in call_args if a.strip() not in BY_ARGUMENT]
+    unmapped = [a for a in call_args if a not in BY_ARGUMENT]
     assert not unmapped, (
         'combinedDutyActView is called with %s, which no row of BY_ARGUMENT claims. Add it — '
         'otherwise this script reports a pair as unprojected while a screen is showing it.'
         % unmapped
     )
-    PROJECTED_ENTITIES = {
-        BY_ARGUMENT[a.strip()] for a in call_args if a.strip() in BY_ARGUMENT
+    projected = {BY_ARGUMENT[a] for a in call_args}
+
+    dormant = [p['entityType'] for p in pairs if p.get('dormant') == 'true']
+    live = [p['entityType'] for p in pairs if p.get('dormant') != 'true']
+
+    return {
+        'pairs': len(pairs),
+        'dormant': dormant,
+        'live': len(live),
+        'projecting': sorted({e for e in live if e in projected}),
+        'writing_only': sorted([e for e in live if e not in projected]),
+        'call_sites': len(call_args),
     }
 
-    projecting = []
-    writing_only = []
-    dormant = []
 
-    for pair in all_pairs:
-        entity = pair['entityType']
-        if pair.get('dormant') == 'true':
-            dormant.append(entity)
-            continue
-        # EXACT, not "a file that mentions both". The first version asked whether any file
-        # mentioning this pair's modelProperty also mentioned the view anywhere, and reported
-        # `Recommendation` as projecting because the one file that calls the view happens to mention
-        # that word — the same substring weakness that produced 69 false positives on the
-        # permission-reachability check. A call site is attributed by the RELATION IN ITS ARGUMENT.
-        shows = entity in PROJECTED_ENTITIES
-        (projecting if shows else writing_only).append(entity)
+def report():
+    r = measure(read_sources())
+    assert r['pairs'] == 15, 'expected 15 registered pairs, parsed %d' % r['pairs']
 
-    print('registered maker/checker pairs        %3d' % len(all_pairs))
-    print('  dormant (no writer at all)          %3d' % len(dormant))
-    print('  live                                %3d' % (len(all_pairs) - len(dormant)))
-    print('    projecting the act on the record  %3d' % len(projecting))
-    print('    writing it and showing nobody     %3d' % len(writing_only))
+    print('registered maker/checker pairs        %3d' % r['pairs'])
+    print('  dormant (ESTIMATE — see header)     %3d' % len(r['dormant']))
+    print('  live                                %3d' % r['live'])
+    print('    projecting the act on the record  %3d' % len(r['projecting']))
+    print('    writing it and showing nobody     %3d' % len(r['writing_only']))
     print()
-    print('view call sites found              %3d' % len(call_args))
+    print('view call sites found                 %3d' % r['call_sites'])
     print()
-    if projecting:
-        print('PROJECTING: %s' % ', '.join(sorted(projecting)))
-    if writing_only:
-        print()
-        print('WRITING ONLY — the record reads as an ordinary two-person approval:')
-        for entity in sorted(writing_only):
-            print('  %s' % entity)
-    if dormant:
-        print()
-        print('DORMANT (nothing writes the model): %s' % ', '.join(sorted(dormant)))
+    print('PROJECTING: %s' % ', '.join(r['projecting']))
+    print()
+    print('WRITING ONLY — the record reads as an ordinary two-person approval:')
+    for entity in r['writing_only']:
+        print('  %s' % entity)
+    return 0
+
+
+def self_test():
+    """Plant each column's condition; assert the figure moves."""
+    base = read_sources()
+    baseline = measure(base)
+    failures = []
+
+    def planted(path, find, replace):
+        mutated = dict(base)
+        assert find in mutated[path], 'self-test plant is STALE: %r not in %s' % (find, path)
+        mutated[path] = mutated[path].replace(find, replace, 1)
+        return mutated
+
+    def check(name, mutated, key):
+        moved = measure(mutated)[key] != baseline[key]
+        print('  %-56s %s' % (name, 'ok' if moved else '*** DID NOT MOVE ***'))
+        if not moved:
+            failures.append(name)
+
+    # 1. The registry count must fall when a pair is removed.
+    check(
+        'registered pairs falls when a pair is dropped',
+        planted(REGISTRY, "entityType: 'Refund',", "notAnEntityType: 'Refund',"),
+        'pairs',
+    )
+
+    # 2. THE COLUMN THAT WAS WRONG THREE TIMES. Removing a call site must drop `projecting`. The old
+    #    heuristic reported a pair as projecting while no call site named it, so removing call sites
+    #    could not move it — exactly what this case refuses to let happen again.
+    commission = os.path.join(MODULES, 'commission', 'commission.config.ts')
+    check(
+        'projecting falls when a view call site is removed',
+        planted(commission, 'combinedDutyActView(row.combinedDutyAct)', 'null'),
+        'projecting',
+    )
+
+    # 3. A call site no mapping row claims must RAISE, never read as "not projecting" — which is how
+    #    a count silently drifts as pairs are added.
+    try:
+        measure(
+            planted(
+                commission,
+                'combinedDutyActView(row.combinedDutyAct)',
+                'combinedDutyActView(row.notInTheMap)',
+            )
+        )
+        print('  %-56s *** NO ERROR RAISED ***' % 'an unmapped call site is refused')
+        failures.append('unmapped call site')
+    except AssertionError as err:
+        if 'no row of BY_ARGUMENT claims' not in str(err):
+            raise
+        print('  %-56s ok' % 'an unmapped call site is refused')
+
+    print()
+    if failures:
+        print('SELF-TEST FAILED: %s' % ', '.join(failures))
+        return 1
+    print('SELF-TEST PASSED — every planted column moved.')
+    print('NOT PLANTABLE, labelled an ESTIMATE above: dormant (0 for every pair today).')
     return 0
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(self_test() if '--self-test' in sys.argv else report())

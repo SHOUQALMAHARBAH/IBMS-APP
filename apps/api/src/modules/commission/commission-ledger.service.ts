@@ -9,7 +9,7 @@ import { Prisma } from '@ibms/db';
 import type { CommissionLedgerEntry } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
-import { CommissionRepository } from '../../repositories/commission.repository';
+import { CommissionRepository , type CommissionLedgerEntryWithAct } from '../../repositories/commission.repository';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import {
   compareMoney,
@@ -164,7 +164,9 @@ export class CommissionLedgerService {
       );
     }
 
-    let created: CommissionLedgerEntry;
+    // The PAYLOAD type, not the bare model: the repository read includes the combined-duty relation
+    // and an annotation without it narrows the relation straight back off.
+    let created: CommissionLedgerEntryWithAct;
     try {
       created = await this.commission.createLedgerEntry({
         policyId: dto.policyId,

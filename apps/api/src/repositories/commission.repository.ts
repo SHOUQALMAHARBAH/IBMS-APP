@@ -113,6 +113,26 @@ export function agreementLineMatch(
  * entry per policy" structural. `P2002` on either surfaces to the service as
  * a resume-or-409.
  */
+/**
+ * The combined-duty act, on every ledger-entry read.
+ *
+ * `CommissionLedgerEntry_maker_checker_distinct` requires that whoever REQUESTS a manual commission
+ * override is not whoever approves it. When an office declares COMBINED mode one person may do both by
+ * stating why, and the act lands in `combinedDutyActId`.
+ *
+ * THIS PAIR IS THE MOST URGENT OF THE FIFTEEN, and the reason is what the screen already shows.
+ * `CommissionSection.tsx` renders `overrideReason` and `overrideRequestedByUserId` — the MAKER half —
+ * and nothing about the approver. **Showing half of a two-person control is worse than showing none
+ * of it: it reads as two people to anybody who does not know the field is missing.**
+ *
+ * On every read and not only the detail one: the override is money the broker is paid, and a row in a
+ * book-wide list that was self-approved should not have to be opened to find that out.
+ */
+const LEDGER_INCLUDE = { combinedDutyAct: true } as const;
+
+export type CommissionLedgerEntryWithAct =
+  Prisma.CommissionLedgerEntryGetPayload<{ include: typeof LEDGER_INCLUDE }>;
+
 @Injectable()
 export class CommissionRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -260,7 +280,7 @@ export class CommissionRepository {
     amount: Prisma.Decimal;
     vatRatePercent: Prisma.Decimal;
     vatAmount: Prisma.Decimal;
-  }): Promise<CommissionLedgerEntry> {
+  }): Promise<CommissionLedgerEntryWithAct> {
     return this.prisma.client.commissionLedgerEntry.create({
       data: {
         policyId: input.policyId,
@@ -271,20 +291,28 @@ export class CommissionRepository {
         status: 'outstanding',
         isManualOverride: false,
       },
+      // Same shape as every read, so the row type needs no optional field — and an optional field
+      // is what lets the next caller pass a row whose act state nobody knows. A newly calculated
+      // entry has no override at all, so this always yields null.
+      include: LEDGER_INCLUDE,
     });
   }
 
-  findLedgerEntryById(id: string): Promise<CommissionLedgerEntry | null> {
+  findLedgerEntryById(
+    id: string,
+  ): Promise<CommissionLedgerEntryWithAct | null> {
     return this.prisma.client.commissionLedgerEntry.findUnique({
       where: { id },
+      include: LEDGER_INCLUDE,
     });
   }
 
   findLedgerEntryByPolicyId(
     policyId: string,
-  ): Promise<CommissionLedgerEntry | null> {
+  ): Promise<CommissionLedgerEntryWithAct | null> {
     return this.prisma.client.commissionLedgerEntry.findUnique({
       where: { policyId },
+      include: LEDGER_INCLUDE,
     });
   }
 
@@ -294,8 +322,9 @@ export class CommissionRepository {
   findLedgerEntries(
     scope: { policyId?: string; insurerId?: string },
     take: number,
-  ): Promise<CommissionLedgerEntry[]> {
+  ): Promise<CommissionLedgerEntryWithAct[]> {
     return this.prisma.client.commissionLedgerEntry.findMany({
+      include: LEDGER_INCLUDE,
       where: {
         ...(scope.policyId ? { policyId: scope.policyId } : {}),
         ...(scope.insurerId

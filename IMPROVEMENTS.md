@@ -5105,6 +5105,64 @@ The owner's ruling, recorded so nobody re-weighs it: the deferral covers money a
 engine, does not extend it, and adds no screening claim anywhere. It is the same line as the other
 twelve, on a record that happens to be a KYC record.
 
+
+### 1.79 — THE COMMISSION OVERRIDE SHOWED HALF A TWO-PERSON CONTROL; AND A PUBLISHED COLUMN NOW PLANTS ITSELF
+
+Both money pairs measured as **screen exists**, so the owner ruled them display work and in scope.
+`CommissionLedgerEntry` was taken first on her reasoning, which is sharper than schema order:
+**`CommissionSection.tsx` already rendered the override reason, named the REQUESTER, and printed
+`(approved)` — and rendered nothing about who approved it.** Showing half of a two-person control is
+worse than showing none of it, because it reads as two people to anybody who does not know the field
+is missing.
+
+The `(approved)` marker is why the ordinary-case test asserts that marker IS present beside the absent
+declaration: the screen makes a positive claim, and the claim has to be true.
+
+#### The structural fix the owner asked for, in place of a better note
+
+"Writes the column" read as "reads the relation" three times, and I had recorded the lesson one entry
+before repeating it. Her instruction: **before a number goes in a report, plant the condition it
+claims to detect and confirm the number moves. A column that cannot be made to move is not a
+measurement.** The same instrument already used on the nav check, turned on published columns.
+
+`scripts/measurements/combined-duty-projection.py --self-test` does it — and it required rewriting the
+script so the report and the self-test call ONE `measure(sources)` seam. It mutates the real sources
+**in memory**, re-runs the measurement and asserts the figure changed:
+
+    registered pairs falls when a pair is dropped             ok
+    projecting falls when a view call site is removed         ok
+    an unmapped call site is refused                          ok
+
+The second case is the one that was wrong three times: the old heuristic reported a pair as projecting
+while no call site named it, so removing call sites **could not move the number** — which is exactly
+what the plant now refuses. A stale plant is loud too: `planted()` asserts its own anchor exists
+before mutating, so the self-test cannot silently pass against code that moved.
+
+**One column is NOT plantable and is labelled an estimate in the output**: `dormant` is 0 for every
+pair today, so planting a `dormant: true` would prove the parser reads a flag rather than that the
+flag is true of anything. An estimate honestly labelled is fine; a count that was never planted,
+presented as a count, is the thing being paid for.
+
+#### The near-miss that produced this, worth keeping separately
+
+A name search for `CommissionLedgerEntry` across the web found it **only inside a comment**, and I
+nearly reported "no screen" — which under the owner's rule would have deferred the work for no reason.
+The web client names the type `CommissionEntry`: **the api's model name and the web's type name
+differ, so a name-matched search answers a question about vocabulary while appearing to answer one
+about screens.** Following the client functions that RETURN the type to their callers is what settled
+it. **No red build would ever have caught that** — the work would simply have gone into the deferred
+pile and nobody would have found out.
+
+#### And two fixtures I invented crashed the page rather than failing an assertion
+
+`Chrome's own "This page couldn't load"` — the recorded symptom of a mock whose SHAPE differs from the
+endpoint's, on its fourth occurrence here. Twice in one spec: a hand-written opportunity missing half
+its fields, then `[]` for `/policies?opportunityId=` which returns a PAGE (`listPoliciesForOpportunity`
+reads `page.items`). Both fixtures are now **copied verbatim from `part-g-core-screens.spec.ts` and
+type-annotated**, which is what makes the next one a compile error instead of a crash.
+
+**Projecting: 4 of 15.**
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

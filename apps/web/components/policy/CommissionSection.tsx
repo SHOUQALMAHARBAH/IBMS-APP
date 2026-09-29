@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import {
   approveCommissionOverride,
   calculateCommission,
@@ -175,6 +176,14 @@ export function CommissionSection({
                   <span>{entry.overrideReason}</span>
                 </div>
               ) : null}
+              {/* Part 4 step 5, and the most urgent of the fifteen: the block above prints
+                  '(approved)' and names the REQUESTER, so a self-approved override read as a
+                  two-person one. Shared renderer — the same sentence as on a refund, a policy's
+                  quality check and a data subject request. */}
+              <CombinedDutyOnRecord
+                act={entry.combinedDutyAct}
+                testId={`combined-duty-commission-${entry.id}`}
+              />
             </>
           ) : null}
 
