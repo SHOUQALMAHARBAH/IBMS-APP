@@ -5354,11 +5354,18 @@ locally first: the identical `1 unacknowledged advisory` failure). The step list
      9  Security tests    failure         9  Security tests    FAILURE
     20  Seed database     success        20  Seed database     success
     21  Install Chromium  SKIPPED        21  Install Chromium  SUCCESS   <- the guard firing
-    22  Integration tests failure        22  Integration tests (runs with a browser)
+    22  Integration tests FAILURE        22  Integration tests SUCCESS   <- the three false
+        (3 PDF tests)                                                       accusations gone
 
-**Same red at step 9, opposite outcome at step 21.** The guard is no longer an unproven negative: it has
-been observed doing the thing it was added for, against the real failure mode rather than a synthetic
-one. A branch push alone runs no CI here (`ci.yml` triggers on `push: [main]` and `pull_request`), which
+**Same red at step 9. Opposite outcome at 21 AND at 22** — and step 22 is the stronger half. The
+integration suite went from three failures to zero **while the root cause stayed red**, which is a
+complete causal demonstration rather than an inference: the ONLY difference between the two runs is the
+guard, so the three PDF failures on `decbcad` were 100% collateral. Nothing was ever wrong with the
+invoice, policy-schedule-summary or certificate-of-insurance tests, and a stretch spent inside them
+would have found nothing — which is exactly what the owner's hypothesis prevented.
+
+The guard is no longer an unproven negative: it has been observed doing the thing it was added for,
+against the real failure mode rather than a synthetic one. A branch push alone runs no CI here (`ci.yml` triggers on `push: [main]` and `pull_request`), which
 is why the plant needed a PR — closed and the branch deleted once read.
 
 #### AND A FOURTH RED, WITH TWO CAUSES AND ONE OF THEM A CASCADE
