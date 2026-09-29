@@ -231,7 +231,9 @@ export default function FinancialDashboardPage() {
                   )}
                 </div>
                 <div>
-                  Outstanding ({summary.payables.totals.outstandingCount})
+                  {t('dfinOutstandingCount', {
+                    count: summary.payables.totals.outstandingCount,
+                  })}
                 </div>
               </div>
               <div>
@@ -241,7 +243,11 @@ export default function FinancialDashboardPage() {
                     language,
                   )}
                 </div>
-                <div>Remitted ({summary.payables.totals.remittedCount})</div>
+                <div>
+                  {t('dfinRemittedCount', {
+                    count: summary.payables.totals.remittedCount,
+                  })}
+                </div>
               </div>
             </div>
           </section>

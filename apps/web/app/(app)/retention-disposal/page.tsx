@@ -400,7 +400,7 @@ export default function RetentionDisposalPage() {
                         {h.customerId
                           ? `Customer ${h.customerId.slice(0, 8)}…`
                           : h.insuredPersonId
-                            ? `Insured person ${h.insuredPersonId.slice(0, 8)}…`
+                            ? t('rdInsuredPersonGeneric')
                             : '—'}
                       </td>
                       <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>

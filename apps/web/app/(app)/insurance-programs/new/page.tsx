@@ -89,7 +89,16 @@ function AssembleFlow() {
   return (
     <>
       <p style={{ opacity: 0.8 }}>
-        Needs assessment {assessment.id.slice(0, 8)} — status {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}.
+        {/*
+          The truncated uuid is gone. Rule 2: what identifies a record to a person must be something the
+          person recognises, and `3f8a1c2b` is not — the reader arrived here BY selecting this assessment,
+          so naming it back at them added nothing. `NeedsAssessment` carries no human-readable name (only
+          `customerId` and `riskProfileId`, both uuids), so the honest line is what the screen needs: the
+          status, which the refusal below depends on.
+        */}
+        {t('iprognAssessmentStatus', {
+          status: t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status]),
+        })}
       </p>
 
       {!isApproved ? (

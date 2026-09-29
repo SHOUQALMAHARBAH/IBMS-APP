@@ -159,7 +159,7 @@ export default function PlanningExportPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Market — insurer performance ({summary.periodLabel})</h2>
+            <h2>{t('pexMarketHeading', { period: summary.periodLabel })}</h2>
             {summary.market.length === 0 ? (
               <p style={{ color: 'var(--ink-secondary)' }}>
                 {t('pexNoInsurerScores')}

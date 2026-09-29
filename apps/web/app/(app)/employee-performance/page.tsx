@@ -169,8 +169,8 @@ export default function EmployeePerformancePage() {
             />
           </div>
           <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-            Most recent period: {latest.periodLabel}. A dash means no outcomes
-            existed to rate that period, not a computed 0%.
+            {t('epMostRecentPeriod', { period: latest.periodLabel })}{' '}
+            {t('epDashMeaning')}
           </p>
 
           <h2>{t('dashHistory')}</h2>

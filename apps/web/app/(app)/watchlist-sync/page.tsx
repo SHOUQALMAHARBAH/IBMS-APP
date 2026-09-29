@@ -115,7 +115,11 @@ export default function WatchlistSyncPage() {
     await run(async () => {
       const result = await runRecurringScreeningBatch();
       setMessage(
-        `Re-screened ${result.screened} active customer(s) — ${result.hits} produced a HIT, ${result.failed} failed.`,
+        t('wsRescreenSummary', {
+          screened: result.screened,
+          hits: result.hits,
+          failed: result.failed,
+        }),
       );
     });
   }

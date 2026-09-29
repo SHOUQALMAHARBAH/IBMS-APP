@@ -25,7 +25,11 @@ import {
   labelStyle,
   successStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { orgUnitColumnStyle, orgUnitGridStyle, orgUnitRowStyle } from '../../../../components/admin/admin.styles';
+import {
+  orgUnitColumnStyle,
+  orgUnitGridStyle,
+  orgUnitRowStyle,
+} from '../../../../components/admin/admin.styles';
 
 /**
  * Departments and branches — the smallest thing that makes the person form honest.
@@ -91,7 +95,9 @@ export default function OrgUnitsPage() {
     } catch (err) {
       setDepartments(null);
       setBranches(null);
-      setLoadError(err instanceof ApiError ? err.message : t('orgUnitLoadError'));
+      setLoadError(
+        err instanceof ApiError ? err.message : t('orgUnitLoadError'),
+      );
     }
   }, [canReadDept, canReadBranch, t]);
 
@@ -117,7 +123,9 @@ export default function OrgUnitsPage() {
       setMessage(done);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('orgUnitLoadError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('orgUnitLoadError'),
+      );
     } finally {
       setBusy(false);
     }
@@ -132,18 +140,15 @@ export default function OrgUnitsPage() {
         name: draft.name.trim(),
         ...(draft.nameAr.trim() ? { nameAr: draft.nameAr.trim() } : {}),
       };
-      void run(
-        async () => {
-          if (kind === 'department') {
-            await createDepartment(payload);
-            setNewDept({ name: '', nameAr: '' });
-          } else {
-            await createBranch(payload);
-            setNewBranch({ name: '', nameAr: '' });
-          }
-        },
-        t('orgUnitCreated'),
-      );
+      void run(async () => {
+        if (kind === 'department') {
+          await createDepartment(payload);
+          setNewDept({ name: '', nameAr: '' });
+        } else {
+          await createBranch(payload);
+          setNewBranch({ name: '', nameAr: '' });
+        }
+      }, t('orgUnitCreated'));
     };
   }
 
@@ -161,7 +166,11 @@ export default function OrgUnitsPage() {
     if (!can.read) return null;
     return (
       <section style={orgUnitColumnStyle} data-org-unit-kind={kind}>
-        <h2>{kind === 'department' ? t('orgUnitDepartments') : t('orgUnitBranches')}</h2>
+        <h2>
+          {kind === 'department'
+            ? t('orgUnitDepartments')
+            : t('orgUnitBranches')}
+        </h2>
 
         {can.create ? (
           <form onSubmit={onCreate(kind)}>
@@ -184,7 +193,12 @@ export default function OrgUnitsPage() {
                 data-new-name-ar={kind}
               />
             </label>
-            <button type="submit" disabled={busy} style={buttonStyle} data-create={kind}>
+            <button
+              type="submit"
+              disabled={busy}
+              style={buttonStyle}
+              data-create={kind}
+            >
               {t('orgUnitCreateButton')}
             </button>
           </form>
@@ -208,7 +222,9 @@ export default function OrgUnitsPage() {
               ) : (
                 <input
                   value={draftName}
-                  onChange={(e) => setEditing({ ...editing, [u.id]: e.target.value })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, [u.id]: e.target.value })
+                  }
                   style={inputStyle}
                   data-rename-input={u.id}
                   aria-label={t('orgUnitNameEn')}
@@ -232,7 +248,10 @@ export default function OrgUnitsPage() {
                   data-save-rename={u.id}
                   onClick={() =>
                     void run(async () => {
-                      if (kind === 'department') await renameDepartment(u.id, { name: draftName.trim() });
+                      if (kind === 'department')
+                        await renameDepartment(u.id, {
+                          name: draftName.trim(),
+                        });
                       else await renameBranch(u.id, { name: draftName.trim() });
                       const next = { ...editing };
                       delete next[u.id];
@@ -251,7 +270,8 @@ export default function OrgUnitsPage() {
                   data-retire={u.id}
                   onClick={() =>
                     void run(async () => {
-                      if (kind === 'department') await deactivateDepartment(u.id);
+                      if (kind === 'department')
+                        await deactivateDepartment(u.id);
                       else await deactivateBranch(u.id);
                     }, t('orgUnitRetired'))
                   }
@@ -276,7 +296,11 @@ export default function OrgUnitsPage() {
           {t('orgUnitNoPermission')}
         </p>
       ) : null}
-      {loadError ? <p style={errorStyle}>{loadError}</p> : null}
+      {loadError ? (
+        <p role="alert" style={errorStyle}>
+          {loadError}
+        </p>
+      ) : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
       {message ? (
         <p role="status" style={successStyle}>
@@ -288,14 +312,24 @@ export default function OrgUnitsPage() {
         {renderColumn(
           'department',
           departments,
-          { read: canReadDept, create: canCreateDept, update: canUpdateDept, retire: canRetireDept },
+          {
+            read: canReadDept,
+            create: canCreateDept,
+            update: canUpdateDept,
+            retire: canRetireDept,
+          },
           newDept,
           setNewDept,
         )}
         {renderColumn(
           'branch',
           branches,
-          { read: canReadBranch, create: canCreateBranch, update: canUpdateBranch, retire: canRetireBranch },
+          {
+            read: canReadBranch,
+            create: canCreateBranch,
+            update: canUpdateBranch,
+            retire: canRetireBranch,
+          },
           newBranch,
           setNewBranch,
         )}

@@ -110,7 +110,16 @@ export default function PolicyDetailPage() {
   if (loadError) {
     return (
       <div style={pageStyle}>
-        <div style={errorStyle}>{loadError}</div>
+        {/*
+          `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
+          role, so a sighted reader saw the error and a screen-reader user was never told — the screen
+          lying by omission to one class of user, and the affected reader has no way to notice. Every
+          other screen in this app announces it; `test/load-error-alert.test.ts` now fails a load-error
+          branch that does not.
+        */}
+        <p role="alert" style={errorStyle}>
+          {loadError}
+        </p>
         <button
           type="button"
           style={smallButtonStyle}

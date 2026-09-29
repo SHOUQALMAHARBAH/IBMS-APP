@@ -111,7 +111,12 @@ export default function RetentionCasesPage() {
     await run(async () => {
       const result = await runRetentionSweep();
       setSweepMessage(
-        `Scanned ${result.scanned} renewal case(s) — opened ${result.openedRenewalInactivity} for inactivity, ${result.openedLapseRisk} for lapse risk, ${result.failed} failed.`,
+        t('retScanSummary', {
+          scanned: result.scanned,
+          inactivity: result.openedRenewalInactivity,
+          lapse: result.openedLapseRisk,
+          failed: result.failed,
+        }),
       );
     });
   }

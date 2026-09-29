@@ -14,7 +14,10 @@ import {
   type UpSellRecommendation,
 } from '../../../lib/up-sell/up-sell-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { buttonStyle, errorStyle } from '../../../components/auth/auth-form.styles';
+import {
+  buttonStyle,
+  errorStyle,
+} from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import {
   upSellActionsStyle,
@@ -24,9 +27,8 @@ import {
   upSellPanelStyle,
 } from '../../../components/up-sell/up-sell.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
-import { formatDate } from '../../../lib/i18n/format';
+import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import { hasPermission } from '../../../lib/auth/permissions';
-
 
 function RecommendationRow({
   recommendation,
@@ -69,14 +71,31 @@ function RecommendationRow({
         }}
       >
         <strong>{t('upsUnderInsuranceFlagged')}</strong>
-        <span style={upSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[recommendation.status])}</span>
+        <span style={upSellBadgeStyle}>
+          {t(ENUM_LABEL.UpSellStatus[recommendation.status])}
+        </span>
       </div>
       <div style={upSellFigureRowStyle}>
-        <span>Designed Sum Insured (JOD): {recommendation.currentSumInsured}</span>
-        <span>Current asset value (JOD): {recommendation.currentAssetValue}</span>
+        {/*
+          The currency is on the VALUE, not in the label. Translating "(JOD)" would make a money figure
+          assert its own currency in prose — fine today, a FALSE STATEMENT the moment currency becomes
+          configurable. `formatMoney` already prefixes it and already defaults to JOD, so the assumption
+          lives in one tested place instead of five label strings. The up-sell payload carries no
+          currency field; that is on the wake-up list rather than assumed away here.
+        */}
+        <span>
+          {t('upsDesignedSi')}:{' '}
+          {formatMoney(recommendation.currentSumInsured, language)}
+        </span>
+        <span>
+          {t('upsAssetValue')}:{' '}
+          {formatMoney(recommendation.currentAssetValue, language)}
+        </span>
       </div>
       <div style={cardMetaStyle}>
-        Flagged {formatDate(recommendation.detectedAt, language)}
+        {t('upsFlaggedOn', {
+          at: formatDate(recommendation.detectedAt, language),
+        })}
       </div>
       {recommendation.status === 'DISMISSED' && recommendation.dismissReason ? (
         <div style={cardMetaStyle}>Reason: {recommendation.dismissReason}</div>
@@ -159,11 +178,10 @@ function RecommendationRow({
 }
 
 function UpSellForCustomer({ customerId }: { customerId: string }) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const { user } = useAuth();
   const canConvert = hasPermission(user, 'up-sell.convert');
-  const canScan =
-    hasPermission(user, 'up-sell.detect');
+  const canScan = hasPermission(user, 'up-sell.detect');
 
   const [recommendations, setRecommendations] = useState<
     UpSellRecommendation[] | null
@@ -252,20 +270,30 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
         <div style={upSellPanelStyle}>
           <strong>{t('upsLastScan')}</strong>
           <div style={upSellFigureRowStyle}>
-            <span>Designed Sum Insured (JOD): {scan.currentSumInsured}</span>
-            <span>Current asset value (JOD): {scan.currentAssetValue}</span>
-            <span>Shortfall (JOD): {scan.shortfall}</span>
+            <span>
+              {t('upsDesignedSi')}:{' '}
+              {formatMoney(scan.currentSumInsured, language)}
+            </span>
+            <span>
+              {t('upsAssetValue')}:{' '}
+              {formatMoney(scan.currentAssetValue, language)}
+            </span>
+            <span>
+              {t('upsShortfall')}: {formatMoney(scan.shortfall, language)}
+            </span>
           </div>
           <div style={cardMetaStyle}>
             {scan.currentSumInsured === '0.000'
               ? t('upsNoDesignedSi')
               : scan.isUnderinsured
                 ? scan.flagged
-                  ? `Under-insured by more than ${scan.thresholdPercent}% — a recommendation was raised.`
+                  ? t('upsUnderinsuredRaised', {
+                      percent: scan.thresholdPercent,
+                    })
                   : scan.suppressedByPriorResolution
                     ? t('upsAlreadyActioned')
                     : t('upsAlreadyOpen')
-                : `Adequately insured (within ${scan.thresholdPercent}% of asset value).`}
+                : t('upsAdequate', { percent: scan.thresholdPercent })}
           </div>
         </div>
       ) : null}
@@ -325,9 +353,7 @@ export default function UpSellPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('upsHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('upsIntro')}
-      </p>
+      <p style={{ opacity: 0.8 }}>{t('upsIntro')}</p>
       <Suspense fallback={null}>
         <UpSellFlow />
       </Suspense>

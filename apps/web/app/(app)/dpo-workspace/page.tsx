@@ -116,8 +116,10 @@ export default function DpoWorkspacePage() {
                         <td style={cell}>{d.slaDueAt.slice(0, 10)}</td>
                         <td style={cell}>
                           {d.daysUntilDue < 0
-                            ? `Overdue by ${Math.abs(d.daysUntilDue)}d`
-                            : `${d.daysUntilDue}d`}
+                            ? t('dpowOverdueBy', {
+                                days: Math.abs(d.daysUntilDue),
+                              })
+                            : t('dpowDaysLeft', { days: d.daysUntilDue })}
                         </td>
                       </tr>
                     ))}

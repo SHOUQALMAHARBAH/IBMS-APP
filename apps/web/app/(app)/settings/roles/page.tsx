@@ -14,8 +14,14 @@ import { hasPermission } from '../../../../lib/auth/permissions';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { PermissionMatrix } from '../../../../components/admin/PermissionMatrix';
-import { createMatrixStyle, generatedNameStyle } from '../../../../components/admin/admin.styles';
-import { machineNameProblem, toMachineName } from '../../../../lib/admin/role-name';
+import {
+  createMatrixStyle,
+  generatedNameStyle,
+} from '../../../../components/admin/admin.styles';
+import {
+  machineNameProblem,
+  toMachineName,
+} from '../../../../lib/admin/role-name';
 import { stepUp } from '../../../../lib/auth/auth-api';
 import {
   createRole,
@@ -116,14 +122,15 @@ export default function RoleAdminPage() {
   // an existing role grants without being able to add new ones. Each control asks for its own.
   const canCreate = hasPermission(user, 'role.create');
   /** Part 5: the operations that need two people, and whether this office has them. */
-  const [readiness, setReadiness] = useState<DutySegregationReadiness[] | null>(null);
+  const [readiness, setReadiness] = useState<DutySegregationReadiness[] | null>(
+    null,
+  );
   const [readinessError, setReadinessError] = useState<string | null>(null);
   const canUpdate = hasPermission(user, 'role.update');
   const canRetire = hasPermission(user, 'role.deactivate');
   /** The actions column exists if ANY row action does. */
   const canActOnRow = canUpdate || canRetire;
   const canReadCatalogue = hasPermission(user, 'permission.read');
-
 
   const [roles, setRoles] = useState<RoleAdminEntry[] | null>(null);
   const [catalogue, setCatalogue] = useState<PermissionCatalogueEntry[]>([]);
@@ -215,11 +222,15 @@ export default function RoleAdminPage() {
         await deleteRole(role.id);
         setDeleting(null);
         // Close the matrix if it was open on the role that no longer exists.
-        setEditing((current) => (current && current.id === role.id ? null : current));
+        setEditing((current) =>
+          current && current.id === role.id ? null : current,
+        );
         setSavedMessage(t('roleDeleted'));
         await load();
       } catch (err) {
-        setActionError(err instanceof ApiError ? err.message : t('roleCouldNotLoad'));
+        setActionError(
+          err instanceof ApiError ? err.message : t('roleCouldNotLoad'),
+        );
       } finally {
         setBusy(false);
       }
@@ -435,7 +446,11 @@ export default function RoleAdminPage() {
       <h1>{t('roleHeading')}</h1>
       <p>{t('roleIntro')}</p>
 
-      {loadError ? <p style={errorStyle}>{loadError}</p> : null}
+      {loadError ? (
+        <p role="alert" style={errorStyle}>
+          {loadError}
+        </p>
+      ) : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
 
       {/* A caller the CLIENT already knows cannot read roles never reaches `load()`, so the
@@ -455,7 +470,9 @@ export default function RoleAdminPage() {
       {/* And the window before the first response: `roles` is null and there is no error yet, which
           used to render nothing at all. A person who opens this screen on a slow connection must see
           that something is happening. */}
-      {canRead && roles === null && !loadError ? <p role="status">{t('commonLoading')}</p> : null}
+      {canRead && roles === null && !loadError ? (
+        <p role="status">{t('commonLoading')}</p>
+      ) : null}
 
       {roles && roles.length === 0 ? <p>{t('roleNoRoles')}</p> : null}
 
@@ -473,7 +490,9 @@ export default function RoleAdminPage() {
       {readiness ? (
         <section style={sectionStyle} data-duty-segregation>
           <h2>{t('dutySegHeading')}</h2>
-          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>{t('dutySegIntro')}</p>
+          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>
+            {t('dutySegIntro')}
+          </p>
           <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
             <thead>
               <tr>
@@ -494,7 +513,10 @@ export default function RoleAdminPage() {
                     a.entityType.localeCompare(b.entityType),
                 )
                 .map((row) => (
-                  <tr key={row.constraint ?? row.entityType + row.pairLabel} data-duty-row={row.status}>
+                  <tr
+                    key={row.constraint ?? row.entityType + row.pairLabel}
+                    data-duty-row={row.status}
+                  >
                     <td style={cell}>{row.entityType}</td>
                     <td style={cell}>
                       <code>{row.checkerPermission}</code>
@@ -592,7 +614,9 @@ export default function RoleAdminPage() {
 
       {deleting ? (
         <section style={sectionStyle} data-delete-confirm={deleting.name}>
-          <h2>{t('roleDeleteConfirmHeading', { role: roleLabel(deleting) })}</h2>
+          <h2>
+            {t('roleDeleteConfirmHeading', { role: roleLabel(deleting) })}
+          </h2>
           <p>{t('roleDeleteConfirmBody')}</p>
           <button
             type="button"
@@ -804,7 +828,6 @@ export default function RoleAdminPage() {
           </table>
         </section>
       ) : null}
-
 
       {stepUpPending ? (
         <section style={sectionStyle} data-step-up="">

@@ -6,8 +6,15 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
-import { profileFieldLabelStyle, profileFieldValueStyle, profileGridStyle } from '../../../../components/prospect/prospect.styles';
+import {
+  pageStyle,
+  smallButtonStyle,
+} from '../../../../components/lead/lead.styles';
+import {
+  profileFieldLabelStyle,
+  profileFieldValueStyle,
+  profileGridStyle,
+} from '../../../../components/prospect/prospect.styles';
 import type { LeadSource, LeadStatus } from '../../../../lib/lead/lead-api';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { leadStatusLabelKey } from '../../../../lib/lead/lead-status';
@@ -45,10 +52,10 @@ export default function LeadDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 404
-          ? (t('leaddNotFound'))
+          ? t('leaddNotFound')
           : err instanceof ApiError
             ? err.message
-            : (t('leaddPleaseTryAgain')),
+            : t('leaddPleaseTryAgain'),
       );
     } finally {
       setIsLoading2(false);
@@ -83,7 +90,16 @@ export default function LeadDetailPage() {
   if (loadError) {
     return (
       <div style={pageStyle}>
-        <div style={errorStyle}>{loadError}</div>
+        {/*
+          `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
+          role, so a sighted reader saw the error and a screen-reader user was never told — the screen
+          lying by omission to one class of user, and the affected reader has no way to notice. Every
+          other screen in this app announces it; `test/load-error-alert.test.ts` now fails a load-error
+          branch that does not.
+        */}
+        <p role="alert" style={errorStyle}>
+          {loadError}
+        </p>
         <button
           type="button"
           style={smallButtonStyle}
@@ -160,23 +176,31 @@ export default function LeadDetailPage() {
           )}
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('leaddMarketingConsent')}</div>
+            <div style={profileFieldLabelStyle}>
+              {t('leaddMarketingConsent')}
+            </div>
             <div style={profileFieldValueStyle}>
-              <bdi>{lead.marketingConsentGranted ? (t('leaddYes')) : (t('leaddNo'))}</bdi>
+              <bdi>
+                {lead.marketingConsentGranted ? t('leaddYes') : t('leaddNo')}
+              </bdi>
             </div>
           </div>
 
           <div>
             <div style={profileFieldLabelStyle}>{t('leaddCreated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(lead.createdAt).toLocaleDateString(t('leaddEnUs'))}</bdi>
+              <bdi>
+                {new Date(lead.createdAt).toLocaleDateString(t('leaddEnUs'))}
+              </bdi>
             </div>
           </div>
 
           <div>
             <div style={profileFieldLabelStyle}>{t('leaddUpdated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(lead.updatedAt).toLocaleDateString(t('leaddEnUs2'))}</bdi>
+              <bdi>
+                {new Date(lead.updatedAt).toLocaleDateString(t('leaddEnUs2'))}
+              </bdi>
             </div>
           </div>
         </div>

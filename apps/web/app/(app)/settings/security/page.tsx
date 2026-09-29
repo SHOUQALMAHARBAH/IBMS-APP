@@ -402,7 +402,13 @@ export default function SecuritySettingsPage() {
         <p>
           {tPlural('secHardLogoutMinutes', user.hardLogoutAfterIdleMinutes)}
         </p>
-        {user.accessValidUntil ? <p>Your access to IBMS ends: {formatDateTime(user.accessValidUntil, language)}</p> : null}
+        {user.accessValidUntil ? (
+          <p>
+            {t('secAccessEnds', {
+              at: formatDateTime(user.accessValidUntil, language),
+            })}
+          </p>
+        ) : null}
       </section>
 
       {/* Renders only for a holder of `encryption-key.read`. A gated SECTION on an

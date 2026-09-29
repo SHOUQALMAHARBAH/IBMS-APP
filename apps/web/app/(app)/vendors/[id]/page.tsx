@@ -275,7 +275,9 @@ export default function VendorDetailPage() {
                 {readiness.ready ? (
                   t("vendReady")
                 ) : (
-                  <>Not ready: {readiness.reasons.join(" ")}</>
+                  t("vendNotReadyWithReasons", {
+                    reasons: readiness.reasons.join(" "),
+                  })
                 )}
               </p>
             ) : null}

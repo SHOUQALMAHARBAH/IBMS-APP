@@ -114,9 +114,11 @@ export default function ConsentPage() {
     try {
       const res = await requestConsentWithdrawal(id);
       setNotice(
-        `Withdrawal request logged for ${id.slice(0, 8)}… — reflect it in the register by ${
-          res.dueAt ? res.dueAt.slice(0, 10) : 'the SLA deadline'
-        }.`,
+        t('consWithdrawalLogged', {
+          due: res.dueAt
+            ? res.dueAt.slice(0, 10)
+            : t('consWithdrawalSlaDeadline'),
+        }),
       );
     } catch (err) {
       setActionError(

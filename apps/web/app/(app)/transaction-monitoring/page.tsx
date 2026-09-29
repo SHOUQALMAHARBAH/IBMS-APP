@@ -111,7 +111,12 @@ export default function TransactionMonitoringPage() {
     await run(async () => {
       const result = await runTransactionMonitoringSweep();
       setSweepMessage(
-        `Scanned ${result.scanned} candidate(s) — created ${result.created} alert(s), ${result.skippedExisting} already flagged, ${result.failed} failed.`,
+        t('tmSweepSummary', {
+          scanned: result.scanned,
+          created: result.created,
+          skipped: result.skippedExisting,
+          failed: result.failed,
+        }),
       );
     });
   }

@@ -248,7 +248,12 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
           <div style={cardMetaStyle}>
             {scan.heldLines.length === 0
               ? t('xsNoInForceCover')
-              : `Gaps: ${scan.gapLines.length ? scan.gapLines.join(', ') : 'none'} · ${scan.newlyFlagged.length} newly flagged`}
+              : t('xsScanGaps', {
+                  gaps: scan.gapLines.length
+                    ? scan.gapLines.join(', ')
+                    : t('xsScanNoGaps'),
+                  count: scan.newlyFlagged.length,
+                })}
           </div>
         </div>
       ) : null}

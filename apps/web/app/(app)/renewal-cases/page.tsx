@@ -94,7 +94,12 @@ export default function RenewalCasesPage() {
       setSweepMessage(
         isArabic
           ? `تم فحص ${result.scanned} وثيقة — فُتحت ${result.opened} حالة تجديد، وتم تخطي ${result.skippedAlreadyOpen}، وفشلت ${result.failed}.`
-          : `Scanned ${result.scanned} policy/policies — opened ${result.opened}, skipped ${result.skippedAlreadyOpen} already open, ${result.failed} failed.`,
+          : t('renScanSummary', {
+              scanned: result.scanned,
+              opened: result.opened,
+              skipped: result.skippedAlreadyOpen,
+              failed: result.failed,
+            }),
       );
     });
   }

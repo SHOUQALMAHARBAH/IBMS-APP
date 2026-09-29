@@ -148,7 +148,8 @@ function NewNeedsAssessmentFlow() {
               <option value="">— select —</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.siteLabel ?? `Risk profile ${p.id.slice(0, 8)}`}
+                  {/* The same dead uuid fallback as `/risk-profiles` — 767 rows, zero null labels. */}
+                  {p.siteLabel ?? t('nanUnnamedSite')}
                 </option>
               ))}
             </select>

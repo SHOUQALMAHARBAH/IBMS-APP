@@ -40,11 +40,16 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'جارٍ التحميل…',
     tmNone: 'لا توجد تنبيهات مراقبة معاملات.',
     tmLoadError: 'تعذّر تحميل تنبيهات مراقبة المعاملات — حاول مرة أخرى.',
+    tmSweepSummary: 'تم فحص {scanned} حالة — أُنشئ {created} تنبيهًا، و{skipped} مرصودة أصلًا، وفشلت {failed}.',
     tmActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     tmNoPermission: 'لا تملك صلاحية aml.monitor اللازمة لعرض تنبيهات مراقبة المعاملات.',
 
     // ---- Watchlist sync (#49) --------------------------------------------
     wsHeading: 'مزامنة قوائم العقوبات',
+    shMissingConfig: 'إعدادات ناقصة: {missing}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
+    shScreeningAttempts: 'عمليات الفحص (آخر {days} يومًا)',
+    shHoldsReleased: 'حالات رفع الإيقاف (آخر {days} يومًا)',
+    wsRescreenSummary: 'أُعيد فحص {screened} عميلًا نشطًا — {hits} منها بنتيجة مطابقة، وفشلت {failed}.',
     wsIntro:
       'تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة الأمم المتحدة الموحّدة) محلياً كل اثنتَي عشرة ساعة — وهي وتيرة التحديث الفعلية للقائمتين — ويُعاد فحص كل عميل نشط عليهما كل أربع ساعات. ويمكن تشغيل كليهما يدوياً من هنا.',
     wsSyncButton: 'مزامنة القوائم الآن',
@@ -347,10 +352,15 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'Loading…',
     tmNone: 'No transaction-monitoring alerts.',
     tmLoadError: 'Could not load transaction-monitoring alerts — try again.',
+    tmSweepSummary: 'Scanned {scanned} candidate(s) — created {created} alert(s), {skipped} already flagged, {failed} failed.',
     tmActionError: 'That action failed — try again.',
     tmNoPermission: "You don't hold the aml.monitor permission.",
 
     wsHeading: 'Sanctions watchlist sync',
+    shMissingConfig: 'Missing configuration: {missing}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.',
+    shScreeningAttempts: 'Screening attempts (last {days} days)',
+    shHoldsReleased: 'Holds released (last {days} days)',
+    wsRescreenSummary: 'Re-screened {screened} active customer(s) — {hits} produced a HIT, {failed} failed.',
     wsIntro:
       "Two free public sanctions lists (OFAC SDN, UN Consolidated) are synced locally every 12 hours — the lists' own real-world refresh cadence — and every ACTIVE customer is re-screened against them every 4 hours. Both can also be run on demand here.",
     wsSyncButton: 'Sync watchlists now',

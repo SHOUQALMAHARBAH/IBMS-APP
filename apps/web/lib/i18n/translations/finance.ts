@@ -117,6 +117,8 @@ export const FINANCE = {
     brIntro:
       'مقارنة كشف شركة التأمين بسجل الوسيط (صافي القسط = القسط ناقص العمولة). وكل فرق غير صفري يفتح حالة عدم تطابق بالمبلغ الدقيق — ولا يُشطب أبداً. تُدرَس كل حالة وتُغلق بتفسير مكتوب، ولا يُعدَّل الرقم إطلاقاً.',
     brStatementLinesLabel: 'سطور كشف الحساب',
+    brStatementLinesHintBefore: 'سطور كشف الحساب — سطر واحد لكل',
+    brStatementLinesHintAfter: '',
     brOpenExceptions: 'حالات عدم التطابق المفتوحة',
     brColInvoice: 'الفاتورة',
     brColStatement: 'الكشف',
@@ -286,6 +288,8 @@ export const FINANCE = {
     brIntro:
       "Compare an insurer's statement against the broker's record (net premium = premium − commission). Every non-zero variance raises an exception with the exact amount — it is never written off. Investigate and close each one with a written explanation; the figure is never adjusted.",
     brStatementLinesLabel: 'Statement lines',
+    brStatementLinesHintBefore: 'Statement lines — one',
+    brStatementLinesHintAfter: 'per line',
     brOpenExceptions: 'Open exceptions',
     brColInvoice: 'Invoice',
     brColStatement: 'Statement',

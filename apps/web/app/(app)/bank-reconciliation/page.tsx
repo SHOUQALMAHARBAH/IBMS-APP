@@ -137,7 +137,13 @@ export default function BankReconciliationPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
           >
-            Statement lines &mdash; one <code>invoiceId, amount</code> per line
+            {/*
+              The `<code>` span stays in JSX and the prose is split around it: markup inside a translated
+              string becomes escaped text, and the Arabic word order around a code span is not the
+              English one.
+            */}
+            {t('brStatementLinesHintBefore')}{' '}
+            <code>invoiceId, amount</code> {t('brStatementLinesHintAfter')}
             <textarea
               aria-label={t('brStatementLinesLabel')}
               value={statement}
