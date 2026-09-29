@@ -21,7 +21,18 @@
 > | § 2 bilingual as first-class copy | rule 6 | meaning parity, not key parity |
 > | § 6 consistency of action placement and naming | rules 5 and 7 | one term per concept, everywhere |
 >
-> ## Where they DISAGREE — for the owner to settle, not for me
+> ## Where they DISAGREED — ALL FOUR SETTLED BY THE OWNER, 2026-09-29
+>
+> Recorded below as they were put to her, each with her ruling. **Two rulings amended the directive
+> itself** — a stated exception in § 1 and a sentence in § 5 — and both are marked in the text as hers,
+> so *"everything below the line is hers, verbatim"* stays true.
+>
+> | # | Her ruling |
+> |---|---|
+> | 1 | **The directive wins** — it is her standard and the stricter statement. The nine screens with an unwritten state are UNFINISHED, not flagged. They fold into item 5's by-hand read of every screen: one pass, wider scope, not two passes. **The dashboards are the part that matters: rendering zeros where there is no data is a box that lies, and that is a correctness rule, not a polish one.** |
+> | 2 | **`/settings/security` stays ungated, and the exception moves INTO § 1** — written above as a stated exception with its reason. |
+> | 3 | **B.7 gains the implementation-detail carve-out.** Code already implements the directive, so the document that lacks it is the one that is wrong. Documents describe what exists. |
+> | 4 | **One sentence in § 5**, written above: a contextual control is reached from its record, and every holder of its permission must have a route to that record. That makes the reachability check the enforcement of a written rule rather than a standalone script. |
 >
 > **1. Is a screen with an unwritten state a DEFECT, or a flag to triage?**
 > The directive: *"a screen is not considered finished if any of the four hasn't been designed and
@@ -75,6 +86,7 @@ This is not new — it restates and extends `MULTI-TENANCY-SPEC.md` §10.4: a us
 
 - The eleven roles (Sales/Relationship Officer, Placement/Technical Officer, Policy Checking Officer, Claims Officer, Finance/Collections Officer, Compliance Officer, Branch/Department Manager, DPO, System/Security Administrator, Executive/Management, External Auditor) each see a genuinely different home dashboard, a genuinely different navigation set, and genuinely different actions on shared records (e.g., a `Policy` detail page shows a "Check this policy" action only to a Policy Checking Officer who isn't the one who placed it — everyone else simply doesn't see that button, per the existing maker/checker rule).
 - Never render a control and then reject the click with "you are not authorized." If a role cannot do something, the control does not exist on their screen. The backend still independently re-validates every request regardless (§10.4) — this is a UX rule, not a substitute for that.
+- **STATED EXCEPTION — `/settings/security` is ungated, deliberately, and must stay so.** `MfaRequiredGuard` refuses every other route until an authenticator is paired, and this is the only screen that can pair one. Gate it and ten of eleven roles can never enrol in MFA and are therefore locked out of the entire system. The exception is recorded here rather than only in `docs/b7-consistency-record.md`, because an absolute rule whose exception lives elsewhere gets "fixed" by somebody who never reads the elsewhere. *(Added by the owner 2026-09-29, settling disagreement 2 in the header block.)*
 
 ## 2. Every message the system shows a user is professional, specific, and immediately understandable
 
@@ -103,6 +115,7 @@ This is the concrete rule behind the "3–5 shortcuts" principle already stated 
 - **A secondary or contextual item never gets its own top-level sidebar slot.** If something is only ever reached starting from a specific record (a document template tied to one insurer, a settlement tied to one claim, a schedule tied to one policy), it is reached by navigating into that record and finding it there — never by hunting through the sidebar.
 - **Guideline, not a hard number**: each role's sidebar should be scannable in a glance — roughly the count of genuinely distinct top-level activities that role performs, not an exhaustive index of every entity in the schema. A sidebar that requires scrolling to see all its own items is a sign something secondary crept in as a top-level entry and needs to move inside a page instead.
 - **Drill-down is always contextual**: from the sidebar's top-level module, the user lands on a list or dashboard for that module, and everything more specific (a single customer, a single policy, a single claim, and everything nested under it) is reached by opening that specific record — not by a parallel sidebar tree trying to mirror the database schema.
+- **A contextual control is reached from its record, and every holder of its permission must have a route to that record.** Keeping a control out of the sidebar is correct; leaving its only holder with no way to reach the record it lives on is a defect, not a consequence. `scripts/measurements/permission-reachability.py` measures this, and it is the general statement of a real case: six Finance capabilities sit on `/opportunities/[id]`, and Finance does not hold `opportunity.read`. *(Added by the owner 2026-09-29, settling disagreement 4 in the header block.)*
 
 ## 6. Consistency across the whole system
 

@@ -5676,6 +5676,43 @@ screening identifier · a PEP data provider · renaming `sanctions-pep.screen` a
 remittance, IBAN validation, CliQ caps) · the four commercial surfaces · who sees
 commission rates · payment methods and insurer credit terms.
 
+**THE FINANCE REACHABILITY SIX — added 2026-09-29, and the scope correction is the point.**
+`refund.disburse` was reported to the owner as one unreachable control and deferred on that
+basis. It is **six**, measured by `scripts/measurements/permission-reachability.py`, and they
+are one defect with one cause: **Finance's whole job sits on `/opportunities/[id]`, and
+FINANCE_COLLECTIONS_OFFICER does not hold `opportunity.read`.**
+
+| Code | Surface that offers it |
+|---|---|
+| `refund.disburse` | `/opportunities/[id]` — § 1.75, the one originally reported |
+| `refund.approve` | `/opportunities/[id]` |
+| `receipt.record` | `/opportunities/[id]` |
+| `invoice.create` | `/opportunities/[id]` |
+| `commission.calculate` | `/opportunities/[id]` |
+| `claim.settle.second-approve` | `/claims/[id]` and `/opportunities/[id]` — holds neither `claim.read` nor `opportunity.read` |
+
+She holds the deferral knowing it is six rather than one. **The direction is settled and
+unchanged: the control goes to where Finance works, NOT `opportunity.read` to Finance** —
+the role's view is not widened for a button. The only missing input is WHICH SCREEN, which is
+the broker's knowledge and not ours; it is question 12 on `docs/broker-session-money-questions.md`.
+
+**Do not build any of the six, and do not "just fix the read" as an interim** — widening
+Finance's view is the fix that was explicitly rejected, and doing it temporarily is doing it.
+
+**`conflict-of-interest.disclose` (COMPLIANCE_OFFICER) — INSIDE THIS DEFERRAL, by the owner's
+ruling of 2026-09-29.** It is unreachable for the same reason (only surface is
+`/opportunities/[id]`; Compliance holds no `opportunity.read`, while PLACEMENT does and
+reaches it). I put the opposite case — that the capability is a regulatory disclosure rather
+than a payment — and she drew the line where the figure is: **if a commission figure is on the
+screen, it is inside the deferral.** This screen shows the commission difference percentage
+between the recommended quotation and a competing one.
+
+Recorded so resuming does not have to rediscover it: **this is a compliance control named in
+the original requirements** (Domain F #50, conflict of interest), not a commercial convenience.
+Its unreachability means the Compliance Officer cannot record a disclosure at all — so it is a
+regulatory gap sitting inside a money deferral, and it should be first out when the deferral
+lifts rather than last.
+
 ### The five safety conditions, and their verified state
 
 | | Condition | State, measured 2026-09-28 |

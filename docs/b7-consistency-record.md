@@ -152,10 +152,30 @@ not judge the wording — that is rule 4, which this does not claim to measure.
   `/risk-profiles/[id]`) are one record: "empty" is n/a, and what matters instead is a not-found state.
 - `/settings/security` has **no permission branch deliberately, and it is load-bearing**: the screen must
   stay ungated or ten of eleven roles can never enrol in MFA and are locked out of everything. A
-  documented exception, not an omission.
+  documented exception, not an omission. **This exception now also lives in the directive's own § 1**, by
+  the owner's ruling of 2026-09-29 — an absolute rule whose exception is recorded only here gets "fixed"
+  by somebody who never reads here.
+
+**RULE 4 GAINS A CARVE-OUT, by the owner's ruling of 2026-09-29 (disagreement 3).** Rule 4 says every
+refusal names the way forward; it said nothing about who may see implementation detail, and
+`docs/frontend-ux-directive.md` § 2 does:
+
+> *"…never expose internal implementation detail (table names, stack traces, raw exception text) to any
+> role other than System/Security Administrator debugging tools."*
+
+**The code already implements the directive**, so the document lacking the rule is the one that was
+wrong: `/settings/email` (§ 1.76) states the deployment gap in every reader's own job language and shows
+the environment-variable names only to SYSTEM_SECURITY_ADMINISTRATOR. Documents describe what exists.
+So this record now carries the carve-out too, and a screen satisfying it is not a rule-4 violation.
 - `/settings/duty-segregation` always has a mode to show, so "empty" is n/a.
 
-**Genuinely worth reading, and NOT closed here** — each needs the sentence read, which is rule 4's work:
+~~**Genuinely worth reading, and NOT closed here**~~ — **RECLASSIFIED BY THE OWNER, 2026-09-29: these are
+UNFINISHED SCREENS, not flags.** The directive is the stricter statement and it wins — *"a screen is not
+considered finished if any of the four hasn't been designed and written with the same care as the 'happy
+path'"*. They do NOT become a new item: they fold into item 5's by-hand read of every screen, one pass at
+wider scope rather than two passes. **The three dashboards are the part that matters and the reason this
+is not polish**: rendering zeros where there is no data is a box that lies, which makes it a CORRECTNESS
+rule. Each still needs the sentence read, which is rule 4's work:
 
 | Screen | Flag |
 |---|---|

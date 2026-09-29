@@ -179,3 +179,27 @@ office has to know to.** If substitution is the practice, the per-year screen sh
 for it alongside the occasion rather than leaving somebody to remember.
 
 Not a build item — an input. Raised by the owner 2026-09-28.
+
+### ١٣. أين يعمل موظف المالية فعليًا؟ ما الشاشة التي يفتحها ليقبض ويدفع ويصدر فاتورة؟ / Where does the Finance officer actually work — which screen does he open to take a payment, pay a refund, and raise an invoice?
+
+**ما الذي يقرره / What it decides.** **SIX Finance capabilities are unreachable by the only
+role that holds them**, measured 2026-09-29 by
+`scripts/measurements/permission-reachability.py`: `receipt.record`, `invoice.create`,
+`commission.calculate`, `refund.approve`, `refund.disburse` and
+`claim.settle.second-approve`. One cause — every one of those controls sits on
+`/opportunities/[id]`, and FINANCE_COLLECTIONS_OFFICER does not hold `opportunity.read`.
+So money cannot be taken in or paid out from anywhere a Finance officer can navigate to.
+
+**The fix direction is already settled and is not his to decide**: the control moves to
+where Finance works, rather than widening Finance's view of the sales pipeline for the sake
+of a button. **The only missing input is which screen that is** — and that is his knowledge.
+An opportunity is a SALES artifact; a Finance officer does not think in opportunities, he
+thinks in a customer, a policy, an invoice, or a day's receipts. Which of those does he
+actually open?
+
+**Why it is a question and not a design task.** Guessing produces a Finance screen nobody
+uses, and the six controls would stay effectively unreachable while appearing fixed — the
+same failure one level up. Ask what he opens first each morning and what he has in his hand
+when he takes a payment.
+
+Raised from measurement 2026-09-29, deferred with the money work by the owner.
