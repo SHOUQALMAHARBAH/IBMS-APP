@@ -27,9 +27,23 @@ const ACKNOWLEDGED = [
       'No upgrade path: multer is hard-pinned to 2.2.0 by @nestjs/platform-express, and @nestjs/platform-express@12.0.1 (the latest major) ' +
       'pins the identical 2.2.0, so upgrading Nest does not clear it. npm `overrides` cannot rewrite that edge (npm 10.8, four syntaxes tried); ' +
       'removing the package makes @nestjs/platform-express fail at import. ' +
-      'UNREACHABLE here: this API exposes no multipart route — there is no FileInterceptor, no @UploadedFile and no upload endpoint anywhere in ' +
-      'apps/api/src (Document stores a storageRef pointer; no object-storage service exists yet — see README § Known gaps). ' +
-      'Re-check the moment a real document-upload endpoint is built, which is what would make it reachable.',
+      '~~UNREACHABLE here: this API exposes no multipart route — there is no FileInterceptor, no @UploadedFile and no upload endpoint ' +
+      'anywhere in apps/api/src~~ — THIS HALF IS FALSE AND HAS BEEN SINCE 2026-09-13. Corrected in place rather than rewritten, because ' +
+      'the original reasoning is what explains why four high advisories were accepted. ' +
+      'MEASURED 2026-09-29: apps/api/src/modules/customer/legacy-import.controller.ts has a FileInterceptor, an @UploadedFile AND an ' +
+      'upload endpoint. It was added on 2026-09-13 (e6eec0e), four days after this acknowledgement was written, and nothing re-checked ' +
+      'the claim. It then had no WEB CALLER until 2026-09-28 (403b8e7), which is when it became reachable from the UI — so the route ' +
+      'existed unreachable for fifteen days and has been reachable since. ' +
+      'THE OTHER HALF STILL HOLDS, re-verified rather than assumed: multer 2.4.0 exists, and `npm update multer` leaves 2.2.0 in place ' +
+      'because @nestjs/platform-express hard-pins it — so there is still no upgrade path. (`npm update` is worth trying: it moved ' +
+      'fast-uri where a root `overrides` entry would not. It does not move this one.) ' +
+      'WHAT THE RISK ACTUALLY IS NOW, measured so the owner can decide rather than infer: the route is gated on ' +
+      '`customer.bulk-import` (two administrator roles), requires an authenticated session, and caps the upload at ' +
+      '`limits: { fileSize: LEGACY_IMPORT_MAX_BYTES, files: 1 }`. So the exposure is a DoS by an authenticated administrator against ' +
+      'a size-bounded single-file endpoint — not an unauthenticated one. ' +
+      'WHETHER THAT IS STILL ACCEPTABLE IS THE OWNER\'S DECISION, NOT A DEVELOPER\'S. This acknowledgement is deliberately left in ' +
+      'force and unchanged: removing it would turn a security judgement into a side effect of a documentation fix, and re-justifying it ' +
+      'on a new basis would be making that judgement without being asked. Raised for decision 2026-09-29.',
     reviewBy: '2026-12-31',
   },
 ];
