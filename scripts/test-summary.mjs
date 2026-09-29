@@ -69,7 +69,15 @@ export function summarise(rawOutput) {
       const f = PLAYWRIGHT_FAILED.exec(text);
       failed = f ? Number(f[1]) : 0;
     }
-    return { runner: p.runner, passed, failed, line: m[0].trim() };
+    // Trailing `(` trimmed off the echoed line: the Playwright matcher has to include it to avoid
+    // matching a bare "7 passed" inside prose, but echoing `[36 passed (]` reads like truncated output —
+    // and a tool whose own output looks broken is a tool people stop trusting.
+    return {
+      runner: p.runner,
+      passed,
+      failed,
+      line: m[0].trim().replace(/\s*\($/, ''),
+    };
   }
   return null;
 }
