@@ -279,7 +279,6 @@ export const DETAIL_PAGES = {
     nanCustomerNotFound:
       'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     nanLoadError: 'تعذّر تحميل ملفات المخاطر — حاول مرة أخرى.',
-    nanUnnamedSite: 'موقع بلا اسم',
     nanCreateError: 'تعذّر إنشاء ملف المخاطر — حاول مرة أخرى.',
     nanAdding: 'جارٍ الإضافة…',
     nanAddButton: 'إضافة ملف مخاطر',
@@ -744,7 +743,6 @@ export const DETAIL_PAGES = {
     nanCustomerNotFound:
       'This customer could not be found — it may not exist, or you may not have access to it.',
     nanLoadError: 'Could not load risk profiles — try again.',
-    nanUnnamedSite: 'Unnamed site',
     nanCreateError: 'Could not create the risk profile — try again.',
     nanAdding: 'Adding…',
     nanAddButton: 'Add risk profile',

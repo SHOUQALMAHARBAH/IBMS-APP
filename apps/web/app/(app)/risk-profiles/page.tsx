@@ -175,20 +175,17 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
               key={profile.id}
               type="button"
               style={siteCardStyle}
-              aria-label={t('rpOpenSurveyAria', {
-                name: profile.siteLabel ?? t('rpUnnamedSite'),
-              })}
+              aria-label={t('rpOpenSurveyAria', { name: profile.siteLabel })}
               onClick={() => router.push(`/risk-profiles/${profile.id}`)}
             >
               <strong>
                 {/*
-                  Was `Risk profile ${id.slice(0, 8)}` — a uuid fragment, and the aria-label above fell
-                  back to the FULL uuid, so a screen reader announced all 36 characters. Measured: 767
-                  `RiskProfile` rows across dev and db-test and ZERO have a null or empty `siteLabel`, so
-                  this fallback has never rendered. It is nullable by OMISSION rather than by design —
-                  requiring it upstream would remove the branch entirely, which is raised rather than done.
+                  No fallback. `siteLabel` is REQUIRED as of migration 20261104100000, so there is no
+                  unlabelled state to render — the branch was deleted rather than given better text,
+                  because nothing else on this row is a name a person recognises. It printed a truncated
+                  uuid, and the aria-label above printed the FULL uuid to a screen reader.
                 */}
-                {profile.siteLabel ?? t('rpUnnamedSite')}
+                {profile.siteLabel}
               </strong>
               {profile.priorClaimsHistorySummary ? (
                 <div style={{ opacity: 0.7, fontSize: '0.85rem' }}>

@@ -136,7 +136,8 @@ export function deriveSumInsured(
 
 export interface SiteSurvey {
   riskProfileId: string;
-  siteLabel: string | null;
+  /** REQUIRED since migration 20261104100000 — see `CreateRiskProfileDto.siteLabel`. */
+  siteLabel: string;
   summary: SumInsuredSummary;
 }
 

@@ -17,7 +17,9 @@ export type AssetType = (typeof ASSET_TYPES)[number];
 export interface RiskProfile {
   id: string;
   customerId: string;
-  siteLabel: string | null;
+  /** REQUIRED since migration 20261104100000 — no uuid fallback, because a uuid identifies nothing
+   *  to a person and nothing else on this row is a name. */
+  siteLabel: string;
   priorClaimsHistorySummary: string | null;
   createdAt: string;
   updatedAt: string;

@@ -1766,7 +1766,9 @@ model RiskProfile {
   organization              Organization @relation(fields: [organizationId], references: [id])
   customerId                String
   customer                  Customer     @relation(fields: [customerId], references: [id])
-  siteLabel                 String? // for multi-site/multi-entity clients (repeated per location)
+  /// REQUIRED since migration 20261104100000 — it is the only thing on this row that identifies the
+  /// profile to a person, and the screens' uuid fallback had never rendered in 767 rows.
+  siteLabel                 String // for multi-site/multi-entity clients (repeated per location)
   priorClaimsHistorySummary String?
   createdAt                 DateTime     @default(now())
   updatedAt                 DateTime     @updatedAt

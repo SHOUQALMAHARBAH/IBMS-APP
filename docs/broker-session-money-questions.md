@@ -235,3 +235,29 @@ appeared, a reader of the stored data could still tell 0/0 from a real zero.
 
 Raised from measurement 2026-09-29, deferred with the money work by the owner. Do not build either side
 before his answer — one of the two paths is wrong and guessing which changes a premium rule.
+
+### ١٥. هل يُفتح ملف مخاطر قبل معرفة الموقع؟ / Does a risk profile ever get opened before the site is known?
+
+**ليس سؤالًا عن المال — مُدرَج هنا لأن الجلسة نفسها هي الفرصة.**
+**Not a money question — it is here because his session is the occasion.**
+
+**ما الذي يقرره / What it decides.** `RiskProfile.siteLabel` was OPTIONAL and is now REQUIRED
+(migration `20261104100000`). The change was made on measurement, not preference: **767 rows across dev
+and db-test and ZERO have a null or empty label**, so the column was nullable by omission rather than by
+design, and the screens' fallback — which printed a truncated uuid, and whose `aria-label` printed the
+FULL uuid to a screen reader — had never once rendered.
+
+**His answer is the verification.** If a surveyor genuinely opens a profile before the site is known — a
+walk-in, a portfolio quoted before the locations are listed, a broker filling one in from a phone call —
+then the requirement is wrong and the branch comes back.
+
+**But it does not come back as it was.** If the state is real, the unlabelled profile is identified by
+something a person can READ: the date it was opened, or a sequence within the customer ("Site 2 of 3").
+**Never an identifier.** A uuid fragment tells the reader nothing, and the same generic phrase repeated
+down a column tells them no more — which is why "Unnamed site" was rejected as the fix too.
+
+**What makes this cheap to reverse**: nothing was backfilled and no data was touched. Dropping the NOT
+NULL and restoring an optional field is one migration, and the display question would then be answered
+with a readable label rather than the uuid it used to show.
+
+Raised from measurement 2026-09-29 (item 5 batch 2).

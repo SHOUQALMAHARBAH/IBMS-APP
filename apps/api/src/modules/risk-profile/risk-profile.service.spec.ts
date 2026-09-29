@@ -119,7 +119,10 @@ describe('RiskProfileService', () => {
         ownerUserId: 'sales-2',
       });
       await expect(
-        service.create({ customerId: 'cust-1' }, makeUser({ id: 'sales-1' })),
+        service.create(
+          { customerId: 'cust-1', siteLabel: 'Head office' },
+          makeUser({ id: 'sales-1' }),
+        ),
       ).rejects.toThrow(NotFoundException);
       expect(mocks.create).not.toHaveBeenCalled();
     });
@@ -131,7 +134,7 @@ describe('RiskProfileService', () => {
         ownerUserId: 'sales-9',
       });
       await service.create(
-        { customerId: 'cust-1' },
+        { customerId: 'cust-1', siteLabel: 'Head office' },
         makeUser({ id: 'placement-1', roles: ['PLACEMENT_TECHNICAL_OFFICER'] }),
       );
       expect(mocks.create).toHaveBeenCalled();
@@ -140,7 +143,10 @@ describe('RiskProfileService', () => {
     it('still returns the row when the audit write fails', async () => {
       const { service, mocks } = makeDeps();
       mocks.record.mockRejectedValueOnce(new Error('audit down'));
-      const result = await service.create({ customerId: 'cust-1' }, makeUser());
+      const result = await service.create(
+        { customerId: 'cust-1', siteLabel: 'Head office' },
+        makeUser(),
+      );
       expect(result.id).toBe('rp-1');
     });
   });
