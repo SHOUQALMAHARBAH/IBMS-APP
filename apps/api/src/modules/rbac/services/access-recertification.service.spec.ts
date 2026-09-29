@@ -522,6 +522,10 @@ describe('AccessRecertificationService', () => {
           reviewerUserId: 'reviewer-1',
           decision: null,
           reviewedAt: null,
+          // Part 4 step 5 — the two relations `ITEM_INCLUDE` now fetches. Both null here: an ordinary
+          // review of somebody else's access, arranged and undecided.
+          combinedDutyAct: null,
+          decisionCombinedDutyAct: null,
           createdAt: new Date('2026-01-01'),
         },
       ]);
@@ -567,6 +571,12 @@ describe('AccessRecertificationService', () => {
           reviewerFullName: 'Compliance Officer',
           decision: null,
           reviewedAt: null,
+          // Part 4 step 5 — TWO acts, and NOT two pairs. `arrangement` is "she was set to review her own
+          // access", written when the cycle opened; `decision` is "she did", dated to the review. Both
+          // null on an ordinary review, and both are in this TOTAL assertion deliberately: `toEqual` is
+          // what made the new fields announce themselves rather than arrive unnoticed.
+          arrangementCombinedDutyAct: null,
+          decisionCombinedDutyAct: null,
           createdAt: new Date('2026-01-01'),
         },
       ]);

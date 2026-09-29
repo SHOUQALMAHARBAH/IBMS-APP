@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   decideRecertificationItem,
   type RecertificationDecision,
   type RecertificationDecisionResult,
   type RecertificationItem,
-} from '../../lib/access-recertification/access-recertification-api';
-import { ApiError } from '../../lib/auth/api-client';
-import { errorStyle } from '../auth/auth-form.styles';
+} from "../../lib/access-recertification/access-recertification-api";
+import { ApiError } from "../../lib/auth/api-client";
+import { errorStyle } from "../auth/auth-form.styles";
 import {
   adminBadgeStyle,
   decidedTagStyle,
@@ -19,19 +19,20 @@ import {
   tableStyle,
   tdStyle,
   thStyle,
-} from './access-recertification.styles';
-import { useLanguage } from '../../lib/i18n/language-context';
-import { useAuth } from '../../lib/auth/auth-context';
+} from "./access-recertification.styles";
+import { useLanguage } from "../../lib/i18n/language-context";
+import { useAuth } from "../../lib/auth/auth-context";
+import { CombinedDutyOnRecord } from "../ui/CombinedDutyOnRecord";
 import {
   CombinedDutyReasonField,
   combinedDutyTooShort,
   needsCombinedDutyDeclaration,
-} from '../ui/CombinedDutyReasonField';
+} from "../ui/CombinedDutyReasonField";
 
 const DECISION_LABEL: Record<RecertificationDecision, string> = {
-  confirmed: 'Confirmed',
-  revoked: 'Revoked',
-  changed: 'Flagged for change',
+  confirmed: "Confirmed",
+  revoked: "Revoked",
+  changed: "Flagged for change",
 };
 
 interface RecertificationItemsTableProps {
@@ -39,7 +40,10 @@ interface RecertificationItemsTableProps {
   onItemDecided: (result: RecertificationDecisionResult) => void;
 }
 
-export function RecertificationItemsTable({ items, onItemDecided }: RecertificationItemsTableProps) {
+export function RecertificationItemsTable({
+  items,
+  onItemDecided,
+}: RecertificationItemsTableProps) {
   const { t } = useLanguage();
   const [decidingItemId, setDecidingItemId] = useState<string | null>(null);
   const [decideErrors, setDecideErrors] = useState<Record<string, string>>({});
@@ -58,7 +62,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
     return needsCombinedDutyDeclaration({
       mode: user?.dutySegregationMode,
       makerUserId: item.subjectUserId,
-      currentUserId: user?.id ?? '',
+      currentUserId: user?.id ?? "",
       alreadyDecided: item.decision != null,
     });
   }
@@ -67,18 +71,20 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
    *  422, and the three buttons are three ways to make the same mistake. */
   function blockedByDeclaration(item: RecertificationItem): boolean {
     return (
-      needsDeclaration(item) &&
-      combinedDutyTooShort(dutyReasons[item.id] ?? '')
+      needsDeclaration(item) && combinedDutyTooShort(dutyReasons[item.id] ?? "")
     );
   }
 
   if (items.length === 0) {
-    return <p style={emptyStateStyle}>{t('acrNone')}</p>;
+    return <p style={emptyStateStyle}>{t("acrNone")}</p>;
   }
 
-  async function handleDecide(item: RecertificationItem, decision: RecertificationDecision) {
+  async function handleDecide(
+    item: RecertificationItem,
+    decision: RecertificationDecision,
+  ) {
     setDecidingItemId(item.id);
-    setDecideErrors((prev) => ({ ...prev, [item.id]: '' }));
+    setDecideErrors((prev) => ({ ...prev, [item.id]: "" }));
     try {
       const updated = await decideRecertificationItem(
         item.id,
@@ -87,7 +93,8 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
       );
       onItemDecided(updated);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : t('acrDecisionError');
+      const message =
+        err instanceof ApiError ? err.message : t("acrDecisionError");
       setDecideErrors((prev) => ({ ...prev, [item.id]: message }));
     } finally {
       setDecidingItemId(null);
@@ -96,19 +103,30 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
 
   return (
     <table style={tableStyle}>
-      <caption style={{ textAlign: 'start', marginBottom: '0.5rem', opacity: 0.75, fontSize: '0.9rem' }}>
-        {t('acrQueueCaption')}
+      <caption
+        style={{
+          textAlign: "start",
+          marginBottom: "0.5rem",
+          opacity: 0.75,
+          fontSize: "0.9rem",
+        }}
+      >
+        {t("acrQueueCaption")}
       </caption>
       <thead>
         <tr>
           <th style={thStyle} scope="col">
             Subject
           </th>
-          <th style={thStyle} scope="col">{t('acrCurrentRoles')}</th>
+          <th style={thStyle} scope="col">
+            {t("acrCurrentRoles")}
+          </th>
           <th style={thStyle} scope="col">
             Cycle
           </th>
-          <th style={thStyle} scope="col">{t('acrStatusDecision')}</th>
+          <th style={thStyle} scope="col">
+            {t("acrStatusDecision")}
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -124,30 +142,52 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
               <td style={tdStyle}>
                 <strong>{item.subjectFullName}</strong>
                 <br />
-                <span style={{ fontSize: '0.85rem', opacity: 0.75 }}>{item.subjectEmail}</span>
+                <span style={{ fontSize: "0.85rem", opacity: 0.75 }}>
+                  {item.subjectEmail}
+                </span>
               </td>
               <td style={tdStyle}>
                 {isAdminSubject ? (
-                  <span style={adminBadgeStyle}>{t('acrAdminNotExempt')}</span>
+                  <span style={adminBadgeStyle}>{t("acrAdminNotExempt")}</span>
                 ) : null}
                 {item.subjectRoles.map((role) => (
                   <span key={role} style={roleBadgeStyle}>
-                    {role.replaceAll('_', ' ')}
+                    {role.replaceAll("_", " ")}
                   </span>
                 ))}
               </td>
               <td style={tdStyle}>{item.cycleLabel}</td>
               <td style={tdStyle}>
                 {item.decision ? (
-                  <span style={decidedTagStyle}>{DECISION_LABEL[item.decision]}</span>
+                  <>
+                    <span style={decidedTagStyle}>
+                      {DECISION_LABEL[item.decision]}
+                    </span>
+                    {/*
+                      Part 4 step 5. The tag reads "Confirmed" whether a colleague reviewed this person's
+                      access or the person reviewed their own. BOTH acts, separately: the arrangement (the
+                      cycle had nobody else to ask) and the decision (she then confirmed it herself).
+                    */}
+                    <CombinedDutyOnRecord
+                      act={item.arrangementCombinedDutyAct}
+                      testId={`combined-duty-recert-arrangement-${item.id}`}
+                    />
+                    <CombinedDutyOnRecord
+                      act={item.decisionCombinedDutyAct}
+                      testId={`combined-duty-recert-decision-${item.id}`}
+                    />
+                  </>
                 ) : (
                   <div style={decisionButtonRowStyle}>
                     {needsDeclaration(item) ? (
                       <CombinedDutyReasonField
                         id={item.id}
-                        value={dutyReasons[item.id] ?? ''}
+                        value={dutyReasons[item.id] ?? ""}
                         onChange={(next) =>
-                          setDutyReasons((prev) => ({ ...prev, [item.id]: next }))
+                          setDutyReasons((prev) => ({
+                            ...prev,
+                            [item.id]: next,
+                          }))
                         }
                       />
                     ) : null}
@@ -155,8 +195,10 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding || blockedByDeclaration(item)}
-                      aria-label={t('acrConfirmAccessAria', { name: item.subjectFullName })}
-                      onClick={() => void handleDecide(item, 'confirmed')}
+                      aria-label={t("acrConfirmAccessAria", {
+                        name: item.subjectFullName,
+                      })}
+                      onClick={() => void handleDecide(item, "confirmed")}
                     >
                       Confirm
                     </button>
@@ -164,22 +206,31 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding || blockedByDeclaration(item)}
-                      aria-label={t('acrRevokeAccessAria', { name: item.subjectFullName })}
-                      onClick={() => void handleDecide(item, 'revoked')}
+                      aria-label={t("acrRevokeAccessAria", {
+                        name: item.subjectFullName,
+                      })}
+                      onClick={() => void handleDecide(item, "revoked")}
                     >
-                      {t('usrRevoke')}
+                      {t("usrRevoke")}
                     </button>
                     <button
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding || blockedByDeclaration(item)}
-                      aria-label={t('acrFlagAccessAria', { name: item.subjectFullName })}
-                      onClick={() => void handleDecide(item, 'changed')}
-                    >{t('acrFlagForChange')}</button>
+                      aria-label={t("acrFlagAccessAria", {
+                        name: item.subjectFullName,
+                      })}
+                      onClick={() => void handleDecide(item, "changed")}
+                    >
+                      {t("acrFlagForChange")}
+                    </button>
                   </div>
                 )}
                 {decideErrors[item.id] ? (
-                  <p role="alert" style={{ ...errorStyle, marginTop: '0.5rem' }}>
+                  <p
+                    role="alert"
+                    style={{ ...errorStyle, marginTop: "0.5rem" }}
+                  >
                     {decideErrors[item.id]}
                   </p>
                 ) : null}

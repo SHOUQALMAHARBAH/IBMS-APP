@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /*
  * Were the ADMINISTRATOR accounts reviewed in this cycle, and by whom?
@@ -28,18 +28,19 @@
  * record exists to prove was reviewed — the same reason the review table does not derive it.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { ApiError } from '../../lib/auth/api-client';
-import { useLanguage } from '../../lib/i18n/language-context';
-import { errorStyle } from '../auth/auth-form.styles';
+import { useCallback, useEffect, useState } from "react";
+import { CombinedDutyOnRecord } from "../ui/CombinedDutyOnRecord";
+import { ApiError } from "../../lib/auth/api-client";
+import { useLanguage } from "../../lib/i18n/language-context";
+import { errorStyle } from "../auth/auth-form.styles";
 import {
   listAdminRecertificationItems,
   listRecertificationCycles,
   type RecertificationCycle,
   type RecertificationDecision,
   type RecertificationItem,
-} from '../../lib/access-recertification/access-recertification-api';
-import type { TranslationKey } from '../../lib/i18n/translations';
+} from "../../lib/access-recertification/access-recertification-api";
+import type { TranslationKey } from "../../lib/i18n/translations";
 
 /**
  * A TOTAL map, not a concatenated key.
@@ -50,16 +51,16 @@ import type { TranslationKey } from '../../lib/i18n/translations';
  * error instead.
  */
 const DECISION_KEY = {
-  confirmed: 'acrAdminDecisionConfirmed',
-  revoked: 'acrAdminDecisionRevoked',
-  changed: 'acrAdminDecisionChanged',
+  confirmed: "acrAdminDecisionConfirmed",
+  revoked: "acrAdminDecisionRevoked",
+  changed: "acrAdminDecisionChanged",
 } satisfies Record<RecertificationDecision, TranslationKey>;
 
 export function AdminAccessRecord() {
   const { t } = useLanguage();
 
   const [cycles, setCycles] = useState<RecertificationCycle[] | null>(null);
-  const [cycleId, setCycleId] = useState('');
+  const [cycleId, setCycleId] = useState("");
   const [items, setItems] = useState<RecertificationItem[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -76,7 +77,7 @@ export function AdminAccessRecord() {
       } catch (error) {
         if (live)
           setLoadError(
-            error instanceof ApiError ? error.message : t('acrAdminLoadFailed'),
+            error instanceof ApiError ? error.message : t("acrAdminLoadFailed"),
           );
       }
     })();
@@ -93,7 +94,7 @@ export function AdminAccessRecord() {
       } catch (error) {
         setItems(null);
         setLoadError(
-          error instanceof ApiError ? error.message : t('acrAdminLoadFailed'),
+          error instanceof ApiError ? error.message : t("acrAdminLoadFailed"),
         );
       }
     },
@@ -101,7 +102,7 @@ export function AdminAccessRecord() {
   );
 
   useEffect(() => {
-    if (cycleId === '') return;
+    if (cycleId === "") return;
     let live = true;
     void (async () => {
       if (live) await loadItems(cycleId);
@@ -112,10 +113,10 @@ export function AdminAccessRecord() {
   }, [cycleId, loadItems]);
 
   return (
-    <section style={{ marginTop: '2rem' }} data-testid="admin-access-record">
-      <h2>{t('acrAdminHeading')}</h2>
-      <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-        {t('acrAdminIntro')}
+    <section style={{ marginTop: "2rem" }} data-testid="admin-access-record">
+      <h2>{t("acrAdminHeading")}</h2>
+      <p style={{ color: "var(--ink-secondary)", fontSize: "0.85rem" }}>
+        {t("acrAdminIntro")}
       </p>
 
       {loadError !== null && (
@@ -125,11 +126,11 @@ export function AdminAccessRecord() {
       )}
 
       {cycles !== null && cycles.length === 0 ? (
-        <p style={{ color: 'var(--ink-secondary)' }}>{t('acrAdminNoCycles')}</p>
+        <p style={{ color: "var(--ink-secondary)" }}>{t("acrAdminNoCycles")}</p>
       ) : (
         <>
           <label>
-            {t('acrAdminCycleLabel')}
+            {t("acrAdminCycleLabel")}
             <select
               value={cycleId}
               onChange={(event) => setCycleId(event.target.value)}
@@ -146,31 +147,27 @@ export function AdminAccessRecord() {
           {items !== null && items.length === 0 ? (
             /* A warning, not an empty state: a cycle that covered no administrator account is
                the condition Part 5.1 exists to prevent, so it must not read as "nothing here". */
-            <p
-              role="alert"
-              style={errorStyle}
-              data-testid="admin-record-none"
-            >
-              {t('acrAdminNoneCovered')}
+            <p role="alert" style={errorStyle} data-testid="admin-record-none">
+              {t("acrAdminNoneCovered")}
             </p>
           ) : null}
 
           {items !== null && items.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'start' }}>
-                      {t('acrAdminColSubject')}
+                    <th style={{ textAlign: "start" }}>
+                      {t("acrAdminColSubject")}
                     </th>
-                    <th style={{ textAlign: 'start' }}>
-                      {t('acrAdminColReviewer')}
+                    <th style={{ textAlign: "start" }}>
+                      {t("acrAdminColReviewer")}
                     </th>
-                    <th style={{ textAlign: 'start' }}>
-                      {t('acrAdminColDecision')}
+                    <th style={{ textAlign: "start" }}>
+                      {t("acrAdminColDecision")}
                     </th>
-                    <th style={{ textAlign: 'start' }}>
-                      {t('acrAdminColReviewedAt')}
+                    <th style={{ textAlign: "start" }}>
+                      {t("acrAdminColReviewedAt")}
                     </th>
                   </tr>
                 </thead>
@@ -186,19 +183,32 @@ export function AdminAccessRecord() {
                         <bdi>{item.reviewerFullName}</bdi>
                         {item.reviewerUserId === item.subjectUserId ? (
                           <>
-                            {' '}
+                            {" "}
                             <strong data-testid={`self-review-${item.id}`}>
-                              {t('acrAdminSelfReview')}
+                              {t("acrAdminSelfReview")}
                             </strong>
                           </>
                         ) : null}
                       </td>
                       <td data-testid={`admin-decision-${item.id}`}>
                         {item.decision === null
-                          ? t('acrAdminNotYetReviewed')
+                          ? t("acrAdminNotYetReviewed")
                           : t(DECISION_KEY[item.decision])}
+                        {/*
+                          Part 4 step 5, and this is the surface it matters most on: "was this
+                          administrator's access reviewed" is only half a question, and an administrator who
+                          reviewed her OWN access is the case the whole record exists to surface.
+                        */}
+                        <CombinedDutyOnRecord
+                          act={item.arrangementCombinedDutyAct}
+                          testId={`combined-duty-admin-arrangement-${item.id}`}
+                        />
+                        <CombinedDutyOnRecord
+                          act={item.decisionCombinedDutyAct}
+                          testId={`combined-duty-admin-decision-${item.id}`}
+                        />
                       </td>
-                      <td>{item.reviewedAt?.slice(0, 10) ?? '—'}</td>
+                      <td>{item.reviewedAt?.slice(0, 10) ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -21,15 +21,19 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
+    }),
   );
   // The administrator-record section renders for ANY role holding
   // `access-recertification.cycle.start`, which COMPLIANCE_OFFICER does — so every test on this
   // screen needs these two reads answered or the section reports a load failure and puts an
   // extra role="alert" on the page. Defaults to NO cycles, which is the quiet state; a test
   // about the record registers its own routes afterwards, and the later registration wins.
-  await page.route("http://localhost:4000/access-recertification/cycles", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+  await page.route(
+    "http://localhost:4000/access-recertification/cycles",
+    (route) => route.fulfill({ status: 200, json: [] }),
   );
 }
 
@@ -65,6 +69,9 @@ const ADMIN_ITEMS = [
     reviewerFullName: "Compliance Reviewer",
     decision: "confirmed",
     reviewedAt: "2026-04-05T00:00:00.000Z",
+    // The endpoint returns both now. Null: no declaration on either the arrangement or the decision.
+    arrangementCombinedDutyAct: null,
+    decisionCombinedDutyAct: null,
     createdAt: "2026-04-01T00:00:00.000Z",
   },
   {
@@ -81,6 +88,9 @@ const ADMIN_ITEMS = [
     reviewerFullName: "Security Administrator",
     decision: null,
     reviewedAt: null,
+    // The endpoint returns both now. Null: no declaration on either the arrangement or the decision.
+    arrangementCombinedDutyAct: null,
+    decisionCombinedDutyAct: null,
     createdAt: "2026-04-01T00:00:00.000Z",
   },
 ];
@@ -90,13 +100,16 @@ async function mockAdminRecord(
   page: Page,
   itemsByCycle: Record<string, unknown[]>,
 ) {
-  await page.route("http://localhost:4000/access-recertification/cycles", (route) =>
-    route.fulfill({ status: 200, json: CYCLES }),
+  await page.route(
+    "http://localhost:4000/access-recertification/cycles",
+    (route) => route.fulfill({ status: 200, json: CYCLES }),
   );
   await page.route(
     "http://localhost:4000/access-recertification/cycles/*/admin-items",
     (route) => {
-      const match = /\/cycles\/([^/]+)\/admin-items/.exec(route.request().url());
+      const match = /\/cycles\/([^/]+)\/admin-items/.exec(
+        route.request().url(),
+      );
       const id = match?.[1] ?? "";
       return route.fulfill({ status: 200, json: itemsByCycle[id] ?? [] });
     },
@@ -120,6 +133,9 @@ const ITEMS = [
     reviewerFullName: "Compliance Reviewer",
     decision: null,
     reviewedAt: null,
+    // The endpoint returns both now. Null: no declaration on either the arrangement or the decision.
+    arrangementCombinedDutyAct: null,
+    decisionCombinedDutyAct: null,
     createdAt: "2026-01-01T00:00:00.000Z",
   },
   {
@@ -135,11 +151,16 @@ const ITEMS = [
     reviewerFullName: "Compliance Reviewer",
     decision: null,
     reviewedAt: null,
+    // The endpoint returns both now. Null: no declaration on either the arrangement or the decision.
+    arrangementCombinedDutyAct: null,
+    decisionCombinedDutyAct: null,
     createdAt: "2026-01-01T00:00:00.000Z",
   },
 ];
 
-test("renders the review queue with subject details and an admin badge", async ({ page }) => {
+test("renders the review queue with subject details and an admin badge", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({ status: 200, json: ITEMS }),
@@ -147,46 +168,70 @@ test("renders the review queue with subject details and an admin badge", async (
 
   await page.goto("/access-recertification");
 
-  await expect(page.getByRole("heading", { name: "Access recertification" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Access recertification" }),
+  ).toBeVisible();
   await expect(page.getByText("Sales Officer")).toBeVisible();
   await expect(page.getByText("sales@ibms.test")).toBeVisible();
-  await expect(page.getByText("Admin access — not exempt from review")).toBeVisible();
+  await expect(
+    page.getByText("Admin access — not exempt from review"),
+  ).toBeVisible();
 });
 
-test("shows the start-cycle form for a Compliance Officer, but not for a Sales Officer", async ({ page }) => {
+test("shows the start-cycle form for a Compliance Officer, but not for a Sales Officer", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
-  await page.route("**/access-recertification/items", (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
   await page.goto("/access-recertification");
-  await expect(page.getByRole("heading", { name: "Start a new recertification cycle" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Start a new recertification cycle" }),
+  ).toBeVisible();
 
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.goto("/access-recertification");
-  await expect(page.getByRole("heading", { name: "Start a new recertification cycle" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Start a new recertification cycle" }),
+  ).toHaveCount(0);
 });
 
-test("shows an empty state when nothing is assigned for review", async ({ page }) => {
+test("shows an empty state when nothing is assigned for review", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
-  await page.route("**/access-recertification/items", (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 
   await page.goto("/access-recertification");
 
   await expect(
-    page.getByText("No access-recertification items are currently assigned to you for review."),
+    page.getByText(
+      "No access-recertification items are currently assigned to you for review.",
+    ),
   ).toBeVisible();
 });
 
-test("shows a friendly message when the user lacks review permission", async ({ page }) => {
+test("shows a friendly message when the user lacks review permission", async ({
+  page,
+}) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({
       status: 403,
-      json: { message: "You do not hold a permission required to perform this action" },
+      json: {
+        message: "You do not hold a permission required to perform this action",
+      },
     }),
   );
 
   await page.goto("/access-recertification");
 
-  await expect(page.locator('p[role="alert"]')).toContainText("don't hold the access-recertification.review");
+  await expect(page.locator('p[role="alert"]')).toContainText(
+    "don't hold the access-recertification.review",
+  );
 });
 
 /**
@@ -212,22 +257,39 @@ async function mockAuthCombined(page: Page) {
   );
 }
 
-test("reviewing your OWN access asks why, and refuses until it is answered", async ({ page }) => {
+test("reviewing your OWN access asks why, and refuses until it is answered", async ({
+  page,
+}) => {
   // The owner chose Option 2: she is asked again at the review itself, so the flagged line in the
   // self-approval report is dated to the act rather than to the arrangement.
   await mockAuthCombined(page);
-  const ownItem = { ...ITEMS[0], subjectUserId: ME_BASE.id, subjectFullName: "Compliance Officer" };
+  const ownItem = {
+    ...ITEMS[0],
+    subjectUserId: ME_BASE.id,
+    subjectFullName: "Compliance Officer",
+  };
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({ status: 200, json: [ownItem] }),
   );
   const sent: string[] = [];
-  await page.route("**/access-recertification/items/item-1/decision", (route) => {
-    sent.push(route.request().postData() ?? "");
-    return route.fulfill({
-      status: 201,
-      json: { id: "item-1", cycleId: "cycle-1", subjectUserId: ME_BASE.id, reviewerUserId: ME_BASE.id, decision: "confirmed", reviewedAt: "2026-03-14T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z" },
-    });
-  });
+  await page.route(
+    "**/access-recertification/items/item-1/decision",
+    (route) => {
+      sent.push(route.request().postData() ?? "");
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: "item-1",
+          cycleId: "cycle-1",
+          subjectUserId: ME_BASE.id,
+          reviewerUserId: ME_BASE.id,
+          decision: "confirmed",
+          reviewedAt: "2026-03-14T00:00:00.000Z",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      });
+    },
+  );
 
   await page.goto("/access-recertification");
 
@@ -246,7 +308,9 @@ test("reviewing your OWN access asks why, and refuses until it is answered", asy
   await expect(confirm).toBeEnabled();
   await confirm.click();
 
-  await expect.poll(() => sent.length, { message: "no decision was sent" }).toBeGreaterThan(0);
+  await expect
+    .poll(() => sent.length, { message: "no decision was sent" })
+    .toBeGreaterThan(0);
   expect(JSON.parse(sent[0]!)).toEqual({
     decision: "confirmed",
     // Trimmed: the surrounding whitespace is not part of what she said.
@@ -254,7 +318,9 @@ test("reviewing your OWN access asks why, and refuses until it is answered", asy
   });
 });
 
-test("reviewing SOMEBODY ELSE's access asks nothing, on the same screen", async ({ page }) => {
+test("reviewing SOMEBODY ELSE's access asks nothing, on the same screen", async ({
+  page,
+}) => {
   // The other half, anchored on the enabled button from the SAME render — an absence satisfied by an
   // unhydrated page would pass while proving nothing.
   await mockAuthCombined(page);
@@ -268,7 +334,9 @@ test("reviewing SOMEBODY ELSE's access asks nothing, on the same screen", async 
   await expectNone(page.getByTestId("combined-duty-reason-item-1"), confirm);
 });
 
-test("lets a reviewer confirm an item, which then shows as decided", async ({ page }) => {
+test("lets a reviewer confirm an item, which then shows as decided", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({ status: 200, json: [ITEMS[0]] }),
@@ -295,10 +363,14 @@ test("lets a reviewer confirm an item, which then shows as decided", async ({ pa
   );
 
   await page.goto("/access-recertification");
-  await page.getByRole("button", { name: "Confirm access for Sales Officer" }).click();
+  await page
+    .getByRole("button", { name: "Confirm access for Sales Officer" })
+    .click();
 
   await expect(page.getByText("Confirmed")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Confirm access for Sales Officer" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Confirm access for Sales Officer" }),
+  ).toHaveCount(0);
   // The row must survive the update without crashing — its enriched fields
   // (only present in the original GET response) should still render.
   await expect(page.getByText("SALES RELATIONSHIP OFFICER")).toBeVisible();
@@ -341,7 +413,9 @@ test("shows which administrator accounts a cycle covered, and who reviewed each"
   );
 });
 
-test("marks an administrator who reviewed their own access", async ({ page }) => {
+test("marks an administrator who reviewed their own access", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({ status: 200, json: ITEMS }),
@@ -382,7 +456,9 @@ test("warns, rather than showing an empty table, when a cycle covered no adminis
   await expect(page.getByTestId("admin-decision-admin-item-1")).toHaveCount(0);
 });
 
-test("asks about an EARLIER cycle, not only the one just started", async ({ page }) => {
+test("asks about an EARLIER cycle, not only the one just started", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({ status: 200, json: ITEMS }),
@@ -432,7 +508,9 @@ test("a reviewer who cannot start cycles is not shown the administrator record",
   await expect(page.getByTestId("admin-access-record")).toHaveCount(0);
 });
 
-test("access-recertification page has no serious/critical accessibility violations @a11y", async ({ page }) => {
+test("access-recertification page has no serious/critical accessibility violations @a11y", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({ status: 200, json: ITEMS }),
@@ -442,20 +520,142 @@ test("access-recertification page has no serious/critical accessibility violatio
   await expect(page.getByText("Sales Officer")).toBeVisible();
 
   const results = await new AxeBuilder({ page }).analyze();
-  const seriousOrCritical = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  const seriousOrCritical = results.violations.filter(
+    (v) => v.impact === "serious" || v.impact === "critical",
+  );
   expect(seriousOrCritical).toEqual([]);
 });
 
-test("decision buttons for a row are reachable via keyboard", async ({ page }) => {
+test("decision buttons for a row are reachable via keyboard", async ({
+  page,
+}) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await page.route("**/access-recertification/items", (route) =>
     route.fulfill({ status: 200, json: [ITEMS[0]] }),
   );
 
   await page.goto("/access-recertification");
-  const confirmButton = page.getByRole("button", { name: "Confirm access for Sales Officer" });
+  const confirmButton = page.getByRole("button", {
+    name: "Confirm access for Sales Officer",
+  });
   await confirmButton.focus();
   await expect(confirmButton).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Revoke access for Sales Officer" })).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: "Revoke access for Sales Officer" }),
+  ).toBeFocused();
+});
+
+/*
+ * THE TWO COMBINED-DUTY RECORDS ON AN ACCESS RECERTIFICATION — Part 4 step 5, the last of the fifteen.
+ *
+ * `AccessRecertificationItem_maker_checker_distinct` requires that the SUBJECT of a review is not its
+ * REVIEWER. It is the only row of the fifteen where the pair has TWO relations, and they are not two
+ * pairs:
+ *
+ *   the ARRANGEMENT — she was SET TO review her own access. Written when the CYCLE OPENED, and in a
+ *                     one-person office it is the only way a cycle can start at all. It says the office
+ *                     had nobody else to ask; it does not say anybody signed off.
+ *   the DECISION    — she DID review it, dated to the review. Evidence, and the act a reader wants.
+ *
+ * The third test below is the one that earns its place: an arrangement with NO decision yet must show the
+ * first and not the second. Collapsing the two would report a cycle that merely could not do better as if
+ * somebody had signed off on their own access — and the administrator record is exactly where a reader
+ * must not be misled about that.
+ */
+
+const ARRANGEMENT_ACT = {
+  id: "cda-acr-arr",
+  at: "2026-04-01T00:00:00.000Z",
+  actorUserId: "admin-2",
+  reason:
+    "This office employs one administrator, so no colleague can review her access.",
+  pair: "AccessRecertificationItem_maker_checker_distinct",
+  roles: ["SYSTEM_SECURITY_ADMINISTRATOR"],
+  hatAmbiguous: false,
+};
+
+const DECISION_ACT = {
+  id: "cda-acr-dec",
+  at: "2026-04-06T00:00:00.000Z",
+  actorUserId: "admin-2",
+  reason:
+    "Confirmed her own access; every role she holds is still required to run the office.",
+  pair: "AccessRecertificationItem_maker_checker_distinct",
+  roles: ["SYSTEM_SECURITY_ADMINISTRATOR"],
+  hatAmbiguous: false,
+};
+
+test("the administrator record shows that a self-review was arranged AND decided", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockAdminRecord(page, {
+    "cycle-2": [
+      {
+        ...ADMIN_ITEMS[1],
+        decision: "confirmed",
+        reviewedAt: "2026-04-06T00:00:00.000Z",
+        arrangementCombinedDutyAct: ARRANGEMENT_ACT,
+        decisionCombinedDutyAct: DECISION_ACT,
+      },
+    ],
+  });
+  await page.goto("/access-recertification");
+
+  const arrangement = page.getByTestId(
+    "combined-duty-admin-arrangement-admin-item-2",
+  );
+  await expect(arrangement).toContainText("employs one administrator");
+  await expect(arrangement).toHaveAttribute(
+    "data-combined-duty-pair",
+    "AccessRecertificationItem_maker_checker_distinct",
+  );
+
+  const decision = page.getByTestId(
+    "combined-duty-admin-decision-admin-item-2",
+  );
+  await expect(decision).toContainText("Confirmed her own access");
+});
+
+test("an arranged self-review that nobody has decided yet shows only the arrangement", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockAdminRecord(page, {
+    // Exactly ADMIN_ITEMS[1]'s state — set to review herself, decision still null.
+    "cycle-2": [
+      { ...ADMIN_ITEMS[1], arrangementCombinedDutyAct: ARRANGEMENT_ACT },
+    ],
+  });
+  await page.goto("/access-recertification");
+
+  // THIS IS WHY THERE ARE TWO COLUMNS. The cycle put her in this position; she has not yet confirmed
+  // anything. A single merged field would pass the test above and report a decision nobody has made.
+  await expect(
+    page.getByTestId("combined-duty-admin-arrangement-admin-item-2"),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("combined-duty-admin-decision-admin-item-2"),
+  ).toHaveCount(0);
+});
+
+test("an administrator reviewed by somebody else declares nothing", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockAdminRecord(page, { "cycle-2": [ADMIN_ITEMS[0]] });
+  await page.goto("/access-recertification");
+
+  // The POSITIVE claim is the anchor: the decision cell reads "Confirmed", which is what a two-person
+  // review shows. Asserting silence alone would pass on a cell that stopped rendering either act.
+  await expect(page.getByTestId("admin-decision-admin-item-1")).toContainText(
+    "Confirmed",
+  );
+  await expect(
+    page.getByTestId("combined-duty-admin-arrangement-admin-item-1"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByTestId("combined-duty-admin-decision-admin-item-1"),
+  ).toHaveCount(0);
 });

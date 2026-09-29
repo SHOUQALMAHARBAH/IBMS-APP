@@ -89,6 +89,18 @@ BY_CALL_SITE = {
         'needs-assessment.controller.ts',
         'row.approverCombinedDutyAct',
     ): 'NeedsAssessment_approver_maker_checker_distinct',
+    # TWO call sites for ONE pair, which is the opposite of the NeedsAssessment case above: this row has
+    # two RELATIONS for one constraint — the act on the ARRANGEMENT (she was set to review her own access)
+    # and the act on the DECISION (she did). Both map to the same pair, so either one alone counts it as
+    # projecting; that they are shown SEPARATELY is pinned by `access-recertification.spec.ts`, not here.
+    (
+        'access-recertification.service.ts',
+        'item.combinedDutyAct',
+    ): 'AccessRecertificationItem_maker_checker_distinct',
+    (
+        'access-recertification.service.ts',
+        'item.decisionCombinedDutyAct',
+    ): 'AccessRecertificationItem_maker_checker_distinct',
 }
 
 

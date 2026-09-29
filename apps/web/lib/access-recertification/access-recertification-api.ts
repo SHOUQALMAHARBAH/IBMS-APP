@@ -1,10 +1,11 @@
+import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOnRecord";
 // Part 10.1 / Process #40 — talks to apps/api's rbac module
 // (access-recertification.controller.ts). Mirrors lib/auth/auth-api.ts's
 // conventions (thin typed wrappers over apiGet/apiPost).
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPost } from "../auth/api-client";
 
-export type RecertificationDecision = 'confirmed' | 'revoked' | 'changed';
+export type RecertificationDecision = "confirmed" | "revoked" | "changed";
 
 export interface RecertificationItem {
   id: string;
@@ -27,6 +28,21 @@ export interface RecertificationItem {
   reviewerFullName: string;
   decision: RecertificationDecision | null;
   reviewedAt: string | null;
+  /**
+   * Part 4 step 5 — TWO acts, and NOT two pairs. The second column exists precisely so these stay
+   * separate facts:
+   *
+   *   `arrangementCombinedDutyAct` — she was SET TO review her own access, written when the cycle OPENED.
+   *                                 In a one-person office this is the only way a cycle can start, so it
+   *                                 says the office had nobody else — not that anybody signed off.
+   *   `decisionCombinedDutyAct`    — she DID review it, dated to the review. EVIDENCE, and the act a
+   *                                 reader is actually looking for.
+   *
+   * Never collapse them: that would report a cycle which merely could not do better as if somebody had
+   * signed off on their own access.
+   */
+  arrangementCombinedDutyAct: CombinedDutyActOnRecord | null;
+  decisionCombinedDutyAct: CombinedDutyActOnRecord | null;
   createdAt: string;
 }
 
@@ -56,7 +72,7 @@ export interface RecertificationDecisionResult {
 }
 
 export function listMyRecertificationItems(): Promise<RecertificationItem[]> {
-  return apiGet('/access-recertification/items');
+  return apiGet("/access-recertification/items");
 }
 
 /**
@@ -67,7 +83,7 @@ export function listMyRecertificationItems(): Promise<RecertificationItem[]> {
  * cycle you had just started in this session and for no earlier one.
  */
 export function listRecertificationCycles(): Promise<RecertificationCycle[]> {
-  return apiGet('/access-recertification/cycles');
+  return apiGet("/access-recertification/cycles");
 }
 
 /**
@@ -97,7 +113,7 @@ export function startRecertificationCycle(input: {
    */
   combinedDutyReason?: string;
 }): Promise<RecertificationCycle> {
-  return apiPost('/access-recertification/cycles', input);
+  return apiPost("/access-recertification/cycles", input);
 }
 
 export function decideRecertificationItem(

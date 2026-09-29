@@ -1,13 +1,31 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  AccessRecertificationCycle,
-  AccessRecertificationItem,
-} from '@ibms/db';
+import type { AccessRecertificationCycle, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type AccessRecertificationItemWithCycle = AccessRecertificationItem & {
-  cycle: { cycleLabel: string };
-};
+/**
+ * The two combined-duty relations, on every item a review screen reads.
+ *
+ * `AccessRecertificationItem` is the only row of the fifteen where the pair has TWO relations, and they
+ * are NOT two pairs. The distinction is recorded on the schema and matters here:
+ *
+ *   `combinedDutyAct`         — the act on the ARRANGEMENT. She was SET TO review her own access, which
+ *                               happens at INSERT when the cycle opens, and is what the CHECK constraint
+ *                               accepts. In a one-person office this is the only way a cycle can start.
+ *   `decisionCombinedDutyAct` — the act on the REVIEW. She DID review it, dated to the review. This one is
+ *                               EVIDENCE rather than an escape column; its FK is what makes it evidence.
+ *
+ * So the record shows both, labelled differently, because "the cycle put her in this position" and "she
+ * then confirmed her own access" are different facts and a reader is entitled to both. Collapsing them
+ * would report a cycle that merely COULD NOT do better as if somebody had signed off on themselves.
+ */
+const ITEM_INCLUDE = {
+  cycle: { select: { cycleLabel: true } },
+  combinedDutyAct: true,
+  decisionCombinedDutyAct: true,
+} as const;
+
+export type AccessRecertificationItemWithCycle =
+  Prisma.AccessRecertificationItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 
 @Injectable()
 export class AccessRecertificationRepository {
@@ -58,7 +76,9 @@ export class AccessRecertificationRepository {
       reviewerUserId: string;
       combinedDutyActId?: string | null;
     }[],
-  ): Promise<AccessRecertificationItem[]> {
+  ): Promise<Prisma.AccessRecertificationItemGetPayload<object>[]> {
+    // No `include`: `createManyAndReturn` cannot take one, and these rows are internal to `startCycle`
+    // rather than a wire shape — the acts are read back through `findItemsForReviewer`.
     return this.prisma.client.accessRecertificationItem.createManyAndReturn({
       data: pairs.map((pair) => ({ cycleId, ...pair })),
     });
@@ -92,9 +112,10 @@ export class AccessRecertificationRepository {
       .filter((id): id is string => id !== null);
   }
 
-  findItemById(id: string): Promise<AccessRecertificationItem | null> {
+  findItemById(id: string): Promise<AccessRecertificationItemWithCycle | null> {
     return this.prisma.client.accessRecertificationItem.findUnique({
       where: { id },
+      include: ITEM_INCLUDE,
     });
   }
 
@@ -105,7 +126,7 @@ export class AccessRecertificationRepository {
     return this.prisma.client.accessRecertificationItem.findMany({
       where: { reviewerUserId, ...(cycleId ? { cycleId } : {}) },
       orderBy: { createdAt: 'desc' },
-      include: { cycle: { select: { cycleLabel: true } } },
+      include: ITEM_INCLUDE,
     });
   }
 
@@ -126,7 +147,7 @@ export class AccessRecertificationRepository {
     return this.prisma.client.accessRecertificationItem.findMany({
       where: { cycleId },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-      include: { cycle: { select: { cycleLabel: true } } },
+      include: ITEM_INCLUDE,
     });
   }
 
@@ -158,7 +179,7 @@ export class AccessRecertificationRepository {
     /** The act on the REVIEW, where the item's own `combinedDutyActId` is the act on the arrangement.
      *  Null on every ordinary two-person review. */
     decisionCombinedDutyActId: string | null = null,
-  ): Promise<AccessRecertificationItem | null> {
+  ): Promise<AccessRecertificationItemWithCycle | null> {
     const { count } =
       await this.prisma.client.accessRecertificationItem.updateMany({
         where: { id, reviewerUserId, decision: null },
@@ -167,6 +188,7 @@ export class AccessRecertificationRepository {
     if (count === 0) return null;
     return this.prisma.client.accessRecertificationItem.findUniqueOrThrow({
       where: { id },
+      include: ITEM_INCLUDE,
     });
   }
 

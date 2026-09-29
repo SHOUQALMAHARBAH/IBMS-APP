@@ -1,4 +1,8 @@
 import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../../common/duty-segregation.view';
+import {
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -58,6 +62,21 @@ export interface RecertificationItemView {
   reviewerFullName: string;
   decision: string | null;
   reviewedAt: Date | null;
+  /**
+   * Part 4 step 5 — TWO acts, and they are NOT two pairs. The distinction is the whole reason
+   * `decisionCombinedDutyActId` exists as a second column beside the escape one:
+   *
+   *   `arrangementCombinedDutyAct` — she was SET TO review her own access. Written when the cycle OPENED,
+   *                                 and in a one-person office it is the only way a cycle can start at
+   *                                 all. It says the office had nobody else, not that anybody signed off.
+   *   `decisionCombinedDutyAct`    — she DID review it, dated to the review. This is the act a reader is
+   *                                 looking for, and it is EVIDENCE rather than an escape column.
+   *
+   * Both are shown, separately. Collapsing them would report a cycle that merely could not do better as
+   * if somebody had signed off on their own access.
+   */
+  arrangementCombinedDutyAct: CombinedDutyActView | null;
+  decisionCombinedDutyAct: CombinedDutyActView | null;
   createdAt: Date;
 }
 
@@ -348,6 +367,10 @@ export class AccessRecertificationService {
           reviewerById.get(item.reviewerUserId)?.fullName ?? '(deleted user)',
         decision: item.decision,
         reviewedAt: item.reviewedAt,
+        arrangementCombinedDutyAct: combinedDutyActView(item.combinedDutyAct),
+        decisionCombinedDutyAct: combinedDutyActView(
+          item.decisionCombinedDutyAct,
+        ),
         createdAt: item.createdAt,
       };
     });
