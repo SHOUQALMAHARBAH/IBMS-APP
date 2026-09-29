@@ -104,7 +104,7 @@ test("lists customer + insurer channels with masked account fragments", async ({
     page.getByRole("cell", { name: "Active", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("cell", { name: "Disabled", exact: true }),
+    page.getByRole("cell", { name: "Deactivated", exact: true }),
   ).toBeVisible();
 
   // Finance sees the add form
@@ -142,7 +142,7 @@ test("the read code alone shows the list and NEITHER write control", async ({
 
   await expectNone(page.getByLabel("Account last 4"), page.getByRole("cell", { name: "••••4321" }));
   await expectNone(
-    page.getByRole("button", { name: "Disable" }),
+    page.getByRole("button", { name: "Deactivate" }),
     page.getByRole("cell", { name: "••••4321" }),
   );
 });
@@ -158,7 +158,7 @@ test("the create code adds the form back without the disable button", async ({
   await page.goto("/payment-channels");
   await expect(page.getByLabel("Account last 4")).toBeVisible();
   await expectNone(
-    page.getByRole("button", { name: "Disable" }),
+    page.getByRole("button", { name: "Deactivate" }),
     page.getByLabel("Account last 4"),
   );
 });

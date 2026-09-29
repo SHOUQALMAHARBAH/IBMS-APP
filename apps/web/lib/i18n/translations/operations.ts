@@ -1128,10 +1128,10 @@ export const OPERATIONS = {
     orgUnitNameAr: 'Name (Arabic) — optional',
     orgUnitCreateButton: 'Add',
     orgUnitRename: 'Rename',
-    orgUnitRetire: 'Retire',
+    orgUnitRetire: 'Deactivate',
     orgUnitCreated: 'Added.',
     orgUnitRenamed: 'Renamed.',
-    orgUnitRetired: 'Retired — existing assignments are unchanged.',
+    orgUnitRetired: 'Deactivated — existing assignments are unchanged.',
     orgUnitNone: 'Nothing here yet — add the first one.',
     orgUnitLoadError: 'Could not load departments and branches — try again.',
     orgUnitNoPermission:

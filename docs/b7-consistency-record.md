@@ -45,6 +45,41 @@ differently — the disagreement is the evidence, not somebody's taste.
 | Ending an entity's active life while keeping its history and its links | **deactivate** | delete, remove, suspend, archive, retire | The four-action scheme names the permission `.deactivate`, and the owner's rule that delete MEANS deactivate. |
 | Ending a ROLE's active life | **retire** | delete, deactivate | Deliberate exception: `/settings/roles` has BOTH — retire (reversible, keeps the grant history) and delete (only a role never used). Two different acts need two words. Recorded here so it is a decision, not drift. |
 | Finding a named thing to attach to a record | **search / find** | pick, select, lookup | `EntitySearch` is one control on every screen that needs one (Plan B). |
+| Ending an ENCRYPTION KEY's use for new writes, while keeping it to decrypt old rows | **retire** | deactivate, disable | A THIRD sense, and legitimately distinct: a retired key is still in use — for reading. It is not an entity whose active life ended. Found by batch 3 while checking whether `encryption-keys`' "Retired" was the same drift as the org units'. It is not; it stays. |
+| Withdrawing a record RAISED IN ERROR | **withdraw** | discard, delete, cancel | The permission family is `*.discard` and the UI says withdraw — a deliberate divergence, not drift: the Arabic «إلغاء» means a cancellation endorsement on a live policy, so the UI could not use the code's own word. `docs/discard.md`. |
+| Taking back something GRANTED — a role, a device's trust, an access right | **revoke** | deactivate, remove, disable | Not the same concept as deactivating an entity: the thing revoked was given to somebody, and the giving is what is undone. Four screens already agreed; recorded so the next one does not reach for "deactivate". |
+| Ending a RELATIONSHIP with a counterparty — employment, a vendor contract | **terminate** | deactivate, end, close | Also distinct, and it carries obligations the other words do not imply (data return, access revocation). Two screens already agreed. |
+| Closing out an item a sweep flagged | **resolve** | clear, dismiss, close | `/bank-reconciliation` and the claims follow-up alerts already agreed. Checked rather than assumed — the same word for the same kind of act, so it is compliance and not a collision. |
+
+### What batch 3 changed, and what it did not
+
+**CHANGED (English), because the table above already decided it:**
+
+| Screen | Was | Now | Why it was a violation |
+|---|---|---|---|
+| `/payment-channels` | Disable / Disabled | **Deactivate / Deactivated** | The permission is `payment-channel.deactivate`. The code already said the settled word and the screen did not. |
+| `/settings/org-units` | Retire / Retired | **Deactivate / Deactivated** | The permissions are `branch.deactivate` / `department.deactivate`. The ROLE exception does not extend here: it exists because `/settings/roles` has retire AND delete, and org units have only the one act — checked, not assumed. |
+
+**NOT CHANGED — singular, so there is nothing to be consistent with.** Per the rule that this list holds
+decisions and not an inventory: `Pay refund`, `Approve refund`, `Calculate adjustment`,
+`Request endorsement`, `Request cancellation`, `Advance to insurer`, `Notify client`, `Register & assign
+adjuster`, `Second-approve settlement`, `Mark survey complete`, `Mark investigation complete`,
+`Issue invoice`, `Record collection`, `Reconcile collected funds`, `Run reconciliation`, `Investigate`.
+Each appears once across the twelve finance and claims surfaces.
+
+One of those is worth a note rather than a row: **`Pay refund` is the UI for the permission
+`refund.disburse`.** The screen says "pay" and the code says "disburse". That is not a rule 7 violation —
+rule 7 is about one action having one name ACROSS SCREENS, and this appears once — but if a second refund
+surface is ever built, "pay" is the word it should use, because it is the one a Finance officer says.
+
+**THE ARABIC IS NOT SETTLED, and it is the owner's to settle.** Measured in batch 3: the English has
+THREE words for the concept in the first row (deactivate, disable, retire) and the Arabic has TWO —
+`إيقاف` on `/sla-policies` and `/settings/org-units`, `تعطيل` on `/settings/users` and
+`/payment-channels`. They diverge in DIFFERENT PLACES, so neither language is the consistent one. The
+English changes above move each screen onto the Arabic its English twin already used, so no Arabic was
+invented and no pair now disagrees — but one English word still has two Arabic renderings. `تعطيل` reads
+as "disable" and `إيقاف` as "halt/suspend"; the table above rejects "suspend" as a synonym, which is an
+argument for `تعطيل`, but the owner writes the Arabic.
 
 ---
 
