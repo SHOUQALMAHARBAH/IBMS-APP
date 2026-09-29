@@ -8,6 +8,7 @@ import {
 import type { KYCRecord, KycStatus } from '@ibms/db';
 import {
   KycRecordRepository,
+  type KycRecordWithAct,
   type KycRecordWithCustomer,
 } from '../../repositories/kyc-record.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
@@ -92,7 +93,10 @@ export class KycService {
     return canReadAllCustomerOwners(actor);
   }
 
-  async start(customerId: string, actorUserId: string): Promise<KYCRecord> {
+  async start(
+    customerId: string,
+    actorUserId: string,
+  ): Promise<KycRecordWithAct> {
     const customer = await this.customers.findById(customerId);
     if (!customer || customer.ownerUserId !== actorUserId) {
       throw new NotFoundException('Customer not found');
@@ -127,7 +131,7 @@ export class KycService {
   private async findOwnedKyc(
     id: string,
     actorUserId: string,
-  ): Promise<KYCRecord> {
+  ): Promise<KycRecordWithAct> {
     const kyc = await this.kycRecords.findById(id);
     if (!kyc || kyc.createdByUserId !== actorUserId) {
       throw new NotFoundException('KYCRecord not found');
@@ -141,7 +145,7 @@ export class KycService {
    * at the write, re-read after" style WorkflowTransitionService and
    * SlaTimerService already use) and as the initial lookup before checking
    * a business precondition. */
-  private async mustFind(id: string): Promise<KYCRecord> {
+  private async mustFind(id: string): Promise<KycRecordWithAct> {
     const kyc = await this.kycRecords.findById(id);
     if (!kyc) {
       throw new NotFoundException(`KYCRecord ${id} not found`);
@@ -149,7 +153,7 @@ export class KycService {
     return kyc;
   }
 
-  async submit(id: string, actorUserId: string): Promise<KYCRecord> {
+  async submit(id: string, actorUserId: string): Promise<KycRecordWithAct> {
     await this.findOwnedKyc(id, actorUserId);
     await this.workflow.transition({
       entityType: 'KYCRecord',
@@ -167,7 +171,10 @@ export class KycService {
    * than stranded in SCREENING with no results (SCREENING -> SCREENING is
    * rejected by the engine, and decide() refuses a file with no
    * ScreeningResult rows). */
-  async runScreening(id: string, actorUserId: string): Promise<KYCRecord> {
+  async runScreening(
+    id: string,
+    actorUserId: string,
+  ): Promise<KycRecordWithAct> {
     const kyc = await this.mustFind(id);
     if (kyc.status !== 'SUBMITTED') {
       throw new UnprocessableEntityException(
@@ -213,7 +220,7 @@ export class KycService {
    * path on a high-risk result" — presupposes a result (isEdd already
    * true), not a free-form manual override with no screening signal behind
    * it. */
-  async triggerEdd(id: string, actorUserId: string): Promise<KYCRecord> {
+  async triggerEdd(id: string, actorUserId: string): Promise<KycRecordWithAct> {
     const kyc = await this.mustFind(id);
     if (!kyc.isEdd) {
       throw new UnprocessableEntityException(
@@ -278,7 +285,7 @@ export class KycService {
     screeningHoldReason?: string,
     /** Part 4 — present only when the approver is also the capturer in an office that declared COMBINED. */
     combinedDutyReason?: string,
-  ): Promise<KYCRecord> {
+  ): Promise<KycRecordWithAct> {
     const kyc = await this.mustFind(id);
     const combinedDutyActId = await this.dutySegregation.resolve({
       constraint: 'KYCRecord_maker_checker_distinct',
@@ -502,7 +509,7 @@ export class KycService {
     id: string,
     dto: ScheduleReviewDto,
     actorUserId: string,
-  ): Promise<KYCRecord> {
+  ): Promise<KycRecordWithAct> {
     const kyc = await this.mustFind(id);
     if (kyc.status !== 'APPROVED') {
       throw new UnprocessableEntityException(
@@ -541,7 +548,7 @@ export class KycService {
     return updated;
   }
 
-  async get(id: string, actor: AuthenticatedUser): Promise<KYCRecord> {
+  async get(id: string, actor: AuthenticatedUser): Promise<KycRecordWithAct> {
     const kyc = await this.kycRecords.findById(id);
     if (!kyc) throw new NotFoundException('KYCRecord not found');
     if (this.isCrossOwner(actor)) return kyc;

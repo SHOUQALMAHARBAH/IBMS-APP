@@ -12,7 +12,10 @@ import { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { hasExactlyOneOwner } from '../../common/dto.util';
-import { DsrRepository , type DataSubjectRequestWithAct } from '../../repositories/dsr.repository';
+import {
+  DsrRepository,
+  type DataSubjectRequestWithAct,
+} from '../../repositories/dsr.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {

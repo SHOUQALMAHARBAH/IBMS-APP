@@ -5,6 +5,7 @@ import type {
   CustomerType,
   KYCRecord,
   KycStatus,
+  Prisma,
   RiskLevel,
   RiskRating,
   ScreeningOutcome,
@@ -72,16 +73,44 @@ export interface UpdateKycRecordInput {
  * workflow-transitions.config.ts's `KYCRecord` entity; `update()` below
  * covers only the non-status columns a KYC decision or screening run needs
  * to persist alongside (or independently of) a transition. */
+/**
+ * The combined-duty act, on every KYC read.
+ *
+ * `KYCRecord_maker_checker_distinct` requires that whoever creates a KYC file is not whoever approves
+ * it. In an office that declared COMBINED mode one person may do both by stating why, and the act
+ * lands in `combinedDutyActId`.
+ *
+ * THE OWNER RULED THIS IN SCOPE rather than deferred, and the reasoning is worth keeping: the money
+ * and screening deferral covers screening work, and **showing who performed an act and who approved it
+ * is neither.** It does not touch the screening engine, does not extend it, and adds no screening
+ * claim anywhere. It is the same line as the other pairs, on a record that happens to be a KYC record.
+ */
+const KYC_INCLUDE = { combinedDutyAct: true } as const;
+
+export type KycRecordWithAct = Prisma.KYCRecordGetPayload<{
+  include: typeof KYC_INCLUDE;
+}>;
+
 @Injectable()
 export class KycRecordRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(input: CreateKycRecordInput): Promise<KYCRecord> {
-    return this.prisma.client.kYCRecord.create({ data: input });
+  create(input: CreateKycRecordInput): Promise<KycRecordWithAct> {
+    // The include here too, so one shape serves reads and writes. A newly started KYC file has no act
+    // — nothing has approved it — so this always yields null; what it buys is that the row type needs
+    // no optional field, and an optional field is what lets the next caller pass a row whose act state
+    // nobody knows.
+    return this.prisma.client.kYCRecord.create({
+      data: input,
+      include: KYC_INCLUDE,
+    });
   }
 
-  findById(id: string): Promise<KYCRecord | null> {
-    return this.prisma.client.kYCRecord.findUnique({ where: { id } });
+  findById(id: string): Promise<KycRecordWithAct | null> {
+    return this.prisma.client.kYCRecord.findUnique({
+      where: { id },
+      include: KYC_INCLUDE,
+    });
   }
 
   findMany(filter: KycRecordFilter): Promise<KycRecordWithCustomer[]> {
@@ -95,6 +124,7 @@ export class KycRecordRepository {
       },
       include: {
         customer: { select: { legalName: true, customerType: true } },
+        ...KYC_INCLUDE,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -103,10 +133,11 @@ export class KycRecordRepository {
   /** The most recently created KYCRecord for a Customer, any status — "the
    * current KYC file" a submit/screening/decision call resolves ownership
    * and state against. */
-  findLatestByCustomerId(customerId: string): Promise<KYCRecord | null> {
+  findLatestByCustomerId(customerId: string): Promise<KycRecordWithAct | null> {
     return this.prisma.client.kYCRecord.findFirst({
       where: { customerId },
       orderBy: { createdAt: 'desc' },
+      include: KYC_INCLUDE,
     });
   }
 
@@ -118,8 +149,14 @@ export class KycRecordRepository {
     });
   }
 
-  update(id: string, data: UpdateKycRecordInput): Promise<KYCRecord> {
-    return this.prisma.client.kYCRecord.update({ where: { id }, data });
+  update(id: string, data: UpdateKycRecordInput): Promise<KycRecordWithAct> {
+    // The include on the write too — every path out of this repository carries the same shape, so a
+    // caller cannot receive a row whose act state is unknowable.
+    return this.prisma.client.kYCRecord.update({
+      where: { id },
+      data,
+      include: KYC_INCLUDE,
+    });
   }
 
   createScreeningResult(

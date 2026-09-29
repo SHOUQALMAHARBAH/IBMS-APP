@@ -6,10 +6,12 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { CommissionLedgerEntry } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
-import { CommissionRepository , type CommissionLedgerEntryWithAct } from '../../repositories/commission.repository';
+import {
+  CommissionRepository,
+  type CommissionLedgerEntryWithAct,
+} from '../../repositories/commission.repository';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import {
   compareMoney,

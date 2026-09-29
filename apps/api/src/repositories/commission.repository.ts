@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  CommissionAgreement,
-  CommissionLedgerEntry,
-  Prisma,
-} from '@ibms/db';
+import type { CommissionAgreement, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
 

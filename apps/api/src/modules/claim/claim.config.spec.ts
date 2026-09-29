@@ -805,8 +805,8 @@ describe('Process 28 — settlement', () => {
         brokerProcessedPayment: false,
         approvedByUserId: 'u-1',
         secondApproverUserId: null,
-      // The read includes this relation now, so the fixture carries it.
-      combinedDutyAct: null,
+        // The read includes this relation now, so the fixture carries it.
+        combinedDutyAct: null,
         clientPaymentConfirmedAt: null,
         createdAt: d('2026-06-01T00:00:00.000Z'),
       },
@@ -837,8 +837,8 @@ describe('Process 28 — settlement', () => {
         brokerProcessedPayment: false,
         approvedByUserId: 'u-1',
         secondApproverUserId: null,
-      // The read includes this relation now, so the fixture carries it.
-      combinedDutyAct: null,
+        // The read includes this relation now, so the fixture carries it.
+        combinedDutyAct: null,
         clientPaymentConfirmedAt: d('2026-06-10T00:00:00.000Z'),
         createdAt: d('2026-06-01T00:00:00.000Z'),
       },

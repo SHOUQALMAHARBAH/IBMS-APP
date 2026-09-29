@@ -425,7 +425,9 @@ export class PolicyService {
               policy.checking.complianceOverrideByUserId,
             checklist: policy.checking.checklistResult ?? null,
             // Part 4 step 5 — on the record, not only in a report.
-            combinedDutyAct: combinedDutyActView(policy.checking.combinedDutyAct),
+            combinedDutyAct: combinedDutyActView(
+              policy.checking.combinedDutyAct,
+            ),
             createdAt: policy.checking.createdAt,
           }
         : null,

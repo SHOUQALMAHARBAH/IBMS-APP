@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import {
   approveKyc,
   getScreeningHold,
@@ -184,6 +185,13 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                     {t("kycQueueHighRiskResult")}
                   </div>
                 ) : null}
+                {/* Part 4 step 5 — in the STATUS cell, because an APPROVED KYC file is the state a
+                    reader is judging here and `createdByUserId` equalling `approvedByUserId` is
+                    visible only to somebody comparing two uuids. Shared renderer. */}
+                <CombinedDutyOnRecord
+                  act={item.combinedDutyAct}
+                  testId={`combined-duty-kyc-${item.id}`}
+                />
               </td>
               <td style={queueCellStyle}>
                 {item.status === "SUBMITTED" ? (

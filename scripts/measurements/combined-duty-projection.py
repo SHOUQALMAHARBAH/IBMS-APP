@@ -54,12 +54,19 @@ FIELD = re.compile(r"(\w+):\s*(?:'([^']*)'|(true|false))")
 # relation name on the parent, and matching loosely on the entity name is what produced the
 # `Recommendation` false positive. An argument no row claims raises — the same discipline as the i18n
 # dictionary registry, which has caught a real omission twice.
-BY_ARGUMENT = {
-    'e.refund.combinedDutyAct': 'Refund',
-    'policy.checking.combinedDutyAct': 'PolicyChecking',
-    'row.closureCombinedDutyAct': 'DataSubjectRequest',
-    'row.combinedDutyAct': 'CommissionLedgerEntry',
-    's.combinedDutyAct': 'Settlement',
+# Keyed on (FILE BASENAME, argument), not the argument alone.
+#
+# `row.combinedDutyAct` appears in TWO pairs' mappers — the commission ledger's and, once KYC gained a
+# wire projection, the KYC controller's. With the argument as the sole key the second silently
+# collided with the first and the count stayed at 5 after the sixth pair was built. The file
+# disambiguates, and the collision is now impossible to express rather than something to notice.
+BY_CALL_SITE = {
+    ('endorsement.service.ts', 'e.refund.combinedDutyAct'): 'Refund',
+    ('policy.service.ts', 'policy.checking.combinedDutyAct'): 'PolicyChecking',
+    ('dsr.config.ts', 'row.closureCombinedDutyAct'): 'DataSubjectRequest',
+    ('commission.config.ts', 'row.combinedDutyAct'): 'CommissionLedgerEntry',
+    ('claim.config.ts', 's.combinedDutyAct'): 'Settlement',
+    ('kyc.controller.ts', 'row.combinedDutyAct'): 'KYCRecord',
 }
 
 
@@ -94,16 +101,17 @@ def measure(sources):
     for path, text in sources.items():
         if path.endswith('duty-segregation.view.ts'):
             continue
+        base = os.path.basename(path)
         for m in re.finditer(re.escape(VIEW) + r'\s*\(([^)]*)\)', text):
-            call_args.append(m.group(1).strip())
+            call_args.append((base, m.group(1).strip()))
 
-    unmapped = [a for a in call_args if a not in BY_ARGUMENT]
+    unmapped = [a for a in call_args if a not in BY_CALL_SITE]
     assert not unmapped, (
-        'combinedDutyActView is called with %s, which no row of BY_ARGUMENT claims. Add it — '
+        'combinedDutyActView is called at %s, which no row of BY_CALL_SITE claims. Add it — '
         'otherwise this script reports a pair as unprojected while a screen is showing it.'
         % unmapped
     )
-    projected = {BY_ARGUMENT[a] for a in call_args}
+    projected = {BY_CALL_SITE[a] for a in call_args}
 
     dormant = [p['entityType'] for p in pairs if p.get('dormant') == 'true']
     live = [p['entityType'] for p in pairs if p.get('dormant') != 'true']
@@ -186,7 +194,7 @@ def self_test():
         print('  %-56s *** NO ERROR RAISED ***' % 'an unmapped call site is refused')
         failures.append('unmapped call site')
     except AssertionError as err:
-        if 'no row of BY_ARGUMENT claims' not in str(err):
+        if 'no row of BY_CALL_SITE claims' not in str(err):
             raise
         print('  %-56s ok' % 'an unmapped call site is refused')
 

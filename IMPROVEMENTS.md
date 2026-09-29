@@ -5187,6 +5187,61 @@ type-annotated**, which is what makes the next one a compile error instead of a 
 
 **Projecting: 4 of 15.**
 
+
+### 1.80 — THE KYC PAIR SENT THE ACT IN THE WRONG SHAPE, AND ONLY THE MEASUREMENT COULD SEE IT
+
+`KYCRecord` is the sixth of fifteen. The owner ruled it in scope rather than deferred, and the
+reasoning is recorded so nobody re-weighs it: the deferral covers money and screening, and **showing
+who performed an act and who approved it is neither** — no screening engine touched, nothing extended,
+no screening claim added.
+
+#### A silent wrong shape, caught by a measurement and by nothing else
+
+KYC is **the only one of the fifteen pairs with no view layer** — nine service methods return the
+Prisma model directly. So the act relation reached the wire RAW, carrying
+`actedAt` / `grantingRoleNames` / `multipleGrantingRoles`, where every other pair sends the view's
+`at` / `roles` / `hatAmbiguous`. The shared component reads the latter, so every field would have
+rendered `undefined`.
+
+**Both the typecheck and the Playwright tests passed.** The web type claimed the view shape, and the
+tests passed because the MOCK sent the view shape — **a mocked endpoint cannot disagree with you about
+its own response**, which is § 1.44's thesis applied to a payload rather than a route. What caught it
+was the projection measurement reporting **5 pairs after the sixth was built**, because no
+`combinedDutyActView` call site existed anywhere. A number that had been made to move was the only
+thing in the stack telling the truth.
+
+Fixed at the controller — the HTTP boundary is where a wire shape belongs — with an `onWire` helper
+that takes a **promise**, so nine handlers stay one-line delegations. Wrapping the awaited value would
+have made them all `async` for no behavioural reason, and my first attempt at that marked the
+constructor `async`.
+
+#### The strict type named four more sites, and one was a different type entirely
+
+Widening the nine service returns produced compile errors at: the `create` path, the `update` path,
+`scheduleReview`, and **`rerunScreening`, which returns a `ScreeningRunResult` and not a KYC record at
+all**. That last one is the helper refusing a mismatched shape rather than projecting onto something
+that has no act — it is left unwrapped, with a comment saying why.
+
+#### AND THE MEASUREMENT'S OWN KEY COLLIDED — the same class, one level up
+
+After the fix the count STILL said 5. `BY_ARGUMENT` was keyed on the call-site argument alone, and
+`row.combinedDutyAct` is the argument in **two** pairs' mappers: the commission ledger's, and now the
+KYC controller's. The second silently overwrote the first in a dict literal, so one of two real
+projections vanished.
+
+Keyed on **(file basename, argument)** now, which makes the collision unrepresentable rather than
+something to notice. **This is the fourth instance of the same family in this feature** — loose
+matching producing a confident wrong number — and it is the first one the `--self-test` could not have
+caught, because the self-test asks whether a number MOVES, not whether two things map to one key. The
+cure for that is the same as the map's own: an explicit key that cannot collide.
+
+**Verification**: api `customer` unit 324/324 (22 files), `kyc-queue-duty` 2/2 first run,
+`customers.spec.ts` 19/19 as a whole file, both typechecks clean, api lint 0 errors after removing
+three imports the widening made unused — which is itself the signal that nothing references the bare
+model any more.
+
+**Projecting: 6 of 15.**
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

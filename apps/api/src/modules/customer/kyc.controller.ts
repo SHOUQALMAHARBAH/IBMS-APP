@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import type { CombinedDutyAct } from '@ibms/db';
+import { combinedDutyActView } from '../../common/duty-segregation.view';
 import { ApiTags } from '@nestjs/swagger';
 import { KycService } from './kyc.service';
 import { ScreeningHoldService } from './screening-hold.service';
@@ -12,6 +14,34 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 /** Process 3-4 — the KYC lifecycle (see kyc.service.ts for the full status
  * chain). Frontend: apps/web/app/(app)/customers/kyc-queue (Compliance
  * queue) and the KYC wizard's submit step. */
+
+/**
+ * The wire shape of a KYC record: the row, with its combined-duty act PROJECTED.
+ *
+ * ## Why here, and why it takes a PROMISE
+ *
+ * KYC is the only one of the fifteen maker/checker pairs with no view layer — nine service methods
+ * return the Prisma model directly, so the act relation reached the wire RAW, carrying `actedAt` /
+ * `grantingRoleNames` / `multipleGrantingRoles` where every other pair sends the view's `at` / `roles`
+ * / `hatAmbiguous`.
+ *
+ * **That would have shipped silently.** The web type claimed the view shape and the Playwright tests
+ * passed, because the MOCK sent the view shape — a mocked endpoint cannot disagree with you about its
+ * own response. What caught it was the projection MEASUREMENT, which still reported 5 pairs after the
+ * sixth was built, because no `combinedDutyActView` call site existed.
+ *
+ * It takes a promise so every handler stays a one-line delegation: wrapping the awaited value instead
+ * would make nine handlers `async` for no behavioural reason, and my first attempt at that marked the
+ * constructor `async`. The controller is the HTTP boundary, which is where a wire shape belongs, and
+ * `combinedDutyActView` remains the ONE definition of this shape for all fifteen pairs.
+ */
+async function onWire<T extends { combinedDutyAct: CombinedDutyAct | null }>(
+  pending: Promise<T>,
+) {
+  const row = await pending;
+  return { ...row, combinedDutyAct: combinedDutyActView(row.combinedDutyAct) };
+}
+
 @ApiTags('kyc-records')
 @Controller()
 export class KycController {
@@ -26,13 +56,13 @@ export class KycController {
     @Param('customerId') customerId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.kyc.start(customerId, user.id);
+    return onWire(this.kyc.start(customerId, user.id));
   }
 
   @RequirePermissions('kyc.capture')
   @Post('kyc-records/:id/submit')
   submit(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.kyc.submit(id, user.id);
+    return onWire(this.kyc.submit(id, user.id));
   }
 
   @RequirePermissions('screening.run')
@@ -41,7 +71,7 @@ export class KycController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.kyc.runScreening(id, user.id);
+    return onWire(this.kyc.runScreening(id, user.id));
   }
 
   @RequirePermissions('screening.run')
@@ -50,13 +80,15 @@ export class KycController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    // NOT wrapped: this route returns a `ScreeningRunResult`, not a KYC record — the strict helper
+    // named it rather than letting a mismatched shape through. Nothing to project here.
     return this.kyc.rerunScreening(id, user.id);
   }
 
   @RequirePermissions('kyc.edd.trigger')
   @Post('kyc-records/:id/trigger-edd')
   triggerEdd(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.kyc.triggerEdd(id, user.id);
+    return onWire(this.kyc.triggerEdd(id, user.id));
   }
 
   /**
@@ -94,13 +126,15 @@ export class KycController {
     @Body() dto: KycDecisionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.kyc.decide(
-      id,
-      'APPROVED',
-      dto.reason,
-      user.id,
-      dto.screeningHoldReason,
-      dto.combinedDutyReason,
+    return onWire(
+      this.kyc.decide(
+        id,
+        'APPROVED',
+        dto.reason,
+        user.id,
+        dto.screeningHoldReason,
+        dto.combinedDutyReason,
+      ),
     );
   }
 
@@ -111,7 +145,7 @@ export class KycController {
     @Body() dto: KycDecisionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.kyc.decide(id, 'REJECTED', dto.reason, user.id);
+    return onWire(this.kyc.decide(id, 'REJECTED', dto.reason, user.id));
   }
 
   @RequirePermissions('kyc.review.schedule')
@@ -121,7 +155,7 @@ export class KycController {
     @Body() dto: ScheduleReviewDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.kyc.scheduleReview(id, dto, user.id);
+    return onWire(this.kyc.scheduleReview(id, dto, user.id));
   }
 
   @RequirePermissions('kyc.capture', 'kyc.approve')
@@ -136,6 +170,6 @@ export class KycController {
   @RequirePermissions('kyc.capture', 'kyc.approve')
   @Get('kyc-records/:id')
   get(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.kyc.get(id, user);
+    return onWire(this.kyc.get(id, user));
   }
 }

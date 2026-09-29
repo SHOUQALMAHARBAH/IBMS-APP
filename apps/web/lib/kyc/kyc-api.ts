@@ -2,6 +2,7 @@
 // Mirrors lib/lead/lead-api.ts's conventions.
 
 import { apiGet, apiPost } from "../auth/api-client";
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
 export type KycStatus =
   | "DRAFT"
@@ -21,6 +22,15 @@ export interface KycRecord {
   submittedAt: string | null;
   createdByUserId: string;
   approvedByUserId: string | null;
+  /**
+   * Set when ONE person both created and approved this KYC file, in an office that declared COMBINED
+   * duty segregation and stated why. Null on every ordinary approval.
+   *
+   * IN SCOPE rather than deferred, by the owner's ruling: the money-and-screening deferral covers
+   * screening work, and showing who performed an act and who approved it is neither — it does not
+   * touch the screening engine, does not extend it, and adds no screening claim.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
   approvedAt: string | null;
   nextReviewDueAt: string | null;
   createdAt: string;

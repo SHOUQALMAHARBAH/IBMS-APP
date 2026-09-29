@@ -63,6 +63,8 @@ const KYC_RECORD = {
   submittedAt: null,
   createdByUserId: "user-1",
   approvedByUserId: null,
+  // The endpoint returns this now. Null: nothing has approved this draft.
+  combinedDutyAct: null,
   approvedAt: null,
   nextReviewDueAt: null,
   createdAt: "2026-08-26T00:00:00.000Z",

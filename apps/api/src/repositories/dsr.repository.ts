@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { DataSubjectRequest, DsrStatus, DsrType, Prisma } from '@ibms/db';
+import type { DsrStatus, DsrType, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** The one terminal state; everything else is still the DPO's problem. */
@@ -120,7 +120,10 @@ export class DsrRepository {
     });
   }
 
-  findMany(scope: DsrScope, take: number): Promise<DataSubjectRequestWithAct[]> {
+  findMany(
+    scope: DsrScope,
+    take: number,
+  ): Promise<DataSubjectRequestWithAct[]> {
     return this.prisma.client.dataSubjectRequest.findMany({
       where: {
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
