@@ -23,7 +23,12 @@ import type { SalesDashboardSummary } from './sales-dashboard.config';
 export interface ExecutiveHeadlines {
   /** Sales — premium written in the period, and the commission it earned. */
   newLeadsCount: number;
-  leadConversionRatePercent: number;
+  /**
+   * NULL when no leads arrived in the period — there is no conversion rate, rather than a rate of zero.
+   * The headline block is the one place this matters most: it shows the figure with no other context, so a
+   * substituted 0% here reads as a measured result to whoever reads the executive summary.
+   */
+  leadConversionRatePercent: number | null;
   commissionIncomeJod: string;
   /** Policy — the in-force book and what is about to fall out of it. */
   activePoliciesCount: number;

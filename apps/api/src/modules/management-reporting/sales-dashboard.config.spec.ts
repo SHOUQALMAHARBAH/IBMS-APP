@@ -8,8 +8,29 @@ import {
 } from './sales-dashboard.config';
 
 describe('computeConversionRatePercent', () => {
-  it('is 0, not NaN, for an empty cohort', () => {
-    expect(computeConversionRatePercent(0, 0)).toBe(0);
+  /*
+   * ~~is 0, not NaN, for an empty cohort~~ — THE POSITION IS REVERSED, on the owner's ruling (item 5
+   * batch 1). An empty cohort has NO conversion rate.
+   *
+   * 0% is a claim about performance where no performance was measured, and on the employee-performance
+   * screens that number sits beside a person's NAME, reading as a judgement of them rather than as "no
+   * data". A zero also enters an average where a null does not, so the substitution propagated into any
+   * figure anybody later meant or charted — which the denominator shown beside it on screen could not fix.
+   *
+   * Keeping both assertions, because NaN is still wrong: the distinction is between "no rate" and "a
+   * broken rate", and only one of those is what null means here.
+   */
+  it('is NULL — not 0 and not NaN — for an empty cohort', () => {
+    expect(computeConversionRatePercent(0, 0)).toBeNull();
+    expect(Number.isNaN(computeConversionRatePercent(0, 0) as number)).toBe(
+      false,
+    );
+  });
+
+  it('is a real 0 when the cohort exists and nobody converted', () => {
+    // THE DISTINCTION THE NULL EXISTS FOR, asserted so it cannot be collapsed: ten leads and none
+    // converted IS a 0% rate and a fact about performance. Zero leads is not.
+    expect(computeConversionRatePercent(0, 10)).toBe(0);
   });
 
   it('rounds to 2dp', () => {

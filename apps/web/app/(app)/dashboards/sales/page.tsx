@@ -17,6 +17,13 @@ import { formatMoney } from '../../../../lib/i18n/format';
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
+/**
+ * The rate with no denominator — item 5 batch 1, the owner's ruling. A cohort with nothing in it has NO
+ * conversion rate, and 0% would be a claim about performance where none was measured. The same em dash the
+ * employee-performance and sales-performance screens already used, so one concept now has one rendering.
+ */
+const EM_DASH = '—';
+
 export default function SalesDashboardPage() {
   const { t, language } = useLanguage();
   const router = useRouter();
@@ -197,7 +204,9 @@ export default function SalesDashboardPage() {
               </div>
               <div>
                 <div style={statStyle}>
-                  {summary.leads.conversionRatePercent}%
+                  {summary.leads.conversionRatePercent === null
+                    ? EM_DASH
+                    : `${summary.leads.conversionRatePercent}%`}
                 </div>
                 <div>{t('dsalConversionRate')}</div>
               </div>
@@ -242,7 +251,9 @@ export default function SalesDashboardPage() {
               </div>
               <div>
                 <div style={statStyle}>
-                  {summary.crossSell.conversionRatePercent}%
+                  {summary.crossSell.conversionRatePercent === null
+                    ? EM_DASH
+                    : `${summary.crossSell.conversionRatePercent}%`}
                 </div>
                 <div>{t('dsalConversionRate')}</div>
               </div>
@@ -262,7 +273,9 @@ export default function SalesDashboardPage() {
               </div>
               <div>
                 <div style={statStyle}>
-                  {summary.upSell.conversionRatePercent}%
+                  {summary.upSell.conversionRatePercent === null
+                    ? EM_DASH
+                    : `${summary.upSell.conversionRatePercent}%`}
                 </div>
                 <div>{t('dsalConversionRate')}</div>
               </div>

@@ -23,15 +23,17 @@ export interface PolicyDashboardSummary {
   cancelledPolicies: CancelledPolicyRow[];
 }
 
-export function getPolicyDashboard(opts: {
-  branchId?: string;
-  insuranceLine?: string;
-  insurerId?: string;
-  periodLabel?: string;
-  periodStart?: string;
-  periodEnd?: string;
-  renewalWindowDays?: number;
-} = {}): Promise<PolicyDashboardSummary> {
+export function getPolicyDashboard(
+  opts: {
+    branchId?: string;
+    insuranceLine?: string;
+    insurerId?: string;
+    periodLabel?: string;
+    periodStart?: string;
+    periodEnd?: string;
+    renewalWindowDays?: number;
+  } = {},
+): Promise<PolicyDashboardSummary> {
   const params = new URLSearchParams();
   if (opts.branchId) params.set('branchId', opts.branchId);
   if (opts.insuranceLine) params.set('insuranceLine', opts.insuranceLine);
@@ -39,7 +41,8 @@ export function getPolicyDashboard(opts: {
   if (opts.periodLabel) params.set('periodLabel', opts.periodLabel);
   if (opts.periodStart) params.set('periodStart', opts.periodStart);
   if (opts.periodEnd) params.set('periodEnd', opts.periodEnd);
-  if (opts.renewalWindowDays) params.set('renewalWindowDays', String(opts.renewalWindowDays));
+  if (opts.renewalWindowDays)
+    params.set('renewalWindowDays', String(opts.renewalWindowDays));
   const qs = params.toString();
   return apiGet(`/dashboards/policy${qs ? `?${qs}` : ''}`);
 }

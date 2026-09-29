@@ -12,22 +12,33 @@ export interface SalesDashboardSummary {
   leads: {
     newLeadsCount: number;
     convertedToProspectCount: number;
-    conversionRatePercent: number;
+    /** NULL when the cohort is empty — no rate, not a rate of zero. Render as an em dash. */
+    conversionRatePercent: number | null;
   };
   premiumWritten: { newJod: string; renewalJod: string; totalJod: string };
   commissionIncomeJod: string;
-  crossSell: { totalCount: number; convertedCount: number; conversionRatePercent: number };
-  upSell: { totalCount: number; convertedCount: number; conversionRatePercent: number };
+  crossSell: {
+    totalCount: number;
+    convertedCount: number;
+    conversionRatePercent: number | null;
+  };
+  upSell: {
+    totalCount: number;
+    convertedCount: number;
+    conversionRatePercent: number | null;
+  };
 }
 
-export function getSalesDashboard(opts: {
-  branchId?: string;
-  insuranceLine?: string;
-  insurerId?: string;
-  periodLabel?: string;
-  periodStart?: string;
-  periodEnd?: string;
-} = {}): Promise<SalesDashboardSummary> {
+export function getSalesDashboard(
+  opts: {
+    branchId?: string;
+    insuranceLine?: string;
+    insurerId?: string;
+    periodLabel?: string;
+    periodStart?: string;
+    periodEnd?: string;
+  } = {},
+): Promise<SalesDashboardSummary> {
   const params = new URLSearchParams();
   if (opts.branchId) params.set('branchId', opts.branchId);
   if (opts.insuranceLine) params.set('insuranceLine', opts.insuranceLine);

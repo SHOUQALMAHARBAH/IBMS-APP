@@ -8,7 +8,10 @@ import { apiGet } from '../auth/api-client';
 export interface ComplianceDashboardSummary {
   generatedAt: string;
   kyc: { byStatus: Record<string, number> };
-  complaints: { byStatus: Record<string, number>; byCategory: Record<string, number> };
+  complaints: {
+    byStatus: Record<string, number>;
+    byCategory: Record<string, number>;
+  };
   complianceExceptions: {
     openAmlAlertsCount: number;
     amlByPatternType: Record<string, number>;
@@ -22,10 +25,15 @@ export interface ComplianceDashboardSummary {
   };
   dsr: { openCount: number; byStatus: Record<string, number> };
   breachRegister: { openCount: number; byStatus: Record<string, number> };
-  dpiaBacklog: { pendingReviewCount: number; byOutcome: Record<string, number> };
+  dpiaBacklog: {
+    pendingReviewCount: number;
+    byOutcome: Record<string, number>;
+  };
 }
 
-export function getComplianceDashboard(opts: { branchId?: string } = {}): Promise<ComplianceDashboardSummary> {
+export function getComplianceDashboard(
+  opts: { branchId?: string } = {},
+): Promise<ComplianceDashboardSummary> {
   const params = new URLSearchParams();
   if (opts.branchId) params.set('branchId', opts.branchId);
   const qs = params.toString();

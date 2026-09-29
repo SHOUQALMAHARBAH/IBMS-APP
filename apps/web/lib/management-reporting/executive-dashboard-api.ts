@@ -10,7 +10,8 @@ import { apiGet } from '../auth/api-client';
 
 export interface ExecutiveHeadlines {
   newLeadsCount: number;
-  leadConversionRatePercent: number;
+  /** NULL when no leads arrived — no rate, not a rate of zero. */
+  leadConversionRatePercent: number | null;
   commissionIncomeJod: string;
   activePoliciesCount: number;
   expiringPoliciesCount: number;

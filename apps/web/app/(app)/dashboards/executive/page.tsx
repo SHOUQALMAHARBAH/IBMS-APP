@@ -34,7 +34,9 @@ export default function ExecutiveDashboardPage() {
   const { user, isLoading } = useAuth();
   const { t } = useLanguage();
 
-  const [summary, setSummary] = useState<ExecutiveDashboardSummary | null>(null);
+  const [summary, setSummary] = useState<ExecutiveDashboardSummary | null>(
+    null,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [branchId, setBranchId] = useState('');
   const [insuranceLine, setInsuranceLine] = useState('');
@@ -86,9 +88,7 @@ export default function ExecutiveDashboardPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>
-        {t('execExecutiveDashboard')}
-      </h1>
+      <h1>{t('execExecutiveDashboard')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
         {t('execTheSalesPolicyClaimsFinancial')}
       </p>
@@ -103,7 +103,9 @@ export default function ExecutiveDashboardPage() {
           margin: '0.75rem 0',
         }}
       >
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('execBranchId')}
           <input
             aria-label={t('dashBranchIdFilterAria')}
@@ -111,7 +113,9 @@ export default function ExecutiveDashboardPage() {
             onChange={(e) => setBranchId(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('execInsuranceLine')}
           <input
             aria-label={t('dashInsuranceLineFilterAria')}
@@ -119,7 +123,9 @@ export default function ExecutiveDashboardPage() {
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('execAsOf')}
           <input
             aria-label={t('dashAsOfDateAria')}
@@ -128,9 +134,7 @@ export default function ExecutiveDashboardPage() {
             onChange={(e) => setAsOf(e.target.value)}
           />
         </label>
-        <button type="submit">
-          {t('execApplyFilters')}
-        </button>
+        <button type="submit">{t('execApplyFilters')}</button>
       </form>
 
       {loadError ? (
@@ -151,12 +155,13 @@ export default function ExecutiveDashboardPage() {
           <section style={sectionStyle}>
             <h2>{t('execSales')}</h2>
             <div style={gridStyle}>
+              <Stat value={h.newLeadsCount} label={t('execNewLeads')} />
               <Stat
-                value={h.newLeadsCount}
-                label={t('execNewLeads')}
-              />
-              <Stat
-                value={`${h.leadConversionRatePercent}%`}
+                value={
+                  h.leadConversionRatePercent === null
+                    ? '—'
+                    : `${h.leadConversionRatePercent}%`
+                }
                 label={t('execConversionRate')}
               />
               <Stat
@@ -183,15 +188,10 @@ export default function ExecutiveDashboardPage() {
           <section style={sectionStyle}>
             <h2>{t('execClaims')}</h2>
             <div style={gridStyle}>
-              <Stat
-                value={h.openClaimsCount}
-                label={t('execOpenClaims')}
-              />
+              <Stat value={h.openClaimsCount} label={t('execOpenClaims')} />
               <Stat
                 value={h.outstandingClaimsValueJod}
-                label={
-                  t('execOutstandingClaimsValueJod')
-                }
+                label={t('execOutstandingClaimsValueJod')}
               />
             </div>
           </section>
@@ -201,15 +201,11 @@ export default function ExecutiveDashboardPage() {
             <div style={gridStyle}>
               <Stat
                 value={h.receivablesOutstandingJod}
-                label={
-                  t('execReceivablesOutstandingJod')
-                }
+                label={t('execReceivablesOutstandingJod')}
               />
               <Stat
                 value={h.payablesOutstandingJod}
-                label={
-                  t('execPayablesToInsurersJod')
-                }
+                label={t('execPayablesToInsurersJod')}
               />
             </div>
           </section>
@@ -219,15 +215,11 @@ export default function ExecutiveDashboardPage() {
             <div style={gridStyle}>
               <Stat
                 value={h.openDsrCount}
-                label={
-                  t('execOpenDataSubjectRequests')
-                }
+                label={t('execOpenDataSubjectRequests')}
               />
               <Stat
                 value={h.openComplianceExceptionsCount}
-                label={
-                  t('execOpenComplianceExceptions')
-                }
+                label={t('execOpenComplianceExceptions')}
               />
             </div>
             <p style={{ color: 'var(--ink-secondary)', marginTop: '0.5rem' }}>

@@ -37,12 +37,14 @@ export interface ClaimsDashboardSummary {
   lossRatioByInsurer: LossRatioBreakdownRow[];
 }
 
-export function getClaimsDashboard(opts: {
-  branchId?: string;
-  insuranceLine?: string;
-  insurerId?: string;
-  asOf?: string;
-} = {}): Promise<ClaimsDashboardSummary> {
+export function getClaimsDashboard(
+  opts: {
+    branchId?: string;
+    insuranceLine?: string;
+    insurerId?: string;
+    asOf?: string;
+  } = {},
+): Promise<ClaimsDashboardSummary> {
   const params = new URLSearchParams();
   if (opts.branchId) params.set('branchId', opts.branchId);
   if (opts.insuranceLine) params.set('insuranceLine', opts.insuranceLine);
