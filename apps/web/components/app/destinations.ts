@@ -239,6 +239,17 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
       },
       { href: '/sla-policies', labelKey: 'navSlaPolicies', permissions: ['sla.policy.read'] },
       { href: '/audit-trail', labelKey: 'navAuditTrail', permissions: ['audit-log.read'] },
+      // § 1.83 — the narrow employee reveal search, in the COMPLIANCE group and not Operations.
+      //
+      // The rule is not what KIND of thing a screen is, it is WHO holds the permission that gates it:
+      // `employee.national-id.reveal` is held by COMPLIANCE_OFFICER ALONE, and that role holds no
+      // `employee.read`, so it cannot see `/employees` in Operations and this entry must not sit beside it.
+      // Compliance already works in this group (measured: it holds `sanctions-pep.screen`,
+      // `internal-controls.view`, `audit-log.read` and more), which is what makes the group visible.
+      //
+      // A separate entry rather than a section on `/employees`, for the same reason: that screen is gated
+      // on a code its only holder does not have.
+      { href: '/employees/reveal', labelKey: 'navEmployeeReveal', permissions: ['employee.national-id.reveal'] },
     ],
   },
   {

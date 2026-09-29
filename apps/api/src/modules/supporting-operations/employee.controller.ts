@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { EmployeeService } from './employee.service';
 import {
@@ -7,6 +15,7 @@ import {
   UpdateEmployeeDto,
 } from './dto/create-employee.dto';
 import { CreateTrainingDto } from './dto/create-training.dto';
+import { SearchEmployeesDto } from './dto/search-employees.dto';
 import { UpdateDeprovisioningChecklistDto } from './dto/update-deprovisioning-checklist.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -34,6 +43,28 @@ export class EmployeeController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.employees.create(dto, user.id);
+  }
+
+  /**
+   * The narrow search — IMPROVEMENTS § 1.83.
+   *
+   * GATED ON `employee.national-id.reveal`, NEVER on `employee.read`. That is the whole point: the reveal's
+   * only holder is COMPLIANCE_OFFICER, which deliberately holds no `employee.read`, so gating this on the
+   * read would leave the capability exactly as unusable as it was.
+   *
+   * Declared BEFORE the `:id` routes so `search` is never parsed as an employee id — the same ordering the
+   * claim module's `follow-up-sweep` needs and says so.
+   *
+   * `q` is mandatory with a two-character floor and is trimmed before the check: see
+   * `SearchEmployeesDto`. There is no unfiltered mode on this route.
+   */
+  @RequirePermissions('employee.national-id.reveal')
+  @Get('search')
+  search(
+    @Query() query: SearchEmployeesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.employees.search(query, user);
   }
 
   @RequirePermissions('employee.read')

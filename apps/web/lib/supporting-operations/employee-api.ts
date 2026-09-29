@@ -147,6 +147,32 @@ export function updateEmployee(
   return apiPatch(`/employees/${encodeURIComponent(id)}`, patch);
 }
 
+/**
+ * What the narrow search returns — IMPROVEMENTS § 1.83. Mirrors the api's `EmployeeSearchResultView`.
+ *
+ * FIVE fields, and deliberately not the employee record: this is what a Compliance Officer may learn about
+ * staff WITHOUT holding `employee.read`, which that role does not. Enough to pick the right person out of
+ * three of the same name; nothing more.
+ */
+export interface EmployeeSearchResult {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  position: string | null;
+  isCurrentEmployee: boolean;
+}
+
+/**
+ * `GET /employees/search?q=` — gated on `employee.national-id.reveal`, NOT on `employee.read`.
+ *
+ * The term is MANDATORY server-side (two characters, trimmed first), so there is no "list everyone" call to
+ * make. This function does not default it, and must not: a caller that sends `q=''` should see the 400
+ * rather than have the client quietly widen the request.
+ */
+export function searchEmployees(q: string): Promise<EmployeeSearchResult[]> {
+  return apiGet(`/employees/search?q=${encodeURIComponent(q)}`);
+}
+
 export function revealEmployeeField(
   id: string,
   reason: string,

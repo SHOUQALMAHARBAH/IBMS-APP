@@ -88,6 +88,22 @@ export interface DeprovisioningChecklistUpdate {
  * touches `User.employeeId` — the FK #61 (Employee Performance) needed but
  * nothing before this process ever set.
  */
+/**
+ * Exactly what a narrow employee search may return — IMPROVEMENTS § 1.83, the owner's condition 2
+ * ("the minimum that distinguishes one person from another — enough to pick the right one, not the
+ * record"). `terminationDate` never leaves the service: it is reduced to `isCurrentEmployee`.
+ *
+ * One definition, because the guard spec asserts the SHAPE against this type's own key set — so adding a
+ * column here is a reviewed change that fails a test rather than a widening nobody sees.
+ */
+export interface EmployeeSearchRow {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  position: string | null;
+  terminationDate: Date | null;
+}
+
 @Injectable()
 export class EmployeeRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -130,6 +146,47 @@ export class EmployeeRepository {
     return this.prisma.client.employee.findUnique({
       where: { id },
       include: { trainings: true, deprovisioningChecklist: true },
+    });
+  }
+
+  /**
+   * The NARROW search behind `GET /employees/search` — IMPROVEMENTS § 1.83.
+   *
+   * `select`, never `include` and never a bare `findMany`: the caller holds `employee.national-id.reveal`
+   * and NOT `employee.read`, so this query is the whole of what that role may see about a person. The five
+   * columns below are what it takes to pick the right Ahmad out of three, and nothing else — no hire date,
+   * no licensing, no background-check state, and obviously not `nationalIdEnc`, which is the thing being
+   * revealed afterwards under its own audited act.
+   *
+   * `terminationDate` is selected and then REDUCED TO A BOOLEAN by the service. A former employee of the
+   * same name and position is a real disambiguation case; the date itself is record detail this role has no
+   * claim on.
+   *
+   * The `term` is never optional here. An empty or whitespace-only `q` is refused by
+   * `SearchEmployeesDto` before this is reached, and `employee-search-narrowness.inventory.spec.ts`
+   * asserts both halves — that an empty search yields nothing, and that a column outside the set below
+   * cannot appear in a result.
+   */
+  searchByName(term: string, take: number): Promise<EmployeeSearchRow[]> {
+    return this.prisma.client.employee.findMany({
+      where: {
+        OR: [
+          { fullName: { contains: term, mode: 'insensitive' } },
+          { fullNameEn: { contains: term, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        fullName: true,
+        fullNameEn: true,
+        position: true,
+        terminationDate: true,
+      },
+      // A TOTAL order. `orderBy: fullName` alone leaves two people of the same name in whatever order the
+      // query plan plays them back, and the consumer picks one by eye — the same defect the recertification
+      // reviewer pool had when `pickReviewer` took `[0]` of an unordered read.
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take,
     });
   }
 
