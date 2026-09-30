@@ -250,7 +250,7 @@ export default function DocumentsPage() {
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button type="submit">{t('docSaveVersionButton')}</button>
             <button type="button" onClick={() => setVersioningId(null)}>
-              Cancel
+              {t('commonCancel')}
             </button>
           </div>
         </form>

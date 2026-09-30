@@ -131,7 +131,7 @@ function OpportunityRow({
                 style={{ ...buttonStyle, width: 'auto' }}
                 onClick={() => setDismissing(false)}
               >
-                Cancel
+                {t('commonCancel')}
               </button>
             </>
           ) : (

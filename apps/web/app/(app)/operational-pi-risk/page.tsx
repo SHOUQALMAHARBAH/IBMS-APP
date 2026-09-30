@@ -488,7 +488,7 @@ export default function OperationalPiRiskPage() {
                           )
                         }
                       >
-                        Save
+                        {t('commonSave')}
                       </button>
                     </div>
                   </td>

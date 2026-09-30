@@ -140,7 +140,7 @@ export default function KnowledgeBasePage() {
           <input dir="rtl" value={titleAr} onChange={(e) => setTitleAr(e.target.value)} />
         </label>
         <label style={labelStyle}>
-          Category
+          {t('kbColCategory')}
           <select value={category} onChange={(e) => setCategory(e.target.value as KbCategory)}>
             {KB_CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -208,11 +208,11 @@ export default function KnowledgeBasePage() {
                   <td style={cell}>
                     {editingId === article.id ? (
                       <button type="button" onClick={() => saveEdit(article.id)}>
-                        Save
+                        {t('commonSave')}
                       </button>
                     ) : (
                       <button type="button" onClick={() => startEdit(article)}>
-                        Edit
+                        {t('commonEdit')}
                       </button>
                     )}
                   </td>

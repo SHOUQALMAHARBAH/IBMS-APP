@@ -161,6 +161,7 @@ export const DETAIL_PAGES = {
     // ---- CRM ------------------------------------------------------------------
     crmHeading: 'إدارة علاقات العملاء',
     crmLogHeading: 'تسجيل تفاعل',
+    crmChannelLabel: 'القناة',
     crmLogged: 'تم تسجيل التفاعل.',
     crmTimeline: 'الخط الزمني',
     crmDetailPlaceholder: 'مثال: اتصلنا لتأكيد شروط التجديد',
@@ -208,6 +209,7 @@ export const DETAIL_PAGES = {
     iprognIntro:
       'يُهيَّأ فرعا التأمين على الممتلكات ضد جميع الأخطار وتوقّف الأعمال بمبلغ التأمين المشتق من مسح المخاطر؛ أما أساس بقية الفروع فيُحدَّد لاحقاً في مرحلة عروض الأسعار.',
     iprognHeading: 'تجميع برنامج تأمين',
+    iprognRefusalAct: 'تجميع برنامج تأمين',
     iprognCoverageLines: 'فروع التغطية المراد تجميعها',
     iprognNoLines: 'لا يوصي تقييم الاحتياجات هذا بأي فروع تغطية — لا شيء لتجميعه.',
     iprognThisOneIs: 'تقييم الاحتياجات هذا حالته {status}.',
@@ -632,6 +634,7 @@ export const DETAIL_PAGES = {
 
     crmHeading: 'Relationship (CRM)',
     crmLogHeading: 'Log an interaction',
+    crmChannelLabel: 'Channel',
     crmLogged: 'Interaction logged.',
     crmTimeline: 'Timeline',
     crmDetailPlaceholder: 'e.g. Called to confirm the renewal terms',
@@ -678,6 +681,7 @@ export const DETAIL_PAGES = {
     iprognIntro:
       "Property All Risks and Business Interruption lines are seeded with the Sum Insured derived from the risk survey; every other line's basis is set later at the quotation stage.",
     iprognHeading: 'Assemble an insurance program',
+    iprognRefusalAct: 'assemble an insurance programme',
     iprognCoverageLines: 'Coverage lines to assemble',
     iprognNoLines: 'This needs assessment recommends no coverage lines — nothing to assemble.',
     iprognThisOneIs: 'This one is {status}.',

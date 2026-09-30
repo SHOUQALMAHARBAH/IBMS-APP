@@ -120,7 +120,7 @@ export default function VendorsPage() {
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
         <label htmlFor="vendor-search" style={{ marginInlineEnd: '0.5rem' }}>
-          Search
+          {t('commonSearch')}
         </label>
         <input
           id="vendor-search"
@@ -130,7 +130,7 @@ export default function VendorsPage() {
           placeholder={t('venSearchPlaceholder')}
         />
         <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
-          Search
+          {t('commonSearch')}
         </button>
       </form>
 
@@ -174,12 +174,12 @@ export default function VendorsPage() {
                   <td style={cell}>
                     {editingId === vendor.id ? (
                       <button type="button" onClick={() => saveEdit(vendor.id)}>
-                        Save
+                        {t('commonSave')}
                       </button>
                     ) : (
                       <>
                         <button type="button" onClick={() => startEdit(vendor)}>
-                          Rename
+                          {t('commonRename')}
                         </button>{' '}
                         <Link href={`/vendors/${vendor.id}`}>{t('venManageButton')}</Link>
                       </>

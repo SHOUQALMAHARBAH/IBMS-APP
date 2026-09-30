@@ -144,7 +144,7 @@ export default function ClaimsAnalyticsPage() {
                 ))}
                 <tr>
                   <td style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}>
-                    Total
+                    {t('claColTotal')}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {ratioPct(data.totals.ratio)}

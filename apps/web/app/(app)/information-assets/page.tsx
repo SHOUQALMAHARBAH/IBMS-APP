@@ -197,11 +197,11 @@ export default function InformationAssetsPage() {
                   <td style={cell}>
                     {editingId === asset.id ? (
                       <button type="button" onClick={() => saveEdit(asset.id)}>
-                        Save
+                        {t('commonSave')}
                       </button>
                     ) : (
                       <button type="button" onClick={() => startEdit(asset)}>
-                        Rename
+                        {t('commonRename')}
                       </button>
                     )}
                   </td>

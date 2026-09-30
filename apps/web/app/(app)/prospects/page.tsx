@@ -67,7 +67,7 @@ export default function ProspectsPage() {
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
         <label htmlFor="prospect-search" style={{ marginInlineEnd: '0.5rem' }}>
-          Search
+          {t('commonSearch')}
         </label>
         <input
           id="prospect-search"
@@ -77,7 +77,7 @@ export default function ProspectsPage() {
           placeholder={t('prosSearchPlaceholder')}
         />
         <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
-          Search
+          {t('commonSearch')}
         </button>
       </form>
 

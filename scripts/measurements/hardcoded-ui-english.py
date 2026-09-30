@@ -21,8 +21,8 @@ So the scan is here, with a self-test whose cases are those three real misses ra
 
 ## WHAT A ZERO FROM THIS SCRIPT MEANS, AND WHAT IT DOES NOT
 
-**Zero means zero of what this detector can see.** FIVE blind spots were found during one sweep, and
-every single one was found by READING a screen for some other reason — none by the guard, and none by
+**Zero means zero of what this detector can see.** SIX blind spots and one counting defect have been found,
+and every single one was found by READING a screen for some other reason — none by the guard, and none by
 reasoning about the patterns:
 
     1  a date inside a template literal            (compliance dashboard)
@@ -30,16 +30,26 @@ reasoning about the patterns:
     3  prose after a backtick                      (risk-profiles)
     4  LOWERCASE prose, which no capital-initial rule can see
     5  a ONE-WORD label before a colon             (13 strings on 8 screens, while this read 0/102)
+    6  a BARE JSX TEXT LINE, one word, no colon    (21 strings on 14 screens, while this read 0/102)
+    +  a DEDUPE keyed on the text alone, so a screen with three `Cancel` buttons reported ONE
 
-Number 5 is the one to keep in mind: this script reported **0 across 102 screens** while thirteen
-violations stood, including a third miss on a screen already reported clean twice.
+Numbers 5 and 6 are the ones to keep in mind, and 6 is the worse of the two: this script reported **0 across
+102 screens** while `Cancel` ×7, `Save` ×4, `Rename` ×2, `Search` ×4, `Edit`, `Back`, `Total`, `Channel` and
+`Category` stood typed into fourteen screens in English. Fourteen of the twenty-one had a translated key
+sitting unused in `common.ts` — the Arabic existed and the screen did not reach for it.
 
-**So this guard PREVENTS REGRESSION; it does not PROVE COMPLIANCE.** Nobody knows whether there is a
-sixth blind spot. A reader who takes "0/102" as "there are none" is building on something that was not
-measured — the honest reading is "none of the five known shapes remain".
+The dedupe is the counting defect and it compounded number 6: `not any(text == t for _, t in out)` skipped a
+repeat of the same text ANYWHERE in the file, so the first pass reported 19 where there were 21, and the last
+two only became visible once the first two were fixed. It is keyed on `(line, text)` now.
 
-If you find a sixth: add the pattern, add its real case to `--self-test` (never an invented one), and add
-a line above. The list getting longer is the point.
+**So this guard PREVENTS REGRESSION; it does not PROVE COMPLIANCE.** Nobody knows whether there is a seventh
+blind spot, and the base rate so far is that there is. A reader who takes "0/102" as "there are none" is
+building on something that was not measured — the honest reading is "none of the six known shapes remain".
+
+If you find a seventh: add the pattern, add its real case to `--self-test` (never an invented one), and add a
+line above. The list getting longer is the point. And when you tighten a pattern, MEASURE THE COUNT BOTH
+WAYS — number 6's first version reported 277 hits on 97 screens, almost all of them multi-line code
+continuations, which is the cry-wolf direction and gets a guard switched off rather than fixed.
 
 Run:  python scripts/measurements/hardcoded-ui-english.py [<screen-glob> ...]
       python scripts/measurements/hardcoded-ui-english.py --self-test
@@ -79,6 +89,23 @@ TEMPLATE_PROSE = re.compile(r'`[^`]*?\b([a-z]{2,}(?:\s+[a-z]{2,}){1,})\b[^`]*?`'
 # Narrow deliberately: a capitalised word of 3+ letters immediately before a colon. `Status:`, `Current:`,
 # `Withdrawn:` are labels; `http:` and `Record<` are not, and the exclusions below carry the rest.
 ONE_WORD_LABEL = re.compile(r'(?:^|[>`]|\}\s)\s*([A-Z][a-z]{2,})\s*:')
+# FAILURE MODE 6, found in batch 5 by READING a screen for something else: a BARE JSX TEXT LINE holding one
+# English word and no colon. `/insurance-programs/new` rendered a back button whose label was the literal
+# text `← Back`, and every pattern above missed it — PROSE needs two capitalised words, TEMPLATE_PROSE needs
+# backticks, ONE_WORD_LABEL needs a colon. The seventh way this script can report a clean screen that is not.
+#
+# Narrow deliberately: a line that is PURE TEXT — no tag, no brace, no attribute, no quote — holding one or
+# two words of which the first is 3+ letters. Any line carrying JSX or an expression is already covered by
+# the patterns above and is excluded here, which is what keeps this from firing on ordinary markup.
+BARE_TEXT_LINE = re.compile(r'^[^<>{}=\'"`]*?([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)\s*$')
+# Bare words that are code, not copy. A statement on its own line reaches this pattern too.
+NOT_BARE_COPY = {
+    'return', 'else', 'true', 'false', 'null', 'undefined', 'const', 'let', 'var', 'async', 'await',
+    'export', 'default', 'function', 'from', 'import', 'as', 'is', 'and', 'or', 'not', 'in', 'of',
+    'if', 'for', 'while', 'case', 'break', 'continue', 'catch', 'try', 'finally', 'throw', 'new',
+    'typeof', 'void', 'yield', 'satisfies', 'interface', 'type', 'enum', 'class', 'extends',
+}
+
 # Type names and switch syntax that a colon-based pattern would otherwise read as labels.
 NOT_A_LABEL = {
     'Record', 'Object', 'Promise', 'String', 'Number', 'Boolean', 'Partial',
@@ -106,7 +133,8 @@ def mask_comments(src):
 def findings(src):
     """[(line_no, text)] for user-facing English in this source. Comments are masked first."""
     out = []
-    for i, raw in enumerate(mask_comments(src).split('\n'), 1):
+    lines = mask_comments(src).split('\n')
+    for i, raw in enumerate(lines, 1):
         s = raw.strip()
         if s.startswith(CODE_PREFIX):
             continue
@@ -121,13 +149,32 @@ def findings(src):
                 out.append((i, text[:60]))
         for m in TEMPLATE_PROSE.finditer(stripped):
             text = m.group(1).strip()
-            if len(text) > 4 and not any(text == t for _, t in out):
+            if len(text) > 4 and (i, text) not in out:
                 out.append((i, text[:60]))
         if not re.search(r'(case |switch|\bextends\b|\bimplements\b)', s):
             for m in ONE_WORD_LABEL.finditer(stripped):
                 text = m.group(1)
-                if text not in NOT_A_LABEL and not any(text == t for _, t in out):
+                if text not in NOT_A_LABEL and (i, text) not in out:
                     out.append((i, text + ':'))
+        # Failure mode 6 — a bare JSX text line, and it needs the PREVIOUS LINE to prove it is one.
+        #
+        # Without that, this fired 277 times on 97 screens and almost every hit was a multi-line CODE
+        # expression whose continuation happens to be bare words: `err instanceof ApiError`, `message`,
+        # `outcomes`. That is the cry-wolf direction, which this script's own header calls as useless as
+        # under-counting and harder to recover from.
+        #
+        # JSX text children come immediately after a tag CLOSES. So the previous non-blank line must end in
+        # `>` — and not `=>`, because an arrow function ends that way too and `onClick={() =>` is followed
+        # by exactly the sort of code continuation this has to exclude.
+        prev = next((p.strip() for p in reversed(lines[:i - 1]) if p.strip()), '')
+        if prev.endswith('>') and not prev.endswith('=>'):
+            bare = BARE_TEXT_LINE.match(stripped.strip())
+            if bare:
+                text = bare.group(1).strip()
+                if (text.split()[0].lower() not in NOT_BARE_COPY
+                        and not ALLOW.match(text)
+                        and (i, text) not in out):
+                    out.append((i, text))
     return out
 
 
@@ -182,6 +229,24 @@ def self_test():
         (
             'a switch case is not a label',
             "      case 'Active':\n",
+            False,
+        ),
+        (
+            # TWO lines, because the rule is contextual: a bare word is JSX text only when the line before
+            # it closes a tag. A one-line case could never pass, and writing it that way would have been a
+            # test asserting the wrong thing about a rule that is deliberately context-dependent.
+            'failure mode 6 — a BARE JSX TEXT LINE after a tag close',
+            '      >\n        ← Back\n',
+            True,
+        ),
+        (
+            'the same bare word after an ARROW function is code, not copy',
+            '      onClick={() =>\n        doTheThing\n',
+            False,
+        ),
+        (
+            'a bare statement on its own line is not copy',
+            '      ) {\n        return\n',
             False,
         ),
     ]

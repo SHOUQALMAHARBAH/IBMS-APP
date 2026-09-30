@@ -256,7 +256,7 @@ export default function ServiceRequestsPage() {
                                 )
                               }
                             >
-                              Cancel
+                              {t('commonCancel')}
                             </button>
                           </div>
                         </div>

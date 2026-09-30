@@ -229,7 +229,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
           <div style={crmFormRowStyle}>
             <div>
               <label htmlFor="crm-channel" style={cardMetaStyle}>
-                Channel
+                {t('crmChannelLabel')}
               </label>
               <br />
               <select

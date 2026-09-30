@@ -235,6 +235,101 @@ in your book."*
 state on a detail page would turn a deliberate ambiguity into an existence oracle, so rule 3's third state
 is **n/a by design** on any screen addressed by an id it did not itself list.
 
+## BATCH 5 — the pre-policy pipeline, 23 screens (2026-09-30)
+
+Rules read: **1, 3, 4, 5, 7.**
+
+`crm` · `cross-sell` · `cross-sell/[id]` · `insurance-programs` · `insurance-programs/[id]` ·
+`insurance-programs/new` · `leads` · `leads/[id]` · `needs-assessments` · `needs-assessments/[id]` ·
+`needs-assessments/new` · `opportunities` · `opportunities/[id]` · `prospects` · `prospects/[id]` ·
+`prospects/new` · `rfqs` · `rfqs/[id]` · `rfqs/new` · `risk-profiles` · `risk-profiles/[id]` · `up-sell` ·
+`up-sell/[id]`
+
+| Rule | Result |
+|---|---|
+| **1** — create form above its table | **CLEAN on all 23.** No screen has a form below a table. Several have a form and no table (`prospects`, `rfqs/new`, `risk-profiles`, `needs-assessments/new`) or a table and no form (`rfqs/[id]`, `insurance-programs/[id]`) — n/a, not violations. |
+| **3** — four states | **One real gap, fixed** (`insurance-programs/new`). Four other screens flagged and all four are the standing detail-page exception. `prospects/new` has no empty state and is a create-only screen — correct. |
+| **4** — refusal names the way forward | Clean; the shared sentence covers it. |
+| **5** — delete means deactivate | **CLEAN.** |
+| **7** — one action, one name | **CLEAN within the batch.** The 21 hardcoded labels below are rule 6, not rule 7 — the *word* was right, it was just in one language. |
+
+### The one rule-3 gap, and it was measured before it was called live
+
+`insurance-programs/new` had no permission-refusal state while its four sibling create screens all do
+(`prospects/new`, `customers/new`, `rfqs/new`, `needs-assessments/new`). Measured before deciding it
+mattered, because § 1.61's discipline is to compare who holds the permission against who can open the
+screen:
+
+    program.assemble        PLACEMENT alone
+    needs-assessment.read   SALES, PLACEMENT, MANAGER, EXEC
+
+**So three roles could open the form, fill it in, and get the API's own English message on submit.** The
+button that leads here is gated on the same permission, correctly, so the state is reached by typing the
+URL — which makes it rarer, not acceptable. Fixed with the shared refusal.
+
+Its **403-and-404-treated-alike** branch is NOT a defect: the screen loads a needs assessment *by id*, so it
+falls under the standing exception recorded in batch 4.
+
+### RULE 6 AGAIN — 21 strings on 14 screens, while the guard read 0 across 102
+
+Found by reading `insurance-programs/new` for something else, and it is the biggest miss this detector has
+had. The seventh blind spot is a **bare JSX text line: one English word, no colon** — which every earlier
+pattern needed two capitalised words, or a backtick, or a colon to see.
+
+    Cancel ×7   Save ×4   Search ×4   Rename ×2   Edit   Back   Total   Channel   Category
+
+**Fourteen of the twenty-one had a translated key sitting unused in `common.ts`.** `commonCancel`,
+`commonSave`, `commonSearch`, `commonEdit`, `commonBack` all existed with Arabic — the screen simply did not
+reach for them. That is what makes this drift rather than a missing capability, and it is why an Arabic
+reader met "Cancel" and "Save" in English on fourteen screens.
+
+Three keys were genuinely missing and were added: `commonRename` (shared, because three screens render that
+button and one of them already had `orgUnitRename` — rule 7), `claColTotal` (matching the established
+`*ColTotal` convention rather than inventing a shared `commonTotal` as a fourth way of saying it), and
+`crmChannelLabel` (the `crmChannel*` keys in `enums.ts` are channel VALUES; the field's own label did not
+exist).
+
+**A COUNTING DEFECT COMPOUNDED IT, and it is the part worth remembering.** The scan's dedupe was
+`not any(text == t for _, t in out)` — keyed on the TEXT alone, per file. So a screen with two `Search`
+buttons reported one. The first pass said 19; after fixing those 19, **two more appeared** on the same two
+screens, and only then was the real total 21. Keyed on `(line, text)` now.
+
+That defect cannot be planted with `scripts/plant.mjs`, and the reason is sound rather than a gap: the tool
+refuses an anchor matching more than once, which is exactly the condition this defect is about. It stands on
+observation instead — 19 → fix → 2 more surfaced → fix → 0 — which is stronger evidence than a plant anyway,
+because it happened rather than being arranged. The blind spot ITSELF is planted: putting one `Cancel` back
+kills the rule-6 guard.
+
+**And the first version of the new pattern reported 277 hits on 97 screens** — almost all multi-line code
+continuations (`instanceof ApiError`, `message`, `outcomes`). That is the cry-wolf direction, so it was
+tightened to require the previous non-blank line to close a tag and not be an arrow function. Both numbers
+are in the script's header, because a pattern that has been wrong in both directions is worth documenting in
+both.
+
+### A DISAGREEMENT FOR THE OWNER, found by sweeping for role-name checks
+
+`apps/web/app/(app)/settings/email/page.tsx:97` reads
+
+    const seesInternalDetail = !!user && user.roles.includes('SYSTEM_SECURITY_ADMINISTRATOR');
+
+and gates whether the raw API error message is shown. It is **the frontend directive implemented as
+written** — the directive reserves implementation detail to the System/Security Administrator, naming a
+role. And it is **what the office-scoped RBAC design forbids**: constraint 1, "a role NAME is not an
+identity", because two offices may each define their own.
+
+The consequence is display-only — an error message — so nothing is exploitable. But an office that renames
+or defines its own administrator role gets different behaviour on that screen, silently.
+
+This is a **fifth disagreement between the directive and what is written in the repo**, and per the owner's
+handling of the other four it is hers to settle rather than mine to merge. The two resolutions are a
+permission code (`diagnostics.view` or similar, which the directive's intent maps onto cleanly) or an
+explicit decision that a role-name read is acceptable for display-only detail. Left exactly as it is.
+
+Two other role-name reads were checked and are fine: `AppNav.tsx:115` orders the nav by role and is the
+known, recorded exception ("which business function owns this", not "who may do this"); and
+`needs-assessments/[id]`'s `isPlacement` is `hasPermission(user, 'program.assemble')` — correctly
+permission-based, just named after a role, which is where somebody later "simplifies" it into a role check.
+
 ---
 
 ## Not yet surveyed
@@ -248,8 +343,8 @@ need no per-batch sweep. Rule 4's permission half is structural for all 102 as w
 renders one sentence from `lib/i18n/permission-refusal.ts` that names the grantor — and its load-error half
 is guarded by `scripts/measurements/load-error-way-forward.py`.
 
-What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batch 4's 20 are listed above
-by name.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
+What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batch 4's 20 and batch 5's 23
+are listed above by name — 43 of 102 covered with a checkable list.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
 substantiated — batch 5 onwards names its screens in this file, which is the only form of that claim anybody
 can check.
 

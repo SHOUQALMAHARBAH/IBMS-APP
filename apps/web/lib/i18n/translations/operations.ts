@@ -298,6 +298,7 @@ export const OPERATIONS = {
     claGroupPolicy: 'الوثيقة',
     claLoading: 'جارٍ التحميل…',
     claLoadError: 'تعذّر تحميل تفصيل معدّل الخسارة — حاول مرة أخرى.',
+    claColTotal: 'الإجمالي',
     claRefusalAct: 'عرض تحليلات المطالبات',
 
     // ---- Risk profiles (#6) -------------------------------------------------------------------
@@ -910,6 +911,7 @@ export const OPERATIONS = {
     claGroupPolicy: 'Policy',
     claLoading: 'Loading…',
     claLoadError: 'Could not load the loss-ratio breakdown — try again.',
+    claColTotal: 'Total',
     claRefusalAct: 'view the claims analytics',
 
     rpIntro:
