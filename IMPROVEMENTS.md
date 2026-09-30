@@ -21,10 +21,124 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Reading a character class to check its ranges (§ 1.34) | Decoding it and diffing against the intended set |
 | Remembering that a guard covers only one directory (§ 1.34) | A sanity test that fails when a root moves |
 | Believing a published count because it was carefully derived | A `--self-test` that plants each column's condition and fails unless the number moves (§ 1.79) |
+| Reading "all green" off a gate that sees only workflow runs | A gate that also reads check-runs and names both passes |
+| Trusting a sweep that reported success over empty output | A non-vacuity check that aborts when rows < commits |
+| A scanner's alert list as the set of instances | Reading the line's other person-authored values |
 
 The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
 THE SAME, and only care separates them. Care is not a control — it is the thing that was
 already being applied when the defect got in.
+
+
+## The blind instrument — what "CI is green" meant in this session, and what it means now
+
+Added 2026-10-01, after the merge of PR #25. **Nothing above or below this section has been edited
+to match it.** The claims it corrects were made in good faith by a gate that could not see the thing
+it was reporting on, and a record that quietly rewrites them loses the only useful part — that the
+instrument looked exactly as trustworthy while it was blind.
+
+### The claims produced by it
+
+`scripts/check-ci.sh` read `gh run list`, which lists **workflow runs**. A **check-run** is a
+different object, and an app can post one with no workflow behind it. Every "CI is green" reported in
+this session before 2026-10-01 was therefore scoped, without saying so, to *workflow runs only*:
+
+| Claim | True at | False at |
+|---|---|---|
+| "All CI green through `cc95b09`" | workflow-run level | check-run level — `CodeQL` was `failure` |
+| "CI is green on `b366561`" | workflow-run level | check-run level — `CodeQL` was `failure` |
+| any green reported for the `7e83fd7` batch | workflow-run level | same alert, same line |
+
+### What the sweep found — measured, not argued
+
+`gh api repos/:owner/:repo/commits/<sha>/check-runs` for **all 143 non-merge commits** the branch
+added to main: **788 check-run rows**.
+
+**Three commits carried a failing check-run, and no others** — `7e83fd7`, `cc95b09`, `b366561`. All
+three are the SAME single alert, `scripts/export-permission-catalogue.ts:107`, *Incomplete string
+escaping or encoding* (high), introduced by the export commit and carried forward on every push until
+`c590c85` fixed it. Every other non-green row belongs to `github-actions` and was visible to the old
+instrument: the reds already in this file's § 1 (`477965d`, `395a0a3`, `ce95dbb`, `29b1e73`) and
+`cancelled` rows from superseded pushes.
+
+**Exactly two reporters post check-runs on this repository**, which is what bounds the blast radius:
+
+| Reporter | app_id | Checks | Visible to `gh run list`? |
+|---|---|---|---|
+| `github-actions` | 15368 | `frontend`, `backend`, `docker (api)`, `docker (web)`, `analyze (javascript-typescript)` | yes |
+| `github-advanced-security` | 57789 | `CodeQL` | **no** |
+
+So the instrument's blind spot was exactly one check, and with 0 open code-scanning alerts on main the
+one defect it hid is closed. Had there been a third reporter, every green in the session record would
+need its scope restated rather than just these three.
+
+**AND 14 OF THE 143 COMMITS HAVE NO CHECK-RUNS AT ALL** — nothing ever verified them. They are
+non-tip commits of multi-commit pushes: CI runs on the pushed tip, and `check-ci.sh` only ever looked
+at HEAD. Not a fault, but it makes "every commit on this branch was verified" false where "every
+pushed tip was" is true. Say the second.
+
+**AND THE FIRST SWEEP WAS ITSELF VACUOUS.** It piped to `jq`, which is **not installed on this host**;
+all 143 iterations exited 127, both output files stayed empty, and the wrapper printed
+`swept 143 commit(s); 0 with no check-runs at all`. It was one step from being reported as "a measured
+nothing". `gh api --jq` is gh's own built-in and works; the standalone binary does not exist. The
+rewrite uses `--jq` only and **aborts when it collects fewer rows than commits**, so an empty run
+cannot be reported as a clean one.
+
+### What the instrument checks now
+
+Two passes, and the workflow pass is KEPT rather than replaced — a workflow that never started posts no
+check-run at all, which a check-run pass alone would read as a clean commit. It also takes an optional
+commit-ish, because the false green could otherwise only be reproduced by checking that commit out;
+`bash scripts/check-ci.sh b366561` now exits 1 naming `CodeQL`, on the exact commit where it printed
+"all green".
+
+### And the gate that should have stopped it
+
+A high-severity alert introduced by a pull request did not block its merge, because `CodeQL` was not
+among main's required checks. It is now — owner's decision, on the grounds that this system holds
+personal data under PDPL and a known high finding reaching main because nothing was configured to stop
+it is not acceptable. Bound to **app_id 57789**, so a check merely NAMED `CodeQL` from another app
+cannot satisfy it. `enforce_admins` stays `true`; `required_linear_history` stays `false`, because the
+no-squash rule needs merge commits to remain possible.
+
+**`analyze (javascript-typescript)` is NOT a substitute and must not be swapped in for it.** It is an
+Actions job from the CodeQL workflow, it concluded `success` on `b366561` *while the high alert
+existed*, and it reports that the analysis RAN rather than that it found nothing. Requiring it would
+look like a security gate and block nothing.
+
+Three properties were measured on throwaway PRs rather than read off the settings page, because a
+required check that never arrives blocks every merge forever:
+
+| Probe | What it tests | `CodeQL` | Mergeable |
+|---|---|---|---|
+| #27, docs only | does the check post when no analyzable code changed? | POSTED, `success` | CLEAN — merge allowed |
+| #28, clean code | does a PR with no alert still pass? | POSTED, `success` | CLEAN — merge allowed |
+| #29, alert reintroduced | **does the gate actually block?** | POSTED, `failure` | **BLOCKED**, with every other required check green |
+
+The third probe is the point. Proving a clean PR passes does not prove the gate stops anything, which
+is the same discipline as a plant: #29 reintroduces the exact escaping defect of alert 3.
+
+### Three rules this branch earned, kept here because they outlive it
+
+**An instrument declares what it cannot see, and "green" names which passes were made.** `gh run list`
+sees workflow runs and not check-runs, a Playwright filter that matches no file runs nothing, a
+`grep | head` truncates, a mangled regex matches nothing, and `jq` is not installed on this host. All
+five produce output shaped exactly like a clean result. So a gate states its own scope — "2 workflow
+runs and every check-run green", never "all green" — and a measurement that finds nothing carries a
+non-vacuity check that fails when it collected nothing to look at.
+
+**A scanner's finding is a starting point, not the finding.** CodeQL flagged the description column
+because it is a plain data flow it could trace. The same defect's reachable instance was the ROLE NAME
+column beside it — office-authored since Phase 3, so `Finance | Ops` is a name somebody can really
+type — and no scanner named it. It was found by reading the code around the alert and asking which
+other value on that line comes from a person. Fix what was flagged, then read the neighbourhood.
+
+**A proof that does not first fail the old form is not a proof.** My first demonstration of the
+escaping bug put a space between the backslash and the pipe; the old form came out correct, and I
+would have reported a fix for something I had not shown. The adversarial input is a backslash
+IMMEDIATELY before a pipe, which yields five cell boundaries where a row has four. Same shape as a
+plant that kills no test, and as the length ladder that had to grow rather than merely not clip: run
+the broken version first and watch it fail, or the proof is decoration.
 
 ## The standing rule for every number this file publishes
 
