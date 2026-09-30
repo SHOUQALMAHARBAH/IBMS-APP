@@ -41,6 +41,29 @@ const MODULE_AR: Record<string, string> = {
   'supporting-operations': 'العمليات المساندة',
 };
 
+/**
+ * One cell of a markdown table, escaped so its content cannot end the cell.
+ *
+ * THE ORDER IS THE WHOLE POINT, and getting it wrong is what CodeQL flagged here (alert 3, high):
+ * escaping `|` alone turns a backslash-then-pipe into `\` + `\|` — an ESCAPED BACKSLASH followed by a
+ * LIVE pipe, so the cell ends early and everything after it shifts into the next column. The backslash
+ * has to be escaped FIRST, before anything that emits one.
+ *
+ * Newlines are collapsed rather than escaped, because a newline inside a cell does not break the cell,
+ * it breaks the ROW — markdown tables are line-oriented, so the remainder becomes a malformed table row.
+ *
+ * No seeded description contains either today (measured). That is exactly why it is worth fixing rather
+ * than arguing about: nothing would have failed, and the first description someone writes with a Windows
+ * path or a regex in it would silently corrupt the table the owner reads to decide grants.
+ */
+function markdownCell(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\r?\n/g, ' ')
+    .trim();
+}
+
 async function main(): Promise<void> {
   const prisma = new PrismaClient();
   try {
@@ -102,9 +125,13 @@ async function main(): Promise<void> {
       lines.push('| Code | English description (stored) | Held by |');
       lines.push('|---|---|---|');
       for (const row of list) {
-        const holders = [...new Set(row.roles.map((r) => r.role.name))].sort();
+        // ESCAPED TOO, and this is the reachable half rather than the flagged one. CodeQL traced the
+        // description because it is a plain column; a ROLE NAME is office-authored — since Phase 3 an
+        // administrator types it at `/settings/roles` — so `Finance | Ops` is a name somebody can
+        // actually create, and it would shift every later column of that row.
+        const holders = [...new Set(row.roles.map((r) => markdownCell(r.role.name)))].sort();
         const held = holders.length > 0 ? holders.join(', ') : '_(no seeded role)_';
-        const desc = (row.description ?? '').replace(/\|/g, '\\|') || '_(none stored)_';
+        const desc = markdownCell(row.description ?? '') || '_(none stored)_';
         lines.push(`| \`${row.code}\` | ${desc} | ${held} |`);
       }
       lines.push('');
