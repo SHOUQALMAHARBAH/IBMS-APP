@@ -52,6 +52,26 @@ const SUMMARY_PATTERNS = [
 ];
 const PLAYWRIGHT_FAILED = /^\s*(\d+) failed\s*$/m;
 
+/**
+ * vitest's FILE-level line: " Test Files  1 failed | 12 passed (13)".
+ *
+ * THE GAP THIS CLOSES, WHICH WAS THIS TOOL'S OWN FAILURE MODE. A test file that cannot LOAD contributes no
+ * failing tests, so the `Tests` line reads clean. On 2026-09-30 vitest printed
+ *
+ *     Test Files  1 failed | 12 passed (13)
+ *           Tests  118 passed (118)
+ *
+ * and this tool reported "118 passed, 0 failed" and EXITED 0 — which is precisely the "blank is not zero"
+ * mistake it exists to prevent, one level up: not a missing summary, but a summary that is true about tests
+ * while a whole file never ran. Six tests were silently absent from every figure reported that way.
+ *
+ * The file in question read a path relative to `process.cwd()` and the run used `--root`, so it threw on
+ * import. That is a common shape — a bad import, a missing env var, a syntax error — and in every case the
+ * honest answer is that the suite did not run, not that it passed.
+ */
+const VITEST_FILES_FAILED = /^\s*Test Files\s+(?:.*?\|\s*)?(\d+) failed/m;
+const VITEST_FILES_FAILED_FIRST = /^\s*Test Files\s+(\d+) failed/m;
+
 /** ANSI, including the colour codes vitest puts INSIDE the summary line. Failure mode 1 and 2. */
 function stripAnsi(text) {
   // eslint-disable-next-line no-control-regex
@@ -69,14 +89,27 @@ export function summarise(rawOutput) {
       const f = PLAYWRIGHT_FAILED.exec(text);
       failed = f ? Number(f[1]) : 0;
     }
-    // Trailing `(` trimmed off the echoed line: the Playwright matcher has to include it to avoid
-    // matching a bare "7 passed" inside prose, but echoing `[36 passed (]` reads like truncated output —
-    // and a tool whose own output looks broken is a tool people stop trusting.
+    // A FILE that failed to load counts as a failure even though no test did. Added to `failed` rather
+    // than reported separately, so every existing caller — including `--expect-fail` and the exit code —
+    // treats it as what it is: a run that did not happen.
+    let fileFailures = 0;
+    if (p.runner === 'vitest') {
+      const ff = VITEST_FILES_FAILED_FIRST.exec(text) ?? VITEST_FILES_FAILED.exec(text);
+      fileFailures = ff ? Number(ff[1]) : 0;
+    }
     return {
       runner: p.runner,
       passed,
-      failed,
-      line: m[0].trim().replace(/\s*\($/, ''),
+      failed: failed + fileFailures,
+      fileFailures,
+      // Trailing `(` trimmed off the echoed line: the Playwright matcher has to include it to avoid
+      // matching a bare "7 passed" inside prose, but echoing `[36 passed (]` reads like truncated output —
+      // and a tool whose own output looks broken is a tool people stop trusting.
+      line:
+        m[0].trim().replace(/\s*\($/, '') +
+        (fileFailures > 0
+          ? `  — plus ${fileFailures} test FILE(S) that failed to load, contributing no failing tests`
+          : ''),
     };
   }
   return null;
@@ -99,6 +132,17 @@ function readStdin() {
 
 function selfTest() {
   const cases = [
+    {
+      // THE REAL CASE, verbatim from a 2026-09-30 run. A test file that could not LOAD contributed no
+      // failing tests, so the Tests line read clean and this tool said "118 passed, 0 failed" and exited 0.
+      // Six tests were missing from every figure reported that way. Built from the actual output rather
+      // than invented, which is this repo's rule for a self-test case.
+      name: 'vitest, a test FILE failed to load while every test that ran passed',
+      input:
+        ' Test Files  1 failed | 12 passed (13)' + String.fromCharCode(10) +
+        '       Tests  118 passed (118)' + String.fromCharCode(10),
+      expect: { passed: 118, failed: 1 },
+    },
     {
       name: 'vitest, all passed',
       input: '[2m Test Files [22m 1 passed\n[2m      Tests [22m [1m[32m12 passed[39m[22m[90m (12)[39m\n',
