@@ -200,7 +200,7 @@ export const CUSTOMER_SERVICE = {
   EN: {
     srHeading: 'Customer requests',
     srIntro:
-      'Certificates, copies, changes and other customer service requests. Each is tracked against a fulfilment SLA (a 5-business-day working target, escalating to the branch manager); the timer clears when the request is fulfilled or cancelled.',
+      'Certificates, copies, changes and other customer service requests. Each is tracked against a fulfilment SLA (a 5-business-day working target, escalating to the branch manager); the timer resolves when the request is fulfilled or cancelled.',
     srCustomerIdLabel: 'Customer',
     srTypeLabel: 'Request type',
     srDetailLabel: 'Detail (optional)',

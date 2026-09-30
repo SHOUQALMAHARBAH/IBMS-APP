@@ -58,6 +58,8 @@ differently — the disagreement is the evidence, not somebody's taste.
 | Abandoning a form that was never submitted | **cancel** | discard, withdraw | Nothing was raised, so there is no record to withdraw. `/sla-policies` said "Discard" while `/watchlist-sync` said "Cancel" for the identical affordance — batch 4, fixed to Cancel, which is also what the Arabic already said («إلغاء الإدخال»). |
 | Not surfacing matches below a score | **ignore** | discard, drop | A THRESHOLD, not a deletion: the matches still exist and are still screened, they are just not shown. `/screening-health` said "Discard below" in English while its own Arabic said «تجاهل دون» — ignore. Fixed to the Arabic's meaning in batch 4. |
 | Deciding a sanctions match is not the person | **clear** | resolve, dismiss | A DELIBERATE exception to the resolve row above, on the same ground as "Suspended": in AML a match is *cleared*, it is the word an examiner expects, and it is a decision about the match's MERITS rather than the closing of a task. Checked in batch 4 and kept. |
+| Choosing from a CLOSED LIST — a `<select>`, a role set, a catalogue | **pick / select** | search, find | NOT the same as the glossary's *search / find* row above, which governs finding a NAMED thing to attach to a record — the `EntitySearch` control, where the reader types. Four screens agree (`/sales-performance`, `/settings/users`, `/employees`, `/insurers/new`, whose catalogue is a `<select>`), checked in batches 6, 7 and 8. |
+| Declining a suggestion the SYSTEM proposed | **dismiss** | resolve, clear, reject | A deliberate exception to the *resolve* row: a reconciliation exception is a problem that must be closed out, while a cross-sell or up-sell suggestion is an OFFER — there is nothing to resolve, and "resolve" would claim a problem existed. `/cross-sell` and `/up-sell` agree (`xsConfirmDismiss`, `upsDismiss*`). Checked in batch 8. |
 | Several codes where ALL are needed | **needs all of these permissions** | any one of these | A screen loading several endpoints with `Promise.all` closes if any one refuses. Two screens. The opposite claim from the row above, and telling a reader the wrong one sends them to ask for a grant they do not need — which is why the two are separate FUNCTIONS with no default mode, rather than one function with a flag. |
 
 ### What batch 3 changed, and what it did not
@@ -481,9 +483,139 @@ eight fall to batches 8 and 9, and they are now NAMED rather than silently absen
     domain act the glossary already protects when it explains why the withdraw concept could not use «إلغاء».
     Correct as written.
 
+## BATCH 8 — customer service, customers and insurers, 14 screens (2026-09-30)
+
+Rules read: **1, 3, 4, 5, 7.**
+
+`communications` · `complaints` · `customers` · `customers/[id]` · `customers/kyc-queue` ·
+`customers/new` · `feedback` · `insurer-directory` · `insurers` · `insurers/[id]` · `insurers/new` ·
+`retention-cases` · `service-requests` · `sla-policies`
+
+| Rule | Result |
+|---|---|
+| **1** | **CLEAN on all 14**, and it sharpened the detector — see below. |
+| **3** | **CLEAN.** `customers/new` has no empty state and is create-only. |
+| **4** | Clean. |
+| **5** | **CLEAN.** `customerStatusSuspended` is the recorded domain-state exception. |
+| **7** | **CLEAN**, with two senses recorded and one prose fix. |
+
+### Rule 1 is now DECIDED FOR ALL 102 SCREENS, and the last step was narrowing the flag
+
+Batch 7 left rule 1 "UNDECIDED" on 26 screens because a form's handler name did not say whether it created
+or filtered. Reading this batch's five flagged screens showed why that flag was too wide: **every one had a
+single form ABOVE its table** —
+
+    communications 142<253   complaints 195<273   feedback 118<196
+    retention-cases 136<195  service-requests 141<193
+
+**A form's KIND only matters when a form sits BELOW a table.** If every form is above every table, rule 1
+holds whether the form creates or filters, so an unclassified handler there is not an open question. With
+that narrowing the undecided set went **26 → 5**, and all five are screens already read by hand:
+
+    documents                batch 6 — later forms belong to sections with no table of their own
+    operational-pi-risk      batch 4 — three (form, table) pairs, all correctly ordered
+    retention-disposal       batch 4 — three pairs, all correctly ordered
+    employee-performance     batch 7 — the onCompute-above-History judgement
+    insurer-performance      batch 7 — same
+
+So every screen in the app now has rule 1 decided: by position, by the create/filter classifier, or by a
+reading recorded in a batch. That is the first of the seven rules to be closed with a checkable denominator.
+
+### Two senses recorded, because four screens and two screens already agreed
+
+  * **`pick` / `select` for choosing from a CLOSED LIST.** `/insurers/new` says "Pick a company from the
+    shared catalogue" and its control is a `<select>`, not a search box — so it is not the glossary's
+    *search / find* row, which governs finding a NAMED thing the reader types. Four screens agree.
+  * **`dismiss` for declining a suggestion the SYSTEM proposed.** A reconciliation exception is a problem to
+    be closed out; a cross-sell suggestion is an OFFER. "Resolve" would claim a problem existed. `/cross-sell`
+    and `/up-sell` agree.
+
+### One prose fix
+
+`srIntro` said *"the timer **clears** when the request is fulfilled"* while the same product calls that state
+**Resolved** in four places on the SLA dashboard and on `/complaints`. Rule 7 governs action names and a
+timer being satisfied is one act; changed to "the timer resolves when". Prose is where a vocabulary decision
+quietly acquires a second word, because nobody checks prose against the glossary.
+
+## BATCH 9 — finance, claims, policy and the launcher, 12 screens (2026-09-30) — THE SWEEP IS COMPLETE
+
+Rules read: **1, 3, 4, 5, 7.**
+
+`(home)` · `bank-reconciliation` · `claims` · `claims-analytics` · `claims/[id]` · `client-accounting` ·
+`commission` · `insurer-accounting` · `payment-channels` · `policies` · `policies/[id]` · `renewal-cases`
+
+**All 102 screens are now named in a batch.**
+
+| Rule | Result |
+|---|---|
+| **1** | **CLEAN.** Every form sits above its table (137<190, 140<242, 144<250); the rest have a form or a table but not both. |
+| **3** | **CLEAN.** `claims/[id]` and `policies/[id]` have no permission refusal — the standing detail-page exception. `(home)` has neither an error branch nor a refusal, and both are correct: see below. |
+| **4** | Clean. |
+| **5** | **ONE VIOLATION, fixed** — and it is on a money screen, flagged below. |
+| **7** | **CLEAN**, with three senses of *resolve/clear* recorded. |
+
+### `(home)` — rule 3's four states presuppose a data load
+
+The launcher makes **no API call of its own**. It reads `user` from the auth context and renders the cards
+that reader can open. So it has no load to fail and no refusal to give: a session failure leaves `user` null
+and the screen redirects to `/login`. Both absences are correct, and the general form is worth stating —
+**rule 3 applies to screens that LOAD something**, and a screen that loads nothing has no fourth state to be
+missing.
+
+### RULE 5 — one screen used both words for one act, and it is a deferred screen
+
+`/payment-channels`:
+
+    pcDisableButton   "Deactivate"      the control
+    pcDisabled        "Deactivated"     the state
+    pcDisableError    "Could not disable it"        <-- the error for that same button
+    pcIntro           "…stays so until it is disabled."
+
+The button performs the act and its own error names it differently. The glossary's first row forbids
+*disable* for this concept, so both strings are aligned to the control that performs it. No Arabic change was
+needed — «تعطيل» is already the settled term on both.
+
+**FLAGGED, because this screen is inside the owner's money deferral.** The change is two English strings; it
+alters no control, no amount, no behaviour and no permission, and the deferral covers the payment-methods
+WORK (types, cheque states, offset, net remittance, IBAN, CliQ caps) rather than the copy on the control that
+already exists. Leaving a money screen saying both words because it is money-adjacent would be
+over-applying the deferral — but it is the owner's to reverse, so it is named here rather than buried.
+
+### Three senses of resolve/clear, all legitimate, recorded so nobody merges them
+
+  * **resolve = close out a flagged item** — `/bank-reconciliation`, claim alerts, invoice exceptions. The
+    glossary's word.
+  * **resolve = DETERMINE a value** — `claimCoverageUnresolved`: *"coverage at loss date could not be
+    resolved"*. Nothing is being closed out; a value could not be worked out.
+  * **clear = a payment/refund clearing** — `endorsementRefundAutoCleared`: *"auto-cleared (below
+    threshold)"*. Money vocabulary, and the refund really is auto-approved. **Not changed: this one is
+    money semantics rather than copy**, and the word is doing work the glossary's *resolve* would not.
+
+`policyRemoveDocRowButton: "Remove"` is also correct — it removes a row from a form before submission, which
+is neither ending an entity's active life nor withdrawing a record.
+
 ---
 
-## Not yet surveyed
+## THE SWEEP, CLOSED
+
+    102 screens, batches 4-9, every screen named in this file.
+
+| Rule | State |
+|---|---|
+| 1 · create form above the table | **CLOSED for all 102** — decided by position, by the create/filter classifier, or by a recorded reading. Two violations found (batch 6) in a pass that had reported zero. |
+| 2 · no identifier reaches a reader | **GUARDED** app-wide (`screen-copy.test.ts`), budget 29, ratcheting down. 28 deferred to broker question 16. |
+| 3 · four states | **CLOSED for all 102**, with three recorded exception classes: detail pages addressed by an id (404, not 403 — a tenancy property), `/settings/security` (must stay ungated), and screens that load nothing. |
+| 4 · every refusal names the way forward | **STRUCTURAL** for permissions (one sentence, 102 act keys, 106 call sites) and **GUARDED** for load errors (109 of 109). |
+| 5 · delete means deactivate | **CLOSED** — 3 violations found across batches 3, 4 and 9. |
+| 6 · Arabic and English say the same | **GUARDED** app-wide, 0/102 — and the guard has six known blind spots and one counting defect, all recorded in its header. Zero means zero of what it can see. |
+| 7 · one action, one name | **CLOSED** — the glossary is 19 rows, every row carrying the disagreement that produced it. |
+
+**What is NOT claimed:** rule 6's zero is bounded by its detector, and the base rate for finding a seventh
+blind spot has so far been one per sweep. Rule 2 has 28 known remaining sites, deferred rather than missed.
+
+---
+
+## ~~Not yet surveyed~~ — THE SWEEP IS COMPLETE
 
 **102 screens exist under `app/(app)`** — measured; the "93" this paragraph used to claim was stale, and the
 five `(auth)` screens sit outside the count because they render before sign-in and have no permission
@@ -494,8 +626,7 @@ need no per-batch sweep. Rule 4's permission half is structural for all 102 as w
 renders one sentence from `lib/i18n/permission-refusal.ts` that names the grantor — and its load-error half
 is guarded by `scripts/measurements/load-error-way-forward.py`.
 
-What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batches 4, 5, 6 and 7 (20 + 23 + 17 + 16)
-are listed above by name — 76 of 102 covered with a checkable list.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
+What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batches 4 through 9 (20 + 23 + 17 + 16 + 14 + 12) name ALL 102 screens** — the coverage is checkable by reading this file, which is the only form of that claim anybody can verify. Rules 1, 3, 5 and 7 are CLOSED; rules 2, 4 and 6 are GUARDED app-wide. See the table at the end of batch 9 for what is and is not claimed. Coverage before batch 4 was reported in conversation and never written here, so it cannot be
 substantiated — batch 5 onwards names its screens in this file, which is the only form of that claim anybody
 can check.
 

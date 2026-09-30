@@ -252,7 +252,7 @@ export const FINANCE = {
 
     pcHeading: 'Payment channels',
     pcIntro:
-      'The approved payment channels for customers (money in, on a collection receipt) and insurers (money out, on a remittance). Finance maintains this list; a channel is usable the moment it is added and stays so until it is disabled. Only the last few digits of an account are ever stored.',
+      'The approved payment channels for customers (money in, on a collection receipt) and insurers (money out, on a remittance). Finance maintains this list; a channel is usable the moment it is added and stays so until it is deactivated. Only the last few digits of an account are ever stored.',
     pcOwnerLabel: 'Owner',
     pcOwnerTypeAria: 'Owner type',
     pcOwnerFieldLabel: 'Owner',
@@ -281,7 +281,7 @@ export const FINANCE = {
     pcLoading: 'Loading…',
     pcLoadError: 'Could not load the payment-channel list — try again.',
     pcAddError: 'Could not add the payment channel — try again.',
-    pcDisableError: 'Could not disable it — try again.',
+    pcDisableError: 'Could not deactivate it — try again.',
     pcRefusalAct: 'view the payment channels an office sends money through',
 
     brHeading: 'Bank reconciliation',

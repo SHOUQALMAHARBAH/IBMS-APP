@@ -156,10 +156,16 @@ def main():
             elif p['creates'] and p['tables'] and min(p['creates']) > min(p['tables']):
                 pairs += '   <-- CREATE form below a table, filter form above it: READ IT'
             elif (p['tables'] and p['handlers']
-                  and p['handlers'] > len(p['creates']) + len(p['filters'])):
-                # Not a finding and not a clean bill either: this screen has a form whose KIND cannot be
-                # told from its handler name, so rule 1 was not decided for it.
-                pairs += '   (unclassified form — rule 1 UNDECIDED here)'
+                  and p['handlers'] > len(p['creates']) + len(p['filters'])
+                  and max(p['forms']) > min(p['tables'])):
+                # UNDECIDED, and narrowed by batch 8: a form's KIND only matters when a form sits BELOW a
+                # table. If EVERY form on the screen is above EVERY table, rule 1 holds whether that form
+                # creates or filters — so an unclassified handler there is not an open question.
+                #
+                # That distinction took the undecided count from 26 to a much smaller set, and the five
+                # screens batch 8 read (communications, complaints, feedback, retention-cases,
+                # service-requests) are all in the dropped group: one form each, above its table.
+                pairs += '   (unclassified form BELOW a table — rule 1 UNDECIDED here)'
         print(header % (rel,
                         'y' if p['loading'] else '.',
                         'y' if p['empty'] else '.',
