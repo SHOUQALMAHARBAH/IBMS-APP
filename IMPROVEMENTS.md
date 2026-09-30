@@ -5477,6 +5477,16 @@ Both halves were fixed and the second is the one that matters:
     rule from the watchlist-sync incident is "scope to the element, never weaken the assertion".
   * `scripts/playwright-specs.mjs` resolves filters and **exits non-zero naming any that matches nothing.**
 
+#### The blast radius is BOUNDED, and that took a measurement rather than a shrug
+
+Every other filter used across the six sweep batches was fed back through the new resolver: **all 44 of them
+resolve to a real spec, and `settings` was the only bad one.** So the false claims are exactly the four runs
+that included it, and no filename was mistyped. "Some of my numbers were short" would have been true and
+useless; which ones, and no others, is checkable.
+
+    node scripts/playwright-specs.mjs permission-refusal payment-channels vendors leads … employee-reveal
+    -> exits 0, every filter resolves
+
 #### The class, which is now four incidents deep
 
     a grep truncated by `head`                 a search that found nothing, read as nothing to find

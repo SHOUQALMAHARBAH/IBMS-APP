@@ -99,6 +99,30 @@ if (!run) {
   process.exit(0);
 }
 
+// A LINGERING WEB SERVER IS THE COMMONEST WAY THIS RUN DIES, and it is litter rather than a code fault.
+// `CI=1` sets `reuseExistingServer: false`, so Playwright refuses port 3000 — correctly, and with a message
+// that says nothing about how to clear it. Twice in one session: once from a run I timed out, once from a
+// background run that was killed and left its server behind. The repo's own rule is that every refusal names
+// the way forward, so this one does.
+const held = spawnSync(
+  "node",
+  [
+    "-e",
+    "const n=require('net');const s=n.createServer();s.once('error',()=>process.exit(1));" +
+      "s.once('listening',()=>{s.close();process.exit(0)});s.listen(3000,'127.0.0.1')",
+  ],
+  { stdio: "ignore" },
+);
+if (held.status !== 0) {
+  die(
+    1,
+    "port 3000 is already in use, and CI=1 makes Playwright refuse to reuse it.\n" +
+      "That is usually a web server left behind by a run that was killed or timed out. Clear it:\n" +
+      '  powershell -Command "Get-NetTCPConnection -LocalPort 3000 -State Listen | ' +
+      'Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }"',
+  );
+}
+
 // `--run` spawns Playwright itself, so there is no shell substitution to come back empty. This is the mode
 // to prefer: with `$(…)` the caller has to check an exit code that `$(…)` has already thrown away.
 process.stderr.write(
