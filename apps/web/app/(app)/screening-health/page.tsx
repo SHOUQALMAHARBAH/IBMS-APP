@@ -14,6 +14,7 @@ import {
   type ScreeningHealth,
   type ScreeningOverview,
 } from "../../../lib/screening/screening-config-api";
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * Screening provider + data health.
@@ -95,7 +96,7 @@ export default function ScreeningHealthPage() {
       setOverview(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('shYouDonTHoldThe')
+          ? permissionRefusal(t, 'shRefusalAct', 'sanctions-pep.screen')
           : err instanceof ApiError
             ? err.message
             : t('shCouldNotLoadScreeningHealth'),

@@ -19,6 +19,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -60,7 +61,7 @@ export default function DocumentsPage() {
       setDocuments(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('docNoPermission')
+          ? permissionRefusal(t, 'docRefusalAct', 'document.read')
           : err instanceof ApiError
             ? err.message
             : t('docLoadError'),

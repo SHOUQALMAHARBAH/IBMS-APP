@@ -34,6 +34,7 @@ import {
   summaryPanelStyle,
 } from '../../../components/risk-profile/risk-profile.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 function Figure({ label, value }: { label: string; value: string }) {
@@ -108,7 +109,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('rpNoPermission')
+          ? permissionRefusal(t, 'rpRefusalAct', 'risk-profile.read')
           : err instanceof ApiError && err.status === 404
             ? t('rpCustomerNotFound')
             : err instanceof ApiError

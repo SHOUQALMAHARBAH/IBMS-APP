@@ -110,7 +110,7 @@ test("a user without the permission sees a friendly message", async ({ page }) =
 
   await page.goto("/client-accounting");
   await expect(
-    page.getByText("client-accounting.read permission", { exact: false }),
+    page.getByText("(client-accounting.read)", { exact: false }),
   ).toBeVisible();
 });
 

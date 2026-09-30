@@ -107,7 +107,7 @@ test("shows a friendly message when the user lacks list permission", async ({ pa
 
   await page.goto("/leads");
 
-  await expect(page.locator('p[role="alert"]')).toContainText("don't hold the lead.list.read");
+  await expect(page.locator('p[role="alert"]')).toContainText("(lead.list.read)");
 });
 
 test("only offers a transition action on the officer's own lead, and moving it updates the board", async ({ page }) => {

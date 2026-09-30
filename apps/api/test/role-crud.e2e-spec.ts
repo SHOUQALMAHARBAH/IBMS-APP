@@ -455,7 +455,10 @@ describe('Role CRUD', () => {
     await request(app!.getHttpServer())
       .put(`/rbac/roles/${role.id}/permissions`)
       .set(bearer(admin.accessToken))
-      .send({ permissionCodes: ['customer.360-view.read'] })
+      // `customer.read`, which is what gates `GET /customers` since migration 20261105100000. The point of
+      // this test is that a grant swap takes effect on the SAME session, so the code just has to be one
+      // that visibly turns a 403 into a 200 — and the narrow list code is now that code.
+      .send({ permissionCodes: ['customer.read'] })
       .expect(200);
 
     await request(app!.getHttpServer())

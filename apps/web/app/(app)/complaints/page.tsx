@@ -30,6 +30,7 @@ import { pageStyle } from "../../../components/lead/lead.styles";
 import { hasAnyPermission } from "../../../lib/auth/permissions";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import type { TranslationKey } from "../../../lib/i18n/translations";
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 // A permission code, like the two below it — NOT the role list this used to
 // hold. §10.4 converted `ESCALATE_ROLES`/`CLOSE_ROLES` and missed this one, so
@@ -108,7 +109,7 @@ export default function ComplaintsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t("complaintsNoPermission")
+          ? permissionRefusal(t, 'complaintsRefusalAct', 'complaint.log')
           : err instanceof ApiError
             ? err.message
             : t("complaintsLoadError"),

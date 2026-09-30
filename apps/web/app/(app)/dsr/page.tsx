@@ -31,6 +31,7 @@ import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { DsrClockControl } from '../../../components/pdpl/DsrClockControl';
 import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const LOG_ROLES = [
   'dsr.log',
@@ -84,7 +85,7 @@ export default function DsrPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dsrNoPermission')
+          ? permissionRefusal(t, 'dsrRefusalAct', 'dsr.log')
           : err instanceof ApiError
             ? err.message
             : t('dsrLoadError'),

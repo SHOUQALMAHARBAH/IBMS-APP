@@ -29,6 +29,7 @@ import {
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function RecommendationRow({
   recommendation,
@@ -198,7 +199,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('upsNoPermission')
+          ? permissionRefusal(t, 'upsRefusalAct', 'up-sell.read')
           : err instanceof ApiError && err.status === 404
             ? t('upsCustomerNotFound')
             : err instanceof ApiError
@@ -223,7 +224,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setScanError(
         err instanceof ApiError && err.status === 403
-          ? t('upsNoPermissionDetect')
+          ? permissionRefusal(t, 'upsDetectRefusalAct', 'up-sell.detect')
           : err instanceof ApiError
             ? err.message
             : t('upsScanError'),

@@ -217,7 +217,13 @@ test("shows a friendly message when the user lacks read permission", async ({ pa
 
   await page.goto("/customers");
 
-  await expect(page.locator('p[role="alert"]')).toContainText("don't hold the customer.360-view.read");
+  // `customer.read` since migration 20261105100000 — the LIST moved onto the narrow code while the
+  // detail kept `customer.360-view.read`. The mechanical rewrite of this assertion could not know that:
+  // it swapped the WORDING and the code had changed too.
+  await expect(page.locator('p[role="alert"]')).toContainText(
+    "You do not hold permission to find and list customers",
+  );
+  await expect(page.locator('p[role="alert"]')).toContainText("(customer.read)");
 });
 
 /*

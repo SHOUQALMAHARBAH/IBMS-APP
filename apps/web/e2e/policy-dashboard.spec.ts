@@ -71,7 +71,7 @@ test("a user without the permission sees the underlying error message", async ({
 
   await page.goto("/dashboards/policy");
   await expect(
-    page.getByText("You don't hold the dashboard.policy.view permission.", { exact: false }),
+    page.getByText("(dashboard.policy.view)", { exact: false }),
   ).toBeVisible();
 });
 

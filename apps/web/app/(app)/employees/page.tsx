@@ -23,6 +23,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle, successStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -126,7 +127,7 @@ export default function EmployeesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('empNoPermission')
+          ? permissionRefusal(t, 'empRefusalAct', 'employee.read')
           : err instanceof ApiError
             ? err.message
             : t('empLoadError'),

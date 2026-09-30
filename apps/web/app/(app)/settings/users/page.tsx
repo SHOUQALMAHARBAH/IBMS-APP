@@ -22,6 +22,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /** The keys `ENUM_LABEL.RoleName` actually has — the eleven seeded names. A role
  *  an office defines is deliberately NOT one of these. */
@@ -146,7 +147,7 @@ export default function UserAdminPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('usrNoPermission')
+          ? permissionRefusal(t, 'usrRefusalAct', 'user.manage')
           : err instanceof ApiError
             ? err.message
             : t('usrCouldNotLoadUsersTry'),

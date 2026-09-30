@@ -17,6 +17,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 const cellStyle: CSSProperties = {
@@ -74,7 +75,7 @@ export default function BankReconciliationPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('brNoPermission')
+          ? permissionRefusal(t, 'brRefusalAct', 'reconciliation-exception.investigate')
           : err instanceof ApiError
             ? err.message
             : t('brLoadError'),

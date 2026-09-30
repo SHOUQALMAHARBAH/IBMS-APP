@@ -27,6 +27,7 @@ import { hasPermission } from '../../../../lib/auth/permissions';
 import { errorStyle, successStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -93,7 +94,7 @@ export default function EmployeeDetailPage() {
       setEmployee(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('empdNoPermission')
+          ? permissionRefusal(t, 'empdRefusalAct', 'employee.read')
           : err instanceof ApiError
             ? err.message
             : t('empdLoadError'),
@@ -332,7 +333,7 @@ export default function EmployeeDetailPage() {
               </p>
             ) : !canIssueLogin ? (
               <p style={{ color: 'var(--ink-secondary)' }} data-login-not-permitted>
-                {t('empdLoginNoPermission')}
+                {permissionRefusal(t, 'empdLoginRefusalAct', 'user.manage')}
               </p>
             ) : !showLoginForm ? (
               <>

@@ -16,6 +16,7 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /*
  * THE OFFICE'S OWN ADDITIONS TO THE INSURANCE-LINE VOCABULARY.
@@ -231,7 +232,7 @@ export default function InsuranceLinesPage() {
         </section>
       ) : (
         <p style={muted} data-testid="line-admin-readonly">
-          {t('lineAdminNoPermission')}
+          {permissionRefusal(t, 'lineAdminRefusalAct', 'insurance-line.create')}
         </p>
       )}
 

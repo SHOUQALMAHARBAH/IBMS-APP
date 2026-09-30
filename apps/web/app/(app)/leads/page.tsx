@@ -11,6 +11,7 @@ import { LeadPipelineBoard } from '../../../components/lead/LeadPipelineBoard';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 // Roles the seeded permission grid grants `lead.create` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
@@ -33,7 +34,7 @@ export default function LeadsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('leadsNoPermission')
+          ? permissionRefusal(t, 'leadsRefusalAct', 'lead.list.read')
           : err instanceof ApiError
             ? err.message
             : t('commonTryAgain'),

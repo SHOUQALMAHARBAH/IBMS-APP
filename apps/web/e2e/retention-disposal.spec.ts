@@ -232,7 +232,7 @@ test("a user without the schedule permission sees the translated 403 message", a
   // asserted exactly that. The absence check is what makes it a proof:
   // without it the old behaviour satisfies the new assertion too.
   await expect(
-    page.getByText("retention/disposal register", { exact: false }),
+    page.getByText("view the retention and disposal register", { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),

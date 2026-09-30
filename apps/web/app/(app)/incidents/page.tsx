@@ -32,6 +32,7 @@ import { errorStyle } from "../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../components/lead/lead.styles";
 import { hasAnyPermission } from "../../../lib/auth/permissions";
 import { useLanguage } from "../../../lib/i18n/language-context";
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const REPORT_ROLES = ["incident.report"];
 const CONTAIN_ROLES = ["incident.contain"];
@@ -112,7 +113,7 @@ export default function IncidentsPage() {
       setIncidents(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t("incNoPermission")
+          ? permissionRefusal(t, 'incRefusalAct', 'incident.report')
           : err instanceof ApiError
             ? err.message
             : t("incLoadError"),

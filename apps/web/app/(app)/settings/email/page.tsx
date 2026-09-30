@@ -57,6 +57,7 @@ import {
   type EmailSendResult,
 } from '../../../../lib/email/email-integration-api';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /**
  * TOTAL maps, not concatenated keys — § 1.45. A missing label would otherwise render its own key on
@@ -272,7 +273,7 @@ export default function EmailIntegrationPage() {
       <main style={pageStyle}>
         <h1>{t('emailHeading')}</h1>
         <p role="alert" style={errorStyle}>
-          {t('emailNoPermission')}
+          {permissionRefusal(t, 'emailRefusalAct', 'email.integration.read')}
         </p>
       </main>
     );

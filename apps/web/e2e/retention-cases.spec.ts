@@ -87,7 +87,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/retention-cases");
   await expect(
-    page.getByText("retention-case.manage permission", { exact: false }),
+    page.getByText("(retention-case.manage)", { exact: false }),
   ).toBeVisible();
 });
 

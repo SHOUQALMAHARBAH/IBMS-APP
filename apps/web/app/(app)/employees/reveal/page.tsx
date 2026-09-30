@@ -19,6 +19,7 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /*
  * FIND A NAMED EMPLOYEE, REVEAL THEIR NATIONAL ID — IMPROVEMENTS § 1.83.
@@ -148,7 +149,7 @@ export default function EmployeeRevealPage() {
       <main style={pageStyle}>
         <h1>{t('empRevealHeading')}</h1>
         <p role="alert" style={errorStyle}>
-          {t('empRevealNoPermission')}
+          {permissionRefusal(t, 'empRevealRefusalAct', 'employee.national-id.reveal')}
         </p>
       </main>
     );

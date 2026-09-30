@@ -30,6 +30,7 @@ import { DeactivatedInsurerBadge } from '../../../../components/insurer/Deactiva
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /**
  * One insurer, and the act of stopping or resuming work with them.
@@ -86,7 +87,7 @@ export default function InsurerDetailPage() {
           : isMfaEnrolmentError(err)
             ? t('insMfaRequired')
             : err instanceof ApiError && err.status === 403
-              ? t('insListNoPermission')
+              ? permissionRefusal(t, 'insListRefusalAct', 'insurer.read')
             : t('insListLoadError'),
       );
     }

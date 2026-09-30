@@ -30,6 +30,7 @@ import {
   orgUnitGridStyle,
   orgUnitRowStyle,
 } from '../../../../components/admin/admin.styles';
+import { permissionRefusalAnyOf } from '../../../../lib/i18n/permission-refusal';
 
 /**
  * Departments and branches — the smallest thing that makes the person form honest.
@@ -293,7 +294,7 @@ export default function OrgUnitsPage() {
 
       {noAccess ? (
         <p role="status" style={errorStyle}>
-          {t('orgUnitNoPermission')}
+          {permissionRefusalAnyOf(t, 'orgUnitRefusalAct', ['department.read', 'branch.read'])}
         </p>
       ) : null}
       {loadError ? (

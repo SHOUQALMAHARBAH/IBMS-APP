@@ -25,6 +25,7 @@ import { hasPermission } from '../../../lib/auth/permissions';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -107,7 +108,7 @@ export default function SlaDashboardPage() {
   const messageFor = useCallback(
     (err: unknown, fallback: string) =>
       err instanceof ApiError && err.status === 403
-        ? tr('slaDashNoPermission')
+        ? permissionRefusal(tr, 'slaDashRefusalAct', 'sla-dashboard.view')
         : err instanceof ApiError
           ? err.message
           : fallback,

@@ -123,7 +123,7 @@ test("a user without the permission sees a friendly message", async ({
     // Four-action Phase 4 — the load failed, so the refusal names the READ code, not a write one. Telling
     // somebody they lack the permission to ADD a channel when what they cannot do is SEE the list would
     // send them to ask for the wrong grant.
-    page.getByText("payment-channel.read permission", { exact: false }),
+    page.getByText("(payment-channel.read)", { exact: false }),
   ).toBeVisible();
 });
 

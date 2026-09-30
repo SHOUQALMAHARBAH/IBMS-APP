@@ -19,6 +19,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const REASON_LABEL_KEY: Record<string, TranslationKey> = {
   renewal_inactivity: 'retReasonRenewalInactivity',
@@ -65,7 +66,7 @@ export default function RetentionCasesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('retNoPermission')
+          ? permissionRefusal(t, 'retRefusalAct', 'retention-case.manage')
           : err instanceof ApiError
             ? err.message
             : t('retLoadError'),

@@ -148,7 +148,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/dsr");
   await expect(
-    page.getByText("dsr.log permission", { exact: false }),
+    page.getByText("(dsr.log)", { exact: false }),
   ).toBeVisible();
 });
 

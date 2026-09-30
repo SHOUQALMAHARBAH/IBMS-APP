@@ -17,6 +17,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /** Feedback context values are plain lowercase strings, not a Prisma enum. */
 const CONTEXT_LABEL_KEY: Record<string, TranslationKey> = {
@@ -62,7 +63,7 @@ export default function FeedbackPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('fbNoPermission')
+          ? permissionRefusal(t, 'fbRefusalAct', 'feedback.log')
           : err instanceof ApiError
             ? err.message
             : t('fbLoadError'),

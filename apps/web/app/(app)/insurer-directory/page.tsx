@@ -26,6 +26,7 @@ import {
   listGridStyle,
 } from '../../../components/insurer/insurer.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * The cross-office insurer directory.
@@ -100,7 +101,7 @@ export default function InsurerDirectoryPage() {
           isMfaEnrolmentError(err)
             ? t('insMfaRequired')
             : err instanceof ApiError && err.status === 403
-              ? t('insDirNoPermission')
+              ? permissionRefusal(t, 'insDirRefusalAct', 'insurer.directory.read')
             : err instanceof ApiError
               ? err.message
               : t('insDirLoadError'),

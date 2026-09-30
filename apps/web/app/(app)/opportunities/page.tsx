@@ -15,6 +15,7 @@ import { rfqBadgeStyle, rfqCardStyle } from '../../../components/rfq/rfq.styles'
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
   NEEDS_CONFIRMED: 'oppStatusNeedsConfirmed',
@@ -42,7 +43,7 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('oppListNoPermission')
+          ? permissionRefusal(t, 'oppListRefusalAct', 'opportunity.read')
           : err instanceof ApiError && err.status === 404
             ? t('oppCustomerNotFound')
             : err instanceof ApiError

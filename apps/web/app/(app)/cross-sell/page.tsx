@@ -28,6 +28,7 @@ import {
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function OpportunityRow({
   opportunity,
@@ -175,7 +176,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('xsNoPermission')
+          ? permissionRefusal(t, 'xsRefusalAct', 'cross-sell.read')
           : err instanceof ApiError && err.status === 404
             ? t('xsCustomerNotFound')
             : err instanceof ApiError
@@ -201,7 +202,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setScanError(
         err instanceof ApiError && err.status === 403
-          ? t('xsNoPermissionDetect')
+          ? permissionRefusal(t, 'xsDetectRefusalAct', 'cross-sell.detect')
           : err instanceof ApiError
             ? err.message
             : t('xsScanError'),

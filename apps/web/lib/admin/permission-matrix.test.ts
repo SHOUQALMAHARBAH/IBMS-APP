@@ -81,9 +81,13 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // a point on that scale — it is a separate act with its own terminal semantics. An office granting
     // "full" on policies is not thereby granting the withdrawal of a placement, and the matrix says so by
     // rendering it as its own checkbox.
-    expect(PERMISSION_CATALOGUE.length).toBe(217);
+    // `customer.read` (the narrow list code, split off `customer.360-view.read`) moves TWO of the four and
+    // leaves two alone, which is the arithmetic worth reading: the `customer` family already held two CRUD
+    // verbs (`create`, `update`), so it was already a five-state row — this adds a THIRD verb to an existing
+    // row rather than creating one. Families stay at 21 and the toggle list does not move at all.
+    expect(PERMISSION_CATALOGUE.length).toBe(218);
     expect(crud.length).toBe(21);
-    expect(crud.flatMap(codesOfRow).length).toBe(58);
+    expect(crud.flatMap(codesOfRow).length).toBe(59);
     expect(toggles.length).toBe(159);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });

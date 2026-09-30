@@ -42,7 +42,7 @@ export const COMPLIANCE_RISK = {
     tmLoadError: 'تعذّر تحميل تنبيهات مراقبة المعاملات — حاول مرة أخرى.',
     tmSweepSummary: 'تم فحص {scanned} حالة — أُنشئ {created} تنبيهًا، و{skipped} مرصودة أصلًا، وفشلت {failed}.',
     tmActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    tmNoPermission: 'لا تملك صلاحية aml.monitor اللازمة لعرض تنبيهات مراقبة المعاملات.',
+    tmRefusalAct: 'عرض تنبيهات مراقبة المعاملات',
 
     // ---- Watchlist sync (#49) --------------------------------------------
     wsHeading: 'مزامنة قوائم العقوبات',
@@ -84,7 +84,7 @@ export const COMPLIANCE_RISK = {
     wsNone: 'لم تُنفَّذ أي مزامنة بعد.',
     wsLoadError: 'تعذّر تحميل حالة المزامنة — حاول مرة أخرى.',
     wsActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    wsNoPermission: 'لا تملك صلاحية sanctions-pep.screen اللازمة لعرض حالة المزامنة.',
+    wsRefusalAct: 'عرض حالة المزامنة',
 
     // ---- Regulatory compliance (#51) --------------------------------------
     rcHeading: 'الالتزام التنظيمي',
@@ -117,8 +117,8 @@ export const COMPLIANCE_RISK = {
     rcLicenseLoadError: 'تعذّر تحميل ترخيص الوسيط — حاول مرة أخرى.',
     rcCalendarLoadError: 'تعذّر تحميل تقويم الالتزامات — حاول مرة أخرى.',
     rcActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    rcNoPermission: 'لا تملك صلاحية license.manage اللازمة لعرض شاشة الالتزام التنظيمي.',
-    rcNoPermissionCalendar: 'لا تملك صلاحية compliance-calendar.manage اللازمة لعرض تقويم الالتزام.',
+    rcRefusalAct: 'عرض شاشة الالتزام التنظيمي',
+    rcCalendarRefusalAct: 'عرض تقويم الالتزام',
     rcDueDate: 'تاريخ الاستحقاق',
     rcOwnerUserId: 'معرّف المستخدم المالك',
     rcExpiresAt: 'تاريخ الانتهاء',
@@ -172,8 +172,8 @@ export const COMPLIANCE_RISK = {
     opPiLoadError: 'تعذّر تحميل سجل وثيقة المسؤولية المهنية — حاول مرة أخرى.',
     opEventsLoadError: 'تعذّر تحميل أحداث مخاطر المسؤولية المهنية — حاول مرة أخرى.',
     opActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    opNoPermission: 'لا تملك صلاحية risk-register.manage اللازمة لعرض سجل المخاطر.',
-    opNoPermissionPi: 'لا تملك صلاحية pi-policy.manage اللازمة لعرض وثيقة المسؤولية المهنية.',
+    opRefusalAct: 'عرض سجل المخاطر',
+    opPiRefusalAct: 'عرض وثيقة المسؤولية المهنية',
     opMitigationRowAria: 'إجراء التخفيف',
     opClaimsHistoryRowAria: 'سجل المطالبات',
     opEventMitigationAria: 'إجراء التخفيف للحادث',
@@ -207,7 +207,7 @@ export const COMPLIANCE_RISK = {
     incNone: 'لا توجد حوادث مسجّلة بعد.',
     incLoadError: 'تعذّر تحميل الحوادث — حاول مرة أخرى.',
     incActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    incNoPermission: 'لا تملك صلاحية incident.report اللازمة لعرض الحوادث.',
+    incRefusalAct: 'عرض الحوادث',
     incStatusReported: 'مُبلَّغ عنه',
     incStatusContained: 'جرى احتواؤه',
     incStatusImpactAssessed: 'جرى تقييم أثره',
@@ -266,7 +266,7 @@ export const COMPLIANCE_RISK = {
     icDeclaredHatAmbiguous: 'أكثر من دور يمنح الاعتماد',
     icDeclaredTruncated: 'تُعرض أحدث الحالات فقط.',
     icDeclaredLoadError: 'تعذّر تحميل الاعتمادات الذاتية المعلنة. حاول مرة أخرى.',
-    icNoPermission: 'لا تملك صلاحية internal-controls.view اللازمة لعرض هذه الشاشة.',
+    icRefusalAct: 'عرض تقرير الضوابط الداخلية',
 
     // ---- Internal audit findings (#57) ---------------------------------------
     iafHeading: 'ملاحظات التدقيق الداخلي',
@@ -288,7 +288,7 @@ export const COMPLIANCE_RISK = {
     iafNone: 'لا توجد ملاحظات تدقيق داخلي مسجّلة بعد.',
     iafLoadError: 'تعذّر تحميل ملاحظات التدقيق الداخلي — حاول مرة أخرى.',
     iafActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    iafNoPermission: 'لا تملك صلاحية internal-audit.record/internal-audit.close اللازمة لعرض ملاحظات التدقيق الداخلي.',
+    iafRefusalAct: 'عرض ملاحظات التدقيق الداخلي',
     iafRemediationActionAria: 'إجراء المعالجة',
 
     // ---- Audit trail (Part 5.1) ----------------------------------------------
@@ -327,7 +327,9 @@ export const COMPLIANCE_RISK = {
     atLogLoadError: 'تعذّر تصفّح سجل التدقيق — حاول مرة أخرى.',
     atWorkflowLoadError: 'تعذّر تحميل تاريخ سير العمل — حاول مرة أخرى.',
     atDocumentLoadError: 'تعذّر تحميل تاريخ المستند — حاول مرة أخرى.',
-    atNoPermissionFor: 'لا تملك صلاحية {permission} اللازمة لعرض هذا المحتوى.',
+    atAuditLogRefusalAct: 'عرض سجل التدقيق',
+    atWorkflowRefusalAct: 'عرض سجل سير العمل',
+    atDocumentRefusalAct: 'عرض سجل المستندات',
   },
   EN: {
     tmHeading: 'AML/CFT transaction monitoring',
@@ -354,7 +356,7 @@ export const COMPLIANCE_RISK = {
     tmLoadError: 'Could not load transaction-monitoring alerts — try again.',
     tmSweepSummary: 'Scanned {scanned} candidate(s) — created {created} alert(s), {skipped} already flagged, {failed} failed.',
     tmActionError: 'That action failed — try again.',
-    tmNoPermission: "You don't hold the aml.monitor permission.",
+    tmRefusalAct: 'view the transaction monitoring alerts',
 
     wsHeading: 'Sanctions watchlist sync',
     shMissingConfig: 'Missing configuration: {missing}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.',
@@ -396,7 +398,7 @@ export const COMPLIANCE_RISK = {
     wsNone: 'No sync has run yet.',
     wsLoadError: 'Could not load the sync status — try again.',
     wsActionError: 'That action failed — try again.',
-    wsNoPermission: "You don't hold the sanctions-pep.screen permission.",
+    wsRefusalAct: 'view the watchlist sync status',
 
     rcHeading: 'Regulatory compliance',
     rcIntro:
@@ -428,8 +430,8 @@ export const COMPLIANCE_RISK = {
     rcLicenseLoadError: 'Could not load the broker license — try again.',
     rcCalendarLoadError: 'Could not load the compliance calendar — try again.',
     rcActionError: 'That action failed — try again.',
-    rcNoPermission: "You don't hold the license.manage permission.",
-    rcNoPermissionCalendar: "You don't hold the compliance-calendar.manage permission.",
+    rcRefusalAct: 'view the regulatory compliance screen',
+    rcCalendarRefusalAct: 'view the compliance calendar',
     rcDueDate: 'Due date',
     rcOwnerUserId: 'Owner user ID',
     rcExpiresAt: 'Expires at',
@@ -482,8 +484,8 @@ export const COMPLIANCE_RISK = {
     opPiLoadError: 'Could not load the PI policy record — try again.',
     opEventsLoadError: 'Could not load PI risk events — try again.',
     opActionError: 'That action failed — try again.',
-    opNoPermission: "You don't hold the risk-register.manage permission.",
-    opNoPermissionPi: "You don't hold the pi-policy.manage permission.",
+    opRefusalAct: 'view the operational risk register',
+    opPiRefusalAct: 'view the professional indemnity policy',
     opMitigationRowAria: 'Mitigation',
     opClaimsHistoryRowAria: 'Claims history',
     opEventMitigationAria: 'Mitigation for this event',
@@ -516,7 +518,7 @@ export const COMPLIANCE_RISK = {
     incNone: 'No incidents recorded yet.',
     incLoadError: 'Could not load incidents — try again.',
     incActionError: 'That action failed — try again.',
-    incNoPermission: "You don't hold the incident.report permission.",
+    incRefusalAct: 'view and report incidents',
     incStatusReported: 'Reported',
     incStatusContained: 'Contained',
     incStatusImpactAssessed: 'Impact assessed',
@@ -573,7 +575,7 @@ export const COMPLIANCE_RISK = {
     icDeclaredLoadError:
       'Could not load the declared self-approvals. Try again.',
     icRunError: 'Could not run the audit — try again.',
-    icNoPermission: "You don't hold the internal-controls.view permission.",
+    icRefusalAct: 'view the internal controls report',
 
     iafHeading: 'Internal Audit Findings',
     iafIntro:
@@ -594,7 +596,7 @@ export const COMPLIANCE_RISK = {
     iafNone: 'No internal audit findings recorded yet.',
     iafLoadError: 'Could not load internal audit findings — try again.',
     iafActionError: 'That action failed — try again.',
-    iafNoPermission: "You don't hold the internal-audit.record/internal-audit.close permission.",
+    iafRefusalAct: 'view internal audit findings',
     iafRemediationActionAria: 'Remediation action',
 
     atHeading: 'Audit Trail',
@@ -632,6 +634,8 @@ export const COMPLIANCE_RISK = {
     atLogLoadError: 'Could not browse the audit log — try again.',
     atWorkflowLoadError: 'Could not load workflow history — try again.',
     atDocumentLoadError: 'Could not load document history — try again.',
-    atNoPermissionFor: "You don't hold the {permission} permission.",
+    atAuditLogRefusalAct: 'view the audit trail',
+    atWorkflowRefusalAct: 'view the workflow history',
+    atDocumentRefusalAct: 'view the document history',
   },
 } as const;

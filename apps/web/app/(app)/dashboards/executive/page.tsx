@@ -11,6 +11,7 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
@@ -60,7 +61,7 @@ export default function ExecutiveDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('execNoPermission')
+          ? permissionRefusal(t, 'execRefusalAct', 'dashboard.executive.view')
           : err instanceof ApiError
             ? err.message
             : t('execCouldNotLoadTheExecutive'),

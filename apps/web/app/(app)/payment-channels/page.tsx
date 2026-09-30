@@ -16,6 +16,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const CHANNEL_TYPES = ['bank_transfer', 'cheque', 'card', 'cash'] as const;
 
@@ -65,7 +66,7 @@ export default function PaymentChannelsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('pcNoPermission')
+          ? permissionRefusal(t, 'pcRefusalAct', 'payment-channel.read')
           : err instanceof ApiError
             ? err.message
             : t('pcLoadError'),

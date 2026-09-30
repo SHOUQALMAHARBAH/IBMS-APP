@@ -49,7 +49,7 @@ export const OPERATIONS = {
     empLoading: 'جارٍ التحميل…',
     empLoadError: 'تعذّر تحميل الموظفين — حاول مرة أخرى.',
     empCreateError: 'تعذّر إنشاء سجل الموظف.',
-    empNoPermission: 'لا تملك صلاحية employee.read اللازمة لعرض الموظفين.',
+    empRefusalAct: 'عرض الموظفين',
     // § 1.83 — the narrow reveal search. Arabic FIRST because this is an Arabic-first platform and a
     // Compliance Officer in Amman is the primary reader of this screen.
     empRevealHeading: 'كشف الرقم الوطني لموظف',
@@ -64,8 +64,7 @@ export const OPERATIONS = {
     empRevealNothingSearchedYet: 'اكتب اسمًا للبدء.',
     empRevealNoMatches: 'لا يوجد موظف بهذا الاسم.',
     empRevealSearchError: 'تعذّر تنفيذ البحث — حاول مرة أخرى.',
-    empRevealNoPermission:
-      'لا تملك صلاحية employee.national-id.reveal اللازمة لكشف الأرقام الوطنية للموظفين.',
+    empRevealRefusalAct: 'كشف الأرقام الوطنية للموظفين',
     empRevealNoPosition: 'المسمّى الوظيفي غير مسجَّل',
     empRevealCurrent: 'على رأس عمله',
     empRevealFormer: 'انتهت خدمته',
@@ -144,7 +143,7 @@ export const OPERATIONS = {
     venSubmitButton: 'تسجيل المورّد',
     venCreateHeading: 'تسجيل مورّد جديد',
     venUpdateError: 'تعذّر تحديث المورّد.',
-    venNoPermission: 'لا تملك صلاحية vendor.read اللازمة لعرض المورّدين.',
+    venRefusalAct: 'عرض المورّدين',
 
     // ---- Documents (#70) -----------------------------------------------------
     docHeading: 'المستندات',
@@ -176,7 +175,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'معرّف الوثيقة',
     docPolicyNotFound: 'الوثيقة غير موجودة.',
     docComputeError: 'تعذّر احتساب ملخّص التصنيف.',
-    docNoPermission: 'لا تملك صلاحية document.read اللازمة لعرض المستندات.',
+    docRefusalAct: 'عرض المستندات',
     docsHighestClassification: '— أعلى تصنيف:',
     docsClassificationNone: 'لا يوجد',
 
@@ -196,7 +195,7 @@ export const OPERATIONS = {
     kbLoadError: 'تعذّر تحميل قاعدة المعرفة — حاول مرة أخرى.',
     kbPublishError: 'تعذّر نشر المقالة.',
     kbUpdateError: 'تعذّر تحديث المقالة.',
-    kbNoPermission: 'لا تملك صلاحية kb.publish اللازمة لعرض قاعدة المعرفة.',
+    kbRefusalAct: 'عرض قاعدة المعرفة',
 
     // ---- BCP / DR (#72-73) --------------------------------------------------------
     bcpHeading: 'استمرارية الأعمال والتعافي من الكوارث',
@@ -218,7 +217,7 @@ export const OPERATIONS = {
     bcpCreateHeading: 'تسجيل خطة جديدة',
     bcpRecordTestButton: 'تسجيل اختبار',
     bcpNoPlanOnFile: '— لا توجد خطة مسجّلة',
-    bcpNoPermission: 'لا تملك صلاحية bcp-dr.manage اللازمة لعرض هذه الخطط.',
+    bcpRefusalAct: 'عرض خطط استمرارية العمل والتعافي من الكوارث وصيانتها',
 
     // ---- Information assets (#69) ---------------------------------------------------
     iassetHeading: 'أصول المعلومات',
@@ -236,7 +235,7 @@ export const OPERATIONS = {
     iassetOwnerUserId: 'معرّف المستخدم المالك',
     iassetCreateHeading: 'تسجيل أصل معلومات جديد',
     iassetUpdateError: 'تعذّر تحديث الأصل.',
-    iassetNoPermission: 'لا تملك صلاحية information-asset.manage اللازمة لعرض أصول المعلومات.',
+    iassetRefusalAct: 'عرض أصول المعلومات',
 
     // ---- Access recertification --------------------------------------------------------
     acrHeading: 'إعادة اعتماد الصلاحيات',
@@ -245,7 +244,7 @@ export const OPERATIONS = {
     acrNone: 'لا توجد بنود إعادة اعتماد صلاحيات مسنَدة إليك للمراجعة حالياً.',
     acrLoading: 'جارٍ التحميل…',
     acrLoadError: 'تعذّر تحميل قائمة المراجعة — حاول مرة أخرى.',
-    acrNoPermission: 'لا تملك صلاحية access-recertification.review اللازمة لعرض هذه الشاشة.',
+    acrRefusalAct: 'مراجعة استمرار حاجة الموظفين إلى صلاحياتهم',
     // The administrator review record — Part 5.1: whoever can administer users is NOT exempt
     // from recertification of their own access, and this is the record proving they were covered.
     acrAdminHeading: 'سجل مراجعة حسابات المسؤولين',
@@ -299,7 +298,7 @@ export const OPERATIONS = {
     claGroupPolicy: 'الوثيقة',
     claLoading: 'جارٍ التحميل…',
     claLoadError: 'تعذّر تحميل تفصيل معدّل الخسارة — حاول مرة أخرى.',
-    claNoPermission: 'لا تملك صلاحية claims-analytics.view اللازمة لعرض هذه الشاشة.',
+    claRefusalAct: 'عرض تحليلات المطالبات',
 
     // ---- Risk profiles (#6) -------------------------------------------------------------------
     rpIntro:
@@ -333,7 +332,7 @@ export const OPERATIONS = {
     rpAddSiteError: 'تعذّرت إضافة الموقع — حاول مرة أخرى.',
     rpAddingButton: 'جارٍ الإضافة…',
     rpAddSiteButton: 'إضافة موقع',
-    rpNoPermission: 'لا تملك صلاحية risk-profile.read اللازمة لعرض ملفات المخاطر.',
+    rpRefusalAct: 'عرض ملفات المخاطر',
     rpOpenSurveyAria: 'فتح مسح المخاطر لـ {name}',
     rpConsolidatedSumInsured: 'إجمالي مبلغ التأمين الموحَّد',
 
@@ -342,7 +341,7 @@ export const OPERATIONS = {
     iprogLoading: 'جارٍ التحميل…',
     iprogCustomerNotFound: 'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     iprogLoadError: 'تعذّر تحميل برامج التأمين — حاول مرة أخرى.',
-    iprogNoPermission: 'لا تملك صلاحية program.read اللازمة لعرض برامج التأمين.',
+    iprogRefusalAct: 'عرض برامج التأمين',
     iprogNoneForCustomer: 'لا يوجد برنامج تأمين لهذا العميل بعد — جمِّع واحداً من تقييم احتياجات معتمد.',
     iprogOpenProgramAria: 'فتح برنامج التأمين المُجمَّع في {at}',
 
@@ -351,7 +350,7 @@ export const OPERATIONS = {
     naLoading: 'جارٍ التحميل…',
     naNone: 'لا توجد تقييمات احتياجات بعد.',
     naLoadError: 'تعذّر تحميل تقييمات الاحتياجات — حاول مرة أخرى.',
-    naNoPermission: 'لا تملك صلاحية needs-assessment.read اللازمة لعرض تقييمات الاحتياجات.',
+    naRefusalAct: 'عرض تقييمات الاحتياجات',
     naViewAssessmentAria: 'عرض تقييم الاحتياجات المُسجَّل في {at}',
 
     // ---- Prospects (#2) -----------------------------------------------------------------------------
@@ -361,7 +360,7 @@ export const OPERATIONS = {
     prosLoadError: 'تعذّر تحميل العملاء المرتقبين — حاول مرة أخرى.',
     prosNoneMatch: 'لا يوجد عميل مرتقب يطابق بحثك.',
     prosNone: 'لا يوجد عملاء مرتقبون بعد.',
-    prosNoPermission: 'لا تملك صلاحية prospect.read اللازمة لعرض العملاء المرتقبين.',
+    prosRefusalAct: 'عرض العملاء المرتقبين',
     prosIntro: 'العملية 2 — العملاء المحتملون المؤهَّلون الذين حُوِّلوا إلى عملاء مرتقبين. حوِّل عميلاً محتملاً من لوحة المسار لإضافته هنا.',
     prosViewProfileAria: 'عرض الملف الشخصي — {name}',
 
@@ -389,10 +388,10 @@ export const OPERATIONS = {
     homeSignedInAs: 'نظام إدارة وساطة التأمين. تسجيل الدخول باسم {roles}.',
     homeNoRole: 'لم يتم تعيين دور',
     usrLoading: 'جارٍ التحميل…',
-    usrNoPermission: 'لا تملك صلاحية user.manage اللازمة لعرض المستخدمين.',
+    usrRefusalAct: 'عرض المستخدمين',
     usrPasswordAria: 'كلمة المرور',
     renLoading: 'جارٍ التحميل…',
-    renNoPermission: 'لا تملك صلاحية renewal.read اللازمة لعرض حالات التجديد.',
+    renRefusalAct: 'عرض حالات التجديد',
 
     // ---- settings/users + renewal-cases — CONVERTED, not rewritten ------
     // Both screens were already bilingual via inline ternaries; the Arabic
@@ -524,8 +523,7 @@ export const OPERATIONS = {
     orgUnitRetired: 'تم التعطيل — تبقى الإسنادات القائمة كما هي.',
     orgUnitNone: 'لا يوجد شيء بعد — أضِف الأول.',
     orgUnitLoadError: 'تعذّر تحميل الأقسام والفروع — حاول مرة أخرى.',
-    orgUnitNoPermission:
-      'يتطلب هذا القسم صلاحية department.read أو branch.read. راجع مسؤول مكتبك.',
+    orgUnitRefusalAct: 'عرض أقسام المكتب وفروعه',
     roleMatrixSummary: 'هذا الدور يملك {granted} من {total} صلاحية.',
     roleMatrixNeedsCatalogue:
       'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية permission.read. يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
@@ -568,8 +566,7 @@ export const OPERATIONS = {
       'سيُحذف الدور فوراً ويُسحب من كل من يحمله — بلا إعادة إسناد. من يبقى بلا أدوار يبقى بلا صلاحيات، وهذا مقبول. ويبقى سجلّ من حمل الدور ومتى محفوظاً.',
     roleDeleteConfirmButton: 'أكّد الحذف',
     roleDeleted: 'تم حذف الدور.',
-    roleNoPermission:
-      'يتطلّب عرض الأدوار صلاحية role.read. راجع مدير مكتبك.',
+    roleRefusalAct: 'عرض أدوار مكتبك',
     roleCouldNotLoad: 'تعذّر تحميل الأدوار — حاول مرة أخرى.',
     roleTableName: 'الدور',
     roleTableStatus: 'الحالة',
@@ -593,7 +590,7 @@ export const OPERATIONS = {
     dutySegStatusNobody: 'لا يمكن إتمامها — لا أحد يملك الصلاحية',
     dutySegStatusSingle: 'شخص واحد فقط — تتعطّل إن كان هو من سجّل الإجراء',
     dutySegStatusReady: 'جاهزة',
-    dutySegNoPermission: 'لا تملك صلاحية role.read اللازمة لعرض هذه القائمة.',
+    dutySegRefusalAct: 'عرض توزيع الفصل بين المهام على أدوار المكتب',
     dutySegLoadError: 'تعذّر تحميل قائمة العمليات التي تحتاج شخصين.',
     roleCreateHeading: 'إنشاء دور',
     roleFieldName: 'الاسم البرمجي',
@@ -669,7 +666,7 @@ export const OPERATIONS = {
     empLoading: 'Loading…',
     empLoadError: 'Could not load employees — try again.',
     empCreateError: 'Could not create the employee record.',
-    empNoPermission: "You don't hold the employee.read permission.",
+    empRefusalAct: 'view employees',
     // § 1.83 — the narrow reveal search.
     empRevealHeading: "Reveal an employee's national ID",
     empRevealIntro:
@@ -683,8 +680,7 @@ export const OPERATIONS = {
     empRevealNothingSearchedYet: 'Type a name to begin.',
     empRevealNoMatches: 'No employee by that name.',
     empRevealSearchError: 'The search could not be run — try again.',
-    empRevealNoPermission:
-      "You don't hold the employee.national-id.reveal permission needed to reveal employees' national IDs.",
+    empRevealRefusalAct: "reveal an employee's national ID",
     empRevealNoPosition: 'No job title recorded',
     empRevealCurrent: 'Currently employed',
     empRevealFormer: 'No longer employed',
@@ -762,7 +758,7 @@ export const OPERATIONS = {
     venSubmitButton: 'Record vendor',
     venCreateHeading: 'Record a new vendor',
     venUpdateError: 'Could not update the vendor.',
-    venNoPermission: "You don't hold the vendor.read permission.",
+    venRefusalAct: 'view vendors',
 
     docHeading: 'Documents',
     docIntro:
@@ -793,7 +789,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'Policy ID',
     docPolicyNotFound: 'Policy not found.',
     docComputeError: 'Could not compute the classification summary.',
-    docNoPermission: "You don't hold the document.read permission.",
+    docRefusalAct: 'view documents',
     docsHighestClassification: '— highest classification:',
     docsClassificationNone: 'none',
 
@@ -812,7 +808,7 @@ export const OPERATIONS = {
     kbLoadError: 'Could not load the knowledge base — try again.',
     kbPublishError: 'Could not publish the article.',
     kbUpdateError: 'Could not update the article.',
-    kbNoPermission: "You don't hold the kb.publish permission.",
+    kbRefusalAct: 'view and publish knowledge base articles',
 
     bcpHeading: 'Business Continuity & Disaster Recovery',
     bcpIntro:
@@ -833,7 +829,7 @@ export const OPERATIONS = {
     bcpCreateHeading: 'Record a new plan',
     bcpRecordTestButton: 'Record test',
     bcpNoPlanOnFile: '— no plan on file',
-    bcpNoPermission: "You don't hold the bcp-dr.manage permission.",
+    bcpRefusalAct: 'view and maintain the business-continuity and disaster-recovery plans',
 
     iassetHeading: 'Information Assets',
     iassetIntro:
@@ -850,7 +846,7 @@ export const OPERATIONS = {
     iassetOwnerUserId: 'Owner user ID',
     iassetCreateHeading: 'Record a new information asset',
     iassetUpdateError: 'Could not update the asset.',
-    iassetNoPermission: "You don't hold the information-asset.manage permission.",
+    iassetRefusalAct: 'view the information asset register',
 
     acrHeading: 'Access recertification',
     acrQueueHeading: 'Your review queue',
@@ -859,7 +855,7 @@ export const OPERATIONS = {
       'No access-recertification items are currently assigned to you for review.',
     acrLoading: 'Loading…',
     acrLoadError: 'Could not load your review queue — try again.',
-    acrNoPermission: "You don't hold the access-recertification.review permission.",
+    acrRefusalAct: 'review who still needs the access they hold',
     // The administrator review record — Part 5.1: whoever can administer users is NOT exempt
     // from recertification of their own access, and this is the record proving they were covered.
     acrAdminHeading: 'Administrator access review record',
@@ -914,7 +910,7 @@ export const OPERATIONS = {
     claGroupPolicy: 'Policy',
     claLoading: 'Loading…',
     claLoadError: 'Could not load the loss-ratio breakdown — try again.',
-    claNoPermission: "You don't hold the claims-analytics.view permission.",
+    claRefusalAct: 'view the claims analytics',
 
     rpIntro:
       'The figure a multi-site client’s single Insurance Program is built from. Program assembly itself is Process 7.',
@@ -948,7 +944,7 @@ export const OPERATIONS = {
     rpAddSiteError: 'Could not add the site — try again.',
     rpAddingButton: 'Adding…',
     rpAddSiteButton: 'Add site',
-    rpNoPermission: "You don't hold the risk-profile.read permission.",
+    rpRefusalAct: 'view risk profiles',
     rpOpenSurveyAria: 'Open risk survey for {name}',
     rpConsolidatedSumInsured: 'Consolidated Sum Insured',
 
@@ -957,7 +953,7 @@ export const OPERATIONS = {
     iprogCustomerNotFound:
       'This customer could not be found — it may not exist, or you may not have access to it.',
     iprogLoadError: 'Could not load insurance programs — try again.',
-    iprogNoPermission: "You don't hold the program.read permission.",
+    iprogRefusalAct: 'view insurance programmes',
     iprogNoneForCustomer: 'No insurance program yet for this customer — assemble one from an approved needs assessment.',
     iprogOpenProgramAria: 'Open the insurance program assembled on {at}',
 
@@ -965,7 +961,7 @@ export const OPERATIONS = {
     naLoading: 'Loading…',
     naNone: 'No needs assessments yet.',
     naLoadError: 'Could not load needs assessments — try again.',
-    naNoPermission: "You don't hold the needs-assessment.read permission.",
+    naRefusalAct: 'view needs assessments',
     naViewAssessmentAria: 'View the needs assessment recorded on {at}',
 
     prosHeading: 'Prospects',
@@ -974,7 +970,7 @@ export const OPERATIONS = {
     prosLoadError: 'Could not load prospects — try again.',
     prosNoneMatch: 'No prospects match your search.',
     prosNone: 'No prospects yet.',
-    prosNoPermission: "You don't hold the prospect.read permission.",
+    prosRefusalAct: 'view prospects',
     prosIntro: 'Process 2 — qualified leads that have been converted into prospects. Convert a lead from the pipeline board to add one here.',
     prosViewProfileAria: 'View profile — {name}',
 
@@ -999,10 +995,10 @@ export const OPERATIONS = {
     homeSignedInAs: 'Insurance Brokerage Management System. Signed in as {roles}.',
     homeNoRole: 'no role assigned',
     usrLoading: 'Loading…',
-    usrNoPermission: "You don't hold the user.manage permission.",
+    usrRefusalAct: 'view user accounts',
     usrPasswordAria: 'Password',
     renLoading: 'Loading…',
-    renNoPermission: "You don't hold the renewal.read permission.",
+    renRefusalAct: 'view renewals',
 
     // ---- settings/users + renewal-cases — CONVERTED, not rewritten ------
     // Both screens were already bilingual via inline ternaries; the Arabic
@@ -1134,8 +1130,7 @@ export const OPERATIONS = {
     orgUnitRetired: 'Deactivated — existing assignments are unchanged.',
     orgUnitNone: 'Nothing here yet — add the first one.',
     orgUnitLoadError: 'Could not load departments and branches — try again.',
-    orgUnitNoPermission:
-      'This screen needs department.read or branch.read. Ask your office administrator.',
+    orgUnitRefusalAct: "view the office's departments and branches",
     roleMatrixSummary: 'This role has {granted} of {total} permissions.',
     roleMatrixNeedsCatalogue:
       'The permission matrix cannot be shown — your account does not hold permission.read. You can still create the role, and someone who holds it can set its permissions.',
@@ -1178,8 +1173,7 @@ export const OPERATIONS = {
       'The role goes immediately and is withdrawn from everyone holding it — with no reassignment. Anyone left with no roles has no permissions, which is an accepted outcome. The record of who held it, and when, is kept.',
     roleDeleteConfirmButton: 'Confirm delete',
     roleDeleted: 'The role was deleted.',
-    roleNoPermission:
-      'Viewing roles needs the role.read permission. Ask your office administrator.',
+    roleRefusalAct: "view this office's roles",
     roleCouldNotLoad: 'Could not load roles — try again.',
     roleTableName: 'Role',
     roleTableStatus: 'Status',
@@ -1203,7 +1197,7 @@ export const OPERATIONS = {
     dutySegStatusNobody: 'Cannot be completed — nobody holds the permission',
     dutySegStatusSingle: 'Only one person — blocked whenever they are the one who recorded it',
     dutySegStatusReady: 'Ready',
-    dutySegNoPermission: 'You do not hold the role.read permission needed to see this list.',
+    dutySegRefusalAct: 'view how this office separates duties across its roles',
     dutySegLoadError: 'The list of operations needing two people could not be loaded.',
     roleCreateHeading: 'Create a role',
     roleFieldName: 'Machine name',

@@ -25,6 +25,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusalAnyOf } from '../../../lib/i18n/permission-refusal';
 
 const REQUEST_ROLES = [
   'data-sharing.request',
@@ -72,7 +73,7 @@ export default function DataSharingApprovalsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dsaNoPermission')
+          ? permissionRefusalAnyOf(t, 'dsaRefusalAct', ['data-sharing.request', 'data-sharing.approve'])
           : err instanceof ApiError
             ? err.message
             : t('dsaLoadError'),

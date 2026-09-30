@@ -15,6 +15,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const ROLES = [
   'cross-border-transfer.approve',
@@ -53,7 +54,7 @@ export default function CrossBorderTransfersPage() {
       setRecords(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('cbtNoPermission')
+          ? permissionRefusal(t, 'cbtRefusalAct', 'cross-border-transfer.approve')
           : err instanceof ApiError
             ? err.message
             : t('cbtLoadError'),

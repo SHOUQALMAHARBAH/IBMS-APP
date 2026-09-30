@@ -120,7 +120,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/incidents");
   await expect(
-    page.getByText("incident.report permission", { exact: false }),
+    page.getByText("(incident.report)", { exact: false }),
   ).toBeVisible();
 });
 

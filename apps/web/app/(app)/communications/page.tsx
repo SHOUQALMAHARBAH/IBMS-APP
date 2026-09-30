@@ -19,6 +19,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const CHANNEL_LABEL_KEY: Record<string, TranslationKey> = {
   EMAIL: 'commChannelEmail',
@@ -70,7 +71,7 @@ export default function CommunicationsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('commNoPermission')
+          ? permissionRefusal(t, 'commRefusalAct', 'communication.send')
           : err instanceof ApiError
             ? err.message
             : t('commLoadError'),

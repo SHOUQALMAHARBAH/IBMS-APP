@@ -7,8 +7,7 @@ export const LEADS = {
       'العملية 1 — التقاط عميل محتمل من أي مصدر اكتساب ونقله عبر مسار المبيعات ' +
       '(جديد ← تم التواصل ← مؤهل ← تحويل إلى عميل مرتقب، أو استبعاد في أي مرحلة).',
     leadsPipelineHeading: 'مسار المبيعات',
-    leadsNoPermission:
-      'لا تملك صلاحية lead.list.read، لذا لا يوجد ما يمكن عرضه هنا.',
+    leadsRefusalAct: 'عرض العملاء المحتملين',
     leadsNoneYet: 'لا يوجد عملاء محتملون بعد — أضف واحداً أعلاه لبدء مسارك.',
     leadsColumnEmpty: 'فارغة',
 
@@ -55,8 +54,7 @@ export const LEADS = {
       'Process 1 — capture a lead from any acquisition source and move it through the pipeline ' +
       '(New → Contacted → Qualified → Converted to prospect, or Disqualified at any stage).',
     leadsPipelineHeading: 'Pipeline',
-    leadsNoPermission:
-      "You don't hold the lead.list.read permission, so there's nothing to show here.",
+    leadsRefusalAct: 'view leads',
     leadsNoneYet: 'No leads yet — add one above to start your pipeline.',
     leadsColumnEmpty: 'Empty',
 

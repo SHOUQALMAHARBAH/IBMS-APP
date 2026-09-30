@@ -15,6 +15,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { Language } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function oldest(daysOverdue: number, dueDate: string | null, language: Language): string {
   if (daysOverdue > 0) return `${daysOverdue}d overdue`;
@@ -51,7 +52,7 @@ export default function ClientAccountingPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('caNoPermission')
+          ? permissionRefusal(t, 'caRefusalAct', 'client-accounting.read')
           : err instanceof ApiError
             ? err.message
             : t('caLoadError'),

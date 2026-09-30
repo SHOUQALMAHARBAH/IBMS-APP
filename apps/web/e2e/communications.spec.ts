@@ -108,7 +108,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/communications");
   await expect(
-    page.getByText("communication.send permission", { exact: false }),
+    page.getByText("(communication.send)", { exact: false }),
   ).toBeVisible();
 });
 

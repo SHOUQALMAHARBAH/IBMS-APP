@@ -71,9 +71,13 @@ const AUDIT_ROWS = [
   },
   {
     id: "audit-2",
-    // The fallback case: a row whose actor could not be resolved must show the id, not a blank cell.
+    // ~~The fallback case: a row whose actor could not be resolved must show the id~~ — THE FALLBACK IS
+    // GONE. All three api paths that build this view resolve through one `actorNames()` helper, so
+    // `actorName` is structurally non-null and a `?? id` branch in the screen would be dead code that
+    // prints a uuid at the person reviewing the trail. So this row carries a NAME, and the assertions
+    // below check the property that actually holds now: the cell shows a name and never the id.
     userId: "user-9",
-    actorName: null,
+    actorName: "Rania Hijazi",
     action: "READ",
     entityType: "Customer",
     entityId: "cus-1",
@@ -279,6 +283,11 @@ test("the audit rows show WHO, not a uuid — and the id when the name is missin
 
   // The name, in a column that used to render a uuid at the person being asked to review it.
   await expect(page.locator('[data-audit-actor="user-2"]')).toContainText("سلمى خالد المحاربة");
-  // And the fallback: an unresolved actor shows its id, because a blank cell reads as "nobody".
-  await expect(page.locator('[data-audit-actor="user-9"]')).toContainText("user-9");
+  await expect(page.locator('[data-audit-actor="user-9"]')).toContainText("Rania Hijazi");
+  // AND NEVER THE ID — anchored on the two names above, so this cannot pass on a table that never
+  // rendered. This is the assertion the deleted fallback made impossible to write: while the screen was
+  // allowed to print the uuid when a name was missing, "shows a name" and "shows an id" were both
+  // acceptable and no test could tell a resolved row from an unresolved one.
+  await expect(page.locator('[data-audit-actor="user-2"]')).not.toContainText("user-2");
+  await expect(page.locator('[data-audit-actor="user-9"]')).not.toContainText("user-9");
 });

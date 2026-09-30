@@ -15,7 +15,7 @@ export const RFQ = {
     oppListIntro:
       'العملية 11 — يُطرح برنامج تأمين معتمد نهائياً في السوق كفرصة تجارية. افتح فرصة ' +
       'لإصدار طلب عرض أسعار لكل خط تأميني وإرساله إلى قائمة مختصرة من شركات التأمين.',
-    oppListNoPermission: 'لا تملك صلاحية opportunity.read، لذا لا يوجد ما يمكن عرضه هنا.',
+    oppListRefusalAct: 'عرض الفرص',
     oppCustomerNotFound:
       'تعذر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     oppListLoadError: 'تعذر تحميل الفرص التجارية — حاول مرة أخرى.',
@@ -50,7 +50,7 @@ export const RFQ = {
 
     // rfqs/page.tsx
     rfqListHeading: 'طلبات عروض الأسعار',
-    rfqListNoPermission: 'لا تملك صلاحية rfq.read، لذا لا يوجد ما يمكن عرضه هنا.',
+    rfqListRefusalAct: 'عرض طلبات عروض الأسعار',
     rfqListParentNotFound:
       'تعذر العثور على الجهة الأصل — قد لا تكون موجودة، أو لا تملك صلاحية الوصول إليها.',
     rfqListLoadError: 'تعذر تحميل طلبات عروض الأسعار — حاول مرة أخرى.',
@@ -64,7 +64,7 @@ export const RFQ = {
     rfqNewIntro:
       'العملية 11 — إنشاء طلب عرض أسعار واحد لخط تأميني واحد وإرساله إلى قائمة مختصرة ' +
       'من شركات التأمين. يبدأ كل مؤمِّن بحالة "أُرسل".',
-    rfqNewNoPermission: 'لا تملك صلاحية rfq.create.',
+    rfqNewRefusalAct: 'إنشاء طلب عرض سعر',
     rfqNewInsurerListLoadError: 'تعذر تحميل قائمة شركات التأمين — حاول مرة أخرى.',
     rfqNewLineLabel: 'الخط التأميني',
     rfqNewLineHint:
@@ -346,7 +346,7 @@ export const RFQ = {
       'Process 11 — a finalized insurance program is taken to market as an ' +
       'Opportunity. Open one to raise an RFQ per insurance line and send it to ' +
       'a shortlist of insurers.',
-    oppListNoPermission: "You don't hold the opportunity.read permission, so there's nothing to show here.",
+    oppListRefusalAct: 'view opportunities',
     oppCustomerNotFound:
       'This customer could not be found — it may not exist, or you may not have access to it.',
     oppListLoadError: 'Could not load opportunities — try again.',
@@ -379,7 +379,7 @@ export const RFQ = {
 
     // rfqs/page.tsx
     rfqListHeading: 'RFQs',
-    rfqListNoPermission: "You don't hold the rfq.read permission, so there's nothing to show here.",
+    rfqListRefusalAct: 'view requests for quotation',
     rfqListParentNotFound: 'That parent could not be found — it may not exist, or you may not have access to it.',
     rfqListLoadError: 'Could not load RFQs — try again.',
     rfqListNone: 'No RFQs.',
@@ -392,7 +392,7 @@ export const RFQ = {
     rfqNewIntro:
       'Process 11 — create one RFQ for one insurance line and send it to a ' +
       'shortlist of insurers. Each insurer starts at SENT.',
-    rfqNewNoPermission: "You don't hold the rfq.create permission.",
+    rfqNewRefusalAct: 'raise a request for quotation',
     rfqNewInsurerListLoadError: 'Could not load the insurer list — try again.',
     rfqNewLineLabel: 'Insurance line',
     rfqNewLineHint:

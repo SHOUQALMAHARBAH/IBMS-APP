@@ -89,7 +89,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/kpi-dashboard");
   await expect(
-    page.getByText("kpi-dashboard.view permission", { exact: false }),
+    page.getByText("(kpi-dashboard.view)", { exact: false }),
   ).toBeVisible();
 });
 

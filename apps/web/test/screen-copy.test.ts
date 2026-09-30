@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { PERMISSION_CATALOGUE } from '../e2e/fixtures/role-permissions';
 
 /*
  * TWO RULES THAT COVER EVERY SCREEN — item 5, rules 6 and 3.
@@ -38,6 +39,27 @@ function screens(): string[] {
   };
   walk(APP);
   return out.sort();
+}
+
+/** Every non-test source file that can render a refusal: the screens plus the shared components. */
+function sources(): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  const walk = (dir: string) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name === '.next') continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
+        out.push([
+          path.relative(WEB, full).split(path.sep).join('/'),
+          fs.readFileSync(full, 'utf8'),
+        ]);
+      }
+    }
+  };
+  walk(APP);
+  walk(path.join(WEB, 'components'));
+  return out;
 }
 
 describe('every screen speaks both languages (rule 6)', () => {
@@ -180,5 +202,224 @@ describe('a load error announces itself (rule 3)', () => {
       withLoadError,
       'no screen appears to render a loadError — the matcher has drifted',
     ).toBeGreaterThan(20);
+  });
+});
+
+/*
+ * THE PERMISSION REFUSAL — one sentence, 100 acts, and a guard so it stays that way.
+ *
+ * ## What was measured
+ *
+ * 100 refusal strings, across 89 files (87 screens and 2 components), each wrote their own sentence. They
+ * became 102 act keys — one of the 100 was a parameterised generic used for three different sections — at
+ * 106 call sites. Those four numbers count four different things and are kept distinct deliberately. The survey
+ * found three things, and each is checked below:
+ *
+ *   * The ENGLISH never named the act — every string named the CODE and stopped ("You do not hold
+ *     insurer.read, so there is nothing to show here"). A dotted identifier is the name of the thing you
+ *     have to go and ask somebody else about, not an answer to "what can I not do here".
+ *   * The ARABIC named the act (`اللازمة ل<act>`), so 52 acts were recoverable there and 50 had to be
+ *     written. The two languages were therefore generated independently, each read for the half it held.
+ *   * Not one of the 100 said WHO could grant it.
+ *
+ * ## THE DENOMINATOR WAS WRONG THREE TIMES, each time because a KEY NAME was trusted
+ *
+ *     91   keys ending in `NoPermission`                      — the first pass
+ *     +6   keys CONTAINING it with a suffix                    — `crmNoPermissionLog`, `atNoPermissionFor`
+ *     +3   keys with no `NoPermission` in them at all          — `smYouDonTHoldThe`, auto-named from its
+ *                                                                own English text
+ *
+ * Each undercount was found by a different accident, and the third only because a floor in
+ * `lib/i18n/translations.test.ts` failed for an unrelated reason. So the guard below keys on the SHAPE —
+ * what the code does — and never on what a key is called.
+ */
+describe('a permission refusal is worded in exactly one place', () => {
+  const HELPERS = [
+    'permissionRefusal',
+    'permissionRefusalAnyOf',
+    'permissionRefusalAllOf',
+  ];
+  const CODES = new Set(PERMISSION_CATALOGUE.map((entry) => entry.code));
+
+  /** Every `permissionRefusal*(t, 'key', <codes>)` call, with its code arguments. */
+  function calls(): Array<{ file: string; act: string; codes: string[] }> {
+    const found: Array<{ file: string; act: string; codes: string[] }> = [];
+    // A LITERAL regex, deliberately, and not one built from HELPERS through a template string: this host
+    // mangles backslashes inside a heredoc, so the first version of this line arrived as `\b…\s…\w` where
+    // it needed `\\b…\\s…\\w`, and in a template literal `\b` is a BACKSPACE CHARACTER. It compiled, ran,
+    // matched nothing, and the two checks above passed on an empty set — caught only by the non-vacuity
+    // floor below. A regex that cannot be written wrongly beats one that has to be written carefully.
+    const pattern =
+      /\b(permissionRefusal|permissionRefusalAnyOf|permissionRefusalAllOf)\(\s*\w+\s*,\s*'([^']+)'\s*,\s*([^)]*)\)/g;
+    for (const [file, src] of sources()) {
+      for (const m of src.matchAll(pattern)) {
+        found.push({
+          file,
+          act: m[2],
+          codes: [...m[3].matchAll(/'([^']+)'/g)].map((c) => c[1]),
+        });
+      }
+    }
+    return found;
+  }
+
+  it('every code handed to the shared sentence names a permission that exists', () => {
+    // This is where the codes went when they left the dictionaries, so this is where the stale-code bug
+    // class now lives. `/` separates genuine alternatives in one slot (`nominate / approve`), which is a
+    // code LIST rather than prose and so is split before checking — otherwise the pair reads as one
+    // unknown code and the guard would report a violation that is not there.
+    const offenders: string[] = [];
+    for (const call of calls()) {
+      for (const raw of call.codes) {
+        for (const code of raw.split('/').map((c) => c.trim())) {
+          if (!CODES.has(code)) offenders.push(`${call.file}: "${code}"`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'A refusal names a permission code that is not in the catalogue. Either the code was renamed and the ' +
+        'refusal was not, which is the bug this checks for, or it is a typo — and a reader told to ask for a ' +
+        'grant that does not exist is worse off than one told nothing.',
+    ).toEqual([]);
+  });
+
+  it('no screen renders an act key outside the shared sentence', () => {
+    // THE PROPERTY THAT KEEPS THE SHAPE IN ONE PLACE. An act phrase is half a sentence — "view payment
+    // channels" — so rendering one through a bare `t()` puts a fragment on screen, and rebuilding the
+    // sentence around it puts the wording back in 100 places, which is what this replaced.
+    const offenders: string[] = [];
+    for (const [file, src] of sources()) {
+      for (const m of src.matchAll(/\b(t|tr)\(\s*'(\w*RefusalAct)'/g)) {
+        offenders.push(`${file}: ${m[1]}('${m[2]}')`);
+      }
+    }
+    expect(
+      offenders,
+      'An act key is being rendered directly instead of through permissionRefusal(). The act is a fragment, ' +
+        'not a sentence: pass it to the helper, which supplies the sentence, the grantor and the code.',
+    ).toEqual([]);
+  });
+
+  it('the matcher names every helper the module exports', () => {
+    // The regex above is a literal, so a FOURTH helper added to `permission-refusal.ts` would be invisible
+    // to it — and invisible in the safe-looking direction: the checks would keep passing while one shape's
+    // call sites went unchecked. This is the one thing the non-vacuity floor cannot catch, because the
+    // other three helpers would still be found.
+    const src = fs.readFileSync(
+      path.join(WEB, 'lib', 'i18n', 'permission-refusal.ts'),
+      'utf8',
+    );
+    const exported = [...src.matchAll(/export function (\w+)/g)].map(
+      (m) => m[1],
+    );
+    expect(
+      exported.sort(),
+      'permission-refusal.ts exports a helper the matcher in this file does not name. Add it to the literal ' +
+        'regex in calls() as well as to HELPERS, or its call sites are never checked.',
+    ).toEqual([...HELPERS].sort());
+  });
+
+  it('is not vacuous — the calls really are being found', () => {
+    // Without this the two checks above pass forever on a regex that matches nothing, which is exactly how
+    // the 91 came to be reported as complete three times.
+    const found = calls();
+    expect(
+      found.length,
+      'no refusal calls found at all — the matcher has drifted',
+    ).toBeGreaterThan(95);
+    const withCode = found.filter((c) => c.codes.length > 0);
+    expect(
+      withCode.length,
+      'calls were found but none carried a code — the code argument is not being captured',
+    ).toBe(found.length);
+  });
+});
+
+/*
+ * TWO KEYS, ONE ACT — and a guard so they cannot drift apart.
+ *
+ * `/customers/[id]` has a needs-assessment SECTION and `/needs-assessments/new` is the standalone create
+ * screen. Two genuine entry points to the same act on the same code (`needs-assessment.create`), so they
+ * keep two keys — deleting either would leave a screen with no refusal — but the ACT is one act, and two
+ * copies of one sentence is one place for it to be edited and one place for it to be forgotten.
+ *
+ * `insList` shows the other resolution already in the file: ONE key serving both `/insurers` and
+ * `/insurers/[id]`. That works where the two screens are the same screen at two depths. It does not work
+ * here, because these two keys live in different dictionary FILES (`customers.ts` and `detail-pages.ts`).
+ */
+describe('two entry points to one act say the same thing', () => {
+  const PAIRS: Array<[string, string]> = [
+    ['customerNeedsAssessmentRefusalAct', 'nanRefusalAct'],
+  ];
+
+  function actValues(): Map<string, string[]> {
+    const dir = path.join(WEB, 'lib', 'i18n', 'translations');
+    const found = new Map<string, string[]>();
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.ts')) continue;
+      const src = fs.readFileSync(path.join(dir, file), 'utf8');
+      for (const m of src.matchAll(
+        /^[ \t]*(\w*RefusalAct)\s*:\s*(?:\n[ \t]*)?(['"])(.*?)\2,/gm,
+      )) {
+        found.set(m[1], [...(found.get(m[1]) ?? []), m[3]]);
+      }
+    }
+    return found;
+  }
+
+  it('holds the identical act in both keys, in both languages', () => {
+    const values = actValues();
+    for (const [a, b] of PAIRS) {
+      const left = values.get(a);
+      const right = values.get(b);
+      // Both keys must EXIST with both language halves — a missing key would make the comparison below
+      // trivially true, which is the vacuity this whole file keeps running into.
+      expect(left, `${a} not found in any dictionary`).toHaveLength(2);
+      expect(right, `${b} not found in any dictionary`).toHaveLength(2);
+      expect(
+        [...(left ?? [])].sort(),
+        `${a} and ${b} are two entry points to the SAME act and their wording has drifted. Change both or ` +
+          'neither — a reader meeting the same refusal on two screens must not be told two different things.',
+      ).toEqual([...(right ?? [])].sort());
+    }
+  });
+});
+
+describe('every act key is reachable, and every reachable key exists', () => {
+  it('has no orphaned act key and no undeclared one', () => {
+    // BOTH DIRECTIONS, because they fail differently and only one of them is loud.
+    //
+    // An UNDECLARED key (a call site naming a key no dictionary holds) already breaks at runtime — `t()`
+    // returns the key and the reader sees `venRefusalAct` in a sentence.
+    //
+    // An ORPHANED key (declared, no call site) is the silent one, and it is the failure this whole exercise
+    // is about: it means a screen that used to refuse a reader now says NOTHING. The reader gets an empty
+    // table and no reason for it, which is indistinguishable from having no data.
+    const dir = path.join(WEB, 'lib', 'i18n', 'translations');
+    const declared = new Set<string>();
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.ts')) continue;
+      for (const m of fs
+        .readFileSync(path.join(dir, file), 'utf8')
+        .matchAll(/^[ \t]*(\w*RefusalAct)\s*:/gm)) {
+        declared.add(m[1]);
+      }
+    }
+    const used = new Set<string>();
+    for (const [, src] of sources()) {
+      for (const m of src.matchAll(/'(\w*RefusalAct)'/g)) used.add(m[1]);
+    }
+    expect(declared.size, 'no act keys declared — the matcher has drifted').toBeGreaterThan(95);
+    expect(
+      [...declared].filter((k) => !used.has(k)).sort(),
+      'An act key is declared and no screen uses it. If a screen dropped its refusal, it now renders an empty ' +
+        'state where it should say why — silence, which reads to the user as "there is no data".',
+    ).toEqual([]);
+    expect(
+      [...used].filter((k) => !declared.has(k)).sort(),
+      'A screen names an act key no dictionary holds, so t() returns the key itself and the reader sees a ' +
+        'camelCase identifier inside a sentence.',
+    ).toEqual([]);
   });
 });

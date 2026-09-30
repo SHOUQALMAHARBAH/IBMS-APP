@@ -230,7 +230,7 @@ test("shows a friendly message when the user lacks review permission", async ({
   await page.goto("/access-recertification");
 
   await expect(page.locator('p[role="alert"]')).toContainText(
-    "don't hold the access-recertification.review",
+    "(access-recertification.review)",
   );
 });
 

@@ -31,6 +31,7 @@ import { CombinedDutyOnRecord } from "../../../../components/ui/CombinedDutyOnRe
 import { errorStyle } from "../../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../../components/lead/lead.styles";
 import { useLanguage } from "../../../../lib/i18n/language-context";
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: "0.35rem 0.75rem",
@@ -75,7 +76,7 @@ export default function VendorDetailPage() {
       setVendor(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t("vendNoPermission")
+          ? permissionRefusal(t, 'vendRefusalAct', 'vendor.read')
           : err instanceof ApiError
             ? err.message
             : t("vendLoadError"),

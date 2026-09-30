@@ -223,7 +223,7 @@ test("a user without insurer.directory.read is told so", async ({ page }) => {
 
   await page.goto("/insurer-directory");
   await expect(
-    page.getByText("You do not hold insurer.directory.read", { exact: false }),
+    page.getByText("(insurer.directory.read)", { exact: false }),
   ).toBeVisible();
 });
 

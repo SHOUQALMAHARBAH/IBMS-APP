@@ -31,6 +31,7 @@ import {
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../lib/i18n/format';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 // Client-side hint only — the API enforces `interaction.log` on write
 // regardless. Matches the seeded grant list for that permission (a superset
@@ -128,7 +129,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         status,
         message:
           status === 403
-            ? t('crmNoPermission')
+            ? permissionRefusal(t, 'crmRefusalAct', 'customer.360-view.read')
             : status === 404
               ? t('crmCustomerNotFound')
               : err instanceof ApiError
@@ -172,7 +173,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLogError(
         err instanceof ApiError && err.status === 403
-          ? t('crmNoPermissionLog')
+          ? permissionRefusal(t, 'crmLogRefusalAct', 'interaction.log')
           : err instanceof ApiError
             ? err.message
             : t('crmLogError'),

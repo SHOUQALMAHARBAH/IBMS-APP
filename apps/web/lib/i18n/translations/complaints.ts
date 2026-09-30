@@ -50,8 +50,7 @@ export const COMPLAINTS = {
     complaintsLoading: 'جارٍ التحميل…',
     complaintsNone: 'لا توجد شكاوى مسجّلة بعد.',
     complaintsLoadError: 'تعذّر تحميل الشكاوى — حاول مرة أخرى.',
-    complaintsNoPermission:
-      'لا تملك صلاحية complaint.log اللازمة لعرض الشكاوى.',
+    complaintsRefusalAct: 'عرض الشكاوى',
     complaintsAckError: 'تعذّر إنشاء إشعار الاستلام — حاول مرة أخرى.',
     complaintsActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
 
@@ -102,7 +101,7 @@ export const COMPLAINTS = {
     complaintsLoading: 'Loading…',
     complaintsNone: 'No complaints.',
     complaintsLoadError: 'Could not load complaints — try again.',
-    complaintsNoPermission: "You don't hold the complaint.log permission.",
+    complaintsRefusalAct: 'view and log complaints',
     complaintsAckError: 'Could not generate the acknowledgement — try again.',
     complaintsActionError: 'That action failed — try again.',
 

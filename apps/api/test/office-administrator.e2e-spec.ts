@@ -102,6 +102,9 @@ const OFFICE_ADMINISTRATOR_CODES = [
   'email.integration.read',
   'email.integration.manage',
   'customer.bulk-import',
+  // The narrow customer list code. This role could bulk-import an office's whole back-book and then
+  // not see one of the rows it had written.
+  'customer.read',
   'audit-log.read',
   'access-recertification.cycle.start',
   'incident.report',

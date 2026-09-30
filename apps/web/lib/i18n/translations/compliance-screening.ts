@@ -10,7 +10,7 @@ export const COMPLIANCE_SCREENING = {
   AR: {
     smLoading: 'جارٍ التحميل…',
     slapLoading: 'جارٍ التحميل…',
-    smYouDonTHoldThe: 'لا تملك صلاحية sanctions-pep.screen.',
+    smRefusalAct: 'عرض قائمة مراجعة العقوبات',
     smCouldNotLoadTheMatch: 'تعذّر تحميل قائمة المطابقات — حاول مرة أخرى.',
     smRecordingThatDecisionFailedTry: 'فشل تسجيل القرار — حاول مرة أخرى.',
     smSanctionsMatchReview: 'مطابقات العقوبات للمراجعة',
@@ -62,7 +62,7 @@ export const COMPLIANCE_SCREENING = {
       'لا يوجد مستخدم نشط يملك صلاحية sanctions-pep.screen غيرك، فلا أحد يمكن الإسناد إليه.',
     smComplianceOfficerOnly: 'مسؤول الامتثال فقط',
     smReviewReasonAria: 'سبب المراجعة لـ {name}',
-    slapYouDonTHoldThe: 'لا تملك صلاحية sla.policy.read.',
+    slapRefusalAct: 'عرض سياسات مستويات الخدمة',
     slapCouldNotLoadSlaPolicies: 'تعذّر تحميل سياسات مستوى الخدمة — حاول مرة أخرى.',
     slapThatActionFailedTryAgain: 'فشل تنفيذ الإجراء — حاول مرة أخرى.',
     slapSlaPolicies: 'سياسات مستوى الخدمة',
@@ -151,7 +151,7 @@ export const COMPLIANCE_SCREENING = {
     slapActivate: 'تفعيل',
     slapReadOnly: 'للاطلاع فقط',
     slapDurationAria: 'المدة لـ {name}',
-    shYouDonTHoldThe: 'لا تملك صلاحية sanctions-pep.screen.',
+    shRefusalAct: 'عرض تقرير سلامة الفحص',
     shCouldNotLoadScreeningHealth: 'تعذّر تحميل حالة الفحص — حاول مرة أخرى.',
     shScreeningHealth: 'حالة فحص العقوبات',
     shWhichProviderActuallyPerformsScreening:
@@ -231,7 +231,7 @@ export const COMPLIANCE_SCREENING = {
   EN: {
     smLoading: 'Loading…',
     slapLoading: 'Loading…',
-    smYouDonTHoldThe: 'You don\'t hold the sanctions-pep.screen permission.',
+    smRefusalAct: 'view the sanctions review queue',
     smCouldNotLoadTheMatch: 'Could not load the match queue — try again.',
     smRecordingThatDecisionFailedTry: 'Recording that decision failed — try again.',
     smSanctionsMatchReview: 'Sanctions match review',
@@ -284,7 +284,7 @@ export const COMPLIANCE_SCREENING = {
       'No active user other than you holds sanctions-pep.screen, so there is nobody to assign to.',
     smComplianceOfficerOnly: 'Compliance Officer only',
     smReviewReasonAria: 'Review reason for {name}',
-    slapYouDonTHoldThe: 'You don\'t hold the sla.policy.read permission.',
+    slapRefusalAct: 'view the service level policies',
     slapCouldNotLoadSlaPolicies: 'Could not load SLA policies — try again.',
     slapThatActionFailedTryAgain: 'That action failed — try again.',
     slapSlaPolicies: 'SLA policies',
@@ -373,7 +373,7 @@ export const COMPLIANCE_SCREENING = {
     slapActivate: 'Activate',
     slapReadOnly: 'Read only',
     slapDurationAria: 'Duration for {name}',
-    shYouDonTHoldThe: 'You don\'t hold the sanctions-pep.screen permission.',
+    shRefusalAct: 'view the screening health report',
     shCouldNotLoadScreeningHealth: 'Could not load screening health — try again.',
     shScreeningHealth: 'Screening health',
     shWhichProviderActuallyPerformsScreening:

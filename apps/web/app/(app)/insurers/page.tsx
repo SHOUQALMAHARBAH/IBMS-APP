@@ -21,6 +21,7 @@ import {
 import { DeactivatedInsurerBadge } from '../../../components/insurer/DeactivatedInsurerBadge';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * The office's own insurer list.
@@ -65,7 +66,7 @@ export default function InsurersPage() {
           isMfaEnrolmentError(err)
             ? t('insMfaRequired')
             : err instanceof ApiError && err.status === 403
-              ? t('insListNoPermission')
+              ? permissionRefusal(t, 'insListRefusalAct', 'insurer.read')
             : err instanceof ApiError
               ? err.message
               : t('insListLoadError'),

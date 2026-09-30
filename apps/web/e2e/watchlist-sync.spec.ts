@@ -158,7 +158,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/watchlist-sync");
   await expect(
-    page.getByText("sanctions-pep.screen permission", { exact: false }),
+    page.getByText("(sanctions-pep.screen)", { exact: false }),
   ).toBeVisible();
 });
 

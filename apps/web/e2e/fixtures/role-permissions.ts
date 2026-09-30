@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 491 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 501 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -41,6 +41,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'customer-file.all-owners.read',
     'customer.360-view.read',
     'customer.all-owners.read',
+    'customer.read',
     'dashboard.claims.view',
     'dashboard.compliance.view',
     'dashboard.executive.view',
@@ -122,6 +123,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'communication.send',
     'complaint.log',
     'consent.manage',
+    'customer.read',
     'dashboard.claims.view',
     'data-sharing.request',
     'document.create',
@@ -148,6 +150,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'customer.360-view.read',
     'customer.all-owners.read',
     'customer.national-id.reveal',
+    'customer.read',
     'dashboard.compliance.view',
     'data-sharing.request',
     'document-history.read',
@@ -230,6 +233,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'customer-file.all-owners.read',
     'customer.360-view.read',
     'customer.all-owners.read',
+    'customer.read',
     'dashboard.claims.view',
     'dashboard.compliance.view',
     'dashboard.executive.view',
@@ -283,6 +287,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'client-accounting.read',
     'customer.360-view.read',
     'customer.all-owners.read',
+    'customer.read',
     'document-history.read',
     'financial-report.view',
     'insurer-accounting.read',
@@ -302,6 +307,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'commission.reconcile',
     'communication.send',
     'complaint.log',
+    'customer.read',
     'dashboard.financial.view',
     'data-sharing.request',
     'document.create',
@@ -335,6 +341,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'branch.read',
     'branch.update',
     'customer.bulk-import',
+    'customer.read',
     'department.create',
     'department.deactivate',
     'department.read',
@@ -382,6 +389,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'conflict-of-interest.disclose',
     'consent.manage',
     'customer-file.all-owners.read',
+    'customer.read',
     'dashboard.policy.view',
     'data-sharing.request',
     'document.create',
@@ -451,6 +459,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'cross-sell.read',
     'customer.360-view.read',
     'customer.create',
+    'customer.read',
     'customer.update',
     'dashboard.sales.view',
     'data-sharing.request',
@@ -503,6 +512,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'branch.update',
     'claim.delete',
     'customer.bulk-import',
+    'customer.read',
     'department.create',
     'department.deactivate',
     'department.read',
@@ -550,7 +560,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 217 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 218 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -596,6 +606,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'customer-file.all-owners.read', module: 'commercial-front-office', description: "See any customer's COMMERCIAL file — risk profile, needs assessment, insurance program, opportunity, RFQ, quotation, comparison, client decision — regardless of owner" },
   { code: 'customer.360-view.read', module: 'commercial-front-office', description: "Read the aggregated 360° customer view" },
   { code: 'customer.create', module: 'commercial-front-office', description: "Create a Customer (individual/corporate)" },
+  { code: 'customer.read', module: 'commercial-front-office', description: "List customers and read a customer's basic identity — the path for finding a customer. Does NOT cover the aggregated 360° view, the UBO register, the document list or revealing a masked field, all of which stay under customer.360-view.read" },
   { code: 'customer.update', module: 'commercial-front-office', description: "Correct a customer's contact details — phone, email and registered address. Does NOT cover name, date of birth, nationality or identity numbers: changing one of those is a screening event under the AMLU rules, not an edit" },
   { code: 'interaction.log', module: 'commercial-front-office', description: "Log a customer interaction (meeting/call/email/...)" },
   { code: 'kyc.approve', module: 'commercial-front-office', description: "Approve a KYC file and activate the Customer (maker/checker: capturer != approver)" },

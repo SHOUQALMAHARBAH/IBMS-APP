@@ -322,8 +322,43 @@ const commercialFrontOffice: PermissionSeed[] = [
     roles: [COMPLIANCE],
   },
   {
+    // FINDING A CUSTOMER IS NOT READING ONE.
+    //
+    // `GET /customers` was gated on `customer.360-view.read`, the same code as the aggregated view, because
+    // no narrower customer read existed. So PLACEMENT/CLAIMS/FINANCE could log an interaction against a
+    // customer they could not list, and the two administrator roles could bulk-import hundreds of customers
+    // and then not see one.
+    //
+    // The rejected alternative is the instructive half: widening `customer.360-view.read` to those five
+    // roles was one line and would have handed them the history, the programmes, the risk profiles, the UBO
+    // register and the reveal endpoint. Same shape as `employee.national-id.reveal`'s narrow search — an
+    // operational path that does not open the directory.
+    //
+    // Held by ten of the eleven seeded roles. The DPO is the omission and it is deliberate: the roles here
+    // are exactly the three source sets (360-view holders, so nobody loses the list; interaction.log; and
+    // bulk-import), and the DPO is in none of them. Migration 20261105100000 asserts all three directions.
+    code: "customer.read",
+    module: "commercial-front-office",
+    description:
+      "List customers and read a customer's basic identity — the path for finding a customer. Does NOT cover the aggregated 360° view, the UBO register, the document list or revealing a masked field, all of which stay under customer.360-view.read",
+    roles: [
+      SALES,
+      MANAGER,
+      EXEC,
+      COMPLIANCE,
+      AUDITOR,
+      PLACEMENT,
+      CLAIMS,
+      FINANCE,
+      ADMIN,
+      OFFICE_ADMIN,
+    ],
+  },
+  {
     code: "customer.360-view.read",
     module: "commercial-front-office",
+    // NOT widened when `customer.read` split off the list. It keeps `GET /customers/:id`,
+    // `POST /customers/:id/reveal-field`, `GET /customers/:id/ubos` and `GET /customers/:id/documents`.
     description: "Read the aggregated 360° customer view",
     roles: [SALES, MANAGER, EXEC, COMPLIANCE, AUDITOR],
   },

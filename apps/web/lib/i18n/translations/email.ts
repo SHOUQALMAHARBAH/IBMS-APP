@@ -17,8 +17,7 @@ export const EMAIL = {
       'يرسل النظام رسائله من صندوق بريد مكتبك نفسه، لا من عنوان تابع للمنصة. ' +
       'اربط الصندوق هنا مرة واحدة، ثم تحقق منه أو اختبره وقت الحاجة.',
     emailLoading: 'جارٍ التحميل…',
-    emailNoPermission:
-      'لا تملك صلاحية email.integration.read اللازمة لعرض إعداد بريد المكتب.',
+    emailRefusalAct: 'عرض إعداد بريد المكتب',
     emailLoadFailed: 'تعذر قراءة حالة بريد المكتب.',
     emailStatusHeading: 'الحالة',
     emailConnectedTo: 'الصندوق المربوط: {address}',
@@ -79,8 +78,7 @@ export const EMAIL = {
       "The system sends from your office's own mailbox, never from a platform address. " +
       'Connect it once here, then verify or test it whenever you need to.',
     emailLoading: 'Loading…',
-    emailNoPermission:
-      'You do not hold the email.integration.read permission needed to view the office mailbox setup.',
+    emailRefusalAct: 'view the office email setup',
     emailLoadFailed: 'Could not read the office mailbox status.',
     emailStatusHeading: 'Status',
     emailConnectedTo: 'Connected mailbox: {address}',

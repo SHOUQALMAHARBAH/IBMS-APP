@@ -117,7 +117,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/internal-controls");
   await expect(
-    page.getByText("internal-controls.view permission", { exact: false }),
+    page.getByText("(internal-controls.view)", { exact: false }),
   ).toBeVisible();
 });
 

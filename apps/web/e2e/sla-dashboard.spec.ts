@@ -233,7 +233,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/sla-dashboard");
   await expect(
-    page.getByText("sla-dashboard.view permission", { exact: false }),
+    page.getByText("(sla-dashboard.view)", { exact: false }),
   ).toBeVisible();
 });
 

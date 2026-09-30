@@ -27,6 +27,19 @@ export const COMMON = {
     commonActions: 'الإجراءات',
     commonStatus: 'الحالة',
     commonTryAgain: 'تعذر تحميل البيانات — حاول مرة أخرى.',
+    // THE REFUSAL SENTENCE — the one place all 91 permission refusals are worded.
+    // `{act}` is the screen's own act, in the language of the WORK rather than of the permission. The
+    // grantor is named BY FUNCTION, never by role name: an office defines its own role names, so
+    // «مسؤول المكتب» would be a sentence that can be false in any given office. The code goes in the
+    // parenthetical, never in the sentence. See lib/i18n/permission-refusal.ts.
+    permissionRefusal:
+      'ليست لديك صلاحية {act} — اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
+    // أي واحدة — a ROUTE guard, which ORs its codes (`required.some`).
+    permissionRefusalAnyOf:
+      'ليست لديك صلاحية {act}، وتكفي أي واحدة من هذه الصلاحيات — اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
+    // كلها — a SCREEN that loads several endpoints together and closes if any one of them refuses.
+    permissionRefusalAllOf:
+      'ليست لديك صلاحية {act}، وهي تحتاج إلى هذه الصلاحيات كلها — اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
     // Rendered by app/(app)/layout.tsx above EVERY authenticated screen while no authenticator is
     // paired. Without it the first sign-in lands on a home page whose every link answers 403, and
     // nothing on screen connects that to enrolment.
@@ -124,6 +137,12 @@ export const COMMON = {
     commonActions: 'Actions',
     commonStatus: 'Status',
     commonTryAgain: 'Could not load this — try again.',
+    permissionRefusal:
+      'You do not hold permission to {act} — ask whoever manages permissions in your office. ({code})',
+    permissionRefusalAnyOf:
+      'You do not hold permission to {act}, and any one of these permissions grants it — ask whoever manages permissions in your office. ({code})',
+    permissionRefusalAllOf:
+      'You do not hold permission to {act}, and it needs all of these permissions — ask whoever manages permissions in your office. ({code})',
     mfaBannerTitle: 'One step before the system works: pair an authenticator app',
     mfaBannerBody:
       'Most screens will refuse to load until you pair an authenticator app with your account. This is not a problem with your permissions.',

@@ -5449,6 +5449,76 @@ because the test still runs and produces a confident wrong answer.
 red is a failure; this session has been red and recovered several times and said so. Because **a rule
 followed only while the news is good is not a rule, and nobody outside can tell the difference.**
 
+### 1.83 — THE REFUSAL DENOMINATOR WAS WRONG THREE TIMES, AND EVERY TIME IT WAS THE KEY NAME
+
+100 refusal strings across 89 files refused a reader for want of a permission, and the count moved three
+times. (Four numbers that are easy to conflate: **100 original keys**, **102 act keys** — one of the 100 was
+a parameterised generic used for three sections and became three — **106 call sites**, **89 files**.) Each
+correction came from a different accident and none came from the detector.
+
+    91   keys ENDING in `NoPermission`              the first pass, reported as the whole population
+    +6   keys CONTAINING it, with a suffix           `crmNoPermissionLog`, `atNoPermissionFor`, ...
+    +3   keys with no `NoPermission` in them at all  `smYouDonTHoldThe` — named after its own English text
+
+The first undercount was caught only because the owner asked for a scope report before any string was
+written. The second was caught while converting call sites, because a call site named a key the act table
+did not contain and the conversion script refused it rather than skipping it. **The third was caught by a
+non-vacuity floor in `lib/i18n/translations.test.ts` failing for an unrelated reason** — the floor asserts
+that the dictionaries contain at least 50 permission codes, the conversion had removed almost all of them,
+and reading WHICH ones survived is what surfaced three more refusals.
+
+So the third was luck. The lesson is not "write a better pattern": it is that **a key name is a label
+somebody chose, and the thing being measured is what the reader sees.** The guard now keys on the SHAPE —
+what the code does — in `apps/web/test/screen-copy.test.ts`.
+
+#### What the survey found, which is why the English had to be written from nothing
+
+  * **The English never named the act.** All 100 named the CODE and stopped: *"You do not hold
+    insurer.read, so there is nothing to show here."* A dotted identifier is the name of the thing the
+    reader must go and ask somebody else about; it is not an answer to "what can I not do here". So there
+    was nothing to recover and all 100 English acts were written.
+  * **The Arabic named the act** (`اللازمة ل<act>`), so 52 were recovered verbatim and 50 written. The two
+    languages were therefore generated INDEPENDENTLY, each read for the half it actually held — not
+    translated from each other, because neither was complete.
+  * **Not one of the 100 said who could grant it.**
+
+#### Two things NOT converted, and the first is a security property
+
+**18 strings of the form "could not find this — it may not exist, or you may not have access" are left
+exactly as they are.** They are the deliberate 404-or-403 ambiguity: a cross-office read returns 404 rather
+than 403 precisely so that the existence of another office's record is not disclosed. Rewriting one into
+*"you do not hold permission to view this customer"* would confirm the record exists. **That is a tenancy
+disclosure, not a wording preference**, and it is the reason the conversion was done by reading the strings
+rather than by matching "permission".
+
+**8 more are a DIFFERENT SHAPE and need their own decision.** They are not screen refusals but reduced-mode
+notes — *"You do not hold `sla.holiday.create`, so the calendar is read-only"*, *"...so you can record
+people without creating logins"*. The decided sentence ("you do not hold permission to X — ask whoever
+manages permissions in your office") throws away the half that says what still works, which is the useful
+half. One of the eight, `kycQueueNoApprovePermission`, says *"this queue is for Compliance only"* — a ROLE
+NAME, which is exactly what the by-function rule exists to remove, so it is a real instance of the defect
+in a string the conversion did not reach.
+
+### 1.84 — THE `Promise.all` SCREEN THAT CLOSES ENTIRELY, THREE INSTANCES, AND ONE OF THEM IS ALREADY RIGHT
+
+A screen that loads several endpoints with `Promise.all` and sets one `loadError` closes COMPLETELY when any
+one of them 403s. Measured while wording the refusals, because the wording depends on it: such a reader
+needs EVERY code, where a reader refused by a route guard needs only ONE of the codes it declares
+(`PermissionsGuard` is `required.some`).
+
+    /dashboards/insurer-employee-performance   2 endpoints   closes entirely   DEFERRED (owner)
+    /retention-disposal                        3 endpoints   closes entirely   DEFERRED, same shape
+    /settings/org-units                        2 reads       DEGRADES          already correct
+
+`/settings/org-units` is the one that behaves properly and it needed no design to get there: it computes
+`noAccess = !canReadDept && !canReadBranch`, so it refuses only a reader holding NEITHER and shows the half
+they do hold. **The correct behaviour is already written in this codebase**, so the fix for the other two is
+to copy it rather than to invent anything.
+
+Both are deferred with a trigger: fixed the day that screen is touched. Their sentences are honest in the
+meantime — `permissionRefusalAllOf` states that all the codes are needed, which is what the screen actually
+requires today.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

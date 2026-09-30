@@ -23,6 +23,7 @@ import { errorStyle } from "../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const STATUSES: ScreeningMatchStatus[] = ["pending", "confirmed", "cleared"];
 /** Mirrors the DTO's own floor, so the button disables instead of the server
@@ -69,7 +70,7 @@ export default function ScreeningMatchesPage() {
         setRows(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? t('smYouDonTHoldThe')
+            ? permissionRefusal(t, 'smRefusalAct', 'sanctions-pep.screen')
             : err instanceof ApiError
               ? err.message
               : t('smCouldNotLoadTheMatch'),

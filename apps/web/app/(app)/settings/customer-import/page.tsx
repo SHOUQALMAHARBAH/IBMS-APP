@@ -41,6 +41,7 @@ import {
   type ImportResult,
 } from '../../../../lib/customer/legacy-import-api';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /**
  * A TOTAL map from field to label key.
@@ -113,7 +114,7 @@ export default function CustomerImportPage() {
       <main style={pageStyle}>
         <h1>{t('impHeading')}</h1>
         <p role="alert" style={errorStyle}>
-          {t('impNoPermission')}
+          {permissionRefusal(t, 'impRefusalAct', 'customer.bulk-import')}
         </p>
       </main>
     );

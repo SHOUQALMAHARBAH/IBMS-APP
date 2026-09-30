@@ -119,10 +119,10 @@ test("a user without either permission sees friendly messages", async ({
 
   await page.goto("/regulatory-compliance");
   await expect(
-    page.getByText("license.manage permission", { exact: false }),
+    page.getByText("(license.manage)", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByText("compliance-calendar.manage permission", { exact: false }),
+    page.getByText("(compliance-calendar.manage)", { exact: false }),
   ).toBeVisible();
 });
 

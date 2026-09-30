@@ -183,9 +183,19 @@ describe('permission codes quoted in user-facing text', () => {
         }
       }
     }
-    // Measured before this was written: 82 distinct codes across 286 occurrences.
-    expect(counts.AR, 'no permission codes found in the Arabic halves').toBeGreaterThan(50);
-    expect(counts.EN, 'no permission codes found in the English halves').toBeGreaterThan(50);
+    // ## Why this floor came DOWN from 50, and where the population went
+    //
+    // It was 50 when 82 distinct codes appeared across 286 occurrences, because almost every screen wrote
+    // its own permission refusal and every one of those named a code. 102 act keys now render
+    // through the ONE shared sentence in `common.ts`, whose code arrives as a call-site argument — so the
+    // codes left in dictionary TEXT are the handful that are there for some other reason.
+    //
+    // Lowering a non-vacuity floor is normally the wrong move, so the population is not unwatched: the
+    // codes that left are covered by a STRONGER check in `apps/web/test/screen-copy.test.ts`, which
+    // verifies every code passed to `permissionRefusal*` against the catalogue — 106 call sites against
+    // this file's 10 strings, and it also refuses an act key rendered outside the shared shape.
+    expect(counts.AR, 'no permission codes found in the Arabic halves').toBeGreaterThan(5);
+    expect(counts.EN, 'no permission codes found in the English halves').toBeGreaterThan(5);
     // And neither half quotes far fewer than the other — that asymmetry IS the bug class.
     const ratio =
       Math.min(counts.AR, counts.EN) / Math.max(counts.AR, counts.EN);

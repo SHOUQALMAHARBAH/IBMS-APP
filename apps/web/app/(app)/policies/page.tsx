@@ -18,6 +18,7 @@ import {
   POLICY_STATUS_LABEL_KEY,
   POLICY_STATUS_OPTIONS,
 } from '../../../lib/policy/policy-status';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * The book-wide policy list.
@@ -71,7 +72,7 @@ export default function PoliciesPage() {
         setPolicies(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? t('policiesNoPermission')
+            ? permissionRefusal(t, 'policiesRefusalAct', 'policy.read')
             : err instanceof ApiError
               ? err.message
               : t('policiesLoadError'),

@@ -13,6 +13,7 @@ import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.s
 import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
 import { insurerPickerStyle } from '../../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   const router = useRouter();
@@ -35,7 +36,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       } catch (err) {
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? t('rfqNewNoPermission')
+            ? permissionRefusal(t, 'rfqNewRefusalAct', 'rfq.create')
             : err instanceof ApiError
               ? err.message
               : t('rfqNewInsurerListLoadError'),

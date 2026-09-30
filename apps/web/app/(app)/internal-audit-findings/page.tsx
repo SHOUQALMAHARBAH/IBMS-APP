@@ -16,6 +16,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusalAnyOf } from '../../../lib/i18n/permission-refusal';
 
 const RECORD_ROLE = [
   'internal-audit.record',
@@ -59,7 +60,7 @@ export default function InternalAuditFindingsPage() {
       setFindings(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('iafNoPermission')
+          ? permissionRefusalAnyOf(t, 'iafRefusalAct', ['internal-audit.record', 'internal-audit.close'])
           : err instanceof ApiError
             ? err.message
             : t('iafLoadError'),

@@ -1,6 +1,6 @@
 PERMISSION CATALOGUE — input for the Arabic one-line descriptions
 
-217 permission codes, 12 modules. Generated from the seeded database by
+218 permission codes, 12 modules. Generated from the seeded database by
 `npm run db:permission-descriptions`, so this IS what the Role screen renders — not a separate
 list that can drift from it. Regenerate rather than hand-editing the structure: any line you have
 already written after `ar:` is carried forward by code and is never overwritten.
@@ -150,12 +150,15 @@ MODULE: claims   —   المطالبات   (13 codes)
           en: View Loss Ratio and claims analytics
           ar: ................................................................
 
-MODULE: commercial-front-office   —   المكتب الأمامي التجاري   (33 codes)
+MODULE: commercial-front-office   —   المكتب الأمامي التجاري   (34 codes)
 ------------------------------------------------------------------------------------------------
 
-  [5-STATE] customer   (create / update)
+  [5-STATE] customer   (create / read / update)
       customer.create
           en: Create a Customer (individual/corporate)
+          ar: ................................................................
+      customer.read
+          en: List customers and read a customer's basic identity — the path for finding a customer. Does NOT cover the aggregated 360° view, the UBO register, the document list or revealing a masked field, all of which stay under customer.360-view.read
           ar: ................................................................
       customer.update
           en: Correct a customer's contact details — phone, email and registered address. Does NOT cover name, date of birth, nationality or identity numbers: changing one of those is a screening event under the AMLU rules, not an edit
@@ -900,4 +903,4 @@ MODULE: supporting-operations   —   العمليات المساندة   (17 co
           en: Record security-awareness training completion
           ar: ................................................................
 ================================================================================================
-TOTALS: 21 five-state families covering 58 codes, 159 toggles, 217 codes in all.
+TOTALS: 21 five-state families covering 59 codes, 159 toggles, 218 codes in all.

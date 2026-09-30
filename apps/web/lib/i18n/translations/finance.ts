@@ -31,7 +31,7 @@ export const FINANCE = {
     caNone: 'لا توجد ذمم مدينة قائمة.',
     caLoading: 'جارٍ التحميل…',
     caLoadError: 'تعذّر تحميل تقرير أعمار الديون — حاول مرة أخرى.',
-    caNoPermission: 'لا تملك صلاحية client-accounting.read اللازمة لعرض هذا التقرير.',
+    caRefusalAct: 'عرض تقرير حسابات العملاء',
 
     // ---- Insurer accounting (#34) ---------------------------------------
     iaHeading: 'حسابات شركات التأمين',
@@ -49,7 +49,7 @@ export const FINANCE = {
     iaNone: 'لا توجد مبالغ مستحقة أو مورَّدة لأي شركة تأمين بعد.',
     iaLoading: 'جارٍ التحميل…',
     iaLoadError: 'تعذّر تحميل تقرير الذمم الدائنة — حاول مرة أخرى.',
-    iaNoPermission: 'لا تملك صلاحية insurer-accounting.read اللازمة لعرض هذا التقرير.',
+    iaRefusalAct: 'عرض تقرير حسابات شركات التأمين',
 
     // ---- Commission rates (#35) -----------------------------------------
     crateHeading: 'نسب العمولة',
@@ -75,7 +75,7 @@ export const FINANCE = {
     crateLoading: 'جارٍ التحميل…',
     crateLoadError: 'تعذّر تحميل جدول نسب العمولة — حاول مرة أخرى.',
     crateOpenError: 'تعذّر فتح نافذة النسبة — حاول مرة أخرى.',
-    crateNoPermission: 'لا تملك صلاحية commission-rate.manage اللازمة لعرض جدول نسب العمولة.',
+    crateRefusalAct: 'عرض جدول نسب العمولة',
 
     // ---- Payment channels (#38) -----------------------------------------
     pcHeading: 'قنوات الدفع',
@@ -110,7 +110,7 @@ export const FINANCE = {
     pcLoadError: 'تعذّر تحميل قائمة قنوات الدفع — حاول مرة أخرى.',
     pcAddError: 'تعذّرت إضافة قناة الدفع — حاول مرة أخرى.',
     pcDisableError: 'تعذّر تعطيلها — حاول مرة أخرى.',
-    pcNoPermission: 'لا تملك صلاحية payment-channel.read اللازمة لعرض قنوات الدفع.',
+    pcRefusalAct: 'عرض قنوات الدفع',
 
     // ---- Bank reconciliation (#39) ---------------------------------------
     brHeading: 'التسوية البنكية',
@@ -136,7 +136,7 @@ export const FINANCE = {
     brLoadError: 'تعذّر تحميل حالات عدم التطابق — حاول مرة أخرى.',
     brDetectError: 'تعذّر تشغيل الكشف — حاول مرة أخرى.',
     brActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    brNoPermission: 'لا تملك صلاحية reconciliation-exception.investigate اللازمة لعرض هذه الشاشة.',
+    brRefusalAct: 'معالجة فروق التسوية البنكية',
     brStatusReconciled: 'مُسوّاة',
     brResumeInvoiceAs: 'استئناف الفاتورة كـ…',
     brResolutionNoteRowAria: 'ملاحظة المعالجة',
@@ -179,7 +179,7 @@ export const FINANCE = {
     frVat: 'ضريبة المبيعات',
     frLoading: 'جارٍ التحميل…',
     frLoadError: 'تعذّر تحميل التقرير المالي — حاول مرة أخرى.',
-    frNoPermission: 'لا تملك صلاحية financial-report.view اللازمة لعرض التقرير المالي.',
+    frRefusalAct: 'عرض التقرير المالي',
     frAgeing1To30: 'من ١ إلى ٣٠ يوماً',
     frAgeing31To60: 'من ٣١ إلى ٦٠ يوماً',
     frAgeing61To90: 'من ٦١ إلى ٩٠ يوماً',
@@ -206,7 +206,7 @@ export const FINANCE = {
     caNone: 'No outstanding receivables to report.',
     caLoading: 'Loading…',
     caLoadError: 'Could not load the ageing report — try again.',
-    caNoPermission: "You don't hold the client-accounting.read permission.",
+    caRefusalAct: 'view the client accounting report',
 
     iaHeading: 'Insurer accounting',
     iaIntro:
@@ -223,7 +223,7 @@ export const FINANCE = {
     iaNone: 'Nothing owed to or remitted from any insurer yet.',
     iaLoading: 'Loading…',
     iaLoadError: 'Could not load the payables report — try again.',
-    iaNoPermission: "You don't hold the insurer-accounting.read permission.",
+    iaRefusalAct: 'view the insurer accounting report',
 
     crateHeading: 'Commission rates',
     crateIntro:
@@ -248,7 +248,7 @@ export const FINANCE = {
     crateLoading: 'Loading…',
     crateLoadError: 'Could not load the commission rate table — try again.',
     crateOpenError: 'Could not open the rate window — try again.',
-    crateNoPermission: "You don't hold the commission-rate.manage permission.",
+    crateRefusalAct: 'view the commission rate table',
 
     pcHeading: 'Payment channels',
     pcIntro:
@@ -282,7 +282,7 @@ export const FINANCE = {
     pcLoadError: 'Could not load the payment-channel list — try again.',
     pcAddError: 'Could not add the payment channel — try again.',
     pcDisableError: 'Could not disable it — try again.',
-    pcNoPermission: "You don't hold the payment-channel.read permission.",
+    pcRefusalAct: 'view the payment channels an office sends money through',
 
     brHeading: 'Bank reconciliation',
     brIntro:
@@ -307,7 +307,7 @@ export const FINANCE = {
     brLoadError: 'Could not load reconciliation exceptions — try again.',
     brDetectError: 'Detection failed — try again.',
     brActionError: 'That action failed — try again.',
-    brNoPermission: "You don't hold the reconciliation-exception.investigate permission.",
+    brRefusalAct: 'investigate bank-reconciliation exceptions',
     brStatusReconciled: 'Reconciled',
     brResumeInvoiceAs: 'Resume invoice as…',
     brResolutionNoteRowAria: 'Resolution note',
@@ -349,7 +349,7 @@ export const FINANCE = {
     frVat: 'VAT',
     frLoading: 'Loading…',
     frLoadError: 'Could not load the financial report — try again.',
-    frNoPermission: "You don't hold the financial-report.view permission.",
+    frRefusalAct: 'view the financial report',
     frAgeing1To30: '1–30 days',
     frAgeing31To60: '31–60 days',
     frAgeing61To90: '61–90 days',

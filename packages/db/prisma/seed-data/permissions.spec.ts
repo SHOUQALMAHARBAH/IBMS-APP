@@ -248,7 +248,7 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 44 codes", () => {
+  it("holds exactly 45 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
@@ -256,6 +256,11 @@ describe("permission grid — the office administrator", () => {
     //
     // 22 at the Phase 3 migration, 24 with insurer management, 26 with the cross-office directory
     // and Q9's office form mapping, 34 with the department/branch four-action pilot (8 codes),
+    // 45 with `customer.read` — the narrow customer list code. This role holds `customer.bulk-import`, so
+    // before the split it could write an office's entire back-book and then not see one of the rows it had
+    // written. NOT in ADDED_AFTER_THE_MIGRATION below, and the reason is worth stating: the legacy
+    // administrator holds `customer.read` too (it went to every holder of the three source codes), so this
+    // is not a divergence from the legacy role — it is the count pin that makes it a decision.
     // 44 with Part 4 step 4's `duty-segregation.mode.declare` — which DOES add a capability, deliberately,
     // and is therefore declared in ADDED_AFTER_THE_MIGRATION below.
     // 43 with four-action Phase 1 — which ADDED no capability: three umbrellas this role held
@@ -277,6 +282,7 @@ describe("permission grid — the office administrator", () => {
         "branch.read",
         "branch.update",
         "customer.bulk-import",
+        "customer.read",
         "department.create",
         "department.deactivate",
         "department.read",

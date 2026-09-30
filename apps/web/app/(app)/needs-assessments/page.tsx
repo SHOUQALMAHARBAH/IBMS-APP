@@ -18,6 +18,7 @@ import {
 import { listGridStyle } from '../../../components/needs-assessment/needs-assessment.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 export default function NeedsAssessmentsPage() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function NeedsAssessmentsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('naNoPermission')
+          ? permissionRefusal(t, 'naRefusalAct', 'needs-assessment.read')
           : err instanceof ApiError
             ? err.message
             : t('naLoadError'),

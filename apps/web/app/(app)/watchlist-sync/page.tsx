@@ -16,6 +16,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 const cell: CSSProperties = {
@@ -50,7 +51,7 @@ export default function WatchlistSyncPage() {
       setRuns(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('wsNoPermission')
+          ? permissionRefusal(t, 'wsRefusalAct', 'sanctions-pep.screen')
           : err instanceof ApiError
             ? err.message
             : t('wsLoadError'),

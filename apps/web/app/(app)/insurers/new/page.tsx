@@ -27,6 +27,7 @@ import {
 } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const STRUCTURES: readonly InsurerStructure[] = [
   'CONVENTIONAL',
@@ -161,7 +162,7 @@ export default function RegisterInsurerPage() {
       <main style={pageStyle}>
         <h1>{t('insNewHeading')}</h1>
         <p role="alert" style={errorStyle}>
-          {t('insNewNoPermission')}
+          {permissionRefusal(t, 'insNewRefusalAct', 'insurer.create')}
         </p>
       </main>
     );

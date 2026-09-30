@@ -45,7 +45,7 @@ export const PDPL = {
     consWithdrawing: 'جارٍ سحب الموافقة…',
     consCaptureFailed: 'فشل تسجيل الموافقة — حاول مرة أخرى.',
     consStatusLoadError: 'تعذّر تحميل حالة الموافقة.',
-    consWidgetNoPermission: 'لا تملك صلاحية consent.manage.',
+    consWidgetRefusalAct: 'عرض سجلات موافقة هذا العميل',
     consFilterButton: 'تصفية',
     consRecordButton: 'تسجيل القرار',
     consSavingButton: 'جارٍ الحفظ…',
@@ -63,7 +63,7 @@ export const PDPL = {
     consWithdrawalSlaDeadline: 'الموعد النهائي المقرَّر',
     consRequestError: 'تعذّر تنفيذ الطلب — حاول مرة أخرى.',
     consWithdrawError: 'تعذّر تنفيذ السحب — حاول مرة أخرى.',
-    consNoPermission: 'لا تملك صلاحية consent.manage اللازمة لعرض سجلات الموافقة.',
+    consRefusalAct: 'عرض سجلات الموافقة',
     consStatusGranted: 'ممنوحة',
     consStatusDeclined: 'مرفوضة',
     consStatusNeverGranted: 'لم تُمنح قط',
@@ -107,7 +107,7 @@ export const PDPL = {
     dsrNone: 'لا توجد طلبات لأصحاب البيانات.',
     dsrLoadError: 'تعذّر تحميل طلبات أصحاب البيانات — حاول مرة أخرى.',
     dsrActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    dsrNoPermission: 'لا تملك صلاحية dsr.log اللازمة لعرض طلبات أصحاب البيانات.',
+    dsrRefusalAct: 'عرض طلبات أصحاب البيانات',
     dsrStatusReceived: 'وارد',
     dsrStatusIdentityVerified: 'تم التحقق من الهوية',
     dsrStatusInProgress: 'قيد المعالجة',
@@ -173,7 +173,7 @@ export const PDPL = {
     rdInsuredPersonGeneric: 'شخص مؤمَّن عليه',
     rdActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     rdSavingButton: 'جارٍ الحفظ…',
-    rdNoPermission: 'لا تملك الصلاحية اللازمة لعرض سجل الاحتفاظ والإتلاف.',
+    rdRefusalAct: 'عرض سجل الاحتفاظ والإتلاف',
     rdStatusNominated: 'مُرشَّحة',
     rdStatusManagerApproved: 'معتمدة من المدير',
     rdStatusDpoApproved: 'معتمدة من مسؤول حماية البيانات',
@@ -208,7 +208,7 @@ export const PDPL = {
     cbtNone: 'لم تُسجَّل أي عمليات نقل عبر الحدود بعد.',
     cbtLoadError: 'تعذّر تحميل سجل النقل عبر الحدود — حاول مرة أخرى.',
     cbtActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    cbtNoPermission: 'لا تملك صلاحية cross-border-transfer.approve اللازمة لعرض هذا السجل.',
+    cbtRefusalAct: 'الموافقة على نقل البيانات الشخصية خارج الأردن',
 
     // ---- Data sharing (M08) ---------------------------------------------
     dsaHeading: 'الأطراف الثالثة ومشاركة البيانات',
@@ -233,7 +233,7 @@ export const PDPL = {
     dsaNone: 'لا توجد طلبات مشاركة بيانات بعد.',
     dsaLoadError: 'تعذّر تحميل طلبات مشاركة البيانات — حاول مرة أخرى.',
     dsaActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    dsaNoPermission: 'لا تملك الصلاحية اللازمة لعرض طلبات مشاركة البيانات.',
+    dsaRefusalAct: 'عرض طلبات مشاركة البيانات',
     dsaStatusApproved: 'معتمد',
     dsaStatusDeclined: 'مرفوض',
     dsaStatusPending: 'قيد الانتظار',
@@ -262,7 +262,7 @@ export const PDPL = {
     dpiaNone: 'لا توجد فحوص تقييم أثر بعد.',
     dpiaLoadError: 'تعذّر تحميل فحوص تقييم الأثر — حاول مرة أخرى.',
     dpiaActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    dpiaNoPermission: 'لا تملك صلاحية dpia.review اللازمة لعرض فحوص تقييم الأثر.',
+    dpiaRefusalAct: 'عرض فحوص تقييم الأثر',
     dpiaOutcomeAutoApproved: 'معتمد تلقائياً',
     dpiaOutcomeDpoReviewRequired: 'يستوجب مراجعة مسؤول حماية البيانات',
 
@@ -284,7 +284,7 @@ export const PDPL = {
     pnNone: 'لم يُنشر أي إشعار خصوصية بعد.',
     pnLoadError: 'تعذّر تحميل إشعارات الخصوصية — حاول مرة أخرى.',
     pnActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    pnNoPermission: 'لا تملك صلاحية privacy-notice.read اللازمة لعرض إشعارات الخصوصية.',
+    pnRefusalAct: 'عرض إشعارات الخصوصية',
 
     // ---- RoPA -------------------------------------------------------------
     ropaHeading: 'سجل أنشطة المعالجة',
@@ -307,7 +307,7 @@ export const PDPL = {
     ropaLoadError: 'تعذّر تحميل سجل أنشطة المعالجة — حاول مرة أخرى.',
     ropaActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     ropaExportError: 'تعذّر التصدير — حاول مرة أخرى.',
-    ropaNoPermission: 'لا تملك صلاحية ropa.manage اللازمة لعرض سجل أنشطة المعالجة.',
+    ropaRefusalAct: 'عرض سجل أنشطة المعالجة',
 
     // ---- DPO workspace ----------------------------------------------------
     dpowHeading: 'مساحة عمل مسؤول حماية البيانات',
@@ -345,7 +345,7 @@ export const PDPL = {
     dpowConsentWithdrawn: 'مسحوبة:',
     dpowConsentDeclined: 'مرفوضة:',
     dpowDaysLeft: '{days} يومًا',
-    dpowNoPermission: 'لا تملك صلاحية dpo-workspace.view اللازمة لعرض هذه المساحة.',
+    dpowRefusalAct: 'عرض مساحة عمل مسؤول حماية البيانات',
   },
   EN: {
     consHeading: 'Consent management',
@@ -373,7 +373,7 @@ export const PDPL = {
     consWithdrawing: 'Withdrawing…',
     consCaptureFailed: 'The capture failed — try again.',
     consStatusLoadError: 'Could not load consent status.',
-    consWidgetNoPermission: "You don't hold the consent.manage permission.",
+    consWidgetRefusalAct: "view this customer's consent records",
     consFilterButton: 'Filter',
     consRecordButton: 'Record decision',
     consSavingButton: 'Saving…',
@@ -391,7 +391,7 @@ export const PDPL = {
     consWithdrawalSlaDeadline: 'the SLA deadline',
     consRequestError: 'The request failed — try again.',
     consWithdrawError: 'The withdrawal failed — try again.',
-    consNoPermission: "You don't hold the consent.manage permission.",
+    consRefusalAct: 'view consent records',
     consStatusGranted: 'Granted',
     consStatusDeclined: 'Declined',
     consStatusNeverGranted: 'Never granted',
@@ -435,7 +435,7 @@ export const PDPL = {
     dsrNone: 'No Data Subject Requests.',
     dsrLoadError: 'Could not load Data Subject Requests — try again.',
     dsrActionError: 'That action failed — try again.',
-    dsrNoPermission: "You don't hold the dsr.log permission.",
+    dsrRefusalAct: 'view and log data subject requests',
     dsrStatusReceived: 'Received',
     dsrStatusIdentityVerified: 'Identity verified',
     dsrStatusInProgress: 'In progress',
@@ -500,7 +500,7 @@ export const PDPL = {
     rdInsuredPersonGeneric: 'An insured person',
     rdActionError: 'That action failed — try again.',
     rdSavingButton: 'Saving…',
-    rdNoPermission: "You don't hold the permission needed to view the retention/disposal register.",
+    rdRefusalAct: 'view the retention and disposal register',
     rdStatusNominated: 'Nominated',
     rdStatusManagerApproved: 'Manager approved',
     rdStatusDpoApproved: 'DPO approved',
@@ -531,7 +531,7 @@ export const PDPL = {
     cbtNone: 'No cross-border transfers logged yet.',
     cbtLoadError: 'Could not load the cross-border transfer register — try again.',
     cbtActionError: 'That action failed — try again.',
-    cbtNoPermission: "You don't hold the cross-border-transfer.approve permission.",
+    cbtRefusalAct: 'approve sending personal data outside Jordan',
 
     dsaHeading: 'Third Parties & Data Sharing',
     dsaIntro:
@@ -555,7 +555,7 @@ export const PDPL = {
     dsaNone: 'No data-sharing requests yet.',
     dsaLoadError: 'Could not load data-sharing requests — try again.',
     dsaActionError: 'That action failed — try again.',
-    dsaNoPermission: "You don't hold the permission needed to view data-sharing requests.",
+    dsaRefusalAct: 'view data-sharing requests',
     dsaStatusApproved: 'Approved',
     dsaStatusDeclined: 'Declined',
     dsaStatusPending: 'Pending',
@@ -583,7 +583,7 @@ export const PDPL = {
     dpiaNone: 'No DPIA screenings yet.',
     dpiaLoadError: 'Could not load DPIA screenings — try again.',
     dpiaActionError: 'That action failed — try again.',
-    dpiaNoPermission: "You don't hold the dpia.review permission.",
+    dpiaRefusalAct: 'view the data-protection impact screenings',
     dpiaOutcomeAutoApproved: 'Auto-approved',
     dpiaOutcomeDpoReviewRequired: 'DPO review required',
 
@@ -604,7 +604,7 @@ export const PDPL = {
     pnNone: 'No privacy notices published yet.',
     pnLoadError: 'Could not load privacy notices — try again.',
     pnActionError: 'That action failed — try again.',
-    pnNoPermission: "You don't hold the privacy-notice.read permission.",
+    pnRefusalAct: 'view the privacy notices',
 
     ropaHeading: 'Records of Processing Activities',
     ropaIntro:
@@ -626,7 +626,7 @@ export const PDPL = {
     ropaLoadError: 'Could not load the RoPA register — try again.',
     ropaActionError: 'That action failed — try again.',
     ropaExportError: 'The export failed — try again.',
-    ropaNoPermission: "You don't hold the ropa.manage permission.",
+    ropaRefusalAct: 'view the record of processing activities',
 
     dpowHeading: 'DPO Workspace',
     dpowIntro:
@@ -663,6 +663,6 @@ export const PDPL = {
     dpowConsentWithdrawn: 'Withdrawn:',
     dpowConsentDeclined: 'Declined:',
     dpowDaysLeft: '{days}d',
-    dpowNoPermission: "You don't hold the dpo-workspace.view permission.",
+    dpowRefusalAct: "view the data protection officer's workspace",
   },
 } as const;

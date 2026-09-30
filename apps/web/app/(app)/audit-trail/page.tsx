@@ -18,6 +18,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * Every action, ordered as the label map declares them rather than alphabetically.
@@ -238,7 +239,7 @@ export default function AuditTrailPage() {
       setBrowseError(
         messageFor(
           err,
-          t('atNoPermissionFor', { permission: 'audit-log.read' }),
+          permissionRefusal(t, 'atAuditLogRefusalAct', 'audit-log.read'),
           t('atLogLoadError'),
         ),
       );
@@ -258,7 +259,7 @@ export default function AuditTrailPage() {
       setWfError(
         messageFor(
           err,
-          t('atNoPermissionFor', { permission: 'workflow-history.read' }),
+          permissionRefusal(t, 'atWorkflowRefusalAct', 'workflow-history.read'),
           t('atWorkflowLoadError'),
         ),
       );
@@ -278,7 +279,7 @@ export default function AuditTrailPage() {
       setDocError(
         messageFor(
           err,
-          t('atNoPermissionFor', { permission: 'document-history.read' }),
+          permissionRefusal(t, 'atDocumentRefusalAct', 'document-history.read'),
           t('atDocumentLoadError'),
         ),
       );

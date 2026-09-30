@@ -54,7 +54,7 @@ test("a user without the permission sees a friendly message", async ({ page }) =
 
   await page.goto("/knowledge-base");
   await expect(
-    page.getByText("kb.publish permission", { exact: false }),
+    page.getByText("(kb.publish)", { exact: false }),
   ).toBeVisible();
 });
 

@@ -13,6 +13,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const ROLES = ['dpo-workspace.view'];
 
@@ -46,7 +47,7 @@ export default function DpoWorkspacePage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dpowNoPermission')
+          ? permissionRefusal(t, 'dpowRefusalAct', 'dpo-workspace.view')
           : err instanceof ApiError
             ? err.message
             : t('dpowLoadError'),

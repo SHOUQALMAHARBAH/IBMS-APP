@@ -161,7 +161,7 @@ test("a user without any of the three permissions sees a friendly message per se
   await page.getByLabel("Entity type").first().fill("Lead");
   await page.getByRole("button", { name: "Browse" }).click();
   await expect(
-    page.getByText("audit-log.read permission", { exact: false }),
+    page.getByText("(audit-log.read)", { exact: false }),
   ).toBeVisible();
 });
 

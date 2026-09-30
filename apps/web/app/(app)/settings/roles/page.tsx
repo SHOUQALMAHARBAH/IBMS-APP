@@ -44,6 +44,7 @@ import {
   listDutySegregationReadiness,
   type DutySegregationReadiness,
 } from '../../../../lib/admin/role-admin-api';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /** Worst first: the row that says nobody can complete an operation is why the list exists. */
 const STATUS_ORDER: Record<DutySegregationReadiness['status'], number> = {
@@ -201,7 +202,7 @@ export default function RoleAdminPage() {
       setRoles(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('roleNoPermission')
+          ? permissionRefusal(t, 'roleRefusalAct', 'role.read')
           : err instanceof ApiError
             ? err.message
             : t('roleCouldNotLoad'),
@@ -254,7 +255,7 @@ export default function RoleAdminPage() {
         setReadiness(null);
         setReadinessError(
           err instanceof ApiError && err.status === 403
-            ? t('dutySegNoPermission')
+            ? permissionRefusal(t, 'dutySegRefusalAct', 'role.read')
             : t('dutySegLoadError'),
         );
       }
@@ -463,7 +464,7 @@ export default function RoleAdminPage() {
           sentence, and it would put a guaranteed 403 in everyone's network log. */}
       {!canRead ? (
         <p role="status" style={errorStyle}>
-          {t('roleNoPermission')}
+          {permissionRefusal(t, 'roleRefusalAct', 'role.read')}
         </p>
       ) : null}
 

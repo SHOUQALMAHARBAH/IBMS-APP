@@ -85,7 +85,9 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   {
     labelKey: 'navGroupClients',
     items: [
-      { href: '/customers', labelKey: 'navCustomers', permissions: ['customer.360-view.read'] },
+      // `customer.read`, not `customer.360-view.read`: the list moved onto the narrow code, and a nav
+      // entry gated on the old one would hide a screen five roles can now open.
+      { href: '/customers', labelKey: 'navCustomers', permissions: ['customer.read'] },
       // EITHER code, because the screen serves two audiences and already says so: `crm/page.tsx`
       // deliberately tolerates a 403 on the 360° view — "a role that holds `interaction.log` but not
       // `customer.360-view.read` still logs interactions here". Gated on the read alone, the nav hid the

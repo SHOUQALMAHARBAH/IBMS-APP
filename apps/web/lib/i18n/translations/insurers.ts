@@ -37,15 +37,14 @@ export const INSURERS = {
     lineAdminAddError: 'تعذّرت إضافة الفرع.',
     lineAdminSaveError: 'تعذّر حفظ التصحيح.',
     lineAdminLoadError: 'تعذّر تحميل فروع التأمين — حاول مرة أخرى.',
-    lineAdminNoPermission:
-      'لا تملك صلاحية insurance-line.create، فالقائمة للقراءة فقط.',
+    lineAdminRefusalAct: 'إضافة فرع تأمين',
     lineAdminLoading: 'جارٍ التحميل…',
     // page.tsx — the list
     insListHeading: 'شركات التأمين',
     insListIntro:
       'شركات التأمين التي يتعامل معها مكتبك. يمكن تسجيل شركة من الدليل العام، أو شركة ' +
       'لا يعرفها أي دليل — كلتا الحالتين تمرّان من هنا.',
-    insListNoPermission: 'لا تملك صلاحية insurer.read، لذا لا يوجد ما يمكن عرضه هنا.',
+    insListRefusalAct: 'عرض شركات التأمين الخاصة بمكتبك',
     // A 403 has two very different causes and telling a person the wrong one costs them an
     // afternoon: the MFA guard refuses EVERY screen until an authenticator is paired, and it looks
     // identical to a missing permission unless the response code is read.
@@ -106,7 +105,7 @@ export const INSURERS = {
     insNewClaimsEmailLabel: 'بريد جهة اتصال المطالبات',
     insNewSubmitButton: 'سجّل',
     insNewSavingButton: 'جارٍ الحفظ…',
-    insNewNoPermission: 'لا تملك صلاحية insurer.create لتسجيل شركة تأمين.',
+    insNewRefusalAct: 'تسجيل شركة تأمين',
     insNewError: 'تعذر إكمال التسجيل.',
 
     // [id]/page.tsx — detail
@@ -160,7 +159,7 @@ export const INSURERS = {
     insDirBoundaryNote:
       'يُظهر الدليل بيانات الشركة العامة فقط: لا شروط سداد، ولا تصنيفاً، ولا جهات اتصال خاصة بمكتب، ' +
       'ولا أي إشارة إلى المكاتب الأخرى.',
-    insDirNoPermission: 'لا تملك صلاحية insurer.directory.read، لذا لا يوجد ما يمكن عرضه هنا.',
+    insDirRefusalAct: 'البحث في دليل شركات التأمين المشترك بين المكاتب',
     insDirLoadError: 'تعذر تحميل الدليل.',
     insDirSearchLabel: 'ابحث باسم الشركة',
     insDirLineLabel: 'الخط التأميني',
@@ -207,16 +206,14 @@ export const INSURERS = {
     lineAdminAddError: 'Could not add that line.',
     lineAdminSaveError: 'Could not save the correction.',
     lineAdminLoadError: 'Could not load the lines of business — try again.',
-    lineAdminNoPermission:
-      'You do not hold insurance-line.create, so the list is read-only.',
+    lineAdminRefusalAct: 'add a line of business',
     lineAdminLoading: 'Loading…',
     // page.tsx — the list
     insListHeading: 'Insurers',
     insListIntro:
       "The insurance companies your office deals with. You can register one from the shared " +
       'catalogue, or one no catalogue has heard of — both paths run through here.',
-    insListNoPermission:
-      'You do not hold insurer.read, so there is nothing to show here.',
+    insListRefusalAct: "view this office's insurers",
     insMfaRequired:
       'You have not paired an authenticator app yet, and the system blocks every screen until you do. This is NOT a permissions problem: open Security at the bottom of the sidebar, scan the QR code with an authenticator app, enter the six-digit code — then come back here.',
     insListLoadError: 'Could not load insurers.',
@@ -272,8 +269,7 @@ export const INSURERS = {
     insNewClaimsEmailLabel: 'Claims contact email',
     insNewSubmitButton: 'Register',
     insNewSavingButton: 'Saving…',
-    insNewNoPermission:
-      'You do not hold insurer.create, so you cannot register an insurer.',
+    insNewRefusalAct: 'register an insurer',
     insNewError: 'Could not complete the registration.',
 
     // [id]/page.tsx — detail
@@ -324,8 +320,7 @@ export const INSURERS = {
       'Every company any office on the platform has registered, one entry per company. For finding who writes cover nobody on your panel writes — and it never says which offices deal with any of them.',
     insDirBoundaryNote:
       'The directory shows public company facts only: no credit terms, no rating, no office-specific contacts, and nothing at all about other offices.',
-    insDirNoPermission:
-      'You do not hold insurer.directory.read, so there is nothing to show here.',
+    insDirRefusalAct: 'search the cross-office insurer directory',
     insDirLoadError: 'Could not load the directory.',
     insDirSearchLabel: 'Search by company name',
     insDirLineLabel: 'Insurance line',

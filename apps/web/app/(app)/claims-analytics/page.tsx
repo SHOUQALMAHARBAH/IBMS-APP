@@ -15,6 +15,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import { formatMoney } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 // Module scope has no translator, so this maps to label KEYS and the
 // component resolves them — same shape as the DPIA screening questions.
@@ -58,7 +59,7 @@ export default function ClaimsAnalyticsPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('claNoPermission')
+          ? permissionRefusal(t, 'claRefusalAct', 'claims-analytics.view')
           : err instanceof ApiError
             ? err.message
             : t('claLoadError'),

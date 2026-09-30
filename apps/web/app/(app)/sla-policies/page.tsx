@@ -19,6 +19,7 @@ import {
 } from "../../../lib/sla/sla-policy-api";
 import { hasPermission } from '../../../lib/auth/permissions';
 import { SlaHolidayCalendar } from '../../../components/sla/SlaHolidayCalendar';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const STATUSES: (SlaPolicyStatus | "ALL")[] = [
   "ALL",
@@ -82,7 +83,7 @@ export default function SlaPoliciesPage() {
         setRows(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? t('slapYouDonTHoldThe')
+            ? permissionRefusal(t, 'slapRefusalAct', 'sla.policy.read')
             : err instanceof ApiError
               ? err.message
               : t('slapCouldNotLoadSlaPolicies'),

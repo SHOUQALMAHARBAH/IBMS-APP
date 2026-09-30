@@ -16,6 +16,7 @@ import { pageStyle } from '../../../components/access-recertification/access-rec
 import { hasPermission } from '../../../lib/auth/permissions';
 import { AdminAccessRecord } from '../../../components/access-recertification/AdminAccessRecord';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 // Roles the seeded permission grid grants `access-recertification.cycle.start`
 // to (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
@@ -38,7 +39,7 @@ export default function AccessRecertificationPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('acrNoPermission')
+          ? permissionRefusal(t, 'acrRefusalAct', 'access-recertification.review')
           : err instanceof ApiError
             ? err.message
             : t('acrLoadError'),

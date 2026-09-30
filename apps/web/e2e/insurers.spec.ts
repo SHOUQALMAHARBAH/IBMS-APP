@@ -344,7 +344,7 @@ test("tells an unenrolled user to pair an authenticator, not that she lacks the 
   await page.goto("/insurers");
   await expect(page.getByText(/not paired an authenticator app yet/i)).toBeVisible();
   await expect(page.getByText(/NOT a permissions problem/i)).toBeVisible();
-  await expect(page.getByText(/do not hold insurer\.read/i)).toHaveCount(0);
+  await expect(page.getByText(/\(insurer\.read\)/)).toHaveCount(0);
 });
 
 test("still says so plainly when the 403 really is a missing permission", async ({ page }) => {
@@ -358,6 +358,6 @@ test("still says so plainly when the 403 really is a missing permission", async 
   );
 
   await page.goto("/insurers");
-  await expect(page.getByText(/do not hold insurer\.read/i)).toBeVisible();
+  await expect(page.getByText(/\(insurer\.read\)/)).toBeVisible();
   await expect(page.getByText(/not paired an authenticator app yet/i)).toHaveCount(0);
 });

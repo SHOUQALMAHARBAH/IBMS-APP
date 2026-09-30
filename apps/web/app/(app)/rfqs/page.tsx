@@ -10,6 +10,7 @@ import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { rfqBadgeStyle, rfqCardStyle } from '../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function RfqList({
   scope,
@@ -30,7 +31,7 @@ function RfqList({
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('rfqListNoPermission')
+          ? permissionRefusal(t, 'rfqListRefusalAct', 'rfq.read')
           : err instanceof ApiError && err.status === 404
             ? t('rfqListParentNotFound')
             : err instanceof ApiError

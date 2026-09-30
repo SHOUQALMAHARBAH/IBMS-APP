@@ -21,6 +21,7 @@ import {
 import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 // Client-side hint only — the backend enforces needs-assessment.create /
 // risk-profile.create on POST regardless (same convention as
@@ -239,7 +240,7 @@ export default function NewNeedsAssessmentPage() {
         </Suspense>
       ) : (
         <p role="alert" style={errorStyle}>
-          {t('nanNoPermission')}
+          {permissionRefusal(t, 'nanRefusalAct', 'needs-assessment.create')}
         </p>
       )}
     </main>

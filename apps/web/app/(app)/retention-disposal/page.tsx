@@ -37,6 +37,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusalAllOf } from '../../../lib/i18n/permission-refusal';
 
 const SCHEDULE_ROLES = [
   'retention-schedule.manage',
@@ -110,7 +111,7 @@ export default function RetentionDisposalPage() {
       setBatches(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('rdNoPermission')
+          ? permissionRefusalAllOf(t, 'rdRefusalAct', ['retention-schedule.manage', 'legal-hold.manage', 'retention.dispose.nominate / retention.dispose.approve'])
           : err instanceof ApiError
             ? err.message
             : t('rdLoadError'),

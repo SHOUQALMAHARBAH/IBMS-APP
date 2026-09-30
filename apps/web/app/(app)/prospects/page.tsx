@@ -10,6 +10,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/prospect/prospect.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 export default function ProspectsPage() {
   const { t } = useLanguage();
@@ -31,7 +32,7 @@ export default function ProspectsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('prosNoPermission')
+          ? permissionRefusal(t, 'prosRefusalAct', 'prospect.read')
           : err instanceof ApiError
             ? err.message
             : t('prosLoadError'),

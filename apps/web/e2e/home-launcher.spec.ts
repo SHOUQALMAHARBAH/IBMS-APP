@@ -41,14 +41,24 @@ test("offers the administrator the screens she can open, and none she cannot", a
   await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
   await page.goto("/");
 
-  // The three she holds and previously had no card for.
-  for (const href of ["/settings/roles", "/settings/users", "/employees"]) {
+  // The three she holds and previously had no card for, plus `/customers` — which MOVED into this list.
+  // Migration 20261105100000 split `customer.read` off `customer.360-view.read` for the list alone, and
+  // this role was one of the two the split is for: it holds `customer.bulk-import`, so it could write an
+  // office's entire back-book and then not see one of the rows it had written.
+  for (const href of [
+    "/settings/roles",
+    "/settings/users",
+    "/employees",
+    "/customers",
+  ]) {
     await expect(page.locator(`[data-home-card="${href}"]`)).toBeVisible();
   }
 
-  // The four that answered 403 for her. Asserted as absence, but only AFTER the positives above
-  // proved the page rendered — an empty page would satisfy absence on its own.
-  for (const href of ["/leads", "/prospects", "/customers", "/customers/kyc-queue"]) {
+  // The three that still answer 403 for her. Asserted as absence, but only AFTER the positives above
+  // proved the page rendered — an empty page would satisfy absence on its own. `/customers/kyc-queue`
+  // stays here deliberately: listing customers is not working their KYC files, and she holds neither
+  // `kyc.capture` nor `kyc.approve`.
+  for (const href of ["/leads", "/prospects", "/customers/kyc-queue"]) {
     await expect(page.locator(`[data-home-card="${href}"]`)).toHaveCount(0);
   }
 });

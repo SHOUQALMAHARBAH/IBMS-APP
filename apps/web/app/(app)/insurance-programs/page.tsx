@@ -15,6 +15,7 @@ import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { programListCardStyle } from '../../../components/insurance-program/insurance-program.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function ProgramsForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
@@ -30,7 +31,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('iprogNoPermission')
+          ? permissionRefusal(t, 'iprogRefusalAct', 'program.read')
           : err instanceof ApiError && err.status === 404
             ? t('iprogCustomerNotFound')
             : err instanceof ApiError

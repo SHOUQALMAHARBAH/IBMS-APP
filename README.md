@@ -2274,8 +2274,10 @@ else.
 
 - **`apps/api/src/modules/customer/`**: `POST /customers` (individual/corporate,
   `CreateCustomerDto` branches required fields on `customerType` via `@ValidateIf`),
-  `GET /customers` / `GET /customers/:id` (owner-scoped like Lead/Prospect, plus
-  `customer.360-view.read`'s Compliance/Manager/Exec/Auditor cross-owner grant),
+  `GET /customers` (`customer.read` since migration `20261105100000` — the narrow list
+  code, held by ten of eleven roles, because finding a customer is not reading one) /
+  `GET /customers/:id` (`customer.360-view.read`), both owner-scoped like Lead/Prospect
+  plus `customer.all-owners.read`'s Compliance/Manager/Exec/Auditor cross-owner grant,
   `POST /customers/:id/ubos` + `GET .../ubos` (`CORPORATE` only), `POST
   /customers/:id/documents` + `GET .../documents` (category fixed to
   `APPLICATION_PROPOSAL` server-side, never caller-chosen), `POST
@@ -2847,7 +2849,9 @@ else.
     allowed).
   - `GET /customers/:customerId/interactions` and `GET /customers/:customerId/360-view`
     (`customer.360-view.read`) — owner-or-cross-owner visibility, identical to
-    `CustomerService.get()` (`NotFoundException` either way, no existence oracle).
+    `CustomerService.get()` (`NotFoundException` either way, no existence oracle). These
+    two keep `customer.360-view.read` after migration `20261105100000`; only the plain
+    customer LIST moved onto the narrower `customer.read`.
 - **The 360° view** aggregates the interaction log with the customer's policies, claims
   and complaints and runs all four through `crm.config.ts`'s **pure, deterministic**
   `buildCustomerTimeline()` — one reverse-chronological list, each kind placed at its
@@ -2895,7 +2899,12 @@ else.
   (Process 44 / Part D — this logs what happened, it does not send anything or check
   marketing consent); no pagination on the interaction list; a role holding
   `interaction.log` but not `customer.360-view.read` (Placement/Claims/Finance) can log
-  but cannot see the timeline it feeds (a grid choice, not a bug); no per-officer queue;
+  but cannot see the TIMELINE it feeds — still true, and still a grid choice. **The other
+  half of this sentence was a defect and is fixed**: those three roles also could not LIST
+  customers, because `GET /customers` was gated on `customer.360-view.read` too, so they
+  could log a touchpoint against somebody they had no way to find. Migration
+  `20261105100000` splits `customer.read` off for the list; the 360° timeline is
+  deliberately not widened. No per-officer queue;
   no reassignment.
 - **`@code-reviewer` pass** (mandatory — the 360° view reads `Claim` / HIGHLY_CONFIDENTIAL
   data): returned **5 findings, all fixed** — (1) the web screen returned the load-error

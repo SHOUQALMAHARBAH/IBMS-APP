@@ -162,7 +162,7 @@ test("a role with neither permission sees a friendly message and no form", async
 
   await page.goto("/crm?customerId=cust-1");
   await expect(page.locator('p[role="alert"]')).toContainText(
-    "don't hold the customer.360-view.read",
+    "(customer.360-view.read)",
   );
   await expect(page.getByLabel("What happened?")).toHaveCount(0);
 });

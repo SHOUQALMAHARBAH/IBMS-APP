@@ -151,7 +151,7 @@ test("a user without the permission sees a friendly message", async ({ page }) =
 
   await page.goto("/commission");
   await expect(
-    page.getByText("commission-rate.manage permission", { exact: false }),
+    page.getByText("(commission-rate.manage)", { exact: false }),
   ).toBeVisible();
 });
 

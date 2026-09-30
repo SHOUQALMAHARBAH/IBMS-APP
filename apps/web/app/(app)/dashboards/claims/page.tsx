@@ -14,6 +14,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
@@ -102,7 +103,7 @@ export default function ClaimsDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dclmNoPermission')
+          ? permissionRefusal(t, 'dclmRefusalAct', 'dashboard.claims.view')
           : err instanceof ApiError
             ? err.message
             : t('dclmLoadError'),

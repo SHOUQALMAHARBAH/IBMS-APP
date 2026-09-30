@@ -11,6 +11,7 @@ import { useAuth } from '../../lib/auth/auth-context';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { hasPermission } from '../../lib/auth/permissions';
 import { errorStyle } from '../auth/auth-form.styles';
+import { permissionRefusal } from '../../lib/i18n/permission-refusal';
 
 /*
  * CORRECTING A CUSTOMER'S CONTACT DETAILS — the web caller `PATCH /customers/:id`
@@ -101,7 +102,7 @@ export function CustomerContactCorrection({
   if (!canUpdate) {
     return (
       <p style={muted} data-testid="customer-correct-denied">
-        {t('customerCorrectNoPermission')}
+        {permissionRefusal(t, 'customerCorrectRefusalAct', 'customer.update')}
       </p>
     );
   }
