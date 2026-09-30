@@ -179,7 +179,8 @@ export const DETAIL_PAGES = {
     crmCountClaims: 'المطالبات:',
     crmCountComplaints: 'الشكاوى:',
     crmLogRefusalAct: 'تسجيل التفاعلات',
-    crmTimelineNeedsPermission: 'يحتاج المخطط الزمني الشامل إلى صلاحية customer.360-view.read. لا يزال بإمكانك تسجيل التفاعلات أعلاه.',
+    crmTimelineCanAct: 'تسجيل تفاعل مع هذا العميل',
+    crmTimelineCannotAct: 'الاطلاع على سجلهم الكامل',
     crmWhenOptional: 'متى (اختياري — الافتراضي الآن)',
     crmWhatHappened: 'ماذا حدث؟',
 
@@ -267,7 +268,7 @@ export const DETAIL_PAGES = {
     vendUnassigned: 'غير محدّدة',
     vendRiskTierLabel: 'فئة المخاطر:',
     vendTypeLabel: 'النوع:',
-    vendDpaApproveError: 'تعذّر تسجيل اعتماد مسؤول حماية البيانات — قد لا تملك صلاحية dpa.approve.',
+    vendDpaApproveAct: 'تسجيل اعتماد مسؤول حماية البيانات',
     vendRefusalAct: 'عرض هذا المورّد',
 
     // ---- Needs assessment (new + detail) -----------------------------------------------
@@ -652,7 +653,8 @@ export const DETAIL_PAGES = {
     crmCountClaims: 'Claims:',
     crmCountComplaints: 'Complaints:',
     crmLogRefusalAct: 'log interactions',
-    crmTimelineNeedsPermission: 'The 360° timeline needs the customer.360-view.read permission. You can still log interactions above.',
+    crmTimelineCanAct: 'log an interaction with this customer',
+    crmTimelineCannotAct: 'see their full history',
     crmWhenOptional: 'When (optional — defaults to now)',
     crmWhatHappened: 'What happened?',
 
@@ -738,7 +740,7 @@ export const DETAIL_PAGES = {
     vendUnassigned: 'unassigned',
     vendRiskTierLabel: 'Risk tier:',
     vendTypeLabel: 'Type:',
-    vendDpaApproveError: 'Could not record DPO approval — you may not hold dpa.approve.',
+    vendDpaApproveAct: 'record the data protection officer approval',
     vendRefusalAct: 'view this vendor',
 
     nanRiskProfileLabel: 'Risk profile',

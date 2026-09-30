@@ -6,8 +6,9 @@
   },
   "resolved-compared-against-raw-dueat": {
     "file": "apps/api/src/modules/sla-dashboard/sla-dashboard.config.ts",
-    "from": "    const dueAtCompletion =\n      timer.dueAt.getTime() + (timer.pausedTotalMs ?? 0);",
-    "to": "    const dueAtCompletion = timer.dueAt.getTime();"
+    "from": "    const dueAtCompletion = timer.dueAt.getTime() + (timer.pausedTotalMs ?? 0);",
+    "to": "    const dueAtCompletion = timer.dueAt.getTime();",
+    "why": "A timer resolved INSIDE its pause-adjusted deadline is recorded `resolved_late`, which never changes again and sits in breachRate forever — a wrong compliance figure on the record, against the brokerage. sla-dashboard.config.spec.ts and the api e2e both die. REPOINTED: the anchor was two lines and the expression now fits on one, so PRETTIER broke it while the code stayed the same."
   },
   "overdue-days-measured-from-dueat": {
     "file": "apps/api/src/modules/sla-dashboard/sla-dashboard.config.ts",

@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 501 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 502 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -518,6 +518,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'department.read',
     'department.update',
     'deprovisioning.execute',
+    'diagnostics.view',
     'document.delete-override',
     'email.integration.manage',
     'email.integration.read',
@@ -560,7 +561,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 218 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 219 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -578,6 +579,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'department.deactivate', module: 'admin', description: "Retire a department so it is no longer offered for new people (existing records keep it)" },
   { code: 'department.read', module: 'admin', description: "View the office's departments" },
   { code: 'department.update', module: 'admin', description: "Rename a department" },
+  { code: 'diagnostics.view', module: 'admin', description: "See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence" },
   { code: 'encryption-key.read', module: 'admin', description: "View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access)" },
   { code: 'permission.read', module: 'admin', description: "View the global permission catalogue (the codes a role can be granted)" },
   { code: 'role.create', module: 'admin', description: "Define a new role in this office's catalogue" },

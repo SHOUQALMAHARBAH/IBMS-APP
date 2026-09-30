@@ -14,11 +14,6 @@
     "from": "      data: {\n        reviewedByUserId: actor.id,\n        reviewerCombinedDutyActId: combinedDutyActId,\n      },",
     "to": "      data: {\n        reviewedByUserId: actor.id,\n      },"
   },
-  "gate-lifted-early": {
-    "file": "apps/api/src/modules/duty-segregation/duty-segregation-mode.service.ts",
-    "from": "export const SELF_APPROVAL_REPORT_EXISTS = false;",
-    "to": "export const SELF_APPROVAL_REPORT_EXISTS = true;"
-  },
   "mode-change-not-audited": {
     "file": "apps/api/src/modules/duty-segregation/duty-segregation-mode.service.ts",
     "from": "    await this.audit.record({\n      userId: actor.id,\n      action: 'UPDATE',\n      entityType: 'Organization',",
@@ -36,8 +31,9 @@
   },
   "report-flag-always-false": {
     "file": "apps/api/src/modules/internal-controls/combined-duty-report.service.ts",
-    "from": "      accessSelfReview: act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT,",
-    "to": "      accessSelfReview: false,"
+    "from": "      accessSelfReview:\n        act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT &&\n        !arrangementActIds.has(act.id),",
+    "to": "      accessSelfReview: false,",
+    "why": "An access self-review stops being flagged, so it no longer sorts ahead of every transaction act — the owner's condition for accepting the combined-duty mode at all. self-approval-report.e2e-spec.ts dies on the ordering assertion. REPOINTED: the original anchored on `act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT` alone, and the expression was later INVERTED to ask which acts are the ARRANGEMENT (so anything unclassifiable stays flagged), making it a conjunction. The whole expression is the anchor now, because flipping half of it is a weaker plant."
   },
   "always-asks-for-a-declaration": {
     "file": "apps/web/components/ui/CombinedDutyReasonField.tsx",

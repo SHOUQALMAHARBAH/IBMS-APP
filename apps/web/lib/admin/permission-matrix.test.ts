@@ -85,10 +85,13 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // leaves two alone, which is the arithmetic worth reading: the `customer` family already held two CRUD
     // verbs (`create`, `update`), so it was already a five-state row — this adds a THIRD verb to an existing
     // row rather than creating one. Families stay at 21 and the toggle list does not move at all.
-    expect(PERMISSION_CATALOGUE.length).toBe(218);
+    // `diagnostics.view` (the code that replaced a ROLE-NAME read on /settings/email) moves exactly two of
+    // the four: it is the only member of a `diagnostics` family, and one CRUD verb is not a family, so it
+    // lands in the TOGGLE list. Families and the codes they cover do not move at all.
+    expect(PERMISSION_CATALOGUE.length).toBe(219);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
-    expect(toggles.length).toBe(159);
+    expect(toggles.length).toBe(160);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 

@@ -1712,6 +1712,27 @@ const admin: PermissionSeed[] = [
     roles: [ADMIN, OFFICE_ADMIN],
   },
   {
+    // A ROLE NAME IS NOT AN IDENTITY, applied to a display decision.
+    //
+    // `/settings/email` decided whether to show the server's raw error text with
+    // `user.roles.includes('SYSTEM_SECURITY_ADMINISTRATOR')` — the frontend directive implemented as
+    // written, and what the office-scoped RBAC design forbids. An office that names its security
+    // administrator anything else was SILENTLY unrecognised: no error, just a weaker message.
+    //
+    // Granted to ADMIN alone, which is exactly the role that line already matched, so no office sees
+    // more or less than before. An office with a differently named administrator can now be granted it,
+    // which is the whole point.
+    //
+    // Read only by `apps/web` — there is nothing to gate server-side, because the API always returns its
+    // message and the screen decides whether to render it. `permission-enforcement.inventory.spec.ts`
+    // counts that as enforced; its ROOTS include the web app deliberately.
+    code: "diagnostics.view",
+    module: "admin",
+    description:
+      "See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence",
+    roles: [ADMIN],
+  },
+  {
     code: "access-recertification.cycle.start",
     module: "admin",
     description: "Start an access-recertification cycle",

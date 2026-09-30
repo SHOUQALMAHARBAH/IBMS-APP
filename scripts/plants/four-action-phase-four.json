@@ -19,20 +19,11 @@
     "from": "const canDeactivate = hasPermission(user, 'payment-channel.deactivate');",
     "to": "const canDeactivate = hasPermission(user, 'payment-channel.create');"
   },
-  "refusal-still-names-the-removed-umbrella": {
-    "file": "apps/web/lib/i18n/translations/finance.ts",
-    "from": "pcNoPermission: \"You don't hold the payment-channel.read permission.\",",
-    "to": "pcNoPermission: \"You don't hold the payment-channel.manage permission.\","
-  },
-  "arabic-refusal-still-names-the-removed-umbrella": {
-    "file": "apps/web/lib/i18n/translations/finance.ts",
-    "from": "pcNoPermission: 'لا تملك صلاحية payment-channel.read اللازمة لعرض قنوات الدفع.',",
-    "to": "pcNoPermission: 'لا تملك صلاحية payment-channel.manage اللازمة لعرض قنوات الدفع.',"
-  },
   "holiday-regated-onto-a-policy-code": {
     "file": "apps/api/src/modules/sla/sla-timer.controller.ts",
-    "from": "@RequirePermissions('sla.holiday.create')",
-    "to": "@RequirePermissions('sla.policy.update')"
+    "from": "  @RequirePermissions('sla.holiday.create')\n  @Post('holidays')",
+    "to": "  @RequirePermissions('sla.policy.update')\n  @Post('holidays')",
+    "why": "Adding a public holiday is re-gated onto an SLA POLICY code, collapsing the distinction four-action Phase 4 drew: a holiday is clerical and factual, an SLA duration is a policy decision with regulatory weight, and an office must be able to grant one without the other. four-action-separability.e2e-spec.ts dies. NARROWED: the decorator alone now matches THREE sites, because the holiday module grew a fixed-dates route and an occasion route. The @Post line beneath it is what says which create this is."
   },
   "deactivate-regated-onto-the-update": {
     "file": "apps/api/src/modules/sla/sla-policy.controller.ts",
@@ -48,5 +39,11 @@
     "file": "apps/web/app/(app)/sla-policies/page.tsx",
     "from": "const canDeactivate = hasPermission(user, 'sla.policy.deactivate');",
     "to": "const canDeactivate = hasPermission(user, 'sla.policy.update');"
+  },
+  "refusal-names-the-removed-umbrella": {
+    "file": "apps/web/app/(app)/payment-channels/page.tsx",
+    "from": "permissionRefusal(t, 'pcRefusalAct', 'payment-channel.read')",
+    "to": "permissionRefusal(t, 'pcRefusalAct', 'payment-channel.manage')",
+    "why": "The refusal names the umbrella that four-action Phase 4 SPLIT, instead of the read code whose absence actually caused the failure — sending the reader to ask for a grant that no longer exists. payment-channels.spec.ts dies on \"(payment-channel.read)\", and screen-copy.test.ts's \"every code handed to the shared sentence names a permission that exists\" dies too, because payment-channel.manage is not in the catalogue any more. REPLACES the two plants `refusal-still-names-the-removed-umbrella` and its `arabic-` twin, which anchored on the two halves of `pcNoPermission`. That key became `pcRefusalAct` and holds only the ACT; the code moved to the call site. So the English/Arabic split no longer exists to plant against — one sentence, one place, one plant, which is the refusal rework showing up in its own evidence."
   }
 }

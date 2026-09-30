@@ -17,6 +17,7 @@ import { useAuth } from '../../lib/auth/auth-context';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { hasPermission } from '../../lib/auth/permissions';
 import { errorStyle } from '../auth/auth-form.styles';
+import { reducedCapability } from '../../lib/i18n/permission-refusal';
 
 /*
  * THE NON-WORKING-DAY CALENDAR, ONE YEAR AT A TIME.
@@ -388,7 +389,7 @@ export function SlaHolidayCalendar() {
         </div>
       ) : (
         <p style={{ fontSize: '0.8rem', color: 'var(--ink-secondary)' }}>
-          {t('slapHolidayReadOnly')}
+          {reducedCapability(t, 'slapHolidayCanAct', 'slapHolidayCannotAct', 'sla.holiday.create')}
         </p>
       )}
 

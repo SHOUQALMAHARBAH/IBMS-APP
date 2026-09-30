@@ -213,8 +213,8 @@ export const CUSTOMERS = {
       "عالية المخاطر عبر العناية الواجبة المعززة، واعتماد أو رفض كل ملف اعرف عميلك. " +
       "الاعتماد يُفعّل العميل؛ ومبدأ الفصل بين المُعِد والمدقق يمنع موظف الالتزام الذي " +
       "سجّل الملف من اعتماده أيضاً.",
-    kycQueueNoApprovePermission:
-      "لا تملك صلاحية kyc.approve — هذه القائمة مخصصة للالتزام فقط.",
+    kycQueueApproveCanAct: 'العمل على قائمة اعرف عميلك والاطلاع على ما ينتظره كل ملف',
+    kycQueueApproveCannotAct: 'الموافقة على ملف أو رفضه',
     kycQueueRefusalAct: 'العمل على قائمة اعرف عميلك',
     kycQueueActionFailed: "تعذر تنفيذ الإجراء — حاول مرة أخرى.",
     kycQueueEmpty: "لا يوجد شيء في قائمة اعرف عميلك حالياً.",
@@ -467,8 +467,8 @@ export const CUSTOMERS = {
       "Process 3-4 — run sanctions/AML screening, route high-risk results through " +
       "enhanced due diligence, and approve or reject each KYC file. Approving activates " +
       "the Customer; maker/checker prevents the capturing officer from also being the approver.",
-    kycQueueNoApprovePermission:
-      "You don't hold the kyc.approve permission — this queue is Compliance-only.",
+    kycQueueApproveCanAct: 'work the KYC queue and see what each file is waiting for',
+    kycQueueApproveCannotAct: 'approve or reject a file',
     kycQueueRefusalAct: 'work the KYC queue',
     kycQueueActionFailed: "Action failed — try again.",
     kycQueueEmpty: "Nothing in the KYC queue right now.",

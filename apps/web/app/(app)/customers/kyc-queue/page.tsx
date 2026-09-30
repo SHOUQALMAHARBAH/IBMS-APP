@@ -10,7 +10,7 @@ import { pageStyle } from '../../../../components/lead/lead.styles';
 import { KycQueue } from '../../../../components/customer/KycQueue';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
-import { permissionRefusalAnyOf } from '../../../../lib/i18n/permission-refusal';
+import { permissionRefusalAnyOf, reducedCapability } from '../../../../lib/i18n/permission-refusal';
 
 // Roles the seeded permission grid grants `kyc.approve` to — the queue is
 // COMPLIANCE_OFFICER-only; the backend independently enforces this
@@ -71,7 +71,7 @@ export default function KycQueuePage() {
       <p style={{ opacity: 0.8 }}>{t('kycQueuePageIntro')}</p>
       {!canApprove ? (
         <p role="alert" style={errorStyle}>
-          {t('kycQueueNoApprovePermission')}
+          {reducedCapability(t, 'kycQueueApproveCanAct', 'kycQueueApproveCannotAct', 'kyc.approve')}
         </p>
       ) : null}
       {items === null && !loadError ? <p>{t('commonLoading')}</p> : null}

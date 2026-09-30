@@ -31,7 +31,7 @@ import {
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../lib/i18n/format';
 import { hasPermission } from '../../../lib/auth/permissions';
-import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
 
 // Client-side hint only — the API enforces `interaction.log` on write
 // regardless. Matches the seeded grant list for that permission (a superset
@@ -300,7 +300,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         <TimelineList view={view} />
       ) : (
         <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
-          {t('crmTimelineNeedsPermission')}
+          {reducedCapability(t, 'crmTimelineCanAct', 'crmTimelineCannotAct', 'customer.360-view.read')}
         </p>
       )}
     </div>

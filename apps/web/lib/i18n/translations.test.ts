@@ -194,8 +194,18 @@ describe('permission codes quoted in user-facing text', () => {
     // codes that left are covered by a STRONGER check in `apps/web/test/screen-copy.test.ts`, which
     // verifies every code passed to `permissionRefusal*` against the catalogue — 106 call sites against
     // this file's 10 strings, and it also refuses an act key rendered outside the shared shape.
-    expect(counts.AR, 'no permission codes found in the Arabic halves').toBeGreaterThan(5);
-    expect(counts.EN, 'no permission codes found in the English halves').toBeGreaterThan(5);
+    // 50 -> 5 -> 1, and the reason is the same each time: codes keep LEAVING dictionary text for call sites.
+    // 100 refusal strings went first, then the eight partially-enabled notes. TWO strings remain that name a
+    // code in prose, and both do it for a reason no shape covers — `smCaseNoReviewers` explains that a
+    // screening case cannot be assigned because nobody holds `sanctions-pep.screen`, and
+    // `roleMatrixNeedsCatalogue` explains that the matrix cannot render without `permission.read`.
+    //
+    // A floor of 1 is nearly vacuous ON THIS SIDE, and saying so is the point: the population it used to
+    // watch now lives at the call sites, where `apps/web/test/screen-copy.test.ts` checks every code against
+    // the catalogue and carries its own floor of 95. This check is still worth keeping for what it can see —
+    // a renamed code left behind in prose — but it should not be read as covering the codes generally.
+    expect(counts.AR, 'no permission codes found in the Arabic halves').toBeGreaterThan(1);
+    expect(counts.EN, 'no permission codes found in the English halves').toBeGreaterThan(1);
     // And neither half quotes far fewer than the other — that asymmetry IS the bug class.
     const ratio =
       Math.min(counts.AR, counts.EN) / Math.max(counts.AR, counts.EN);

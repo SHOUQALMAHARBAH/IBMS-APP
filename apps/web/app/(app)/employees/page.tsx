@@ -23,7 +23,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle, successStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
-import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -513,7 +513,7 @@ export default function EmployeesPage() {
           // Said plainly rather than left blank: recording people is this role's job, issuing logins
           // is not, and an absent control with no explanation reads as a missing feature.
           <p style={hintStyle} data-no-login-permission>
-            {t('empNoLoginPermission')}
+            {reducedCapability(t, 'empLoginCanAct', 'empLoginCannotAct', 'user.manage')}
           </p>
         )}
 

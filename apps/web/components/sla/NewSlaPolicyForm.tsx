@@ -38,6 +38,7 @@ import {
   type SlaDurationUnit,
   type SlaSourceType,
 } from '../../lib/sla/sla-policy-api';
+import { reducedCapability } from '../../lib/i18n/permission-refusal';
 
 const DURATION_UNITS: SlaDurationUnit[] = [
   'MINUTES',
@@ -289,7 +290,7 @@ export function NewSlaPolicyForm({ onCreated }: { onCreated: () => void }) {
             style={{ fontSize: '0.8rem', color: 'var(--ink-secondary)' }}
             data-testid="new-sla-regulatory-note"
           >
-            {t('slapCreateNotRegulatoryNote')}
+            {reducedCapability(t, 'slapRegulatoryCanAct', 'slapRegulatoryCannotAct', 'sla.policy.regulatory')}
           </p>
         )}
 

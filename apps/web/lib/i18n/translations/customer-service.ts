@@ -178,8 +178,8 @@ export const CUSTOMER_SERVICE = {
     slaDashRegulatoryTitle: 'هذه المهلة مصدرها نظامي، لا هدف داخلي.',
     slaDashPauseError: 'تعذّر إيقاف الساعة — حاول مرة أخرى.',
     slaDashResumeError: 'تعذّر استئناف الساعة — حاول مرة أخرى.',
-    slaDashNoPausePermission:
-      'لا تملك صلاحية sla.timer.pause، لذا لا يمكنك إيقاف ساعة أو استئنافها.',
+    slaDashPauseCanAct: 'الاطلاع على كل مهلة وكيفية حسابها',
+    slaDashPauseCannotAct: 'إيقاف المهلة أو إعادة تشغيلها',
     slaDashRefusalAct: 'عرض لوحة مستويات الخدمة',
     slaDashStateOnTrack: 'ضمن المهلة',
     slaDashStateDueSoon: 'تقترب من الاستحقاق',
@@ -359,8 +359,8 @@ export const CUSTOMER_SERVICE = {
     slaDashRegulatoryTitle: 'This deadline comes from a regulatory source, not an internal target.',
     slaDashPauseError: 'Could not pause the clock — try again.',
     slaDashResumeError: 'Could not resume the clock — try again.',
-    slaDashNoPausePermission:
-      'You do not hold sla.timer.pause, so you cannot stop or restart a clock.',
+    slaDashPauseCanAct: 'see every deadline and how it is counted',
+    slaDashPauseCannotAct: 'stop or restart a clock',
     slaDashRefusalAct: 'view the service level dashboard',
     slaDashStateOnTrack: 'On track',
     slaDashStateDueSoon: 'Due soon',

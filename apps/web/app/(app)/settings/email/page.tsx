@@ -93,9 +93,20 @@ export default function EmailIntegrationPage() {
 
   const canRead = !!user && hasPermission(user, 'email.integration.read');
   const canManage = !!user && hasPermission(user, 'email.integration.manage');
-  // The one role the directive allows implementation detail to reach.
-  const seesInternalDetail =
-    !!user && user.roles.includes('SYSTEM_SECURITY_ADMINISTRATOR');
+  // A PERMISSION CODE, NOT A ROLE NAME.
+  //
+  // This read `user.roles.includes('SYSTEM_SECURITY_ADMINISTRATOR')` — the frontend directive implemented
+  // as written, since it reserves implementation detail to the System/Security Administrator and names that
+  // role. It is also what office-scoped RBAC constraint 1 forbids: an office defines its own roles under
+  // its own names, so an office whose security administrator is called anything else was silently
+  // unrecognised here. No error, no complaint — just a weaker message and no way to find out why.
+  //
+  // Same decision as `customer.read`, and the same decision as naming the administrator BY FUNCTION in the
+  // 100 permission refusals: having removed role names from a hundred sentences, the code must not read one.
+  //
+  // `diagnostics.view` is granted to exactly the role the old line matched, so no office sees more or less
+  // than before; an office with a differently named administrator can now simply be granted it.
+  const seesInternalDetail = !!user && hasPermission(user, 'diagnostics.view');
 
   const [status, setStatus] = useState<EmailIntegrationStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -345,7 +356,7 @@ export default function EmailIntegrationPage() {
           <p role="alert" style={errorStyle} data-testid="email-action-error">
             {actionError}
           </p>
-          {/* Implementation detail for the one role the directive allows it to reach. */}
+          {/* Implementation detail, for whoever holds `diagnostics.view` — a code, never a role name. */}
           {gapDetail !== null && (
             <p
               style={{ fontSize: '0.8rem', color: 'var(--ink-secondary)' }}

@@ -234,10 +234,16 @@ describe('a load error announces itself (rule 3)', () => {
  * what the code does — and never on what a key is called.
  */
 describe('a permission refusal is worded in exactly one place', () => {
+  // All FIVE exported shapes, not just the three refusals. The two reduced-capability shapes
+  // (`reducedCapability`, `permissionMayBeMissing`) pass codes and act keys exactly as the refusals do, so
+  // leaving them out would exempt their call sites from every check below — and this guard caught precisely
+  // that omission the moment they were added, which is what it is for.
   const HELPERS = [
     'permissionRefusal',
     'permissionRefusalAnyOf',
     'permissionRefusalAllOf',
+    'reducedCapability',
+    'permissionMayBeMissing',
   ];
   const CODES = new Set(PERMISSION_CATALOGUE.map((entry) => entry.code));
 
@@ -249,8 +255,10 @@ describe('a permission refusal is worded in exactly one place', () => {
     // it needed `\\b…\\s…\\w`, and in a template literal `\b` is a BACKSPACE CHARACTER. It compiled, ran,
     // matched nothing, and the two checks above passed on an empty set — caught only by the non-vacuity
     // floor below. A regex that cannot be written wrongly beats one that has to be written carefully.
+    // The optional second quoted argument covers `reducedCapability(t, can, cannot, code)`, which carries TWO
+    // act keys where the refusals carry one.
     const pattern =
-      /\b(permissionRefusal|permissionRefusalAnyOf|permissionRefusalAllOf)\(\s*\w+\s*,\s*'([^']+)'\s*,\s*([^)]*)\)/g;
+      /\b(permissionRefusal|permissionRefusalAnyOf|permissionRefusalAllOf|reducedCapability|permissionMayBeMissing)\(\s*\w+\s*,\s*'([^']+)'(?:\s*,\s*'[^']+')?\s*,\s*([^)]*)\)/g;
     for (const [file, src] of sources()) {
       for (const m of src.matchAll(pattern)) {
         found.push({
@@ -290,7 +298,7 @@ describe('a permission refusal is worded in exactly one place', () => {
     // sentence around it puts the wording back in 100 places, which is what this replaced.
     const offenders: string[] = [];
     for (const [file, src] of sources()) {
-      for (const m of src.matchAll(/\b(t|tr)\(\s*'(\w*RefusalAct)'/g)) {
+      for (const m of src.matchAll(/\b(t|tr)\(\s*'(\w*(?:Refusal|Can|Cannot)?Act)'/g)) {
         offenders.push(`${file}: ${m[1]}('${m[2]}')`);
       }
     }
@@ -360,7 +368,7 @@ describe('two entry points to one act say the same thing', () => {
       if (!file.endsWith('.ts')) continue;
       const src = fs.readFileSync(path.join(dir, file), 'utf8');
       for (const m of src.matchAll(
-        /^[ \t]*(\w*RefusalAct)\s*:\s*(?:\n[ \t]*)?(['"])(.*?)\2,/gm,
+        /^[ \t]*(\w*(?:Refusal|Can|Cannot)?Act)\s*:\s*(?:\n[ \t]*)?(['"])(.*?)\2,/gm,
       )) {
         found.set(m[1], [...(found.get(m[1]) ?? []), m[3]]);
       }
@@ -402,13 +410,13 @@ describe('every act key is reachable, and every reachable key exists', () => {
       if (!file.endsWith('.ts')) continue;
       for (const m of fs
         .readFileSync(path.join(dir, file), 'utf8')
-        .matchAll(/^[ \t]*(\w*RefusalAct)\s*:/gm)) {
+        .matchAll(/^[ \t]*(\w*(?:Refusal|Can|Cannot)?Act)\s*:/gm)) {
         declared.add(m[1]);
       }
     }
     const used = new Set<string>();
     for (const [, src] of sources()) {
-      for (const m of src.matchAll(/'(\w*RefusalAct)'/g)) used.add(m[1]);
+      for (const m of src.matchAll(/'(\w*(?:Refusal|Can|Cannot)?Act)'/g)) used.add(m[1]);
     }
     expect(declared.size, 'no act keys declared — the matcher has drifted').toBeGreaterThan(95);
     expect(

@@ -1,0 +1,74 @@
+{
+  "act-dropped-from-the-sentence": {
+    "file": "apps/web/lib/i18n/translations/common.ts",
+    "from": "      'You do not hold permission to {act} — ask whoever manages permissions in your office. ({code})',",
+    "to": "      'You do not hold the {code} permission.',",
+    "why": "The sentence stops naming the act and goes back to naming only the code — the exact state the 100 strings were in. e2e permission-refusal.spec.ts 'names the act, names who grants it' must die on 'view the payment channels an office sends money through'."
+  },
+  "grantor-named-by-role": {
+    "file": "apps/web/lib/i18n/translations/common.ts",
+    "from": "      'You do not hold permission to {act} — ask whoever manages permissions in your office. ({code})',",
+    "to": "      'You do not hold permission to {act} — ask your Office Administrator. ({code})',",
+    "why": "The grantor is named by ROLE NAME, which an office may not use. The ROLE_WORDS absence loop in permission-refusal.spec.ts must die."
+  },
+  "role-name-appended-beside-the-function": {
+    "file": "apps/web/lib/i18n/translations/common.ts",
+    "from": "      'You do not hold permission to {act} — ask whoever manages permissions in your office. ({code})',",
+    "to": "      'You do not hold permission to {act} — ask whoever manages permissions in your office, or ask your Manager. ({code})',",
+    "why": "A role name APPENDED beside the by-function clause, which is the realistic regression: somebody adds a role name 'to be helpful'. The `grantor-named-by-role` plant could not prove the ROLE_WORDS loop because it removed the by-function clause and the POSITIVE assertion at line 107 died first, leaving the loop unreached. This one keeps that clause so the loop is reached."
+  },
+  "all-of-phrased-as-any-one": {
+    "file": "apps/web/lib/i18n/permission-refusal.ts",
+    "from": "  return t('permissionRefusalAllOf', { act: t(act), code: codes.join(', ') });",
+    "to": "  return t('permissionRefusalAnyOf', { act: t(act), code: codes.join(', ') });",
+    "why": "The two opposite claims collapse into one. 'ALL of several codes' must die and 'ANY ONE of several codes' must still pass — that asymmetry is what proves the two are independently observed."
+  },
+  "stale-code-at-a-call-site": {
+    "file": "apps/web/app/(app)/payment-channels/page.tsx",
+    "from": "permissionRefusal(t, 'pcRefusalAct', 'payment-channel.read')",
+    "to": "permissionRefusal(t, 'pcRefusalAct', 'payment-channel.view')",
+    "why": "A renamed code left behind in a refusal — the bug class that used to live in the dictionaries. screen-copy.test.ts 'every code handed to the shared sentence names a permission that exists' must die."
+  },
+  "act-key-rendered-bare": {
+    "file": "apps/web/app/(app)/vendors/page.tsx",
+    "from": "permissionRefusal(t, 'venRefusalAct', 'vendor.read')",
+    "to": "t('venRefusalAct')",
+    "why": "A screen renders the act fragment without the sentence around it. screen-copy.test.ts 'no screen renders an act key outside the shared sentence' must die."
+  },
+  "fourth-helper-invisible-to-the-matcher": {
+    "file": "apps/web/lib/i18n/permission-refusal.ts",
+    "from": "export function permissionRefusal(\n",
+    "to": "export function permissionRefusalSometimes(t: Translate, act: TranslationKey): string {\n  return t(act);\n}\n\nexport function permissionRefusal(\n",
+    "why": "A fourth shape whose call sites the literal regex cannot see. screen-copy.test.ts 'the matcher names every helper the module exports' must die — the non-vacuity floor cannot catch this, because the other three are still found. ANCHOR REPOINTED: the original hung off a doc comment carrying a COUNT, and correcting that count made the plant stale — so its proof silently stopped re-running. Anchor a plant on the thing it is about, never on prose beside it."
+  },
+  "screen-dropped-its-refusal": {
+    "file": "apps/web/app/(app)/vendors/page.tsx",
+    "from": "permissionRefusal(t, 'venRefusalAct', 'vendor.read')",
+    "to": "t('commonTryAgain')",
+    "why": "A screen quietly stops refusing and shows a generic retry message instead, leaving its act key orphaned. screen-copy.test.ts 'has no orphaned act key and no undeclared one' must die — this is the SILENT failure the guard exists for, and it would otherwise look exactly like a screen with no data."
+  },
+  "duplicate-act-drifted": {
+    "file": "apps/web/lib/i18n/translations/detail-pages.ts",
+    "from": "nanRefusalAct: 'بدء تقييم احتياجات',",
+    "to": "nanRefusalAct: 'إنشاء تقييم احتياجات جديد',",
+    "why": "One of the two entry points to the same act is reworded and the other is not — a reader meets the same refusal on two screens and is told two different things. screen-copy.test.ts 'holds the identical act in both keys, in both languages' must die."
+  },
+  "duty-mode-403-swallowed": {
+    "file": "apps/web/app/(app)/settings/duty-segregation/page.tsx",
+    "from": "err instanceof ApiError && err.status === 403",
+    "to": "err instanceof ApiError && err.status === 999",
+    "why": "The 403 branch stops matching, so a reader gets the API's raw English message again — the state this screen was in before batch 6. There is no automated guard for a MISSING 403 branch, so this plant's purpose is to establish that the branch is load-bearing rather than decorative: with it disabled, the screen renders the server's caller-facing text."
+  },
+  "diagnostics-gated-on-a-role-name": {
+    "file": "apps/web/app/(app)/settings/email/page.tsx",
+    "from": "const seesInternalDetail = !!user && hasPermission(user, 'diagnostics.view');",
+    "to": "const seesInternalDetail =\n    !!user && user.roles.includes('SYSTEM_SECURITY_ADMINISTRATOR');",
+    "why": "Implementation detail goes back to being gated on a ROLE NAME, so an office whose security administrator is called anything else is silently shown less — no error, no complaint. email-integration.spec.ts's \"a differently NAMED role holding diagnostics.view sees the raw detail\" dies; the SYSTEM_SECURITY_ADMINISTRATOR test keeps passing, which is exactly why that test alone could not observe the fix."
+  },
+  "reduced-capability-loses-the-can-half": {
+    "file": "apps/web/lib/i18n/translations/common.ts",
+    "from": "      'You can {can}, but not {cannot} — ask whoever manages permissions in your office to change that. ({code})',",
+    "to": "      'You do not hold permission to {cannot}. ({code})',",
+    "why": "The SECOND decided shape collapses into the refusal sentence, throwing away the half that says what the reader can still do and the grantor with it — which is exactly why these eight strings were kept out of the refusal sweep. crm.spec.ts dies on \"but not see their full history\" AND on \"ask whoever manages permissions in your office\", so both halves of the decision are observed rather than just the wording."
+  }
+}

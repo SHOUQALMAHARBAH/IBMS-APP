@@ -86,8 +86,8 @@ export const COMPLIANCE_SCREENING = {
     slapHolidayAdd: 'إضافة يوم عطلة',
     slapHolidayAddError: 'تعذّر إضافة يوم العطلة — حاول مرة أخرى.',
     slapHolidayLoadError: 'تعذّر تحميل تقويم العطل — حاول مرة أخرى.',
-    slapHolidayReadOnly:
-      'لا تملك صلاحية sla.holiday.create، فالتقويم للقراءة فقط.',
+    slapHolidayCanAct: 'الاطلاع على أيام العطل التي تُحسب المهل مقابلها',
+    slapHolidayCannotAct: 'إدخال يوم عطلة',
     slapHolidayLoading: 'جارٍ تحميل التقويم…',
     slapHolidayYear: 'السنة',
     slapHolidayYearOwes: 'ما زالت هذه السنة تنقصها أيام',
@@ -131,8 +131,8 @@ export const COMPLIANCE_SCREENING = {
     slapCreateUnit: 'الوحدة',
     slapCreateCalendar: 'التقويم',
     slapCreateSourceType: 'مصدر الإلزام',
-    slapCreateNotRegulatoryNote:
-      'لا تملك صلاحية sla.policy.regulatory، فلا يمكنك تسجيل هذه السياسة كإلزام قانوني.',
+    slapRegulatoryCanAct: 'إنشاء هذه السياسة',
+    slapRegulatoryCannotAct: 'تسجيلها كمطلوبة بحكم التنظيم',
     slapCreateRegulatoryWarning:
       'تسجيل السياسة كإلزام قانوني يقتضي تسمية النص الذي يفرضها. المرجع والمستند مطلوبان.',
     slapCreateSourceReference: 'المرجع',
@@ -309,8 +309,8 @@ export const COMPLIANCE_SCREENING = {
     slapHolidayAdd: 'Add non-working day',
     slapHolidayAddError: 'Could not add that day — try again.',
     slapHolidayLoadError: 'Could not load the calendar — try again.',
-    slapHolidayReadOnly:
-      'You do not hold sla.holiday.create, so the calendar is read-only.',
+    slapHolidayCanAct: 'see the non-working days a deadline is counted against',
+    slapHolidayCannotAct: 'enter one',
     slapHolidayLoading: 'Loading the calendar…',
     slapHolidayYear: 'Year',
     slapHolidayYearOwes: 'This year is still missing days',
@@ -353,8 +353,8 @@ export const COMPLIANCE_SCREENING = {
     slapCreateUnit: 'Unit',
     slapCreateCalendar: 'Calendar',
     slapCreateSourceType: 'Where this SLA comes from',
-    slapCreateNotRegulatoryNote:
-      'You do not hold sla.policy.regulatory, so you cannot record this policy as a legal requirement.',
+    slapRegulatoryCanAct: 'create this policy',
+    slapRegulatoryCannotAct: 'record it as required by regulation',
     slapCreateRegulatoryWarning:
       'Recording this as a legal requirement means naming the instrument that imposes it. The reference and the document are both required.',
     slapCreateSourceReference: 'Reference',

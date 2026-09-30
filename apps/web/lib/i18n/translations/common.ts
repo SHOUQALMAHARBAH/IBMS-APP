@@ -41,6 +41,13 @@ export const COMMON = {
     // كلها — a SCREEN that loads several endpoints together and closes if any one of them refuses.
     permissionRefusalAllOf:
       'ليست لديك صلاحية {act}، وهي تحتاج إلى هذه الصلاحيات كلها — اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
+    // THE SECOND SHAPE — a reader who is partially enabled rather than refused. Keeps the half that says
+    // what still works, and adds the grantor the eight originals all lacked.
+    reducedCapability:
+      'يمكنك {can}، لكن لا يمكنك {cannot} — اطلب ذلك ممن يدير الصلاحيات في مكتبك. ({code})',
+    // An action that FAILED where a missing grant is the likely cause, not a certainty.
+    permissionMayBeMissing:
+      'تعذّر {act} — قد لا تكون لديك الصلاحية اللازمة. اطلبها ممن يدير الصلاحيات في مكتبك. ({code})',
     // Rendered by app/(app)/layout.tsx above EVERY authenticated screen while no authenticator is
     // paired. Without it the first sign-in lands on a home page whose every link answers 403, and
     // nothing on screen connects that to enrolment.
@@ -146,6 +153,10 @@ export const COMMON = {
       'You do not hold permission to {act}, and any one of these permissions grants it — ask whoever manages permissions in your office. ({code})',
     permissionRefusalAllOf:
       'You do not hold permission to {act}, and it needs all of these permissions — ask whoever manages permissions in your office. ({code})',
+    reducedCapability:
+      'You can {can}, but not {cannot} — ask whoever manages permissions in your office to change that. ({code})',
+    permissionMayBeMissing:
+      'Could not {act} — you may not hold the permission for it. Ask whoever manages permissions in your office. ({code})',
     mfaBannerTitle: 'One step before the system works: pair an authenticator app',
     mfaBannerBody:
       'Most screens will refuse to load until you pair an authenticator app with your account. This is not a problem with your permissions.',

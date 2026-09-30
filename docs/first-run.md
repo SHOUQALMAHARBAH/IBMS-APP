@@ -12,7 +12,73 @@
 
 ---
 
+> ## ⚖️ قبل أي خطوة: بيانات تجريبية فقط
+>
+> **هذا النظام يُشغَّل على بيانات تجريبية مُولَّدة فقط. لا تُدخلي بيانات أي عميل حقيقي — لا اسماً، ولا
+> رقماً وطنياً، ولا هاتفاً، ولا أي وثيقة.**
+>
+> والسبب قانوني لا تنظيمي داخلي: قانون حماية البيانات الشخصية الأردني رقم ٢٤ لسنة ٢٠٢٣، **المادة
+> ٦/ب**، لا يسمح بالاحتفاظ بالبيانات الشخصية بعد انتهاء الغرض الذي جُمعت له إلا إذا نصّ تشريع آخر على
+> خلاف ذلك. ومدد الاحتفاظ الخاصة بمكتبنا **لا تزال عند المحامي ولم تُحدَّد بعد**. أي أننا لا نستطيع
+> اليوم أن نقول كم من الوقت يحق لنا الاحتفاظ ببيانات عميل — وما لا نستطيع تحديد مدة الاحتفاظ به لا
+> نحتفظ به.
+>
+> ما في النظام الآن كله من صنع أداة التجهيز: العملاء، الموظفون، الوثائق، المطالبات. الأسماء تبدو
+> حقيقية وليست كذلك. استخدميها بحرية — املئي، عدّلي، احذفي، اكسري ما شئت. لا شيء منها يعود لإنسان.
+>
+> **هذا حدّ قانوني، وليس تفضيلاً.** يُرفع عندما تصل مدد الاحتفاظ من المحامي وتُدخل في النظام، لا قبل.
+
+---
+
 # بالعربية
+
+## ٠. التجهيز لأول مرة — تُنفَّذ مرة واحدة فقط
+
+هذا القسم للمرة الأولى على جهاز جديد. إن كنتِ قد نفّذتِه مسبقاً فانتقلي إلى القسم ١.
+
+### أ. تثبيت البرنامجين
+
+| ماذا | من أين | كيف تعرفين أنه نجح |
+|---|---|---|
+| **Docker Desktop** | `https://www.docker.com/products/docker-desktop/` — نزّلي نسخة Windows وثبّتيها، ثم **افتحيه ودعيه يعمل** | افتحي PowerShell واكتبي `docker ps`. النجاح: جدول فارغ برؤوس أعمدة. الفشل: `error during connect` — معناه أن Docker Desktop غير مفتوح، افتحيه وانتظري حتى تستقر الأيقونة |
+| **Node.js 20.19.0** | `https://nodejs.org/` — نزّلي نسخة **20.x LTS** لويندوز | `node --version` يجب أن يطبع `v20.` شيئاً. إن طبع `v22` أو `v18` فالنسخة خطأ: النظام مُثبَّت على العشرين |
+
+> **بعد تثبيت أيٍّ منهما أغلقي نافذة PowerShell وافتحي واحدة جديدة.** النافذة القديمة لا ترى
+> البرامج التي ثُبِّتت بعد فتحها، فستقول لكِ `command not found` عن برنامج مثبَّت فعلاً. هذا أكثر
+> سؤال يُطرح في هذه الخطوة.
+
+### ب. الأوامر الأربعة، بهذا الترتيب
+
+افتحي PowerShell على مجلد المشروع `C:\Users\user\Downloads\ibms-app` ونفّذي:
+
+```powershell
+npm install
+Copy-Item .env.example .env
+docker compose up -d db
+npm run db:migrate:deploy
+npm run db:seed
+```
+
+ماذا يفعل كل واحد، وكيف تعرفين أنه نجح:
+
+| الأمر | ماذا يفعل | النجاح | الفشل الشائع |
+|---|---|---|---|
+| `npm install` | ينزّل مكتبات المشروع. **يستغرق دقائق عدة في المرة الأولى** | سطر أخير مثل `added 1500 packages` | `EPERM` أو ملف مقفل: أغلقي أي محرر أو نافذة أخرى تعمل على المجلد وأعيدي المحاولة |
+| `Copy-Item .env.example .env` | ينسخ ملف الإعدادات. **لا يطبع شيئاً عند النجاح** — الصمت هو النجاح | لا رسالة | `already exists`: الملف موجود، تخطّي الأمر |
+| `docker compose up -d db` | يشغّل قاعدة البيانات داخل Docker | `Started` أو `Running` | `error during connect`: Docker Desktop غير مفتوح |
+| `npm run db:migrate:deploy` | **ينشئ جداول قاعدة البيانات.** بدونه القاعدة فارغة تماماً ولن يعمل أي شيء | `All migrations have been successfully applied` | `Can't reach database server`: القاعدة لم تجهز بعد — انتظري عشر ثوانٍ وأعيدي الأمر |
+| `npm run db:seed` | يضع الأدوار و**٢١٩ صلاحية**. بدونه تدخلين ولا تستطيعين فتح أي شاشة | `Seeded 219 permissions.` | إن طبع رقماً أصغر فالأمر لم يكتمل؛ أعيديه |
+
+> **استخدمي `db:migrate:deploy` وليس `db:migrate:dev`.** الأول يطبّق الترحيلات الموجودة ولا شيء غير ذلك.
+> الثاني يقارن بعدها ملف المخطط بقاعدة البيانات، وفي هذا المشروع الملف يحتوي أقل مما تحتويه القاعدة
+> عن قصد، فقد يعرض عليكِ إنشاء ترحيل جديد لا تريدينه. إن رأيتِ سؤالاً عن إنشاء ترحيل فاضغطي إلغاء
+> واستخدمي `deploy`.
+>
+> **`db:migrate:deploy` و `db:seed` مختلفان ولا يغني أحدهما عن الآخر.** الأول يبني الجداول، والثاني
+> يضع فيها الأدوار والصلاحيات. تخطّي الثاني وستنجح كلمة المرور ثم تُرفض كل شاشة — وهي أكثر حالة
+> محيّرة في هذا النظام، لأن الخطأ يبدو كمشكلة في حسابك وهو ليس كذلك.
+
+بعد هذه الخمسة انتقلي إلى القسم ١. لن تحتاجي القسم ٠ مرة أخرى على هذا الجهاز.
 
 ## ١. قبل أن تبدئي
 
@@ -296,7 +362,76 @@ yarmouk insurance (Demo)
 
 ---
 
+> ## ⚖️ Before any step: seeded test data only
+>
+> **This system runs on generated test data only. Do not put any real customer's details into it —
+> no name, no national ID, no phone number, no document.**
+>
+> The reason is legal, not an internal preference. Jordan's Personal Data Protection Law No. 24 of
+> 2023, **Article 6(B)**, does not permit personal data to be kept beyond the purpose it was
+> collected for unless other legislation says otherwise. **Our own retention periods are still with
+> the lawyer and are not set.** So today we cannot say how long we are entitled to keep a customer's
+> data — and what we cannot state a retention period for, we do not hold.
+>
+> Everything in the system now came from the seeding tool: the customers, the employees, the
+> policies, the claims. The names look real and are not. Use them freely — fill things in, change
+> them, delete them, break whatever you like. None of it belongs to a person.
+>
+> **This is a legal boundary, not a preference.** It lifts when the retention periods come back from
+> the lawyer and are entered into the system, and not before.
+
+---
+
 # In English
+
+## 0. First-time setup — once per machine
+
+This section is for the first time on a new machine. If you have done it before, go to §1.
+
+### a. Install the two programs
+
+| What | Where | How you know it worked |
+|---|---|---|
+| **Docker Desktop** | `https://www.docker.com/products/docker-desktop/` — download the Windows version, install it, then **open it and leave it running** | Open PowerShell and type `docker ps`. Success: an empty table with column headings. Failure: `error during connect` — Docker Desktop is not open; open it and wait for its icon to settle |
+| **Node.js 20.19.0** | `https://nodejs.org/` — download the **20.x LTS** Windows installer | `node --version` must print something starting `v20.`. If it prints `v22` or `v18` it is the wrong one: this system is pinned to 20 |
+
+> **After installing either one, close the PowerShell window and open a new one.** An old window
+> cannot see a program installed after it opened, so it will tell you `command not found` about
+> something that is genuinely installed. This is the most common question at this step.
+
+### b. The five commands, in this order
+
+Open PowerShell in the project folder `C:\Users\user\Downloads\ibms-app` and run:
+
+```powershell
+npm install
+Copy-Item .env.example .env
+docker compose up -d db
+npm run db:migrate:deploy
+npm run db:seed
+```
+
+What each one does, and how you know it worked:
+
+| Command | What it does | Success | Common failure |
+|---|---|---|---|
+| `npm install` | Downloads the project's libraries. **Takes several minutes the first time** | A last line like `added 1500 packages` | `EPERM` or a locked file: close any editor or other window working in the folder and run it again |
+| `Copy-Item .env.example .env` | Copies the settings file. **Prints nothing when it works** — silence is success | No message | `already exists`: the file is there, skip this one |
+| `docker compose up -d db` | Starts the database inside Docker | `Started` or `Running` | `error during connect`: Docker Desktop is not open |
+| `npm run db:migrate:deploy` | **Creates the database tables.** Without it the database is completely empty and nothing works | `All migrations have been successfully applied` | `Can't reach database server`: the database is not ready yet — wait ten seconds and run it again |
+| `npm run db:seed` | Puts in the roles and **219 permissions**. Without it you can sign in and then open nothing | `Seeded 219 permissions.` | A smaller number means it did not finish; run it again |
+
+> **Use `db:migrate:deploy`, not `db:migrate:dev`.** The first applies the existing migrations and nothing
+> else. The second then compares the schema file against the database, and in this project the file
+> deliberately holds less than the database does — so it can offer to create a new migration you do not
+> want. If you are ever asked about creating a migration, cancel and use `deploy`.
+>
+> **`db:migrate:deploy` and `db:seed` are different and neither replaces the other.** The first builds
+> the tables; the second fills them with roles and permissions. Skip the second and your password
+> will work and then every screen will refuse you — the most confusing state this system has, because
+> it looks like a problem with your account and is not.
+
+After these five, go to §1. You will not need §0 again on this machine.
 
 ## 1. Before you start
 

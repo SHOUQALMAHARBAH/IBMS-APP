@@ -78,6 +78,27 @@ async function mockStatus(page: Page, json: unknown) {
   });
 }
 
+/**
+ * An EXACT permission set under a role name this product has never heard of.
+ *
+ * This is the state the role-name read could not see, and the only state in which the fix is observable:
+ * an office defines its own roles under its own names, so "Bilal's IT desk" holding `diagnostics.view` must
+ * see raw detail and the same role without it must not. No seeded role name can express that, which is why
+ * the roles array here is deliberately fictional — the same reason `payment-channels.spec.ts` builds an
+ * exact code set rather than naming a role.
+ */
+async function mockAuthWithCodes(page: Page, permissions: string[]) {
+  await page.route("**/auth/refresh", (route) =>
+    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+  );
+  await page.route("**/auth/me", (route) =>
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, roles: ["OFFICE IT DESK"], permissions },
+    }),
+  );
+}
+
 async function mockAuthorizeUrl(page: Page) {
   await page.route(
     "http://localhost:4000/admin/email-integration/authorize-url?**",
@@ -371,4 +392,75 @@ test("office mailbox screen has no serious/critical accessibility violations @a1
     ["serious", "critical"].includes(v.impact ?? ""),
   );
   expect(serious).toEqual([]);
+});
+
+/*
+ * THE GATE IS THE CODE, NOT THE ROLE NAME — the defect the previous test could not observe.
+ *
+ * `shows the variable names to a System/Security Administrator` passes either way: that role holds
+ * `diagnostics.view` now and matched the old `roles.includes('SYSTEM_SECURITY_ADMINISTRATOR')` before. So it
+ * proves the behaviour is unchanged and says nothing about WHY it happens.
+ *
+ * These two do. Both use a role name this product has never heard of, which is precisely the state an office
+ * creates the moment it defines its own roles — and the state in which the old line silently showed less with
+ * no error and no way to find out why.
+ */
+test("a differently NAMED role holding diagnostics.view sees the raw detail", async ({
+  page,
+}) => {
+  await mockAuthWithCodes(page, [
+    "email.integration.read",
+    "email.integration.manage",
+    "diagnostics.view",
+  ]);
+  await mockStatus(page, DISCONNECTED);
+  await page.route(
+    "http://localhost:4000/admin/email-integration/authorize-url?**",
+    (route) =>
+      route.fulfill({
+        status: 422,
+        json: {
+          message:
+            "No OAuth application is configured on this deployment for MICROSOFT365. Set the EMAIL_MS_CLIENT_ID / _CLIENT_SECRET / _REDIRECT_URI environment variables.",
+        },
+      }),
+  );
+
+  await page.goto("/settings/email");
+  await page.getByTestId("email-begin").click();
+  // `email-gap-detail`, which is where the raw text lands — NOT `email-status`, whose section closes before
+  // it. The first draft of this test asserted on `email-status` (copied from the negative test above) and
+  // failed for that reason rather than for the reason it is about.
+  await expect(page.getByTestId("email-gap-detail")).toContainText(
+    "EMAIL_MS_CLIENT_ID",
+  );
+});
+
+test("the same role WITHOUT diagnostics.view is refused the detail, and still told what happened", async ({
+  page,
+}) => {
+  await mockAuthWithCodes(page, [
+    "email.integration.read",
+    "email.integration.manage",
+  ]);
+  await mockStatus(page, DISCONNECTED);
+  await page.route(
+    "http://localhost:4000/admin/email-integration/authorize-url?**",
+    (route) =>
+      route.fulfill({
+        status: 422,
+        json: {
+          message:
+            "No OAuth application is configured on this deployment for MICROSOFT365. Set the EMAIL_MS_CLIENT_ID / _CLIENT_SECRET / _REDIRECT_URI environment variables.",
+        },
+      }),
+  );
+
+  await page.goto("/settings/email");
+  await page.getByTestId("email-begin").click();
+
+  // The PLAIN sentence is asserted FIRST, so the absence below cannot pass on a screen that rendered
+  // nothing — and because the point of withholding detail is that the reader is still told something.
+  await expect(page.getByTestId("email-action-error")).toBeVisible();
+  await expect(page.getByTestId("email-gap-detail")).toHaveCount(0);
 });

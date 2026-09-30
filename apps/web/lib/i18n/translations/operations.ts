@@ -123,8 +123,8 @@ export const OPERATIONS = {
     empSubmitWithLogin: 'تسجيل الشخص وإنشاء الحساب',
     empCreatedPerson: 'تم تسجيل الشخص.',
     empCreatedWithLogin: 'تم تسجيل الشخص وإنشاء حساب الدخول.',
-    empNoLoginPermission:
-      'لا تملك صلاحية user.manage، لذا يمكنك تسجيل الأشخاص دون إنشاء حسابات دخول لهم.',
+    empLoginCanAct: 'تسجيل الأشخاص',
+    empLoginCannotAct: 'منحهم حساب دخول',
 
     // ---- Vendors (#67 / #71) ------------------------------------------------
     venHeading: 'المورّدون',
@@ -163,7 +163,7 @@ export const OPERATIONS = {
     docLoading: 'جارٍ التحميل…',
     docLoadError: 'تعذّر تحميل المستندات — حاول مرة أخرى.',
     docVersionError: 'تعذّر إنشاء إصدار جديد.',
-    docUnlockError: 'تعذّر فك القفل — قد لا تملك صلاحية document.delete-override.',
+    docUnlockAct: 'فك قفل هذا المستند',
     docDeleteError: 'تعذّر حذف المستند.',
     docClassificationSummaryIntro: 'أعلى تصنيف موجود عبر الملف الإلكتروني للوثيقة — لا يُحتسب كمتوسط أبداً.',
     docStorageReference: 'مرجع التخزين',
@@ -740,8 +740,8 @@ export const OPERATIONS = {
     empSubmitWithLogin: 'Record the person and create the login',
     empCreatedPerson: 'The person was recorded.',
     empCreatedWithLogin: 'The person was recorded and their login created.',
-    empNoLoginPermission:
-      'You do not hold user.manage, so you can record people without creating logins for them.',
+    empLoginCanAct: 'record people',
+    empLoginCannotAct: 'give them a login',
 
     venHeading: 'Vendors',
     venIntro:
@@ -778,7 +778,7 @@ export const OPERATIONS = {
     docLoading: 'Loading…',
     docLoadError: 'Could not load documents — try again.',
     docVersionError: 'Could not create a new version.',
-    docUnlockError: 'Could not unlock — you may not hold document.delete-override.',
+    docUnlockAct: 'unlock that document',
     docDeleteError: 'Could not delete the document.',
     docClassificationSummaryIntro: "The highest classification present across a policy's electronic file — never averaged.",
     docStorageReference: 'Storage reference',

@@ -91,3 +91,54 @@ export function permissionRefusalAllOf(
 ): string {
   return t('permissionRefusalAllOf', { act: t(act), code: codes.join(', ') });
 }
+
+/*
+ * THE SECOND DECIDED SHAPE — a reader who is PARTIALLY ENABLED, not refused.
+ *
+ * Eight strings were found by the refusal sweep and deliberately left out of it, because the decided refusal
+ * sentence would have thrown away the half that matters. "You do not hold `sla.holiday.create`, so the
+ * calendar is read-only" tells a reader they can still READ it; "you do not hold permission to add a
+ * non-working day — ask whoever manages permissions in your office" does not.
+ *
+ * So this shape keeps that half and adds what the eight were all missing, which is the same thing the 100
+ * refusals were missing: **who can change it.** The owner's decision, and the reasoning is that rule 4 is
+ * satisfied by naming the way forward rather than by trading the useful half against it.
+ *
+ *     what they CAN do  ·  what they CANNOT  ·  who administers it, named by FUNCTION
+ *
+ * ## Why two functions
+ *
+ * Six of the eight are genuine reduced-capability notes, where both halves are known. Two are ERROR PATHS —
+ * an action failed and a missing grant is the likely cause, not a certainty ("Could not unlock — you may not
+ * hold `document.delete-override`"). There the `can` half is unknown and claiming one would be a guess, so
+ * `permissionMayBeMissing` states the failure, the suspicion and the grantor, and nothing it cannot support.
+ *
+ * ## The role name this fixes
+ *
+ * `kycQueueNoApprovePermission` said «هذه القائمة مخصصة للالتزام فقط» — *this queue is for Compliance only* —
+ * naming a ROLE. An office defines its own role names, so that sentence can be false in any given office; it
+ * is corrected inside this shape rather than by a separate edit, because the shape is what makes the grantor
+ * a function instead of a name.
+ */
+
+/** A reader who can do one thing and not another. Both halves are act phrases, in the language of the work. */
+export function reducedCapability(
+  t: Translate,
+  can: TranslationKey,
+  cannot: TranslationKey,
+  code: string,
+): string {
+  return t('reducedCapability', { can: t(can), cannot: t(cannot), code });
+}
+
+/**
+ * An action that FAILED, where a missing permission is the likely cause rather than a known one. The
+ * suspicion is stated as a suspicion: the server refused and the screen cannot always tell why.
+ */
+export function permissionMayBeMissing(
+  t: Translate,
+  act: TranslationKey,
+  code: string,
+): string {
+  return t('permissionMayBeMissing', { act: t(act), code });
+}

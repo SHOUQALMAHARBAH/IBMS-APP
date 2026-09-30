@@ -11,7 +11,8 @@
   },
   "policies-reverts-to-the-vacuous-spelling": {
     "file": "apps/web/e2e/policies.spec.ts",
-    "from": "  const primary = page.getByRole(\"navigation\", { name: \"Primary\" });\n  await expectNone(\n    primary.locator('a[href=\"/policies\"]'),\n    primary.locator('a[href=\"/consent\"]'),\n  );",
-    "to": "  await expect(\n    page.getByRole(\"navigation\", { name: \"Primary\" }).getByRole(\"link\", { name: \"Policies\" }),\n  ).toHaveCount(0);"
+    "from": "    primary.locator('a[href=\"/policies\"]'),",
+    "to": "    primary.getByRole('link', { name: 'Policies' }),",
+    "why": "The nav-absence assertion goes back to matching by accessible ROLE. A nav group is a <details> that collapses by default, so its links are outside the accessibility tree and `getByRole` returns zero whether the DPO is denied `policy.read` or handed it — the assertion can never fail. With every role holding every permission in the fixture, the href spelling dies and the role spelling passes, which is what proves the difference. REPOINTED: the original anchor spanned five lines in DOUBLE quotes and this file uses single, so it broke on quote style."
   }
 }

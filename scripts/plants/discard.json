@@ -6,8 +6,9 @@
   },
   "discarded-may-advance": {
     "file": "apps/api/src/modules/workflow/workflow-transition.service.ts",
-    "from": "    if (discardableEntity(entityType)) {\n      const discardedAt = (current as { discardedAt?: Date | null }).discardedAt;\n      if (discardedAt != null) {",
-    "to": "    if (discardableEntity(entityType)) {\n      const discardedAt = (current as { discardedAt?: Date | null }).discardedAt;\n      if (false) {"
+    "from": "      if (discardedAt != null) {",
+    "to": "      if (false) {",
+    "why": "A withdrawn record may advance again, so a policy raised in error can be walked to ISSUED — the state docs/discard.md exists to make impossible. discard.e2e-spec.ts dies. REPOINTED: the original anchor spanned three lines including `const discardedAt = (current as { discardedAt?: Date | null }).discardedAt;`, and PRETTIER later wrapped that expression across two lines, so the anchor stopped matching while the code was unchanged. A one-line anchor cannot be broken by a reflow — the same lesson as the rendered-identifier detector, whose sixth blind spot was introduced by a reformat rather than by code."
   },
   "committed-may-be-discarded": {
     "file": "apps/api/src/common/discard.util.ts",

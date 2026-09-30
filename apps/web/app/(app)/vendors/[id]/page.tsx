@@ -31,7 +31,7 @@ import { CombinedDutyOnRecord } from "../../../../components/ui/CombinedDutyOnRe
 import { errorStyle } from "../../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../../components/lead/lead.styles";
 import { useLanguage } from "../../../../lib/i18n/language-context";
-import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { permissionMayBeMissing, permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: "0.35rem 0.75rem",
@@ -186,7 +186,7 @@ export default function VendorDetailPage() {
       await loadDpas();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t("vendDpaApproveError"),
+        err instanceof ApiError ? err.message : permissionMayBeMissing(t, 'vendDpaApproveAct', 'dpa.approve'),
       );
     }
   }

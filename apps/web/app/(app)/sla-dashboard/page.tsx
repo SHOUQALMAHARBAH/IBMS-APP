@@ -25,7 +25,7 @@ import { hasPermission } from '../../../lib/auth/permissions';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
-import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -376,7 +376,7 @@ export default function SlaDashboardPage() {
             )}
             {!canPause && (
               <p style={{ fontSize: '0.8rem', opacity: 0.75 }}>
-                {tr('slaDashNoPausePermission')}
+                {reducedCapability(tr, 'slaDashPauseCanAct', 'slaDashPauseCannotAct', 'sla.timer.pause')}
               </p>
             )}
             <div style={{ overflowX: 'auto' }}>

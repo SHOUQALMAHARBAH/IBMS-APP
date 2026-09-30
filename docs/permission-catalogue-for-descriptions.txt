@@ -1,6 +1,6 @@
 PERMISSION CATALOGUE — input for the Arabic one-line descriptions
 
-218 permission codes, 12 modules. Generated from the seeded database by
+219 permission codes, 12 modules. Generated from the seeded database by
 `npm run db:permission-descriptions`, so this IS what the Role screen renders — not a separate
 list that can drift from it. Regenerate rather than hand-editing the structure: any line you have
 already written after `ar:` is carried forward by code and is never overwritten.
@@ -21,7 +21,7 @@ A code whose en: line begins NOT YET ENFORCED needs NO Arabic line. Holding it d
 and the screen says so — skip those rather than describing a capability that is not there.
 
 ================================================================================================
-MODULE: admin   —   الإدارة والنظام   (20 codes)
+MODULE: admin   —   الإدارة والنظام   (21 codes)
 ------------------------------------------------------------------------------------------------
 
   [5-STATE] branch   (create / deactivate / read / update)
@@ -81,6 +81,10 @@ MODULE: admin   —   الإدارة والنظام   (20 codes)
   [toggle]  access-recertification.review.routine
       access-recertification.review.routine
           en: Be assigned access-recertification items routinely, ahead of fallback reviewers — the assignment preference, not the right to decide (that is access-recertification.review)
+          ar: ................................................................
+  [toggle]  diagnostics.view
+      diagnostics.view
+          en: See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence
           ar: ................................................................
   [toggle]  encryption-key.read
       encryption-key.read
@@ -903,4 +907,4 @@ MODULE: supporting-operations   —   العمليات المساندة   (17 co
           en: Record security-awareness training completion
           ar: ................................................................
 ================================================================================================
-TOTALS: 21 five-state families covering 59 codes, 159 toggles, 218 codes in all.
+TOTALS: 21 five-state families covering 59 codes, 160 toggles, 219 codes in all.

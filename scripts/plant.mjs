@@ -30,8 +30,14 @@
  * Revert restores from the backup written at apply time, so a plant cannot leave a half-reverted file
  * behind — the failure mode after "never applied" that actually costs a day.
  */
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdtempSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdtempSync, rmSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Resolved from THIS FILE so the committed-plant check works from any cwd — the same lesson
+// `playwright-specs.mjs` learned the hard way, where a cwd-relative path died inside a $() and the
+// empty substitution ran the whole suite.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 
@@ -291,11 +297,81 @@ function selfTest() {
 
   rmSync(dir, { recursive: true, force: true });
 
+  failures += verifyCommittedPlants();
+
   if (failures > 0) {
     console.error(`plant --self-test: ${failures} case(s) failed. The plant mechanism is not trustworthy.`);
     process.exit(1);
   }
   console.log("plant --self-test: every failure mode is loud.");
+}
+
+/**
+ * Every plant in `scripts/plants/` must still apply — exactly one match for its `from`.
+ *
+ * ## Why this is part of the self-test rather than a separate script
+ *
+ * A guard's proof is the plant that kills it. Keeping those proofs in a scratchpad leaves whoever receives
+ * this system with "they said they tested it", so they are committed; and a committed proof that has
+ * silently stopped applying is worse than none, because it looks like evidence.
+ *
+ * That is not hypothetical. One plant in this repo's first committed set had anchored on a doc comment
+ * carrying a COUNT ("85 of the 91"); correcting that count to "96 of the 102" broke the anchor, and nothing
+ * noticed until all twelve were checked BY HAND. `verify.sh` already gates `--self-test`, so putting the
+ * check here means a stale anchor fails a build instead of waiting to be found.
+ *
+ * It checks applicability, NOT that each plant still kills its test — that would mean running the suite
+ * once per plant. The `why` field carries which test should die, and a stale anchor is the failure that
+ * happens silently; a plant that applies but no longer kills anything fails loudly the moment it is used.
+ */
+function verifyCommittedPlants() {
+  const dir = join(REPO_ROOT, "scripts", "plants");
+  if (!existsSync(dir)) {
+    console.log("  ok    no scripts/plants/ directory yet — nothing committed to verify");
+    return 0;
+  }
+  const files = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+  if (files.length === 0) {
+    console.error("  FAIL  scripts/plants/ exists and holds no plant files — an empty proof set reads as a verified one");
+    return 1;
+  }
+
+  let bad = 0;
+  let total = 0;
+  for (const name of files) {
+    const plants = loadPlants(join(dir, name));
+    for (const [plantName, spec] of Object.entries(plants)) {
+      total += 1;
+      for (const key of ["file", "from", "to"]) {
+        if (typeof spec[key] !== "string") {
+          console.error(`  FAIL  ${name} :: ${plantName} — missing a string "${key}"`);
+          bad += 1;
+          continue;
+        }
+      }
+      const target = join(REPO_ROOT, spec.file);
+      if (!existsSync(target)) {
+        console.error(`  FAIL  ${name} :: ${plantName} — ${spec.file} does not exist`);
+        bad += 1;
+        continue;
+      }
+      const hits = readFileSync(target, "utf8").split(spec.from).length - 1;
+      if (hits !== 1) {
+        console.error(
+          `  FAIL  ${name} :: ${plantName} — its anchor occurs ${hits} time(s) in ${spec.file}. ` +
+            `A committed plant that no longer applies is evidence that has quietly expired: ` +
+            `${hits === 0 ? "the code moved, so repoint it at the thing it is about rather than at prose beside it" : "the anchor is ambiguous, so narrow it"}.`,
+        );
+        bad += 1;
+      }
+    }
+  }
+  console.log(
+    bad === 0
+      ? `  ok    ${total} committed plant(s) across ${files.length} file(s) still apply`
+      : `  FAIL  ${bad} of ${total} committed plant(s) no longer apply`,
+  );
+  return bad;
 }
 
 cli(process.argv.slice(2));
