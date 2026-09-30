@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Process 49 — the sanctions match review queue.
@@ -75,8 +76,55 @@ function matchRow(over: Record<string, unknown> = {}) {
     listEntryName: "AHMAD AL HASHIMI",
     listEntryRemarks: null,
     listEntryDelisted: false,
+    /* THE CASE WORKFLOW, which this fixture did not carry and the endpoint did
+     * not return (IMPROVEMENTS § 1.62).
+     *
+     * Defaulted to UNDER_REVIEW — a case somebody has picked up — because the
+     * decision tests below are about the DECISION, and the API refuses one
+     * unless the case is UNDER_REVIEW or ESCALATED. Before this field existed
+     * those tests passed against a mocked `/review` while the real endpoint
+     * would have returned 422 every time: the mock was what hid it. */
+    caseStatus: "UNDER_REVIEW",
+    assignedToUserId: "user-1",
+    assignedAt: "2026-09-11T00:00:00.000Z",
+    reviewStartedAt: "2026-09-11T09:00:00.000Z",
+    escalatedToUserId: null,
+    escalatedAt: null,
+    escalationReason: null,
     ...over,
   };
+}
+
+const REVIEWERS = [
+  { id: "user-1", fullName: "Compliance Officer" },
+  { id: "user-2", fullName: "Senior Compliance Officer" },
+];
+
+/** The assignee picker's source. Mocked on every queue test because the screen
+ * loads it once for any reader holding the screening permission. */
+async function mockReviewers(
+  page: Page,
+  rows: { id: string; fullName: string }[] = REVIEWERS,
+) {
+  await page.route("**/screening/reviewers", (route) =>
+    route.fulfill({ status: 200, json: rows }),
+  );
+}
+
+/** Every case-workflow POST, captured so assertions are about the wire rather
+ * than about a button having been clickable. */
+async function captureCaseCalls(page: Page) {
+  const calls: { url: string; body: unknown }[] = [];
+  for (const path of ["assign", "start-review", "escalate", "notes"]) {
+    await page.route(`**/screening/matches/*/${path}`, (route) => {
+      calls.push({
+        url: route.request().url(),
+        body: route.request().postDataJSON(),
+      });
+      return route.fulfill({ status: 201, json: matchRow() });
+    });
+  }
+  return calls;
 }
 
 async function mockQueue(
@@ -93,6 +141,9 @@ async function mockQueue(
   await page.route("**/screening/matches?*", (route) =>
     route.fulfill({ status: 200, json: rows }),
   );
+  // Loaded by the screen for any reader who can review, so it is part of the
+  // queue mock rather than something each test remembers separately.
+  await mockReviewers(page);
 }
 
 test("warns that an empty queue means nothing was CHECKED, not nothing matched", async ({
@@ -196,6 +247,188 @@ test("records a decision and sends the written reason to the API", async ({
   expect(String(posted!.reviewReason)).toContain("Different date of birth");
 });
 
+/*
+ * THE CASE WORKFLOW — assign, pick up, escalate, annotate.
+ *
+ * Five routes with no web caller (IMPROVEMENTS § 1.44), and the consequence was
+ * not five missing conveniences: the API refuses a decision unless the case is
+ * UNDER_REVIEW or ESCALATED, and nothing could reach either state, so every match
+ * sat at OPEN and the only control this screen offered returned 422 every time.
+ */
+
+test("an OPEN case cannot be decided, says why, and offers the assignment", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [matchRow({ caseStatus: "OPEN", assignedToUserId: null })]);
+
+  await page.goto("/screening-matches");
+
+  // Anchor: the row rendered for this reader before anything is asserted absent
+  // or disabled.
+  await expect(page.getByTestId("case-status-sm-1")).toHaveText(
+    "Open — nobody assigned",
+  );
+
+  // A VALID REASON IS TYPED FIRST, and that is the whole assertion.
+  //
+  // Without it this test could not fail: the decision button is also disabled
+  // while the reason is too short, so asserting `toBeDisabled()` on an empty
+  // form proves nothing about the case state. Planting the removal of
+  // `caseCanBeDecided` left all 13 tests green, which is § 1.51(d) — a guard
+  // whose test cannot observe it. With a valid reason present, the ONLY
+  // remaining cause of the disabled button is that the case is not decidable.
+  await page
+    .getByLabel(/Review reason/i)
+    .fill("Checked the identifiers and this is a clear false positive.");
+  await expect(
+    page.getByRole("button", { name: "Clear (false positive)" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Confirm match" }),
+  ).toBeDisabled();
+  await expect(page.getByTestId("case-not-decidable-sm-1")).toContainText(
+    "Assign the case and start the review",
+  );
+
+  // And the way forward is present.
+  await expect(page.getByTestId("case-assignee-select-sm-1")).toBeVisible();
+});
+
+test("assigns a case to a named reviewer and then starts the review", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [matchRow({ caseStatus: "OPEN", assignedToUserId: null })]);
+  const calls = await captureCaseCalls(page);
+
+  await page.goto("/screening-matches");
+
+  const assign = page.getByTestId("case-assign-sm-1");
+  // Nobody chosen yet: the button must not send a request the API would 400.
+  await expect(assign).toBeDisabled();
+
+  await page
+    .getByTestId("case-assignee-select-sm-1")
+    .selectOption("user-2");
+  await expect(assign).toBeEnabled();
+  await assign.click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  expect(calls[0].url).toContain("/screening/matches/sm-1/assign");
+  expect(calls[0].body).toEqual({ assigneeUserId: "user-2" });
+});
+
+test("starts the review on an assigned case", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [matchRow({ caseStatus: "ASSIGNED", reviewStartedAt: null })]);
+  const calls = await captureCaseCalls(page);
+
+  await page.goto("/screening-matches");
+  // The reviewer's NAME, resolved from the picker source — never the raw uuid,
+  // which is the defect the audit screen had.
+  await expect(page.getByTestId("case-assignee-sm-1")).toContainText(
+    "Compliance Officer",
+  );
+
+  await page.getByTestId("case-start-sm-1").click();
+  await expect.poll(() => calls.length).toBe(1);
+  expect(calls[0].url).toContain("/screening/matches/sm-1/start-review");
+});
+
+test("escalates only with a stated reason of at least ten characters", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [matchRow()]);
+  const calls = await captureCaseCalls(page);
+
+  await page.goto("/screening-matches");
+  const escalate = page.getByTestId("case-escalate-sm-1");
+  await page.getByTestId("case-escalate-to-sm-1").selectOption("user-2");
+
+  // NINE characters, not zero: a test that types nothing cannot tell a
+  // ten-character floor from a non-empty check.
+  await page.getByTestId("case-escalate-reason-sm-1").fill("Nine char");
+  await expect(escalate).toBeDisabled();
+  expect(calls).toHaveLength(0);
+
+  await page
+    .getByTestId("case-escalate-reason-sm-1")
+    .fill("  Same date of birth as the SDN entry, needs a second opinion  ");
+  await expect(escalate).toBeEnabled();
+  await escalate.click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  expect(calls[0].url).toContain("/screening/matches/sm-1/escalate");
+  expect(calls[0].body).toEqual({
+    toUserId: "user-2",
+    reason: "Same date of birth as the SDN entry, needs a second opinion",
+  });
+});
+
+test("records a working note and reads the case notes back", async ({ page }) => {
+  // The note is the evidence half the AMLU requires kept — "the verification
+  // mechanism and actions taken regarding the case" — which a decision reason
+  // alone does not carry.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [matchRow()]);
+  const calls = await captureCaseCalls(page);
+  await page.route("**/screening/matches/sm-1/case", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...matchRow(),
+        notes: [
+          {
+            id: "n-1",
+            note: "Passport scan shows a different nationality from the SDN entry.",
+            authorUserId: "user-1",
+            createdAt: "2026-09-11T10:00:00.000Z",
+          },
+        ],
+      },
+    }),
+  );
+
+  await page.goto("/screening-matches");
+
+  const add = page.getByTestId("case-note-add-sm-1");
+  await expect(add).toBeDisabled();
+  await page
+    .getByTestId("case-note-sm-1")
+    .fill("  Checked the date of birth against the list entry.  ");
+  await expect(add).toBeEnabled();
+  await add.click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  expect(calls[0].url).toContain("/screening/matches/sm-1/notes");
+  expect(calls[0].body).toEqual({
+    note: "Checked the date of birth against the list entry.",
+  });
+
+  // And the trail can be read back on the case.
+  await page.getByTestId("case-notes-toggle-sm-1").click();
+  await expect(page.getByTestId("case-notes-sm-1")).toContainText(
+    "different nationality",
+  );
+});
+
+test("a one-officer office is told there is nobody to assign to", async ({
+  page,
+}) => {
+  // A real state, and it must read as a sentence rather than an empty dropdown
+  // the officer clicks at.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [matchRow({ caseStatus: "OPEN", assignedToUserId: null })]);
+  await mockReviewers(page, []);
+
+  await page.goto("/screening-matches");
+  await expect(page.getByTestId("case-status-sm-1")).toBeVisible();
+  await expect(page.getByText("nobody to assign to")).toBeVisible();
+  await expect(page.getByTestId("case-assignee-select-sm-1")).toHaveCount(0);
+});
+
 test("a non-reviewer can read the queue but cannot adjudicate it", async ({
   page,
 }) => {
@@ -244,4 +477,24 @@ test("renders the queue in Arabic with RTL direction", async ({ page }) => {
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await capture(page, "populated-ar");
+});
+
+test("the case workflow controls have no serious/critical accessibility violations @a11y", async ({
+  page,
+}) => {
+  // This screen had NO a11y test, and the case panel adds a select and two
+  // textareas to every pending row — the controls most likely to ship without a
+  // label. Run against an OPEN case, which renders the assignment picker.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [matchRow({ caseStatus: "OPEN", assignedToUserId: null })]);
+
+  await page.goto("/screening-matches");
+  await expect(page.getByTestId("case-assignee-select-sm-1")).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(
+    results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    ),
+  ).toEqual([]);
 });

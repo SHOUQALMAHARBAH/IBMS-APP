@@ -17,6 +17,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -59,7 +60,7 @@ export default function VendorsPage() {
       setVendors(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('venNoPermission')
+          ? permissionRefusal(t, 'venRefusalAct', 'vendor.read')
           : err instanceof ApiError
             ? err.message
             : t('venLoadError'),
@@ -119,7 +120,7 @@ export default function VendorsPage() {
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
         <label htmlFor="vendor-search" style={{ marginInlineEnd: '0.5rem' }}>
-          Search
+          {t('commonSearch')}
         </label>
         <input
           id="vendor-search"
@@ -129,7 +130,7 @@ export default function VendorsPage() {
           placeholder={t('venSearchPlaceholder')}
         />
         <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
-          Search
+          {t('commonSearch')}
         </button>
       </form>
 
@@ -138,6 +139,33 @@ export default function VendorsPage() {
           {loadError}
         </p>
       ) : null}
+
+      <form onSubmit={onCreate} style={formStyle}>
+        <h2>{t('venCreateHeading')}</h2>
+        <label style={labelStyle}>
+          {t('venColName')}
+          <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label style={labelStyle}>
+          {t('venColType')}
+          <select
+            value={vendorType}
+            onChange={(e) => setVendorType(e.target.value as VendorType)}
+          >
+            {VENDOR_TYPES.map((opt) => (
+              <option key={opt} value={opt}>
+                {t(ENUM_LABEL.VendorType[opt])}
+              </option>
+            ))}
+          </select>
+        </label>
+        {formError ? (
+          <p role="alert" style={errorStyle}>
+            {formError}
+          </p>
+        ) : null}
+        <button type="submit">{t('venSubmitButton')}</button>
+      </form>
 
       {vendors ? (
         vendors.length === 0 ? (
@@ -173,12 +201,12 @@ export default function VendorsPage() {
                   <td style={cell}>
                     {editingId === vendor.id ? (
                       <button type="button" onClick={() => saveEdit(vendor.id)}>
-                        Save
+                        {t('commonSave')}
                       </button>
                     ) : (
                       <>
                         <button type="button" onClick={() => startEdit(vendor)}>
-                          Rename
+                          {t('commonRename')}
                         </button>{' '}
                         <Link href={`/vendors/${vendor.id}`}>{t('venManageButton')}</Link>
                       </>
@@ -193,32 +221,6 @@ export default function VendorsPage() {
         <p>{t('venLoading')}</p>
       )}
 
-      <form onSubmit={onCreate} style={formStyle}>
-        <h2>{t('venCreateHeading')}</h2>
-        <label style={labelStyle}>
-          {t('venColName')}
-          <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label style={labelStyle}>
-          {t('venColType')}
-          <select
-            value={vendorType}
-            onChange={(e) => setVendorType(e.target.value as VendorType)}
-          >
-            {VENDOR_TYPES.map((opt) => (
-              <option key={opt} value={opt}>
-                {t(ENUM_LABEL.VendorType[opt])}
-              </option>
-            ))}
-          </select>
-        </label>
-        {formError ? (
-          <p role="alert" style={errorStyle}>
-            {formError}
-          </p>
-        ) : null}
-        <button type="submit">{t('venSubmitButton')}</button>
-      </form>
     </main>
   );
 }

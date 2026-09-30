@@ -16,6 +16,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const ROLES = [
   'privacy-notice.publish',
@@ -53,7 +54,7 @@ export default function PrivacyNoticesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('pnNoPermission')
+          ? permissionRefusal(t, 'pnRefusalAct', 'privacy-notice.read')
           : err instanceof ApiError
             ? err.message
             : t('pnLoadError'),

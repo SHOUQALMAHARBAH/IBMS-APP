@@ -216,6 +216,7 @@ describe('cross-owner visibility is a permission, not a role name', () => {
     // what the caller cannot see.
     const ownerRole = await makeCustomRole(`Visibility List Owner ${tag}`, [
       'customer.create',
+      'customer.read',
       'customer.360-view.read',
     ]);
     const owner = await makeUserWithRole(`vis-list-owner-${tag}`, ownerRole.id);
@@ -234,6 +235,11 @@ describe('cross-owner visibility is a permission, not a role name', () => {
       .expect(201);
 
     const scopedRole = await makeCustomRole(`Visibility List Scoped ${tag}`, [
+      // `customer.read` is what gates the LIST since migration 20261105100000 split finding a customer from
+      // reading one. This role keeps `customer.360-view.read` as well, because what is under test here is
+      // the cross-owner FILTER and not the gate — a role holding only the narrow code would 403 before the
+      // filter ran, and the test would pass for the wrong reason.
+      'customer.read',
       'customer.360-view.read',
     ]);
     const scoped = await makeUserWithRole(
@@ -253,6 +259,7 @@ describe('cross-owner visibility is a permission, not a role name', () => {
     expect((ownList.body as { items: unknown[] }).items).toEqual([]);
 
     const crossRole = await makeCustomRole(`Visibility List Cross ${tag}`, [
+      'customer.read',
       'customer.360-view.read',
       'customer.all-owners.read',
     ]);

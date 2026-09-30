@@ -1,4 +1,9 @@
 import { DsrType } from '@ibms/db';
+import type { CombinedDutyAct } from '@ibms/db';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 import type { DsrStatus, Prisma } from '@ibms/db';
 import {
   applyDuration,
@@ -108,6 +113,10 @@ export interface DataSubjectRequestRow {
   dpoHandlerUserId: string | null;
   processedByUserId: string | null;
   closedByUserId: string | null;
+  /** The relation is `closureCombinedDutyAct` — each pair's escape column is named after the
+   *  CONSTRAINT it excuses, not the table, because `NeedsAssessment` has two pairs and one shared
+   *  column would let a declared combined REVIEW excuse a self-APPROVAL. */
+  closureCombinedDutyAct: CombinedDutyAct | null;
   rejectionReason: string | null;
   noOpenRetentionHoldConfirmedAt: Date | null;
   createdAt: Date;
@@ -130,8 +139,35 @@ export interface DataSubjectRequestView {
   dpoHandlerUserId: string | null;
   processedByUserId: string | null;
   closedByUserId: string | null;
+  /**
+   * Set when ONE person both logged and closed this request, in an office that declared COMBINED duty
+   * segregation and stated why. Null on every ordinary closure.
+   *
+   * `DataSubjectRequest_maker_checker_distinct` normally forbids it. Here rather than only in the
+   * report at `/internal-controls` because a statutory request closed by its own logger is exactly
+   * what an auditor asks about, and `closedByUserId` alone cannot say it — Part 4 step 5.
+   */
+  combinedDutyAct: CombinedDutyActView | null;
   rejectionReason: string | null;
   noOpenRetentionHoldConfirmedAt: string | null;
+
+  /* THE REQUEST'S OWN CLOCK STATE. A request carries SEVERAL `SlaTimer` rows — two
+   * escalation stages, and a second pair once an extension re-bases the deadline — so
+   * these are COUNTS rather than a boolean: "two of four paused" is a real state an
+   * extension can produce, and a boolean would round it to "paused" or "running" and be
+   * wrong about the rest. Present so the pause control on the request screen offers the
+   * right action without a second request (IMPROVEMENTS § 1.61).
+   *
+   * OPTIONAL, and only on the DETAIL read. A list of requests has no use for it and
+   * populating it there would be one timer query per row — an N+1 for a figure nobody
+   * reads on a list. A caller that does not find it must treat the clock as unknown
+   * rather than as running. */
+  slaClock?: {
+    open: number;
+    paused: number;
+    pauseReason: string | null;
+    pausedAt: string | null;
+  };
   /** Derived — `status` is not yet CLOSED/terminal and `slaDueAt` has
    * passed. The `Policy.issuanceComplete` / `ServiceRequest.sla.breached`
    * shape: a live-computed convenience so the UI shows "overdue" without
@@ -165,6 +201,7 @@ export function deriveDsrView(
     dpoHandlerUserId: row.dpoHandlerUserId,
     processedByUserId: row.processedByUserId,
     closedByUserId: row.closedByUserId,
+    combinedDutyAct: combinedDutyActView(row.closureCombinedDutyAct),
     rejectionReason: row.rejectionReason,
     noOpenRetentionHoldConfirmedAt: row.noOpenRetentionHoldConfirmedAt
       ? row.noOpenRetentionHoldConfirmedAt.toISOString()

@@ -18,6 +18,12 @@ function org(id: string, legalName = `Office ${id}`): Organization {
     subdomain: id,
     status: 'ACTIVE',
     dpoAlternateApproverUserId: null,
+    // Part 4 — every office reads SEGREGATED unless it has declared otherwise, which is what the migration
+    // left every existing one at. A fixture that omitted these would not compile, deliberately: the type is
+    // the reminder that a new office-level setting has to be decided here rather than defaulted silently.
+    dutySegregationMode: 'SEGREGATED',
+    dutySegregationModeDeclaredAt: null,
+    dutySegregationModeDeclaredByUserId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

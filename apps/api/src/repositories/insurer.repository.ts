@@ -272,6 +272,10 @@ export class InsurerRepository {
       this.prisma.client.policy.count({
         where: {
           insurerId,
+          // A policy withdrawn as raised in error is not an obligation anybody owes. It stays
+          // PLACEMENT_CONFIRMED forever (a discarded record cannot advance), which is exactly the status this
+          // set opens on — so without this clause the figure in the deactivation audit row counts mistakes.
+          discardedAt: null,
           status: { in: [...OPEN_OBLIGATION_POLICY_STATUSES] },
         },
       }),

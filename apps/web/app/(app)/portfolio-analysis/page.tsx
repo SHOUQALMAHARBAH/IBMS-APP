@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ReportProvenance } from '../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -12,13 +13,18 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: '2px solid var(--border-default)',
+};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 function BreakdownTable({ rows }: { rows: PortfolioBreakdownRow[] }) {
@@ -70,7 +76,7 @@ export default function PortfolioAnalysisPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('paNoPermission')
+          ? permissionRefusal(t, 'paRefusalAct', 'portfolio-analysis.view')
           : err instanceof ApiError
             ? err.message
             : t('paLoadError'),
@@ -90,9 +96,7 @@ export default function PortfolioAnalysisPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('paHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('paIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('paIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -102,9 +106,7 @@ export default function PortfolioAnalysisPage() {
 
       {summary ? (
         <>
-          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-            Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)}.
-          </p>
+          <ReportProvenance kind="generatedAt" at={summary.generatedAt} />
 
           <section style={sectionStyle}>
             <h2>{t('paByLine')}</h2>

@@ -13,6 +13,11 @@ export const OPERATIONS = {
     // ---- Account security -------------------------------------------------
     secHeading: 'الأمان',
     secMfaHeading: 'المصادقة متعدّدة العوامل',
+    // A QR is unusable to anyone whose authenticator is on the SAME device as the screen, or who
+    // has no camera, or whose camera cannot focus on it. The key is the same secret in a form a
+    // person can type, which is why every authenticator offers manual entry.
+    secManualKeyLabel: 'أو أدخل هذا المفتاح يدوياً في التطبيق:',
+    secManualKeyHint: 'استخدم هذا إن كان تطبيق المصادقة على نفس الجهاز، أو إن لم تتمكن من مسح الرمز.',
     secScanInstruction:
       'امسح رمز الاستجابة السريعة بتطبيق المصادقة لديك، ثم أدخل الرمز المكوّن من ستة أرقام الذي يعرضه.',
     secSession: 'الجلسة',
@@ -23,6 +28,7 @@ export const OPERATIONS = {
     secNotEnrolled: 'غير مسجَّلة — مطلوبة قبل استخدام معظم أجزاء النظام',
     secQrAlt: 'رمز الاستجابة السريعة لتسجيل المصادقة',
     secAuthCodeLabel: 'رمز المصادقة',
+    secAccessEnds: 'ينتهي وصولك إلى النظام في: {at}',
     secVerifyingButton: 'جارٍ التحقّق…',
     secVerifyButton: 'التحقّق والتفعيل',
     secStartingButton: 'جارٍ البدء…',
@@ -43,7 +49,31 @@ export const OPERATIONS = {
     empLoading: 'جارٍ التحميل…',
     empLoadError: 'تعذّر تحميل الموظفين — حاول مرة أخرى.',
     empCreateError: 'تعذّر إنشاء سجل الموظف.',
-    empNoPermission: 'لا تملك صلاحية employee.read اللازمة لعرض الموظفين.',
+    empRefusalAct: 'عرض الموظفين',
+    // § 1.83 — the narrow reveal search. Arabic FIRST because this is an Arabic-first platform and a
+    // Compliance Officer in Amman is the primary reader of this screen.
+    empRevealHeading: 'كشف الرقم الوطني لموظف',
+    empRevealIntro:
+      'ابحث عن الشخص بالاسم، ثم اكشف رقمه الوطني مع بيان السبب. لا تُتاح هنا أي بيانات أخرى عن الموظفين.',
+    empRevealSearchLabel: 'اسم الموظف',
+    empRevealSearchPlaceholder: 'مثال: أحمد الزعبي',
+    empRevealSearchHint:
+      'الاسم مطلوب — حرفان على الأقل. لا توجد قائمة بجميع الموظفين على هذه الشاشة.',
+    empRevealSearchButton: 'بحث',
+    empRevealSearching: 'جارٍ البحث…',
+    empRevealNothingSearchedYet: 'اكتب اسمًا للبدء.',
+    empRevealNoMatches: 'لا يوجد موظف بهذا الاسم.',
+    empRevealSearchError: 'تعذّر تنفيذ البحث — حاول مرة أخرى.',
+    empRevealRefusalAct: 'كشف الأرقام الوطنية للموظفين',
+    empRevealNoPosition: 'المسمّى الوظيفي غير مسجَّل',
+    empRevealCurrent: 'على رأس عمله',
+    empRevealFormer: 'انتهت خدمته',
+    empRevealStartButton: 'كشف الرقم الوطني',
+    empRevealReasonLabel: 'سبب الكشف (عشرة أحرف على الأقل)',
+    empRevealConfirmButton: 'تأكيد الكشف',
+    empRevealNationalIdLabel: 'الرقم الوطني:',
+    empRevealFailed: 'تعذّر كشف الرقم الوطني.',
+    empRevealLoading: 'جارٍ التحميل…',
     empSubmitButton: 'تسجيل الموظف',
     empLicensedRole: 'الدور المرخَّص (اختياري)',
     empHireDate: 'تاريخ التعيين',
@@ -54,6 +84,47 @@ export const OPERATIONS = {
     empFatherName: 'اسم الأب (اختياري)',
     empGivenName: 'الاسم الأول',
     empCreateHeading: 'تسجيل موظف جديد',
+
+    // ---- The unified person form: one screen, one Save ----------------------
+    empPersonHeading: 'بيانات الشخص',
+    empEnglishNameHeading: 'الاسم بالإنجليزية (اختياري)',
+    empEnglishNameHint:
+      'لا يُترجم النظام الاسم العربي تلقائياً — إن تُرك فارغاً يبقى فارغاً، ويظهر الاسم العربي في كل الشاشات.',
+    empGivenNameEn: 'الاسم الأول بالإنجليزية',
+    empFatherNameEn: 'اسم الأب بالإنجليزية',
+    empGrandfatherNameEn: 'اسم الجد بالإنجليزية',
+    empFamilyNameEn: 'اسم العائلة بالإنجليزية',
+    empPlacementHeading: 'الموقع في المنظمة',
+    empDepartment: 'القسم',
+    empBranch: 'الفرع',
+    empUnset: '— غير محدَّد —',
+    empOrgUnitsMissing:
+      'لا توجد أقسام أو فروع بعد. أنشئها من شاشة الأقسام والفروع أولاً.',
+    empOrgUnitsLink: 'الأقسام والفروع',
+    empAccountHeading: 'حساب الدخول',
+    empGiveLogin: 'منح هذا الشخص حساب دخول',
+    empGiveLoginHint:
+      'حفظ واحد يُنشئ الشخص وحسابه معاً. الاسم يُبنى من أجزاء الاسم أعلاه، والقسم والفرع يُستخدمان للاثنين.',
+    empAccountNeedsOrgUnits:
+      'حساب الدخول يحتاج قسماً وفرعاً. أنشئ واحداً من كل منهما من شاشة الأقسام والفروع، ثم عد إلى هنا.',
+    empAccountEmail: 'البريد الإلكتروني',
+    empTempPassword: 'كلمة مرور مؤقتة',
+    empTempPasswordHint:
+      'سيُطلب من الشخص تغييرها وتسجيل عامل مصادقة ثانٍ عند أول دخول.',
+    empRolesHeading: 'الأدوار',
+    empRolesHint: 'دور واحد على الأقل — الحساب بلا أدوار لا يملك أي صلاحية.',
+    empRolesNone: 'لا توجد أدوار فعّالة لمنحها.',
+    empRoleRequired: 'اختر دوراً واحداً على الأقل.',
+    empRegistrationType: 'طريقة الدخول',
+    empRegistrationDefault: 'كلمة مرور في هذا النظام',
+    empRegistrationWindows: 'حساب ويندوز (مُسجَّل فقط)',
+    empRegistrationHint:
+      'مُسجَّل للتوثيق فقط — لا يوجد ربط مع مجال ويندوز بعد، وكل حساب يحتاج كلمة مرور هنا.',
+    empSubmitWithLogin: 'تسجيل الشخص وإنشاء الحساب',
+    empCreatedPerson: 'تم تسجيل الشخص.',
+    empCreatedWithLogin: 'تم تسجيل الشخص وإنشاء حساب الدخول.',
+    empLoginCanAct: 'تسجيل الأشخاص',
+    empLoginCannotAct: 'منحهم حساب دخول',
 
     // ---- Vendors (#67 / #71) ------------------------------------------------
     venHeading: 'المورّدون',
@@ -72,7 +143,7 @@ export const OPERATIONS = {
     venSubmitButton: 'تسجيل المورّد',
     venCreateHeading: 'تسجيل مورّد جديد',
     venUpdateError: 'تعذّر تحديث المورّد.',
-    venNoPermission: 'لا تملك صلاحية vendor.manage اللازمة لعرض المورّدين.',
+    venRefusalAct: 'عرض المورّدين',
 
     // ---- Documents (#70) -----------------------------------------------------
     docHeading: 'المستندات',
@@ -92,7 +163,7 @@ export const OPERATIONS = {
     docLoading: 'جارٍ التحميل…',
     docLoadError: 'تعذّر تحميل المستندات — حاول مرة أخرى.',
     docVersionError: 'تعذّر إنشاء إصدار جديد.',
-    docUnlockError: 'تعذّر فك القفل — قد لا تملك صلاحية document.delete-override.',
+    docUnlockAct: 'فك قفل هذا المستند',
     docDeleteError: 'تعذّر حذف المستند.',
     docClassificationSummaryIntro: 'أعلى تصنيف موجود عبر الملف الإلكتروني للوثيقة — لا يُحتسب كمتوسط أبداً.',
     docStorageReference: 'مرجع التخزين',
@@ -104,7 +175,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'معرّف الوثيقة',
     docPolicyNotFound: 'الوثيقة غير موجودة.',
     docComputeError: 'تعذّر احتساب ملخّص التصنيف.',
-    docNoPermission: 'لا تملك صلاحية document.manage اللازمة لعرض المستندات.',
+    docRefusalAct: 'عرض المستندات',
     docsHighestClassification: '— أعلى تصنيف:',
     docsClassificationNone: 'لا يوجد',
 
@@ -124,7 +195,7 @@ export const OPERATIONS = {
     kbLoadError: 'تعذّر تحميل قاعدة المعرفة — حاول مرة أخرى.',
     kbPublishError: 'تعذّر نشر المقالة.',
     kbUpdateError: 'تعذّر تحديث المقالة.',
-    kbNoPermission: 'لا تملك صلاحية kb.publish اللازمة لعرض قاعدة المعرفة.',
+    kbRefusalAct: 'عرض قاعدة المعرفة',
 
     // ---- BCP / DR (#72-73) --------------------------------------------------------
     bcpHeading: 'استمرارية الأعمال والتعافي من الكوارث',
@@ -146,7 +217,7 @@ export const OPERATIONS = {
     bcpCreateHeading: 'تسجيل خطة جديدة',
     bcpRecordTestButton: 'تسجيل اختبار',
     bcpNoPlanOnFile: '— لا توجد خطة مسجّلة',
-    bcpNoPermission: 'لا تملك صلاحية bcp-dr.manage اللازمة لعرض هذه الخطط.',
+    bcpRefusalAct: 'عرض خطط استمرارية العمل والتعافي من الكوارث وصيانتها',
 
     // ---- Information assets (#69) ---------------------------------------------------
     iassetHeading: 'أصول المعلومات',
@@ -164,7 +235,7 @@ export const OPERATIONS = {
     iassetOwnerUserId: 'معرّف المستخدم المالك',
     iassetCreateHeading: 'تسجيل أصل معلومات جديد',
     iassetUpdateError: 'تعذّر تحديث الأصل.',
-    iassetNoPermission: 'لا تملك صلاحية information-asset.manage اللازمة لعرض أصول المعلومات.',
+    iassetRefusalAct: 'عرض أصول المعلومات',
 
     // ---- Access recertification --------------------------------------------------------
     acrHeading: 'إعادة اعتماد الصلاحيات',
@@ -173,7 +244,27 @@ export const OPERATIONS = {
     acrNone: 'لا توجد بنود إعادة اعتماد صلاحيات مسنَدة إليك للمراجعة حالياً.',
     acrLoading: 'جارٍ التحميل…',
     acrLoadError: 'تعذّر تحميل قائمة المراجعة — حاول مرة أخرى.',
-    acrNoPermission: 'لا تملك صلاحية access-recertification.review اللازمة لعرض هذه الشاشة.',
+    acrRefusalAct: 'مراجعة استمرار حاجة الموظفين إلى صلاحياتهم',
+    // The administrator review record — Part 5.1: whoever can administer users is NOT exempt
+    // from recertification of their own access, and this is the record proving they were covered.
+    acrAdminHeading: 'سجل مراجعة حسابات المسؤولين',
+    acrAdminIntro:
+      'من يملك إدارة المستخدمين ليس مستثنى من مراجعة صلاحياته. هذا السجل يبيّن أي حسابات ' +
+      'المسؤولين شملتها الدورة، ومن راجع كل منها.',
+    acrAdminCycleLabel: 'الدورة',
+    acrAdminNoCycles: 'لم تُفتح أي دورة مراجعة بعد.',
+    acrAdminNoneCovered:
+      'لم تشمل هذه الدورة أي حساب مسؤول. هذه هي الحالة التي يمنعها البند 5.1 — راجِع الدورة.',
+    acrAdminColSubject: 'الحساب',
+    acrAdminColReviewer: 'المراجع',
+    acrAdminColDecision: 'القرار',
+    acrAdminColReviewedAt: 'تاريخ المراجعة',
+    acrAdminSelfReview: '(راجع صلاحياته بنفسه)',
+    acrAdminNotYetReviewed: 'لم تُراجع بعد',
+    acrAdminDecisionConfirmed: 'أُكِّدت',
+    acrAdminDecisionRevoked: 'سُحبت',
+    acrAdminDecisionChanged: 'عُدِّلت',
+    acrAdminLoadFailed: 'تعذر تحميل سجل مراجعة حسابات المسؤولين.',
     acrStartCycleError: 'تعذّر بدء الدورة — حاول مرة أخرى.',
     acrCycleDueDate: 'تاريخ الاستحقاق (اختياري — الافتراضي 15 يوماً)',
     acrCycleLabel: 'وسم الدورة',
@@ -207,7 +298,8 @@ export const OPERATIONS = {
     claGroupPolicy: 'الوثيقة',
     claLoading: 'جارٍ التحميل…',
     claLoadError: 'تعذّر تحميل تفصيل معدّل الخسارة — حاول مرة أخرى.',
-    claNoPermission: 'لا تملك صلاحية claims-analytics.view اللازمة لعرض هذه الشاشة.',
+    claColTotal: 'الإجمالي',
+    claRefusalAct: 'عرض تحليلات المطالبات',
 
     // ---- Risk profiles (#6) -------------------------------------------------------------------
     rpIntro:
@@ -226,6 +318,7 @@ export const OPERATIONS = {
     rpPriorClaimsField: 'ملخّص سجل المطالبات السابقة (اختياري)',
     rpSiteLabelField: 'وسم الموقع (اختياري)',
     rpNoProfileYet: 'لا يوجد ملف مخاطر لهذا العميل بعد — أضف الموقع الأول أدناه.',
+    rpPriorClaims: 'مطالبات سابقة: {summary}',
     rpAddSiteHeading: 'إضافة موقع',
     rpSurveysHeading: 'مسوحات المخاطر',
     rpColProperty: 'الممتلكات (دينار أردني)',
@@ -240,7 +333,7 @@ export const OPERATIONS = {
     rpAddSiteError: 'تعذّرت إضافة الموقع — حاول مرة أخرى.',
     rpAddingButton: 'جارٍ الإضافة…',
     rpAddSiteButton: 'إضافة موقع',
-    rpNoPermission: 'لا تملك صلاحية risk-profile.read اللازمة لعرض ملفات المخاطر.',
+    rpRefusalAct: 'عرض ملفات المخاطر',
     rpOpenSurveyAria: 'فتح مسح المخاطر لـ {name}',
     rpConsolidatedSumInsured: 'إجمالي مبلغ التأمين الموحَّد',
 
@@ -249,17 +342,17 @@ export const OPERATIONS = {
     iprogLoading: 'جارٍ التحميل…',
     iprogCustomerNotFound: 'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     iprogLoadError: 'تعذّر تحميل برامج التأمين — حاول مرة أخرى.',
-    iprogNoPermission: 'لا تملك صلاحية program.read اللازمة لعرض برامج التأمين.',
+    iprogRefusalAct: 'عرض برامج التأمين',
     iprogNoneForCustomer: 'لا يوجد برنامج تأمين لهذا العميل بعد — جمِّع واحداً من تقييم احتياجات معتمد.',
-    iprogOpenProgramAria: 'فتح برنامج التأمين {id}',
+    iprogOpenProgramAria: 'فتح برنامج التأمين المُجمَّع في {at}',
 
     // ---- Needs assessments (#5) --------------------------------------------------------------------
     naHeading: 'تقييمات الاحتياجات',
     naLoading: 'جارٍ التحميل…',
     naNone: 'لا توجد تقييمات احتياجات بعد.',
     naLoadError: 'تعذّر تحميل تقييمات الاحتياجات — حاول مرة أخرى.',
-    naNoPermission: 'لا تملك صلاحية needs-assessment.read اللازمة لعرض تقييمات الاحتياجات.',
-    naViewAssessmentAria: 'عرض تقييم الاحتياجات {id}',
+    naRefusalAct: 'عرض تقييمات الاحتياجات',
+    naViewAssessmentAria: 'عرض تقييم الاحتياجات المُسجَّل في {at}',
 
     // ---- Prospects (#2) -----------------------------------------------------------------------------
     prosHeading: 'العملاء المرتقبون',
@@ -268,7 +361,7 @@ export const OPERATIONS = {
     prosLoadError: 'تعذّر تحميل العملاء المرتقبين — حاول مرة أخرى.',
     prosNoneMatch: 'لا يوجد عميل مرتقب يطابق بحثك.',
     prosNone: 'لا يوجد عملاء مرتقبون بعد.',
-    prosNoPermission: 'لا تملك صلاحية prospect.read اللازمة لعرض العملاء المرتقبين.',
+    prosRefusalAct: 'عرض العملاء المرتقبين',
     prosIntro: 'العملية 2 — العملاء المحتملون المؤهَّلون الذين حُوِّلوا إلى عملاء مرتقبين. حوِّل عميلاً محتملاً من لوحة المسار لإضافته هنا.',
     prosViewProfileAria: 'عرض الملف الشخصي — {name}',
 
@@ -281,14 +374,25 @@ export const OPERATIONS = {
     homeKycQueueBlurb: 'راجع سجلات «اعرف عميلك» المعلّقة واعتمدها قبل تفعيل العميل.',
     homeAccessRecertBlurb: 'نفّذ دورة مراجعة الصلاحيات الدورية وأكملها.',
     homeSecurityBlurb: 'أدر المصادقة متعدّدة العوامل وراجع سياسة جلستك.',
+    // The three destinations an office administrator holds and had no card for, plus the heading the
+    // launcher needs now that it groups what it shows.
+    homeRolesBlurb: 'أنشئ أدوار مكتبك وحدّد صلاحيات كل دور من مصفوفة الصلاحيات الكاملة.',
+    homeUsersBlurb: 'أنشئ حسابات المستخدمين، وأسند الأدوار أو اسحبها، وفعّل الحساب أو ألغِه.',
+    homeEmployeesBlurb: 'سجلات الموظفين والتراخيص والشهادات والتدريب.',
+    homeOrgUnitsBlurb: 'أسماء أقسام مكتبك وفروعه — تُنشأ قبل تسجيل أول موظف.',
+    homeInsuranceLinesBlurb:
+      'فروع التأمين التي تُصنَّف بها أعمالك — أضِف فرعاً لا تغطيه القائمة القياسية.',
+    navGroupAccount: 'حسابك',
+    homeNoDestinations:
+      'لا توجد شاشة متاحة لحسابك حالياً — لم تُسند إليك أي صلاحية بعد. راجع مسؤول النظام في مكتبك.',
     homeWelcome: 'مرحباً، {name}',
     homeSignedInAs: 'نظام إدارة وساطة التأمين. تسجيل الدخول باسم {roles}.',
     homeNoRole: 'لم يتم تعيين دور',
     usrLoading: 'جارٍ التحميل…',
-    usrNoPermission: 'لا تملك صلاحية user.manage اللازمة لعرض المستخدمين.',
+    usrRefusalAct: 'عرض المستخدمين',
     usrPasswordAria: 'كلمة المرور',
     renLoading: 'جارٍ التحميل…',
-    renNoPermission: 'لا تملك صلاحية renewal.read اللازمة لعرض حالات التجديد.',
+    renRefusalAct: 'عرض حالات التجديد',
 
     // ---- settings/users + renewal-cases — CONVERTED, not rewritten ------
     // Both screens were already bilingual via inline ternaries; the Arabic
@@ -332,6 +436,7 @@ export const OPERATIONS = {
     usrActivate: 'تفعيل',
     usrRoleToGrantAria: 'الدور المراد منحه لـ {email}',
     renCouldNotLoadRenewalCases: 'تعذّر تحميل حالات التجديد — حاول مرة أخرى.',
+    renScanSummary: 'تم فحص {scanned} وثيقة — فُتحت {opened}، وتُخطِّيت {skipped} لأنها مفتوحة أصلًا، وفشلت {failed}.',
     renThatActionFailedTryAgain: 'فشل الإجراء — حاول مرة أخرى.',
     renRenewalCases: 'حالات التجديد',
     renARenewalCaseOpensAutomatically:
@@ -349,9 +454,18 @@ export const OPERATIONS = {
     renRequired: 'مطلوبة',
     renInsurerTermsWorsened: 'شروط المؤمِّن ساءت',
     renRiskChanged: 'تغيّر الخطر',
-    usrEmployeeRecord: 'سجل الموظف',
-    usrNoEmployeeLink: 'بدون ربط',
     secDevicesHeading: 'الأجهزة الموثوقة',
+    secKeysHeading: 'مفاتيح تشفير البيانات',
+    secKeysIntro:
+      'المفاتيح التي تُشفَّر بها الحقول الشديدة السرية. تُعرض المُعرِّفات والحالة ' +
+      'فقط — مادة المفتاح نفسها لا تصل إلى المتصفح ولا إلى أي استجابة.',
+    secKeysColId: 'مُعرِّف المفتاح',
+    secKeysColStatus: 'الحالة',
+    secKeysActive: 'نشط — يُستخدم للتشفير الجديد',
+    secKeysRetired: 'متقاعد — يفكّ تشفير الصفوف القديمة فقط',
+    secKeysNone: 'لا توجد مفاتيح مُعدَّة.',
+    secKeysLoadError: 'تعذّر تحميل قائمة المفاتيح — حاول مرة أخرى.',
+    secKeysLoading: 'جارٍ تحميل المفاتيح…',
     secDevicesIntro:
       'هذه الأجهزة تتخطّى رمز التحقق عند تسجيل الدخول. ألغِ الثقة بأي جهاز لا تعرفه.',
     secNoTrustedDevices: 'لا توجد أجهزة موثوقة.',
@@ -393,8 +507,67 @@ export const OPERATIONS = {
     roleHeading: 'الأدوار والصلاحيات',
     roleIntro:
       'كل دور هنا يخصّ مكتبك وحده. تُحدَّد الصلاحيات لكل دور، ولا يمنح أي دور شيئاً لم يُعطَ له صراحةً.',
-    roleNoPermission:
-      'يتطلّب عرض الأدوار صلاحية role.read. راجع مدير مكتبك.',
+    // --- Role screen: the permission matrix, the generated machine name, and delete ---
+    // --- Departments and branches (the four-action pilot) ---
+    orgUnitHeading: 'الأقسام والفروع',
+    orgUnitIntro:
+      'أسماء أقسام مكتبك وفروعه. تُسند كل موظفة إلى قسم وفرع، ولهذا يجب إنشاؤها قبل تسجيل أول شخص. لا تمنح هذه الأسماء أي صلاحية ولا تحدّد من يرى ماذا.',
+    orgUnitDepartments: 'الأقسام',
+    orgUnitBranches: 'الفروع',
+    orgUnitNameEn: 'الاسم بالإنجليزية',
+    orgUnitNameAr: 'الاسم بالعربية (اختياري)',
+    orgUnitCreateButton: 'إضافة',
+    orgUnitRename: 'إعادة تسمية',
+    orgUnitRetire: 'تعطيل',
+    orgUnitCreated: 'تمت الإضافة.',
+    orgUnitRenamed: 'تم تغيير الاسم.',
+    orgUnitRetired: 'تم التعطيل — تبقى الإسنادات القائمة كما هي.',
+    orgUnitNone: 'لا يوجد شيء بعد — أضِف الأول.',
+    orgUnitLoadError: 'تعذّر تحميل الأقسام والفروع — حاول مرة أخرى.',
+    orgUnitRefusalAct: 'عرض أقسام المكتب وفروعه',
+    roleMatrixSummary: 'هذا الدور يملك {granted} من {total} صلاحية.',
+    roleMatrixNeedsCatalogue:
+      'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية permission.read. يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
+    roleMatrixSearchLabel: 'ابحث في الصلاحيات',
+    roleMatrixNoMatch: 'لا توجد صلاحية مطابقة لهذا البحث.',
+    roleVerbFull: 'الكل',
+    roleSelectAllInSection: 'تحديد كل صلاحيات هذا القسم',
+    roleVerbView: 'عرض',
+    roleVerbCreate: 'إنشاء',
+    roleVerbEdit: 'تعديل',
+    roleVerbDelete: 'حذف',
+    roleVerbDeactivate: 'تقاعد',
+    roleVerbManage: 'إدارة',
+    roleVerbOther: 'أخرى',
+    roleModuleAdmin: 'الإدارة والنظام',
+    roleModuleClaims: 'المطالبات',
+    roleModuleCommercial: 'المكتب الأمامي التجاري',
+    roleModuleCompliance: 'الالتزام والمخاطر',
+    roleModuleCustomer: 'العملاء',
+    roleModuleCustomerService: 'خدمة العملاء',
+    roleModuleFinance: 'المالية',
+    roleModuleInsuranceOps: 'العمليات التأمينية',
+    roleModuleReporting: 'التقارير الإدارية',
+    roleModulePdpl: 'حماية البيانات',
+    roleModuleSla: 'مستويات الخدمة',
+    roleModuleSupporting: 'العمليات المساندة',
+    roleModuleOther: 'أخرى',
+    roleMachineNameLabel: 'الاسم البرمجي (يُنشأ تلقائياً)',
+    roleMachineNameHint:
+      'يُشتق من الاسم بالإنجليزية، ولا يمكن تغييره بعد الإنشاء — وهو ما يظهر في سجلّ التدقيق.',
+    roleMachineNameUnreadable:
+      'لا يمكن اشتقاق اسم برمجي مقروء من هذا الاسم. اكتب الاسم بالإنجليزية بحروف لاتينية (مثال: Claims Triage Desk).',
+    roleEnglishNameRequired: 'الاسم بالإنجليزية مطلوب — منه يُشتق الاسم البرمجي الدائم.',
+    roleCreatePermissionsHeading: 'صلاحيات هذا الدور',
+    roleCreatePermissionsIntro:
+      'اختر ما يستطيع هذا الدور عمله. يمكن تعديل الصلاحيات لاحقاً، ويسري التعديل فوراً على كل من يحمل الدور.',
+    roleDeleteButton: 'حذف',
+    roleDeleteConfirmHeading: 'حذف الدور «{role}»؟',
+    roleDeleteConfirmBody:
+      'سيُحذف الدور فوراً ويُسحب من كل من يحمله — بلا إعادة إسناد. من يبقى بلا أدوار يبقى بلا صلاحيات، وهذا مقبول. ويبقى سجلّ من حمل الدور ومتى محفوظاً.',
+    roleDeleteConfirmButton: 'أكّد الحذف',
+    roleDeleted: 'تم حذف الدور.',
+    roleRefusalAct: 'عرض أدوار مكتبك',
     roleCouldNotLoad: 'تعذّر تحميل الأدوار — حاول مرة أخرى.',
     roleTableName: 'الدور',
     roleTableStatus: 'الحالة',
@@ -408,6 +581,18 @@ export const OPERATIONS = {
     roleSystemExplain:
       'دور يحدّده النظام لا يحدّده المكتب: لا يمكن تغيير اسمه ولا تقاعده ولا تعديل صلاحياته. هذه العلامة لا تمنح أي صلاحية بحد ذاتها.',
     roleNoRoles: 'لا توجد أدوار بعد.',
+    dutySegHeading: 'عمليات تحتاج شخصين مختلفين',
+    dutySegIntro:
+      'خمس عشرة عملية في هذا النظام لا يمكن أن ينفّذها شخص واحد: من يسجّل الإجراء لا يمكن أن يكون من يعتمده. هذه قائمة بها، ومعها ما إذا كان مكتبك يملك شخصاً ثانياً لكل منها اليوم.',
+    dutySegColOperation: 'العملية',
+    dutySegColPermission: 'صلاحية المعتمِد',
+    dutySegColHolders: 'عدد من يملكها',
+    dutySegColStatus: 'الحالة',
+    dutySegStatusNobody: 'لا يمكن إتمامها — لا أحد يملك الصلاحية',
+    dutySegStatusSingle: 'شخص واحد فقط — تتعطّل إن كان هو من سجّل الإجراء',
+    dutySegStatusReady: 'جاهزة',
+    dutySegRefusalAct: 'عرض توزيع الفصل بين المهام على أدوار المكتب',
+    dutySegLoadError: 'تعذّر تحميل قائمة العمليات التي تحتاج شخصين — حاول مرة أخرى.',
     roleCreateHeading: 'إنشاء دور',
     roleFieldName: 'الاسم البرمجي',
     roleFieldNameHint: 'ثابت، ويُكتب في سجلّ التدقيق. لا يمكن تغييره بعد الإنشاء.',
@@ -450,6 +635,8 @@ export const OPERATIONS = {
   EN: {
     secHeading: 'Security',
     secMfaHeading: 'Multi-factor authentication',
+    secManualKeyLabel: 'Or type this key into the app by hand:',
+    secManualKeyHint: 'Use this if your authenticator is on the same device as this screen, or you cannot scan the code.',
     secScanInstruction:
       'Scan this QR code with your authenticator app, then enter the 6-digit code it shows.',
     secSession: 'Session',
@@ -460,6 +647,7 @@ export const OPERATIONS = {
     secNotEnrolled: 'Not enrolled — required before you can use most of IBMS',
     secQrAlt: 'MFA enrollment QR code',
     secAuthCodeLabel: 'Authentication code',
+    secAccessEnds: 'Your access to IBMS ends: {at}',
     secVerifyingButton: 'Verifying…',
     secVerifyButton: 'Verify and enable',
     secStartingButton: 'Starting…',
@@ -479,7 +667,30 @@ export const OPERATIONS = {
     empLoading: 'Loading…',
     empLoadError: 'Could not load employees — try again.',
     empCreateError: 'Could not create the employee record.',
-    empNoPermission: "You don't hold the employee.read permission.",
+    empRefusalAct: 'view employees',
+    // § 1.83 — the narrow reveal search.
+    empRevealHeading: "Reveal an employee's national ID",
+    empRevealIntro:
+      'Find the person by name, then reveal their national ID with a stated reason. No other employee data is available here.',
+    empRevealSearchLabel: 'Employee name',
+    empRevealSearchPlaceholder: 'e.g. Ahmad Al-Zoubi',
+    empRevealSearchHint:
+      'A name is required — at least two characters. This screen has no list of all employees.',
+    empRevealSearchButton: 'Search',
+    empRevealSearching: 'Searching…',
+    empRevealNothingSearchedYet: 'Type a name to begin.',
+    empRevealNoMatches: 'No employee by that name.',
+    empRevealSearchError: 'The search could not be run — try again.',
+    empRevealRefusalAct: "reveal an employee's national ID",
+    empRevealNoPosition: 'No job title recorded',
+    empRevealCurrent: 'Currently employed',
+    empRevealFormer: 'No longer employed',
+    empRevealStartButton: 'Reveal national ID',
+    empRevealReasonLabel: 'Reason for revealing (at least ten characters)',
+    empRevealConfirmButton: 'Confirm reveal',
+    empRevealNationalIdLabel: 'National ID:',
+    empRevealFailed: 'The national ID could not be revealed.',
+    empRevealLoading: 'Loading…',
     empSubmitButton: 'Record employee',
     empLicensedRole: 'Licensed role (optional)',
     empHireDate: 'Hire date',
@@ -490,6 +701,47 @@ export const OPERATIONS = {
     empFatherName: "Father's name (optional)",
     empGivenName: 'Given name',
     empCreateHeading: 'Record a new employee',
+
+    // ---- The unified person form: one screen, one Save ----------------------
+    empPersonHeading: 'The person',
+    empEnglishNameHeading: 'Name in English (optional)',
+    empEnglishNameHint:
+      'Nothing is transliterated for you — left empty it stays empty, and the Arabic name is what every screen shows.',
+    empGivenNameEn: 'Given name in English',
+    empFatherNameEn: "Father's name in English",
+    empGrandfatherNameEn: "Grandfather's name in English",
+    empFamilyNameEn: 'Family name in English',
+    empPlacementHeading: 'Where they sit',
+    empDepartment: 'Department',
+    empBranch: 'Branch',
+    empUnset: '— not set —',
+    empOrgUnitsMissing:
+      'No departments or branches yet. Create them on the Departments & branches screen first.',
+    empOrgUnitsLink: 'Departments & branches',
+    empAccountHeading: 'Login',
+    empGiveLogin: 'Give this person a login',
+    empGiveLoginHint:
+      'One Save creates the person and their account together. The name comes from the parts above, and the department and branch are used for both.',
+    empAccountNeedsOrgUnits:
+      'A login needs a department and a branch. Create one of each on the Departments & branches screen, then come back.',
+    empAccountEmail: 'Email',
+    empTempPassword: 'Temporary password',
+    empTempPasswordHint:
+      'They will be asked to change it and to enrol a second factor on first sign-in.',
+    empRolesHeading: 'Roles',
+    empRolesHint: 'At least one — an account with no roles holds no permissions at all.',
+    empRolesNone: 'No active roles to grant.',
+    empRoleRequired: 'Pick at least one role.',
+    empRegistrationType: 'How they sign in',
+    empRegistrationDefault: 'A password held here',
+    empRegistrationWindows: 'Windows account (recorded only)',
+    empRegistrationHint:
+      'Recorded for the record only — there is no domain integration yet, and every account still needs a password here.',
+    empSubmitWithLogin: 'Record the person and create the login',
+    empCreatedPerson: 'The person was recorded.',
+    empCreatedWithLogin: 'The person was recorded and their login created.',
+    empLoginCanAct: 'record people',
+    empLoginCannotAct: 'give them a login',
 
     venHeading: 'Vendors',
     venIntro:
@@ -507,7 +759,7 @@ export const OPERATIONS = {
     venSubmitButton: 'Record vendor',
     venCreateHeading: 'Record a new vendor',
     venUpdateError: 'Could not update the vendor.',
-    venNoPermission: "You don't hold the vendor.manage permission.",
+    venRefusalAct: 'view vendors',
 
     docHeading: 'Documents',
     docIntro:
@@ -526,7 +778,7 @@ export const OPERATIONS = {
     docLoading: 'Loading…',
     docLoadError: 'Could not load documents — try again.',
     docVersionError: 'Could not create a new version.',
-    docUnlockError: 'Could not unlock — you may not hold document.delete-override.',
+    docUnlockAct: 'unlock that document',
     docDeleteError: 'Could not delete the document.',
     docClassificationSummaryIntro: "The highest classification present across a policy's electronic file — never averaged.",
     docStorageReference: 'Storage reference',
@@ -538,7 +790,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'Policy ID',
     docPolicyNotFound: 'Policy not found.',
     docComputeError: 'Could not compute the classification summary.',
-    docNoPermission: "You don't hold the document.manage permission.",
+    docRefusalAct: 'view documents',
     docsHighestClassification: '— highest classification:',
     docsClassificationNone: 'none',
 
@@ -557,7 +809,7 @@ export const OPERATIONS = {
     kbLoadError: 'Could not load the knowledge base — try again.',
     kbPublishError: 'Could not publish the article.',
     kbUpdateError: 'Could not update the article.',
-    kbNoPermission: "You don't hold the kb.publish permission.",
+    kbRefusalAct: 'view and publish knowledge base articles',
 
     bcpHeading: 'Business Continuity & Disaster Recovery',
     bcpIntro:
@@ -578,7 +830,7 @@ export const OPERATIONS = {
     bcpCreateHeading: 'Record a new plan',
     bcpRecordTestButton: 'Record test',
     bcpNoPlanOnFile: '— no plan on file',
-    bcpNoPermission: "You don't hold the bcp-dr.manage permission.",
+    bcpRefusalAct: 'view and maintain the business-continuity and disaster-recovery plans',
 
     iassetHeading: 'Information Assets',
     iassetIntro:
@@ -595,7 +847,7 @@ export const OPERATIONS = {
     iassetOwnerUserId: 'Owner user ID',
     iassetCreateHeading: 'Record a new information asset',
     iassetUpdateError: 'Could not update the asset.',
-    iassetNoPermission: "You don't hold the information-asset.manage permission.",
+    iassetRefusalAct: 'view the information asset register',
 
     acrHeading: 'Access recertification',
     acrQueueHeading: 'Your review queue',
@@ -604,7 +856,29 @@ export const OPERATIONS = {
       'No access-recertification items are currently assigned to you for review.',
     acrLoading: 'Loading…',
     acrLoadError: 'Could not load your review queue — try again.',
-    acrNoPermission: "You don't hold the access-recertification.review permission.",
+    acrRefusalAct: 'review who still needs the access they hold',
+    // The administrator review record — Part 5.1: whoever can administer users is NOT exempt
+    // from recertification of their own access, and this is the record proving they were covered.
+    acrAdminHeading: 'Administrator access review record',
+    acrAdminIntro:
+      'Whoever can administer users is not exempt from review of their own access. This record ' +
+      'shows which administrator accounts a cycle covered, and who reviewed each one.',
+    acrAdminCycleLabel: 'Cycle',
+    acrAdminNoCycles: 'No review cycle has been opened yet.',
+    acrAdminNoneCovered:
+      'This cycle covered no administrator account. That is the condition Part 5.1 exists to ' +
+      'prevent — review the cycle.',
+    acrAdminColSubject: 'Account',
+    acrAdminColReviewer: 'Reviewer',
+    acrAdminColDecision: 'Decision',
+    acrAdminColReviewedAt: 'Reviewed on',
+    acrAdminSelfReview: '(reviewed their own access)',
+    acrAdminNotYetReviewed: 'Not yet reviewed',
+    acrAdminDecisionConfirmed: 'Confirmed',
+    acrAdminDecisionRevoked: 'Revoked',
+    acrAdminDecisionChanged: 'Changed',
+    acrAdminLoadFailed: 'Could not load the administrator access review record.'
+    ,
     acrStartCycleError: 'Could not start the cycle — try again.',
     acrCycleDueDate: 'Due date (optional — defaults to 15 days)',
     acrCycleLabel: 'Cycle label',
@@ -637,7 +911,8 @@ export const OPERATIONS = {
     claGroupPolicy: 'Policy',
     claLoading: 'Loading…',
     claLoadError: 'Could not load the loss-ratio breakdown — try again.',
-    claNoPermission: "You don't hold the claims-analytics.view permission.",
+    claColTotal: 'Total',
+    claRefusalAct: 'view the claims analytics',
 
     rpIntro:
       'The figure a multi-site client’s single Insurance Program is built from. Program assembly itself is Process 7.',
@@ -655,6 +930,7 @@ export const OPERATIONS = {
     rpPriorClaimsField: 'Prior claims history summary (optional)',
     rpSiteLabelField: 'Site label (optional)',
     rpNoProfileYet: 'No risk profile yet for this customer — add the first site below.',
+    rpPriorClaims: 'Prior claims: {summary}',
     rpAddSiteHeading: 'Add a site / location',
     rpSurveysHeading: 'Risk surveys',
     rpColProperty: 'Property (JOD)',
@@ -670,7 +946,7 @@ export const OPERATIONS = {
     rpAddSiteError: 'Could not add the site — try again.',
     rpAddingButton: 'Adding…',
     rpAddSiteButton: 'Add site',
-    rpNoPermission: "You don't hold the risk-profile.read permission.",
+    rpRefusalAct: 'view risk profiles',
     rpOpenSurveyAria: 'Open risk survey for {name}',
     rpConsolidatedSumInsured: 'Consolidated Sum Insured',
 
@@ -679,16 +955,16 @@ export const OPERATIONS = {
     iprogCustomerNotFound:
       'This customer could not be found — it may not exist, or you may not have access to it.',
     iprogLoadError: 'Could not load insurance programs — try again.',
-    iprogNoPermission: "You don't hold the program.read permission.",
+    iprogRefusalAct: 'view insurance programmes',
     iprogNoneForCustomer: 'No insurance program yet for this customer — assemble one from an approved needs assessment.',
-    iprogOpenProgramAria: 'Open insurance program {id}',
+    iprogOpenProgramAria: 'Open the insurance program assembled on {at}',
 
     naHeading: 'Needs assessments',
     naLoading: 'Loading…',
     naNone: 'No needs assessments yet.',
     naLoadError: 'Could not load needs assessments — try again.',
-    naNoPermission: "You don't hold the needs-assessment.read permission.",
-    naViewAssessmentAria: 'View needs assessment {id}',
+    naRefusalAct: 'view needs assessments',
+    naViewAssessmentAria: 'View the needs assessment recorded on {at}',
 
     prosHeading: 'Prospects',
     prosLoading: 'Loading…',
@@ -696,7 +972,7 @@ export const OPERATIONS = {
     prosLoadError: 'Could not load prospects — try again.',
     prosNoneMatch: 'No prospects match your search.',
     prosNone: 'No prospects yet.',
-    prosNoPermission: "You don't hold the prospect.read permission.",
+    prosRefusalAct: 'view prospects',
     prosIntro: 'Process 2 — qualified leads that have been converted into prospects. Convert a lead from the pipeline board to add one here.',
     prosViewProfileAria: 'View profile — {name}',
 
@@ -708,14 +984,23 @@ export const OPERATIONS = {
     homeKycQueueBlurb: 'Review and approve pending KYC records before a customer is activated.',
     homeAccessRecertBlurb: 'Run and complete the periodic access-review cycle.',
     homeSecurityBlurb: 'Manage multi-factor authentication and review your session policy.',
+    homeRolesBlurb: "Define your office's roles and set each one's permissions from the full matrix.",
+    homeUsersBlurb: 'Create user accounts, grant or revoke roles, activate or deactivate access.',
+    homeEmployeesBlurb: 'Employee records, licences, certifications and training.',
+    homeOrgUnitsBlurb: "Your office's department and branch names — created before the first employee.",
+    homeInsuranceLinesBlurb:
+      'The lines of business your work is classified by — add one the standard list does not cover.',
+    navGroupAccount: 'Your account',
+    homeNoDestinations:
+      'No screen is available to your account yet — no permissions have been granted to it. Ask your office administrator.',
     homeWelcome: 'Welcome, {name}',
     homeSignedInAs: 'Insurance Brokerage Management System. Signed in as {roles}.',
     homeNoRole: 'no role assigned',
     usrLoading: 'Loading…',
-    usrNoPermission: "You don't hold the user.manage permission.",
+    usrRefusalAct: 'view user accounts',
     usrPasswordAria: 'Password',
     renLoading: 'Loading…',
-    renNoPermission: "You don't hold the renewal.read permission.",
+    renRefusalAct: 'view renewals',
 
     // ---- settings/users + renewal-cases — CONVERTED, not rewritten ------
     // Both screens were already bilingual via inline ternaries; the Arabic
@@ -756,6 +1041,7 @@ export const OPERATIONS = {
     usrActivate: 'Activate',
     usrRoleToGrantAria: 'Role to grant to {email}',
     renCouldNotLoadRenewalCases: 'Could not load renewal cases — try again.',
+    renScanSummary: 'Scanned {scanned} policy/policies — opened {opened}, skipped {skipped} already open, {failed} failed.',
     renThatActionFailedTryAgain: 'That action failed — try again.',
     renRenewalCases: 'Renewal cases',
     renARenewalCaseOpensAutomatically:
@@ -774,9 +1060,18 @@ export const OPERATIONS = {
     renRequired: 'Required',
     renInsurerTermsWorsened: 'Insurer terms worsened',
     renRiskChanged: 'Risk changed',
-    usrEmployeeRecord: 'Employee record',
-    usrNoEmployeeLink: 'Not linked',
     secDevicesHeading: 'Trusted devices',
+    secKeysHeading: 'Data encryption keys',
+    secKeysIntro:
+      'The keys Highly Confidential fields are encrypted with. Identifiers and status ' +
+      'only — the key material itself never reaches a browser or any response.',
+    secKeysColId: 'Key ID',
+    secKeysColStatus: 'Status',
+    secKeysActive: 'Active — used for new encryption',
+    secKeysRetired: 'Retired — decrypts existing rows only',
+    secKeysNone: 'No keys are configured.',
+    secKeysLoadError: 'Could not load the key list — try again.',
+    secKeysLoading: 'Loading keys…',
     secDevicesIntro:
       'These devices skip the verification code at sign-in. Revoke any you do not recognise.',
     secNoTrustedDevices: 'No trusted devices.',
@@ -820,8 +1115,67 @@ export const OPERATIONS = {
     roleHeading: 'Roles and permissions',
     roleIntro:
       'Every role here belongs to your office alone. Permissions are set per role, and a role grants nothing it has not explicitly been given.',
-    roleNoPermission:
-      'Viewing roles needs the role.read permission. Ask your office administrator.',
+    // --- Role screen: the permission matrix, the generated machine name, and delete ---
+    // --- Departments and branches (the four-action pilot) ---
+    orgUnitHeading: 'Departments and branches',
+    orgUnitIntro:
+      "Your office's department and branch names. Every employee is assigned to one of each, which is why these must exist before the first person is registered. These names grant no permission and decide nothing about who sees what.",
+    orgUnitDepartments: 'Departments',
+    orgUnitBranches: 'Branches',
+    orgUnitNameEn: 'Name (English)',
+    orgUnitNameAr: 'Name (Arabic) — optional',
+    orgUnitCreateButton: 'Add',
+    orgUnitRename: 'Rename',
+    orgUnitRetire: 'Deactivate',
+    orgUnitCreated: 'Added.',
+    orgUnitRenamed: 'Renamed.',
+    orgUnitRetired: 'Deactivated — existing assignments are unchanged.',
+    orgUnitNone: 'Nothing here yet — add the first one.',
+    orgUnitLoadError: 'Could not load departments and branches — try again.',
+    orgUnitRefusalAct: "view the office's departments and branches",
+    roleMatrixSummary: 'This role has {granted} of {total} permissions.',
+    roleMatrixNeedsCatalogue:
+      'The permission matrix cannot be shown — your account does not hold permission.read. You can still create the role, and someone who holds it can set its permissions.',
+    roleMatrixSearchLabel: 'Search permissions',
+    roleMatrixNoMatch: 'No permission matches that search.',
+    roleVerbFull: 'Full',
+    roleSelectAllInSection: 'Select every permission in this section',
+    roleVerbView: 'View',
+    roleVerbCreate: 'Create',
+    roleVerbEdit: 'Edit',
+    roleVerbDelete: 'Delete',
+    roleVerbDeactivate: 'Retire',
+    roleVerbManage: 'Manage',
+    roleVerbOther: 'Other',
+    roleModuleAdmin: 'Administration and system',
+    roleModuleClaims: 'Claims',
+    roleModuleCommercial: 'Commercial front office',
+    roleModuleCompliance: 'Compliance and risk',
+    roleModuleCustomer: 'Customers',
+    roleModuleCustomerService: 'Customer service',
+    roleModuleFinance: 'Finance',
+    roleModuleInsuranceOps: 'Insurance operations',
+    roleModuleReporting: 'Management reporting',
+    roleModulePdpl: 'Data protection',
+    roleModuleSla: 'Service levels',
+    roleModuleSupporting: 'Supporting operations',
+    roleModuleOther: 'Other',
+    roleMachineNameLabel: 'Machine name (generated)',
+    roleMachineNameHint:
+      'Derived from the English name and permanent once saved — this is what appears in the audit log.',
+    roleMachineNameUnreadable:
+      'No readable machine name can be derived from this. Enter the English name in Latin letters — for example, Claims Triage Desk.',
+    roleEnglishNameRequired: 'The English name is required — the permanent machine name is derived from it.',
+    roleCreatePermissionsHeading: 'What this role can do',
+    roleCreatePermissionsIntro:
+      'Choose what this role may do. Permissions can be changed later, and a change applies immediately to everyone holding the role.',
+    roleDeleteButton: 'Delete',
+    roleDeleteConfirmHeading: 'Delete the role "{role}"?',
+    roleDeleteConfirmBody:
+      'The role goes immediately and is withdrawn from everyone holding it — with no reassignment. Anyone left with no roles has no permissions, which is an accepted outcome. The record of who held it, and when, is kept.',
+    roleDeleteConfirmButton: 'Confirm delete',
+    roleDeleted: 'The role was deleted.',
+    roleRefusalAct: "view this office's roles",
     roleCouldNotLoad: 'Could not load roles — try again.',
     roleTableName: 'Role',
     roleTableStatus: 'Status',
@@ -835,6 +1189,18 @@ export const OPERATIONS = {
     roleSystemExplain:
       'A role the platform defines rather than your office: it cannot be renamed, retired, or re-granted. The flag itself grants nothing.',
     roleNoRoles: 'No roles yet.',
+    dutySegHeading: 'Operations that need two different people',
+    dutySegIntro:
+      'Fifteen operations in this system cannot be done by one person: whoever records the action cannot be the one who approves it. This is the list, with whether your office has a second person for each of them today.',
+    dutySegColOperation: 'Operation',
+    dutySegColPermission: "Approver's permission",
+    dutySegColHolders: 'People who hold it',
+    dutySegColStatus: 'Status',
+    dutySegStatusNobody: 'Cannot be completed — nobody holds the permission',
+    dutySegStatusSingle: 'Only one person — blocked whenever they are the one who recorded it',
+    dutySegStatusReady: 'Ready',
+    dutySegRefusalAct: 'view how this office separates duties across its roles',
+    dutySegLoadError: 'Could not load the list of operations needing two people — try again.',
     roleCreateHeading: 'Create a role',
     roleFieldName: 'Machine name',
     roleFieldNameHint:

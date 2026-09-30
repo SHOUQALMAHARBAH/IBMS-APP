@@ -1,4 +1,9 @@
 import { Prisma } from '@ibms/db';
+import type { CombinedDutyAct } from '@ibms/db';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 
 /**
  * M06 — Disposal Batch (backlog Part D §5.1, Process #52). Destruction is
@@ -41,6 +46,8 @@ export interface DisposalBatchRow {
   nominatedByUserId: string;
   managerApprovedAt: Date | null;
   dpoApprovedByUserId: string | null;
+  /** This pair's escape column relation — named per CONSTRAINT, so read it off the schema. */
+  combinedDutyAct: CombinedDutyAct | null;
   dpoApprovedAt: Date | null;
   method: string | null;
   executedAt: Date | null;
@@ -55,6 +62,16 @@ export interface DisposalBatchView {
   nominatedByUserId: string;
   managerApprovedAt: string | null;
   dpoApprovedByUserId: string | null;
+  /**
+   * Set when ONE person both nominated this batch for destruction and approved it, in an office that
+   * declared COMBINED duty segregation and stated why. Null on every ordinary approval.
+   *
+   * This is the pair that authorises IRREVERSIBLE DESTRUCTION of personal data — no undo behind it, and
+   * a certificate of destruction issued afterwards — so whether two people agreed is the most
+   * load-bearing fact on the record. `nominatedByUserId` equalling `dpoApprovedByUserId` is visible only
+   * to somebody comparing two uuids (Part 4 step 5).
+   */
+  combinedDutyAct: CombinedDutyActView | null;
   dpoApprovedAt: string | null;
   method: string | null;
   executedAt: string | null;
@@ -72,6 +89,7 @@ export function deriveDisposalBatchView(
     retentionScheduleItemId: row.retentionScheduleItemId,
     status: row.status,
     nominatedByUserId: row.nominatedByUserId,
+    combinedDutyAct: combinedDutyActView(row.combinedDutyAct),
     managerApprovedAt: row.managerApprovedAt
       ? row.managerApprovedAt.toISOString()
       : null,

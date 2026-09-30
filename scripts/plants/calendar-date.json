@@ -1,0 +1,17 @@
+{
+  "calendar-date-check-is-shape-only": {
+    "file": "apps/api/src/common/is-calendar-date.validator.ts",
+    "from": "  return parsed.toISOString().slice(0, 10) === value;",
+    "to": "  return true;"
+  },
+  "holiday-dto-drops-the-calendar-guard": {
+    "file": "apps/api/src/modules/sla/dto/sla-policy.dto.ts",
+    "from": "  @IsCalendarDate()\n  observedOn!: string;",
+    "to": "  observedOn!: string;"
+  },
+  "commission-date-nan-check-only": {
+    "file": "apps/api/src/modules/commission/commission-agreement.service.ts",
+    "from": "    if (!isCalendarDate(raw)) {",
+    "to": "    if (Number.isNaN(new Date(`${raw}T00:00:00.000Z`).getTime())) {"
+  }
+}

@@ -23,7 +23,11 @@ export interface ReceivablesAgeingReport {
   asOf: string;
   currency: string;
   rows: CustomerReceivablesRow[];
-  totals: ReceivablesAgeingBucketAmounts & { outstandingTotal: string; invoiceCount: number; customerCount: number };
+  totals: ReceivablesAgeingBucketAmounts & {
+    outstandingTotal: string;
+    invoiceCount: number;
+    customerCount: number;
+  };
 }
 
 export interface InsurerPayableRow {
@@ -40,7 +44,13 @@ export interface InsurerPayablesReport {
   asOf: string;
   currency: string;
   rows: InsurerPayableRow[];
-  totals: { outstandingAmount: string; outstandingCount: number; remittedAmount: string; remittedCount: number; insurerCount: number };
+  totals: {
+    outstandingAmount: string;
+    outstandingCount: number;
+    remittedAmount: string;
+    remittedCount: number;
+    insurerCount: number;
+  };
 }
 
 export interface CommissionRollupFigures {
@@ -87,12 +97,14 @@ export interface FinancialDashboardSummary {
   profitability: ProfitabilitySection;
 }
 
-export function getFinancialDashboard(opts: {
-  branchId?: string;
-  insuranceLine?: string;
-  insurerId?: string;
-  asOf?: string;
-} = {}): Promise<FinancialDashboardSummary> {
+export function getFinancialDashboard(
+  opts: {
+    branchId?: string;
+    insuranceLine?: string;
+    insurerId?: string;
+    asOf?: string;
+  } = {},
+): Promise<FinancialDashboardSummary> {
   const params = new URLSearchParams();
   if (opts.branchId) params.set('branchId', opts.branchId);
   if (opts.insuranceLine) params.set('insuranceLine', opts.insuranceLine);

@@ -82,7 +82,7 @@ test("a user without the permission sees the underlying error message", async ({
 
   await page.goto("/dashboards/financial");
   await expect(
-    page.getByText("You don't hold the dashboard.financial.view permission.", { exact: false }),
+    page.getByText("(dashboard.financial.view)", { exact: false }),
   ).toBeVisible();
 });
 

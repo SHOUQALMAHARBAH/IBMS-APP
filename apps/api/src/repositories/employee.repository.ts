@@ -6,6 +6,7 @@ import type {
   User,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import type { TenantTransactionClient } from '../prisma/tenant-scope.extension';
 
 export interface CreateEmployeeInput {
   id: string;
@@ -16,12 +17,22 @@ export interface CreateEmployeeInput {
   fatherName?: string;
   grandfatherName?: string;
   familyName: string;
+  /** The same four in English, and `fullNameEn` composed from them. Every one is optional and every
+   *  one is NULL on all 133 rows that predate migration 20261024100000: transliterating a real
+   *  person's name is a judgement, and nothing here guesses one. */
+  givenNameEn?: string;
+  fatherNameEn?: string;
+  grandfatherNameEn?: string;
+  familyNameEn?: string;
+  fullNameEn?: string;
   nationalIdEnc: string;
   position?: string;
   /** Spec §4.1.2 — the org-chart department. Optional: an employee can be
    * recorded before HR has placed them, and a linked account's own
    * `departmentId` is adopted by `linkUser` when this is left unset. */
   departmentId?: string;
+  /** §4.2.2's location axis. First written by the unified person form; see `CreateEmployeeDto`. */
+  branchId?: string;
   hireDate: Date;
   licensedRole?: string;
   confidentialityAgreementSignedAt?: Date;
@@ -77,12 +88,39 @@ export interface DeprovisioningChecklistUpdate {
  * touches `User.employeeId` — the FK #61 (Employee Performance) needed but
  * nothing before this process ever set.
  */
+/**
+ * Exactly what a narrow employee search may return — IMPROVEMENTS § 1.83, the owner's condition 2
+ * ("the minimum that distinguishes one person from another — enough to pick the right one, not the
+ * record"). `terminationDate` never leaves the service: it is reduced to `isCurrentEmployee`.
+ *
+ * One definition, because the guard spec asserts the SHAPE against this type's own key set — so adding a
+ * column here is a reviewed change that fails a test rather than a widening nobody sees.
+ */
+export interface EmployeeSearchRow {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  position: string | null;
+  terminationDate: Date | null;
+}
+
 @Injectable()
 export class EmployeeRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(input: CreateEmployeeInput): Promise<Employee> {
-    return this.prisma.client.employee.create({ data: input });
+  /**
+   * `tx` is how this write joins someone else's transaction.
+   *
+   * `UserAdminService.provision` creates a person and their account together, and the two rows must
+   * exist together or not at all — a failed second write would otherwise leave a person who half
+   * exists, with no way for whoever pressed Save to tell which half. Defaults to the ordinary client,
+   * so the person-only route is unchanged.
+   */
+  create(
+    input: CreateEmployeeInput,
+    tx?: TenantTransactionClient,
+  ): Promise<Employee> {
+    return (tx ?? this.prisma.client).employee.create({ data: input });
   }
 
   /** Correct an existing record. Deliberately narrow — see `UpdateEmployeeDto`
@@ -108,6 +146,47 @@ export class EmployeeRepository {
     return this.prisma.client.employee.findUnique({
       where: { id },
       include: { trainings: true, deprovisioningChecklist: true },
+    });
+  }
+
+  /**
+   * The NARROW search behind `GET /employees/search` — IMPROVEMENTS § 1.83.
+   *
+   * `select`, never `include` and never a bare `findMany`: the caller holds `employee.national-id.reveal`
+   * and NOT `employee.read`, so this query is the whole of what that role may see about a person. The five
+   * columns below are what it takes to pick the right Ahmad out of three, and nothing else — no hire date,
+   * no licensing, no background-check state, and obviously not `nationalIdEnc`, which is the thing being
+   * revealed afterwards under its own audited act.
+   *
+   * `terminationDate` is selected and then REDUCED TO A BOOLEAN by the service. A former employee of the
+   * same name and position is a real disambiguation case; the date itself is record detail this role has no
+   * claim on.
+   *
+   * The `term` is never optional here. An empty or whitespace-only `q` is refused by
+   * `SearchEmployeesDto` before this is reached, and `employee-search-narrowness.inventory.spec.ts`
+   * asserts both halves — that an empty search yields nothing, and that a column outside the set below
+   * cannot appear in a result.
+   */
+  searchByName(term: string, take: number): Promise<EmployeeSearchRow[]> {
+    return this.prisma.client.employee.findMany({
+      where: {
+        OR: [
+          { fullName: { contains: term, mode: 'insensitive' } },
+          { fullNameEn: { contains: term, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        fullName: true,
+        fullNameEn: true,
+        position: true,
+        terminationDate: true,
+      },
+      // A TOTAL order. `orderBy: fullName` alone leaves two people of the same name in whatever order the
+      // query plan plays them back, and the consumer picks one by eye — the same defect the recertification
+      // reviewer pool had when `pickReviewer` took `[0]` of an unordered read.
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take,
     });
   }
 

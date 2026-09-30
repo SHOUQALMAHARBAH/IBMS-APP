@@ -15,6 +15,7 @@ import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { programListCardStyle } from '../../../components/insurance-program/insurance-program.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function ProgramsForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
@@ -30,7 +31,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('iprogNoPermission')
+          ? permissionRefusal(t, 'iprogRefusalAct', 'program.read')
           : err instanceof ApiError && err.status === 404
             ? t('iprogCustomerNotFound')
             : err instanceof ApiError
@@ -70,10 +71,15 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
           key={program.id}
           type="button"
           style={programListCardStyle}
-          aria-label={t('iprogOpenProgramAria', { id: program.id })}
+          aria-label={t('iprogOpenProgramAria', {
+            at: formatDate(program.createdAt, language),
+          })}
           onClick={() => router.push(`/insurance-programs/${program.id}`)}
         >
-          <strong>Status: {t(ENUM_LABEL.InsuranceProgramStatus[program.status])}</strong>
+          <strong>
+            {t('commonStatusLabel')}{' '}
+            {t(ENUM_LABEL.InsuranceProgramStatus[program.status])}
+          </strong>
           <div style={cardMetaStyle}>
             {tPlural('iprogLineCount', program.lines.length)}
           </div>
@@ -121,9 +127,7 @@ export default function InsuranceProgramsPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('iprogHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('iprogIntro')}
-      </p>
+      <p style={{ opacity: 0.8 }}>{t('iprogIntro')}</p>
       <Suspense fallback={null}>
         <InsuranceProgramsFlow />
       </Suspense>

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   ConflictException,
   ForbiddenException,
@@ -85,11 +86,16 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     resolve: vi.fn().mockResolvedValue({ count: 1 }),
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
+
   const service = new IncidentService(
     repo as unknown as IncidentRepository,
     workflow as unknown as WorkflowTransitionService,
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
+    dutySegregation,
   );
   return { service, repo, workflow, slaTimer, audit };
 }
@@ -357,7 +363,7 @@ describe('IncidentService.coSign (Process 55) — Executive Management only, Mat
       },
     });
     await service.coSign('incident-1', dpo);
-    expect(repo.recordCoSign).toHaveBeenCalledWith('incident-1', 'u-dpo');
+    expect(repo.recordCoSign).toHaveBeenCalledWith('incident-1', 'u-dpo', null);
   });
 
   it('422s (fail closed) if classified but no recorded classifier', async () => {
@@ -417,7 +423,11 @@ describe('IncidentService.coSign (Process 55) — Executive Management only, Mat
       },
     });
     const v = await service.coSign('incident-1', exec);
-    expect(repo.recordCoSign).toHaveBeenCalledWith('incident-1', 'u-exec');
+    expect(repo.recordCoSign).toHaveBeenCalledWith(
+      'incident-1',
+      'u-exec',
+      null,
+    );
     expect(v.seniorManagementCoSignUserId).toBe('u-exec');
   });
 

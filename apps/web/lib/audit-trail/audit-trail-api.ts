@@ -11,6 +11,19 @@ export type AuditAction =
   | 'READ'
   | 'UPDATE'
   | 'DELETE'
+  // THREE values were missing from this union, not one, and a truncated grep said one.
+  //
+  // `DISCARD` came with Class B piece 1; `SLA_ESCALATED` and `ENCRYPTION_KEY_USED` are older. All three
+  // were harmless while nothing rendered a list of actions — TypeScript does not check a value arriving
+  // over HTTP against a union, so rows simply flowed through. They stopped being harmless the moment the
+  // audit screen gained an action FILTER built from this list: a compliance officer could not have
+  // searched for a withdrawn record, an SLA escalation, or a use of the encryption key.
+  //
+  // `packages/db/prisma/audit-action-parity.spec.ts` reads the GENERATED enum and refuses the drift in
+  // both directions. It is what found the two beyond `DISCARD`.
+  | 'DISCARD'
+  | 'SLA_ESCALATED'
+  | 'ENCRYPTION_KEY_USED'
   | 'APPROVE'
   | 'REJECT'
   | 'TRANSITION'
@@ -44,9 +57,18 @@ export type DocumentCategory =
 
 export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
 
+/** One person who appears as an actor in the audit log — the actor picker's option shape. */
+export interface AuditActor {
+  id: string;
+  fullName: string;
+}
+
 export interface AuditLogEntry {
   id: string;
   userId: string;
+  /** Who that id is. Nullable because it is a lookup; unreachable in practice because the actor FK is
+   *  ON DELETE RESTRICT and `userId` is NOT NULL. The screen falls back to the id anyway. */
+  actorName: string | null;
   action: AuditAction;
   entityType: string;
   entityId: string;
@@ -73,6 +95,18 @@ export interface DocumentHistory {
   requestedDocumentId: string;
   versions: DocumentVersion[];
   auditTrail: AuditLogEntry[];
+}
+
+/**
+ * The people who appear in this office's audit log, by name.
+ *
+ * Gated by `audit-log.read`, the same permission as the log — NOT `user.manage`. Compliance and the
+ * external auditor read the audit trail and hold no user-administration permission at all, so the admin
+ * user list would have refused exactly the people this control is for.
+ */
+export function listAuditActors(search?: string): Promise<AuditActor[]> {
+  const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+  return apiGet(`/audit-trail/actors${qs}`);
 }
 
 export function browseAuditTrail(filters: {

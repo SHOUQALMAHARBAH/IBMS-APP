@@ -6,6 +6,7 @@
 // (commission-override.approve).
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
 export interface CommissionAgreement {
   id: string;
@@ -34,6 +35,15 @@ export interface CommissionEntry {
   overrideReason: string | null;
   overrideRequestedByUserId: string | null;
   overrideApprovedByUserId: string | null;
+  /**
+   * Set when ONE person both requested and approved this override, in an office that declared COMBINED
+   * duty segregation and stated why. Null on every ordinary override.
+   *
+   * This screen already renders the override reason and the REQUESTER, and prints '(approved)' — so
+   * without this field a self-approved override reads as a two-person one to anybody who does not know
+   * the approver is missing. Showing half of a two-person control is worse than showing none of it.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
   overridePending: boolean;
   paidAmount: string | null;
   paidAt: string | null;
@@ -91,9 +101,15 @@ export function raiseCommissionOverride(
 }
 
 export function approveCommissionOverride(
+
   entryId: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
 ): Promise<CommissionEntry> {
-  return apiPost(`/commission/entries/${entryId}/override/approve`, {});
+  return apiPost(`/commission/entries/${entryId}/override/approve`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
 /** Process 36 — reconcile the entry against an insurer statement and mark it

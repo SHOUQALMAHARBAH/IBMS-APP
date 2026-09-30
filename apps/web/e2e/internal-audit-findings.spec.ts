@@ -86,7 +86,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/internal-audit-findings");
   await expect(
-    page.getByText("internal-audit.record/internal-audit.close permission", {
+    page.getByText("(internal-audit.record, internal-audit.close)", {
       exact: false,
     }),
   ).toBeVisible();

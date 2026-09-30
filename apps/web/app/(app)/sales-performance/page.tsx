@@ -14,6 +14,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
@@ -75,7 +76,7 @@ export default function SalesPerformancePage() {
         setPerformance(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? t('spNoPermission')
+            ? permissionRefusal(t, 'spRefusalAct', 'dashboard.sales.view')
             : err instanceof ApiError
               ? err.message
               : t('spLoadError'),

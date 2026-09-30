@@ -4,7 +4,9 @@
 // then records the insurer-issued policy/schedule/documents/premium invoice.
 
 import type { Paginated } from '../api/paginated';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export type PolicyStatus =
   | 'PLACEMENT_CONFIRMED'
@@ -79,6 +81,14 @@ export interface PolicyChecking {
   complianceOverrideByUserId: string | null;
   checklist: unknown;
   createdAt: string;
+  /**
+   * Set when ONE person both placed and checked this policy, in an office that declared COMBINED
+   * duty segregation and stated why. Null on every ordinary check, which is nearly all of them.
+   *
+   * Without it a reader sees `placedByUserId` and `checkedByUserId` and cannot tell they are the
+   * same person without looking both up — Part 4 step 5, the act on the record.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
 }
 
 export const DELIVERY_METHOD_OPTIONS = [
@@ -124,6 +134,11 @@ export interface Policy {
   deliveryComplete: boolean;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface RequestedCoverageInput {

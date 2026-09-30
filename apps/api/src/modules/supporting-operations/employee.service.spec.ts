@@ -8,6 +8,7 @@ import {
 import { EmployeeService } from './employee.service';
 import type { EmployeeRepository } from '../../repositories/employee.repository';
 import type { DepartmentRepository } from '../../repositories/department.repository';
+import type { BranchRepository } from '../../repositories/branch.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { EncryptionService } from '../security/encryption.service';
 import type { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
@@ -51,6 +52,7 @@ function makeService(
   over: {
     repo?: Record<string, unknown>;
     departments?: Record<string, unknown>;
+    branches?: Record<string, unknown>;
   } = {},
 ) {
   const repo = {
@@ -132,9 +134,15 @@ function makeService(
     ...(over.departments ?? {}),
   };
 
+  const branches = {
+    findById: vi.fn().mockResolvedValue({ id: 'branch-1', name: 'Irbid' }),
+    ...(over.branches ?? {}),
+  };
+
   const service = new EmployeeService(
     repo as unknown as EmployeeRepository,
     departments as unknown as DepartmentRepository,
+    branches as unknown as BranchRepository,
     audit as unknown as AuditService,
     encryption as unknown as EncryptionService,
     reveal as unknown as SensitiveFieldRevealService,
@@ -143,6 +151,7 @@ function makeService(
   );
   return {
     service,
+    branches,
     repo,
     departments,
     audit,

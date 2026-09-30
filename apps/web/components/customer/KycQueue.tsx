@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import {
   approveKyc,
   getScreeningHold,
@@ -13,6 +14,12 @@ import {
   type ScreeningHoldView,
 } from "../../lib/kyc/kyc-api";
 import { ApiError } from "../../lib/auth/api-client";
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 import { useLanguage } from "../../lib/i18n/language-context";
 import type { TranslationKey } from "../../lib/i18n/translations";
 import { errorStyle } from "../auth/auth-form.styles";
@@ -56,6 +63,10 @@ const TYPE_LABEL_KEY: Record<"INDIVIDUAL" | "CORPORATE", TranslationKey> = {
 
 export function KycQueue({ items, onItemChanged }: KycQueueProps) {
   const { t } = useLanguage();
+  // Part 4 — read here rather than taken as a prop: this component already renders its own controls from what
+  // the caller passes, and threading the office's mode and the viewer's id through every caller of a shared
+  // queue component is a wider change than reading the session the component is already inside.
+  const { user } = useAuth();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
@@ -70,6 +81,8 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
   // exists to gate.
   const [holds, setHolds] = useState<Record<string, ScreeningHoldView>>({});
   const [holdReason, setHoldReason] = useState<Record<string, string>>({});
+  // Part 4 — the combined-duty reason, keyed by record like `holdReason` above it.
+  const [dutyReason, setDutyReason] = useState<Record<string, string>>({});
 
   const decidableIds = items
     .filter(
@@ -145,6 +158,14 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
         {items.map((item) => {
           const isBusy = busyId === item.id;
           const hold = holds[item.id];
+          // Part 4 — computed once here, like the other eleven approve controls: the field and the button
+          // must agree, and two copies of the same condition are two places for them to stop agreeing.
+          const needsDuty = needsCombinedDutyDeclaration({
+            mode: user?.dutySegregationMode,
+            makerUserId: item.createdByUserId,
+            currentUserId: user?.id ?? '',
+            alreadyDecided: false,
+          });
           return (
             <tr key={item.id}>
               <td style={queueCellStyle}>
@@ -164,6 +185,13 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                     {t("kycQueueHighRiskResult")}
                   </div>
                 ) : null}
+                {/* Part 4 step 5 — in the STATUS cell, because an APPROVED KYC file is the state a
+                    reader is judging here and `createdByUserId` equalling `approvedByUserId` is
+                    visible only to somebody comparing two uuids. Shared renderer. */}
+                <CombinedDutyOnRecord
+                  act={item.combinedDutyAct}
+                  testId={`combined-duty-kyc-${item.id}`}
+                />
               </td>
               <td style={queueCellStyle}>
                 {item.status === "SUBMITTED" ? (
@@ -274,6 +302,21 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                         />
                       </label>
                     ) : null}
+                    {/*
+                      Part 4 — the officer who captured the file may approve it in an office that has declared
+                      COMBINED, only by saying why. Two reasons can be asked for on this one control and they
+                      are different things: a screening-hold acceptance says why a sanctions finding is not
+                      disqualifying, this says why one person is doing both halves.
+                    */}
+                    {needsDuty ? (
+                      <CombinedDutyReasonField
+                        id={item.id}
+                        value={dutyReason[item.id] ?? ''}
+                        onChange={(next) =>
+                          setDutyReason((prev) => ({ ...prev, [item.id]: next }))
+                        }
+                      />
+                    ) : null}
                     <button
                       type="button"
                       style={smallButtonStyle}
@@ -286,7 +329,9 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                         hold === undefined ||
                         hold.level === "BLOCKED" ||
                         (hold.level === "REVIEW_REQUIRED" &&
-                          !holdReason[item.id]?.trim())
+                          !holdReason[item.id]?.trim()) ||
+                        (needsDuty &&
+                          combinedDutyTooShort(dutyReason[item.id] ?? ''))
                       }
                       onClick={() =>
                         void run(item.id, () =>
@@ -294,6 +339,9 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                             item.id,
                             undefined,
                             holdReason[item.id]?.trim() || undefined,
+                            needsDuty
+                              ? dutyReason[item.id]?.trim()
+                              : undefined,
                           ),
                         )
                       }

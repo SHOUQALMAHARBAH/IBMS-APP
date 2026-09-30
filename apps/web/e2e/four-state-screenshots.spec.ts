@@ -240,7 +240,11 @@ test("four-state screenshots: /watchlist-sync (item #2 RTL layout mirroring)", a
     route.fulfill({ status: 403, json: { message: "no" } }),
   );
   await page.goto(page.url());
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  // TWO alerts now, and both are correct: the sync-runs load and the list-generations
+  // load are independent reads of the same screen, and a 403 fails both. Asserting a
+  // COUNT rather than `.first()` keeps this honest — it says "the error state is
+  // reported", and it would notice a section that silently rendered nothing.
+  await expect(page.locator('p[role="alert"]')).toHaveCount(2);
   await capture(page, "watchlist-sync", "error");
   await page.unroute("http://localhost:4000/watchlist-sync/status**");
 
@@ -688,6 +692,11 @@ test("four-state screenshots: /opportunities/[id] (item #7 slices — recommenda
   );
   await page.goto("/opportunities/opp-1");
   await expect(page.getByText("No RFQs yet.", { exact: false })).toBeVisible();
+  // NOT at risk of the anchored-read race, checked rather than assumed: the download button is
+  // produced by a RECOMMENDATION, and the recommendations mock two lines above returns `[]`. So the
+  // button is absent while that read is in flight AND absent after it lands — the assertion reaches
+  // the same verdict either way. The race only gives a WRONG answer where the absent element would
+  // be produced by data the mock actually returns. See `e2e/anchored-helper.spec.ts`.
   await expect(
     page.getByRole("button", { name: "Download report (PDF)" }),
   ).toHaveCount(0);

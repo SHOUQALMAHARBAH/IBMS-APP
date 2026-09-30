@@ -13,7 +13,9 @@ import type {
   SecurityAwarenessTraining,
 } from '@ibms/db';
 import { EmployeeRepository } from '../../repositories/employee.repository';
+import { SearchEmployeesDto } from './dto/search-employees.dto';
 import { DepartmentRepository } from '../../repositories/department.repository';
+import { BranchRepository } from '../../repositories/branch.repository';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { EncryptionService } from '../security/encryption.service';
@@ -25,7 +27,10 @@ import {
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { SessionService } from '../auth/services/session.service';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
-import { composeFullName } from '../../common/person-name.util';
+import {
+  composeFullName,
+  composeOptionalFullName,
+} from '../../common/person-name.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   CreateEmployeeDto,
@@ -50,6 +55,34 @@ const TERMINATION_SLA_WORKFLOW = 'termination_access_revocation';
  * `ibms-brain/meta/context/employee-onboarding.md` for why `terminate()` is
  * the first real caller of the ALREADY-registered `termination_access_
  * revocation` SLA entry. */
+
+/**
+ * What a narrow employee search returns — IMPROVEMENTS § 1.83, the owner's condition 2.
+ *
+ * FIVE fields, each earning its place: `id` (the reveal needs it), the name in both languages (the same
+ * fact twice on an Arabic-first platform, not two facts), `position` (what tells two people of the same
+ * name apart), and whether they still work here (the other real disambiguator, derived from
+ * `terminationDate` so the date itself stays out).
+ *
+ * `employee-search-narrowness.inventory.spec.ts` pins this key set exactly, so a sixth field is a change
+ * somebody reviews rather than a widening that arrives quietly.
+ */
+export interface EmployeeSearchResultView {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  position: string | null;
+  isCurrentEmployee: boolean;
+}
+
+/**
+ * A hard cap, and the result says when it bit (`truncated` in the audit row).
+ *
+ * Not a page size — there is no second page, deliberately. Pagination would make "walk the whole staff
+ * list two at a time" reachable, which is the thing the mandatory search term exists to prevent.
+ */
+export const EMPLOYEE_SEARCH_MAX_RESULTS = 25;
+
 @Injectable()
 export class EmployeeService {
   private readonly logger = new Logger(EmployeeService.name);
@@ -57,6 +90,7 @@ export class EmployeeService {
   constructor(
     private readonly employees: EmployeeRepository,
     private readonly departments: DepartmentRepository,
+    private readonly branches: BranchRepository,
     private readonly audit: AuditService,
     private readonly encryption: EncryptionService,
     private readonly reveal: SensitiveFieldRevealService,
@@ -90,6 +124,18 @@ export class EmployeeService {
       if (!department) {
         throw new UnprocessableEntityException(
           "Unknown department. Pick one of this office's own departments.",
+        );
+      }
+    }
+
+    // §4.2.2's location axis, validated exactly like the department above: the tenant-scoped read
+    // means an Office A record can never be filed under an Office B branch, and an id from another
+    // office reads as "unknown" rather than as a hint that the row exists somewhere.
+    if (dto.branchId) {
+      const branch = await this.branches.findById(dto.branchId);
+      if (!branch) {
+        throw new UnprocessableEntityException(
+          "Unknown branch. Pick one of this office's own branches.",
         );
       }
     }
@@ -135,6 +181,16 @@ export class EmployeeService {
       familyName: dto.familyName,
     });
 
+    // The English set is optional as a WHOLE, so this composes to undefined rather than to an empty
+    // string when none of it was given — `Employee.fullNameEn` stays NULL, which is what every row
+    // predating migration 20261024100000 holds and what the screens fall back from.
+    const fullNameEn = composeOptionalFullName({
+      givenName: dto.givenNameEn,
+      fatherName: dto.fatherNameEn,
+      grandfatherName: dto.grandfatherNameEn,
+      familyName: dto.familyNameEn,
+    });
+
     const employee = await this.employees.create({
       id,
       fullName,
@@ -142,9 +198,15 @@ export class EmployeeService {
       fatherName: dto.fatherName,
       grandfatherName: dto.grandfatherName,
       familyName: dto.familyName,
+      givenNameEn: dto.givenNameEn,
+      fatherNameEn: dto.fatherNameEn,
+      grandfatherNameEn: dto.grandfatherNameEn,
+      familyNameEn: dto.familyNameEn,
+      fullNameEn,
       nationalIdEnc: encrypted.nationalIdEnc,
       position: dto.position,
       departmentId: dto.departmentId,
+      branchId: dto.branchId,
       hireDate,
       licensedRole: dto.licensedRole,
       confidentialityAgreementSignedAt,
@@ -191,10 +253,14 @@ export class EmployeeService {
     const employee = await this.employees.findByIdWithRelations(id);
     if (!employee) throw new NotFoundException('Employee not found');
     const masked = await this.toMasked(employee, actorUserId);
+    // Whether this person already has a login. The screen needs it to decide between offering one and
+    // naming the one that exists; `findUserByEmployeeId` is tenant-scoped like every other read here.
+    const account = await this.employees.findUserByEmployeeId(id);
     return {
       ...masked,
       trainings: employee.trainings,
       deprovisioningChecklist: employee.deprovisioningChecklist,
+      account: account ? { id: account.id, email: account.email } : null,
     };
   }
 
@@ -259,6 +325,67 @@ export class EmployeeService {
       },
     });
     return updated;
+  }
+
+  /**
+   * The NARROW employee search — IMPROVEMENTS § 1.83, and the only route by which the sole holder of
+   * `employee.national-id.reveal` can discover the id it needs.
+   *
+   * ## The search itself is audited, not only the reveal
+   *
+   * The owner's condition 3, and the reasoning is hers: **in a compliance context, who asked about a
+   * person is information in its own right.** A log that records only successful reveals cannot answer
+   * "was this officer probing for somebody", which is precisely the question an access review of a
+   * decryption capability exists to ask.
+   *
+   * THE SEARCH TERM IS RECORDED, and that is a deliberate exception to "what enters the audit trail is
+   * described, not quoted". The rule exists so data the log should not hold cannot enter an uneditable
+   * table; here the term IS the audited fact. Recording only the matched ids would leave the ZERO-RESULT
+   * search — the most interesting case to a reviewer — unable to say who was being looked for. The term is
+   * also not a new disclosure: it is a name the searcher typed and therefore already knew.
+   *
+   * Both are stored: the term, and the ids that matched. `entityId` is the ACTOR, because this act is about
+   * a person searching rather than about one employee record — there is no single employee it happened to.
+   *
+   * Audited BEFORE the rows are returned and NOT best-effort-swallowed the way the writes in this service
+   * are: if the record of the search cannot be written, the search does not happen. A silent search by a
+   * decryption-capable role is the one thing this control exists to prevent.
+   */
+  async search(
+    dto: SearchEmployeesDto,
+    actor: AuthenticatedUser,
+  ): Promise<EmployeeSearchResultView[]> {
+    const rows = await this.employees.searchByName(
+      dto.q,
+      EMPLOYEE_SEARCH_MAX_RESULTS,
+    );
+
+    // Deliberately NOT `safeAudit`. Every other audit call in this service is best-effort because losing
+    // the record of a training row is worse than failing the write; here the record of who searched for
+    // whom is the control, so a failure to write it must surface as a failed request.
+    await this.audit.record({
+      userId: actor.id,
+      action: 'READ',
+      entityType: 'EmployeeSearch',
+      entityId: actor.id,
+      afterValue: {
+        term: dto.q,
+        matchedEmployeeIds: rows.map((r) => r.id),
+        matchCount: rows.length,
+        truncated: rows.length === EMPLOYEE_SEARCH_MAX_RESULTS,
+      },
+      isSensitiveDataAccess: true,
+    });
+
+    // `terminationDate` is reduced here and never leaves the service. A former employee of the same name
+    // and position is a real disambiguation case; the date is record detail this role has no claim on.
+    return rows.map((r) => ({
+      id: r.id,
+      fullName: r.fullName,
+      fullNameEn: r.fullNameEn,
+      position: r.position,
+      isCurrentEmployee: r.terminationDate === null,
+    }));
   }
 
   async revealField(

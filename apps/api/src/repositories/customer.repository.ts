@@ -100,6 +100,56 @@ export class CustomerRepository {
     return this.prisma.client.customer.create({ data: input });
   }
 
+  /**
+   * Correct a customer's CONTACT details. The first write to a `Customer` row this codebase has ever had
+   * other than the create — see IMPROVEMENTS § 3.14.
+   *
+   * Only the three fields with no screening consequence. Widening this to a name or a date of birth would
+   * put a screening event behind a repository method, which is exactly the shape the AMLU rules refuse:
+   * those ship with the re-screening mechanism or not at all.
+   */
+  updateContactDetails(
+    id: string,
+    data: {
+      contactPhoneEnc?: string;
+      contactEmailEnc?: string;
+      registeredAddress?: string;
+    },
+  ): Promise<Customer> {
+    return this.prisma.client.customer.update({ where: { id }, data });
+  }
+
+  /**
+   * Record a correction. The evidence the AMLU requires kept — "the verification mechanism and actions
+   * taken … in internal records" — and, when `dsrId` is set, the evidence that a statutory request was
+   * actually answered rather than attested to.
+   */
+  recordCorrection(input: {
+    id: string;
+    customerId: string;
+    field: string;
+    beforeValueEnc?: string;
+    afterValueEnc?: string;
+    reason: string;
+    correctedByUserId: string;
+    dsrId?: string;
+    kycRecordId?: string;
+    kycStatusBefore?: string;
+    priorScreeningResultId?: string;
+  }): Promise<{ id: string }> {
+    return this.prisma.client.customerIdentifierCorrection.create({
+      data: input,
+      select: { id: true },
+    });
+  }
+
+  /** How many corrections were recorded in answer to this request. The DSR closure gate's one query. */
+  countCorrectionsForDsr(dsrId: string): Promise<number> {
+    return this.prisma.client.customerIdentifierCorrection.count({
+      where: { dsrId },
+    });
+  }
+
   findById(id: string): Promise<Customer | null> {
     return this.prisma.client.customer.findUnique({ where: { id } });
   }

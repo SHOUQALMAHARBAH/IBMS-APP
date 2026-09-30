@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useEffect, useState } from 'react';
+import { ReportProvenance } from '../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -11,15 +12,24 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: '2px solid var(--border-default)',
+};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem' };
+const statRow: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.75rem',
+};
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -86,7 +96,7 @@ export default function KpiDashboardPage() {
         setSummary(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? t('kpiNoPermission')
+            ? permissionRefusal(t, 'kpiRefusalAct', 'kpi-dashboard.view')
             : err instanceof ApiError
               ? err.message
               : t('kpiLoadError'),
@@ -100,9 +110,7 @@ export default function KpiDashboardPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('kpiHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('kpiIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('kpiIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -112,16 +120,24 @@ export default function KpiDashboardPage() {
 
       {summary ? (
         <>
-          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-            Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)}.
-          </p>
+          <ReportProvenance kind="generatedAt" at={summary.generatedAt} />
 
           <section style={sectionStyle}>
             <h2>{t('kpiSales')}</h2>
             <div style={statRow}>
-              <Stat label={t('kpiCustomers')} value={summary.sales.totalCustomers} />
+              <Stat
+                label={t('kpiCustomers')}
+                value={summary.sales.totalCustomers}
+              />
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '0.75rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '2rem',
+                marginTop: '0.75rem',
+              }}
+            >
               <div>
                 <h3>{t('kpiLeads')}</h3>
                 <StatusTable counts={summary.sales.leadsByStatus} />
@@ -181,7 +197,9 @@ export default function KpiDashboardPage() {
               />
             </div>
             <div style={{ marginTop: '0.75rem' }}>
-              <StatusTable counts={summary.customerService.complaintsByStatus} />
+              <StatusTable
+                counts={summary.customerService.complaintsByStatus}
+              />
             </div>
           </section>
 

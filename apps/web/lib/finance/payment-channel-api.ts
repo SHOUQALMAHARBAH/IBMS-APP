@@ -1,6 +1,7 @@
 // Process 38 — Payment Processing (backlog Part C #38, Domain D). Reads
 // apps/api's /payment-channels endpoints: the approved payment-channel list for
-// customers and insurers, maintained by Finance (payment-channel.manage). #32's
+// customers and insurers, maintained by Finance (payment-channel.read to list, .create to add,
+// .deactivate to disable). #32's
 // collection cycle references a channel on a Receipt / Remittance.
 
 import { apiGet, apiPost } from '../auth/api-client';

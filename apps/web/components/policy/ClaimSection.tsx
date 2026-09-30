@@ -21,11 +21,14 @@ import { useLanguage } from '../../lib/i18n/language-context';
 // screen renders the identical component it always did — see that file's
 // header for why the extraction was safe.
 import { ClaimCard } from '../claim/ClaimCard';
+import { NotifyClaimForm } from '../claim/NotifyClaimForm';
 
 interface Props {
   opportunityId: string;
   /** Sales / Claims — record a claim notification. */
   canNotify: boolean;
+  /** Claims — withdraw a claim notified in error, before it reaches the insurer. */
+  canDiscard: boolean;
   /** Claims — register a NOTIFIED claim with the insurer + assign the adjuster. */
   canRegister: boolean;
   /** Claims — file claim documentation against the mandatory checklist. */
@@ -49,6 +52,7 @@ interface Props {
 export function ClaimSection({
   opportunityId,
   canNotify,
+  canDiscard,
   canRegister,
   canDocument,
   canAssess,
@@ -61,17 +65,17 @@ export function ClaimSection({
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /*
+   * `busy` and `formError` STAY here, and this is a correction to my own extraction measurement: I checked
+   * what the notify block REFERENCED and not what else used the state I was moving. The follow-up sweep
+   * button below shares both.
+   *
+   * `NotifyClaimForm` now owns its own copies, which is better than passing these down: two independent
+   * actions get two independent busy flags, so running the insurer follow-up sweep no longer disables the
+   * notify button, and a sweep error no longer appears above the notify form as though the form had failed.
+   */
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const [lossDate, setLossDate] = useState('');
-  const [causeOfLoss, setCauseOfLoss] = useState('');
-  const [lossLocation, setLossLocation] = useState('');
-  const [estimatedLoss, setEstimatedLoss] = useState('');
-  const [thirdParty, setThirdParty] = useState(false);
-  const [tpName, setTpName] = useState('');
-  const [tpContact, setTpContact] = useState('');
-  const [tpSubrogation, setTpSubrogation] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -83,11 +87,7 @@ export function ClaimSection({
     } catch (err) {
       setPolicy(null);
       setRows([]);
-      setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('claimLoadError'),
-      );
+      setLoadError(err instanceof ApiError ? err.message : t('claimLoadError'));
     }
   }, [opportunityId, t]);
 
@@ -96,45 +96,6 @@ export function ClaimSection({
       await load();
     })();
   }, [load]);
-
-  async function submit() {
-    setBusy(true);
-    setFormError(null);
-    try {
-      await notifyClaim({
-        policyId: (policy as Policy).id,
-        lossDate,
-        causeOfLoss: causeOfLoss.trim(),
-        lossLocation: lossLocation.trim() || undefined,
-        estimatedLoss: estimatedLoss.trim(),
-        isThirdPartyInvolved: thirdParty || undefined,
-        thirdParty: thirdParty
-          ? {
-              fullName: tpName.trim() || undefined,
-              contactDetails: tpContact.trim() || undefined,
-              subrogationRecoveryFlag: tpSubrogation || undefined,
-            }
-          : undefined,
-      });
-      setLossDate('');
-      setCauseOfLoss('');
-      setLossLocation('');
-      setEstimatedLoss('');
-      setThirdParty(false);
-      setTpName('');
-      setTpContact('');
-      setTpSubrogation(false);
-      await load();
-    } catch (err) {
-      setFormError(
-        err instanceof ApiError
-          ? err.message
-          : t('claimCreateError'),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
 
   if (policy === undefined) return null;
   // A failed load nulls the policy, which then short-circuits the section
@@ -156,8 +117,6 @@ export function ClaimSection({
   // exists) or claims already sit against it.
   if (!policy || (!policy.issuanceComplete && rows.length === 0)) return null;
 
-  const canRecord = canNotify && policy.issuanceComplete;
-
   return (
     <section>
       <h2 style={{ marginTop: '2.5rem' }}>{t('claimSectionHeading')}</h2>
@@ -175,9 +134,7 @@ export function ClaimSection({
               .then(() => load())
               .catch((err) =>
                 setFormError(
-                  err instanceof ApiError
-                    ? err.message
-                    : t('claimSweepError'),
+                  err instanceof ApiError ? err.message : t('claimSweepError'),
                 ),
               )
               .finally(() => setBusy(false));
@@ -192,20 +149,18 @@ export function ClaimSection({
           {loadError}
         </p>
       ) : null}
-      {formError ? (
-        <p role="alert" style={errorStyle}>
-          {formError}
-        </p>
-      ) : null}
 
       {rows.length === 0 ? (
-        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('policyNoClaimsYet')}</p>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+          {t('policyNoClaimsYet')}
+        </p>
       ) : (
         rows.map((c) => (
           <ClaimCard
             key={c.id}
             claim={c}
             abilities={{
+              canDiscard,
               canRegister,
               canDocument,
               canAssess,
@@ -219,102 +174,13 @@ export function ClaimSection({
         ))
       )}
 
-      {canRecord ? (
-        <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
-          <strong>{t('claimNotifyButton')}</strong>
-          <div style={quoteFieldStyle}>
-            <label htmlFor="claim-loss-date">{t('claimLossDueDateLabel')}</label>
-            <input
-              id="claim-loss-date"
-              type="date"
-              value={lossDate}
-              onChange={(ev) => setLossDate(ev.target.value)}
-            />
-          </div>
-          <div style={quoteFieldStyle}>
-            <label htmlFor="claim-cause">{t('claimCauseOfLossLabel')}</label>
-            <input
-              id="claim-cause"
-              maxLength={2000}
-              dir="auto"
-              value={causeOfLoss}
-              onChange={(ev) => setCauseOfLoss(ev.target.value)}
-            />
-          </div>
-          <div style={quoteFieldStyle}>
-            <label htmlFor="claim-location">{t('claimLocationLabel')}</label>
-            <input
-              id="claim-location"
-              maxLength={500}
-              dir="auto"
-              value={lossLocation}
-              onChange={(ev) => setLossLocation(ev.target.value)}
-            />
-          </div>
-          <div style={quoteFieldStyle}>
-            <label htmlFor="claim-estimate">{t('claimEstimatedLossLabel')}</label>
-            <input
-              id="claim-estimate"
-              inputMode="decimal"
-              placeholder="20000.000"
-              value={estimatedLoss}
-              onChange={(ev) => setEstimatedLoss(ev.target.value)}
-            />
-          </div>
-          <label
-            style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0' }}
-          >
-            <input
-              type="checkbox"
-              checked={thirdParty}
-              onChange={(ev) => setThirdParty(ev.target.checked)}
-            />{t('claimThirdPartyInvolved')}</label>
-          {thirdParty ? (
-            <>
-              <div style={quoteFieldStyle}>
-                <label htmlFor="claim-tp-name">{t('claimThirdPartyName')}</label>
-                <input
-                  id="claim-tp-name"
-                  maxLength={200}
-                  dir="auto"
-                  value={tpName}
-                  onChange={(ev) => setTpName(ev.target.value)}
-                />
-              </div>
-              <div style={quoteFieldStyle}>
-                <label htmlFor="claim-tp-contact">{t('claimThirdPartyContact')}</label>
-                <input
-                  id="claim-tp-contact"
-                  maxLength={500}
-                  value={tpContact}
-                  onChange={(ev) => setTpContact(ev.target.value)}
-                />
-              </div>
-              <label
-                style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0' }}
-              >
-                <input
-                  type="checkbox"
-                  checked={tpSubrogation}
-                  onChange={(ev) => setTpSubrogation(ev.target.checked)}
-                />{t('claimSubrogationFlag')}</label>
-            </>
-          ) : null}
-          <button
-            type="button"
-            disabled={
-              busy ||
-              lossDate.trim().length === 0 ||
-              causeOfLoss.trim().length < 3 ||
-              estimatedLoss.trim().length === 0
-            }
-            style={{ ...buttonStyle, width: 'auto' }}
-            onClick={() => void submit()}
-          >
-            {busy ? t('claimNotifyingButton') : t('claimNotifySubmitButton')}
-          </button>
-        </div>
-      ) : null}
+      {/*
+        The notify form lives in `components/claim/NotifyClaimForm.tsx` — ONE implementation, mounted
+        here and on `/policies/[id]`. Extracted rather than duplicated, and this is the second time this
+        file has made that move: `ClaimCard` went first, for the same reason and against the same
+        permission gate. See that component for why two mount points is the design.
+      */}
+      <NotifyClaimForm policy={policy} canNotify={canNotify} onDone={load} />
     </section>
   );
 }

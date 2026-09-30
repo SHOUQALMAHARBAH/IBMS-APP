@@ -112,10 +112,10 @@ test("a user without the permission sees a friendly message", async ({ page }) =
 
   await page.goto("/operational-pi-risk");
   await expect(
-    page.getByText("risk-register.manage permission", { exact: false }),
+    page.getByText("(risk-register.manage)", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByText("pi-policy.manage permission", { exact: false }).first(),
+    page.getByText("(pi-policy.manage)", { exact: false }).first(),
   ).toBeVisible();
 });
 

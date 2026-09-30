@@ -77,8 +77,20 @@ async function main() {
     );
   }
 
+  // SEEDED roles only — `isSystem`, and in the default office.
+  //
+  // Without the `isSystem` filter this gate is unsatisfiable on any database where somebody has used
+  // the Role screen, which is the screen's whole purpose. Measured: the write variant reads the DEV
+  // database and the `verify.sh` check reads DB-TEST, and dev's default office carried two roles the
+  // owner had created by hand while testing ("LOL123", "SHOUQ") — 14 roles / 467 grants against
+  // db-test's 12 / 445. The 22-grant difference was exactly those two roles: the seeded grid itself
+  // agreed to the grant. So the gate reported STALE forever, and regenerating would have baked a
+  // stranger's experimental role into the web e2e fixture.
+  //
+  // An office's own roles are data. The fixture mirrors what the SEED grants, which is what every
+  // Playwright spec mocks `/auth/me` with.
   const roles = await prisma.role.findMany({
-    where: { organizationId: org.id },
+    where: { organizationId: org.id, isSystem: true },
     select: {
       name: true,
       permissions: { select: { permission: { select: { code: true } } } },
@@ -87,9 +99,29 @@ async function main() {
   });
   if (roles.length === 0) {
     throw new Error(
-      `The default office has no roles. Run \`npm run db:seed\`; an empty grid here would generate a fixture that makes every Playwright nav assertion fail closed.`,
+      `The default office has no SYSTEM roles. Run \`npm run db:seed\`; an empty grid here would generate a fixture that makes every Playwright nav assertion fail closed.`,
     );
   }
+
+  // The whole catalogue, not just the granted codes: the Role screen's matrix renders EVERY
+  // permission, and the test that pins its shape (13 five-state families / 27 codes / 159 toggles)
+  // has to run against the real 186 rather than the union of what happens to be granted. Emitting it
+  // here keeps one generated source of truth and makes `--check` fail when a permission is added.
+  const catalogue = await prisma.permission.findMany({
+    select: { code: true, module: true, description: true },
+    orderBy: [{ module: 'asc' }, { code: 'asc' }],
+  });
+  if (catalogue.length === 0) {
+    throw new Error(
+      'The permission catalogue is empty. Run `npm run db:seed`; an empty catalogue would generate a matrix fixture that hides every permission.',
+    );
+  }
+  const catalogueBody = catalogue
+    .map(
+      (perm) =>
+        `  { code: '${perm.code}', module: '${perm.module}', description: ${JSON.stringify(perm.description ?? '')} },`,
+    )
+    .join('\n');
 
   const body = roles
     .map((role) => {
@@ -97,7 +129,13 @@ async function main() {
         .map((grant) => grant.permission.code)
         .sort((a, b) => a.localeCompare(b, 'en'));
       const lines = codes.map((code) => `    '${code}',`).join('\n');
-      return `  ${role.name}: [\n${lines}\n  ],`;
+      // QUOTED via JSON.stringify: the API accepts ANY 1-100 character string as a machine name
+      // today, so a role named with spaces or non-Latin characters emits an invalid object key and
+      // breaks this fixture for every spec that imports it. Measured — one such role existed and did
+      // exactly that, taking the whole web unit suite down with a parse error.
+      return `  ${JSON.stringify(role.name)}: [
+${lines}
+  ],`;
     })
     .join('\n');
 
@@ -119,7 +157,8 @@ async function main() {
  * the grid as declared instead of as granted. \`--check\` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * ${roles.length} roles, ${total} grants, from the default office.
+ * ${roles.length} seeded (\`isSystem\`) roles, ${total} grants, from the default office. An office's own
+ * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
 ${body}
@@ -134,6 +173,22 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
   }
   return [...set].sort();
 }
+
+/**
+ * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
+ *
+ * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
+ * this rather than a hand-written sample: ${catalogue.length} codes across ${
+    new Set(catalogue.map((c) => c.module)).size
+  } modules at generation time.
+ */
+export const PERMISSION_CATALOGUE: readonly {
+  code: string;
+  module: string;
+  description: string;
+}[] = [
+${catalogueBody}
+];
 `;
 
   if (CHECK_ONLY) {

@@ -37,7 +37,9 @@ test("home page greets the signed-in user and shows the primary nav", async ({ p
   // route opens. Home belongs to no group, so "Leads" is RENDERED but sits
   // inside a closed <details> — present in the DOM, hidden from the user,
   // which is the whole point of the restructure. Permission-hidden items are
-  // a different thing entirely and have count 0 (see policies.spec.ts).
+  // a different thing entirely and have count 0 BY HREF — `policies.spec.ts` is the
+  // worked example, and it was fixed on 2026-09-28 after a sweep found it asserting
+  // count 0 by ROLE, which can never fail for exactly the reason this comment gives.
   // By href, not by role: a closed <details> drops its contents from the
   // accessibility tree, so `getByRole` legitimately finds zero.
   const leads = nav.locator('a[href="/leads"]');

@@ -14,6 +14,11 @@ import type { EncryptionService, KeyUseContext } from './encryption.service';
  */
 export const ENCRYPTED_FIELDS = {
   Customer: ['nationalIdEnc', 'contactPhoneEnc', 'contactEmailEnc'],
+  // A corrected identifier's BEFORE and AFTER values. Encrypted for the same reason
+  // `Customer.nationalIdEnc` is: the AMLU requires the prior value retained, and retaining a national ID
+  // in the clear in a second table would defeat the column it came from. Both obligations are met
+  // together rather than traded against each other.
+  CustomerIdentifierCorrection: ['beforeValueEnc', 'afterValueEnc'],
   UltimateBeneficialOwner: ['nationalIdEnc'],
   InsuredPerson: ['nationalIdEnc'],
   Employee: ['nationalIdEnc'],

@@ -14,6 +14,7 @@ import {
   type ScreeningHealth,
   type ScreeningOverview,
 } from "../../../lib/screening/screening-config-api";
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * Screening provider + data health.
@@ -95,7 +96,7 @@ export default function ScreeningHealthPage() {
       setOverview(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('shYouDonTHoldThe')
+          ? permissionRefusal(t, 'shRefusalAct', 'sanctions-pep.screen')
           : err instanceof ApiError
             ? err.message
             : t('shCouldNotLoadScreeningHealth'),
@@ -205,9 +206,13 @@ export default function ScreeningHealthPage() {
 
             {health.missing.length > 0 ? (
               <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {isArabic
-                  ? `إعدادات ناقصة: ${health.missing.join(", ")}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.`
-                  : `Missing configuration: ${health.missing.join(", ")}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.`}
+                {/*
+                  Was an `isArabic ? … : …` ternary. BOTH languages were present, so this was never a
+                  missing translation — it was three strings the i18n parity guard and the collision check
+                  could not see, because they bypassed the dictionary. Moved in so they are audited with
+                  the rest.
+                */}
+                {t('shMissingConfig', { missing: health.missing.join(', ') })}
               </p>
             ) : null}
           </section>
@@ -335,9 +340,7 @@ export default function ScreeningHealthPage() {
           {/* ---------------- screening volume ---------------- */}
           <section style={card} data-testid="ops-attempts">
             <h2 style={{ marginTop: 0 }}>
-              {isArabic
-                ? `عمليات الفحص (آخر ${overview.windowDays} يوماً)`
-                : `Screening attempts (last ${overview.windowDays} days)`}
+              {t('shScreeningAttempts', { days: overview.windowDays })}
             </h2>
             <p style={{ opacity: 0.75, marginTop: 0 }}>
               {t('shAHealthCheckAnswersWhether')}
@@ -437,9 +440,7 @@ export default function ScreeningHealthPage() {
             </div>
             <div style={row}>
               <span>
-                {isArabic
-                  ? `حالات رفع الإيقاف (آخر ${overview.windowDays} يوماً)`
-                  : `Holds released (last ${overview.windowDays} days)`}
+                {t('shHoldsReleased', { days: overview.windowDays })}
               </span>
               <span data-testid="ops-holds-released">
                 {overview.holds.releasedInWindow}

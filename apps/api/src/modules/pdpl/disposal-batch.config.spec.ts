@@ -11,6 +11,8 @@ const row = (over: Partial<DisposalBatchRow> = {}): DisposalBatchRow => ({
   retentionScheduleItemId: 'rsi-1',
   status: 'NOMINATED',
   nominatedByUserId: 'u-manager',
+  // The read includes this relation now, so the fixture carries it.
+  combinedDutyAct: null,
   managerApprovedAt: null,
   dpoApprovedByUserId: null,
   dpoApprovedAt: null,

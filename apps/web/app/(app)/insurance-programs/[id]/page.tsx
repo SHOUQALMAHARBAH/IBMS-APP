@@ -13,10 +13,14 @@ import {
 } from '../../../../lib/insurance-program/insurance-program-api';
 import { createOpportunity } from '../../../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  buttonStyle,
+  errorStyle,
+} from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -29,9 +33,8 @@ import {
   programTableStyle,
 } from '../../../../components/insurance-program/insurance-program.styles';
 
-
 export default function InsuranceProgramDetailPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
@@ -101,9 +104,7 @@ export default function InsuranceProgramDetailPage() {
         return;
       }
       setActionError(
-        err instanceof ApiError
-          ? err.message
-          : t('iprogdToMarketError'),
+        err instanceof ApiError ? err.message : t('iprogdToMarketError'),
       );
       setBusy(false);
     }
@@ -138,8 +139,16 @@ export default function InsuranceProgramDetailPage() {
 
       {program && ctx ? (
         <>
-          <h1>Insurance program{ctx.siteLabel ? ` — ${ctx.siteLabel}` : ''}</h1>
-          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.InsuranceProgramStatus[program.status])}</p>
+          <h1>
+            {ctx.siteLabel
+              ? t('iprogdHeadingWithSite', { site: ctx.siteLabel })
+              : t('iprogdHeading')}
+          </h1>
+          <p style={{ opacity: 0.8 }}>
+            {t('iprogdStatus', {
+              status: t(ENUM_LABEL.InsuranceProgramStatus[program.status]),
+            })}
+          </p>
 
           <div
             style={{
@@ -150,7 +159,9 @@ export default function InsuranceProgramDetailPage() {
             }}
           >
             <div>
-              <div style={profileFieldLabelStyle}>{t('iprogdSourceNeedsAssessment')}</div>
+              <div style={profileFieldLabelStyle}>
+                {t('iprogdSourceNeedsAssessment')}
+              </div>
               <div style={profileFieldValueStyle}>
                 {ctx.needsAssessmentId ? (
                   <button
@@ -165,12 +176,11 @@ export default function InsuranceProgramDetailPage() {
                       color: 'inherit',
                     }}
                     onClick={() =>
-                      router.push(
-                        `/needs-assessments/${ctx.needsAssessmentId}`,
-                      )
+                      router.push(`/needs-assessments/${ctx.needsAssessmentId}`)
                     }
                   >
-                    {ctx.needsAssessmentId.slice(0, 8)} ({ctx.needsAssessmentStatus})
+                    {ctx.needsAssessmentId.slice(0, 8)} (
+                    {ctx.needsAssessmentStatus})
                   </button>
                 ) : (
                   '—'
@@ -189,7 +199,13 @@ export default function InsuranceProgramDetailPage() {
 
           <div style={programPanelStyle}>
             <strong>{t('iprogdDerivedSi')}</strong>
-            <p style={{ opacity: 0.7, margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
+            <p
+              style={{
+                opacity: 0.7,
+                margin: '0.25rem 0 0',
+                fontSize: '0.85rem',
+              }}
+            >
               {t('iprogdReassemblyNote')}
             </p>
             <div
@@ -200,23 +216,34 @@ export default function InsuranceProgramDetailPage() {
                 marginTop: '0.5rem',
               }}
             >
-              <span>Property (JOD): {ctx.sumInsured.propertySumInsured}</span>
+              {/* The currency rides on the VALUE through `formatMoney`, never in the label. */}
               <span>
-                Business Interruption (JOD):{' '}
-                {ctx.sumInsured.businessInterruptionSumInsured}
+                {t('iprogdProperty')}:{' '}
+                {formatMoney(ctx.sumInsured.propertySumInsured, language)}
               </span>
               <span>
-                Indemnity period:{' '}
+                {t('iprogdBusinessInterruption')}:{' '}
+                {formatMoney(
+                  ctx.sumInsured.businessInterruptionSumInsured,
+                  language,
+                )}
+              </span>
+              <span>
+                {t('iprogdIndemnityPeriod')}:{' '}
                 {ctx.sumInsured.indemnityPeriodMonths == null
                   ? '—'
-                  : `${ctx.sumInsured.indemnityPeriodMonths} months`}
+                  : t('iprogdMonths', {
+                      count: ctx.sumInsured.indemnityPeriodMonths,
+                    })}
               </span>
             </div>
           </div>
 
           <h2 style={{ marginTop: '2rem' }}>{t('iprogdLines')}</h2>
           {program.lines.length === 0 ? (
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('iprogdNoLines')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>
+              {t('iprogdNoLines')}
+            </p>
           ) : (
             <table style={programTableStyle}>
               <thead>

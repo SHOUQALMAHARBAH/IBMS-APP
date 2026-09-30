@@ -21,7 +21,7 @@ import { SlaModule } from '../sla/sla.module';
  *     registered with zero prior caller; `vendor_termination_access_
  *     revocation`, a genuinely NEW registry entry this process added).
  *
- * No new permission, no migration — `vendor.manage` and `dpa.approve`
+ * No new permission, no migration at the time — `vendor.manage` (since split into four) and `dpa.approve`
  * were both already pre-seeded.
  */
 @Module({

@@ -30,9 +30,32 @@ function makeDeps(overrides?: {
     .fn()
     .mockResolvedValue({ count: overrides?.updateManyCount ?? 1 });
 
+  // `pause`/`resume` read the row back after their status-conditional write, so the
+  // entity-level methods below need these two as well.
+  const findUniqueOrThrow = vi.fn((args: { where: { id: string } }) =>
+    Promise.resolve({
+      id: args.where.id,
+      entityType: 'DataSubjectRequest',
+      entityId: 'dsr-1',
+      workflowName: 'dsr_access_deletion',
+      pausedAt: new Date('2026-09-28T00:00:00.000Z'),
+      pausedTotalMs: 0,
+      pauseReason: 'stated',
+      dueAt: new Date('2026-10-20T00:00:00.000Z'),
+      resolvedAt: null,
+    }),
+  );
+  const findUnique = vi.fn((args: { where: { id: string } }) =>
+    Promise.resolve({
+      id: args.where.id,
+      pausedAt: new Date('2026-09-28T00:00:00.000Z'),
+      pausedTotalMs: 0,
+    }),
+  );
+
   const prisma = {
     client: {
-      slaTimer: { create, findMany, updateMany },
+      slaTimer: { create, findMany, updateMany, findUniqueOrThrow, findUnique },
     },
   } as unknown as PrismaService;
 
@@ -58,6 +81,8 @@ function makeDeps(overrides?: {
     create,
     findMany,
     updateMany,
+    findUniqueOrThrow,
+    findUnique,
     record,
     findByEmail,
     policies,
@@ -516,5 +541,110 @@ describe('startTimer uses the CONFIGURED policy, not the registry constant', () 
       actorUserId: 'user-1',
     });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SlaTimerService — one record, several clocks (IMPROVEMENTS § 1.61)', () => {
+  /*
+   * A record does not have A clock. Measured on db-test: one data-subject request carries
+   * FOUR `SlaTimer` rows — two escalation stages, and a second pair once an extension
+   * re-bases the deadline. Pausing one of them leaves the others running, so the request
+   * still escalates on a deadline the office believes it stopped.
+   *
+   * **A control that pauses one of four looks exactly like a control that worked**, which
+   * is why this is asserted on the number of WRITES rather than on the return value.
+   */
+
+  it('pauses EVERY open clock on the record', async () => {
+    const { service, updateMany } = makeDeps({
+      findManyResult: [
+        { id: 't-1', pausedAt: null },
+        { id: 't-2', pausedAt: null },
+        { id: 't-3', pausedAt: null },
+        { id: 't-4', pausedAt: null },
+      ],
+    });
+
+    const result = await service.pauseForEntity(
+      'DataSubjectRequest',
+      'dsr-1',
+      'Waiting for the identity documents the subject was asked for',
+      'dpo-1',
+    );
+
+    expect(result).toEqual({ paused: 4, alreadyPaused: 0, open: 4 });
+    // FOUR conditional writes, one per timer — the observable a "pause the first one"
+    // implementation cannot fake.
+    expect(updateMany).toHaveBeenCalledTimes(4);
+    const ids = updateMany.mock.calls.map(
+      (c) => (c[0] as { where: { id: string } }).where.id,
+    );
+    expect(ids).toEqual(['t-1', 't-2', 't-3', 't-4']);
+  });
+
+  it('SKIPS a clock that is already paused rather than failing the act', async () => {
+    // The caller asked for the record's clock to be stopped, and it is. Reporting a
+    // conflict because one of four was already stopped would describe a success as a
+    // failure.
+    const { service, updateMany } = makeDeps({
+      findManyResult: [
+        { id: 't-1', pausedAt: new Date('2026-09-01T00:00:00.000Z') },
+        { id: 't-2', pausedAt: null },
+      ],
+    });
+
+    const result = await service.pauseForEntity(
+      'DataSubjectRequest',
+      'dsr-1',
+      'A stated reason, long enough',
+      'dpo-1',
+    );
+
+    expect(result).toEqual({ paused: 1, alreadyPaused: 1, open: 2 });
+    expect(updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes every paused clock and leaves the running ones alone', async () => {
+    const { service, updateMany } = makeDeps({
+      findManyResult: [
+        { id: 't-1', pausedAt: new Date('2026-09-01T00:00:00.000Z') },
+        { id: 't-2', pausedAt: new Date('2026-09-02T00:00:00.000Z') },
+        { id: 't-3', pausedAt: null },
+      ],
+    });
+
+    const result = await service.resumeForEntity(
+      'DataSubjectRequest',
+      'dsr-1',
+      'dpo-1',
+    );
+
+    expect(result).toEqual({ resumed: 2, notPaused: 1 });
+    expect(updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports the clock state as COUNTS, with the most recent stated basis', async () => {
+    // "Two of four paused" is a real state an extension can produce, and a boolean would
+    // round it to "paused" or "running" and be wrong about the rest.
+    const { service } = makeDeps({
+      findManyResult: [
+        {
+          pausedAt: new Date('2026-09-28T00:00:00.000Z'),
+          pauseReason: 'Awaiting documents',
+        },
+        {
+          pausedAt: new Date('2026-09-20T00:00:00.000Z'),
+          pauseReason: 'Older',
+        },
+        { pausedAt: null, pauseReason: null },
+        { pausedAt: null, pauseReason: null },
+      ],
+    });
+
+    const state = await service.entityClockState('DataSubjectRequest', 'dsr-1');
+    expect(state.open).toBe(4);
+    expect(state.paused).toBe(2);
+    expect(state.pauseReason).toBe('Awaiting documents');
+    expect(state.pausedAt).toBe('2026-09-28T00:00:00.000Z');
   });
 });

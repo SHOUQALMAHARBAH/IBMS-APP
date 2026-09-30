@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -18,6 +18,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 const cell: CSSProperties = {
@@ -62,7 +63,7 @@ export default function ConsentPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('consNoPermission')
+          ? permissionRefusal(t, 'consRefusalAct', 'consent.manage')
           : err instanceof ApiError
             ? err.message
             : t('consLoadError'),
@@ -114,9 +115,11 @@ export default function ConsentPage() {
     try {
       const res = await requestConsentWithdrawal(id);
       setNotice(
-        `Withdrawal request logged for ${id.slice(0, 8)}… — reflect it in the register by ${
-          res.dueAt ? res.dueAt.slice(0, 10) : 'the SLA deadline'
-        }.`,
+        t('consWithdrawalLogged', {
+          due: res.dueAt
+            ? res.dueAt.slice(0, 10)
+            : t('consWithdrawalSlaDeadline'),
+        }),
       );
     } catch (err) {
       setActionError(
@@ -190,7 +193,8 @@ export default function ConsentPage() {
               those two keep the id field rather than get a picker that cannot
               search anything. */}
           {ownerKind === 'customer' ? (
-            <CustomerPicker
+            <EntitySearch
+            kind="customer"
               value={ownerId}
               onChange={setOwnerId}
               label={t('consCustomerIdLabel')}

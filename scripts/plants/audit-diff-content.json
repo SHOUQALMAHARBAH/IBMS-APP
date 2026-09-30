@@ -1,0 +1,7 @@
+{
+  "audit-row-drops-the-diff": {
+    "file": "apps/api/src/modules/rbac/services/role-admin.service.ts",
+    "from": "        added: [...after].filter((c) => !before.has(c)).sort(),",
+    "to": "        added: undefined,"
+  }
+}

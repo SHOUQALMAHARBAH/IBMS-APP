@@ -24,6 +24,7 @@ import { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
 import { DocumentLanguageQueryDto } from '../document-generation/dto/document-language-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { DiscardDto } from '../../common/dto/discard.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 /** Process 18-19 — Policy Placement & Issuance (backlog Part C #18-19, Domain
@@ -128,7 +129,7 @@ export class PolicyController {
   /** Attach documents to the policy's electronic Insurance File (Part 4.2)
    * at any lifecycle stage — used when certificates / an endorsement
    * template / the wording PDF arrive separately. */
-  @RequirePermissions('document.manage')
+  @RequirePermissions('document.create')
   @Post(':id/documents')
   attachDocuments(
     @Param('id') id: string,
@@ -177,5 +178,22 @@ export class PolicyController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.policyDelivery.acknowledgeReceipt(id, dto, user);
+  }
+  /**
+   * Mark this policy as raised in error. Terminal, reason mandatory, and refused once the policy has been
+   * issued — the record stays either way.
+   *
+   * ONE permission code, not two. `PermissionsGuard` ORs what it is given, so
+   * `@RequirePermissions('policy.discard', 'policy.create')` would let a holder of EITHER through alone,
+   * which is the opposite of the intent.
+   */
+  @RequirePermissions('policy.discard')
+  @Post(':id/discard')
+  discard(
+    @Param('id') id: string,
+    @Body() dto: DiscardDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policies.discard(id, dto, user);
   }
 }

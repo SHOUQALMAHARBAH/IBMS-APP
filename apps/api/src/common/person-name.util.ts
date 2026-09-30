@@ -29,3 +29,25 @@ export function composeFullName(parts: PersonNameParts): string {
     .map((part) => part.trim())
     .join(' ');
 }
+
+/**
+ * `composeFullName` for a name set that may be entirely absent.
+ *
+ * Returns `undefined` rather than `''` when no part was given, so a caller writes NULL instead of an
+ * empty string. The distinction is not cosmetic: an empty string is a name somebody entered and left
+ * blank, NULL is "this person has no English name recorded" — and on this platform the second is the
+ * ordinary case, since transliterating an Arabic name is a judgement the system must not make.
+ */
+export function composeOptionalFullName(
+  parts: Partial<PersonNameParts>,
+): string | undefined {
+  // `Partial`, and NOT by widening `composeFullName` — the Arabic set has a required given and
+  // family name and the compiler should keep insisting on them for every caller that has them.
+  // The empty strings below are filtered out by the same filter that drops an absent father's name.
+  const composed = composeFullName({
+    ...parts,
+    givenName: parts.givenName ?? '',
+    familyName: parts.familyName ?? '',
+  });
+  return composed.length > 0 ? composed : undefined;
+}

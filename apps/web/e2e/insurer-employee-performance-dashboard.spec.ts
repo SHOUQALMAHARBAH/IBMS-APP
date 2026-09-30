@@ -112,7 +112,7 @@ test("a user without either permission sees the underlying error message", async
   await page.goto("/dashboards/insurer-employee-performance");
   await expect(
     page.getByText(
-      "You don't hold the insurer-performance.view / employee-performance.view permissions.",
+      "(insurer-performance.view, employee-performance.view)",
       { exact: false },
     ),
   ).toBeVisible();

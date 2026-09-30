@@ -4,7 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateRiskProfileInput {
   customerId: string;
-  siteLabel?: string;
+  /** REQUIRED since migration 20261104100000 — it is the only readable identifier on the row. */
+  siteLabel: string;
   priorClaimsHistorySummary?: string;
 }
 

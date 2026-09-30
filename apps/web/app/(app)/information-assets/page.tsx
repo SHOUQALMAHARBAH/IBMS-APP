@@ -18,6 +18,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -57,7 +58,7 @@ export default function InformationAssetsPage() {
       setAssets(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('iassetNoPermission')
+          ? permissionRefusal(t, 'iassetRefusalAct', 'information-asset.manage')
           : err instanceof ApiError
             ? err.message
             : t('iassetLoadError'),
@@ -118,56 +119,6 @@ export default function InformationAssetsPage() {
         </p>
       ) : null}
 
-      {assets ? (
-        assets.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('iassetNone')}</p>
-        ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
-            <thead>
-              <tr>
-                <th style={head}>{t('iassetColName')}</th>
-                <th style={head}>{t('iassetColType')}</th>
-                <th style={head}>{t('iassetColClassification')}</th>
-                <th style={head}>{t('iassetColOwner')}</th>
-                <th style={head} />
-              </tr>
-            </thead>
-            <tbody>
-              {assets.map((asset) => (
-                <tr key={asset.id}>
-                  <td style={cell}>
-                    {editingId === asset.id ? (
-                      <input
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                      />
-                    ) : (
-                      asset.name
-                    )}
-                  </td>
-                  <td style={cell}>{asset.assetType}</td>
-                  <td style={cell}>{t(ENUM_LABEL.DataClassification[asset.classification])}</td>
-                  <td style={cell}>{asset.ownerUserId}</td>
-                  <td style={cell}>
-                    {editingId === asset.id ? (
-                      <button type="button" onClick={() => saveEdit(asset.id)}>
-                        Save
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => startEdit(asset)}>
-                        Rename
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      ) : loadError ? null : (
-        <p>{t('iassetLoading')}</p>
-      )}
-
       <form onSubmit={onCreate} style={formStyle}>
         <h2>{t('iassetCreateHeading')}</h2>
         <label style={labelStyle}>
@@ -212,6 +163,57 @@ export default function InformationAssetsPage() {
         ) : null}
         <button type="submit">{t('iassetSubmitButton')}</button>
       </form>
+
+      {assets ? (
+        assets.length === 0 ? (
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('iassetNone')}</p>
+        ) : (
+          <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
+            <thead>
+              <tr>
+                <th style={head}>{t('iassetColName')}</th>
+                <th style={head}>{t('iassetColType')}</th>
+                <th style={head}>{t('iassetColClassification')}</th>
+                <th style={head}>{t('iassetColOwner')}</th>
+                <th style={head} />
+              </tr>
+            </thead>
+            <tbody>
+              {assets.map((asset) => (
+                <tr key={asset.id}>
+                  <td style={cell}>
+                    {editingId === asset.id ? (
+                      <input
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                      />
+                    ) : (
+                      asset.name
+                    )}
+                  </td>
+                  <td style={cell}>{asset.assetType}</td>
+                  <td style={cell}>{t(ENUM_LABEL.DataClassification[asset.classification])}</td>
+                  <td style={cell}>{asset.ownerUserId}</td>
+                  <td style={cell}>
+                    {editingId === asset.id ? (
+                      <button type="button" onClick={() => saveEdit(asset.id)}>
+                        {t('commonSave')}
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => startEdit(asset)}>
+                        {t('commonRename')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      ) : loadError ? null : (
+        <p>{t('iassetLoading')}</p>
+      )}
+
     </main>
   );
 }

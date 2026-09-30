@@ -17,6 +17,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 const cell: CSSProperties = {
@@ -52,7 +53,7 @@ export default function RenewalCasesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('renNoPermission')
+          ? permissionRefusal(t, 'renRefusalAct', 'renewal.read')
           : err instanceof ApiError
             ? err.message
             : t('renCouldNotLoadRenewalCases'),
@@ -94,7 +95,12 @@ export default function RenewalCasesPage() {
       setSweepMessage(
         isArabic
           ? `تم فحص ${result.scanned} وثيقة — فُتحت ${result.opened} حالة تجديد، وتم تخطي ${result.skippedAlreadyOpen}، وفشلت ${result.failed}.`
-          : `Scanned ${result.scanned} policy/policies — opened ${result.opened}, skipped ${result.skippedAlreadyOpen} already open, ${result.failed} failed.`,
+          : t('renScanSummary', {
+              scanned: result.scanned,
+              opened: result.opened,
+              skipped: result.skippedAlreadyOpen,
+              failed: result.failed,
+            }),
       );
     });
   }

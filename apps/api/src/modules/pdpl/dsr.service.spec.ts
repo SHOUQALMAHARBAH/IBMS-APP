@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CustomerRepository } from '../../repositories/customer.repository';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   ConflictException,
   ForbiddenException,
@@ -10,6 +12,7 @@ import type { DsrRepository } from '../../repositories/dsr.repository';
 import type { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { SlaTimerService } from '../sla/sla-timer.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import type { AuditService } from '../audit/audit.service';
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -40,6 +43,7 @@ function makeService(
     repo?: Record<string, unknown>;
     legalHolds?: Record<string, unknown>;
     slaTimer?: Record<string, unknown>;
+    customers?: Record<string, unknown>;
   } = {},
 ) {
   const repo = {
@@ -80,17 +84,43 @@ function makeService(
     computeDueAt: vi.fn().mockReturnValue(new Date('2026-09-22T00:00:00.000Z')),
     startTimer: vi.fn().mockResolvedValue([{ id: 'sla-1' }]),
     resolve: vi.fn().mockResolvedValue({ count: 1 }),
+    // The detail read reports the request's clock state, because the pause control lives
+    // on the request screen (IMPROVEMENTS § 1.61). A request carries SEVERAL timers, so
+    // the default here is the ordinary case: four open, none paused.
+    entityClockState: vi.fn().mockResolvedValue({
+      open: 4,
+      paused: 0,
+      pauseReason: null,
+      pausedAt: null,
+    }),
+    pauseForEntity: vi
+      .fn()
+      .mockResolvedValue({ paused: 4, alreadyPaused: 0, open: 4 }),
+    resumeForEntity: vi.fn().mockResolvedValue({ resumed: 4, notPaused: 0 }),
     ...over.slaTimer,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The correction count the CORRECTION closure gate reads. Defaults to ONE, so every existing test in
+  // this file — none of which is about corrections — keeps asserting what it always did. A default of
+  // zero would make the new gate refuse every CORRECTION fulfilment here and the failures would look like
+  // the gate working rather than the fixture being wrong.
+  const customers = {
+    countCorrectionsForDsr: vi.fn().mockResolvedValue(1),
+    ...over.customers,
+  };
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
   const service = new DsrService(
     repo as unknown as DsrRepository,
     legalHolds as unknown as LegalHoldRepository,
     workflow as unknown as WorkflowTransitionService,
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
+    dutySegregation,
+    customers as unknown as CustomerRepository,
   );
-  return { service, repo, legalHolds, workflow, slaTimer, audit };
+  return { service, repo, legalHolds, workflow, slaTimer, audit, customers };
 }
 
 describe('DsrService.create (M04)', () => {
@@ -426,6 +456,53 @@ describe('DsrService.applyExtension (M04)', () => {
 });
 
 describe('DsrService.fulfil (M04)', () => {
+  it('422s a CORRECTION fulfil when NO correction was recorded against it — no false closure', async () => {
+    // The owner's requirement 4. A CORRECTION request is a statutory right with a ten-working-day clock
+    // and a two-person closure, and it could be marked FULFILLED on a staff member's word with nothing
+    // able to verify the data changed — and until this week nothing COULD change it (§ 3.14).
+    //
+    // A closed request with nothing behind it is worse than an open one: the open one is visible, and the
+    // falsely closed one is the record a regulator reads.
+    const { service, workflow, customers } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValue(
+            row({ type: 'CORRECTION', status: 'IN_PROGRESS' }),
+          ),
+      },
+      customers: { countCorrectionsForDsr: vi.fn().mockResolvedValue(0) },
+    });
+
+    await expect(service.fulfil('dsr-1', {}, 'u-dpo')).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+    expect(customers.countCorrectionsForDsr).toHaveBeenCalledWith('dsr-1');
+    // Nothing moved. Asserted because a refusal that still transitioned would leave the request closed
+    // and the refusal cosmetic.
+    expect(workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('allows a CORRECTION fulfil once a correction exists, and asks for no attestation', async () => {
+    // A LIVE check rather than a confirmation flag. The DELETION branch uses both, because a hold can
+    // exist that the officer must acknowledge; here there is nothing to acknowledge — either a correction
+    // was recorded or it was not — and asking for a confirmation would reintroduce the attestation this
+    // replaces.
+    const { service, workflow } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValue(
+            row({ type: 'CORRECTION', status: 'IN_PROGRESS' }),
+          ),
+      },
+      customers: { countCorrectionsForDsr: vi.fn().mockResolvedValue(1) },
+    });
+
+    await expect(service.fulfil('dsr-1', {}, 'u-dpo')).resolves.toBeDefined();
+    expect(workflow.transition).toHaveBeenCalled();
+  });
+
   it('422s a DELETION fulfil with no confirmNoOpenRetentionHold', async () => {
     const { service } = makeService({
       repo: {
@@ -837,5 +914,110 @@ describe('DsrService reads (M04) — audited (sensitive)', () => {
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'READ', entityId: 'list' }),
     );
+  });
+});
+
+/** The pause routes take the whole session, not a bare id — the act is attributed. */
+const actor = (id: string) =>
+  ({
+    id,
+    roles: [],
+    roleIds: [],
+    permissions: [],
+  }) as unknown as AuthenticatedUser;
+const closedDsrRow = () =>
+  row({ closedAt: new Date('2026-09-01T00:00:00.000Z') });
+
+describe("DsrService — stopping the request's clock (IMPROVEMENTS § 1.61)", () => {
+  /*
+   * The control lives on the REQUEST, not on the deadlines dashboard, because the Data
+   * Protection Officer holds `sla.timer.pause` and NOT `sla-dashboard.view` — so for the
+   * one role whose own statutory clocks are the likeliest thing anybody would legitimately
+   * pause, the capability was unreachable. The owner's decision was to move the control
+   * rather than hand that role the whole office's dashboard.
+   */
+
+  it('stops EVERY open clock on the request, not one of them', async () => {
+    // A request carries several timers — measured, four: two escalation stages and a
+    // second pair once an extension re-bases the deadline. Pausing one leaves the others
+    // running and the request still escalates, which looks exactly like a control that
+    // worked.
+    const { service, slaTimer } = makeService();
+
+    const result = await service.pauseSla(
+      'dsr-1',
+      'Waiting for the identity documents the subject was asked for',
+      actor('dpo-1'),
+    );
+
+    expect(slaTimer.pauseForEntity).toHaveBeenCalledWith(
+      'DataSubjectRequest',
+      'dsr-1',
+      'Waiting for the identity documents the subject was asked for',
+      'dpo-1',
+    );
+    expect(result.paused).toBe(4);
+  });
+
+  it('refuses a request with no running clock rather than reporting success', async () => {
+    // "Nothing to pause" and "paused" must not look the same to somebody who pressed a
+    // button to stop a statutory deadline.
+    const { service } = makeService({
+      slaTimer: {
+        pauseForEntity: vi
+          .fn()
+          .mockResolvedValue({ paused: 0, alreadyPaused: 0, open: 0 }),
+      },
+    });
+
+    await expect(
+      service.pauseSla('dsr-1', 'A stated reason, long enough', actor('dpo-1')),
+    ).rejects.toThrow(/no running clock/i);
+  });
+
+  it('refuses to pause a CLOSED request', async () => {
+    // Its clock has already stopped. Accepting this would record a pause on a deadline
+    // that no longer runs, and the stated reason would describe nothing.
+    const { service } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(closedDsrRow()) },
+    });
+
+    await expect(
+      service.pauseSla('dsr-1', 'A stated reason, long enough', actor('dpo-1')),
+    ).rejects.toThrow(/closed/i);
+  });
+
+  it('resumes every paused clock on the request', async () => {
+    const { service, slaTimer } = makeService();
+    const result = await service.resumeSla('dsr-1', actor('dpo-1'));
+    expect(slaTimer.resumeForEntity).toHaveBeenCalledWith(
+      'DataSubjectRequest',
+      'dsr-1',
+      'dpo-1',
+    );
+    expect(result.resumed).toBe(4);
+  });
+
+  it('reports the clock state on the detail read, as COUNTS', async () => {
+    // "Two of four paused" is a real state — an extension can add a timer after a pause —
+    // and a boolean would round it to "paused" or "running" and be wrong about the rest.
+    const { service } = makeService({
+      slaTimer: {
+        entityClockState: vi.fn().mockResolvedValue({
+          open: 4,
+          paused: 2,
+          pauseReason: 'Awaiting documents',
+          pausedAt: '2026-09-28T00:00:00.000Z',
+        }),
+      },
+    });
+
+    const view = await service.get('dsr-1', 'dpo-1');
+    expect(view.slaClock).toEqual({
+      open: 4,
+      paused: 2,
+      pauseReason: 'Awaiting documents',
+      pausedAt: '2026-09-28T00:00:00.000Z',
+    });
   });
 });

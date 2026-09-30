@@ -7,6 +7,7 @@
 // notify the client.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export type EndorsementStatus =
   | 'REQUESTED'
@@ -60,6 +61,19 @@ export interface Endorsement {
   } | null;
   refund: {
     id: string;
+    /**
+     * Part 4 step 5 — the declared combined-duty act, when one person raised AND approved this refund in an
+     * office that has declared COMBINED mode. Null on every ordinary approval, which is every one today.
+     */
+    combinedDutyAct: {
+      id: string;
+      at: string;
+      actorUserId: string;
+      reason: string;
+      pair: string;
+      roles: string[];
+      hatAmbiguous: boolean;
+    } | null;
     amount: string;
     reason: string;
     raisedByUserId: string;
@@ -71,6 +85,11 @@ export interface Endorsement {
   commissionReversal: { amount: string } | null;
   scheduleVersioned: boolean;
   createdAt: string;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface RequestEndorsementInput {
@@ -138,8 +157,55 @@ export function applyEndorsement(id: string): Promise<Endorsement> {
 
 export function approveEndorsementRefund(
   refundId: string,
+  /**
+   * Part 4 — required only when the approver IS the raiser and the office has declared COMBINED mode. Omitted
+   * on every ordinary two-person approval, which sends no body at all and behaves exactly as before.
+   */
+  combinedDutyReason?: string,
 ): Promise<Endorsement> {
-  return apiPost(`/refunds/${encodeURIComponent(refundId)}/approve`, {});
+  return apiPost(
+    `/refunds/${encodeURIComponent(refundId)}/approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
+}
+
+/**
+ * Is there a refund here that can actually be PAID?
+ *
+ * Exported and tested rather than inlined in the button, for the reason `needsCombinedDutyDeclaration` is:
+ * the condition decides whether money can leave the office, and three separate facts have to agree. A
+ * condition of that kind written inside JSX is a condition nothing can observe.
+ *
+ * Three facts, each with a reason:
+ *   - a refund EXISTS (a positive endorsement produces none);
+ *   - it is UNPAID (`paidAt`), so the button does not reappear after a payment — the service refuses a
+ *     second attempt with a 409 regardless, because a status-conditional write is the real guard and a
+ *     disabled button is only a courtesy;
+ *   - it is APPROVED, or was cleared below the value threshold. That second branch matters: a
+ *     below-threshold refund is auto-cleared with `approvedByUserId` left NULL and `needsApproval` false,
+ *     so testing only for an approver would make every small refund unpayable.
+ */
+export function refundIsPayable(
+  refund: Endorsement['refund'],
+): refund is NonNullable<Endorsement['refund']> {
+  if (refund === null) return false;
+  if (refund.paidAt !== null) return false;
+  return refund.approvedByUserId !== null || !refund.needsApproval;
+}
+
+/**
+ * Pay an approved refund: stamps `paidAt` and books the client-funds `out` movement in one transaction.
+ *
+ * IMPROVEMENTS § 1.44 — this route existed with NO web caller, so **money left the office through a path
+ * nothing could invoke**. An approved refund could not be paid from the application at all. It is the first
+ * of the 33 unreachable routes to close, on the owner's instruction, because it is the one where the
+ * unreachability has a balance attached to it.
+ */
+export function disburseRefund(refundId: string): Promise<{ paidAt: string }> {
+  return apiPost(
+    `/refunds/${encodeURIComponent(refundId)}/disburse`,
+    {},
+  );
 }
 
 export function notifyEndorsementClient(id: string): Promise<Endorsement> {

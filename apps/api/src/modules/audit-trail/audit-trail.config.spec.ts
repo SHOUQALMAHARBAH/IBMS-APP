@@ -17,6 +17,31 @@ describe('AUDIT_ACTIONS', () => {
 });
 
 describe('deriveAuditLogEntryView', () => {
+  it('resolves the actor name when the page supplied one, and leaves it null when it did not', () => {
+    const row: AuditLogEntryRow = {
+      id: 'audit-2',
+      userId: 'user-7',
+      action: 'READ',
+      entityType: 'Customer',
+      entityId: 'cus-1',
+      beforeValue: null,
+      afterValue: null,
+      isSensitiveDataAccess: true,
+      actorRoleIds: [],
+      actorRoleNames: [],
+      occurredAt: new Date('2026-09-25T08:00:00.000Z'),
+    };
+    const names = new Map([['user-7', 'سلمى خالد المحاربة']]);
+    expect(deriveAuditLogEntryView(row, names).actorName).toBe(
+      'سلمى خالد المحاربة',
+    );
+    // A map that does not contain this actor is the same as no map: null, never the empty string, so
+    // "unresolvable" and "named nothing" cannot be confused on screen.
+    expect(
+      deriveAuditLogEntryView(row, new Map([['someone-else', 'X']])).actorName,
+    ).toBeNull();
+  });
+
   it('maps every field and ISO-stamps occurredAt', () => {
     const row: AuditLogEntryRow = {
       id: 'audit-1',
@@ -34,6 +59,9 @@ describe('deriveAuditLogEntryView', () => {
     expect(deriveAuditLogEntryView(row)).toEqual({
       id: 'audit-1',
       userId: 'user-1',
+      // No name map passed: the actor is unresolvable, which is a real state (a seed, a scheduled
+      // sweep) and must be null so the screen can fall back to showing the id.
+      actorName: null,
       action: 'UPDATE',
       entityType: 'Policy',
       entityId: 'policy-1',

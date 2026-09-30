@@ -1,10 +1,16 @@
-'use client';
+"use client";
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
-import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../lib/auth/auth-context';
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { EntitySearch } from "../../../components/ui/EntitySearch";
+import { ENUM_LABEL } from "../../../lib/i18n/enum-labels";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../../../lib/auth/auth-context";
+import { CombinedDutyOnRecord } from "../../../components/ui/CombinedDutyOnRecord";
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from "../../../components/ui/CombinedDutyReasonField";
 import {
   addComplaintAction,
   assignComplaint,
@@ -17,13 +23,14 @@ import {
   resolveComplaint,
   startComplaint,
   type Complaint,
-} from '../../../lib/customer-service/complaint-api';
-import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
-import { hasAnyPermission } from '../../../lib/auth/permissions';
-import { useLanguage } from '../../../lib/i18n/language-context';
-import type { TranslationKey } from '../../../lib/i18n/translations';
+} from "../../../lib/customer-service/complaint-api";
+import { ApiError } from "../../../lib/auth/api-client";
+import { errorStyle } from "../../../components/auth/auth-form.styles";
+import { pageStyle } from "../../../components/lead/lead.styles";
+import { hasAnyPermission } from "../../../lib/auth/permissions";
+import { useLanguage } from "../../../lib/i18n/language-context";
+import type { TranslationKey } from "../../../lib/i18n/translations";
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 // A permission code, like the two below it — NOT the role list this used to
 // hold. §10.4 converted `ESCALATE_ROLES`/`CLOSE_ROLES` and missed this one, so
@@ -34,49 +41,44 @@ import type { TranslationKey } from '../../../lib/i18n/translations';
 // `complaint.log` is seeded to exactly the five roles that were listed here
 // (Sales, Claims, Finance, Compliance, Branch/Department Manager), so this
 // restores the intended behaviour rather than changing who may log a complaint.
-const LOG_PERMISSIONS = ['complaint.log'];
-const ESCALATE_ROLES = [
-  'complaint.escalate',
-];
-const CLOSE_ROLES = [
-  'complaint.close',
-];
+const LOG_PERMISSIONS = ["complaint.log"];
+const ESCALATE_ROLES = ["complaint.escalate"];
+const CLOSE_ROLES = ["complaint.close"];
 
 const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
+  padding: "0.4rem 0.75rem",
+  borderBottom: "1px solid var(--border-subtle)",
+  textAlign: "start",
+  verticalAlign: "top",
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
+  borderBottom: "2px solid var(--border-default)",
 };
 
 /** ComplaintStatus -> label key. Typed against the union so a new status is
  * a compile error rather than a raw token on screen. */
-const STATUS_LABEL_KEY: Record<Complaint['status'], TranslationKey> = {
-  LOGGED: 'complaintsStatusLogged',
-  ASSIGNED: 'complaintsStatusAssigned',
-  IN_PROGRESS: 'complaintsStatusInProgress',
-  ESCALATED: 'complaintsStatusEscalated',
-  RESOLVED: 'complaintsStatusResolved',
-  CLOSED: 'complaintsStatusClosed',
+const STATUS_LABEL_KEY: Record<Complaint["status"], TranslationKey> = {
+  LOGGED: "complaintsStatusLogged",
+  ASSIGNED: "complaintsStatusAssigned",
+  IN_PROGRESS: "complaintsStatusInProgress",
+  ESCALATED: "complaintsStatusEscalated",
+  RESOLVED: "complaintsStatusResolved",
+  CLOSED: "complaintsStatusClosed",
 };
 
 function slaLabel(
   c: Complaint,
   t: (k: TranslationKey, p?: Record<string, string | number>) => string,
 ): string {
-  if (!c.sla) return t('complaintsSlaNone');
-  if (c.sla.resolvedAt) return t('complaintsSlaResolved');
+  if (!c.sla) return t("complaintsSlaNone");
+  if (c.sla.resolvedAt) return t("complaintsSlaResolved");
   const date = c.sla.dueAt.slice(0, 10);
   return c.sla.breached
-    ? t('complaintsSlaBreached', { date })
-    : t('complaintsSlaDue', { date });
+    ? t("complaintsSlaBreached", { date })
+    : t("complaintsSlaDue", { date });
 }
-
 
 export default function ComplaintsPage() {
   const router = useRouter();
@@ -90,11 +92,13 @@ export default function ComplaintsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by record so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
-  const [customerId, setCustomerId] = useState('');
-  const [issue, setIssue] = useState('');
-  const [category, setCategory] = useState('');
-  const [claimId, setClaimId] = useState('');
+  const [customerId, setCustomerId] = useState("");
+  const [issue, setIssue] = useState("");
+  const [category, setCategory] = useState("");
+  const [claimId, setClaimId] = useState("");
   const [text, setText] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -105,16 +109,16 @@ export default function ComplaintsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('complaintsNoPermission')
+          ? permissionRefusal(t, 'complaintsRefusalAct', 'complaint.log')
           : err instanceof ApiError
             ? err.message
-            : t('complaintsLoadError'),
+            : t("complaintsLoadError"),
       );
     }
   }, [t]);
 
   useEffect(() => {
-    if (!isLoading && !user) router.push('/login');
+    if (!isLoading && !user) router.push("/login");
   }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
@@ -132,7 +136,7 @@ export default function ComplaintsPage() {
     try {
       const blob = await downloadComplaintAcknowledgement(id);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `complaint-acknowledgement-${id}.pdf`;
       document.body.appendChild(a);
@@ -141,9 +145,7 @@ export default function ComplaintsPage() {
       URL.revokeObjectURL(url);
     } catch (err) {
       setActionError(
-        err instanceof ApiError
-          ? err.message
-          : t('complaintsAckError'),
+        err instanceof ApiError ? err.message : t("complaintsAckError"),
       );
     }
   }
@@ -156,7 +158,7 @@ export default function ComplaintsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('complaintsActionError'),
+        err instanceof ApiError ? err.message : t("complaintsActionError"),
       );
     } finally {
       setBusy(false);
@@ -172,41 +174,46 @@ export default function ComplaintsPage() {
         ...(category ? { category } : {}),
         ...(claimId.trim() ? { claimId: claimId.trim() } : {}),
       });
-      setCustomerId('');
-      setIssue('');
-      setCategory('');
-      setClaimId('');
+      setCustomerId("");
+      setIssue("");
+      setCategory("");
+      setClaimId("");
     });
   }
 
-  const val = (id: string) => (text[id] ?? '').trim();
-  const setVal = (id: string, v: string) =>
-    setText((t) => ({ ...t, [id]: v }));
+  const val = (id: string) => (text[id] ?? "").trim();
+  const setVal = (id: string, v: string) => setText((t) => ({ ...t, [id]: v }));
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>{t('complaintsHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('complaintsIntro')}
-      </p>
+      <h1>{t("complaintsHeading")}</h1>
+      <p style={{ opacity: 0.75, maxWidth: "46rem" }}>{t("complaintsIntro")}</p>
 
       {canLog ? (
         <form
           onSubmit={submit}
-          style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '32rem' }}
+          style={{
+            margin: "1rem 0",
+            display: "grid",
+            gap: "0.4rem",
+            maxWidth: "32rem",
+          }}
         >
-          <CustomerPicker
+          <EntitySearch
+            kind="customer"
             value={customerId}
             onChange={setCustomerId}
-            label={t('complaintsCustomerIdLabel')}
+            label={t("complaintsCustomerIdLabel")}
             required
           />
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('complaintsIssueLabel')}
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}
+          >
+            {t("complaintsIssueLabel")}
             <textarea
-              aria-label={t('complaintsIssueLabel')}
+              aria-label={t("complaintsIssueLabel")}
               dir="auto"
               value={issue}
               onChange={(e) => setIssue(e.target.value)}
@@ -214,10 +221,12 @@ export default function ComplaintsPage() {
               rows={2}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('complaintsCategoryLabel')}
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}
+          >
+            {t("complaintsCategoryLabel")}
             <select
-              aria-label={t('complaintsCategoryAria')}
+              aria-label={t("complaintsCategoryAria")}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -229,16 +238,18 @@ export default function ComplaintsPage() {
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('complaintsClaimIdLabel')}
+          <label
+            style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}
+          >
+            {t("complaintsClaimIdLabel")}
             <input
-              aria-label={t('complaintsClaimIdLabel')}
+              aria-label={t("complaintsClaimIdLabel")}
               value={claimId}
               onChange={(e) => setClaimId(e.target.value)}
             />
           </label>
-          <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? t('complaintsSavingButton') : t('complaintsLogButton')}
+          <button type="submit" disabled={busy} style={{ marginTop: "0.3rem" }}>
+            {busy ? t("complaintsSavingButton") : t("complaintsLogButton")}
           </button>
         </form>
       ) : null}
@@ -256,18 +267,18 @@ export default function ComplaintsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('complaintsNone')}</p>
+          <p style={{ color: "var(--ink-secondary)" }}>{t("complaintsNone")}</p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", minWidth: "52rem" }}>
               <thead>
                 <tr>
-                  <th style={head}>{t('complaintsColCustomer')}</th>
-                  <th style={head}>{t('complaintsColIssue')}</th>
-                  <th style={head}>{t('complaintsColStatus')}</th>
-                  <th style={head}>{t('complaintsColSla')}</th>
-                  <th style={head}>{t('complaintsColEscalations')}</th>
-                  <th style={head}>{t('complaintsColAction')}</th>
+                  <th style={head}>{t("complaintsColCustomer")}</th>
+                  <th style={head}>{t("complaintsColIssue")}</th>
+                  <th style={head}>{t("complaintsColStatus")}</th>
+                  <th style={head}>{t("complaintsColSla")}</th>
+                  <th style={head}>{t("complaintsColEscalations")}</th>
+                  <th style={head}>{t("complaintsColAction")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,54 +288,81 @@ export default function ComplaintsPage() {
                     <td style={cell}>
                       <bdi>{c.issue}</bdi>
                     </td>
-                    <td style={cell}>{t(STATUS_LABEL_KEY[c.status])}</td>
+                    <td style={cell}>
+                      {t(STATUS_LABEL_KEY[c.status])}
+                      {/*
+                        Part 4 step 5. CLOSED is what the status reads whether one person or two signed the
+                        closure off, so without this the cell cannot distinguish them.
+                      */}
+                      <CombinedDutyOnRecord
+                        act={c.closureCombinedDutyAct}
+                        testId={`combined-duty-complaint-${c.id}`}
+                      />
+                    </td>
                     <td style={cell}>{slaLabel(c, t)}</td>
-                    <td style={cell}>{c.escalations.length || '—'}</td>
+                    <td style={cell}>{c.escalations.length || "—"}</td>
                     <td style={cell}>
                       {canLog ? (
                         <button
                           type="button"
                           onClick={() => void downloadAcknowledgement(c.id)}
-                          style={{ marginBottom: '0.4rem' }}
+                          style={{ marginBottom: "0.4rem" }}
                         >
-                          {t('complaintsDownloadAckButton')}
+                          {t("complaintsDownloadAckButton")}
                         </button>
                       ) : null}
                       {c.isClosed ? (
-                        <bdi>{c.resolution ?? '—'}</bdi>
+                        <bdi>{c.resolution ?? "—"}</bdi>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '16rem' }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.3rem",
+                            minWidth: "16rem",
+                          }}
+                        >
                           <input
-                            aria-label={t('complaintsTextAria', { id: c.id })}
-                            placeholder={t('complaintsTextPlaceholder')}
+                            aria-label={t("complaintsTextAria")}
+                            placeholder={t("complaintsTextPlaceholder")}
                             dir="auto"
-                            value={text[c.id] ?? ''}
+                            value={text[c.id] ?? ""}
                             onChange={(e) => setVal(c.id, e.target.value)}
                           />
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                            {canLog && c.status === 'LOGGED' ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "0.3rem",
+                            }}
+                          >
+                            {canLog && c.status === "LOGGED" ? (
                               <button
                                 type="button"
                                 disabled={busy}
                                 onClick={() =>
-                                  void run(() => assignComplaint(c.id, val(c.id)))
+                                  void run(() =>
+                                    assignComplaint(c.id, val(c.id)),
+                                  )
                                 }
                               >
-                                {t('complaintsAssignButton')}
+                                {t("complaintsAssignButton")}
                               </button>
                             ) : null}
                             {canLog &&
-                            (c.status === 'ASSIGNED' ||
-                              c.status === 'ESCALATED') ? (
+                            (c.status === "ASSIGNED" ||
+                              c.status === "ESCALATED") ? (
                               <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => void run(() => startComplaint(c.id))}
+                                onClick={() =>
+                                  void run(() => startComplaint(c.id))
+                                }
                               >
-                                {t('complaintsStartButton')}
+                                {t("complaintsStartButton")}
                               </button>
                             ) : null}
-                            {canLog && c.status === 'IN_PROGRESS' ? (
+                            {canLog && c.status === "IN_PROGRESS" ? (
                               <button
                                 type="button"
                                 disabled={busy}
@@ -334,23 +372,25 @@ export default function ComplaintsPage() {
                                   )
                                 }
                               >
-                                {t('complaintsAddActionButton')}
+                                {t("complaintsAddActionButton")}
                               </button>
                             ) : null}
                             {canLog &&
-                            (c.status === 'IN_PROGRESS' ||
-                              c.status === 'ESCALATED') ? (
+                            (c.status === "IN_PROGRESS" ||
+                              c.status === "ESCALATED") ? (
                               <button
                                 type="button"
                                 disabled={busy}
                                 onClick={() =>
-                                  void run(() => resolveComplaint(c.id, val(c.id)))
+                                  void run(() =>
+                                    resolveComplaint(c.id, val(c.id)),
+                                  )
                                 }
                               >
-                                {t('complaintsResolveButton')}
+                                {t("complaintsResolveButton")}
                               </button>
                             ) : null}
-                            {canEscalate && c.status === 'IN_PROGRESS' ? (
+                            {canEscalate && c.status === "IN_PROGRESS" ? (
                               <button
                                 type="button"
                                 disabled={busy}
@@ -362,18 +402,62 @@ export default function ComplaintsPage() {
                                   )
                                 }
                               >
-                                {t('complaintsEscalateButton')}
+                                {t("complaintsEscalateButton")}
                               </button>
                             ) : null}
-                            {canClose && c.status === 'RESOLVED' ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => closeComplaint(c.id))}
-                              >
-                                {t('complaintsCloseButton')}
-                              </button>
-                            ) : null}
+                            {canClose && c.status === "RESOLVED"
+                              ? (() => {
+                                  // Part 4 — the person who performed the first half may complete it themselves in an office
+                                  // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                                  const needs = needsCombinedDutyDeclaration({
+                                    mode: user.dutySegregationMode,
+                                    makerUserId: c.resolvedByUserId,
+                                    currentUserId: user.id,
+                                    // `c.status === 'CLOSED'` is provably false here — this branch already
+                                    // narrowed it to RESOLVED, and TypeScript said so. The column the write
+                                    // sets is the honest test.
+                                    alreadyDecided:
+                                      c.closureApprovedByUserId != null,
+                                  });
+                                  const declaration = declarations[c.id] ?? "";
+                                  return (
+                                    <>
+                                      {needs ? (
+                                        <CombinedDutyReasonField
+                                          id={c.id}
+                                          value={declaration}
+                                          onChange={(next) =>
+                                            setDeclarations((prev) => ({
+                                              ...prev,
+                                              [c.id]: next,
+                                            }))
+                                          }
+                                        />
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        disabled={
+                                          busy ||
+                                          (needs &&
+                                            combinedDutyTooShort(declaration))
+                                        }
+                                        onClick={() =>
+                                          void run(() =>
+                                            closeComplaint(
+                                              c.id,
+                                              needs
+                                                ? declaration.trim()
+                                                : undefined,
+                                            ),
+                                          )
+                                        }
+                                      >
+                                        {t("complaintsCloseButton")}
+                                      </button>
+                                    </>
+                                  );
+                                })()
+                              : null}
                           </div>
                         </div>
                       )}
@@ -385,7 +469,7 @@ export default function ComplaintsPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>{t('complaintsLoading')}</p>
+        <p>{t("complaintsLoading")}</p>
       )}
     </main>
   );

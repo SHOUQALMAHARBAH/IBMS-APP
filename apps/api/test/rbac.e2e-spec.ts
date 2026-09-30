@@ -42,7 +42,9 @@ interface RecertificationItemBody {
   subjectFullName: string;
   subjectEmail: string;
   subjectRoles: string[];
+  subjectIsUserAdministrator: boolean;
   reviewerUserId: string;
+  reviewerFullName: string;
   decision: string | null;
 }
 interface CycleBody {
@@ -250,7 +252,7 @@ describe('RBAC / access recertification (e2e)', () => {
   });
 
   describe('GET /rbac/roles, /rbac/permissions', () => {
-    it('is forbidden for a user without role.manage/permission.manage', async () => {
+    it('is forbidden for a user without the role write codes or permission.read', async () => {
       const app = await boot();
       const plain = await makeUser(app, 'rbac-plain');
       await request(app.getHttpServer())
@@ -545,6 +547,147 @@ describe('RBAC / access recertification (e2e)', () => {
       } finally {
         // db-test is cumulative.
         const ids = [reviewerRole.id, subjectRole.id];
+        await prisma.userRoleAssignment.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.rolePermission.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.role.deleteMany({ where: { id: { in: ids } } });
+      }
+    }, 300_000);
+
+    /*
+     * THE ADMINISTRATOR REVIEW RECORD, OVER HTTP.
+     *
+     * `GET /cycles/:id/admin-items` had no web caller AND no e2e — a compliance-evidence control
+     * exercised by a unit test and nothing else. Part 5.1 is explicit that whoever can administer
+     * users is NOT exempt from recertification of their own access, so this is the record proving
+     * they were covered.
+     *
+     * It has a PRECONDITION a mocked endpoint cannot reproduce: the filter selects on who holds
+     * `user.manage`, resolved live from the grants. A Playwright mock returns whatever it is told,
+     * so only this level can show that an administrator subject is IN and an ordinary one is OUT.
+     */
+    it('lists the cycles, and reports which administrator accounts a cycle covered', async () => {
+      const app = await boot();
+      await resetReviewerPool();
+
+      const tag = Date.now();
+      const starterRole = await makeCustomRole(`Cycle Starter ${tag}`, [
+        'access-recertification.cycle.start',
+        'access-recertification.review',
+        'access-recertification.review.routine',
+      ]);
+      // The ADMINISTRATOR subject is defined by holding `user.manage` — the capability, not a
+      // role name. A name-keyed report would quietly omit an office's own administrator role,
+      // which is exactly the account Part 5.1 singles out.
+      const adminSubjectRole = await makeCustomRole(`Admin Subject ${tag}`, [
+        'user.manage',
+      ]);
+      const plainSubjectRole = await makeCustomRole(`Plain Subject ${tag}`, [
+        'lead.list.read',
+      ]);
+      const outsiderRole = await makeCustomRole(`Recert Outsider ${tag}`, [
+        'access-recertification.review',
+      ]);
+
+      try {
+        const starter = await makeUserWithRoleId(
+          app,
+          'recert-starter',
+          starterRole.id,
+        );
+        const adminSubject = await makeUserWithRoleId(
+          app,
+          'recert-admin-subject',
+          adminSubjectRole.id,
+        );
+        const plainSubject = await makeUserWithRoleId(
+          app,
+          'recert-plain-subject',
+          plainSubjectRole.id,
+        );
+        const outsider = await makeUserWithRoleId(
+          app,
+          'recert-outsider',
+          outsiderRole.id,
+        );
+
+        const cycleRes = await request(app.getHttpServer())
+          .post('/access-recertification/cycles')
+          .set(bearer(starter.accessToken))
+          .send({ cycleLabel: `admin-record-${tag}` })
+          .expect(201);
+        const cycleId = (cycleRes.body as CycleBody).id;
+
+        // (1) The cycles list — the route that makes admin-items ADDRESSABLE. Without it the
+        // only source of a cycle id was this POST response, so the record was readable for a
+        // cycle you had just started and for no earlier one.
+        const cyclesRes = await request(app.getHttpServer())
+          .get('/access-recertification/cycles')
+          .set(bearer(starter.accessToken))
+          .expect(200);
+        const cycles = cyclesRes.body as { id: string; cycleLabel: string }[];
+        expect(cycles.find((c) => c.id === cycleId)).toBeDefined();
+        expect(cycles.find((c) => c.id === cycleId)!.cycleLabel).toBe(
+          `admin-record-${tag}`,
+        );
+        // Gated on EITHER code, so a reviewer who cannot start cycles still reads it — they need
+        // the label of the cycle their own queue belongs to.
+        await request(app.getHttpServer())
+          .get('/access-recertification/cycles')
+          .set(bearer(outsider.accessToken))
+          .expect(200);
+
+        // (2) The record itself: the administrator subject is IN and the ordinary subject is OUT.
+        // Asserting only the first would pass on a report that returned every item in the cycle.
+        const adminRes = await request(app.getHttpServer())
+          .get(`/access-recertification/cycles/${cycleId}/admin-items`)
+          .set(bearer(starter.accessToken))
+          .expect(200);
+        const adminItems = adminRes.body as RecertificationItemBody[];
+
+        const adminRow = adminItems.find(
+          (i) => i.subjectUserId === adminSubject.userId,
+        );
+        expect(
+          adminRow,
+          'a subject holding user.manage must appear in the administrator record',
+        ).toBeDefined();
+        expect(
+          adminItems.find((i) => i.subjectUserId === plainSubject.userId),
+          'a subject who cannot administer users must NOT appear',
+        ).toBeUndefined();
+
+        // (3) ENRICHED, not raw. The route returned uuids for both people and no cycle label
+        // until 2026-09-28, which is unreadable by the only person who would ask.
+        //
+        // Asserted against the ACTUAL name, not `toBeTruthy()`. The first version of this test
+        // checked truthiness and "not equal to the uuid", and a plant that emptied the reviewer
+        // lookup PASSED it: the fallback is the literal '(deleted user)', which is truthy and is
+        // not a uuid. An assertion has to isolate the cause it claims to be about — here, that
+        // the name was resolved at all rather than silently replaced by a placeholder.
+        expect(adminRow!.subjectFullName).toBe('RBAC Test User');
+        expect(adminRow!.reviewerFullName).toBe('RBAC Test User');
+        expect(adminRow!.reviewerFullName).not.toBe('(deleted user)');
+        expect(adminRow!.cycleLabel).toBe(`admin-record-${tag}`);
+        expect(adminRow!.subjectIsUserAdministrator).toBe(true);
+
+        // (4) The record is gated on `cycle.start`, NOT on `.review`: a reviewer who cannot open
+        // cycles cannot read the administrator record either.
+        await request(app.getHttpServer())
+          .get(`/access-recertification/cycles/${cycleId}/admin-items`)
+          .set(bearer(outsider.accessToken))
+          .expect(403);
+      } finally {
+        // db-test is cumulative.
+        const ids = [
+          starterRole.id,
+          adminSubjectRole.id,
+          plainSubjectRole.id,
+          outsiderRole.id,
+        ];
         await prisma.userRoleAssignment.deleteMany({
           where: { roleId: { in: ids } },
         });

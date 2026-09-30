@@ -1,0 +1,17 @@
+{
+  "key-inventory-ignores-the-permission": {
+    "file": "apps/web/components/security/EncryptionKeyInventory.tsx",
+    "from": "  const canRead = hasPermission(user, 'encryption-key.read');",
+    "to": "  const canRead = true;"
+  },
+  "active-and-retired-read-the-same": {
+    "file": "apps/web/components/security/EncryptionKeyInventory.tsx",
+    "from": "                    {k.active ? t('secKeysActive') : t('secKeysRetired')}",
+    "to": "                    {t('secKeysActive')}"
+  },
+  "empty-registry-renders-an-empty-table": {
+    "file": "apps/web/components/security/EncryptionKeyInventory.tsx",
+    "from": "      ) : rows.length === 0 ? (\n        <p style={{ color: 'var(--ink-secondary)' }}>{t('secKeysNone')}</p>",
+    "to": "      ) : false ? (\n        <p style={{ color: 'var(--ink-secondary)' }}>{t('secKeysNone')}</p>"
+  }
+}

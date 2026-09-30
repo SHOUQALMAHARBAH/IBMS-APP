@@ -14,6 +14,7 @@ import {
   type RevealableField,
   type Ubo,
 } from '../../../../lib/customer/customer-api';
+import { CustomerContactCorrection } from '../../../../components/customer/CustomerContactCorrection';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
@@ -29,6 +30,7 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../../lib/customer/customer-api';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -295,6 +297,16 @@ export default function CustomerProfilePage() {
             </div>
           ) : null}
 
+          {/* Correcting the three contact fields. Placed directly under the profile
+            * it edits, and it reloads through the same `load` the page already uses,
+            * because a correction changes the MASKED values shown above. */}
+          <div style={{ marginTop: '1.25rem' }}>
+            <CustomerContactCorrection
+              customerId={customer.id}
+              onCorrected={load}
+            />
+          </div>
+
           {customer.customerType === 'CORPORATE' ? (
             <section style={{ marginTop: '2rem' }}>
               <h2>{t('customerUbosHeading')}</h2>
@@ -335,7 +347,7 @@ export default function CustomerProfilePage() {
                 {t('customerNeedsAssessmentStartButton')}
               </button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerNeedsAssessmentNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerNeedsAssessmentRefusalAct', 'needs-assessment.create')}</p>
             )}
           </section>
 
@@ -353,7 +365,7 @@ export default function CustomerProfilePage() {
                 {t('customerRiskSurveyOpenButton')}
               </button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerRiskSurveyNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerRiskSurveyRefusalAct', 'risk-profile.read')}</p>
             )}
           </section>
 
@@ -371,7 +383,7 @@ export default function CustomerProfilePage() {
                 {t('customerInsuranceProgramOpenButton')}
               </button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerInsuranceProgramNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerInsuranceProgramRefusalAct', 'program.read')}</p>
             )}
           </section>
 
@@ -389,7 +401,7 @@ export default function CustomerProfilePage() {
                 {t('customerCrossSellOpenButton')}
               </button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrossSellNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerCrossSellRefusalAct', 'cross-sell.read')}</p>
             )}
           </section>
 
@@ -407,7 +419,7 @@ export default function CustomerProfilePage() {
                 {t('customerUpSellOpenButton')}
               </button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUpSellNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerUpSellRefusalAct', 'up-sell.read')}</p>
             )}
           </section>
 
@@ -423,7 +435,7 @@ export default function CustomerProfilePage() {
                 {t('customerCrmOpenButton')}
               </button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrmNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerCrmRefusalAct', 'customer.360-view.read')}</p>
             )}
           </section>
         </>

@@ -125,6 +125,10 @@ export default function OpportunityDetailPage() {
   const canDeliverPolicy = hasPermission(user, 'policy.deliver');
   const canManageEndorsement = hasPermission(user, 'endorsement.create');
   const canApproveRefund = hasPermission(user, 'refund.approve');
+  // Finance pays the approved refund. Separate from the approval on purpose and by grant: `refund.approve`
+  // goes to Manager or Finance, `refund.disburse` to Finance alone — so approving and paying are not one
+  // capability, which is the whole point of a maker/checker pair having a payment step after it.
+  const canDisburseRefund = hasPermission(user, 'refund.disburse');
   const canInvoice = hasPermission(user, 'invoice.create');
   const canCollect = hasPermission(user, 'receipt.record');
   const canCalculateCommission = hasPermission(user, 'commission.calculate');
@@ -140,6 +144,14 @@ export default function OpportunityDetailPage() {
     'claim.settle.second-approve',
   );
   const canCloseClaim = hasPermission(user, 'claim.close');
+  // Four separate codes, one per entity — a discard is its own action in the four-action scheme, and the
+  // roles that can raise each record are the ones that can withdraw it. Never derived from the create
+  // ability: an office that wants somebody to record placements without being able to unpick them is a state
+  // the Role screen can express, so this screen has to express it too.
+  const canDiscardRecommendation = hasPermission(user, 'recommendation.discard');
+  const canDiscardPolicy = hasPermission(user, 'policy.discard');
+  const canDiscardEndorsement = hasPermission(user, 'endorsement.discard');
+  const canDiscardClaim = hasPermission(user, 'claim.discard');
 
   return (
     <main style={pageStyle}>
@@ -256,6 +268,7 @@ export default function OpportunityDetailPage() {
             isPlacement={canCaptureQuotation}
             isManager={canNegotiate}
             isCompliance={canDiscloseCoi}
+            canDiscard={canDiscardRecommendation}
             onOpportunityChanged={() => void load()}
           />
 
@@ -270,6 +283,7 @@ export default function OpportunityDetailPage() {
             isPlacement={canPlacePolicy}
             canCheck={canCheckPolicy}
             canDeliver={canDeliverPolicy}
+            canDiscard={canDiscardPolicy}
             onOpportunityChanged={() => void load()}
           />
 
@@ -277,6 +291,11 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canManage={canManageEndorsement}
             canApproveRefund={canApproveRefund}
+            canDisburseRefund={canDisburseRefund}
+            canDiscard={canDiscardEndorsement}
+            // Part 4 — from `/auth/me`, so the section can decide whether to ask the approver for a reason.
+            dutySegregationMode={user.dutySegregationMode ?? 'SEGREGATED'}
+            currentUserId={user.id}
           />
 
           <FinanceSection
@@ -301,6 +320,7 @@ export default function OpportunityDetailPage() {
           <ClaimSection
             opportunityId={opportunity.id}
             canNotify={canNotifyClaim}
+            canDiscard={canDiscardClaim}
             canRegister={canRegisterClaim}
             canDocument={canDocumentClaim}
             canAssess={canAssessClaim}

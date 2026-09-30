@@ -8,6 +8,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 
 export default function NewCustomerPage() {
@@ -31,7 +32,7 @@ export default function NewCustomerPage() {
         <CustomerOnboardingWizard />
       ) : (
         <p role="alert" style={errorStyle}>
-          {t('customerNewNoPermission')}
+          {permissionRefusal(t, 'customerNewRefusalAct', 'customer.create')}
         </p>
       )}
     </main>

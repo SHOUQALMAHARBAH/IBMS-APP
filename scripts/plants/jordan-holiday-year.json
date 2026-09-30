@@ -1,0 +1,32 @@
+{
+  "occasion-always-one-day": {
+    "file": "apps/api/src/modules/sla/sla-policy.service.ts",
+    "from": "    const run = consecutiveDays(start, occasion.days);",
+    "to": "    const run = consecutiveDays(start, 1);"
+  },
+  "year-reports-nothing-missing": {
+    "file": "apps/api/src/modules/sla/sla-policy.service.ts",
+    "from": "    const missingOccasions = JORDAN_MOVING_HOLIDAYS.filter(",
+    "to": "    const missingOccasions = ([] as typeof JORDAN_MOVING_HOLIDAYS[number][]).filter("
+  },
+  "fixed-batch-not-idempotent": {
+    "file": "apps/api/src/modules/sla/sla-policy.service.ts",
+    "from": "    const { missingFixed } = await this.holidayCalendarForYear(year);",
+    "to": "    const missingFixed = fixedHolidaysForYear(year).map((h) => ({ nameEn: h.nameEn, nameAr: h.nameAr, observedOn: utcDayKey(h.observedOn) }));"
+  },
+  "unknown-occasion-silently-accepted": {
+    "file": "apps/api/src/modules/sla/sla-policy.service.ts",
+    "from": "    if (!occasion) {\n      throw new UnprocessableEntityException(",
+    "to": "    if (false) {\n      throw new UnprocessableEntityException("
+  },
+  "occasion-start-date-unchecked": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "                      busy || occasion === '' || !holidayDateIsValid(startDay)",
+    "to": "                      busy || occasion === ''"
+  },
+  "missing-occasion-hides-its-length": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "                    {o.nameEn} · {o.days} {t('slapHolidayDays')}",
+    "to": "                    {o.nameEn}"
+  }
+}

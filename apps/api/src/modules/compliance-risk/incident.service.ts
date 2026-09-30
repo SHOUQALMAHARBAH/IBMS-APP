@@ -5,13 +5,14 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { IncidentReport } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
-import { IncidentRepository } from '../../repositories/incident.repository';
+import {
+  IncidentRepository,
+  type IncidentReportWithAct,
+} from '../../repositories/incident.repository';
 import {
   deriveIncidentReportView,
   incidentReportAuditSnapshot,
@@ -25,6 +26,7 @@ import type { NotifyRegulatorsDto } from './dto/notify-regulators.dto';
 import type { CloseIncidentDto } from './dto/close-incident.dto';
 import type { ListIncidentsQueryDto } from './dto/list-incidents-query.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 const INCIDENT_CONTAINMENT_WORKFLOW = 'incident_containment';
 const INCIDENT_SENIOR_MANAGEMENT_WORKFLOW =
@@ -78,6 +80,7 @@ export class IncidentService {
     private readonly workflow: WorkflowTransitionService,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   async create(
@@ -254,6 +257,8 @@ export class IncidentService {
   async coSign(
     id: string,
     actor: AuthenticatedUser,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<IncidentReportView> {
     const incident = await this.load(id);
     if (incident.classification !== 'MATERIAL') {
@@ -272,13 +277,17 @@ export class IncidentService {
         `Incident ${id} is classified but has no recorded classifier — co-sign segregation cannot be verified.`,
       );
     }
-    assertDifferentActors(
-      incident.classifiedByDpoUserId,
-      actor.id,
-      'IncidentReport.co-sign',
-    );
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'IncidentReport_classification_maker_checker_distinct',
+      makerId: incident.classifiedByDpoUserId,
+      checkerId: actor.id,
+      entityId: id,
+      context: 'IncidentReport.co-sign',
+      actorUserId: actor.id,
+      reason: combinedDutyReason,
+    });
 
-    const res = await this.repo.recordCoSign(id, actor.id);
+    const res = await this.repo.recordCoSign(id, actor.id, combinedDutyActId);
     if (res.count === 0) {
       throw new ConflictException(
         `Incident ${id} changed concurrently — reload and retry.`,
@@ -546,7 +555,7 @@ export class IncidentService {
 
   // --- helpers -------------------------------------------------
 
-  private async load(id: string): Promise<IncidentReport> {
+  private async load(id: string): Promise<IncidentReportWithAct> {
     const incident = await this.repo.findById(id);
     if (!incident) {
       throw new NotFoundException(`Incident report ${id} not found.`);

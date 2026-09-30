@@ -149,6 +149,86 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
     expect(employee.familyName).toBe('Hijazi');
   });
 
+  it('stores the English name set and the branch the unified form sends', async () => {
+    // The person-ONLY route, which the unified form uses when nobody is getting a login. Its three new
+    // fields — the English name set, and the branch — are the ones a DTO can gain without any writer
+    // exercising them: the paired route proves its own path, and this one had nothing asserting that
+    // POST /employees actually persists them. That is the "migration changed no writer" shape in
+    // miniature (IMPROVEMENTS § 1.40), so it gets its own reading of the stored row.
+    const app = await boot();
+    const admin = await makeUser(
+      app,
+      'hr-admin-en-branch',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const branch = await request(app.getHttpServer())
+      .post('/admin/branches')
+      .set(bearer(admin.accessToken))
+      .send({ name: `EN Branch ${suffix}` })
+      .expect(201);
+    const branchId = (branch.body as { id: string }).id;
+
+    const res = await request(app.getHttpServer())
+      .post('/employees')
+      .set(bearer(admin.accessToken))
+      .send({
+        givenName: 'سلمى',
+        familyName: 'المحاربة',
+        givenNameEn: 'Salma',
+        familyNameEn: 'Almaharbah',
+        nationalId: '9933445566',
+        hireDate: '2022-03-01',
+        branchId,
+      })
+      .expect(201);
+    const created = res.body as { id: string };
+
+    const stored = await prisma.employee.findUniqueOrThrow({
+      where: { id: created.id },
+      select: {
+        fullName: true,
+        fullNameEn: true,
+        givenNameEn: true,
+        fatherNameEn: true,
+        familyNameEn: true,
+        branchId: true,
+      },
+    });
+    expect(stored.fullName).toBe('سلمى المحاربة');
+    // Composed from the two parts given. The father's English name was not sent and stays NULL —
+    // nothing transliterates the Arabic on a person's behalf.
+    expect(stored.fullNameEn).toBe('Salma Almaharbah');
+    expect(stored.givenNameEn).toBe('Salma');
+    expect(stored.fatherNameEn).toBeNull();
+    expect(stored.branchId).toBe(branchId);
+  });
+
+  it('refuses a branch from another office by name, not by hint', async () => {
+    // Validated exactly like the department: a tenant-scoped read, so an id that exists elsewhere
+    // reads as unknown rather than as a hint that the row exists somewhere.
+    const app = await boot();
+    const admin = await makeUser(
+      app,
+      'hr-admin-bad-branch',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+    const res = await request(app.getHttpServer())
+      .post('/employees')
+      .set(bearer(admin.accessToken))
+      .send({
+        givenName: 'Noor',
+        familyName: 'Saleh',
+        nationalId: '9944556677',
+        hireDate: '2022-03-01',
+        branchId: 'a-branch-that-does-not-exist',
+      })
+      .expect(422);
+    expect(
+      JSON.stringify((res.body as { message: unknown }).message),
+    ).toContain('branch');
+  });
+
   it("omits father's/grandfather's name from the computed fullName when they are not supplied", async () => {
     const app = await boot();
     const admin = await makeUser(

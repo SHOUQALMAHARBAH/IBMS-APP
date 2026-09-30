@@ -1,6 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 import { useLanguage } from '../../lib/i18n/language-context';
 import {
   approveNeedsAssessment,
@@ -32,6 +38,16 @@ export function NeedsAssessmentReviewPanel({
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [dutyReason, setDutyReason] = useState('');
+  // Computed once and used by both buttons: the maker is the same person for review and approve, and the
+  // status decides which button is on screen.
+  const needsDeclaration = needsCombinedDutyDeclaration({
+    mode: user?.dutySegregationMode,
+    makerUserId: assessment.createdByUserId,
+    currentUserId: user?.id ?? '',
+    alreadyDecided: false,
+  });
 
   async function run(action: string, fn: () => Promise<NeedsAssessment>) {
     setError(null);
@@ -62,13 +78,33 @@ export function NeedsAssessmentReviewPanel({
       </p>
 
       <div style={reviewActionsStyle}>
+        {/*
+          Part 4 — the officer who captured the assessment may review AND approve it in an office that has
+          declared COMBINED, only by saying why. One box serves both buttons: only one of them is ever
+          rendered at a time, because the status decides which.
+        */}
+        {needsDeclaration ? (
+          <CombinedDutyReasonField
+            id={assessment.id}
+            value={dutyReason}
+            onChange={setDutyReason}
+          />
+        ) : null}
         {assessment.status === 'PENDING_REVIEW' ? (
           <button
             type="button"
-            disabled={busy !== null}
+            disabled={
+              busy !== null ||
+              (needsDeclaration && combinedDutyTooShort(dutyReason))
+            }
             style={{ ...buttonStyle, marginTop: 0, width: 'auto' }}
             onClick={() =>
-              void run('review', () => reviewNeedsAssessment(assessment.id))
+              void run('review', () =>
+                reviewNeedsAssessment(
+                  assessment.id,
+                  needsDeclaration ? dutyReason.trim() : undefined,
+                ),
+              )
             }
           >
             {busy === 'review' ? t('nadRecording') : 'Mark reviewed'}
@@ -77,10 +113,18 @@ export function NeedsAssessmentReviewPanel({
         {assessment.status === 'REVIEWED' ? (
           <button
             type="button"
-            disabled={busy !== null}
+            disabled={
+              busy !== null ||
+              (needsDeclaration && combinedDutyTooShort(dutyReason))
+            }
             style={{ ...buttonStyle, marginTop: 0, width: 'auto' }}
             onClick={() =>
-              void run('approve', () => approveNeedsAssessment(assessment.id))
+              void run('approve', () =>
+                approveNeedsAssessment(
+                  assessment.id,
+                  needsDeclaration ? dutyReason.trim() : undefined,
+                ),
+              )
             }
           >
             {busy === 'approve' ? t('nadApproving') : t('kycQueueApproveButton')}

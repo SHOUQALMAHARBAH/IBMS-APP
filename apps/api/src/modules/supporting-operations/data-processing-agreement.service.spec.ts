@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   ConflictException,
   ForbiddenException,
@@ -42,10 +43,15 @@ function makeService(
     ...over.vendorRepo,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
+
   const service = new DataProcessingAgreementService(
     dpaRepo as unknown as DataProcessingAgreementRepository,
     vendorRepo as unknown as VendorRepository,
     audit as unknown as AuditService,
+    dutySegregation,
   );
   return { service, dpaRepo, vendorRepo, audit };
 }
@@ -125,7 +131,7 @@ describe('DataProcessingAgreementService.dpoApprove', () => {
   it('approves the DPA when the DPO differs from the assessor', async () => {
     const { service, dpaRepo, audit } = makeService();
     const result = await service.dpoApprove('dpa-1', 'dpo-1');
-    expect(dpaRepo.dpoApprove).toHaveBeenCalledWith('dpa-1', 'dpo-1');
+    expect(dpaRepo.dpoApprove).toHaveBeenCalledWith('dpa-1', 'dpo-1', null);
     expect(result.dpoApprovedByUserId).toBe('dpo-1');
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({

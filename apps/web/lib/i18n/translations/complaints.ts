@@ -38,7 +38,7 @@ export const COMPLAINTS = {
     // Row actions
     complaintsDownloadAckButton: 'تنزيل إشعار الاستلام (PDF)',
     complaintsTextPlaceholder: 'معرّف المُسنَد إليه / الإجراء / الحل / السبب',
-    complaintsTextAria: 'نص الشكوى {id}',
+    complaintsTextAria: 'نص الشكوى',
     complaintsAssignButton: 'إسناد',
     complaintsStartButton: 'بدء المعالجة',
     complaintsAddActionButton: 'إضافة إجراء',
@@ -50,8 +50,7 @@ export const COMPLAINTS = {
     complaintsLoading: 'جارٍ التحميل…',
     complaintsNone: 'لا توجد شكاوى مسجّلة بعد.',
     complaintsLoadError: 'تعذّر تحميل الشكاوى — حاول مرة أخرى.',
-    complaintsNoPermission:
-      'لا تملك صلاحية complaint.log اللازمة لعرض الشكاوى.',
+    complaintsRefusalAct: 'عرض الشكاوى',
     complaintsAckError: 'تعذّر إنشاء إشعار الاستلام — حاول مرة أخرى.',
     complaintsActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
 
@@ -91,7 +90,7 @@ export const COMPLAINTS = {
 
     complaintsDownloadAckButton: 'Download acknowledgement (PDF)',
     complaintsTextPlaceholder: 'assignee id / action / resolution / reason',
-    complaintsTextAria: 'Text for {id}',
+    complaintsTextAria: 'Complaint text',
     complaintsAssignButton: 'Assign',
     complaintsStartButton: 'Start',
     complaintsAddActionButton: 'Add action',
@@ -102,7 +101,7 @@ export const COMPLAINTS = {
     complaintsLoading: 'Loading…',
     complaintsNone: 'No complaints.',
     complaintsLoadError: 'Could not load complaints — try again.',
-    complaintsNoPermission: "You don't hold the complaint.log permission.",
+    complaintsRefusalAct: 'view and log complaints',
     complaintsAckError: 'Could not generate the acknowledgement — try again.',
     complaintsActionError: 'That action failed — try again.',
 

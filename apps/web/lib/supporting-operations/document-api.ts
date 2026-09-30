@@ -1,6 +1,6 @@
 // Process 70 — Document Management (backlog Part C #70, Domain H). Calls
 // apps/api's /documents routes — version control + the deletion-lock
-// override for the Part 4.2 electronic Insurance File. document.manage
+// override for the Part 4.2 electronic Insurance File. document.read / document.create
 // gates the general surface; document.delete-override (narrower, ADMIN/DPO)
 // gates the two deletion routes.
 

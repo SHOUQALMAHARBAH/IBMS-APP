@@ -81,7 +81,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/bank-reconciliation");
   await expect(
-    page.getByText("reconciliation-exception.investigate permission", {
+    page.getByText("(reconciliation-exception.investigate)", {
       exact: false,
     }),
   ).toBeVisible();

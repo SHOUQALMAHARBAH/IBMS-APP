@@ -1,0 +1,34 @@
+{
+  "empty-warning-shows-even-when-days-exist": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "{view != null && view.holidays.length === 0 && (",
+    "to": "{view != null && (",
+    "why": "The \"this calendar is empty, so every business-day deadline is computed as though Fridays were the only non-working days\" warning shows even when the year HAS holidays, which turns a wrong-answer alert into noise people learn to ignore. sla-policies.spec.ts dies. REPOINTED: the original read `rows != null && rows.length === 0` and the screen later became per-YEAR, so the collection is now `view.holidays` — a real code change rather than formatting."
+  },
+  "add-ignores-the-name-floor": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "            disabled={busy || !holidayDateIsValid(day) || !holidayNameIsValid(name)}",
+    "to": "            disabled={busy || !holidayDateIsValid(day)}"
+  },
+  "holiday-name-sent-untrimmed": {
+    "file": "apps/web/lib/sla/sla-holiday-api.ts",
+    "from": "    name: input.name.trim(),",
+    "to": "    name: input.name,"
+  },
+  "calendar-type-always-sent": {
+    "file": "apps/web/lib/sla/sla-holiday-api.ts",
+    "from": "    ...(input.calendarType ? { calendarType: input.calendarType } : {}),",
+    "to": "    calendarType: input.calendarType ?? null,"
+  },
+  "calendar-form-ignores-the-permission": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "  const canCreate = hasPermission(user, 'sla.holiday.create');",
+    "to": "  const canCreate = true;"
+  },
+  "conflict-message-swallowed": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "      setActionError(err instanceof ApiError ? err.message : t(fallbackKey));",
+    "to": "      setActionError(t(fallbackKey));",
+    "why": "The server's 409 naming the day already taken is swallowed and replaced by a generic sentence, so two people working from one published holiday list are told \"something went wrong\" instead of which day collided. sla-policies.spec.ts dies. REPOINTED: `setAddError` no longer exists — every write on this screen now goes through one `setActionError` with a per-call fallback key, which is why the anchor includes `fallbackKey`."
+  }
+}

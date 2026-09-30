@@ -31,6 +31,7 @@ import {
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../lib/i18n/format';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
 
 // Client-side hint only — the API enforces `interaction.log` on write
 // regardless. Matches the seeded grant list for that permission (a superset
@@ -128,7 +129,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         status,
         message:
           status === 403
-            ? t('crmNoPermission')
+            ? permissionRefusal(t, 'crmRefusalAct', 'customer.360-view.read')
             : status === 404
               ? t('crmCustomerNotFound')
               : err instanceof ApiError
@@ -172,7 +173,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLogError(
         err instanceof ApiError && err.status === 403
-          ? t('crmNoPermissionLog')
+          ? permissionRefusal(t, 'crmLogRefusalAct', 'interaction.log')
           : err instanceof ApiError
             ? err.message
             : t('crmLogError'),
@@ -202,13 +203,22 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             <bdi>{view.customer.legalName}</bdi>
           </h2>
           <p style={{ opacity: 0.8, marginTop: '0.2rem' }}>
-            {view.customer.customerType} — Status: {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
+            {view.customer.customerType} — Status:{' '}
+            {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
           </p>
           <div style={crmCountRowStyle}>
-            <span>Interactions: {view.counts.interactions}</span>
-            <span>Policies: {view.counts.policies}</span>
-            <span>Claims: {view.counts.claims}</span>
-            <span>Complaints: {view.counts.complaints}</span>
+            <span>
+              {t('crmCountInteractions')} {view.counts.interactions}
+            </span>
+            <span>
+              {t('crmCountPolicies')} {view.counts.policies}
+            </span>
+            <span>
+              {t('crmCountClaims')} {view.counts.claims}
+            </span>
+            <span>
+              {t('crmCountComplaints')} {view.counts.complaints}
+            </span>
           </div>
         </>
       ) : null}
@@ -219,7 +229,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
           <div style={crmFormRowStyle}>
             <div>
               <label htmlFor="crm-channel" style={cardMetaStyle}>
-                Channel
+                {t('crmChannelLabel')}
               </label>
               <br />
               <select
@@ -290,7 +300,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         <TimelineList view={view} />
       ) : (
         <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
-          {t('crmTimelineNeedsPermission')}
+          {reducedCapability(t, 'crmTimelineCanAct', 'crmTimelineCannotAct', 'customer.360-view.read')}
         </p>
       )}
     </div>
@@ -332,9 +342,7 @@ export default function CrmPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('crmHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('crmIntro')}
-      </p>
+      <p style={{ opacity: 0.8 }}>{t('crmIntro')}</p>
       <Suspense fallback={null}>
         <CrmFlow />
       </Suspense>

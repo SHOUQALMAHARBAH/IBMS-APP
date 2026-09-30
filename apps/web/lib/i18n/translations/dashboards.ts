@@ -34,6 +34,20 @@ export const DASHBOARDS = {
     dashDatePlaceholder: 'سنة-شهر-يوم',
     dashMonthPlaceholder: 'سنة-شهر',
     dashLoading: 'جارٍ التحميل…',
+    commonStatusLabel: 'الحالة:',
+    commonCurrentLabel: 'الحالي:',
+    // Item 5 batch 1, violation 1 — the provenance line, previously hardcoded ENGLISH on eight of the
+    // sixteen reporting screens. `provGeneratedAt` is when the report was COMPUTED; `provAsOf` is the date
+    // the figures are measured TO. Different claims, deliberately different sentences.
+    provGeneratedAt: 'صُدِّر في {at}.',
+    dcmpSelfApprovalViolations: 'حالات موافقة ذاتية',
+    dcmpScanAsOf: '(حتى {at})',
+    dcmpNoScanYet: '(لم يُجرَ أي فحص بعد)',
+    slaDashDueSoonMeaning: '«قريبة الاستحقاق» تعني غير مُنجَزة ويحلّ موعدها خلال {window}.',
+    slaDashBreachRateMeaning: 'نسبة الإخلال = المتأخِّرة أو المُخلَّة من بين كل المهل التي حلّ موعدها.',
+    provAsOf: 'الأرقام كما في {at}.',
+    provGeneratedAtWithPeriod: 'صُدِّر في {at} — فترة السوق {period}.',
+    provPeriod: 'الفترة {period} (من {from} إلى {to}).',
     dashNoData: 'لا توجد بيانات.',
     dashColGroup: 'المجموعة',
     dashColKey: 'المفتاح',
@@ -67,7 +81,7 @@ export const DASHBOARDS = {
     kpiColCount: 'العدد',
     kpiNone: 'لا توجد سجلات بعد.',
     kpiLoadError: 'تعذّر تحميل لوحة مؤشرات الأداء — حاول مرة أخرى.',
-    kpiNoPermission: 'لا تملك صلاحية kpi-dashboard.view اللازمة لعرض هذه اللوحة.',
+    kpiRefusalAct: 'عرض لوحة مؤشرات الأداء',
 
     // ---- Sales performance (#59) -------------------------------------------
     spHeading: 'أداء المبيعات',
@@ -91,7 +105,7 @@ export const DASHBOARDS = {
     spSaveTargetError: 'تعذّر حفظ الحصة المستهدفة.',
     spReviseButton: 'تعديل الحصة',
     spSetButton: 'تحديد الحصة',
-    spNoPermission: 'لا تملك صلاحية dashboard.sales.view اللازمة لعرض أداء المبيعات.',
+    spRefusalAct: 'عرض أداء المبيعات',
     spPeriodRange: 'الفترة {label} ({from} إلى {to}).',
 
     // ---- Sales dashboard ----------------------------------------------------
@@ -112,7 +126,7 @@ export const DASHBOARDS = {
     dsalConverted: 'المحوَّلة',
     dsalRecommendations: 'التوصيات',
     dsalLoadError: 'تعذّر تحميل لوحة المبيعات — حاول مرة أخرى.',
-    dsalNoPermission: 'لا تملك صلاحية dashboard.sales.view اللازمة لعرض لوحة المبيعات.',
+    dsalRefusalAct: 'عرض لوحة المبيعات',
 
     // ---- Policy dashboard ---------------------------------------------------
     dpolHeading: 'لوحة الوثائق',
@@ -130,7 +144,7 @@ export const DASHBOARDS = {
     dpolColReason: 'السبب',
     dpolColCancelledAt: 'تاريخ الإلغاء',
     dpolLoadError: 'تعذّر تحميل لوحة الوثائق — حاول مرة أخرى.',
-    dpolNoPermission: 'لا تملك صلاحية dashboard.policy.view اللازمة لعرض لوحة الوثائق.',
+    dpolRefusalAct: 'عرض لوحة الوثائق',
     dpolPeriodRange: 'الفترة {label} ({from} – {to}).',
 
     // ---- Claims dashboard ---------------------------------------------------
@@ -150,7 +164,7 @@ export const DASHBOARDS = {
     dclmByLine: 'حسب الفرع',
     dclmByInsurer: 'حسب شركة التأمين',
     dclmLoadError: 'تعذّر تحميل لوحة المطالبات — حاول مرة أخرى.',
-    dclmNoPermission: 'لا تملك صلاحية dashboard.claims.view اللازمة لعرض لوحة المطالبات.',
+    dclmRefusalAct: 'عرض لوحة المطالبات',
     dclmAgeing0To30: 'من ٠ إلى ٣٠ يوماً',
     dclmAgeing31To60: 'من ٣١ إلى ٦٠ يوماً',
     dclmAgeing61To90: 'من ٦١ إلى ٩٠ يوماً',
@@ -172,9 +186,11 @@ export const DASHBOARDS = {
     dfinColCommission: 'العمولة (دينار أردني)',
     dfinColNetPosition: 'صافي المركز (دينار أردني)',
     dfinByLine: 'حسب الفرع',
+    dfinOutstandingCount: 'المستحق ({count})',
+    dfinRemittedCount: 'المُحوَّل ({count})',
     dfinByClientSegment: 'حسب شريحة العملاء',
     dfinLoadError: 'تعذّر تحميل اللوحة المالية — حاول مرة أخرى.',
-    dfinNoPermission: 'لا تملك صلاحية dashboard.financial.view اللازمة لعرض اللوحة المالية.',
+    dfinRefusalAct: 'عرض اللوحة المالية',
 
     // ---- Compliance dashboard -------------------------------------------------
     dcmpHeading: 'لوحة الالتزام',
@@ -196,7 +212,7 @@ export const DASHBOARDS = {
     dcmpByStatus: 'حسب الحالة',
     dcmpByOutcome: 'حسب النتيجة',
     dcmpLoadError: 'تعذّر تحميل لوحة الالتزام — حاول مرة أخرى.',
-    dcmpNoPermission: 'لا تملك صلاحية dashboard.compliance.view اللازمة لعرض لوحة الالتزام.',
+    dcmpRefusalAct: 'عرض لوحة الالتزام',
 
     // ---- Insurer & employee performance dashboard ------------------------------
     diepHeading: 'لوحة أداء شركات التأمين والموظفين',
@@ -220,7 +236,7 @@ export const DASHBOARDS = {
     diepRenewalRate: 'معدّل التجديد',
     diepCrossSellRate: 'معدّل البيع المتبادل',
     diepLoadError: 'تعذّر تحميل لوحة أداء شركات التأمين والموظفين — حاول مرة أخرى.',
-    diepNoPermission: 'لا تملك صلاحيتَي insurer-performance.view و employee-performance.view اللازمتين لعرض هذه اللوحة.',
+    diepRefusalAct: 'عرض لوحة أداء شركات التأمين والموظفين',
 
     // ---- Insurer performance (#60) ----------------------------------------------
     ipHeading: 'أداء شركة التأمين',
@@ -237,7 +253,7 @@ export const DASHBOARDS = {
     ipComputed: 'جرى احتساب الدرجة.',
     ipComputeError: 'تعذّر احتساب الدرجة.',
     ipLoadError: 'تعذّر تحميل أداء شركة التأمين — حاول مرة أخرى.',
-    ipNoPermission: 'لا تملك صلاحية insurer-performance.view اللازمة لعرض هذه الشاشة.',
+    ipRefusalAct: 'عرض لوحة أداء شركات التأمين',
     ipComputeNote: 'يستخدم معرّف شركة التأمين أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
     ipMostRecentPeriod: 'أحدث فترة: {label} (احتُسبت {computed}).',
 
@@ -256,7 +272,9 @@ export const DASHBOARDS = {
     epComputed: 'جرى احتساب السجل.',
     epComputeError: 'تعذّر احتساب السجل.',
     epLoadError: 'تعذّر تحميل أداء الموظف — حاول مرة أخرى.',
-    epNoPermission: 'لا تملك صلاحية employee-performance.view اللازمة لعرض هذه الشاشة.',
+    epMostRecentPeriod: 'أحدث فترة: {period}.',
+    epDashMeaning: 'الشَّرطة تعني أنه لم تتوفَّر نتائج لتقييم تلك الفترة، وليست صفرًا محسوبًا.',
+    epRefusalAct: 'عرض لوحة أداء الموظفين',
     epComputeNote: 'يستخدم معرّف الموظف أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
 
     // ---- Portfolio analysis (#62) --------------------------------------------------
@@ -269,7 +287,7 @@ export const DASHBOARDS = {
     paByClientSegment: 'حسب شريحة العملاء',
     paByGeography: 'حسب التوزيع الجغرافي (الفرع)',
     paLoadError: 'تعذّر تحميل تحليل المحفظة — حاول مرة أخرى.',
-    paNoPermission: 'لا تملك صلاحية portfolio-analysis.view اللازمة لعرض تحليل المحفظة.',
+    paRefusalAct: 'عرض تحليل المحفظة',
 
     // ---- Profitability analysis (#63) -------------------------------------------------
     praHeading: 'تحليل الربحية',
@@ -283,7 +301,7 @@ export const DASHBOARDS = {
     praColCostToServe: 'تكلفة الخدمة (دينار أردني)',
     praColNetProfitability: 'صافي الربحية (دينار أردني)',
     praLoadError: 'تعذّر تحميل تحليل الربحية — حاول مرة أخرى.',
-    praNoPermission: 'لا تملك صلاحية profitability-analysis.view اللازمة لعرض تحليل الربحية.',
+    praRefusalAct: 'عرض تحليل الربحية',
 
     // ---- Strategic planning inputs (#65) --------------------------------------------
     pexHeading: 'مدخلات التخطيط الاستراتيجي',
@@ -296,11 +314,12 @@ export const DASHBOARDS = {
     pexPortfolioByGeography: 'المحفظة — حسب التوزيع الجغرافي (الفرع)',
     pexNoInsurerScores: 'لا توجد درجات أداء لشركات التأمين في هذه الفترة بعد.',
     pexGenerateButton: 'إنشاء التصدير',
+    pexMarketHeading: 'السوق — أداء شركات التأمين ({period})',
     pexGeneratingButton: 'جارٍ الإنشاء…',
     pexExportError: 'تعذّر إنشاء التصدير — حاول مرة أخرى.',
     pexLoading: 'جارٍ التحميل…',
     pexNoPolicies: 'لا توجد وثائق صادرة بعد.',
-    pexNoPermission: 'لا تملك صلاحية planning-export.generate اللازمة لعرض هذه الشاشة.',
+    pexRefusalAct: 'تصدير أرقام التخطيط الاستراتيجي',
     pexPeriodNote: 'اتركه فارغاً لاحتساب الشهر الميلادي المنتهي بتوقيت UTC. بيانات المحفظة تعكس دائماً الدفتر الحالي بغضّ النظر عن الفترة.',
 
     // ---- Executive Dashboard — CONVERTED, not rewritten ----------------
@@ -308,7 +327,7 @@ export const DASHBOARDS = {
     // below is that text moved verbatim. Keys are generated from the
     // English, hence the mechanical names.
     execCouldNotLoadTheExecutive: 'تعذّر تحميل لوحة الإدارة التنفيذية — حاول مرة أخرى.',
-    execNoPermission: 'لا تملك صلاحية dashboard.executive.view.',
+    execRefusalAct: 'عرض اللوحة التنفيذية',
     execPeriodAsOf: 'الفترة {period} · كما في {asOf}',
     execExecutiveDashboard: 'لوحة الإدارة التنفيذية',
     execTheSalesPolicyClaimsFinancial:
@@ -353,6 +372,18 @@ export const DASHBOARDS = {
     dashDatePlaceholder: 'YYYY-MM-DD',
     dashMonthPlaceholder: 'YYYY-MM',
     dashLoading: 'Loading…',
+    commonStatusLabel: 'Status:',
+    commonCurrentLabel: 'Current:',
+    // Item 5 batch 1, violation 1 — see the Arabic block for why these are two sentences and not one.
+    provGeneratedAt: 'Generated {at}.',
+    dcmpSelfApprovalViolations: 'Self-approval violations',
+    dcmpScanAsOf: '(as of {at})',
+    dcmpNoScanYet: '(no scan has run yet)',
+    slaDashDueSoonMeaning: '“Due soon” = unresolved and due within {window}.',
+    slaDashBreachRateMeaning: 'Breach rate = late-or-breached over all timers that have reached a deadline.',
+    provAsOf: 'Figures as of {at}.',
+    provGeneratedAtWithPeriod: 'Generated {at} — market period {period}.',
+    provPeriod: 'Period {period} ({from} to {to}).',
     dashNoData: 'No data.',
     dashColGroup: 'Group',
     dashColKey: 'Key',
@@ -385,7 +416,7 @@ export const DASHBOARDS = {
     kpiColCount: 'Count',
     kpiNone: 'No records yet.',
     kpiLoadError: 'Could not load the KPI dashboard — try again.',
-    kpiNoPermission: "You don't hold the kpi-dashboard.view permission.",
+    kpiRefusalAct: 'view the KPI dashboard',
 
     spHeading: 'Sales Performance',
     spIntro:
@@ -408,7 +439,7 @@ export const DASHBOARDS = {
     spSaveTargetError: 'Could not save the target.',
     spReviseButton: 'Revise target',
     spSetButton: 'Set target',
-    spNoPermission: "You don't hold the dashboard.sales.view permission.",
+    spRefusalAct: 'view sales performance',
     spPeriodRange: 'Period {label} ({from} to {to}).',
 
     dsalHeading: 'Sales Dashboard',
@@ -428,7 +459,7 @@ export const DASHBOARDS = {
     dsalConverted: 'Converted',
     dsalRecommendations: 'Recommendations',
     dsalLoadError: 'Could not load the Sales Dashboard — try again.',
-    dsalNoPermission: "You don't hold the dashboard.sales.view permission.",
+    dsalRefusalAct: 'view the sales dashboard',
 
     dpolHeading: 'Policy Dashboard',
     dpolIntro:
@@ -445,7 +476,7 @@ export const DASHBOARDS = {
     dpolColReason: 'Reason',
     dpolColCancelledAt: 'Cancelled at',
     dpolLoadError: 'Could not load the Policy Dashboard — try again.',
-    dpolNoPermission: "You don't hold the dashboard.policy.view permission.",
+    dpolRefusalAct: 'view the policy dashboard',
     dpolPeriodRange: 'Period {label} ({from} – {to}).',
 
     dclmHeading: 'Claims Dashboard',
@@ -464,7 +495,7 @@ export const DASHBOARDS = {
     dclmByLine: 'By line',
     dclmByInsurer: 'By insurer',
     dclmLoadError: 'Could not load the Claims Dashboard — try again.',
-    dclmNoPermission: "You don't hold the dashboard.claims.view permission.",
+    dclmRefusalAct: 'view the claims dashboard',
     dclmAgeing0To30: '0-30 days',
     dclmAgeing31To60: '31-60 days',
     dclmAgeing61To90: '61-90 days',
@@ -485,9 +516,11 @@ export const DASHBOARDS = {
     dfinColCommission: 'Commission (JOD)',
     dfinColNetPosition: 'Net position (JOD)',
     dfinByLine: 'By line',
+    dfinOutstandingCount: 'Outstanding ({count})',
+    dfinRemittedCount: 'Remitted ({count})',
     dfinByClientSegment: 'By client segment',
     dfinLoadError: 'Could not load the Financial Dashboard — try again.',
-    dfinNoPermission: "You don't hold the dashboard.financial.view permission.",
+    dfinRefusalAct: 'view the financial dashboard',
 
     dcmpHeading: 'Compliance Dashboard',
     dcmpIntro:
@@ -508,7 +541,7 @@ export const DASHBOARDS = {
     dcmpByStatus: 'By status',
     dcmpByOutcome: 'By outcome',
     dcmpLoadError: 'Could not load the Compliance Dashboard — try again.',
-    dcmpNoPermission: "You don't hold the dashboard.compliance.view permission.",
+    dcmpRefusalAct: 'view the compliance dashboard',
 
     diepHeading: 'Insurer & Employee Performance Dashboard',
     diepIntro:
@@ -531,7 +564,7 @@ export const DASHBOARDS = {
     diepRenewalRate: 'Renewal rate',
     diepCrossSellRate: 'Cross-sell rate',
     diepLoadError: 'Could not load the Insurer & Employee Performance Dashboard — try again.',
-    diepNoPermission: "You don't hold the insurer-performance.view / employee-performance.view permissions.",
+    diepRefusalAct: 'view the insurer and employee performance dashboard',
 
     ipHeading: 'Insurer Performance',
     ipIntro:
@@ -547,7 +580,7 @@ export const DASHBOARDS = {
     ipComputed: 'Score computed.',
     ipComputeError: 'Could not compute the score.',
     ipLoadError: 'Could not load insurer performance — try again.',
-    ipNoPermission: "You don't hold the insurer-performance.view permission.",
+    ipRefusalAct: 'view the insurer performance dashboard',
     ipComputeNote: 'Uses the Insurer ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
     ipMostRecentPeriod: 'Most recent period: {label} (computed {computed}).',
 
@@ -565,7 +598,9 @@ export const DASHBOARDS = {
     epComputed: 'Record computed.',
     epComputeError: 'Could not compute the record.',
     epLoadError: 'Could not load employee performance — try again.',
-    epNoPermission: "You don't hold the employee-performance.view permission.",
+    epMostRecentPeriod: 'Most recent period: {period}.',
+    epDashMeaning: 'A dash means no outcomes existed to rate that period, not a computed 0%.',
+    epRefusalAct: 'view the employee performance dashboard',
     epComputeNote: 'Uses the Employee ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
 
     paHeading: 'Portfolio Analysis',
@@ -577,7 +612,7 @@ export const DASHBOARDS = {
     paByClientSegment: 'By client segment',
     paByGeography: 'By geography (branch)',
     paLoadError: 'Could not load portfolio analysis — try again.',
-    paNoPermission: "You don't hold the portfolio-analysis.view permission.",
+    paRefusalAct: 'view the portfolio analysis',
 
     praHeading: 'Profitability Analysis',
     praIntro:
@@ -590,7 +625,7 @@ export const DASHBOARDS = {
     praColCostToServe: 'Cost to serve (JOD)',
     praColNetProfitability: 'Net profitability (JOD)',
     praLoadError: 'Could not load profitability analysis — try again.',
-    praNoPermission: "You don't hold the profitability-analysis.view permission.",
+    praRefusalAct: 'view the profitability analysis',
 
     pexHeading: 'Strategic Planning Inputs',
     pexIntro:
@@ -602,11 +637,12 @@ export const DASHBOARDS = {
     pexPortfolioByGeography: 'Portfolio — by geography (branch)',
     pexNoInsurerScores: 'No insurer performance scores for this period yet.',
     pexGenerateButton: 'Generate export',
+    pexMarketHeading: 'Market — insurer performance ({period})',
     pexGeneratingButton: 'Generating…',
     pexExportError: 'Could not generate the export — try again.',
     pexLoading: 'Loading…',
     pexNoPolicies: 'No issued policies yet.',
-    pexNoPermission: "You don't hold the planning-export.generate permission.",
+    pexRefusalAct: 'export the strategic planning figures',
     pexPeriodNote: 'Leave blank to score the UTC calendar month that just ended. Portfolio data is always the current book, regardless of period.',
 
     // ---- Executive Dashboard — CONVERTED, not rewritten ----------------
@@ -614,8 +650,7 @@ export const DASHBOARDS = {
     // below is that text moved verbatim. Keys are generated from the
     // English, hence the mechanical names.
     execCouldNotLoadTheExecutive: 'Could not load the Executive Dashboard — try again.',
-    execNoPermission:
-      "You don't hold the dashboard.executive.view permission.",
+    execRefusalAct: 'view the executive dashboard',
     execPeriodAsOf: 'Period {period} · as of {asOf}',
     execExecutiveDashboard: 'Executive Dashboard',
     execTheSalesPolicyClaimsFinancial:

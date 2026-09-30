@@ -10,17 +10,24 @@ import {
 } from '../../../lib/needs-assessment/needs-assessment-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  cardMetaStyle,
+  cardStyle,
+  pageStyle,
+} from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/needs-assessment/needs-assessment.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 export default function NeedsAssessmentsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { language, t, tPlural } = useLanguage();
 
-  const [assessments, setAssessments] = useState<NeedsAssessment[] | null>(null);
+  const [assessments, setAssessments] = useState<NeedsAssessment[] | null>(
+    null,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -30,7 +37,7 @@ export default function NeedsAssessmentsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('naNoPermission')
+          ? permissionRefusal(t, 'naRefusalAct', 'needs-assessment.read')
           : err instanceof ApiError
             ? err.message
             : t('naLoadError'),
@@ -54,9 +61,7 @@ export default function NeedsAssessmentsPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('naHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('naIntro')}
-      </p>
+      <p style={{ opacity: 0.8 }}>{t('naIntro')}</p>
 
       {assessments === null && !loadError ? <p>{t('naLoading')}</p> : null}
       {loadError ? (
@@ -66,18 +71,32 @@ export default function NeedsAssessmentsPage() {
       ) : null}
       {assessments !== null && !loadError ? (
         assessments.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('naNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+            {t('naNone')}
+          </p>
         ) : (
           <div style={listGridStyle}>
             {assessments.map((assessment) => (
               <button
                 key={assessment.id}
                 type="button"
-                style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
-                aria-label={t('naViewAssessmentAria', { id: assessment.id })}
-                onClick={() => router.push(`/needs-assessments/${assessment.id}`)}
+                style={{
+                  ...cardStyle,
+                  textAlign: 'start',
+                  width: '100%',
+                  cursor: 'pointer',
+                }}
+                aria-label={t('naViewAssessmentAria', {
+                  at: formatDate(assessment.createdAt, language),
+                })}
+                onClick={() =>
+                  router.push(`/needs-assessments/${assessment.id}`)
+                }
               >
-                <strong>Status: {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}</strong>
+                <strong>
+                  {t('commonStatusLabel')}{' '}
+                  {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}
+                </strong>
                 <div style={cardMetaStyle}>
                   {tPlural(
                     'naCoverageLinesRecommended',

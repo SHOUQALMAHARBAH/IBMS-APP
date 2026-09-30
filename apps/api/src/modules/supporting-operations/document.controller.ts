@@ -18,7 +18,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 /**
- * Process 70 (backlog Part C #70, Domain H) — `document.manage` (upload/
+ * Process 70 (backlog Part C #70, Domain H) — `document.read` and `document.create` (view/upload/
  * version — the same permission `PolicyController`'s own document-attach
  * route already uses) gates the general surface; `document.delete-override`
  * (narrower, ADMIN/DPO only) gates the two deletion routes. See
@@ -34,7 +34,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 export class DocumentController {
   constructor(private readonly documents: DocumentService) {}
 
-  @RequirePermissions('document.manage')
+  @RequirePermissions('document.read')
   @Get('classification-summary')
   policyFileClassification(
     @Query() query: PolicyFileClassificationQueryDto,
@@ -43,19 +43,19 @@ export class DocumentController {
     return this.documents.policyFileClassification(query.policyId, user.id);
   }
 
-  @RequirePermissions('document.manage')
+  @RequirePermissions('document.read')
   @Get()
   list(@Query() query: ListDocumentsQueryDto) {
     return this.documents.list(query);
   }
 
-  @RequirePermissions('document.manage')
+  @RequirePermissions('document.read')
   @Get(':id')
   get(@Param('id') id: string) {
     return this.documents.get(id);
   }
 
-  @RequirePermissions('document.manage')
+  @RequirePermissions('document.create')
   @Post(':id/versions')
   createVersion(
     @Param('id') id: string,

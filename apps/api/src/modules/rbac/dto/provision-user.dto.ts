@@ -9,7 +9,21 @@ import {
   IsString,
   IsUUID,
   Length,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { PersonRecordDto } from '../../../common/person-record.dto';
+
+/**
+ * The person half of "register someone and give them a login", as ONE act.
+ *
+ * Nothing but the shared person definition. Department and branch are deliberately NOT here: they are
+ * already on the account, one field each, and one field cannot disagree with itself. The old failure
+ * mode — an HR record and an account naming different departments, refused by a ConflictException on
+ * both link paths — becomes unreachable rather than caught.
+ */
+export class ProvisionEmployeeDto extends PersonRecordDto {}
 
 /**
  * Backlog A.2 — provision a user account WITH its initial role grants.
@@ -21,9 +35,50 @@ import {
  * roles it needs — role assignment is `user.manage`, never self-service.
  */
 export class ProvisionUserDto {
+  /**
+   * The display name — REQUIRED for an account with no person record, and REFUSED when `employee`
+   * is present.
+   *
+   * `User.fullName` stays a stored, NOT NULL column: an audit row holds a `userId` and nothing
+   * else, so the name has to be readable from the account itself years later, and an account need not
+   * have an employee at all (the external auditor). Stored does not mean typed twice — when a person
+   * record is being created here the name is COMPOSED from its four parts, and sending both would be
+   * two spellings of one person with nothing to say which is right.
+   */
+  @ValidateIf((o: ProvisionUserDto) => o.employee === undefined)
   @IsString()
   @Length(1, 200)
-  fullName!: string;
+  fullName?: string;
+
+  /**
+   * Create the person and the account in ONE request, in one transaction.
+   *
+   * Two calls from a browser was the shape this replaces: the second can fail, and then a person
+   * half-exists with no way for whoever pressed Save to tell which half. It also required the HR
+   * record to be created FIRST and named here by id, so the screen had a picker listing every
+   * employee — and the person being registered was, by definition, never in it.
+   *
+   * Requires `employee.create` IN ADDITION to the `user.manage` that gates this route. A Manager
+   * holds the first and not the second, which is a real state: a Manager registers people and cannot
+   * hand out logins.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProvisionEmployeeDto)
+  employee?: ProvisionEmployeeDto;
+
+  /**
+   * How this account authenticates — recorded, and only recorded.
+   *
+   * `DEFAULT` is a password held here. `WINDOWS` states that the office intends this account to be
+   * a domain login; nothing in the product reads it yet and a `WINDOWS` account still gets a
+   * password, because refusing one would lock the account out of a system with no directory
+   * integration. It is a column so that integration is a provider config hanging off an existing
+   * fact, rather than a migration of every account on the day it arrives.
+   */
+  @IsOptional()
+  @IsIn(['DEFAULT', 'WINDOWS'])
+  registrationType?: 'DEFAULT' | 'WINDOWS';
 
   @IsEmail()
   email!: string;
@@ -93,10 +148,16 @@ export class ProvisionUserDto {
   /**
    * The HR record this account belongs to, when one exists.
    *
-   * Optional and LINK-ONLY: an Employee cannot be created here, because
-   * creating one requires a national ID — Highly Confidential under Part 10.2
-   * — and a user-provisioning form is not where that should first be typed.
-   * HR creates the Employee; this names it.
+   * Optional and LINK-ONLY: it names an HR record that ALREADY EXISTS.
+   *
+   * To create the person here instead, send `employee` — the two are mutually exclusive and sending
+   * both is a 422. This comment used to argue that an Employee must never be created on this route,
+   * because a national ID is Highly Confidential under Part 10.2 and "a user-provisioning form is not
+   * where that should first be typed". The classification is unchanged and the field is still
+   * encrypted, masked and reveal-gated. What changed is the premise: the owner's form is no longer a
+   * user-provisioning form, it is a PERSON form that can also issue a login, so the national ID is
+   * typed exactly where it belongs — on the HR record — and this route is what writes both rows
+   * atomically.
    *
    * Linking is what makes `Employee.fullName` reachable as the display name.
    * Until an account is linked it falls back to the free-text `fullName`

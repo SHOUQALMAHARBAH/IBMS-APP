@@ -1,0 +1,12 @@
+{
+  "payable-requires-an-approver": {
+    "file": "apps/web/lib/endorsement/endorsement-api.ts",
+    "from": "  return refund.approvedByUserId !== null || !refund.needsApproval;",
+    "to": "  return refund.approvedByUserId !== null;"
+  },
+  "payable-ignores-already-paid": {
+    "file": "apps/web/lib/endorsement/endorsement-api.ts",
+    "from": "  if (refund.paidAt !== null) return false;",
+    "to": "  if (false) return false;"
+  }
+}

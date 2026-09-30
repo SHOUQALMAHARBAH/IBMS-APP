@@ -16,7 +16,12 @@ export class RoleRepository {
    * point of deriving the scoped set from the schema rather than a hand list.
    */
   findAll(): Promise<Role[]> {
-    return this.prisma.client.role.findMany({ orderBy: { name: 'asc' } });
+    // Deleted roles are excluded everywhere they could be OFFERED. The grant dropdown reads this,
+    // and offering a role the office deleted would let someone grant a row that grants nothing.
+    return this.prisma.client.role.findMany({
+      where: { deletedAt: null },
+      orderBy: { name: 'asc' },
+    });
   }
 
   /**
@@ -35,6 +40,10 @@ export class RoleRepository {
     (Role & { holderCount: number; permissionCount: number })[]
   > {
     const roles = await this.prisma.client.role.findMany({
+      // Retired roles stay — an office must be able to reactivate one. DELETED roles do not: delete
+      // is one-way, the row survives only to hold the history, and showing it would offer a
+      // reactivate control that the CHECK constraint refuses.
+      where: { deletedAt: null },
       orderBy: [{ status: 'asc' }, { name: 'asc' }],
       include: {
         _count: {
@@ -157,6 +166,53 @@ export class RoleRepository {
           })),
         });
       }
+    });
+  }
+
+  /**
+   * Delete a role: the office's view of it ends, and the record of who held it does not.
+   *
+   * A SOFT delete, and not by preference. `UserRoleAssignment.roleId` is ON DELETE RESTRICT
+   * (measured), so a hard delete fails the moment anyone holds the role — the only case that
+   * matters — and loosening that FK would trade the owner's decision for the mechanism: CASCADE
+   * destroys the history she asked to keep, SET NULL keeps rows that no longer name the role.
+   *
+   * Three writes, one transaction:
+   *
+   *  1. The `RolePermission` rows are DELETED. This is what makes the effect vanish structurally
+   *     rather than by filtering — there are fourteen Role/assignment read sites in these
+   *     repositories, and a design that needed all fourteen to remember `deletedAt` is the shape
+   *     that has bitten this codebase before. Nothing to resolve means nothing resolves.
+   *  2. Every live `UserRoleAssignment` is marked `revokedAt` — the history survives, still naming
+   *     the role, exactly as the owner decided. Rows already revoked keep their original timestamp;
+   *     overwriting them would rewrite when someone actually lost access.
+   *  3. The role is stamped `deletedAt` and forced INACTIVE (a CHECK constraint holds that pair, so
+   *     a deleted role can never be reactivated back into service).
+   *
+   * Returns what it removed, so the caller can write the codes into the audit row — deleting the
+   * grants means this is the last moment anything knows what the role could do.
+   */
+  async softDelete(
+    roleId: string,
+  ): Promise<{ permissionCodes: string[]; assignmentsRevoked: number }> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const grants = await tx.rolePermission.findMany({
+        where: { roleId },
+        select: { permission: { select: { code: true } } },
+      });
+      await tx.rolePermission.deleteMany({ where: { roleId } });
+      const revoked = await tx.userRoleAssignment.updateMany({
+        where: { roleId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.role.update({
+        where: { id: roleId },
+        data: { deletedAt: new Date(), status: 'INACTIVE' },
+      });
+      return {
+        permissionCodes: grants.map((g) => g.permission.code).sort(),
+        assignmentsRevoked: revoked.count,
+      };
     });
   }
 

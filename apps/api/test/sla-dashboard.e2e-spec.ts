@@ -44,6 +44,11 @@ interface SlaTimerRow {
   resolvedAt: string | null;
   overdueDays: number | null;
   ageDays: number;
+  slaStatus: string;
+  effectiveDueAt: string;
+  pausedAt: string | null;
+  pauseReason: string | null;
+  isRegulatory: boolean;
 }
 interface SlaWorkflowRow {
   workflowName: string;
@@ -132,6 +137,167 @@ describe('SLA Management dashboard (e2e) — backlog Part C #43', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
+  });
+
+  /*
+   * STOPPING A STATUTORY CLOCK, END TO END.
+   *
+   * `POST /sla/timers/:id/pause` and `/resume` had NO e2e coverage and no web
+   * caller (IMPROVEMENTS § 1.44): the only way to reach them was to construct
+   * the request by hand, and nothing proved they worked. Pausing a compliance
+   * deadline is close to the definition of an act that must be visible and
+   * audited, so this asserts the route, the refusal, the audit row AND what the
+   * dashboard then says about the row — because the dashboard was pause-blind,
+   * and a paused clock reported as BREACHED is a breach that did not happen.
+   */
+  it('pauses and resumes a timer, refuses a bare reason, and stops reporting a paused clock as breached', async () => {
+    const app = await boot();
+    const compliance = await makeUser(app, 'sp-comp', 'COMPLIANCE_OFFICER');
+    const sales = await makeUser(app, 'sp-sales', 'SALES_RELATIONSHIP_OFFICER');
+
+    const tag = Math.random().toString(36).slice(2, 10);
+    const ENTITY_TYPE = `SlaPauseE2E_${tag}`;
+    const WORKFLOW = `e2e_sla_pause_${tag}`;
+    const now = Date.now();
+
+    // Already past its deadline, so it reads `breached` before the pause. That
+    // is what makes the state change observable rather than a no-op.
+    const timer = await prisma.slaTimer.create({
+      data: {
+        entityType: ENTITY_TYPE,
+        entityId: 'e-pause',
+        workflowName: WORKFLOW,
+        dueAt: new Date(now - 4 * DAY),
+        createdAt: new Date(now - 20 * DAY),
+      },
+    });
+
+    const readRow = async (): Promise<SlaTimerRow> => {
+      const res = await request(app.getHttpServer())
+        .get(`/sla-dashboard/timers?entityType=${ENTITY_TYPE}`)
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const rows = res.body as SlaTimerRow[];
+      const row = rows.find((r) => r.id === timer.id);
+      if (!row) throw new Error(`timer ${timer.id} absent from the drill-down`);
+      return row;
+    };
+
+    const before = await readRow();
+    expect(before.state).toBe('breached');
+    expect(before.overdueDays).toBe(4);
+    expect(before.pausedAt).toBeNull();
+
+    // THE FLOOR IS SERVER-SIDE. Nine characters, not zero: a test that only
+    // sends nothing cannot tell a ten-character floor from a non-empty check.
+    await request(app.getHttpServer())
+      .post(`/sla/timers/${timer.id}/pause`)
+      .set(bearer(compliance.accessToken))
+      .send({ reason: 'Nine char' })
+      .expect(400);
+
+    // AND THE PERMISSION IS THE GATE, not the screen hiding the button. A Sales
+    // officer holds neither `sla.timer.pause` nor the dashboard view.
+    await request(app.getHttpServer())
+      .post(`/sla/timers/${timer.id}/pause`)
+      .set(bearer(sales.accessToken))
+      .send({ reason: 'Trying to stop a clock I may not stop' })
+      .expect(403);
+
+    const REASON = 'Awaiting the loss adjuster report the insurer asked for';
+    await request(app.getHttpServer())
+      .post(`/sla/timers/${timer.id}/pause`)
+      .set(bearer(compliance.accessToken))
+      .send({ reason: REASON })
+      .expect(201);
+
+    // Pausing twice is a 409, not a silent restart of the accumulator.
+    await request(app.getHttpServer())
+      .post(`/sla/timers/${timer.id}/pause`)
+      .set(bearer(compliance.accessToken))
+      .send({ reason: REASON })
+      .expect(409);
+
+    const paused = await readRow();
+    // THE ASSERTION THIS WHOLE PIECE EXISTS FOR: not `breached`.
+    expect(paused.state).toBe('paused');
+    expect(paused.slaStatus).toBe('PAUSED');
+    // And it is not charged overdue days for a deadline it has not passed.
+    expect(paused.overdueDays).toBeNull();
+    // The stated basis reaches the reader, which is the only thing that makes a
+    // mandatory reason worth collecting.
+    expect(paused.pauseReason).toBe(REASON);
+    expect(paused.pausedAt).not.toBeNull();
+
+    // The act is audited, carrying the reason.
+    const pauseAudit = await prisma.auditLogEntry.findMany({
+      where: { entityType: ENTITY_TYPE, entityId: 'e-pause' },
+    });
+    expect(pauseAudit.length).toBeGreaterThan(0);
+    const payloads = pauseAudit.map((a) => JSON.stringify(a.afterValue));
+    expect(payloads.some((p) => p.includes('SLA_PAUSED'))).toBe(true);
+    expect(payloads.some((p) => p.includes(REASON))).toBe(true);
+
+    // RESUME puts it back, and a second resume is a 409 rather than banking the
+    // same pause twice.
+    await request(app.getHttpServer())
+      .post(`/sla/timers/${timer.id}/resume`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/sla/timers/${timer.id}/resume`)
+      .set(bearer(compliance.accessToken))
+      .expect(409);
+
+    const resumed = await readRow();
+    expect(resumed.pausedAt).toBeNull();
+    expect(resumed.pauseReason).toBeNull();
+    // Breached again — the obligation really is late — but the deadline it is
+    // measured against has moved by the time the clock spent stopped, so
+    // `effectiveDueAt` is now later than the original `dueAt`.
+    expect(resumed.state).toBe('breached');
+    expect(new Date(resumed.effectiveDueAt).getTime()).toBeGreaterThanOrEqual(
+      new Date(resumed.dueAt).getTime(),
+    );
+  });
+
+  /*
+   * THE PERMANENT ONE, THROUGH HTTP. `resolved_late` never changes again and
+   * feeds `breachRate` forever, so a timer resolved inside the deadline it
+   * actually had must not be recorded late. Seeded with a banked pause rather
+   * than by pausing in real time, because a pause measured in milliseconds
+   * cannot move a day-grained figure.
+   */
+  it('does not report a timer resolved within its pause-adjusted deadline as late', async () => {
+    const app = await boot();
+    const compliance = await makeUser(app, 'sl-comp', 'COMPLIANCE_OFFICER');
+
+    const tag = Math.random().toString(36).slice(2, 10);
+    const ENTITY_TYPE = `SlaLateE2E_${tag}`;
+    const now = Date.now();
+
+    // Due 6 days ago, paused for 5 of them, resolved 2 days after the original
+    // deadline — so 3 days INSIDE the deadline it actually had.
+    const timer = await prisma.slaTimer.create({
+      data: {
+        entityType: ENTITY_TYPE,
+        entityId: 'e-late',
+        workflowName: `e2e_sla_late_${tag}`,
+        dueAt: new Date(now - 6 * DAY),
+        createdAt: new Date(now - 20 * DAY),
+        pausedTotalMs: 5 * DAY,
+        resolvedAt: new Date(now - 4 * DAY),
+      },
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(`/sla-dashboard/timers?state=resolved&entityType=${ENTITY_TYPE}`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const row = (res.body as SlaTimerRow[]).find((r) => r.id === timer.id);
+    expect(row).toBeDefined();
+    expect(row!.state).toBe('resolved_on_time');
+    expect(row!.overdueDays).toBeNull();
   });
 
   it('aggregates SlaTimer rows across states, gates on sla-dashboard.view, and filters the drill-down list', async () => {

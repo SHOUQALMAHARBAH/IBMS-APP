@@ -55,7 +55,7 @@ test("a user without the permission sees a friendly message", async ({ page }) =
 
   await page.goto("/information-assets");
   await expect(
-    page.getByText("information-asset.manage permission", { exact: false }),
+    page.getByText("(information-asset.manage)", { exact: false }),
   ).toBeVisible();
 });
 

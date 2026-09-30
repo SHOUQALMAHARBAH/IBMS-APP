@@ -1,4 +1,5 @@
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPatch, apiPost } from '../auth/api-client';
+import type { PersonInput } from '../supporting-operations/employee-api';
 
 // Backlog A.2 — user provisioning and role assignment. `POST /auth/signup`
 // creates an account with NO roles (and therefore no permissions); every real
@@ -23,6 +24,12 @@ export interface RoleCatalogueEntry {
   nameEn: string;
   nameAr: string;
   description: string | null;
+  /**
+   * The endpoint has always returned this and this type has always dropped it, which is why the
+   * grant dropdown offered RETIRED roles. A retired role grants nothing — `findCodesForRoles`
+   * filters on `role.status = 'ACTIVE'` — so granting one hands someone a row that does nothing.
+   */
+  status: 'ACTIVE' | 'INACTIVE';
 }
 
 export function listRoles(): Promise<RoleCatalogueEntry[]> {
@@ -59,7 +66,10 @@ export interface OrgUnit {
 }
 
 export interface ProvisionUserInput {
-  fullName: string;
+  /** Required for an account with NO person, and REFUSED when `employee` is present: with a person
+   *  the display name is composed from the four name parts, and two spellings of one person leave
+   *  nothing to say which is right. */
+  fullName?: string;
   email: string;
   password: string;
   languagePreference?: 'AR' | 'EN';
@@ -76,6 +86,16 @@ export interface ProvisionUserInput {
   /** Role IDS. A name is unique only within an office and an office can edit it,
    *  so it is not an identity — see the API's `RoleAssignmentDto`. */
   roleIds: string[];
+  /**
+   * Create the person and the account in ONE request, in one transaction.
+   *
+   * The alternative was two calls from the browser, where the second can fail and leave a person who
+   * half exists with nothing on screen to say which half. Requires `employee.create` in addition to
+   * the `user.manage` this route is gated on — a Manager holds the first and not the second.
+   */
+  employee?: PersonInput;
+  /** Recorded only; no authentication path reads it yet. */
+  registrationType?: 'DEFAULT' | 'WINDOWS';
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window. */
   accessValidFrom?: string;
   accessValidUntil?: string;
@@ -140,4 +160,33 @@ export function setUserActive(
   return apiPost(
     `/admin/users/${encodeURIComponent(userId)}/${isActive ? 'activate' : 'deactivate'}`,
   );
+}
+
+/**
+ * Rename and retire, the other half of the four-action scheme.
+ *
+ * `.update` and `.deactivate` are separate codes from `.create`, so a role can be given one without
+ * the others — which is the whole reason these are four codes rather than one `.manage`.
+ */
+export function renameDepartment(
+  id: string,
+  input: { name?: string; nameAr?: string },
+): Promise<OrgUnit> {
+  return apiPatch(`/admin/departments/${encodeURIComponent(id)}`, input);
+}
+
+export function renameBranch(
+  id: string,
+  input: { name?: string; nameAr?: string },
+): Promise<OrgUnit> {
+  return apiPatch(`/admin/branches/${encodeURIComponent(id)}`, input);
+}
+
+/** Retires the unit. Existing assignments keep pointing at it; it stops being offered. */
+export function deactivateDepartment(id: string): Promise<OrgUnit> {
+  return apiPost(`/admin/departments/${encodeURIComponent(id)}/deactivate`, {});
+}
+
+export function deactivateBranch(id: string): Promise<OrgUnit> {
+  return apiPost(`/admin/branches/${encodeURIComponent(id)}/deactivate`, {});
 }

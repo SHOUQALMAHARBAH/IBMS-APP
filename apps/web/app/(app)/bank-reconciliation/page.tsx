@@ -17,6 +17,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 const cellStyle: CSSProperties = {
@@ -74,7 +75,7 @@ export default function BankReconciliationPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('brNoPermission')
+          ? permissionRefusal(t, 'brRefusalAct', 'reconciliation-exception.investigate')
           : err instanceof ApiError
             ? err.message
             : t('brLoadError'),
@@ -137,7 +138,13 @@ export default function BankReconciliationPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
           >
-            Statement lines &mdash; one <code>invoiceId, amount</code> per line
+            {/*
+              The `<code>` span stays in JSX and the prose is split around it: markup inside a translated
+              string becomes escaped text, and the Arabic word order around a code span is not the
+              English one.
+            */}
+            {t('brStatementLinesHintBefore')}{' '}
+            <code>invoiceId, amount</code> {t('brStatementLinesHintAfter')}
             <textarea
               aria-label={t('brStatementLinesLabel')}
               value={statement}
@@ -232,7 +239,7 @@ export default function BankReconciliationPage() {
                             </button>
                           ) : null}
                           <input
-                            aria-label={t('brResolutionNoteRowAria', { id: r.id })}
+                            aria-label={t('brResolutionNoteRowAria')}
                             placeholder={t('brResolutionNoteAria')}
                             value={notes[r.id] ?? ''}
                             onChange={(e) =>
@@ -240,7 +247,7 @@ export default function BankReconciliationPage() {
                             }
                           />
                           <select
-                            aria-label={t('brResumeInvoiceRowAria', { id: r.id })}
+                            aria-label={t('brResumeInvoiceRowAria')}
                             value={resumes[r.id] ?? ''}
                             onChange={(e) =>
                               setResumes((s) => ({

@@ -84,7 +84,7 @@ test("a user without the permission sees a friendly message", async ({
   await page.getByLabel("Insurer ID").fill("insurer-1");
   await page.getByRole("button", { name: "View performance" }).click();
   await expect(
-    page.getByText("insurer-performance.view permission", { exact: false }),
+    page.getByText("(insurer-performance.view)", { exact: false }),
   ).toBeVisible();
 });
 

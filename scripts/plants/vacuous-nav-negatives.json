@@ -1,0 +1,18 @@
+{
+  "every-role-holds-every-permission": {
+    "file": "apps/web/e2e/fixtures/role-permissions.ts",
+    "from": "  const set = new Set<string>();\n  for (const role of roles) {\n    for (const code of ROLE_PERMISSIONS[role] ?? []) set.add(code);\n  }\n  return [...set].sort();",
+    "to": "  const set = new Set<string>();\n  for (const c of PERMISSION_CATALOGUE) set.add(c.code);\n  void roles;\n  return [...set].sort();"
+  },
+  "launcher-ignores-permissions": {
+    "file": "apps/web/app/(app)/page.tsx",
+    "from": "    items: group.items.filter((d) => canReach(user, d)),",
+    "to": "    items: group.items,"
+  },
+  "policies-reverts-to-the-vacuous-spelling": {
+    "file": "apps/web/e2e/policies.spec.ts",
+    "from": "    primary.locator('a[href=\"/policies\"]'),",
+    "to": "    primary.getByRole('link', { name: 'Policies' }),",
+    "why": "The nav-absence assertion goes back to matching by accessible ROLE. A nav group is a <details> that collapses by default, so its links are outside the accessibility tree and `getByRole` returns zero whether the DPO is denied `policy.read` or handed it — the assertion can never fail. With every role holding every permission in the fixture, the href spelling dies and the role spelling passes, which is what proves the difference. REPOINTED: the original anchor spanned five lines in DOUBLE quotes and this file uses single, so it broke on quote style."
+  }
+}

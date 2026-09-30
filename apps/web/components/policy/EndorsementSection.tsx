@@ -1,11 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   advanceEndorsement,
   applyEndorsement,
   approveEndorsementRefund,
+  disburseRefund,
+  refundIsPayable,
   calculateEndorsementAdjustment,
   listEndorsementsForPolicy,
   notifyEndorsementClient,
@@ -26,6 +29,10 @@ import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
 import type { TranslationKey } from '../../lib/i18n/translations';
+import {
+  DiscardControl,
+  DiscardedNotice,
+} from '../ui/DiscardControl';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 
@@ -35,6 +42,26 @@ interface Props {
   canManage: boolean;
   /** Manager — approve a return-premium refund above the value threshold. */
   canApproveRefund: boolean;
+  /** Finance — pay an approved refund. `refund.disburse`. */
+  canDisburseRefund: boolean;
+  /**
+   * Part 4 — the office's declared mode, from `/auth/me`, and the caller's own id.
+   *
+   * Both are needed to decide whether to ASK for a combined-duty reason: the field appears only when this
+   * office has declared COMBINED and the person approving is the person who raised it. Asking everybody would
+   * be noise on every ordinary approval; asking nobody is a 422 with nowhere to type, which is the wall the
+   * mode screen must not open onto.
+   */
+  dutySegregationMode: 'SEGREGATED' | 'COMBINED';
+  currentUserId: string;
+  /**
+   * `endorsement.discard` — its own code, deliberately not implied by `canManage`.
+   *
+   * This is the control the discard feature exists for: before it, the only exit from a wrongly raised
+   * endorsement was to APPLY it, changing a real policy, its premium and its commission, and then correct it
+   * with a second endorsement.
+   */
+  canDiscard: boolean;
 }
 
 /** The one action each endorsement status offers, given the caller's role. */
@@ -42,7 +69,10 @@ function nextAction(
   e: Endorsement,
   canManage: boolean,
   canApproveRefund: boolean,
+  canDisburseRefund: boolean,
   t: (key: TranslationKey) => string,
+  /** Part 4 — sent only on the refund approval, and only when the screen asked for it. */
+  combinedDutyReason?: string,
 ):
   | { label: string; run: () => Promise<unknown> }
   | null {
@@ -68,14 +98,33 @@ function nextAction(
       return canApproveRefund && refundId
         ? {
             label: t('endorsementApproveRefundButton'),
-            run: () => approveEndorsementRefund(refundId),
+            run: () => approveEndorsementRefund(refundId, combinedDutyReason),
           }
         : null;
     }
-    case 'APPLIED':
+    case 'APPLIED': {
+      // PAY THE APPROVED REFUND — IMPROVEMENTS § 1.44's first closure.
+      //
+      // `POST /refunds/:id/disburse` had no web caller at all, so money left the office through a route
+      // nothing could invoke and an approved refund could not be paid from the application. It takes
+      // precedence over "notify the client" here because an unpaid refund is money the office still holds
+      // and the client is owed.
+      //
+      // Offered only when there is something to pay: a refund that exists, is approved (or was cleared
+      // below the threshold, where `approvedByUserId` stays null and `needsApproval` is false), and has not
+      // been paid. `paidAt` is what stops the button reappearing after a payment; the service refuses a
+      // second attempt regardless, because a status-conditional write is the real guard.
+      if (canDisburseRefund && refundIsPayable(e.refund)) {
+        const refundId = e.refund.id;
+        return {
+          label: t('endorsementDisburseRefundButton'),
+          run: () => disburseRefund(refundId),
+        };
+      }
       return canManage
         ? { label: t('endorsementNotifyButton'), run: () => notifyEndorsementClient(e.id) }
         : null;
+    }
     default:
       return null;
   }
@@ -85,6 +134,10 @@ export function EndorsementSection({
   opportunityId,
   canManage,
   canApproveRefund,
+  canDisburseRefund,
+  canDiscard,
+  dutySegregationMode,
+  currentUserId,
 }: Props) {
   const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
@@ -99,6 +152,11 @@ export function EndorsementSection({
     useState<EndorsementChangeType>('sum_insured_increase');
   const [premiumAmount, setPremiumAmount] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState('');
+
+  // Part 4 — the combined-duty reason, per refund. Keyed by refund id so two rows cannot share one box.
+  const [combinedDutyReasons, setCombinedDutyReasons] = useState<
+    Record<string, string>
+  >({});
 
   // Cancellation form.
   const [cancelReason, setCancelReason] = useState('');
@@ -173,7 +231,28 @@ export function EndorsementSection({
         <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('endorsementNoneYet')}</p>
       ) : (
         rows.map((e) => {
-          const action = nextAction(e, canManage, canApproveRefund, t);
+          // Part 4 — one person approving their own refund in a COMBINED office has to say why, and the
+          // field below is where. `selfApproving` is the whole condition: an ordinary approval by a second
+          // person sends nothing and is unchanged.
+          const selfApproving =
+            e.refund != null &&
+            e.refund.approvedByUserId === null &&
+            e.refund.raisedByUserId === currentUserId;
+          const needsDeclaration =
+            dutySegregationMode === 'COMBINED' && selfApproving;
+          const declaration = e.refund
+            ? (combinedDutyReasons[e.refund.id] ?? '')
+            : '';
+          const action = nextAction(
+            e,
+            canManage,
+            canApproveRefund,
+            canDisburseRefund,
+            t,
+            needsDeclaration ? declaration : undefined,
+          );
+          const declarationTooShort =
+            needsDeclaration && declaration.trim().length < 10;
           return (
             <div key={e.id} style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
               <div
@@ -201,6 +280,14 @@ export function EndorsementSection({
                   {formatMoney(e.cancellation.returnPremium, language)}
                 </p>
               ) : null}
+              {/* The SHARED renderer. This was four inline lines here, and it is now one component
+                  because there are fifteen maker/checker pairs and fifteen copies is fifteen chances
+                  for one of them to say less than the others. It renders nothing when there is no
+                  act, which is every ordinary two-person approval. */}
+              <CombinedDutyOnRecord
+                act={e.refund?.combinedDutyAct}
+                testId={`combined-duty-${e.refund?.id ?? 'none'}`}
+              />
               {e.refund ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
                   {t('endorsementRefundLabel')} {formatMoney(e.refund.amount, language)} ·{' '}
@@ -216,16 +303,63 @@ export function EndorsementSection({
                   ? t('endorsementNewVersionOpened')
                   : t('endorsementNoVersionYet')}
               </p>
-              {action ? (
+              <DiscardedNotice discard={e.discard} />
+              {needsDeclaration && e.refund ? (
+                <div style={{ margin: '0.5rem 0', maxWidth: '32rem' }}>
+                  <label htmlFor={`cd-reason-${e.refund.id}`}>
+                    {t('combinedDutyReasonLabel')}
+                  </label>
+                  <textarea
+                    id={`cd-reason-${e.refund.id}`}
+                    data-testid={`combined-duty-reason-${e.refund.id}`}
+                    value={declaration}
+                    rows={2}
+                    onChange={(ev) => {
+                      const refundId = e.refund?.id;
+                      if (!refundId) return;
+                      setCombinedDutyReasons((prev) => ({
+                        ...prev,
+                        [refundId]: ev.target.value,
+                      }));
+                    }}
+                    style={{ width: '100%', marginTop: '0.25rem' }}
+                  />
+                  <p
+                    style={{
+                      color: 'var(--ink-secondary)',
+                      fontSize: '0.8rem',
+                      margin: '0.2rem 0',
+                    }}
+                  >
+                    {t('combinedDutyReasonHint')}
+                  </p>
+                </div>
+              ) : null}
+              {action && !e.discard ? (
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || declarationTooShort}
                   style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
                   onClick={() => void run(action.run)}
                 >
                   {busy ? t('endorsementWorkingButton') : action.label}
                 </button>
               ) : null}
+              <DiscardControl
+                collection="endorsements"
+                id={e.id}
+                canDiscard={canDiscard}
+                // Everything up to APPLIED, matching `discard.config.ts`. SUBMITTED_TO_INSURER is
+                // deliberately still discardable: the insurer has been told, which a discard cannot retract,
+                // so whoever withdraws it has to tell them — and the mandatory reason is where that is
+                // recorded. Refusing here instead would leave applying it as the only exit, which is the trap.
+                discardable={
+                  !e.discard &&
+                  e.status !== 'APPLIED' &&
+                  e.status !== 'CLIENT_NOTIFIED'
+                }
+                onDiscarded={load}
+              />
             </div>
           );
         })

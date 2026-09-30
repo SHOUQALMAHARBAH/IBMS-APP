@@ -1,0 +1,17 @@
+{
+  "dto-accepts-a-screening-identifier": {
+    "file": "apps/api/src/modules/customer/dto/update-customer-contact.dto.ts",
+    "from": "  /** Corporate customers only — the service refuses it on an individual. */",
+    "to": "  @IsOptional()\n  @IsString()\n  @Length(1, 200)\n  givenName?: string;\n\n  /** Corporate customers only — the service refuses it on an individual. */"
+  },
+  "empty-correction-reported-as-done": {
+    "file": "apps/api/src/modules/customer/customer.service.ts",
+    "from": "    if (changed.length === 0) {",
+    "to": "    if (false) {"
+  },
+  "address-accepted-on-an-individual": {
+    "file": "apps/api/src/modules/customer/customer.service.ts",
+    "from": "      customer.customerType !== 'CORPORATE'\n    ) {",
+    "to": "      false\n    ) {"
+  }
+}

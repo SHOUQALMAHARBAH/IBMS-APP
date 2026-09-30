@@ -10,7 +10,7 @@ export const COMPLIANCE_SCREENING = {
   AR: {
     smLoading: 'جارٍ التحميل…',
     slapLoading: 'جارٍ التحميل…',
-    smYouDonTHoldThe: 'لا تملك صلاحية sanctions-pep.screen.',
+    smRefusalAct: 'عرض قائمة مراجعة العقوبات',
     smCouldNotLoadTheMatch: 'تعذّر تحميل قائمة المطابقات — حاول مرة أخرى.',
     smRecordingThatDecisionFailedTry: 'فشل تسجيل القرار — حاول مرة أخرى.',
     smSanctionsMatchReview: 'مطابقات العقوبات للمراجعة',
@@ -32,15 +32,81 @@ export const COMPLIANCE_SCREENING = {
     smReasonForTheDecisionMin: 'سبب القرار (١٠ أحرف على الأقل)',
     smClearFalsePositive: 'مطابقة خاطئة',
     smConfirmMatch: 'تأكيد المطابقة',
+    smCaseColumn: 'حالة الملف',
+    smCaseOpen: 'مفتوح — لم يُسنَد',
+    smCaseAssigned: 'مُسنَد',
+    smCaseUnderReview: 'قيد المراجعة',
+    smCaseEscalated: 'مُصعَّد',
+    smCaseClosed: 'مُغلق',
+    smCaseAssignee: 'المراجع',
+    smCaseUnknownReviewer: 'مُسنَد إلى شخص لم يبقَ مؤهلاً للمراجعة — أعِد الإسناد',
+    smCaseReviewerLabel: 'اختر مراجعاً',
+    smCaseAssign: 'إسناد',
+    smCaseReassign: 'إعادة الإسناد',
+    smCaseStartReview: 'بدء المراجعة',
+    smCaseEscalate: 'تصعيد',
+    smCaseEscalateReason: 'سبب التصعيد (١٠ أحرف على الأقل)',
+    smCaseNotes: 'ملاحظات العمل',
+    smCaseAddNote: 'إضافة ملاحظة',
+    smCaseNotePlaceholder:
+      'ما الذي تحقّقت منه، وبأي مُعرِّفات، وما النتيجة. هذا هو السجل الذي تطلبه ' +
+      'الجهة الرقابية: «يجب على الجهة الاحتفاظ بآلية التحقق والإجراءات المتخذة ' +
+      'بشأن الحالة في سجلاتها الداخلية».',
+    smCaseShowNotes: 'عرض الملاحظات',
+    smCaseHideNotes: 'إخفاء الملاحظات',
+    smCaseNoNotes: 'لا ملاحظات بعد.',
+    smCaseDecideAfterReview:
+      'أسنِد الملف وابدأ المراجعة قبل تسجيل القرار — قرار على ملف لم يفتحه أحد ليس مراجعة.',
+    smCaseActionFailed: 'تعذّر تنفيذ الإجراء على الملف — حاول مرة أخرى.',
+    smCaseNoReviewers:
+      'لا يوجد مستخدم نشط يملك صلاحية sanctions-pep.screen غيرك، فلا أحد يمكن الإسناد إليه.',
     smComplianceOfficerOnly: 'مسؤول الامتثال فقط',
     smReviewReasonAria: 'سبب المراجعة لـ {name}',
-    slapYouDonTHoldThe: 'لا تملك صلاحية sla.policy.read.',
+    slapRefusalAct: 'عرض سياسات مستويات الخدمة',
     slapCouldNotLoadSlaPolicies: 'تعذّر تحميل سياسات مستوى الخدمة — حاول مرة أخرى.',
     slapThatActionFailedTryAgain: 'فشل تنفيذ الإجراء — حاول مرة أخرى.',
     slapSlaPolicies: 'سياسات مستوى الخدمة',
     slapEveryDeadlineInTheSystem:
       'كل مهلة زمنية في النظام قابلة للتهيئة من هنا دون تغيير في الشيفرة. الأهم: يوضّح هذا الجدول مصدر كل مهلة — «تنظيمي» يعني أنّ هناك نصاً قانونياً يوجبها ويُذكر مرجعه، وأي تصنيف آخر يعني أنّها هدف داخلي وليست إلزاماً قانونياً.',
     slapNoPolicies: 'لا توجد سياسات.',
+    slapHolidaysHeading: 'أيام العطل الرسمية',
+    slapHolidaysIntro:
+      'كل مهلة محسوبة بأيام العمل تُحتسب مقابل هذا التقويم. الأيام المدرجة هنا ' +
+      'لا تُحتسب ضمن المدة.',
+    slapHolidaysEmptyWarning:
+      'التقويم فارغ. كل مهلة محسوبة بأيام العمل تُحسب حالياً كأن الجمعة هي يوم ' +
+      'العمل المعطَّل الوحيد في السنة — فتأتي المواعيد أبكر من حقيقتها، ويُسجَّل ' +
+      'التجاوز قبل وقوعه، ويُسجَّل الإنجاز الواقع داخل المدة الحقيقية متأخراً. ' +
+      'أرقام الالتزام الحالية تُظهر تأخراً أكبر من الواقع — في غير مصلحة الشركة. ' +
+      'أدخل الأيام المعتمدة رسمياً.',
+    slapHolidayDate: 'التاريخ',
+    slapHolidayName: 'المناسبة',
+    slapHolidayCalendar: 'التقويم',
+    slapHolidayAllCalendars: 'كل التقاويم',
+    slapHolidayAdd: 'إضافة يوم عطلة',
+    slapHolidayAddError: 'تعذّر إضافة يوم العطلة — حاول مرة أخرى.',
+    slapHolidayLoadError: 'تعذّر تحميل تقويم العطل — حاول مرة أخرى.',
+    slapHolidayCanAct: 'الاطلاع على أيام العطل التي تُحسب المهل مقابلها',
+    slapHolidayCannotAct: 'إدخال يوم عطلة',
+    slapHolidayLoading: 'جارٍ تحميل التقويم…',
+    slapHolidayYear: 'السنة',
+    slapHolidayYearOwes: 'ما زالت هذه السنة تنقصها أيام',
+    slapHolidayFixedMissing: 'العطل ثابتة التاريخ غير المُدخلة',
+    slapHolidayAddFixed: 'أضِف العطل الثابتة لهذه السنة',
+    slapHolidayFixedNote:
+      'أربع عطل تتكرر في التاريخ نفسه كل سنة: رأس السنة الميلادية (١ كانون الثاني)، ' +
+      'عيد العمال (١ أيار)، عيد الاستقلال (٢٥ أيار)، عيد الميلاد المجيد (٢٥ كانون الأول).',
+    slapHolidayMovingHeading: 'المناسبات الإسلامية — تُدخل حسب الإعلان الرسمي',
+    slapHolidayMovingNote:
+      'تواريخ هذه المناسبات تُحدَّد بإعلان رسمي في الأردن وقد تختلف بيوم عن أي تحويل ' +
+      'تقويمي، لذلك لا يحسبها النظام. أدخل تاريخ أول يوم من الإعلان، ويتولى النظام ' +
+      'باقي الأيام بعدد أيام المناسبة.',
+    slapHolidayOccasion: 'المناسبة',
+    slapHolidayStartDate: 'تاريخ أول يوم',
+    slapHolidayAddOccasion: 'إدخال المناسبة',
+    slapHolidayDays: 'أيام',
+    slapHolidayYearComplete: 'هذه السنة مكتملة — كل العطل المعروفة مُدخلة.',
+    slapHolidayOccasionError: 'تعذّر إدخال المناسبة — حاول مرة أخرى.',
     slapProcess: 'العملية',
     slapDuration: 'المهلة',
     slapSource: 'المصدر',
@@ -48,15 +114,44 @@ export const COMPLIANCE_SCREENING = {
     slapStatus: 'الحالة',
     slapAction: 'إجراء',
     slapNotALegalRequirement: 'ليست إلزاماً قانونياً',
+    // Defining a new SLA policy. The REGULATORY wording is the load-bearing part: it must say
+    // that the choice claims LEGAL force, because recording an internal target as a legal
+    // requirement is the failure `sourceType` exists to prevent.
+    slapCreateOpen: 'تعريف سياسة مدة جديدة',
+    slapCreateLegend: 'سياسة مدة جديدة',
+    slapCreateCode: 'رمز السياسة',
+    slapCreateCodeHint:
+      'من 3 إلى 64 خانة: أحرف إنجليزية كبيرة وأرقام وشرطات، مثل SLA-DSR-ACCESS. ' +
+      'يُقتبس في مستندات الحوكمة، فلا يتغير عند تغيّر المدة.',
+    slapCreateName: 'اسم السياسة',
+    slapCreateProcess: 'العملية',
+    slapCreateWorkflowState: 'حالة سير العمل (اتركها فارغة لتشمل العملية كاملة)',
+    slapCreateDescription: 'الوصف',
+    slapCreateDuration: 'المدة',
+    slapCreateUnit: 'الوحدة',
+    slapCreateCalendar: 'التقويم',
+    slapCreateSourceType: 'مصدر الإلزام',
+    slapRegulatoryCanAct: 'إنشاء هذه السياسة',
+    slapRegulatoryCannotAct: 'تسجيلها كمطلوبة بحكم التنظيم',
+    slapCreateRegulatoryWarning:
+      'تسجيل السياسة كإلزام قانوني يقتضي تسمية النص الذي يفرضها. المرجع والمستند مطلوبان.',
+    slapCreateSourceReference: 'المرجع',
+    slapCreateSourceDocument: 'المستند',
+    slapCreateSourceSection: 'البند',
+    slapCreateBornDraft:
+      'تُنشأ السياسة كمسودة. التفعيل قرار منفصل ومسجَّل، فلا تسري المدة قبله.',
+    slapCreateSave: 'حفظ السياسة',
+    slapCreateCancel: 'إلغاء الإدخال',
+    slapCreateFailed: 'تعذر إنشاء السياسة.',
     slap247: 'على مدار الساعة',
     slapCustom: 'مخصّص',
     slapJordanWorkingDays: 'أيام العمل (الأردن)',
     slapSave: 'حفظ',
-    slapDeactivate: 'إيقاف',
+    slapDeactivate: 'تعطيل',
     slapActivate: 'تفعيل',
     slapReadOnly: 'للاطلاع فقط',
     slapDurationAria: 'المدة لـ {name}',
-    shYouDonTHoldThe: 'لا تملك صلاحية sanctions-pep.screen.',
+    shRefusalAct: 'عرض تقرير سلامة الفحص',
     shCouldNotLoadScreeningHealth: 'تعذّر تحميل حالة الفحص — حاول مرة أخرى.',
     shScreeningHealth: 'حالة فحص العقوبات',
     shWhichProviderActuallyPerformsScreening:
@@ -136,7 +231,7 @@ export const COMPLIANCE_SCREENING = {
   EN: {
     smLoading: 'Loading…',
     slapLoading: 'Loading…',
-    smYouDonTHoldThe: 'You don\'t hold the sanctions-pep.screen permission.',
+    smRefusalAct: 'view the sanctions review queue',
     smCouldNotLoadTheMatch: 'Could not load the match queue — try again.',
     smRecordingThatDecisionFailedTry: 'Recording that decision failed — try again.',
     smSanctionsMatchReview: 'Sanctions match review',
@@ -158,15 +253,84 @@ export const COMPLIANCE_SCREENING = {
     smReasonForTheDecisionMin: 'Reason for the decision (min. 10 characters)',
     smClearFalsePositive: 'Clear (false positive)',
     smConfirmMatch: 'Confirm match',
+    smCaseColumn: 'Case',
+    smCaseOpen: 'Open — nobody assigned',
+    smCaseAssigned: 'Assigned',
+    smCaseUnderReview: 'Under review',
+    smCaseEscalated: 'Escalated',
+    smCaseClosed: 'Closed',
+    smCaseAssignee: 'Reviewer',
+    smCaseUnknownReviewer:
+      'Assigned to somebody who is no longer an eligible reviewer — re-assign it',
+    smCaseReviewerLabel: 'Choose a reviewer',
+    smCaseAssign: 'Assign',
+    smCaseReassign: 'Re-assign',
+    smCaseStartReview: 'Start review',
+    smCaseEscalate: 'Escalate',
+    smCaseEscalateReason: 'Reason for escalating (min. 10 characters)',
+    smCaseNotes: 'Working notes',
+    smCaseAddNote: 'Add note',
+    smCaseNotePlaceholder:
+      'What you checked, against which identifiers, and what it showed. This is ' +
+      'the record the regulator asks for: "the entity must keep the verification ' +
+      'mechanism and actions taken regarding the case in internal records."',
+    smCaseShowNotes: 'Show notes',
+    smCaseHideNotes: 'Hide notes',
+    smCaseNoNotes: 'No notes yet.',
+    smCaseDecideAfterReview:
+      'Assign the case and start the review before recording a decision — a decision on a case nobody picked up is not a review.',
+    smCaseActionFailed: 'That case action failed — try again.',
+    smCaseNoReviewers:
+      'No active user other than you holds sanctions-pep.screen, so there is nobody to assign to.',
     smComplianceOfficerOnly: 'Compliance Officer only',
     smReviewReasonAria: 'Review reason for {name}',
-    slapYouDonTHoldThe: 'You don\'t hold the sla.policy.read permission.',
+    slapRefusalAct: 'view the service level policies',
     slapCouldNotLoadSlaPolicies: 'Could not load SLA policies — try again.',
     slapThatActionFailedTryAgain: 'That action failed — try again.',
     slapSlaPolicies: 'SLA policies',
     slapEveryDeadlineInTheSystem:
       'Every deadline in the system is configured here, with no code change. More importantly, this table states where each deadline COMES FROM: “Regulatory” means an instrument requires it and names that instrument; any other classification means it is an internal target, not a legal obligation.',
     slapNoPolicies: 'No policies.',
+    slapHolidaysHeading: 'Non-working days',
+    slapHolidaysIntro:
+      'Every deadline measured in business days is counted against this calendar. ' +
+      'A day listed here does not consume any of the allowance.',
+    slapHolidaysEmptyWarning:
+      'The calendar is EMPTY. Every business-day deadline is currently computed as ' +
+      'though Fridays were the only non-working days of the year, so deadlines land ' +
+      'earlier than they really fall, a breach is reported before it happens, and ' +
+      'work finished inside the true window is recorded late. The compliance figures ' +
+      'currently overstate lateness — against this brokerage. Enter the officially ' +
+      'observed days.',
+    slapHolidayDate: 'Date',
+    slapHolidayName: 'Occasion',
+    slapHolidayCalendar: 'Calendar',
+    slapHolidayAllCalendars: 'All calendars',
+    slapHolidayAdd: 'Add non-working day',
+    slapHolidayAddError: 'Could not add that day — try again.',
+    slapHolidayLoadError: 'Could not load the calendar — try again.',
+    slapHolidayCanAct: 'see the non-working days a deadline is counted against',
+    slapHolidayCannotAct: 'enter one',
+    slapHolidayLoading: 'Loading the calendar…',
+    slapHolidayYear: 'Year',
+    slapHolidayYearOwes: 'This year is still missing days',
+    slapHolidayFixedMissing: 'Fixed-date holidays not yet entered',
+    slapHolidayAddFixed: 'Add the fixed holidays for this year',
+    slapHolidayFixedNote:
+      'Four holidays fall on the same date every year: New Year\'s Day (1 Jan), Labour ' +
+      'Day (1 May), Independence Day (25 May), Christmas (25 Dec).',
+    slapHolidayMovingHeading: 'Islamic occasions — entered from the official announcement',
+    slapHolidayMovingNote:
+      'These dates are set by official announcement in Jordan and can differ by a day ' +
+      'from any calendar conversion, so the system does not compute them. Enter the ' +
+      'first day from the announcement and the system fills the rest, using the number ' +
+      'of days the occasion runs.',
+    slapHolidayOccasion: 'Occasion',
+    slapHolidayStartDate: 'First day',
+    slapHolidayAddOccasion: 'Enter the occasion',
+    slapHolidayDays: 'days',
+    slapHolidayYearComplete: 'This year is complete — every known holiday is entered.',
+    slapHolidayOccasionError: 'Could not enter that occasion — try again.',
     slapProcess: 'Process',
     slapDuration: 'Duration',
     slapSource: 'Source',
@@ -174,6 +338,33 @@ export const COMPLIANCE_SCREENING = {
     slapStatus: 'Status',
     slapAction: 'Action',
     slapNotALegalRequirement: 'Not a legal requirement',
+    // Defining a new SLA policy.
+    slapCreateOpen: 'Define a new SLA policy',
+    slapCreateLegend: 'New SLA policy',
+    slapCreateCode: 'Policy code',
+    slapCreateCodeHint:
+      '3 to 64 characters of upper-case letters, digits and hyphens, e.g. SLA-DSR-ACCESS. ' +
+      'It is quoted in governance documents, so it does not change when the duration does.',
+    slapCreateName: 'Policy name',
+    slapCreateProcess: 'Process',
+    slapCreateWorkflowState: 'Workflow state (leave empty for the whole process)',
+    slapCreateDescription: 'Description',
+    slapCreateDuration: 'Duration',
+    slapCreateUnit: 'Unit',
+    slapCreateCalendar: 'Calendar',
+    slapCreateSourceType: 'Where this SLA comes from',
+    slapRegulatoryCanAct: 'create this policy',
+    slapRegulatoryCannotAct: 'record it as required by regulation',
+    slapCreateRegulatoryWarning:
+      'Recording this as a legal requirement means naming the instrument that imposes it. The reference and the document are both required.',
+    slapCreateSourceReference: 'Reference',
+    slapCreateSourceDocument: 'Document',
+    slapCreateSourceSection: 'Section',
+    slapCreateBornDraft:
+      'A new policy is created as a DRAFT. Activation is its own recorded decision, so the duration does not apply until then.',
+    slapCreateSave: 'Save the policy',
+    slapCreateCancel: 'Cancel',
+    slapCreateFailed: 'Could not create the policy.',
     slap247: '24/7',
     slapCustom: 'Custom',
     slapJordanWorkingDays: 'Jordan working days',
@@ -182,7 +373,7 @@ export const COMPLIANCE_SCREENING = {
     slapActivate: 'Activate',
     slapReadOnly: 'Read only',
     slapDurationAria: 'Duration for {name}',
-    shYouDonTHoldThe: 'You don\'t hold the sanctions-pep.screen permission.',
+    shRefusalAct: 'view the screening health report',
     shCouldNotLoadScreeningHealth: 'Could not load screening health — try again.',
     shScreeningHealth: 'Screening health',
     shWhichProviderActuallyPerformsScreening:
@@ -215,7 +406,7 @@ export const COMPLIANCE_SCREENING = {
       'These thresholds are configurable and represent the broker’s own risk appetite. They are not a regulatory rule.',
     shHigh: 'High',
     shReview: 'Review',
-    shDiscardBelow: 'Discard below',
+    shDiscardBelow: 'Ignore below',
     shSendIdentifiersToProvider: 'Send identifiers to provider',
     shYes: 'Yes',
     shNo: 'No',

@@ -1,11 +1,23 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SlaTimerService } from './sla-timer.service';
 import { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
+import { SlaPolicyService } from './sla-policy.service';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { CreateSlaHolidayDto, PauseSlaTimerDto } from './dto/sla-policy.dto';
+import {
+  AddMovingHolidayDto,
+  CreateSlaHolidayDto,
+  PauseSlaTimerDto,
+} from './dto/sla-policy.dto';
 
 /**
  * The running SLA clock: status, pause/resume, and the working calendar the
@@ -22,6 +34,7 @@ export class SlaTimerController {
   constructor(
     private readonly timers: SlaTimerService,
     private readonly policies: SlaPolicyRepository,
+    private readonly policyService: SlaPolicyService,
   ) {}
 
   /** Where a timer stands, with the provenance of its deadline attached: a
@@ -61,20 +74,71 @@ export class SlaTimerController {
     return this.policies.findHolidays();
   }
 
-  @RequirePermissions('sla.policy.manage')
+  /**
+   * One year of the calendar and what it still owes — the read a per-year screen is
+   * built on. Declared BEFORE `holidays/:something` would be if one is ever added:
+   * Nest matches in declaration order and a literal behind a parameter route is
+   * unreachable.
+   */
+  @RequirePermissions('sla.policy.read')
+  @Get('holidays/year/:year')
+  holidayYear(@Param('year', ParseIntPipe) year: number) {
+    return this.policyService.holidayCalendarForYear(year);
+  }
+
+  /** Fill in the four fixed-date holidays for a year. Idempotent — it creates only
+   * what is missing, because two people opening the same year is ordinary. */
+  @RequirePermissions('sla.holiday.create')
+  @Post('holidays/year/:year/fixed')
+  addFixedHolidays(
+    @Param('year', ParseIntPipe) year: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policyService.createFixedHolidaysForYear(year, user);
+  }
+
+  /**
+   * Enter a moving occasion from the year's official announcement: a start date, which
+   * the server expands to the occasion's own length (Eid al-Adha is five days, Eid
+   * al-Fitr four). The length comes from the vocabulary rather than the request so an
+   * officer does not have to remember which is which.
+   *
+   * The DATE is never computed. Jordan's Islamic holidays are set by announcement and
+   * can differ by a day from any calendar conversion.
+   */
+  @RequirePermissions('sla.holiday.create')
+  @Post('holidays/occasion')
+  addOccasion(
+    @Body() dto: AddMovingHolidayDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policyService.createMovingOccasion(
+      dto.occasionKey,
+      dto.startDate,
+      user,
+    );
+  }
+
+  @RequirePermissions('sla.holiday.create')
   @Post('holidays')
   createHoliday(
     @Body() dto: CreateSlaHolidayDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.policies.createHoliday({
-      // Parsed as a UTC whole day, matching how `SlaHoliday.observedOn` is
-      // stored and how `utcDateKey` looks it up. A local-time parse here would
-      // shift the holiday a day for half the world.
-      observedOn: new Date(`${dto.observedOn}T00:00:00.000Z`),
-      name: dto.name,
-      calendarType: dto.calendarType ?? null,
-      createdByUserId: user.id,
-    });
+    // Through the SERVICE, not the repository: a duplicate date has to come back
+    // as a 409 naming the day rather than an unhandled P2002, and adding a
+    // holiday has to be audited — one holiday row moves every business-day
+    // deadline in the office.
+    return this.policyService.createHoliday(
+      {
+        // Parsed as a UTC whole day, matching how `SlaHoliday.observedOn` is
+        // stored and how `utcDateKey` looks it up. A local-time parse here would
+        // shift the holiday a day for half the world.
+        observedOn: new Date(`${dto.observedOn}T00:00:00.000Z`),
+        name: dto.name,
+        calendarType: dto.calendarType ?? null,
+      },
+      user,
+    );
   }
 }

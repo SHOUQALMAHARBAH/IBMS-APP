@@ -229,7 +229,7 @@ export default function UpSellRecommendationDetailPage() {
                     style={{ ...buttonStyle, width: 'auto' }}
                     onClick={() => setDismissing(false)}
                   >
-                    Cancel
+                    {t('commonCancel')}
                   </button>
                 </>
               ) : (

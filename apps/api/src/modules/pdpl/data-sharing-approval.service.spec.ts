@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   BadRequestException,
   ForbiddenException,
@@ -59,12 +60,17 @@ function makeService(
     ...over.slaTimer,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
+
   const service = new DataSharingApprovalService(
     repo as unknown as DataSharingApprovalRepository,
     vendors as unknown as VendorRepository,
     dpas as unknown as DataProcessingAgreementRepository,
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
+    dutySegregation,
   );
   return { service, repo, vendors, dpas, slaTimer, audit };
 }
@@ -171,6 +177,9 @@ describe('DataSharingApprovalService.approve/decline', () => {
       'dsa-1',
       'u-dpo',
       expect.any(Date),
+      // The combined-duty escape column: null on the ordinary two-person path, which is what would catch a
+      // call site that started sending an act id when the approver differs from the requester.
+      null,
     );
     expect(slaTimer.resolve).toHaveBeenCalledWith(
       expect.objectContaining({ workflowName: 'data_sharing_decision' }),

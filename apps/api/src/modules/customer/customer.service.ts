@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
+  Logger,
 } from '@nestjs/common';
 import {
   Prisma,
@@ -33,6 +34,7 @@ import { composeFullName } from '../../common/person-name.util';
 import { pageWindow, type Paginated } from '../../common/pagination';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
+import type { UpdateCustomerContactDto } from './dto/update-customer-contact.dto';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import type { CreateUboDto } from './dto/create-ubo.dto';
 import type { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
@@ -71,6 +73,8 @@ export interface MaskedCustomer extends Omit<
  * a customer to work its KYC file, not just their own pipeline). */
 @Injectable()
 export class CustomerService {
+  private readonly logger = new Logger(CustomerService.name);
+
   constructor(
     private readonly customers: CustomerRepository,
     private readonly prospects: ProspectRepository,
@@ -455,6 +459,152 @@ export class CustomerService {
           )
         : null,
     };
+  }
+
+  /**
+   * Correct a customer's CONTACT details — phone, email, registered address.
+   *
+   * THE FIRST WRITE TO A CUSTOMER ROW THIS PRODUCT HAS EVER HAD other than the create, which is what
+   * `IMPROVEMENTS.md` § 3.14 measured: a misspelled name or a changed phone number could not be fixed, and
+   * a PDPL CORRECTION request — a statutory right with a ten-working-day clock and a two-person closure —
+   * could only be closed by a staff member attesting to a change the system gave them no way to make.
+   *
+   * ## What this deliberately cannot do
+   *
+   * Name, date of birth, nationality, place of birth, identity numbers and beneficial owner are not
+   * accepted; `UpdateCustomerContactDto` omits them and `forbidNonWhitelisted` refuses them with a 400.
+   * Jordan's AMLU requires screening "Upon KYC reviews or CHANGES TO A CUSTOMER'S INFORMATION" and requires
+   * the other identifiers — full name, date of birth, nationality — to resolve a potential match:
+   *
+   *   https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions
+   *
+   * So those are screening events, not edits, and the owner's ruling is that the re-screening mechanism is
+   * the precondition for editing them at all. This method covers the three fields that trigger nothing.
+   */
+  async updateContactDetails(
+    customerId: string,
+    dto: UpdateCustomerContactDto,
+    actor: AuthenticatedUser,
+  ): Promise<MaskedCustomer> {
+    const customer = await this.findOwnedOrVisible(customerId, actor);
+
+    // Mirrors the create path, where `registeredAddress` is written only for a corporate customer. An
+    // individual has no such column, so accepting it and silently dropping it would be a field that looks
+    // saved and is not.
+    if (
+      dto.registeredAddress !== undefined &&
+      customer.customerType !== 'CORPORATE'
+    ) {
+      throw new UnprocessableEntityException(
+        `Customer ${customerId}: registeredAddress applies to a CORPORATE customer (this one is ${customer.customerType}). An individual's address is not a field this record has.`,
+      );
+    }
+
+    const changed = (
+      ['contactPhone', 'contactEmail', 'registeredAddress'] as const
+    ).filter((field) => dto[field] !== undefined);
+    if (changed.length === 0) {
+      throw new UnprocessableEntityException(
+        `Customer ${customerId}: nothing to correct — send at least one of contactPhone, contactEmail or registeredAddress.`,
+      );
+    }
+
+    const encrypted = await encryptEntityFields(
+      this.encryption,
+      'Customer',
+      {
+        contactPhoneEnc: dto.contactPhone,
+        contactEmailEnc: dto.contactEmail,
+      },
+      { userId: actor.id, entityType: 'Customer', entityId: customerId },
+    );
+
+    const updated = await this.customers.updateContactDetails(customerId, {
+      contactPhoneEnc: encrypted.contactPhoneEnc,
+      contactEmailEnc: encrypted.contactEmailEnc,
+      registeredAddress: dto.registeredAddress,
+    });
+
+    // ONE CORRECTION ROW PER FIELD CHANGED, and it is what lets a statutory request be shown to have been
+    // ANSWERED rather than merely attested to.
+    //
+    // `DsrService.fulfil` refuses to close a CORRECTION request with no correction recorded against it
+    // (the owner's requirement 4), and the only link it can read is `dsrId` here. An audit row cannot
+    // serve: it is not queryable as "was this request answered", which is why this table covers the
+    // contact fields as well as the screening identifiers.
+    //
+    // Best-effort, like the audit call below and for the same reason: the customer's details are already
+    // corrected and the client believes so. A failure here costs the DSR link, which surfaces as the
+    // closure gate refusing — the safe direction, because it asks somebody to look rather than closing a
+    // request on a record that is not there.
+    const dsrId =
+      dto.answersRequestType === 'dsr' ? dto.answersRequestId : undefined;
+    for (const field of changed) {
+      try {
+        const values = await encryptEntityFields(
+          this.encryption,
+          'CustomerIdentifierCorrection',
+          {
+            // The BEFORE value is not read back for the contact fields: they are encrypted at rest and
+            // decrypting the old one to re-encrypt it into the correction would put the plaintext through
+            // a second round trip for no gain. The AFTER value is what the officer just typed.
+            afterValueEnc:
+              field === 'registeredAddress' ? undefined : dto[field],
+          },
+          {
+            userId: actor.id,
+            entityType: 'CustomerIdentifierCorrection',
+            entityId: customerId,
+          },
+        );
+        await this.customers.recordCorrection({
+          id: randomUUID(),
+          customerId,
+          field,
+          afterValueEnc: values.afterValueEnc,
+          reason: dto.reason ?? 'Contact detail corrected',
+          correctedByUserId: actor.id,
+          dsrId,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Customer ${customerId}: failed to record the ${field} correction${dsrId ? ` against DSR ${dsrId}` : ''}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    try {
+      await this.audit.record({
+        userId: actor.id,
+        action: 'UPDATE',
+        entityType: 'Customer',
+        entityId: customerId,
+        // WHICH FIELDS CHANGED, NEVER THEIR VALUES for the encrypted two.
+        //
+        // `contactPhoneEnc` and `contactEmailEnc` exist so the plaintext is not at rest in the clear;
+        // writing it into an audit row would defeat the column. `sensitive-data-handling.md` is the rule —
+        // metadata not body — and the create path's own audit row follows it, recording customerType,
+        // legalName, status and prospectId and none of the contact details.
+        //
+        // The ADDRESS is recorded before and after, because it is not an encrypted column and a correction
+        // history that cannot say what the address was is not a history. The AMLU's requirement to retain
+        // "the verification mechanism and actions taken" is about screening, and the identifier corrections
+        // that carry it are a separate piece of work — see § 3.14.
+        beforeValue: { registeredAddress: customer.registeredAddress },
+        afterValue: {
+          fieldsCorrected: changed,
+          registeredAddress: updated.registeredAddress,
+          hasReason: dto.reason !== undefined,
+          answersRequestType: dto.answersRequestType ?? null,
+          answersRequestId: dto.answersRequestId ?? null,
+        },
+      });
+    } catch {
+      // Best-effort, the same treatment every other audit call in this service gets: a failed audit row
+      // must not undo a correction the client already believes was made.
+    }
+
+    return this.toMasked(updated, actor.id);
   }
 
   async addUbo(

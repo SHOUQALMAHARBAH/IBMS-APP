@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, type Role, type RoleStatus } from '@ibms/db';
 import { UserRepository } from '../../../repositories/user.repository';
+import { MAKER_CHECKER_REGISTRY } from '../../../common/maker-checker-pairs.config';
 import { RoleRepository } from '../../../repositories/role.repository';
 import { PermissionRepository } from '../../../repositories/permission.repository';
 import { OrgContextService } from '../../../common/org-context/org-context.service';
@@ -70,6 +71,22 @@ const USER_ADMIN_PERMISSION = 'user.manage';
  * one administrator role while another request revokes the last grant on a
  * different one — serialise rather than both observing a survivor.
  */
+/**
+ * One row of the readiness list: an operation that needs two people, and whether this office has them.
+ *
+ * `constraint` is carried so the row can be tied back to what actually refuses — the CHECK constraint —
+ * rather than only to a label somebody might rename.
+ */
+export interface DutySegregationReadiness {
+  entityType: string;
+  pairLabel: string;
+  constraint: string | null;
+  checkerPermission: string;
+  /** Distinct ACTIVE users holding the checker permission. */
+  holderCount: number;
+  status: 'NOBODY' | 'SINGLE_HOLDER' | 'READY';
+}
+
 @Injectable()
 export class RoleAdminService {
   private readonly logger = new Logger(RoleAdminService.name);
@@ -216,6 +233,46 @@ export class RoleAdminService {
    * The audit row names which codes MOVED, not that "permissions changed": that
    * diff is the only record of when an office widened a role, and it is the first
    * thing an auditor asks for.
+   *
+   * ## AN ADMINISTRATOR CAN GRANT THEMSELVES ANYTHING, AND THAT IS THE DECISION
+   *
+   * IMPROVEMENTS § 1.53, decided by the owner 2026-09-28: **this permission is NOT split
+   * and there is NO self-grant check.** An office administrator editing this screen can
+   * add any capability in the catalogue to their own role. If you have arrived here
+   * intending to close that, read all three of the following — the first two alone read
+   * like an excuse, and it is the third that makes the decision acceptable rather than
+   * merely necessary.
+   *
+   * **1. Blocking a self-grant breaks the screen's actual job.** Configuring a Finance
+   * role with capabilities the administrator will never hold is precisely what this screen
+   * is for. A rule of "you may not grant what you do not hold" makes the common,
+   * legitimate case impossible while stopping nothing an administrator could not achieve
+   * by creating a second role and assigning it to themselves.
+   *
+   * **2. A second approver cannot exist in a one-person office**, which is the size of
+   * office this product is built for. Requiring one would mean such an office could never
+   * change a permission at all — the shape Part 4's declared duty-segregation mode exists
+   * to avoid.
+   *
+   * **3. The change is already recorded, and recorded usefully.** Measured, not assumed:
+   * the audit row below carries `beforeValue.permissionCodes`, `afterValue.permissionCodes`
+   * and an explicit `added` / `removed` diff. So "who widened which role, when, and by
+   * exactly which capabilities" is answerable from the audit trail without reconstructing
+   * it from two snapshots. **That is what makes prevention unnecessary here: the control is
+   * detective rather than preventive, and it is a real one.**
+   *
+   * ## THIS DECISION'S BASIS IS THE CONTENT OF THAT ROW
+   *
+   * If the audit row ever stops naming the capabilities — if it degrades to "permissions
+   * changed", or drops the diff — then point 3 is no longer true and § 1.53 loses its
+   * basis. `role-admin.service.spec.ts` therefore asserts the row's CONTENT, not its
+   * existence: the before set, the after set, and the added/removed diff by name. A test
+   * that only checked an audit row was written would pass on the degraded version.
+   *
+   * And what is NOT at stake, so nobody re-derives it: the money controls are unreachable
+   * by any grant. `assertDifferentActors` plus fifteen database CHECK constraints refuse a
+   * self-approval regardless of what permissions the actor holds, so this is a segregation
+   * boundary question and not an open exploit.
    */
   async setPermissions(
     roleId: string,
@@ -406,6 +463,82 @@ export class RoleAdminService {
   }
 
   /**
+   * Delete one of the office's own roles.
+   *
+   * The owner's decision, verbatim in its parts: the role and its effect go immediately, there is no
+   * "reassign the users first" gate, and a user left with zero roles and zero permissions is an
+   * accepted outcome rather than something to prevent. Permissions resolve from the role at request
+   * time, so nothing is copied onto a user that could survive this.
+   *
+   * It is a SOFT delete — see `RoleRepository.softDelete` and the migration for why the FK makes a
+   * hard one impossible without discarding the history she asked to keep.
+   *
+   * ONE refusal is kept, and it is deliberately NOT a reassignment gate: deleting the last role that
+   * grants user administration would leave the office with nobody able to grant it back, and there
+   * is no route into the application that repairs that. It is the same guard the other three write
+   * paths already carry (retiring a role, unchecking `user.manage` in the matrix, revoking the last
+   * grant), under the same per-office lock, so delete cannot slip past a control the other three
+   * respect. Losing every permission is recoverable by an administrator; losing every administrator
+   * is not.
+   */
+  async remove(roleId: string, actorUserId: string): Promise<void> {
+    const role = await this.users.findRoleById(roleId);
+    if (!role) throw new NotFoundException(`Role ${roleId} not found.`);
+    if (role.deletedAt) {
+      throw new UnprocessableEntityException(
+        `Role ${role.name} is already deleted.`,
+      );
+    }
+    this.assertNotSystem(role, 'deleted');
+
+    const guarded = await this.users.roleGrantsPermission(
+      role.id,
+      USER_ADMIN_PERMISSION,
+    );
+    if (!guarded) {
+      await this.applyRemoval(role, actorUserId);
+      return;
+    }
+
+    await this.users.withCapabilityLocked(USER_ADMIN_PERMISSION, async () => {
+      const holders = await this.users.findActiveHoldersOfPermission(
+        USER_ADMIN_PERMISSION,
+      );
+      const remaining = new Set(
+        holders.filter((h) => h.roleId !== role.id).map((h) => h.userId),
+      );
+      if (remaining.size === 0) {
+        throw new UnprocessableEntityException(
+          'Refusing to delete the last role that grants user administration — nobody would be able to grant it back. Give another role that permission first.',
+        );
+      }
+      await this.applyRemoval(role, actorUserId);
+    });
+  }
+
+  /** The write half, called from both sides of the lockout guard so the guarded and unguarded paths
+   *  cannot drift — the same shape `setStatus` uses. */
+  private async applyRemoval(role: Role, actorUserId: string): Promise<void> {
+    const { permissionCodes, assignmentsRevoked } = await this.roles.softDelete(
+      role.id,
+    );
+
+    await this.safeAudit({
+      userId: actorUserId,
+      action: 'DELETE',
+      entityType: 'Role',
+      entityId: role.id,
+      // The codes go in the BEFORE value because the grants no longer exist anywhere else: this row
+      // is now the only record of what the role could do.
+      beforeValue: { name: role.name, permissionCodes },
+      afterValue: { deleted: true, assignmentsRevoked },
+    });
+    // Not optional. Until this runs, a session that resolved this role keeps its permissions for up
+    // to the cache TTL — a deletion that takes a minute to bite is the one direction that matters.
+    this.permissions.invalidateCache();
+  }
+
+  /**
    * Retire or reactivate one of the office's own roles.
    *
    * Retirement is the only removal there is — see `Role.status` in the schema for
@@ -515,5 +648,56 @@ export class RoleAdminService {
         `Failed to write the audit entry for Role ${input.entityId}: ${(err as Error).message}`,
       );
     }
+  }
+  /**
+   * WHICH OPERATIONS NEEDING TWO PEOPLE CAN THIS OFFICE ACTUALLY COMPLETE?
+   *
+   * Part 5's first honesty fix. Fifteen operations in this system require a second person by law and by
+   * constraint, and an office found that out the way the owner did: by being refused halfway through one.
+   * Nothing told anybody in advance, and nothing said which of them the office had nobody able to finish.
+   *
+   * For each pair this returns the checker permission and how many ACTIVE people hold it —
+   * `findActiveHoldersOfPermission` already excludes retired roles and expired access windows, which is
+   * the hard-won part. Distinct USERS, not grants: one person holding the code through two roles is one
+   * person.
+   *
+   * Three states, and the middle one is the useful one:
+   *
+   *   NOBODY         nobody holds the checker permission — the operation cannot be completed at all
+   *   SINGLE_HOLDER  exactly one person does — completable only when they are not also the maker
+   *   READY          two or more
+   *
+   * It deliberately does NOT try to say "and therefore you are fine". Whether a specific record can be
+   * checked depends on who raised it, which is a per-instance question this cannot answer. What it answers
+   * is the office-level one, which is the one nobody could ask before.
+   */
+  async dutySegregationReadiness(): Promise<DutySegregationReadiness[]> {
+    // One lookup per DISTINCT permission, not per pair: two NeedsAssessment pairs share
+    // `needs-assessment.approve`, and asking twice would be two identical queries.
+    const codes = [
+      ...new Set(MAKER_CHECKER_REGISTRY.map((p) => p.checkerPermission)),
+    ];
+    const holders = new Map<string, number>();
+    for (const code of codes) {
+      const grants = await this.users.findActiveHoldersOfPermission(code);
+      holders.set(code, new Set(grants.map((g) => g.userId)).size);
+    }
+
+    return MAKER_CHECKER_REGISTRY.map((pair) => {
+      const holderCount = holders.get(pair.checkerPermission) ?? 0;
+      return {
+        entityType: pair.entityType,
+        pairLabel: pair.pairLabel,
+        constraint: pair.dbCheckConstraint,
+        checkerPermission: pair.checkerPermission,
+        holderCount,
+        status:
+          holderCount === 0
+            ? ('NOBODY' as const)
+            : holderCount === 1
+              ? ('SINGLE_HOLDER' as const)
+              : ('READY' as const),
+      };
+    });
   }
 }

@@ -115,7 +115,7 @@ describe('Procurement / Vendor Management (e2e) — backlog Part C #67 / #71', (
     sharedApp = undefined;
   });
 
-  it('gates every route behind vendor.manage', async () => {
+  it('gates every route behind its own vendor.* code', async () => {
     const app = await boot();
     const outsider = await makeUser(
       app,
@@ -456,7 +456,7 @@ describe('Procurement / Vendor Management (e2e) — backlog Part C #67 / #71', (
     ).body as DpaBody;
     expect(dpa.assessedByUserId).toBe(compliance.userId);
 
-    // outsider holds neither vendor.manage nor dpa.approve.
+    // outsider holds none of the vendor.* codes, nor dpa.approve.
     await request(app.getHttpServer())
       .post(`/data-processing-agreements/${dpa.id}/sign`)
       .set(bearer(outsider.accessToken))

@@ -63,6 +63,8 @@ const KYC_RECORD = {
   submittedAt: null,
   createdByUserId: "user-1",
   approvedByUserId: null,
+  // The endpoint returns this now. Null: nothing has approved this draft.
+  combinedDutyAct: null,
   approvedAt: null,
   nextReviewDueAt: null,
   createdAt: "2026-08-26T00:00:00.000Z",
@@ -215,7 +217,186 @@ test("shows a friendly message when the user lacks read permission", async ({ pa
 
   await page.goto("/customers");
 
-  await expect(page.locator('p[role="alert"]')).toContainText("don't hold the customer.360-view.read");
+  // `customer.read` since migration 20261105100000 — the LIST moved onto the narrow code while the
+  // detail kept `customer.360-view.read`. The mechanical rewrite of this assertion could not know that:
+  // it swapped the WORDING and the code had changed too.
+  await expect(page.locator('p[role="alert"]')).toContainText(
+    "You do not hold permission to find and list customers",
+  );
+  await expect(page.locator('p[role="alert"]')).toContainText("(customer.read)");
+});
+
+/*
+ * CORRECTING A CUSTOMER'S CONTACT DETAILS — the caller `PATCH /customers/:id` shipped
+ * without (IMPROVEMENTS § 1.65).
+ *
+ * Two capabilities were unreachable. The owner's requirement that phone, address and
+ * email be correctable unconditionally; and — worse, because it is a gate whose
+ * precondition became unreachable — `DsrService.fulfil` refuses to close a CORRECTION
+ * request until a correction has actually been RECORDED against it, and this route is
+ * the only thing that records one. So a statutory correction request could be neither
+ * answered nor closed.
+ */
+
+/** The detail-page reads, plus a method-aware capture of the correction PATCH. The
+ * detail GET and the correction PATCH share a path, so the mock has to branch on the
+ * method or the GET swallows the PATCH. */
+async function mockCustomerDetail(page: Page) {
+  const patches: { body: unknown }[] = [];
+  await page.route("http://localhost:4000/customers/cust-1", (route) => {
+    if (route.request().method() === "PATCH") {
+      patches.push({ body: route.request().postDataJSON() });
+      return route.fulfill({ status: 200, json: CUSTOMER });
+    }
+    return route.fulfill({ status: 200, json: CUSTOMER });
+  });
+  await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  return patches;
+}
+
+test("records a contact correction, sending only the fields actually typed", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const patches = await mockCustomerDetail(page);
+
+  await page.goto("/customers/cust-1");
+  await page.getByTestId("customer-correct-open").click();
+
+  // NOTHING IS PREFILLED, and that is a correctness rule rather than a style
+  // choice: `contactPhone` and `contactEmail` arrive MASKED on the detail read, so
+  // prefilling would write the mask back as the customer's phone number.
+  await expect(page.getByTestId("correct-phone")).toHaveValue("");
+  await expect(page.getByTestId("correct-email")).toHaveValue("");
+
+  // An empty correction is refused client-side — the service answers one with a 422.
+  await expect(page.getByTestId("customer-correct-submit")).toBeDisabled();
+
+  await page.getByTestId("correct-phone").fill("  +962 7 9000 1234  ");
+  await page.getByTestId("correct-reason").fill("  Customer called to report it  ");
+  await expect(page.getByTestId("customer-correct-submit")).toBeEnabled();
+  await page.getByTestId("customer-correct-submit").click();
+
+  await expect.poll(() => patches.length).toBe(1);
+  // TRIMMED, and the two untouched fields are ABSENT rather than empty strings: a
+  // blank box means "leave it alone", not "store an empty value".
+  expect(patches[0].body).toEqual({
+    contactPhone: "+962 7 9000 1234",
+    reason: "Customer called to report it",
+  });
+});
+
+test("omits a field the officer typed into and then cleared", async ({ page }) => {
+  // THE CASE THE FILTER ACTUALLY EXISTS FOR, and my first version of these tests
+  // could not observe it. An UNTOUCHED field is `undefined` and never reaches the
+  // body at all, so planting the removal of the empty-string filter killed nothing
+  // (§ 1.51(d)). It is only a typed-then-cleared field that becomes `''` — and
+  // sending `''` instructs the server to STORE an empty phone number, which is the
+  // opposite of "leave it alone".
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const patches = await mockCustomerDetail(page);
+
+  await page.goto("/customers/cust-1");
+  await page.getByTestId("customer-correct-open").click();
+
+  await page.getByTestId("correct-email").fill("typed-then-cleared@example.test");
+  await page.getByTestId("correct-phone").fill("+962 7 9000 1234");
+  // Cleared again — the officer changed their mind about the email.
+  await page.getByTestId("correct-email").fill("");
+  await page.getByTestId("customer-correct-submit").click();
+
+  await expect.poll(() => patches.length).toBe(1);
+  expect(patches[0].body).toEqual({ contactPhone: "+962 7 9000 1234" });
+});
+
+test("sends the DSR reference, and the request type alongside it", async ({ page }) => {
+  // The reference is what `DsrService.fulfil` looks for before it will close a
+  // statutory correction request, so it is the field that makes the gate satisfiable.
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const patches = await mockCustomerDetail(page);
+
+  await page.goto("/customers/cust-1");
+  await page.getByTestId("customer-correct-open").click();
+  await page.getByTestId("correct-address").fill("12 King Hussein Street, Amman");
+  await page.getByTestId("correct-dsr").fill("dsr-77");
+  await page.getByTestId("customer-correct-submit").click();
+
+  await expect.poll(() => patches.length).toBe(1);
+  expect(patches[0].body).toEqual({
+    registeredAddress: "12 King Hussein Street, Amman",
+    answersRequestId: "dsr-77",
+    // Never sent without the id it qualifies.
+    answersRequestType: "dsr",
+  });
+});
+
+test("says which fields cannot be corrected here, and why", async ({ page }) => {
+  // Name, date of birth, nationality and national ID are screening identifiers: the
+  // AMLU requires a fresh screen on a change to any of them, and that mechanism does
+  // not exist (§ 1.59). The server refuses them structurally via
+  // `forbidNonWhitelisted`; an officer who cannot find the name field needs telling
+  // why rather than concluding the form is broken.
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await mockCustomerDetail(page);
+
+  await page.goto("/customers/cust-1");
+  await page.getByTestId("customer-correct-open").click();
+  await expect(
+    page.getByTestId("customer-correct-identifiers-note"),
+  ).toContainText("screening event");
+});
+
+test("surfaces the server's refusal rather than a generic failure", async ({ page }) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await mockCustomerDetail(page);
+  // Re-routed after the helper, so this takes precedence for the PATCH.
+  await page.route("http://localhost:4000/customers/cust-1", (route) => {
+    if (route.request().method() !== "PATCH") {
+      return route.fulfill({ status: 200, json: CUSTOMER });
+    }
+    return route.fulfill({
+      status: 422,
+      json: {
+        message:
+          "registeredAddress is a corporate field and this customer is an individual.",
+      },
+    });
+  });
+
+  await page.goto("/customers/cust-1");
+  await page.getByTestId("customer-correct-open").click();
+  await page.getByTestId("correct-address").fill("12 King Hussein Street, Amman");
+  await page.getByTestId("customer-correct-submit").click();
+
+  await expect(page.getByTestId("customer-correct-error")).toContainText(
+    "corporate field",
+  );
+});
+
+test("a reader without customer.update is told, not shown a dead form", async ({
+  page,
+}) => {
+  // COMPLIANCE_OFFICER holds `customer.360-view.read` and NOT `customer.update` —
+  // measured against the seeded grid, and it is also the finding in § 1.65: the DPO
+  // who must CLOSE a correction request cannot RECORD the correction that unlocks it,
+  // so the statutory flow needs two people.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockCustomerDetail(page);
+
+  await page.goto("/customers/cust-1");
+  // Anchor: the profile rendered for this reader before asserting the absence.
+  await expect(
+    page.getByRole("heading", { name: "Ahmad Al-Fulani" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("customer-correct-open")).toHaveCount(0);
+  await expect(page.getByTestId("customer-correct-denied")).toContainText(
+    "customer.update",
+  );
 });
 
 test("the onboarding wizard walks an individual customer through profile -> documents -> submit", async ({

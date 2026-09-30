@@ -4,6 +4,7 @@ import { DEFAULT_PAGE_SIZE } from '../../common/pagination';
 import { AuditTrailService } from './audit-trail.service';
 import type { AuditTrailRepository } from '../../repositories/audit-trail.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { UserRepository } from '../../repositories/user.repository';
 import type {
   AuditLogEntryRow,
   DocumentVersionRow,
@@ -44,7 +45,12 @@ function docVersion(
   };
 }
 
-function makeService(over: { repo?: Record<string, unknown> } = {}) {
+function makeService(
+  over: {
+    repo?: Record<string, unknown>;
+    users?: Record<string, unknown>;
+  } = {},
+) {
   const repo = {
     findAuditLog: vi.fn().mockResolvedValue([logRow()]),
     countAuditLog: vi.fn().mockResolvedValue(1),
@@ -60,11 +66,18 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     ...over.repo,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // Resolves the page's actor ids to names. Empty by default, so the existing cases assert the
+  // unresolvable path — which is a real state (a seed, a scheduled sweep) and must render the id.
+  const users = {
+    findSummariesByIds: vi.fn().mockResolvedValue([]),
+    ...over.users,
+  };
   const service = new AuditTrailService(
     repo as unknown as AuditTrailRepository,
     audit as unknown as AuditService,
+    users as unknown as UserRepository,
   );
-  return { service, repo, audit };
+  return { service, repo, audit, users };
 }
 
 describe('AuditTrailService.browseAuditLog (Process 57)', () => {

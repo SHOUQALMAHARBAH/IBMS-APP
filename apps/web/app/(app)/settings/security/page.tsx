@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
+import { EncryptionKeyInventory } from '../../../../components/security/EncryptionKeyInventory';
 import {
   changePassword,
   enrollTotp,
@@ -15,7 +16,15 @@ import {
   type TrustedDevice,
 } from '../../../../lib/auth/auth-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { buttonDisabledStyle, buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  buttonDisabledStyle,
+  buttonStyle,
+  errorStyle,
+  inputStyle,
+  labelStyle,
+  manualKeyStyle,
+  successStyle,
+} from '../../../../components/auth/auth-form.styles';
 import {
   PasswordRequirements,
   meetsPasswordPolicy,
@@ -29,6 +38,21 @@ export default function SecuritySettingsPage() {
   const { language, t, tPlural } = useLanguage();
 
   const [enrollment, setEnrollment] = useState<MfaEnrollResponse | null>(null);
+
+  /**
+   * The base32 secret the QR encodes, pulled out of the otpauth:// URI so it can be shown as text.
+   * Grouped in fours because a 32-character unbroken run is a transcription error waiting to happen,
+   * and authenticators ignore the spaces.
+   */
+  const manualKey = (() => {
+    if (!enrollment?.otpAuthUri) return null;
+    try {
+      const secret = new URL(enrollment.otpAuthUri).searchParams.get('secret');
+      return secret ? (secret.match(/.{1,4}/g) ?? [secret]).join(' ') : null;
+    } catch {
+      return null;
+    }
+  })();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -72,7 +96,9 @@ export default function SecuritySettingsPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setDeviceError(err instanceof ApiError ? err.message : t('authGenericError'));
+        setDeviceError(
+          err instanceof ApiError ? err.message : t('authGenericError'),
+        );
         // null would render the loading state forever; an empty list beside
         // the error line says "we tried, and could not".
         setDevices([]);
@@ -109,7 +135,10 @@ export default function SecuritySettingsPage() {
     // server-side, and reporting a later failure as an invalid code tells the
     // user the opposite of what happened.
     try {
-      await verifyTotpEnrollment({ credentialId: enrollment.credentialId, code });
+      await verifyTotpEnrollment({
+        credentialId: enrollment.credentialId,
+        code,
+      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('secInvalidCode'));
       setIsBusy(false);
@@ -170,7 +199,9 @@ export default function SecuritySettingsPage() {
       // should disappear on the same refresh.
       setDevices(await listTrustedDevices());
     } catch (err) {
-      setDeviceError(err instanceof ApiError ? err.message : t('authGenericError'));
+      setDeviceError(
+        err instanceof ApiError ? err.message : t('authGenericError'),
+      );
     } finally {
       setRevoking(null);
     }
@@ -189,7 +220,10 @@ export default function SecuritySettingsPage() {
       <section style={{ marginTop: '2rem' }}>
         <h2>{t('secMfaHeading')}</h2>
         <p>
-          Status: <strong>{user.mfaEnabled ? t('secEnabled') : t('secNotEnrolled')}</strong>
+          {t('commonStatusLabel')}{' '}
+          <strong>
+            {user.mfaEnabled ? t('secEnabled') : t('secNotEnrolled')}
+          </strong>
         </p>
         {!user.mfaPolicySatisfied && user.mfaEnabled ? (
           <p style={{ fontSize: '0.85rem', opacity: 0.8 }}>
@@ -199,10 +233,36 @@ export default function SecuritySettingsPage() {
 
         {message ? <p style={successStyle}>{message}</p> : null}
 
+        {/* Parsed from the enrolment URI rather than added to the API response: the secret is
+            already there, and a second field carrying the same secret is a second place for it to
+            leak from. `URLSearchParams` so a padded or reordered URI still yields it. */}
         {user.mfaEnabled ? null : enrollment ? (
           <div>
             <p>{t('secScanInstruction')}</p>
-            <Image src={enrollment.qrCodeDataUrl} alt={t('secQrAlt')} width={200} height={200} unoptimized />
+            <Image
+              src={enrollment.qrCodeDataUrl}
+              alt={t('secQrAlt')}
+              width={200}
+              height={200}
+              unoptimized
+            />
+            {/* The same secret the QR encodes, in a form a person can type. A screen whose ONLY
+                route is a camera locks out anyone whose authenticator lives on this device, and
+                leaves nothing to fall back on if the image does not render. The secret is already
+                in `otpAuthUri`; it was simply never shown. */}
+            {manualKey ? (
+              <p style={{ marginTop: '0.75rem' }}>
+                <span style={labelStyle}>{t('secManualKeyLabel')}</span>
+                <code data-mfa-manual-key style={manualKeyStyle}>
+                  {manualKey}
+                </code>
+                <span
+                  style={{ display: 'block', fontSize: '0.8rem', opacity: 0.8 }}
+                >
+                  {t('secManualKeyHint')}
+                </span>
+              </p>
+            ) : null}
             <form onSubmit={(e) => void handleVerify(e)}>
               <label htmlFor="code" style={labelStyle}>
                 {t('secAuthCodeLabel')}
@@ -228,7 +288,12 @@ export default function SecuritySettingsPage() {
             </form>
           </div>
         ) : (
-          <button type="button" onClick={() => void handleStartEnrollment()} disabled={isBusy} style={buttonStyle}>
+          <button
+            type="button"
+            onClick={() => void handleStartEnrollment()}
+            disabled={isBusy}
+            style={buttonStyle}
+          >
             {isBusy ? t('secStartingButton') : t('secEnrollButton')}
           </button>
         )}
@@ -276,7 +341,9 @@ export default function SecuritySettingsPage() {
             autoComplete="new-password"
             required
             minLength={12}
-            aria-invalid={confirmPassword.length > 0 && newPassword !== confirmPassword}
+            aria-invalid={
+              confirmPassword.length > 0 && newPassword !== confirmPassword
+            }
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             style={inputStyle}
@@ -314,7 +381,14 @@ export default function SecuritySettingsPage() {
         ) : devices.length === 0 ? (
           <p>{t('secNoTrustedDevices')}</p>
         ) : (
-          <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 'var(--space-2)' }}>
+          <ul
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              display: 'grid',
+              gap: 'var(--space-2)',
+            }}
+          >
             {devices.map((d) => (
               <li
                 key={d.id}
@@ -330,10 +404,17 @@ export default function SecuritySettingsPage() {
               >
                 <span style={{ display: 'grid', minWidth: 0 }}>
                   <strong>{d.label ?? t('secUnnamedDevice')}</strong>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--ink-secondary)' }}>
-                    {t('secDeviceTrustedOn')} {formatDateTime(d.trustedAt, language)}
+                  <span
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--ink-secondary)',
+                    }}
+                  >
+                    {t('secDeviceTrustedOn')}{' '}
+                    {formatDateTime(d.trustedAt, language)}
                     {' · '}
-                    {t('secDeviceExpires')} {formatDateTime(d.expiresAt, language)}
+                    {t('secDeviceExpires')}{' '}
+                    {formatDateTime(d.expiresAt, language)}
                   </span>
                 </span>
                 <button
@@ -348,7 +429,9 @@ export default function SecuritySettingsPage() {
                   })}
                   style={revoking === d.id ? buttonDisabledStyle : buttonStyle}
                 >
-                  {revoking === d.id ? t('secRevokingDevice') : t('secRevokeDevice')}
+                  {revoking === d.id
+                    ? t('secRevokingDevice')
+                    : t('secRevokeDevice')}
                 </button>
               </li>
             ))}
@@ -362,10 +445,26 @@ export default function SecuritySettingsPage() {
         <p>
           {tPlural('secHardLogoutMinutes', user.hardLogoutAfterIdleMinutes)}
         </p>
-        {user.accessValidUntil ? <p>Your access to IBMS ends: {formatDateTime(user.accessValidUntil, language)}</p> : null}
+        {user.accessValidUntil ? (
+          <p>
+            {t('secAccessEnds', {
+              at: formatDateTime(user.accessValidUntil, language),
+            })}
+          </p>
+        ) : null}
       </section>
 
-      <button type="button" onClick={() => void handleLogout()} style={{ ...buttonStyle, marginTop: '2rem' }}>
+      {/* Renders only for a holder of `encryption-key.read`. A gated SECTION on an
+       * ungated page: this route is the only way through the MFA enrolment guard, so
+       * gating the PAGE would lock ten of eleven roles out of pairing an
+       * authenticator. */}
+      <EncryptionKeyInventory />
+
+      <button
+        type="button"
+        onClick={() => void handleLogout()}
+        style={{ ...buttonStyle, marginTop: '2rem' }}
+      >
         {t('signOut')}
       </button>
     </main>

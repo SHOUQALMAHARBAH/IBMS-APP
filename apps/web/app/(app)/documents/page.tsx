@@ -19,6 +19,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionMayBeMissing, permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -60,7 +61,7 @@ export default function DocumentsPage() {
       setDocuments(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('docNoPermission')
+          ? permissionRefusal(t, 'docRefusalAct', 'document.read')
           : err instanceof ApiError
             ? err.message
             : t('docLoadError'),
@@ -105,7 +106,7 @@ export default function DocumentsPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : t('docUnlockError'),
+          : permissionMayBeMissing(t, 'docUnlockAct', 'document.delete-override'),
       );
     }
   }
@@ -249,7 +250,7 @@ export default function DocumentsPage() {
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button type="submit">{t('docSaveVersionButton')}</button>
             <button type="button" onClick={() => setVersioningId(null)}>
-              Cancel
+              {t('commonCancel')}
             </button>
           </div>
         </form>

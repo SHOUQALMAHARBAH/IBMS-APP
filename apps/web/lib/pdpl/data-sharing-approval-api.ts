@@ -3,6 +3,7 @@
 // checker) gates approve/decline.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
 export const DATA_CLASSIFICATIONS = [
   'PUBLIC',
@@ -43,6 +44,14 @@ export interface DataSharingApproval {
   isRegulatoryChannel: boolean;
   requestedByUserId: string;
   approvedByUserId: string | null;
+  /**
+   * Set when ONE person both requested and decided this approval, in an office that declared COMBINED
+   * duty segregation and stated why. Null on every ordinary decision.
+   *
+   * This pair guards personal data LEAVING THE OFFICE to a third party, and the status cell asserts
+   * "Approved" — a claim only true of a two-person decision.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
   slaDueAt: string;
   decidedAt: string | null;
   createdAt: string;
@@ -72,8 +81,18 @@ export function createDataSharingApproval(body: {
   return apiPost('/data-sharing-approvals', body);
 }
 
-export function approveDataSharingApproval(id: string): Promise<DataSharingApproval> {
-  return apiPost(`/data-sharing-approvals/${id}/approve`, {});
+export function approveDataSharingApproval(
+  id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<DataSharingApproval> {
+  return apiPost(
+    `/data-sharing-approvals/${id}/approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 export function declineDataSharingApproval(id: string): Promise<DataSharingApproval> {

@@ -12,7 +12,7 @@ import {
   type InsuranceLine,
 } from '../../../lib/insurer/insurance-line-api';
 import { STRUCTURE_LABEL_KEY } from '../../../lib/insurer/insurer-api';
-import { ApiError } from '../../../lib/auth/api-client';
+import { ApiError, isMfaEnrolmentError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
   cardMetaStyle,
@@ -26,6 +26,7 @@ import {
   listGridStyle,
 } from '../../../components/insurer/insurer.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * The cross-office insurer directory.
@@ -97,8 +98,10 @@ export default function InsurerDirectoryPage() {
         }
         setLineError(null);
         setLoadError(
-          err instanceof ApiError && err.status === 403
-            ? t('insDirNoPermission')
+          isMfaEnrolmentError(err)
+            ? t('insMfaRequired')
+            : err instanceof ApiError && err.status === 403
+              ? permissionRefusal(t, 'insDirRefusalAct', 'insurer.directory.read')
             : err instanceof ApiError
               ? err.message
               : t('insDirLoadError'),

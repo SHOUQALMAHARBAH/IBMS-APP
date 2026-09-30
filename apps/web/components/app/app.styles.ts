@@ -336,3 +336,54 @@ export const homeCardBlurbStyle: CSSProperties = {
   fontSize: 'var(--text-sm)',
   color: 'var(--ink-secondary)',
 };
+
+/**
+ * The forced-MFA-enrolment banner in `app/(app)/layout.tsx`.
+ *
+ * Built on the existing `--warning-*` triple rather than new colours: that trio is already
+ * contrast-checked in both themes by the accessibility gate, and an attention strip that invents
+ * its own amber is exactly the kind of one-off that gets past the light theme and fails the dark
+ * one. It sits inside `contentStyle`, so it inherits the page gutter and needs only its own
+ * bottom gap.
+ */
+export const mfaBannerStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  gap: '0.5rem 0.75rem',
+  marginBottom: '1.25rem',
+  padding: '0.875rem 1rem',
+  background: 'var(--warning-bg)',
+  color: 'var(--warning-ink)',
+  border: '1px solid var(--warning-border)',
+  borderRadius: '0.5rem',
+  lineHeight: 1.6,
+};
+
+export const mfaBannerTitleStyle: CSSProperties = {
+  fontSize: '0.95rem',
+  fontWeight: 600,
+};
+
+export const mfaBannerBodyStyle: CSSProperties = {
+  fontSize: '0.875rem',
+};
+
+export const mfaBannerCtaStyle: CSSProperties = {
+  fontSize: '0.875rem',
+  fontWeight: 600,
+  color: 'var(--warning-ink)',
+  textDecoration: 'underline',
+  // Never `nowrap` on the Arabic string, which is the longer of the two.
+  whiteSpace: 'normal',
+};
+
+/** Group heading on the home launcher, which now groups what it offers by module. */
+export const homeGroupHeadingStyle: CSSProperties = {
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--ink-secondary)',
+  margin: '0 0 0.6rem',
+};

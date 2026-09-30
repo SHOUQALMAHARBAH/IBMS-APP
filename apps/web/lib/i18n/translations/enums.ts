@@ -15,6 +15,10 @@ export const ENUMS = {
     auditActionRead: 'اطّلاع',
     auditActionUpdate: 'تعديل',
     auditActionDelete: 'حذف',
+    // «سحب» لا «إلغاء»: الإلغاء في هذا النظام يعني ملحق إلغاء على وثيقة سارية.
+    auditActionDiscard: 'سحب',
+    auditActionSlaEscalated: 'تصعيد مستوى خدمة',
+    auditActionEncryptionKeyUsed: 'استخدام مفتاح التشفير',
     auditActionApprove: 'اعتماد',
     auditActionReject: 'رفض',
     auditActionTransition: 'تغيير حالة',
@@ -309,6 +313,11 @@ export const ENUMS = {
     auditActionRead: 'Read',
     auditActionUpdate: 'Update',
     auditActionDelete: 'Delete',
+    // "Withdrawn", not "Cancelled": a cancellation in this product is an endorsement on a live policy,
+    // which is the same collision `DiscardControl`'s Arabic wording had to avoid.
+    auditActionDiscard: 'Withdrawn',
+    auditActionSlaEscalated: 'SLA escalated',
+    auditActionEncryptionKeyUsed: 'Encryption key used',
     auditActionApprove: 'Approve',
     auditActionReject: 'Reject',
     auditActionTransition: 'Status change',

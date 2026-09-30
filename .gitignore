@@ -42,3 +42,8 @@ Thumbs.db
 # records the demo accounts and their shared password, so it must not be
 # committed even though it lands next to the script that writes it.
 apps/api/scripts/seed-demo-report.json
+
+# Written by `scripts/plant.mjs` when a plant is applied and removed by `--revert`. Never committed:
+# a leftover backup next to a source file is a plant somebody forgot to revert, and `git add -A` would
+# turn that into a committed copy of the pre-plant file.
+*.plant-backup

@@ -65,11 +65,42 @@ export function listSlaPolicies(filter?: {
   return apiGet(`/sla/policies${query ? `?${query}` : ""}`);
 }
 
+/**
+ * Define a new SLA policy — `sla.policy.create`, which had no web caller, so an office could
+ * only edit the seeded policies and never state a target of its own.
+ *
+ * The body carries the essential fields only. Working hours, timezone, the warning threshold and
+ * the escalation stages all have server defaults and are deliberately not on the create form:
+ * they are refinements of a policy that exists, and a fifteen-field form to state "answer a quote
+ * request within two business days" is a form nobody completes.
+ *
+ * `sourceType` is the field that decides whether this SLA claims LEGAL FORCE. The API gates the
+ * whole route on `sla.policy.create` alone, while CHANGING an existing policy's source type needs
+ * `sla.policy.regulatory` on top — so the screen, not the server, is what keeps the two paths
+ * consistent. See the note on the form.
+ */
+export function createSlaPolicy(input: {
+  policyCode: string;
+  policyName: string;
+  processType: string;
+  workflowState?: string;
+  description?: string;
+  durationValue: number;
+  durationUnit: SlaDurationUnit;
+  calendarType?: SlaPolicy['calendarType'];
+  sourceType: SlaSourceType;
+  sourceReference?: string;
+  sourceDocument?: string;
+  sourceSection?: string;
+}): Promise<SlaPolicy> {
+  return apiPost('/sla/policies', input);
+}
+
 export function getSlaPolicy(id: string): Promise<SlaPolicy> {
   return apiGet(`/sla/policies/${encodeURIComponent(id)}`);
 }
 
-/** Duration/calendar/escalation edits. Needs `sla.policy.manage`.
+/** Duration/calendar/escalation edits. Needs `sla.policy.update`.
  *
  * Deliberately CANNOT change the source/citation — that is a different route
  * behind `sla.policy.regulatory` (see `updateSlaPolicySource`), because
@@ -112,7 +143,7 @@ export function durationUnitKey(unit: SlaDurationUnit): string {
 }
 
 /** Change what the system CLAIMS about an SLA's legal force. Needs
- * `sla.policy.regulatory` on top of `sla.policy.manage`. `REGULATORY` still
+ * `sla.policy.regulatory` on top of `sla.policy.update`. `REGULATORY` still
  * requires a named instrument — a 422, not a silent downgrade. */
 export function updateSlaPolicySource(
   id: string,

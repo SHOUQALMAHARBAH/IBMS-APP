@@ -19,6 +19,7 @@ import { SlaModule } from '../sla/sla.module';
 import { DepartmentRepository } from '../../repositories/department.repository';
 import { BranchRepository } from '../../repositories/branch.repository';
 import { EmployeeRepository } from '../../repositories/employee.repository';
+import { SecurityModule } from '../security/security.module';
 
 @Module({
   // AuthModule exports UserRepository — reused here (the scheduler needs it
@@ -26,7 +27,15 @@ import { EmployeeRepository } from '../../repositories/employee.repository';
   // needs it to enrich item views with subject name/email/roles) rather
   // than re-provided. SlaModule exports SlaTimerService — AccessRecertification
   // Service.startCycle() starts a quarterly_access_review timer (backlog A.8).
-  imports: [AuditModule, AuthModule, SlaModule, PermissionsModule],
+  imports: [
+    AuditModule,
+    AuthModule,
+    SlaModule,
+    PermissionsModule,
+    // EncryptionService — the paired person-and-account create encrypts the national ID before
+    // opening its transaction. PrismaService needs no import: PrismaModule is @Global().
+    SecurityModule,
+  ],
   controllers: [
     RbacController,
     AccessRecertificationController,

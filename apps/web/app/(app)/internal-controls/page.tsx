@@ -4,13 +4,17 @@ import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
+  getCombinedDutyActs,
   getSelfApprovalAudit,
+  type CombinedDutyReport,
   type InternalControlsAuditReport,
 } from '../../../lib/internal-controls/internal-controls-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDateTime } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -47,18 +51,35 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 export default function InternalControlsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [report, setReport] = useState<InternalControlsAuditReport | null>(
     null,
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 step 6 — the DECLARED acts, beside the scan for silent ones. Its own state and its own error,
+  // because one failing must not blank the other: they answer different questions and a reviewer needs
+  // whichever half still works.
+  const [declared, setDeclared] = useState<CombinedDutyReport | null>(null);
+  const [declaredError, setDeclaredError] = useState<string | null>(null);
 
   // Deliberately does not touch `busy` — a `useEffect` below calls this
   // directly on mount, and setting state synchronously at the top of an
   // effect-invoked function trips react-hooks/set-state-in-effect. The
   // "Run audit now" button manages `busy` itself around this call instead.
+  const loadDeclared = useCallback(async () => {
+    try {
+      setDeclared(await getCombinedDutyActs());
+      setDeclaredError(null);
+    } catch (err) {
+      setDeclared(null);
+      setDeclaredError(
+        err instanceof ApiError ? err.message : t('icDeclaredLoadError'),
+      );
+    }
+  }, [t]);
+
   const load = useCallback(async () => {
     try {
       setReport(await getSelfApprovalAudit());
@@ -67,7 +88,7 @@ export default function InternalControlsPage() {
       setReport(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('icNoPermission')
+          ? permissionRefusal(t, 'icRefusalAct', 'internal-controls.view')
           : err instanceof ApiError
             ? err.message
             : t('icRunError'),
@@ -90,6 +111,12 @@ export default function InternalControlsPage() {
   useEffect(() => {
     if (!user) return;
     void (async () => {
+      await loadDeclared();
+    })();
+  }, [user, loadDeclared]);
+  useEffect(() => {
+    if (!user) return;
+    void (async () => {
       await load();
     })();
   }, [user, load, t]);
@@ -101,9 +128,7 @@ export default function InternalControlsPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('icHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('icIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('icIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -115,20 +140,142 @@ export default function InternalControlsPage() {
         {busy ? t('icRunningButton') : t('icRunButton')}
       </button>
 
+      {/*
+        THE SELF-APPROVAL REPORT — the shipping gate for COMBINED mode, and the reason a control could be
+        weakened at all. Rendered FIRST, above the silent-self-approval scan: the scan should always find
+        nothing (the CHECK constraints refuse silent ones), whereas anything here is a real act somebody
+        performed, and the more important half should not be below a table of zeroes.
+      */}
+      <section style={sectionStyle} data-testid="declared-acts">
+        <h2>{t('icDeclaredHeading')}</h2>
+        <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>
+          {t('icDeclaredIntro')}
+        </p>
+        {declaredError ? (
+          <p role="alert" style={errorStyle}>
+            {declaredError}
+          </p>
+        ) : null}
+        {declared ? (
+          <>
+            <p
+              data-testid="declared-office-mode"
+              style={{ margin: '0.4rem 0' }}
+            >
+              {declared.office.mode === 'COMBINED'
+                ? t('icDeclaredOfficeCombined')
+                : t('icDeclaredOfficeSegregated')}{' '}
+              {declared.office.declaredAt
+                ? t('icDeclaredOfficeDeclaredBy', {
+                    who:
+                      declared.office.declaredByName ??
+                      declared.office.declaredByUserId ??
+                      '—',
+                  })
+                : t('icDeclaredOfficeNeverDeclared')}
+            </p>
+            {declared.rows.length === 0 ? (
+              // "Nobody has done this" is a different claim from "the report could not be read", and the two
+              // must not share a blank space.
+              <p data-testid="declared-empty">{t('icDeclaredEmpty')}</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '48rem' }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={leftHead}>{t('icDeclaredColWhen')}</th>
+                      <th style={leftHead}>{t('icDeclaredColWho')}</th>
+                      <th style={leftHead}>{t('icDeclaredColPair')}</th>
+                      <th style={leftHead}>{t('icDeclaredColRoles')}</th>
+                      <th style={leftHead}>{t('icDeclaredColReason')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {declared.rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        data-testid={
+                          row.accessSelfReview
+                            ? 'declared-row-access'
+                            : 'declared-row'
+                        }
+                      >
+                        <td style={leftCell}>
+                          {/* FLAGGED, not merely first: a position is something a reader re-sorts away. */}
+                          {row.accessSelfReview ? (
+                            <strong data-testid="access-flag">
+                              {t('icDeclaredAccessFlag')}{' '}
+                            </strong>
+                          ) : null}
+                          {formatDateTime(row.at, language)}
+                        </td>
+                        <td style={leftCell}>
+                          {/*
+                            No `?? id` fallback. `CombinedDutyAct.actor` is a REQUIRED relation, so
+                            Prisma's default `onDelete: Restrict` applies and the actor cannot be deleted
+                            out from under an act — and the single path that builds this row resolves every
+                            distinct actor on the page. So the null branch is structurally impossible, and
+                            a fallback for it would be dead code that displays a uuid: it never renders, so
+                            nobody reads it, so nobody notices what it shows. Third instance of that class
+                            — see `scripts/measurements/rendered-identifiers.py`.
+                          */}
+                          {row.actorName}
+                        </td>
+                        <td style={leftCell}>
+                          {row.entity} · <code>{row.pair}</code>
+                        </td>
+                        <td style={leftCell}>
+                          {row.roles.join(', ') || '—'}
+                          {row.hatAmbiguous
+                            ? ` — ${t('icDeclaredHatAmbiguous')}`
+                            : ''}
+                        </td>
+                        <td style={leftCell}>{row.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {declared.truncated ? (
+                  <p
+                    style={{
+                      color: 'var(--ink-secondary)',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    {t('icDeclaredTruncated')}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </>
+        ) : declaredError ? null : (
+          <p>{t('icLoading')}</p>
+        )}
+      </section>
+
       {report ? (
         <>
           <section style={sectionStyle}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               <Stat label={t('icPairsScanned')} value={report.pairsScanned} />
-              <Stat label={t('icColRowsChecked')} value={report.totalRowsChecked} />
+              <Stat
+                label={t('icColRowsChecked')}
+                value={report.totalRowsChecked}
+              />
               <Stat
                 label={t('icColViolations')}
-                value={
-                  violationCount === 0 ? 'None' : String(violationCount)
-                }
+                value={violationCount === 0 ? 'None' : String(violationCount)}
               />
             </div>
-            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <p
+              style={{
+                color: 'var(--ink-secondary)',
+                fontSize: '0.85rem',
+                marginTop: '0.5rem',
+              }}
+            >
               Generated {report.generatedAt.replace('T', ' ').slice(0, 16)}.
             </p>
           </section>
@@ -141,11 +288,11 @@ export default function InternalControlsPage() {
 
           {violationCount > 0 ? (
             <section style={sectionStyle}>
-              <h2 style={{ color: '#b91c1c' }}>
-                {t('icViolationsHeading')}
-              </h2>
+              <h2 style={{ color: '#b91c1c' }}>{t('icViolationsHeading')}</h2>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '48rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={leftHead}>{t('icColEntity')}</th>

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { IncidentService } from './incident.service';
 import { CreateIncidentDto } from './dto/create-incident.dto';
@@ -74,8 +75,12 @@ export class IncidentController {
 
   @RequirePermissions('incident.classification.co-sign')
   @Post(':id/co-sign')
-  coSign(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.incidents.coSign(id, user);
+  coSign(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.incidents.coSign(id, user, dto.combinedDutyReason);
   }
 
   @RequirePermissions('incident.senior-management.notify')

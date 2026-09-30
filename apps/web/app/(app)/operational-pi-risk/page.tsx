@@ -30,6 +30,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const RISK_REGISTER_ROLE = [
   'risk-register.manage',
@@ -88,7 +89,7 @@ export default function OperationalPiRiskPage() {
       setRisks(null);
       setRisksError(
         err instanceof ApiError && err.status === 403
-          ? t('opNoPermission')
+          ? permissionRefusal(t, 'opRefusalAct', 'risk-register.manage')
           : err instanceof ApiError
             ? err.message
             : t('opRegisterLoadError'),
@@ -104,7 +105,7 @@ export default function OperationalPiRiskPage() {
       setPolicies(null);
       setPoliciesError(
         err instanceof ApiError && err.status === 403
-          ? t('opNoPermissionPi')
+          ? permissionRefusal(t, 'opPiRefusalAct', 'pi-policy.manage')
           : err instanceof ApiError
             ? err.message
             : t('opPiLoadError'),
@@ -120,7 +121,7 @@ export default function OperationalPiRiskPage() {
       setEvents(null);
       setEventsError(
         err instanceof ApiError && err.status === 403
-          ? t('opNoPermissionPi')
+          ? permissionRefusal(t, 'opPiRefusalAct', 'pi-policy.manage')
           : err instanceof ApiError
             ? err.message
             : t('opEventsLoadError'),
@@ -265,7 +266,7 @@ export default function OperationalPiRiskPage() {
                   {canManageRiskRegister && r.status === 'open' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '14rem' }}>
                       <input
-                        aria-label={t('opMitigationRowAria', { id: r.id })}
+                        aria-label={t('opMitigationRowAria')}
                         placeholder={t('opMitigationActionLabel')}
                         value={mitigationDrafts[r.id] ?? ''}
                         onChange={(e) =>
@@ -382,7 +383,7 @@ export default function OperationalPiRiskPage() {
                   <td style={cell}>
                     <div style={{ display: 'flex', gap: '0.3rem' }}>
                       <input
-                        aria-label={t('opClaimsHistoryRowAria', { id: p.id })}
+                        aria-label={t('opClaimsHistoryRowAria')}
                         placeholder={t('opClaimsHistoryLabel')}
                         value={claimsHistoryDrafts[p.id] ?? ''}
                         onChange={(e) =>
@@ -468,7 +469,7 @@ export default function OperationalPiRiskPage() {
                   <td style={cell}>
                     <div style={{ display: 'flex', gap: '0.3rem' }}>
                       <input
-                        aria-label={t('opEventMitigationAria', { id: ev.id })}
+                        aria-label={t('opEventMitigationAria')}
                         placeholder={t('opMitigationActionLabel')}
                         value={eventMitigationDrafts[ev.id] ?? ''}
                         onChange={(e) =>
@@ -487,7 +488,7 @@ export default function OperationalPiRiskPage() {
                           )
                         }
                       >
-                        Save
+                        {t('commonSave')}
                       </button>
                     </div>
                   </td>

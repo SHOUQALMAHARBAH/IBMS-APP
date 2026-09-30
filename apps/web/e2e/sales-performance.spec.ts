@@ -96,7 +96,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/sales-performance");
   await expect(
-    page.getByText("dashboard.sales.view permission", { exact: false }),
+    page.getByText("(dashboard.sales.view)", { exact: false }),
   ).toBeVisible();
 });
 

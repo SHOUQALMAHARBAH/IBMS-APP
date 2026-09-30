@@ -1,3 +1,4 @@
+import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOnRecord";
 // Process 55/Part 6.2/Part 7.4 — Incident Management (backlog Part C #55).
 // Reads/writes apps/api's /incidents endpoints. incident.report (broad)
 // gates create+read; incident.contain (Admin/Compliance) gates the
@@ -5,27 +6,33 @@
 // gates classify/co-sign/notify-senior-management; incident.notify-regulator
 // (DPO/Compliance) gates the external filings.
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPost } from "../auth/api-client";
 
-export const INCIDENT_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
+export const INCIDENT_SEVERITIES = [
+  "low",
+  "medium",
+  "high",
+  "critical",
+] as const;
 export const INCIDENT_REGULATORS = [
-  'CBJ',
-  'NCSC',
-  'Personal_Data_Protection_Council',
+  "CBJ",
+  "NCSC",
+  "Personal_Data_Protection_Council",
 ];
 
-export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type IncidentSeverity = "low" | "medium" | "high" | "critical";
 
 export type IncidentStatus =
-  | 'REPORTED'
-  | 'CONTAINED'
-  | 'IMPACT_ASSESSED'
-  | 'CLASSIFIED'
-  | 'NOTIFIED'
-  | 'RECOVERED'
-  | 'CLOSED';
+  | "REPORTED"
+  | "CONTAINED"
+  | "IMPACT_ASSESSED"
+  | "CLASSIFIED"
+  | "NOTIFIED"
+  | "RECOVERED"
+  | "CLOSED";
 
-export type IncidentClassification = 'NOT_YET_CLASSIFIED' | 'MATERIAL' | 'NON_MATERIAL';
+export type IncidentClassification =
+  "NOT_YET_CLASSIFIED" | "MATERIAL" | "NON_MATERIAL";
 
 export interface IncidentReport {
   id: string;
@@ -39,6 +46,13 @@ export interface IncidentReport {
   classification: IncidentClassification;
   classifiedByDpoUserId: string | null;
   seniorManagementCoSignUserId: string | null;
+  /**
+   * Part 4 step 5 — present when ONE person both classified this incident and co-signed that
+   * classification, in an office that declared COMBINED. A classification is the decision that a regulator
+   * and the affected data subjects either do or do not get told, and the co-sign stamp reads as filled
+   * either way.
+   */
+  classificationCombinedDutyAct: CombinedDutyActOnRecord | null;
   seniorManagementNotifiedAt: string | null;
   notifiedRegulators: string[];
   notifiedAt: string | null;
@@ -53,11 +67,11 @@ export function listIncidents(
   opts: { status?: string; severity?: string; classification?: string } = {},
 ): Promise<IncidentReport[]> {
   const params = new URLSearchParams();
-  if (opts.status) params.set('status', opts.status);
-  if (opts.severity) params.set('severity', opts.severity);
-  if (opts.classification) params.set('classification', opts.classification);
+  if (opts.status) params.set("status", opts.status);
+  if (opts.severity) params.set("severity", opts.severity);
+  if (opts.classification) params.set("classification", opts.classification);
   const qs = params.toString();
-  return apiGet(`/incidents${qs ? `?${qs}` : ''}`);
+  return apiGet(`/incidents${qs ? `?${qs}` : ""}`);
 }
 
 export function createIncident(body: {
@@ -65,7 +79,7 @@ export function createIncident(body: {
   description: string;
   severity: string;
 }): Promise<IncidentReport> {
-  return apiPost('/incidents', body);
+  return apiPost("/incidents", body);
 }
 
 export function containIncident(id: string): Promise<IncidentReport> {
@@ -78,13 +92,23 @@ export function assessIncidentImpact(id: string): Promise<IncidentReport> {
 
 export function classifyIncident(
   id: string,
-  classification: 'MATERIAL' | 'NON_MATERIAL',
+  classification: "MATERIAL" | "NON_MATERIAL",
 ): Promise<IncidentReport> {
   return apiPost(`/incidents/${id}/classify`, { classification });
 }
 
-export function coSignIncident(id: string): Promise<IncidentReport> {
-  return apiPost(`/incidents/${id}/co-sign`, {});
+export function coSignIncident(
+  id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<IncidentReport> {
+  return apiPost(
+    `/incidents/${id}/co-sign`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 export function notifyIncidentSeniorManagement(

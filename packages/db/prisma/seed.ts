@@ -663,9 +663,81 @@ async function main() {
     console.log("NODE_ENV=production — skipping sample insurers/users.");
   }
 
+  // Every office, every environment: a business-day deadline counted against an
+  // empty calendar lands earlier than the law requires, and the error runs against
+  // the brokerage (IMPROVEMENTS § 1.57).
+  await ensureJordanFixedHolidays();
+
   // Runs in EVERY environment: in dev it is an optional extra alongside the
   // sample users, in production it is the only way anyone gets in at all.
   await ensureBootstrapAdmin(roleIdByName);
+}
+
+/**
+ * Jordan's four FIXED-DATE public holidays, for every office, for this year and next.
+ *
+ * Source: Jordan's Ministry of Foreign Affairs,
+ * https://www.mfa.gov.jo/content/public-holidays.
+ *
+ * ## WHY ONLY FOUR, AND WHY ONLY TWO YEARS
+ *
+ * Jordan also observes the Islamic New Year, the Prophet's Birthday, Eid al-Fitr (four
+ * days) and Eid al-Adha (five days) — **and those are deliberately not seeded and must
+ * never be computed.** In Jordan the actual date is fixed by official announcement and
+ * can differ by a day from any calendar conversion, so a generated Hijri calendar would
+ * be wrong most years and nobody would know why: every business-day deadline would
+ * simply be off, and the error would look like arithmetic rather than a wrong input. An
+ * office enters them from the announcement, and `/sla-policies` tells it which ones a
+ * year is still missing.
+ *
+ * The fixed four are a different matter: 1 January is 1 January, so generating them is
+ * not a conversion and carries no risk.
+ *
+ * TWO YEARS, not ten: a horizon further out is a guess about how long this seed's output
+ * stays untouched, and the screen fills any year on demand. This year and next means an
+ * office is never looking at an empty calendar for the year it is working in.
+ *
+ * Idempotent per (office, date) — the table carries a partial unique on an
+ * all-calendars entry per date, so a re-run must skip rather than collide.
+ */
+async function ensureJordanFixedHolidays(): Promise<void> {
+  // Month is 1-based here and 0-based in `Date.UTC`, which is exactly the kind of
+  // off-by-one that silently moves a holiday; the conversion happens once, below.
+  const FIXED: { month: number; day: number; name: string }[] = [
+    { month: 1, day: 1, name: "New Year's Day" },
+    { month: 5, day: 1, name: "Labour Day" },
+    { month: 5, day: 25, name: "Independence Day" },
+    { month: 12, day: 25, name: "Christmas" },
+  ];
+
+  const organizations = await prisma.organization.findMany({ select: { id: true } });
+  const thisYear = new Date().getUTCFullYear();
+  let created = 0;
+
+  for (const org of organizations) {
+    for (const year of [thisYear, thisYear + 1]) {
+      for (const h of FIXED) {
+        const observedOn = new Date(Date.UTC(year, h.month - 1, h.day));
+        // An all-calendars entry is `calendarType: null`, and Postgres treats NULLs as
+        // distinct — so `findFirst` rather than an upsert on a unique that a null key
+        // cannot address.
+        const existing = await prisma.slaHoliday.findFirst({
+          where: { organizationId: org.id, observedOn, calendarType: null },
+          select: { id: true },
+        });
+        if (existing) continue;
+        await prisma.slaHoliday.create({
+          data: { organizationId: org.id, observedOn, name: h.name, calendarType: null },
+        });
+        created += 1;
+      }
+    }
+  }
+
+  console.log(
+    `Seeded ${created} fixed-date Jordanian public holiday(s) across ${organizations.length} office(s) for ${thisYear} and ${thisYear + 1}. ` +
+      "The Islamic occasions are NOT seeded — they are set by official announcement and are entered per year.",
+  );
 }
 
 main()

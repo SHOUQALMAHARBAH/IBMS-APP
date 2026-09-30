@@ -538,6 +538,68 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
         .expect(201)
     ).body as DsrBody;
 
+    // NO FALSE CLOSURE, end to end against the real database. The owner's requirement 4.
+    //
+    // A CORRECTION request could be marked FULFILLED on the DPO's word alone, with nothing able to verify
+    // the data changed — and until this week nothing COULD change it (IMPROVEMENTS § 3.14). Proven here
+    // rather than only in the unit spec because the gate is one query against a real table, and a unit
+    // mock of that query would be asserting the mock.
+    // Its OWN customer, deliberately. The list assertion further down counts this test's requests for
+    // `customer` and expects exactly one; adding a second request there would have made a correct
+    // assertion fail, and weakening it to accommodate a new fixture is how a count stops meaning
+    // anything. (It did fail, once, which is how this comment came to be here.)
+    const gatedCustomer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `DSR Correction Gate E2E ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+      },
+    });
+    const gated = (
+      await request(app.getHttpServer())
+        .post('/dsr')
+        .set(bearer(sales.accessToken))
+        .send({ customerId: gatedCustomer.id, type: 'CORRECTION' })
+        .expect(201)
+    ).body as DsrBody;
+    await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/verify-identity`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/start`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+
+    // Nothing has been corrected against it: refused.
+    await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/fulfil`)
+      .set(bearer(dpo.accessToken))
+      .send({})
+      .expect(422);
+
+    // Correct the customer's phone, naming this request. `PATCH /customers/:id` records the correction
+    // with the request's id, which is the only link the gate can read — an audit row is not queryable as
+    // "was this request answered".
+    await request(app.getHttpServer())
+      .patch(`/customers/${gatedCustomer.id}`)
+      .set(bearer(sales.accessToken))
+      .send({
+        contactPhone: '+962-7-9444-4444',
+        reason: 'Data subject asked for the number on file to be corrected.',
+        answersRequestType: 'dsr',
+        answersRequestId: gated.id,
+      })
+      .expect(200);
+
+    // Now it closes.
+    const nowFulfilled = await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/fulfil`)
+      .set(bearer(dpo.accessToken))
+      .send({})
+      .expect(201);
+    expect((nowFulfilled.body as DsrBody).status).toBe('FULFILLED');
+
     // reject straight from RECEIVED — legal per WORKFLOW_TRANSITIONS
     const rejected = await request(app.getHttpServer())
       .post(`/dsr/${correction.id}/reject`)
@@ -580,5 +642,117 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       .set(bearer(dpo.accessToken))
       .expect(200);
     expect(byWrongType.body as DsrBody[]).toEqual([]);
+  });
+
+  it("lets the DPO stop and restart a request's clock, and refuses a Sales Officer", async () => {
+    /*
+     * IMPROVEMENTS § 1.61, and the crux is the GATE rather than the button.
+     *
+     * `sla.timer.pause` is held by the Manager, Compliance and the DPO — and the DPO does
+     * NOT hold `sla-dashboard.view`, so the capability was unreachable for the one role
+     * whose own statutory clocks are the likeliest thing anybody would legitimately pause.
+     * The owner's decision moved the control to the request. This proves a real DPO token
+     * can reach it, which no screen test can: a Playwright mock cannot refuse you.
+     *
+     * Gated on `sla.timer.pause`, deliberately NOT on `dsr.handle` — stopping a compliance
+     * clock is the same act here as anywhere else, and a route that let anyone who can
+     * handle a request also stop its clock would quietly widen who may pause a statutory
+     * deadline.
+     */
+    const app = await boot();
+    const dpo = await makeUser(app, 'dsr-clock-dpo', 'DATA_PROTECTION_OFFICER');
+    const sales = await makeUser(
+      app,
+      'dsr-clock-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `DSR Clock ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: dpo.userId,
+      },
+    });
+
+    const created = await request(app.getHttpServer())
+      .post('/dsr')
+      .set(bearer(dpo.accessToken))
+      .send({ customerId: customer.id, type: 'ACCESS' })
+      .expect(201);
+    const dsrId = (created.body as { id: string }).id;
+
+    // A Sales Officer holds neither `sla.timer.pause` nor `dsr.handle`.
+    await request(app.getHttpServer())
+      .post(`/dsr/${dsrId}/sla/pause`)
+      .set(bearer(sales.accessToken))
+      .send({ reason: 'Trying to stop a clock I may not stop' })
+      .expect(403);
+
+    // The floor is server-side: nine characters, not zero, so the assertion cannot pass
+    // against a non-empty check.
+    await request(app.getHttpServer())
+      .post(`/dsr/${dsrId}/sla/pause`)
+      .set(bearer(dpo.accessToken))
+      .send({ reason: 'Nine char' })
+      .expect(400);
+
+    const REASON =
+      'Waiting for the identity documents the subject was asked for';
+    const paused = await request(app.getHttpServer())
+      .post(`/dsr/${dsrId}/sla/pause`)
+      .set(bearer(dpo.accessToken))
+      .send({ reason: REASON })
+      .expect(201);
+    const pausedBody = paused.body as {
+      paused: number;
+      alreadyPaused: number;
+      open: number;
+    };
+    // EVERY open clock on the request, not one — a request carries several timers, and
+    // pausing one looks exactly like a control that worked while it still escalates.
+    expect(pausedBody.open).toBeGreaterThan(0);
+    expect(pausedBody.paused).toBe(pausedBody.open);
+
+    // The detail read reports it, which is what the screen offers the control from.
+    const detail = await request(app.getHttpServer())
+      .get(`/dsr/${dsrId}`)
+      .set(bearer(dpo.accessToken))
+      .expect(200);
+    const clock = (
+      detail.body as {
+        slaClock: { open: number; paused: number; pauseReason: string | null };
+      }
+    ).slaClock;
+    expect(clock.paused).toBe(clock.open);
+    expect(clock.pauseReason).toBe(REASON);
+
+    // Every pause is audited, per timer — the stated basis IS the control.
+    const audit = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'DataSubjectRequest', entityId: dsrId },
+    });
+    const payloads = audit.map((a) => JSON.stringify(a.afterValue));
+    expect(payloads.some((x) => x.includes('SLA_PAUSED'))).toBe(true);
+    expect(payloads.some((x) => x.includes(REASON))).toBe(true);
+
+    // And it restarts.
+    const resumed = await request(app.getHttpServer())
+      .post(`/dsr/${dsrId}/sla/resume`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+    expect((resumed.body as { resumed: number }).resumed).toBe(
+      pausedBody.paused,
+    );
+
+    // THE SECOND HALF OF THE ACCEPTANCE: the DPO still cannot read the deadlines
+    // dashboard. A test that only proved the pause works would pass equally on the
+    // version that also handed this role the whole office's dashboard.
+    await request(app.getHttpServer())
+      .get('/sla-dashboard/timers')
+      .set(bearer(dpo.accessToken))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/sla-dashboard/summary')
+      .set(bearer(dpo.accessToken))
+      .expect(403);
   });
 });

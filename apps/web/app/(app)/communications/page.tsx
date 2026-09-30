@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -19,6 +19,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const CHANNEL_LABEL_KEY: Record<string, TranslationKey> = {
   EMAIL: 'commChannelEmail',
@@ -70,7 +71,7 @@ export default function CommunicationsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('commNoPermission')
+          ? permissionRefusal(t, 'commRefusalAct', 'communication.send')
           : err instanceof ApiError
             ? err.message
             : t('commLoadError'),
@@ -147,7 +148,8 @@ export default function CommunicationsPage() {
             maxWidth: '34rem',
           }}
         >
-          <CustomerPicker
+          <EntitySearch
+            kind="customer"
             value={customerId}
             onChange={setCustomerId}
             label={t('commCustomerIdLabel')}

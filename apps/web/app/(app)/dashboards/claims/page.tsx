@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ReportProvenance } from '../../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -13,11 +14,18 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
-function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdownRow[] }) {
+function LossRatioTable({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: LossRatioBreakdownRow[];
+}) {
   const { t } = useLanguage();
   return (
     <section style={sectionStyle}>
@@ -28,10 +36,18 @@ function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdo
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dashColGroup')}</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dclmColClaims')}</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dclmColPremium')}</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dclmColRatio')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+                {t('dashColGroup')}
+              </th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+                {t('dclmColClaims')}
+              </th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+                {t('dclmColPremium')}
+              </th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+                {t('dclmColRatio')}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -87,7 +103,7 @@ export default function ClaimsDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dclmNoPermission')
+          ? permissionRefusal(t, 'dclmRefusalAct', 'dashboard.claims.view')
           : err instanceof ApiError
             ? err.message
             : t('dclmLoadError'),
@@ -114,19 +130,31 @@ export default function ClaimsDashboardPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('dclmHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('dclmIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dclmIntro')}</p>
 
       <form
         onSubmit={applyFilters}
-        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          alignItems: 'flex-end',
+          margin: '0.75rem 0',
+        }}
       >
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashBranchIdLabel')}
-          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          <input
+            aria-label={t('dashBranchIdFilterAria')}
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+          />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashInsuranceLineLabel')}
           <input
             aria-label={t('dashInsuranceLineFilterAria')}
@@ -135,13 +163,26 @@ export default function ClaimsDashboardPage() {
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashInsurerIdLabel')}
-          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
+          <input
+            aria-label={t('dashInsurerIdFilterAria')}
+            value={insurerId}
+            onChange={(e) => setInsurerId(e.target.value)}
+          />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashAsOf')}
-          <input aria-label={t('dashAsOfDateAria')} placeholder={t('dashDatePlaceholder')} value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+          <input
+            aria-label={t('dashAsOfDateAria')}
+            placeholder={t('dashDatePlaceholder')}
+            value={asOf}
+            onChange={(e) => setAsOf(e.target.value)}
+          />
         </label>
         <button type="submit">{t('dashApplyFilters')}</button>
       </form>
@@ -154,7 +195,7 @@ export default function ClaimsDashboardPage() {
 
       {summary ? (
         <>
-          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>As of {summary.asOf.slice(0, 10)}.</p>
+          <ReportProvenance kind="asOf" at={summary.asOf} />
 
           <section style={sectionStyle}>
             <h2>{t('dclmOpenVsClosed')}</h2>
@@ -183,25 +224,29 @@ export default function ClaimsDashboardPage() {
               <div>
                 <div style={statStyle}>{summary.ageing.d0_30.count}</div>
                 <div>
-                  {t('dclmAgeing0To30')} ({formatMoney(summary.ageing.d0_30.valueJod, language)})
+                  {t('dclmAgeing0To30')} (
+                  {formatMoney(summary.ageing.d0_30.valueJod, language)})
                 </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d31_60.count}</div>
                 <div>
-                  {t('dclmAgeing31To60')} ({formatMoney(summary.ageing.d31_60.valueJod, language)})
+                  {t('dclmAgeing31To60')} (
+                  {formatMoney(summary.ageing.d31_60.valueJod, language)})
                 </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d61_90.count}</div>
                 <div>
-                  {t('dclmAgeing61To90')} ({formatMoney(summary.ageing.d61_90.valueJod, language)})
+                  {t('dclmAgeing61To90')} (
+                  {formatMoney(summary.ageing.d61_90.valueJod, language)})
                 </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d90_plus.count}</div>
                 <div>
-                  {t('dclmAgeing90Plus')} ({formatMoney(summary.ageing.d90_plus.valueJod, language)})
+                  {t('dclmAgeing90Plus')} (
+                  {formatMoney(summary.ageing.d90_plus.valueJod, language)})
                 </div>
               </div>
             </div>
@@ -209,9 +254,18 @@ export default function ClaimsDashboardPage() {
 
           <section style={sectionStyle}>
             <h2>{t('dclmLossRatio')}</h2>
-            <LossRatioTable title={t('dclmByClient')} rows={summary.lossRatioByClient} />
-            <LossRatioTable title={t('dclmByLine')} rows={summary.lossRatioByLine} />
-            <LossRatioTable title={t('dclmByInsurer')} rows={summary.lossRatioByInsurer} />
+            <LossRatioTable
+              title={t('dclmByClient')}
+              rows={summary.lossRatioByClient}
+            />
+            <LossRatioTable
+              title={t('dclmByLine')}
+              rows={summary.lossRatioByLine}
+            />
+            <LossRatioTable
+              title={t('dclmByInsurer')}
+              rows={summary.lossRatioByInsurer}
+            />
           </section>
         </>
       ) : loadError ? null : (

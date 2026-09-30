@@ -10,7 +10,9 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 /**
  * Process 38 (backlog Part C #38, Domain D) — Payment Processing: the approved
  * `PaymentChannel` list for customers and insurers. Finance maintains it
- * (`payment-channel.manage`); #32's collection cycle references a channel on a
+ * (`payment-channel.create` to add, `.read` to list, `.deactivate` to disable — four-action Phase 4,
+ * because a destination for client money is not the same capability as the list of them); #32's
+ * collection cycle references a channel on a
  * `Receipt` / `Remittance`. No `AuthModule` import — the global
  * `PermissionsGuard` + `@CurrentUser` cover it (same as the rest of
  * `FinanceModule`).
@@ -20,7 +22,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 export class PaymentChannelController {
   constructor(private readonly channels: PaymentChannelService) {}
 
-  @RequirePermissions('payment-channel.manage')
+  @RequirePermissions('payment-channel.create')
   @Post()
   create(
     @Body() dto: CreatePaymentChannelDto,
@@ -29,13 +31,13 @@ export class PaymentChannelController {
     return this.channels.create(dto, user.id);
   }
 
-  @RequirePermissions('payment-channel.manage')
+  @RequirePermissions('payment-channel.read')
   @Get()
   list(@Query() query: ListPaymentChannelsQueryDto) {
     return this.channels.list(query);
   }
 
-  @RequirePermissions('payment-channel.manage')
+  @RequirePermissions('payment-channel.deactivate')
   @Post(':id/disable')
   disable(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.channels.disable(id, user.id);

@@ -10,6 +10,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 // Roles the seeded permission grid grants `prospect.capture` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
@@ -77,7 +78,7 @@ export default function NewProspectPage() {
         </Suspense>
       ) : (
         <p role="alert" style={errorStyle}>
-          {t('prosnNoPermission')}
+          {permissionRefusal(t, 'prosnRefusalAct', 'prospect.capture')}
         </p>
       )}
     </main>

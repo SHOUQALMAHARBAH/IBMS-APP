@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { InternalControlsController } from './internal-controls.controller';
 import { InternalControlsService } from './internal-controls.service';
+import { CombinedDutyReportService } from './combined-duty-report.service';
+import { CombinedDutyActRepository } from '../../repositories/combined-duty-act.repository';
+import { AccessRecertificationRepository } from '../../repositories/access-recertification.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 import { InternalControlsAuditScheduler } from './internal-controls-audit.scheduler';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -33,6 +37,16 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [AuditModule, AuthModule],
   controllers: [InternalControlsController],
-  providers: [InternalControlsService, InternalControlsAuditScheduler],
+  providers: [
+    InternalControlsService,
+    CombinedDutyReportService,
+    CombinedDutyActRepository,
+    OrganizationRepository,
+    // Shared REPOSITORY, not a service: the report needs one fact from the recertification tables —
+    // which of two acts on the same item is the review — so the self-approval report can flag the act
+    // that happened rather than the arrangement.
+    AccessRecertificationRepository,
+    InternalControlsAuditScheduler,
+  ],
 })
 export class InternalControlsModule {}

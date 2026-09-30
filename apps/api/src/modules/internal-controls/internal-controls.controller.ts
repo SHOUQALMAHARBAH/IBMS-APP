@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { InternalControlsService } from './internal-controls.service';
+import { CombinedDutyReportService } from './combined-duty-report.service';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -30,11 +31,28 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 @ApiTags('internal-controls')
 @Controller('internal-controls')
 export class InternalControlsController {
-  constructor(private readonly internalControls: InternalControlsService) {}
+  constructor(
+    private readonly internalControls: InternalControlsService,
+    private readonly combinedDuty: CombinedDutyReportService,
+  ) {}
 
   @RequirePermissions('internal-controls.view')
   @Get('self-approval-audit')
   selfApprovalAudit(@CurrentUser() user: AuthenticatedUser) {
     return this.internalControls.runSelfApprovalAudit(user.id);
+  }
+
+  /**
+   * Part 4 step 6 — THE SELF-APPROVAL REPORT, and the shipping gate for COMBINED mode.
+   *
+   * The sibling above scans for SILENT self-approvals, which the CHECK constraints refuse and which should
+   * therefore find none. This one lists the DECLARED ones, with their reasons and the roles the actor wore.
+   * Both on the same screen, because a reviewer asking "who has been on both sides of a control" needs both
+   * answers and neither is the other.
+   */
+  @RequirePermissions('internal-controls.view')
+  @Get('combined-duty-acts')
+  combinedDutyActs(@CurrentUser() user: AuthenticatedUser) {
+    return this.combinedDuty.run(user);
   }
 }

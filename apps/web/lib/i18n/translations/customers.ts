@@ -2,14 +2,46 @@
 // Process 3-4, Customer Acquisition/Onboarding + KYC.
 export const CUSTOMERS = {
   AR: {
+    // /settings/customer-import — loading an office's legacy customer file.
+    // The screening line is worded as WORK, never as an error: the row is imported and any match
+    // goes to the sanctions review queue like any other.
+    impHeading: 'استيراد العملاء',
+    impIntro:
+      'حمّل ملف عملائك الحالي كما هو. أنت من يحدد أي عمود في ملفك يحمل كل حقل، ' +
+      'فلا حاجة لإعادة كتابة الملف. تُفحص كل صفحة مقابل قوائم الجزاءات أثناء الاستيراد.',
+    impLoading: 'جارٍ التحميل…',
+    impRefusalAct: 'استيراد ملف عملاء',
+    impUploadLegend: 'الملف وربط الأعمدة',
+    impFileLabel: 'ملف CSV',
+    impMappingIntro:
+      'اكتب اسم العمود في ملفك مقابل كل حقل. اترك الحقل فارغاً إن لم يكن في ملفك. ' +
+      'الحقول المعلَّمة بنجمة مطلوبة.',
+    impFieldLegalName: 'الاسم القانوني',
+    impFieldCustomerType: 'نوع العميل (فرد / شركة)',
+    impFieldRegistrationNumber: 'رقم التسجيل',
+    impFieldNationality: 'الجنسية',
+    impFieldContactEmail: 'البريد الإلكتروني',
+    impFieldContactPhone: 'الهاتف',
+    impFieldRegisteredAddress: 'العنوان المسجَّل',
+    impMissingRequired: 'لم تُربط الحقول المطلوبة: {fields}.',
+    impSubmit: 'استيراد',
+    impImporting: 'جارٍ الاستيراد…',
+    impFailed: 'تعذر استيراد الملف.',
+    impResultHeading: 'نتيجة استيراد {fileName}',
+    impResultCounts: 'استُورد {imported} من {total} صف، ورُفض {rejected}.',
+    impScreeningClear: 'فُحص {screened} صف مقابل قوائم الجزاءات، ولم تظهر أي مطابقة محتملة.',
+    impScreeningFlagged:
+      'فُحص {screened} صف مقابل قوائم الجزاءات، وظهرت {flagged} مطابقة محتملة. ' +
+      'الصفوف مستوردة، والمطابقات في قائمة مراجعة الجزاءات للفصل فيها.',
+    impColLine: 'رقم السطر في ملفك',
+    impColReason: 'السبب',
     customersHeading: "العملاء",
     customersProcessIntro:
       "العملية 3-4 — اكتساب العملاء والتهيئة (أفراد وشركات)، اعرف عميلك، والملكية النفعية.",
     customersOnboardButton: "+ تهيئة عميل جديد",
     customersSearchLabel: "بحث",
     customersViewProfileAria: "عرض الملف الشخصي — {name}",
-    customersNoPermission:
-      "لا تملك صلاحية customer.360-view.read، لذا لا يوجد ما يمكن عرضه هنا.",
+    customersRefusalAct: 'البحث في العملاء وعرض قائمتهم',
     customersNoneMatch: "لا يوجد عملاء مطابقون لبحثك.",
     customersNoneYet: "لا يوجد عملاء بعد.",
 
@@ -33,6 +65,30 @@ export const CUSTOMERS = {
     customerFieldContactEmail: "البريد الإلكتروني",
     customerFieldRegistrationNumber: "رقم السجل",
     customerFieldRegisteredAddress: "العنوان المسجل",
+    customerCorrectHeading: "تصحيح بيانات الاتصال",
+    customerCorrectIntro:
+      "صحّح رقم الهاتف أو البريد الإلكتروني أو العنوان المسجل. اترك أي حقل فارغاً " +
+      "لتركه كما هو — الحقول تبدأ فارغة عن قصد، لأن المعروض على الشاشة مُقنَّع " +
+      "وليس القيمة نفسها.",
+    customerCorrectOpen: "تصحيح بيانات الاتصال",
+    customerCorrectPhone: "رقم الهاتف الجديد",
+    customerCorrectEmail: "البريد الإلكتروني الجديد",
+    customerCorrectAddress: "العنوان المسجل الجديد",
+    customerCorrectReason: "سبب التصحيح",
+    customerCorrectReasonHint:
+      "يُسجَّل السبب مع كل حقل مُصحَّح ويُنسب إليك. اذكر من أبلغ عن الخطأ وكيف " +
+      "تحقّقت منه.",
+    customerCorrectAnswersDsr: "رقم طلب صاحب البيانات (إن كان هذا التصحيح رداً على طلب)",
+    customerCorrectAnswersDsrHint:
+      "إن كان هذا التصحيح رداً على طلب تصحيح نظامي، أدخل رقم الطلب. لا يمكن إغلاق " +
+      "طلب التصحيح قبل تسجيل تصحيح فعلي مرتبط به.",
+    customerCorrectSubmit: "تسجيل التصحيح",
+    customerCorrectCancel: "إلغاء",
+    customerCorrectError: "تعذّر تسجيل التصحيح — حاول مرة أخرى.",
+    customerCorrectRefusalAct: 'تصحيح بيانات الاتصال بالعميل',
+    customerCorrectIdentifiersNote:
+      "الاسم وتاريخ الميلاد والجنسية ورقم الهوية لا تُصحَّح من هنا: تغييرها يستوجب " +
+      "إعادة الفحص مقابل قوائم العقوبات، وهذه الآلية لم تُبنَ بعد.",
     customerFieldNatureOfBusiness: "طبيعة النشاط",
     customerFieldLanguagePreference: "تفضيل اللغة",
     customerFieldGivenName: "الاسم الأول",
@@ -57,43 +113,42 @@ export const CUSTOMERS = {
       "العملية 5 — استبيان مخاطر منظّم يقترح قائمة تغطية، تتم مراجعتها واعتمادها " +
       "قبل أن تغذي فرصة تجارية أو طلب عروض أسعار.",
     customerNeedsAssessmentStartButton: "بدء تقييم احتياجات",
-    customerNeedsAssessmentNoPermission:
-      "لا تملك صلاحية needs-assessment.create.",
+    customerNeedsAssessmentRefusalAct: 'بدء تقييم احتياجات',
 
     customerRiskSurveyHeading: "مسح المخاطر",
     customerRiskSurveyIntro:
       "العملية 6 — مسح تفصيلي للأصول لكل موقع (المبنى / المعدات / المخزون / الربح " +
       "السنوي / الأسطول)، لاشتقاق مبلغ التأمين وفترة التعويض، مجمّعة عبر المواقع.",
     customerRiskSurveyOpenButton: "فتح مسح المخاطر",
-    customerRiskSurveyNoPermission: "لا تملك صلاحية risk-profile.read.",
+    customerRiskSurveyRefusalAct: 'عرض ملفات المخاطر لهذا العميل',
 
     customerInsuranceProgramHeading: "برنامج التأمين",
     customerInsuranceProgramIntro:
       "العملية 7 — برنامج تأمين متعدد الخطوط يُبنى من قائمة تغطية معتمدة من تقييم " +
       "الاحتياجات ومبلغ التأمين المشتق من مسح المخاطر، ثم يُعتمد نهائياً ليغذي طلب عروض الأسعار.",
     customerInsuranceProgramOpenButton: "فتح برنامج التأمين",
-    customerInsuranceProgramNoPermission: "لا تملك صلاحية program.read.",
+    customerInsuranceProgramRefusalAct: 'عرض برامج التأمين لهذا العميل',
 
     customerCrossSellHeading: "البيع المتبادل",
     customerCrossSellIntro:
       "العملية 8 — فحص ليلي يقارن خطوط الوثائق السارية لهذا العميل بقائمة خطوط مرجعية " +
       "ويحدد الفجوات كفرص بيع متبادل للتحويل أو الرفض.",
     customerCrossSellOpenButton: "فتح فرص البيع المتبادل",
-    customerCrossSellNoPermission: "لا تملك صلاحية cross-sell.read.",
+    customerCrossSellRefusalAct: 'عرض فرص البيع المتبادل لهذا العميل',
 
     customerUpSellHeading: "البيع الإضافي",
     customerUpSellIntro:
       "العملية 9 — مهمة ليلية تقارن مبلغ التأمين المصمم للممتلكات لهذا العميل بالقيمة " +
       "الحالية لأصوله الممسوحة وتقترح زيادة عند وجود فجوة جوهرية.",
     customerUpSellOpenButton: "فتح توصيات البيع الإضافي",
-    customerUpSellNoPermission: "لا تملك صلاحية up-sell.read.",
+    customerUpSellRefusalAct: 'عرض توصيات البيع الإضافي لهذا العميل',
 
     customerCrmHeading: "إدارة علاقات العملاء",
     customerCrmIntro:
       "العملية 10 — تسجيل كل نقطة تواصل مع العميل ورؤية الجدول الزمني الشامل " +
       "(التفاعلات حالياً، إضافة إلى الوثائق والمطالبات والشكاوى عند توفر تلك الوحدات).",
     customerCrmOpenButton: "فتح الجدول الزمني للعلاقة",
-    customerCrmNoPermission: "لا تملك صلاحية customer.360-view.read.",
+    customerCrmRefusalAct: 'عرض السجل الكامل لهذا العميل',
 
     // CustomerOnboardingWizard.tsx
     customerWizardStepType: "نوع العميل",
@@ -149,8 +204,7 @@ export const CUSTOMERS = {
     customerNewIntro:
       "العملية 3-4 — معالج اعرف عميلك خطوة بخطوة: نوع العميل، الملف الشخصي، المستفيدون " +
       "الحقيقيون (للشركات)، المستندات الداعمة، ثم الإرسال إلى الالتزام للفحص والاعتماد.",
-    customerNewNoPermission:
-      "لا تملك صلاحية customer.create، لذا لا يوجد ما يمكن فعله هنا.",
+    customerNewRefusalAct: 'إضافة عميل',
 
     // KycQueue.tsx + customers/kyc-queue/page.tsx
     kycQueuePageHeading: "قائمة فحص اعرف عميلك",
@@ -159,10 +213,9 @@ export const CUSTOMERS = {
       "عالية المخاطر عبر العناية الواجبة المعززة، واعتماد أو رفض كل ملف اعرف عميلك. " +
       "الاعتماد يُفعّل العميل؛ ومبدأ الفصل بين المُعِد والمدقق يمنع موظف الالتزام الذي " +
       "سجّل الملف من اعتماده أيضاً.",
-    kycQueueNoApprovePermission:
-      "لا تملك صلاحية kyc.approve — هذه القائمة مخصصة للالتزام فقط.",
-    kycQueueNoPermission:
-      "لا تملك صلاحية kyc.approve أو kyc.capture، لذا لا يوجد ما يمكن عرضه هنا.",
+    kycQueueApproveCanAct: 'العمل على قائمة اعرف عميلك والاطلاع على ما ينتظره كل ملف',
+    kycQueueApproveCannotAct: 'الموافقة على ملف أو رفضه',
+    kycQueueRefusalAct: 'العمل على قائمة اعرف عميلك',
     kycQueueActionFailed: "تعذر تنفيذ الإجراء — حاول مرة أخرى.",
     kycQueueEmpty: "لا يوجد شيء في قائمة اعرف عميلك حالياً.",
     kycQueueColumnCustomer: "العميل",
@@ -193,6 +246,40 @@ export const CUSTOMERS = {
     kycStatusPeriodicReviewDue: "مراجعة دورية مستحقة",
   },
   EN: {
+    // /settings/customer-import — loading an office's legacy customer file.
+    impHeading: 'Customer import',
+    impIntro:
+      'Upload your existing customer file as it is. You say which column in YOUR file carries ' +
+      'each field, so the file does not have to be rewritten. Every row is screened against the ' +
+      'sanctions lists as it is imported.',
+    impLoading: 'Loading…',
+    impRefusalAct: 'import a customer file',
+    impUploadLegend: 'The file, and which column is which',
+    impFileLabel: 'CSV file',
+    impMappingIntro:
+      'Name the column in your file for each field. Leave a field empty if your file does not ' +
+      'carry it. Fields marked with an asterisk are required.',
+    impFieldLegalName: 'Legal name',
+    impFieldCustomerType: 'Customer type (individual / corporate)',
+    impFieldRegistrationNumber: 'Registration number',
+    impFieldNationality: 'Nationality',
+    impFieldContactEmail: 'Email',
+    impFieldContactPhone: 'Phone',
+    impFieldRegisteredAddress: 'Registered address',
+    impMissingRequired: 'No column named yet for: {fields}.',
+    impSubmit: 'Import',
+    impImporting: 'Importing…',
+    impFailed: 'Could not import the file.',
+    impResultHeading: 'Result of importing {fileName}',
+    impResultCounts: 'Imported {imported} of {total} rows; {rejected} rejected.',
+    impScreeningClear:
+      'Screened {screened} rows against the sanctions lists, with no potential match.',
+    impScreeningFlagged:
+      'Screened {screened} rows against the sanctions lists, with {flagged} potential ' +
+      'match(es). Those rows ARE imported; the matches are in the sanctions review queue to be ' +
+      'decided.',
+    impColLine: 'Line in your file',
+    impColReason: 'Reason',
     customersHeading: "Customers",
     customersProcessIntro:
       "Process 3-4 — customer acquisition and onboarding (individual and corporate), KYC, and " +
@@ -200,8 +287,7 @@ export const CUSTOMERS = {
     customersOnboardButton: "+ Onboard a new customer",
     customersSearchLabel: "Search",
     customersViewProfileAria: "View profile — {name}",
-    customersNoPermission:
-      "You don't hold the customer.360-view.read permission, so there's nothing to show here.",
+    customersRefusalAct: 'find and list customers',
     customersNoneMatch: "No customers match your search.",
     customersNoneYet: "No customers yet.",
 
@@ -225,6 +311,32 @@ export const CUSTOMERS = {
     customerFieldContactEmail: "Contact email",
     customerFieldRegistrationNumber: "Registration number",
     customerFieldRegisteredAddress: "Registered address",
+    customerCorrectHeading: "Correct contact details",
+    customerCorrectIntro:
+      "Correct the phone number, email address or registered address. Leave a field " +
+      "blank to leave it unchanged — the fields start empty deliberately, because " +
+      "what the page shows is masked rather than the value itself.",
+    customerCorrectOpen: "Correct contact details",
+    customerCorrectPhone: "New phone number",
+    customerCorrectEmail: "New email address",
+    customerCorrectAddress: "New registered address",
+    customerCorrectReason: "Reason for the correction",
+    customerCorrectReasonHint:
+      "The reason is stored against every corrected field and attributed to you. Say " +
+      "who reported the error and how you verified it.",
+    customerCorrectAnswersDsr: "Data subject request reference (if this answers one)",
+    customerCorrectAnswersDsrHint:
+      "If this correction answers a statutory correction request, enter its " +
+      "reference. A correction request cannot be closed until a correction has " +
+      "actually been recorded against it.",
+    customerCorrectSubmit: "Record the correction",
+    customerCorrectCancel: "Cancel",
+    customerCorrectError: "Could not record the correction — try again.",
+    customerCorrectRefusalAct: "correct a customer's contact details",
+    customerCorrectIdentifiersNote:
+      "Name, date of birth, nationality and national ID are not corrected here: " +
+      "changing one is a screening event against the sanctions lists, and that " +
+      "mechanism is not built yet.",
     customerFieldNatureOfBusiness: "Nature of business",
     customerFieldLanguagePreference: "Language preference",
     customerFieldGivenName: "Given name",
@@ -250,8 +362,7 @@ export const CUSTOMERS = {
       "Process 5 — a structured risk questionnaire that recommends a coverage list, " +
       "reviewed and approved before it feeds an opportunity or RFQ.",
     customerNeedsAssessmentStartButton: "Start a needs assessment",
-    customerNeedsAssessmentNoPermission:
-      "You don't hold the needs-assessment.create permission.",
+    customerNeedsAssessmentRefusalAct: 'start a needs assessment',
 
     customerRiskSurveyHeading: "Risk survey",
     customerRiskSurveyIntro:
@@ -259,8 +370,7 @@ export const CUSTOMERS = {
       "stock / annual profit / fleet), deriving the Sum Insured and indemnity " +
       "period, consolidated across sites.",
     customerRiskSurveyOpenButton: "Open the risk survey",
-    customerRiskSurveyNoPermission:
-      "You don't hold the risk-profile.read permission.",
+    customerRiskSurveyRefusalAct: "view this customer's risk profiles",
 
     customerInsuranceProgramHeading: "Insurance program",
     customerInsuranceProgramIntro:
@@ -268,8 +378,7 @@ export const CUSTOMERS = {
       "needs assessment's coverage list and the risk survey's derived " +
       "Sum Insured, then finalized to feed an RFQ.",
     customerInsuranceProgramOpenButton: "Open the insurance program",
-    customerInsuranceProgramNoPermission:
-      "You don't hold the program.read permission.",
+    customerInsuranceProgramRefusalAct: "view this customer's insurance programmes",
 
     customerCrossSellHeading: "Cross-sell",
     customerCrossSellIntro:
@@ -277,8 +386,7 @@ export const CUSTOMERS = {
       "policy lines against a benchmark line list and flags the gaps as " +
       "cross-sell opportunities to convert or dismiss.",
     customerCrossSellOpenButton: "Open cross-sell opportunities",
-    customerCrossSellNoPermission:
-      "You don't hold the cross-sell.read permission.",
+    customerCrossSellRefusalAct: "view this customer's cross-sell opportunities",
 
     customerUpSellHeading: "Up-sell",
     customerUpSellIntro:
@@ -286,7 +394,7 @@ export const CUSTOMERS = {
       "property Sum Insured against the current value of their surveyed " +
       "assets and proposes an increase where the gap is material.",
     customerUpSellOpenButton: "Open up-sell recommendations",
-    customerUpSellNoPermission: "You don't hold the up-sell.read permission.",
+    customerUpSellRefusalAct: "view this customer's up-sell recommendations",
 
     customerCrmHeading: "Relationship (CRM)",
     customerCrmIntro:
@@ -294,8 +402,7 @@ export const CUSTOMERS = {
       "timeline (interactions today, plus policies, claims and " +
       "complaints once those modules exist).",
     customerCrmOpenButton: "Open the relationship timeline",
-    customerCrmNoPermission:
-      "You don't hold the customer.360-view.read permission.",
+    customerCrmRefusalAct: "view this customer's full history",
 
     // CustomerOnboardingWizard.tsx
     customerWizardStepType: "Customer type",
@@ -352,8 +459,7 @@ export const CUSTOMERS = {
       "Process 3-4 — a step-by-step KYC wizard: customer type, profile, beneficial owners " +
       "(if corporate), supporting documents, then submission to Compliance for screening " +
       "and approval.",
-    customerNewNoPermission:
-      "You don't hold the customer.create permission, so there's nothing to do here.",
+    customerNewRefusalAct: 'add a customer',
 
     // KycQueue.tsx + customers/kyc-queue/page.tsx
     kycQueuePageHeading: "KYC compliance queue",
@@ -361,10 +467,9 @@ export const CUSTOMERS = {
       "Process 3-4 — run sanctions/AML screening, route high-risk results through " +
       "enhanced due diligence, and approve or reject each KYC file. Approving activates " +
       "the Customer; maker/checker prevents the capturing officer from also being the approver.",
-    kycQueueNoApprovePermission:
-      "You don't hold the kyc.approve permission — this queue is Compliance-only.",
-    kycQueueNoPermission:
-      "You don't hold the kyc.approve/kyc.capture permission, so there's nothing to show here.",
+    kycQueueApproveCanAct: 'work the KYC queue and see what each file is waiting for',
+    kycQueueApproveCannotAct: 'approve or reject a file',
+    kycQueueRefusalAct: 'work the KYC queue',
     kycQueueActionFailed: "Action failed — try again.",
     kycQueueEmpty: "Nothing in the KYC queue right now.",
     kycQueueColumnCustomer: "Customer",

@@ -43,6 +43,22 @@ export interface ScreeningMatchView {
   /** The matched entry has since been removed from the source list. The
    * decision and its reason stand; the entry can no longer be re-checked. */
   listEntryDelisted: boolean;
+
+  /* THE CASE WORKFLOW, which this view did not carry.
+   *
+   * `status` above is the DECISION (pending / cleared / confirmed);
+   * `caseStatus` is the workflow around it, and `decide()` refuses unless the
+   * case is UNDER_REVIEW or ESCALATED. Without these fields the queue screen
+   * could not show who owns a case or whether anybody had started — so the
+   * only control it offered was the decision, which then refused every time
+   * (IMPROVEMENTS § 1.62). */
+  caseStatus: string;
+  assignedToUserId: string | null;
+  assignedAt: string | null;
+  reviewStartedAt: string | null;
+  escalatedToUserId: string | null;
+  escalatedAt: string | null;
+  escalationReason: string | null;
 }
 
 /**
@@ -283,5 +299,12 @@ function toView(row: ScreeningMatchWithContext): ScreeningMatchView {
     /// True once the source list no longer carries this entry — the decision
     /// stands, but it can no longer be re-checked against the live list.
     listEntryDelisted: row.watchlistEntryId === null,
+    caseStatus: row.caseStatus,
+    assignedToUserId: row.assignedToUserId,
+    assignedAt: row.assignedAt?.toISOString() ?? null,
+    reviewStartedAt: row.reviewStartedAt?.toISOString() ?? null,
+    escalatedToUserId: row.escalatedToUserId,
+    escalatedAt: row.escalatedAt?.toISOString() ?? null,
+    escalationReason: row.escalationReason,
   };
 }

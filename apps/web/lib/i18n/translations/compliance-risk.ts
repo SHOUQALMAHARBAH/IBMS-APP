@@ -40,11 +40,16 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'جارٍ التحميل…',
     tmNone: 'لا توجد تنبيهات مراقبة معاملات.',
     tmLoadError: 'تعذّر تحميل تنبيهات مراقبة المعاملات — حاول مرة أخرى.',
+    tmSweepSummary: 'تم فحص {scanned} حالة — أُنشئ {created} تنبيهًا، و{skipped} مرصودة أصلًا، وفشلت {failed}.',
     tmActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    tmNoPermission: 'لا تملك صلاحية aml.monitor اللازمة لعرض تنبيهات مراقبة المعاملات.',
+    tmRefusalAct: 'عرض تنبيهات مراقبة المعاملات',
 
     // ---- Watchlist sync (#49) --------------------------------------------
     wsHeading: 'مزامنة قوائم العقوبات',
+    shMissingConfig: 'إعدادات ناقصة: {missing}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
+    shScreeningAttempts: 'عمليات الفحص (آخر {days} يومًا)',
+    shHoldsReleased: 'حالات رفع الإيقاف (آخر {days} يومًا)',
+    wsRescreenSummary: 'أُعيد فحص {screened} عميلًا نشطًا — {hits} منها بنتيجة مطابقة، وفشلت {failed}.',
     wsIntro:
       'تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة الأمم المتحدة الموحّدة) محلياً كل اثنتَي عشرة ساعة — وهي وتيرة التحديث الفعلية للقائمتين — ويُعاد فحص كل عميل نشط عليهما كل أربع ساعات. ويمكن تشغيل كليهما يدوياً من هنا.',
     wsSyncButton: 'مزامنة القوائم الآن',
@@ -52,13 +57,34 @@ export const COMPLIANCE_RISK = {
     wsColSource: 'المصدر',
     wsColStatus: 'الحالة',
     wsColRecords: 'السجلات',
+    wsGenerationsHeading: 'إصدارات القوائم',
+    wsGenerationsIntro:
+      'كل تنزيل للقائمة يُحفظ كإصدار. الإصدار المنشور هو الذي يجري الفحص ' +
+      'مقابله الآن.',
+    wsGenerationsNone: 'لا توجد إصدارات بعد — لم تُنفَّذ أي مزامنة.',
+    wsColVersion: 'الإصدار',
+    wsColDownloaded: 'نُزّل في',
+    wsColGenerationStatus: 'الحالة',
+    wsRestore: 'استعادة هذا الإصدار',
+    wsRestoreReason: 'سبب استعادة قائمة أقدم (١٠ أحرف على الأقل)',
+    wsRestoreReasonHint:
+      'استعادة إصدار أقدم تُضيّق ما يمكن أن يكتشفه الفحص. اذكر ما حدث للإصدار ' +
+      'الأحدث — السبب يُسجَّل في سجل التدقيق ويُنسب إليك.',
+    wsRestoreConfirm: 'تأكيد الاستعادة',
+    wsCancel: 'إلغاء',
+    wsRestoreError: 'تعذّرت استعادة هذا الإصدار.',
+    wsGenerationsLoadError: 'تعذّر تحميل إصدارات القوائم — حاول مرة أخرى.',
+    wsRestoreUnavailable:
+      'لا يمكن الاستعادة إلا إلى إصدار سابق ما زالت سجلاته محفوظة.',
+    wsRolledBackFrom: 'استُعيد — السبب المسجَّل:',
+    wsGenerationsLoading: 'جارٍ تحميل الإصدارات…',
     wsColStarted: 'وقت البدء',
     wsColCompleted: 'وقت الانتهاء',
     wsLoading: 'جارٍ التحميل…',
     wsNone: 'لم تُنفَّذ أي مزامنة بعد.',
     wsLoadError: 'تعذّر تحميل حالة المزامنة — حاول مرة أخرى.',
     wsActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    wsNoPermission: 'لا تملك صلاحية sanctions-pep.screen اللازمة لعرض حالة المزامنة.',
+    wsRefusalAct: 'عرض حالة المزامنة',
 
     // ---- Regulatory compliance (#51) --------------------------------------
     rcHeading: 'الالتزام التنظيمي',
@@ -91,8 +117,8 @@ export const COMPLIANCE_RISK = {
     rcLicenseLoadError: 'تعذّر تحميل ترخيص الوسيط — حاول مرة أخرى.',
     rcCalendarLoadError: 'تعذّر تحميل تقويم الالتزامات — حاول مرة أخرى.',
     rcActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    rcNoPermission: 'لا تملك صلاحية license.manage اللازمة لعرض شاشة الالتزام التنظيمي.',
-    rcNoPermissionCalendar: 'لا تملك صلاحية compliance-calendar.manage اللازمة لعرض تقويم الالتزام.',
+    rcRefusalAct: 'عرض شاشة الالتزام التنظيمي',
+    rcCalendarRefusalAct: 'عرض تقويم الالتزام',
     rcDueDate: 'تاريخ الاستحقاق',
     rcOwnerUserId: 'معرّف المستخدم المالك',
     rcExpiresAt: 'تاريخ الانتهاء',
@@ -146,11 +172,11 @@ export const COMPLIANCE_RISK = {
     opPiLoadError: 'تعذّر تحميل سجل وثيقة المسؤولية المهنية — حاول مرة أخرى.',
     opEventsLoadError: 'تعذّر تحميل أحداث مخاطر المسؤولية المهنية — حاول مرة أخرى.',
     opActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    opNoPermission: 'لا تملك صلاحية risk-register.manage اللازمة لعرض سجل المخاطر.',
-    opNoPermissionPi: 'لا تملك صلاحية pi-policy.manage اللازمة لعرض وثيقة المسؤولية المهنية.',
-    opMitigationRowAria: 'إجراء التخفيف لـ {id}',
-    opClaimsHistoryRowAria: 'سجل المطالبات لـ {id}',
-    opEventMitigationAria: 'إجراء التخفيف للحدث {id}',
+    opRefusalAct: 'عرض سجل المخاطر',
+    opPiRefusalAct: 'عرض وثيقة المسؤولية المهنية',
+    opMitigationRowAria: 'إجراء التخفيف',
+    opClaimsHistoryRowAria: 'سجل المطالبات',
+    opEventMitigationAria: 'إجراء التخفيف للحادث',
 
     // ---- Incident management (#55) -----------------------------------------
     incHeading: 'إدارة الحوادث',
@@ -181,7 +207,7 @@ export const COMPLIANCE_RISK = {
     incNone: 'لا توجد حوادث مسجّلة بعد.',
     incLoadError: 'تعذّر تحميل الحوادث — حاول مرة أخرى.',
     incActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    incNoPermission: 'لا تملك صلاحية incident.report اللازمة لعرض الحوادث.',
+    incRefusalAct: 'عرض الحوادث',
     incStatusReported: 'مُبلَّغ عنه',
     incStatusContained: 'جرى احتواؤه',
     incStatusImpactAssessed: 'جرى تقييم أثره',
@@ -195,7 +221,7 @@ export const COMPLIANCE_RISK = {
     incRoleDpo: 'مسؤول حماية البيانات',
     incRoleExec: 'الإدارة التنفيذية',
     incNotifyRoleAria: 'إشعار {role} بخصوص {id}',
-    incRootCauseAria: 'تحليل السبب الجذري لـ {id}',
+    incRootCauseAria: 'تحليل السبب الجذري',
 
     // ---- Internal controls (#56) --------------------------------------------
     icHeading: 'الضوابط الداخلية — تدقيق الموافقة الذاتية',
@@ -220,7 +246,27 @@ export const COMPLIANCE_RISK = {
     icPairsScanned: 'الثنائيات المفحوصة',
     icLoading: 'جارٍ التحميل…',
     icRunError: 'تعذّر تشغيل التدقيق — حاول مرة أخرى.',
-    icNoPermission: 'لا تملك صلاحية internal-controls.view اللازمة لعرض هذه الشاشة.',
+    // Part 4 step 6 — the self-approval report. «الاعتماد الذاتي» names what it is; the access row is
+    // flagged «مراجعة صلاحيات نفسه» because "reviewed their own access" is the phrase that has to stand out,
+    // not a generic warning glyph.
+    icDeclaredHeading: 'اعتمادات ذاتية معلنة',
+    icDeclaredIntro:
+      'الحالات التي نفّذ فيها شخص واحد طرفي عملية تتطلب شخصين، في مكتب أعلن السماح بذلك. كل حالة مسجّلة بسببها وبالأدوار التي كان يحملها. أي مراجعة لصلاحيات الشخص نفسه تظهر في الأعلى ومُعلَّمة.',
+    icDeclaredOfficeSegregated: 'هذا المكتب يفصل بين المهام.',
+    icDeclaredOfficeCombined: 'هذا المكتب أعلن السماح بتنفيذ الشخص نفسه لطرفي العملية.',
+    icDeclaredOfficeDeclaredBy: 'أعلنه {who}.',
+    icDeclaredOfficeNeverDeclared: 'لم يُعلَن هذا صراحةً — هو الوضع الافتراضي.',
+    icDeclaredEmpty: 'لا توجد اعتمادات ذاتية معلنة.',
+    icDeclaredColWhen: 'التاريخ',
+    icDeclaredColWho: 'الشخص',
+    icDeclaredColPair: 'العملية',
+    icDeclaredColRoles: 'الأدوار التي تمنح الاعتماد',
+    icDeclaredColReason: 'السبب المسجّل',
+    icDeclaredAccessFlag: 'مراجعة صلاحيات نفسه —',
+    icDeclaredHatAmbiguous: 'أكثر من دور يمنح الاعتماد',
+    icDeclaredTruncated: 'تُعرض أحدث الحالات فقط.',
+    icDeclaredLoadError: 'تعذّر تحميل الاعتمادات الذاتية المعلنة. حاول مرة أخرى.',
+    icRefusalAct: 'عرض تقرير الضوابط الداخلية',
 
     // ---- Internal audit findings (#57) ---------------------------------------
     iafHeading: 'ملاحظات التدقيق الداخلي',
@@ -242,8 +288,8 @@ export const COMPLIANCE_RISK = {
     iafNone: 'لا توجد ملاحظات تدقيق داخلي مسجّلة بعد.',
     iafLoadError: 'تعذّر تحميل ملاحظات التدقيق الداخلي — حاول مرة أخرى.',
     iafActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    iafNoPermission: 'لا تملك صلاحية internal-audit.record/internal-audit.close اللازمة لعرض ملاحظات التدقيق الداخلي.',
-    iafRemediationActionAria: 'إجراء المعالجة لـ {id}',
+    iafRefusalAct: 'عرض ملاحظات التدقيق الداخلي',
+    iafRemediationActionAria: 'إجراء المعالجة',
 
     // ---- Audit trail (Part 5.1) ----------------------------------------------
     atHeading: 'سجل التدقيق',
@@ -253,6 +299,7 @@ export const COMPLIANCE_RISK = {
     atColAction: 'الإجراء',
     atColEntity: 'الكيان',
     atColUser: 'المستخدم',
+    atActorLabel: 'الشخص الذي نفّذ الإجراء',
     atColSensitive: 'حسّاس',
     atNone: 'لا توجد قيود.',
     atAuditLogHeading: 'سجل التدقيق',
@@ -267,6 +314,10 @@ export const COMPLIANCE_RISK = {
     atColCreated: 'تاريخ الإنشاء',
     atEntityTypeLabel: 'نوع الكيان',
     atEntityIdLabel: 'معرّف الكيان',
+    atActionLabel: 'نوع العملية',
+    atActionAny: 'كل العمليات',
+    atFromLabel: 'من تاريخ',
+    atToLabel: 'إلى تاريخ',
     atWorkflowEntityTypeLabel: 'نوع كيان سير العمل',
     atWorkflowEntityIdLabel: 'معرّف كيان سير العمل',
     atDocumentIdLabel: 'معرّف المستند',
@@ -276,7 +327,9 @@ export const COMPLIANCE_RISK = {
     atLogLoadError: 'تعذّر تصفّح سجل التدقيق — حاول مرة أخرى.',
     atWorkflowLoadError: 'تعذّر تحميل تاريخ سير العمل — حاول مرة أخرى.',
     atDocumentLoadError: 'تعذّر تحميل تاريخ المستند — حاول مرة أخرى.',
-    atNoPermissionFor: 'لا تملك صلاحية {permission} اللازمة لعرض هذا المحتوى.',
+    atAuditLogRefusalAct: 'عرض سجل التدقيق',
+    atWorkflowRefusalAct: 'عرض سجل سير العمل',
+    atDocumentRefusalAct: 'عرض سجل المستندات',
   },
   EN: {
     tmHeading: 'AML/CFT transaction monitoring',
@@ -301,10 +354,15 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'Loading…',
     tmNone: 'No transaction-monitoring alerts.',
     tmLoadError: 'Could not load transaction-monitoring alerts — try again.',
+    tmSweepSummary: 'Scanned {scanned} candidate(s) — created {created} alert(s), {skipped} already flagged, {failed} failed.',
     tmActionError: 'That action failed — try again.',
-    tmNoPermission: "You don't hold the aml.monitor permission.",
+    tmRefusalAct: 'view the transaction monitoring alerts',
 
     wsHeading: 'Sanctions watchlist sync',
+    shMissingConfig: 'Missing configuration: {missing}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.',
+    shScreeningAttempts: 'Screening attempts (last {days} days)',
+    shHoldsReleased: 'Holds released (last {days} days)',
+    wsRescreenSummary: 'Re-screened {screened} active customer(s) — {hits} produced a HIT, {failed} failed.',
     wsIntro:
       "Two free public sanctions lists (OFAC SDN, UN Consolidated) are synced locally every 12 hours — the lists' own real-world refresh cadence — and every ACTIVE customer is re-screened against them every 4 hours. Both can also be run on demand here.",
     wsSyncButton: 'Sync watchlists now',
@@ -312,13 +370,35 @@ export const COMPLIANCE_RISK = {
     wsColSource: 'Source',
     wsColStatus: 'Status',
     wsColRecords: 'Records',
+    wsGenerationsHeading: 'List generations',
+    wsGenerationsIntro:
+      'Every download of a list is kept as a generation. The PUBLISHED one is what ' +
+      'screening runs against right now.',
+    wsGenerationsNone: 'No generations yet — no sync has run.',
+    wsColVersion: 'Generation',
+    wsColDownloaded: 'Downloaded',
+    wsColGenerationStatus: 'Status',
+    wsRestore: 'Restore this generation',
+    wsRestoreReason: 'Reason for restoring an older list (min. 10 characters)',
+    wsRestoreReasonHint:
+      'Restoring an older generation narrows what screening can find. Say what was ' +
+      'wrong with the newer one — the reason is written to the audit log and ' +
+      'attributed to you.',
+    wsRestoreConfirm: 'Confirm restore',
+    wsCancel: 'Cancel',
+    wsRestoreError: 'Could not restore that generation.',
+    wsGenerationsLoadError: 'Could not load the list generations — try again.',
+    wsRestoreUnavailable:
+      'Only a superseded generation whose records are still held can be restored.',
+    wsRolledBackFrom: 'Restored — recorded reason:',
+    wsGenerationsLoading: 'Loading generations…',
     wsColStarted: 'Started',
     wsColCompleted: 'Completed',
     wsLoading: 'Loading…',
     wsNone: 'No sync has run yet.',
     wsLoadError: 'Could not load the sync status — try again.',
     wsActionError: 'That action failed — try again.',
-    wsNoPermission: "You don't hold the sanctions-pep.screen permission.",
+    wsRefusalAct: 'view the watchlist sync status',
 
     rcHeading: 'Regulatory compliance',
     rcIntro:
@@ -350,8 +430,8 @@ export const COMPLIANCE_RISK = {
     rcLicenseLoadError: 'Could not load the broker license — try again.',
     rcCalendarLoadError: 'Could not load the compliance calendar — try again.',
     rcActionError: 'That action failed — try again.',
-    rcNoPermission: "You don't hold the license.manage permission.",
-    rcNoPermissionCalendar: "You don't hold the compliance-calendar.manage permission.",
+    rcRefusalAct: 'view the regulatory compliance screen',
+    rcCalendarRefusalAct: 'view the compliance calendar',
     rcDueDate: 'Due date',
     rcOwnerUserId: 'Owner user ID',
     rcExpiresAt: 'Expires at',
@@ -404,11 +484,11 @@ export const COMPLIANCE_RISK = {
     opPiLoadError: 'Could not load the PI policy record — try again.',
     opEventsLoadError: 'Could not load PI risk events — try again.',
     opActionError: 'That action failed — try again.',
-    opNoPermission: "You don't hold the risk-register.manage permission.",
-    opNoPermissionPi: "You don't hold the pi-policy.manage permission.",
-    opMitigationRowAria: 'Mitigation for {id}',
-    opClaimsHistoryRowAria: 'Claims history for {id}',
-    opEventMitigationAria: 'Mitigation for event {id}',
+    opRefusalAct: 'view the operational risk register',
+    opPiRefusalAct: 'view the professional indemnity policy',
+    opMitigationRowAria: 'Mitigation',
+    opClaimsHistoryRowAria: 'Claims history',
+    opEventMitigationAria: 'Mitigation for this event',
 
     incHeading: 'Incident Management',
     incIntro:
@@ -438,7 +518,7 @@ export const COMPLIANCE_RISK = {
     incNone: 'No incidents recorded yet.',
     incLoadError: 'Could not load incidents — try again.',
     incActionError: 'That action failed — try again.',
-    incNoPermission: "You don't hold the incident.report permission.",
+    incRefusalAct: 'view and report incidents',
     incStatusReported: 'Reported',
     incStatusContained: 'Contained',
     incStatusImpactAssessed: 'Impact assessed',
@@ -452,7 +532,7 @@ export const COMPLIANCE_RISK = {
     incRoleDpo: 'Data Protection Officer',
     incRoleExec: 'Executive Management',
     incNotifyRoleAria: 'Notify {role} for {id}',
-    incRootCauseAria: 'Root cause analysis for {id}',
+    incRootCauseAria: 'Root cause analysis',
 
     icHeading: 'Internal controls — self-approval audit',
     icIntro:
@@ -473,8 +553,29 @@ export const COMPLIANCE_RISK = {
     icRunningButton: 'Running…',
     icPairsScanned: 'Pairs scanned',
     icLoading: 'Loading…',
+    // Part 4 step 6 — the self-approval report.
+    icDeclaredHeading: 'Declared self-approvals',
+    icDeclaredIntro:
+      'Occasions where one person performed both halves of an operation that needs two, in an office that has declared this is allowed. Each one carries its reason and the roles the person was acting under. A review of somebody\u2019s own access appears at the top, flagged.',
+    icDeclaredOfficeSegregated: 'This office separates duties.',
+    icDeclaredOfficeCombined:
+      'This office has declared that one person may perform both halves.',
+    icDeclaredOfficeDeclaredBy: 'Declared by {who}.',
+    icDeclaredOfficeNeverDeclared:
+      'Nobody has declared this explicitly — it is the default.',
+    icDeclaredEmpty: 'No declared self-approvals.',
+    icDeclaredColWhen: 'When',
+    icDeclaredColWho: 'Who',
+    icDeclaredColPair: 'Operation',
+    icDeclaredColRoles: 'Roles granting the approval',
+    icDeclaredColReason: 'Recorded reason',
+    icDeclaredAccessFlag: 'Reviewed their own access —',
+    icDeclaredHatAmbiguous: 'more than one role grants this',
+    icDeclaredTruncated: 'Showing the most recent only.',
+    icDeclaredLoadError:
+      'Could not load the declared self-approvals. Try again.',
     icRunError: 'Could not run the audit — try again.',
-    icNoPermission: "You don't hold the internal-controls.view permission.",
+    icRefusalAct: 'view the internal controls report',
 
     iafHeading: 'Internal Audit Findings',
     iafIntro:
@@ -495,8 +596,8 @@ export const COMPLIANCE_RISK = {
     iafNone: 'No internal audit findings recorded yet.',
     iafLoadError: 'Could not load internal audit findings — try again.',
     iafActionError: 'That action failed — try again.',
-    iafNoPermission: "You don't hold the internal-audit.record/internal-audit.close permission.",
-    iafRemediationActionAria: 'Remediation action for {id}',
+    iafRefusalAct: 'view internal audit findings',
+    iafRemediationActionAria: 'Remediation action',
 
     atHeading: 'Audit Trail',
     atIntro:
@@ -505,6 +606,7 @@ export const COMPLIANCE_RISK = {
     atColAction: 'Action',
     atColEntity: 'Entity',
     atColUser: 'User',
+    atActorLabel: 'Who did it',
     atColSensitive: 'Sensitive',
     atNone: 'No entries.',
     atAuditLogHeading: 'Audit log',
@@ -519,6 +621,10 @@ export const COMPLIANCE_RISK = {
     atColCreated: 'Created',
     atEntityTypeLabel: 'Entity type',
     atEntityIdLabel: 'Entity id',
+    atActionLabel: 'Action',
+    atActionAny: 'Any action',
+    atFromLabel: 'From',
+    atToLabel: 'To',
     atWorkflowEntityTypeLabel: 'Workflow entity type',
     atWorkflowEntityIdLabel: 'Workflow entity id',
     atDocumentIdLabel: 'Document id',
@@ -528,6 +634,8 @@ export const COMPLIANCE_RISK = {
     atLogLoadError: 'Could not browse the audit log — try again.',
     atWorkflowLoadError: 'Could not load workflow history — try again.',
     atDocumentLoadError: 'Could not load document history — try again.',
-    atNoPermissionFor: "You don't hold the {permission} permission.",
+    atAuditLogRefusalAct: 'view the audit trail',
+    atWorkflowRefusalAct: 'view the workflow history',
+    atDocumentRefusalAct: 'view the document history',
   },
 } as const;

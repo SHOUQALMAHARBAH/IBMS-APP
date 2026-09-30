@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -20,6 +20,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 const cell: CSSProperties = {
@@ -60,7 +61,7 @@ export default function TransactionMonitoringPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('tmNoPermission')
+          ? permissionRefusal(t, 'tmRefusalAct', 'aml.monitor')
           : err instanceof ApiError
             ? err.message
             : t('tmLoadError'),
@@ -111,7 +112,12 @@ export default function TransactionMonitoringPage() {
     await run(async () => {
       const result = await runTransactionMonitoringSweep();
       setSweepMessage(
-        `Scanned ${result.scanned} candidate(s) — created ${result.created} alert(s), ${result.skippedExisting} already flagged, ${result.failed} failed.`,
+        t('tmSweepSummary', {
+          scanned: result.scanned,
+          created: result.created,
+          skipped: result.skippedExisting,
+          failed: result.failed,
+        }),
       );
     });
   }
@@ -136,7 +142,8 @@ export default function TransactionMonitoringPage() {
               maxWidth: '30rem',
             }}
           >
-            <CustomerPicker
+            <EntitySearch
+            kind="customer"
               value={customerId}
               onChange={setCustomerId}
               label={t('tmCustomerIdOptionalLabel')}

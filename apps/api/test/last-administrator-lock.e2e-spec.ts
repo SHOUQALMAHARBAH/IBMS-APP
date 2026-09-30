@@ -319,7 +319,9 @@ describe('withCapabilityLocked actually serialises', () => {
         users.withCapabilityLocked('user.manage', section('a')),
       ),
       orgContext.runAs(ORG_ID, () =>
-        users.withCapabilityLocked('role.manage', section('b')),
+        // `role.manage` split in four-action Phase 1; this test only needs a capability key DIFFERENT
+        // from the one above, and `role.update` is the successor that carries its meaning.
+        users.withCapabilityLocked('role.update', section('b')),
       ),
     ]);
 

@@ -1,4 +1,8 @@
 import { ForbiddenException } from '@nestjs/common';
+import {
+  pairByConstraint,
+  type MakerCheckerConstraint,
+} from './maker-checker-pairs.config';
 
 /**
  * Maker/checker segregation of duties (Part 5.2;
@@ -19,21 +23,13 @@ import { ForbiddenException } from '@nestjs/common';
  * A checker id of `null`/`undefined` means "not yet decided" and is not a
  * violation — only an actual match with the maker id is rejected.
  *
- * Covered pairs (Part 5.2 table + the M-series rules in `PRIV-SRS-01`):
+ * ## Covered pairs: all of them, from one list
  *
- * | Entity                    | Maker field                 | Checker field               |
- * |---------------------------|------------------------------|------------------------------|
- * | KYCRecord                 | createdByUserId              | approvedByUserId             |
- * | PolicyChecking            | placedByUserId                | checkedByUserId              |
- * | Refund                    | raisedByUserId                | approvedByUserId             |
- * | DisposalBatch             | nominatedByUserId             | dpoApprovedByUserId          |
- * | DataSharingApproval       | requestedByUserId             | approvedByUserId             |
- * | DataProcessingAgreement   | assessedByUserId               | dpoApprovedByUserId          |
- * | Settlement                | approvedByUserId               | secondApproverUserId         |
- * | CommissionLedgerEntry     | overrideRequestedByUserId      | overrideApprovedByUserId     |
- * | Recommendation            | draftedByUserId                | approvedByUserId             |
- * | AccessRecertificationItem | subjectUserId                  | reviewerUserId               |
- * | Complaint                 | resolvedByUserId               | closureApprovedByUserId      |
+ * `maker-checker-pairs.config.ts`. This header used to carry its own 11-row table while the database
+ * enforces 15 — both `NeedsAssessment` pairs were missing from it, so a developer reading here would have
+ * believed the set was smaller than it is. One list now, and
+ * `test/maker-checker-pairs.e2e-spec.ts` derives the expected set from `pg_constraint` so a sixteenth
+ * constraint cannot be added without that file moving.
  *
  * @param makerId the user id who performed the maker action (requested,
  *   captured, placed, nominated, raised, drafted, assessed, ...)
@@ -41,16 +37,38 @@ import { ForbiddenException } from '@nestjs/common';
  *   checked, DPO-approved, ...) — `null`/`undefined` if not yet decided
  * @param context a short label identifying the call site for the error
  *   message, e.g. `"Refund.approve"` or `"KYCRecord.approve"`
+ * @param constraint the CHECK constraint enforcing this pair, when the caller knows it — see below
  * @throws {ForbiddenException} if `checkerId` is set and equals `makerId`
  */
 export function assertDifferentActors(
   makerId: string,
   checkerId: string | null | undefined,
   context: string,
+  /**
+   * Naming the pair is what lets the refusal name the REMEDY.
+   *
+   * Optional because 19 call sites predate it, and a refusal without a remedy is still a correct refusal —
+   * passing it upgrades the message from a statement of the rule to something a person can act on. The type
+   * is the constraint-name union from `maker-checker-pairs.config.ts`, so a typo is a compile error rather
+   * than a message naming a permission nobody holds.
+   */
+  constraint?: MakerCheckerConstraint,
 ): void {
   if (checkerId != null && checkerId === makerId) {
+    const pair = constraint ? pairByConstraint(constraint) : undefined;
+    // WHAT TO DO, not only what went wrong.
+    //
+    // The old message stated the rule and stopped: "the checker must be a different user than the maker".
+    // True, and useless to whoever is holding it — they cannot tell from it whether their office has anyone
+    // else who could do this, or what to ask an administrator for. Naming the permission makes the next
+    // step a sentence somebody can act on, and the readiness list is where they see who holds it.
+    const remedy = pair
+      ? ' A second person holding ' +
+        pair.checkerPermission +
+        ' has to do it — Settings, Roles & permissions lists who does, under the operations that need two people.'
+      : '';
     throw new ForbiddenException(
-      `${context}: the checker must be a different user than the maker (maker/checker segregation of duties — Part 5.2)`,
+      `${context}: the checker must be a different user than the maker (maker/checker segregation of duties — Part 5.2).${remedy}`,
     );
   }
 }

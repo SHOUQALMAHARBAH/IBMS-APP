@@ -32,6 +32,7 @@ const baseRow = (over: Partial<ComplaintRow> = {}): ComplaintRow => ({
   resolvedByUserId: null,
   resolvedAt: null,
   closureApprovedByUserId: null,
+  closureCombinedDutyAct: null,
   closedAt: null,
   createdAt: new Date('2026-09-03T09:00:00.000Z'),
   actions: [],

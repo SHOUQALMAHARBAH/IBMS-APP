@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ReportProvenance } from '../../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -12,9 +13,17 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
+
+/**
+ * The rate with no denominator — item 5 batch 1, the owner's ruling. A cohort with nothing in it has NO
+ * conversion rate, and 0% would be a claim about performance where none was measured. The same em dash the
+ * employee-performance and sales-performance screens already used, so one concept now has one rendering.
+ */
+const EM_DASH = '—';
 
 export default function SalesDashboardPage() {
   const { t, language } = useLanguage();
@@ -52,13 +61,21 @@ export default function SalesDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dsalNoPermission')
+          ? permissionRefusal(t, 'dsalRefusalAct', 'dashboard.sales.view')
           : err instanceof ApiError
             ? err.message
             : t('dsalLoadError'),
       );
     }
-  }, [branchId, insuranceLine, insurerId, periodLabel, periodStart, periodEnd, t]);
+  }, [
+    branchId,
+    insuranceLine,
+    insurerId,
+    periodLabel,
+    periodStart,
+    periodEnd,
+    t,
+  ]);
 
   useEffect(() => {
     if (!user) return;
@@ -79,19 +96,31 @@ export default function SalesDashboardPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('dsalHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('dsalIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dsalIntro')}</p>
 
       <form
         onSubmit={applyFilters}
-        style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          alignItems: 'flex-end',
+          margin: '0.75rem 0',
+        }}
       >
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashBranchIdLabel')}
-          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          <input
+            aria-label={t('dashBranchIdFilterAria')}
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+          />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashInsuranceLineLabel')}
           <input
             aria-label={t('dashInsuranceLineFilterAria')}
@@ -100,11 +129,19 @@ export default function SalesDashboardPage() {
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashInsurerIdLabel')}
-          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
+          <input
+            aria-label={t('dashInsurerIdFilterAria')}
+            value={insurerId}
+            onChange={(e) => setInsurerId(e.target.value)}
+          />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashPeriodLabel')}
           <input
             aria-label={t('dashPeriodLabel')}
@@ -113,7 +150,9 @@ export default function SalesDashboardPage() {
             onChange={(e) => setPeriodLabel(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashPeriodStart')}
           <input
             aria-label={t('dashPeriodStart')}
@@ -122,7 +161,9 @@ export default function SalesDashboardPage() {
             onChange={(e) => setPeriodStart(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        >
           {t('dashPeriodEnd')}
           <input
             aria-label={t('dashPeriodEnd')}
@@ -142,10 +183,12 @@ export default function SalesDashboardPage() {
 
       {summary ? (
         <>
-          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-            Period {summary.periodLabel} ({summary.periodStart.slice(0, 10)} –{' '}
-            {summary.periodEnd.slice(0, 10)}).
-          </p>
+          <ReportProvenance
+            kind="period"
+            periodLabel={summary.periodLabel}
+            from={summary.periodStart}
+            to={summary.periodEnd}
+          />
 
           <section style={sectionStyle}>
             <h2>{t('kpiLeads')}</h2>
@@ -155,11 +198,17 @@ export default function SalesDashboardPage() {
                 <div>{t('dsalNewLeads')}</div>
               </div>
               <div>
-                <div style={statStyle}>{summary.leads.convertedToProspectCount}</div>
+                <div style={statStyle}>
+                  {summary.leads.convertedToProspectCount}
+                </div>
                 <div>{t('dsalConvertedToProspect')}</div>
               </div>
               <div>
-                <div style={statStyle}>{summary.leads.conversionRatePercent}%</div>
+                <div style={statStyle}>
+                  {summary.leads.conversionRatePercent === null
+                    ? EM_DASH
+                    : `${summary.leads.conversionRatePercent}%`}
+                </div>
                 <div>{t('dsalConversionRate')}</div>
               </div>
             </div>
@@ -185,7 +234,9 @@ export default function SalesDashboardPage() {
 
           <section style={sectionStyle}>
             <h2>{t('dsalCommissionIncome')}</h2>
-            <div style={statStyle}>{formatMoney(summary.commissionIncomeJod, language)}</div>
+            <div style={statStyle}>
+              {formatMoney(summary.commissionIncomeJod, language)}
+            </div>
           </section>
 
           <section style={sectionStyle}>
@@ -200,7 +251,11 @@ export default function SalesDashboardPage() {
                 <div>{t('dsalConverted')}</div>
               </div>
               <div>
-                <div style={statStyle}>{summary.crossSell.conversionRatePercent}%</div>
+                <div style={statStyle}>
+                  {summary.crossSell.conversionRatePercent === null
+                    ? EM_DASH
+                    : `${summary.crossSell.conversionRatePercent}%`}
+                </div>
                 <div>{t('dsalConversionRate')}</div>
               </div>
             </div>
@@ -218,7 +273,11 @@ export default function SalesDashboardPage() {
                 <div>{t('dsalConverted')}</div>
               </div>
               <div>
-                <div style={statStyle}>{summary.upSell.conversionRatePercent}%</div>
+                <div style={statStyle}>
+                  {summary.upSell.conversionRatePercent === null
+                    ? EM_DASH
+                    : `${summary.upSell.conversionRatePercent}%`}
+                </div>
                 <div>{t('dsalConversionRate')}</div>
               </div>
             </div>

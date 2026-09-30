@@ -22,6 +22,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 const cell: CSSProperties = {
@@ -79,7 +80,7 @@ export default function RegulatoryCompliancePage() {
       setLicense(null);
       setLicenseLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('rcNoPermission')
+          ? permissionRefusal(t, 'rcRefusalAct', 'license.manage')
           : err instanceof ApiError && err.status === 404
             ? t('rcNoLicense')
             : err instanceof ApiError
@@ -97,7 +98,7 @@ export default function RegulatoryCompliancePage() {
       setItems(null);
       setItemsLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('rcNoPermissionCalendar')
+          ? permissionRefusal(t, 'rcCalendarRefusalAct', 'compliance-calendar.manage')
           : err instanceof ApiError
             ? err.message
             : t('rcCalendarLoadError'),

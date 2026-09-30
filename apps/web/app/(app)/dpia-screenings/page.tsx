@@ -18,6 +18,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const ROLES = [
   'dpia.review',
@@ -76,7 +77,7 @@ export default function DpiaScreeningsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dpiaNoPermission')
+          ? permissionRefusal(t, 'dpiaRefusalAct', 'dpia.review')
           : err instanceof ApiError
             ? err.message
             : t('dpiaLoadError'),

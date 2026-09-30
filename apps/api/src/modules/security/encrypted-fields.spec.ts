@@ -31,8 +31,15 @@ describe('ENCRYPTED_FIELDS — the exact Part 10.2 field map', () => {
     // multi-tenancy Phase 3 step 11 (Part I §6): not personal data, but the
     // same treatment, because it is the credential that sends mail as a real
     // company.
+    //
+    // And CustomerIdentifierCorrection (§ 3.14): the BEFORE and AFTER values of a corrected screening
+    // identifier. The AMLU requires the prior value retained — "keep the verification mechanism and
+    // actions taken … in internal records" — and a corrected national ID kept in the clear in a second
+    // table would defeat `Customer.nationalIdEnc`. Encrypting it satisfies the retention requirement and
+    // `sensitive-data-handling.md` together rather than trading one against the other.
     expect(ENCRYPTED_FIELDS).toEqual({
       Customer: ['nationalIdEnc', 'contactPhoneEnc', 'contactEmailEnc'],
+      CustomerIdentifierCorrection: ['beforeValueEnc', 'afterValueEnc'],
       UltimateBeneficialOwner: ['nationalIdEnc'],
       InsuredPerson: ['nationalIdEnc'],
       Employee: ['nationalIdEnc'],

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../../../../components/ui/CombinedDutyOnRecord';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
@@ -14,7 +15,10 @@ import {
 import { NeedsAssessmentForm } from '../../../../components/needs-assessment/NeedsAssessmentForm';
 import { NeedsAssessmentReviewPanel } from '../../../../components/needs-assessment/NeedsAssessmentReviewPanel';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  buttonStyle,
+  errorStyle,
+} from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import {
   coveragePreviewStyle,
@@ -29,7 +33,6 @@ import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCapture
 import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
-
 
 export default function NeedsAssessmentDetailPage() {
   const { t } = useLanguage();
@@ -82,9 +85,7 @@ export default function NeedsAssessmentDetailPage() {
       setAssessment(await submitNeedsAssessment(assessment.id));
     } catch (err) {
       setActionError(
-        err instanceof ApiError
-          ? err.message
-          : t('nadSubmitError'),
+        err instanceof ApiError ? err.message : t('nadSubmitError'),
       );
     } finally {
       setSubmitting(false);
@@ -97,7 +98,8 @@ export default function NeedsAssessmentDetailPage() {
   const isManager = hasPermission(user, 'needs-assessment.approve');
   const isPlacement = hasPermission(user, 'program.assemble');
   const inReview =
-    assessment?.status === 'PENDING_REVIEW' || assessment?.status === 'REVIEWED';
+    assessment?.status === 'PENDING_REVIEW' ||
+    assessment?.status === 'REVIEWED';
 
   return (
     <main style={pageStyle}>
@@ -118,7 +120,10 @@ export default function NeedsAssessmentDetailPage() {
       {assessment ? (
         <>
           <h1>{t('nadHeading')}</h1>
-          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}</p>
+          <p style={{ opacity: 0.8 }}>
+            {t('commonStatusLabel')}{' '}
+            {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}
+          </p>
 
           <ConsentCaptureWidget
             customerId={assessment.customerId}
@@ -134,7 +139,9 @@ export default function NeedsAssessmentDetailPage() {
           <div style={coveragePreviewStyle}>
             <strong>{t('nadRecommendedCoverage')}</strong>
             {assessment.recommendedCoverageLines.length === 0 ? (
-              <p style={{ color: 'var(--ink-secondary)', margin: '0.5rem 0 0' }}>
+              <p
+                style={{ color: 'var(--ink-secondary)', margin: '0.5rem 0 0' }}
+              >
                 {t('nadNoCoverageLines')}
               </p>
             ) : (
@@ -148,17 +155,37 @@ export default function NeedsAssessmentDetailPage() {
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '2rem',
+              flexWrap: 'wrap',
+              marginTop: '1.5rem',
+            }}
+          >
             <div>
               <div style={profileFieldLabelStyle}>{t('nadReviewedBy')}</div>
               <div style={profileFieldValueStyle}>
                 {assessment.reviewedByUserId ?? '—'}
+                {/*
+                  Part 4 step 5. The row names a reviewer whether that was a second person or the
+                  capturer herself. Under the REVIEWER row specifically, because the approval below has
+                  its own act and its own column — merging them would lose which one was doubled up.
+                */}
+                <CombinedDutyOnRecord
+                  act={assessment.reviewerCombinedDutyAct}
+                  testId="combined-duty-assessment-reviewer"
+                />
               </div>
             </div>
             <div>
               <div style={profileFieldLabelStyle}>{t('nadApprovedBy')}</div>
               <div style={profileFieldValueStyle}>
                 {assessment.approvedByUserId ?? '—'}
+                <CombinedDutyOnRecord
+                  act={assessment.approverCombinedDutyAct}
+                  testId="combined-duty-assessment-approver"
+                />
               </div>
             </div>
           </div>

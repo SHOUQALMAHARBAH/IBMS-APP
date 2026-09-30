@@ -3,6 +3,8 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { hasPermission } from '../../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   getNeedsAssessment,
@@ -89,7 +91,16 @@ function AssembleFlow() {
   return (
     <>
       <p style={{ opacity: 0.8 }}>
-        Needs assessment {assessment.id.slice(0, 8)} — status {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}.
+        {/*
+          The truncated uuid is gone. Rule 2: what identifies a record to a person must be something the
+          person recognises, and `3f8a1c2b` is not — the reader arrived here BY selecting this assessment,
+          so naming it back at them added nothing. `NeedsAssessment` carries no human-readable name (only
+          `customerId` and `riskProfileId`, both uuids), so the honest line is what the screen needs: the
+          status, which the refusal below depends on.
+        */}
+        {t('iprognAssessmentStatus', {
+          status: t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status]),
+        })}
       </p>
 
       {!isApproved ? (
@@ -147,6 +158,28 @@ export default function NewInsuranceProgramPage() {
 
   if (isLoading || !user) return null;
 
+  /*
+   * MEASURED, and it is a reachable state rather than a theoretical one.
+   *
+   * `program.assemble` is held by PLACEMENT ALONE, while `needs-assessment.read` — which is what gets you
+   * to the assessment this screen designs from — is held by SALES, PLACEMENT, MANAGER and EXEC. So three
+   * roles could open this form, fill it in, and get the API's own English message on submit.
+   *
+   * The button that leads here IS gated (on the same permission, correctly), so the state is reached by
+   * typing the URL. That makes it rarer, not acceptable: four sibling create screens refuse in words, and
+   * the directive's rule is that a control a role cannot use does not exist on their screen.
+   */
+  if (!hasPermission(user, 'program.assemble')) {
+    return (
+      <main style={pageStyle}>
+        <h1>{t('iprognHeading')}</h1>
+        <p role="status" style={{ marginTop: '1rem' }}>
+          {permissionRefusal(t, 'iprognRefusalAct', 'program.assemble')}
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main style={pageStyle}>
       <button
@@ -154,7 +187,7 @@ export default function NewInsuranceProgramPage() {
         onClick={() => router.back()}
         style={{ cursor: 'pointer' }}
       >
-        ← Back
+        ← {t('commonBack')}
       </button>
       <h1>{t('iprognHeading')}</h1>
       <Suspense fallback={null}>

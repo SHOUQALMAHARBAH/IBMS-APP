@@ -1,0 +1,12 @@
+{
+  "correction-closes-with-nothing-behind-it": {
+    "file": "apps/api/src/modules/pdpl/dsr.service.ts",
+    "from": "      if (corrections === 0) {",
+    "to": "      if (false) {"
+  },
+  "gate-applies-to-the-wrong-type": {
+    "file": "apps/api/src/modules/pdpl/dsr.service.ts",
+    "from": "    if (dsr.type === 'CORRECTION') {",
+    "to": "    if (dsr.type === 'ACCESS') {"
+  }
+}

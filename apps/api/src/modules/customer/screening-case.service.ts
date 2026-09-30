@@ -208,6 +208,31 @@ export class ScreeningCaseService {
   }
 
   /** The case with its notes, for the reviewer working it. */
+  /**
+   * Who a case may be assigned to: active users holding `sanctions-pep.screen`,
+   * with the access window respected.
+   *
+   * ITS OWN SOURCE RATHER THAN `GET /admin/users`, the `/audit-trail/actors`
+   * precedent and for the same measured reason: `user.manage` is held by the
+   * administrator roles, and a Compliance Officer — the person who actually
+   * assigns screening work — does not hold it. Sourcing a picker from the admin
+   * user list would 403 for the only people who need it.
+   *
+   * Narrowed to holders of the screening permission, not the staff directory.
+   * That is what `assign`'s own comment is about — "a case assigned to somebody
+   * who cannot act on it is a case that stalls silently" — and it also means
+   * this read tells a reviewer only who their fellow reviewers are, which is
+   * inherent to handing work to one of them.
+   *
+   * No audit row: it is a lookup feeding a control, and one row per keystroke
+   * would be noise in the log a screening case is reviewed from.
+   */
+  listReviewers(): Promise<{ id: string; fullName: string }[]> {
+    return this.users.findActiveHolderProfilesOfPermission(
+      'sanctions-pep.screen',
+    );
+  }
+
   async get(id: string) {
     const row = await this.prisma.client.screeningMatch.findUnique({
       where: { id },

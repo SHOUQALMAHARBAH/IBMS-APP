@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -18,6 +18,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const REQUEST_TYPES = ['certificate', 'copy', 'change', 'other'] as const;
 
@@ -81,7 +82,7 @@ export default function ServiceRequestsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('srNoPermission')
+          ? permissionRefusal(t, 'srRefusalAct', 'service-request.manage')
           : err instanceof ApiError
             ? err.message
             : t('srLoadError'),
@@ -138,7 +139,8 @@ export default function ServiceRequestsPage() {
 
       {canManage ? (
         <form onSubmit={submit} style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}>
-          <CustomerPicker
+          <EntitySearch
+            kind="customer"
             value={customerId}
             onChange={setCustomerId}
             label={t('srCustomerIdLabel')}
@@ -254,7 +256,7 @@ export default function ServiceRequestsPage() {
                                 )
                               }
                             >
-                              Cancel
+                              {t('commonCancel')}
                             </button>
                           </div>
                         </div>

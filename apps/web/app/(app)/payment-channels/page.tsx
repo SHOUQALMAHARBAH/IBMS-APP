@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -16,6 +16,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const CHANNEL_TYPES = ['bank_transfer', 'cheque', 'card', 'cash'] as const;
 
@@ -39,7 +40,11 @@ export default function PaymentChannelsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { t } = useLanguage();
-  const canManage = hasPermission(user, 'payment-channel.manage');
+  // Four-action Phase 4 — three codes, because adding a destination for client money and disabling one
+  // are not one capability. A Finance officer can be given the LIST (which recording a receipt needs)
+  // without either.
+  const canCreate = hasPermission(user, 'payment-channel.create');
+  const canDeactivate = hasPermission(user, 'payment-channel.deactivate');
 
   const [rows, setRows] = useState<PaymentChannel[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,7 +66,7 @@ export default function PaymentChannelsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('pcNoPermission')
+          ? permissionRefusal(t, 'pcRefusalAct', 'payment-channel.read')
           : err instanceof ApiError
             ? err.message
             : t('pcLoadError'),
@@ -135,7 +140,7 @@ export default function PaymentChannelsPage() {
         {t('pcIntro')}
       </p>
 
-      {canManage ? (
+      {canCreate ? (
         <form
           onSubmit={submit}
           style={{
@@ -161,7 +166,8 @@ export default function PaymentChannelsPage() {
               list with a different search, and a customer picker there would
               be worse than the box it replaced. */}
           {ownerType === 'customer' ? (
-            <CustomerPicker
+            <EntitySearch
+            kind="customer"
               value={ownerId}
               onChange={setOwnerId}
               label={t('pcCustomerIdLabel')}
@@ -269,7 +275,7 @@ export default function PaymentChannelsPage() {
                       {r.isActive ? <strong>{t('pcActive')}</strong> : t('pcDisabled')}
                     </td>
                     <td style={cellStyle}>
-                      {canManage && r.isActive ? (
+                      {canDeactivate && r.isActive ? (
                         <button
                           type="button"
                           disabled={busy}

@@ -19,3 +19,21 @@ export class CreateOrgUnitDto {
   @Length(1, 100)
   nameAr?: string;
 }
+
+/**
+ * Rename an existing department or branch.
+ *
+ * Both names optional and at least one required: renaming only the Arabic label is a real edit, and
+ * a PATCH that demanded both would force a person to retype the half they were not changing.
+ */
+export class RenameOrgUnitDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  nameAr?: string;
+}

@@ -15,6 +15,16 @@ const WITH_DETAIL = {
     },
     actions: true,
     escalations: true,
+    /**
+     * Part 4 step 5 — the combined-duty act, on every read that returns a complaint.
+     *
+     * `Complaint_closure_maker_checker_distinct` requires that whoever RESOLVES a complaint is not whoever
+     * approves its closure. A closed complaint is the record a regulator reads to see the office answered
+     * its customer, and the status reads CLOSED whether one person or two signed it off.
+     *
+     * `ComplaintWithDetail` derives from this object, so the type widens with it and names every site.
+     */
+    closureCombinedDutyAct: true,
   },
 } as const;
 

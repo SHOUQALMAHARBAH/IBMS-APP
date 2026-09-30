@@ -121,13 +121,22 @@ test("the profile menu closes when the pointer goes elsewhere", async ({ page })
   await expect(bar.getByRole("link", { name: "Change password" })).toBeHidden();
 });
 
-test("the notifications slot is reserved but announces no control", async ({ page }) => {
+test("the notifications slot holds a control with a real accessible name", async ({ page }) => {
   await openApp(page);
-  // Not a button: an empty button would take focus, show a focus ring and do
-  // nothing, which is how a control reads as broken. It is out of the
-  // accessibility tree entirely until item 1b gives it behaviour.
-  await expect(navbar(page).getByRole("button", { name: /notification/i })).toHaveCount(0);
-  await expect(navbar(page).locator('[aria-hidden="true"]').first()).toBeVisible();
+  // THIS TEST ASSERTED THE OPPOSITE, AND PASSED, FOR 107 COMMITS.
+  //
+  // Written at c5fafb2 the claim was true: the slot was a decorative `<span aria-hidden>`, kept out
+  // of the accessibility tree on purpose, because an empty button takes focus, shows a focus ring and
+  // does nothing — which reads as broken. Thirteen commits later 9bd396d built the bell and replaced
+  // that span (its own header says so). The claim became false and nothing failed, because
+  // `toHaveCount(0)` is satisfied on its FIRST poll: the button had not rendered yet, so the
+  // assertion passed before the page could contradict it. Anchoring the read is what surfaced it.
+  //
+  // The behaviour belongs to notifications.spec.ts (7 tests). What this spec still owns is the
+  // navbar's own property: the slot is not an unnamed control.
+  const bell = navbar(page).getByRole("button", { name: /notification/i });
+  await expect(bell).toBeVisible();
+  await expect(bell).toHaveAttribute("aria-expanded", "false");
 });
 
 test("the sidebar still starts below the navbar rather than under it", async ({ page }) => {

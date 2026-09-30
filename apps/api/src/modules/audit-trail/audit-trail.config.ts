@@ -55,9 +55,38 @@ export interface AuditLogEntryRow {
   occurredAt: Date;
 }
 
+/**
+ * One person who appears as an actor in the audit log. Identifiers and a name — never a role, never an
+ * email: this backs a filter control, and the roles an actor HELD are already on the rows themselves.
+ */
+export interface AuditActorView {
+  id: string;
+  fullName: string;
+}
+
 export interface AuditLogEntryView {
   id: string;
   userId: string;
+  /**
+   * Who that id IS, resolved for display.
+   *
+   * The screen rendered `userId` — a raw uuid — in a column headed "User", which is unreadable by the
+   * person the audit trail exists for.
+   *
+   * Typed nullable because it is a LOOKUP, and `null` is what a lookup that missed returns. On this
+   * schema it cannot miss, and that is worth writing down rather than trusting: `userId` is NOT NULL,
+   * `AuditLogEntry_userId_fkey` is ON DELETE RESTRICT (measured, not read off the schema — the
+   * declaration has been wrong about an onDelete before), and both reads are scoped to the same office.
+   * So an actor cannot be deleted out from under their own audit rows, and the screen's fallback to the
+   * id is defence against a future change to any one of those three, not a state you can reach today.
+   * There is a test that keeps the RESTRICT true.
+   *
+   * Deliberately NOT stored on the row. `actorRoleNames` is stored because a role held in the past and
+   * then revoked is unrecoverable; a NAME is recoverable by lookup, and resolving it means the reader
+   * sees who the person is TODAY, which is what "who did this" asks. A stored copy would also be a
+   * second place a rename has to reach.
+   */
+  actorName: string | null;
   action: string;
   entityType: string;
   entityId: string;
@@ -74,10 +103,13 @@ export interface AuditLogEntryView {
 
 export function deriveAuditLogEntryView(
   row: AuditLogEntryRow,
+  /** Resolved names for the page, keyed by user id. Absent for the two history reads. */
+  names?: Map<string, string>,
 ): AuditLogEntryView {
   return {
     id: row.id,
     userId: row.userId,
+    actorName: names?.get(row.userId) ?? null,
     action: row.action,
     entityType: row.entityType,
     entityId: row.entityId,

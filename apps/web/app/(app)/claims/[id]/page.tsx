@@ -10,6 +10,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { ClaimCard } from '../../../../components/claim/ClaimCard';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDate } from '../../../../lib/i18n/format';
 
 /**
  * One claim, on a route the Claims desk can actually reach.
@@ -24,6 +25,20 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
  * starts from the policy it is being raised against, and a notify form with no
  * policy in hand would have to make the user find one first. Notification
  * stays where the policy already is.
+ *
+ * ~~Notification stays where the policy already is.~~ **THAT SENTENCE POINTS AT A SCREEN THAT DOES NOT
+ * HAVE THE CONTROL.** Measured 2026-09-29 by `scripts/measurements/permission-reachability.py`: the only
+ * surface offering `claim.notify` is `/opportunities/[id]`, behind an `opportunity.read` a CLAIMS_OFFICER
+ * does not hold — and neither `/policies` nor `/policies/[id]` offers it either. So **a Claims Officer
+ * cannot raise a claim from anywhere they can navigate to**, and the reasoning above described an
+ * intention rather than a state.
+ *
+ * Left as a stated defect rather than fixed here, because the fix is not a line: `ClaimSection` is keyed
+ * on `opportunityId` and carries the whole claim lifecycle in nine capability props, so putting
+ * notification on the policy screen means either re-keying that component or extracting a notify-only
+ * control — and the form collects `estimatedLoss`, a monetary figure. Both are decisions. Raised for the
+ * owner with the measurement attached; do not quietly duplicate the claims UI on a second screen, which
+ * is the thing the paragraph above this one exists to prevent.
  */
 export default function ClaimDetailPage() {
   const router = useRouter();
@@ -31,7 +46,7 @@ export default function ClaimDetailPage() {
   // every other dynamic route in this app already reads the hook.
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [claim, setClaim] = useState<Claim | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -85,17 +100,28 @@ export default function ClaimDetailPage() {
 
       {claim ? (
         <>
+          {/*
+            Was `claim.id.slice(0, 8)` as the last fallback — a uuid fragment in a page HEADING. Rule 2:
+            what identifies a record to a person must be something the person recognises.
+            
+            This state is REACHABLE, unlike the risk-profile one: a claim that has been notified but not
+            yet registered has neither a claim number nor an insurer reference. So the field could not
+            simply be required — the heading needed a readable answer for that state, and the loss date is
+            it. There is nothing to disambiguate against on a detail page, and a person recognises a date.
+          */}
           <h1>
-            {t('claimsDetailHeading', {
-              name:
-                claim.claimNumber ??
-                claim.insurerClaimReference ??
-                claim.id.slice(0, 8),
-            })}
+            {(claim.claimNumber ?? claim.insurerClaimReference)
+              ? t('claimsDetailHeading', {
+                  name: claim.claimNumber ?? claim.insurerClaimReference ?? '',
+                })
+              : t('claimsDetailHeadingByLoss', {
+                  at: formatDate(claim.lossDate, language),
+                })}
           </h1>
           <ClaimCard
             claim={claim}
             abilities={{
+              canDiscard: hasPermission(user, 'claim.discard'),
               canRegister: hasPermission(user, 'claim.register'),
               canDocument: hasPermission(user, 'claim.document'),
               canAssess: hasPermission(user, 'claim.assess'),

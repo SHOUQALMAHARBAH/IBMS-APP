@@ -23,32 +23,32 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  * Part C #71, Domain H — Vendor Management) extends the SAME controller
  * with risk tiering, the annual-review action, termination + access
  * revocation, and the data-share readiness gate — all still under
- * `vendor.manage`.
+ * the four `vendor.*` codes — read, create, update, deactivate.
  */
 @ApiTags('supporting-operations')
 @Controller('vendors')
 export class VendorController {
   constructor(private readonly vendors: VendorService) {}
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.create')
   @Post()
   create(@Body() dto: CreateVendorDto, @CurrentUser() user: AuthenticatedUser) {
     return this.vendors.create(dto, user.id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.read')
   @Get()
   list(@Query() query: ListVendorsQueryDto) {
     return this.vendors.list(query);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.read')
   @Get(':id')
   get(@Param('id') id: string) {
     return this.vendors.get(id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.update')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -58,7 +58,7 @@ export class VendorController {
     return this.vendors.update(id, dto, user.id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.update')
   @Patch(':id/risk-tier')
   setRiskTier(
     @Param('id') id: string,
@@ -68,7 +68,7 @@ export class VendorController {
     return this.vendors.setRiskTier(id, dto, user.id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.update')
   @Post(':id/annual-review')
   recordAnnualReview(
     @Param('id') id: string,
@@ -77,7 +77,7 @@ export class VendorController {
     return this.vendors.recordAnnualReview(id, user.id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.deactivate')
   @Post(':id/terminate')
   terminate(
     @Param('id') id: string,
@@ -87,7 +87,7 @@ export class VendorController {
     return this.vendors.terminate(id, dto, user.id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.deactivate')
   @Post(':id/revoke-access')
   revokeAccess(
     @Param('id') id: string,
@@ -96,7 +96,7 @@ export class VendorController {
     return this.vendors.revokeAccess(id, user.id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.read')
   @Get(':id/data-share-readiness')
   dataShareReadiness(@Param('id') id: string) {
     return this.vendors.dataShareReadiness(id);

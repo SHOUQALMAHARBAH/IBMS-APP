@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { anchoredTexts } from "./support/anchored";
 
 /*
  * The sidebar restructure, exercised through the role it was designed around.
@@ -157,16 +158,10 @@ test("the Manager's group order puts the book of business above administration",
   await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
-  // Wait for the nav to have groups at all first: they render only once
-  // /auth/me resolves, and `allInnerTexts()` does NOT auto-wait — reading it
-  // too early returns [] and every index assertion below passes vacuously or
-  // fails for the wrong reason.
   const sidebar = nav(page);
-  await expect(sidebar.getByRole("link", { name: "Customers", exact: true })).toBeVisible();
-
   // Lower-cased because the group headings are uppercased in CSS and
   // `innerText` reports the rendered text, not the source string.
-  const headings = await sidebar.locator("summary").allInnerTexts();
+  const headings = await anchoredTexts(sidebar.locator("summary"));
   const order = headings.map((h) => h.trim().toLowerCase());
 
   // Not a full-sequence assertion — that would break on any future group — but

@@ -3,6 +3,7 @@ import { EmployeeController } from './employee.controller';
 import { EmployeeService } from './employee.service';
 import { EmployeeRepository } from '../../repositories/employee.repository';
 import { DepartmentRepository } from '../../repositories/department.repository';
+import { BranchRepository } from '../../repositories/branch.repository';
 import { AuditModule } from '../audit/audit.module';
 import { SecurityModule } from '../security/security.module';
 import { SlaModule } from '../sla/sla.module';
@@ -35,6 +36,11 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [AuditModule, SecurityModule, SlaModule, AuthModule],
   controllers: [EmployeeController],
-  providers: [EmployeeService, EmployeeRepository, DepartmentRepository],
+  providers: [
+    EmployeeService,
+    EmployeeRepository,
+    DepartmentRepository,
+    BranchRepository,
+  ],
 })
 export class EmployeeModule {}

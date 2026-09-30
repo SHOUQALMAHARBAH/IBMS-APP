@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { DataSubjectRequest, DsrStatus, DsrType, Prisma } from '@ibms/db';
+import type { DsrStatus, DsrType, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** The one terminal state; everything else is still the DPO's problem. */
@@ -23,6 +23,29 @@ export interface DsrScope {
  * `ComplaintRepository.recordAssignee` shape (status-conditional so a
  * concurrent transition wins the race — `race-safe-invariants.md`).
  */
+/**
+ * The combined-duty act, on every DSR read.
+ *
+ * `DataSubjectRequest_maker_checker_distinct` requires that whoever logs a request is not whoever
+ * closes it. When an office declares COMBINED mode one person may do both by stating why, and the
+ * act lands in `combinedDutyActId`. Reading it back is what lets the REQUEST say so — Part 4 step 5,
+ * "on the record, not only in a report".
+ *
+ * THE RELATION IS `closureCombinedDutyAct`, NOT `combinedDutyAct`. Each pair's escape column is named
+ * after the CONSTRAINT it excuses rather than after the table, deliberately: `NeedsAssessment` has two
+ * pairs and one shared column would let a declared combined REVIEW excuse a self-APPROVAL. So the name
+ * must be read off the schema per pair — `grep 'CombinedDutyAct?' schema.prisma` lists all sixteen —
+ * and assuming the uniform name is a compile error at best.
+ *
+ * On EVERY read and not only the detail one: the DPO's queue is where a statutory deadline is worked,
+ * and a row there that was closed by its own logger should not have to be opened to find that out.
+ */
+const DSR_INCLUDE = { closureCombinedDutyAct: true } as const;
+
+export type DataSubjectRequestWithAct = Prisma.DataSubjectRequestGetPayload<{
+  include: typeof DSR_INCLUDE;
+}>;
+
 @Injectable()
 export class DsrRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -51,7 +74,7 @@ export class DsrRepository {
     type: DsrType;
     slaDueAt: Date;
     dpoHandlerUserId: string | null;
-  }): Promise<DataSubjectRequest> {
+  }): Promise<DataSubjectRequestWithAct> {
     return this.prisma.client.dataSubjectRequest.create({
       data: {
         customerId: input.customerId,
@@ -61,12 +84,18 @@ export class DsrRepository {
         dpoHandlerUserId: input.dpoHandlerUserId,
         // status defaults to RECEIVED, receivedAt defaults to now()
       },
+      // The include is here too, so `create` returns the same shape every read does. A newly logged
+      // request cannot have a combined-duty act — nothing has closed it — so this always yields
+      // `null`; what it buys is that the row type needs no optional field, and an optional field is
+      // what lets the next caller pass a row whose act state nobody knows.
+      include: DSR_INCLUDE,
     });
   }
 
-  findById(id: string): Promise<DataSubjectRequest | null> {
+  findById(id: string): Promise<DataSubjectRequestWithAct | null> {
     return this.prisma.client.dataSubjectRequest.findUnique({
       where: { id },
+      include: DSR_INCLUDE,
     });
   }
 
@@ -82,15 +111,19 @@ export class DsrRepository {
    * OPEN requests only; ordering ascending means that if the cap is ever hit,
    * what it truncates is the least urgent tail, never the most urgent head.
    */
-  findOpenQueue(take: number): Promise<DataSubjectRequest[]> {
+  findOpenQueue(take: number): Promise<DataSubjectRequestWithAct[]> {
     return this.prisma.client.dataSubjectRequest.findMany({
       where: { status: { not: CLOSED_DSR_STATUS } },
       orderBy: { createdAt: 'asc' },
       take,
+      include: DSR_INCLUDE,
     });
   }
 
-  findMany(scope: DsrScope, take: number): Promise<DataSubjectRequest[]> {
+  findMany(
+    scope: DsrScope,
+    take: number,
+  ): Promise<DataSubjectRequestWithAct[]> {
     return this.prisma.client.dataSubjectRequest.findMany({
       where: {
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
@@ -105,6 +138,7 @@ export class DsrRepository {
       },
       orderBy: { createdAt: 'desc' },
       take,
+      include: DSR_INCLUDE,
     });
   }
 

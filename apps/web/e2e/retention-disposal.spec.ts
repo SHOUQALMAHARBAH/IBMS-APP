@@ -70,6 +70,9 @@ const BATCHES = [
     nominatedByUserId: "user-2",
     managerApprovedAt: "2026-09-05T00:00:00.000Z",
     dpoApprovedByUserId: "user-1",
+    // The endpoint returns this now. Null here, and the fixture is ALREADY the ordinary case:
+    // nominated by user-2 and approved by user-1 — two different people.
+    combinedDutyAct: null,
     dpoApprovedAt: "2026-09-06T00:00:00.000Z",
     method: null,
     executedAt: null,
@@ -81,7 +84,7 @@ const BATCHES = [
 
 async function mockRegister(
   page: Page,
-  opts: { scheduleStatus?: number } = {},
+  opts: { scheduleStatus?: number; batches?: unknown[] } = {},
 ) {
   await page.route("http://localhost:4000/retention-schedule**", (route) => {
     if (opts.scheduleStatus && opts.scheduleStatus !== 200) {
@@ -96,7 +99,7 @@ async function mockRegister(
     route.fulfill({ status: 200, json: HOLDS }),
   );
   await page.route("http://localhost:4000/disposal-batches**", (route) =>
-    route.fulfill({ status: 200, json: BATCHES }),
+    route.fulfill({ status: 200, json: opts.batches ?? BATCHES }),
   );
 }
 
@@ -229,7 +232,7 @@ test("a user without the schedule permission sees the translated 403 message", a
   // asserted exactly that. The absence check is what makes it a proof:
   // without it the old behaviour satisfies the new assertion too.
   await expect(
-    page.getByText("retention/disposal register", { exact: false }),
+    page.getByText("view the retention and disposal register", { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),
@@ -250,4 +253,60 @@ test("retention-disposal screen has no serious/critical accessibility violations
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+/*
+ * THE COMBINED-DUTY ACT ON A DISPOSAL BATCH — Part 4 step 5.
+ *
+ * `DisposalBatch_maker_checker_distinct` requires that whoever NOMINATES records for destruction is not
+ * whoever approves it. **This is the pair that authorises irreversible destruction of personal data** —
+ * no undo behind it, and a certificate of destruction issued afterwards — so whether two people agreed
+ * is the most load-bearing fact on the row.
+ *
+ * And the status column reads `DPO_APPROVED` either way, which is why the ordinary-case test asserts
+ * that status IS shown beside the absent declaration rather than asserting silence.
+ */
+
+/** Nominated AND approved by the same person, with the reason they gave. */
+const SELF_APPROVED_BATCH = {
+  ...BATCHES[0],
+  id: "db-2",
+  dpoApprovedByUserId: "user-2",
+  combinedDutyAct: {
+    id: "cda-db-1",
+    at: "2026-09-06T00:00:00.000Z",
+    actorUserId: "user-2",
+    reason: "Retention period expired and the DPO was the only officer present that week.",
+    pair: "DisposalBatch_maker_checker_distinct",
+    roles: ["DATA_PROTECTION_OFFICER"],
+    hatAmbiguous: false,
+  },
+};
+
+test("shows that one person both nominated and approved a disposal batch, and why", async ({
+  page,
+}) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await mockRegister(page, { batches: [SELF_APPROVED_BATCH] });
+  await page.goto("/retention-disposal");
+
+  const declared = page.getByTestId("combined-duty-disposal-db-2");
+  await expect(declared).toContainText("DATA_PROTECTION_OFFICER");
+  await expect(declared).toContainText("only officer present");
+  // Tied to the database rule it excuses, so the record and the constraint cannot drift apart.
+  await expect(declared).toHaveAttribute(
+    "data-combined-duty-pair",
+    "DisposalBatch_maker_checker_distinct",
+  );
+});
+
+test("shows DPO approved and declares nothing when two people agreed", async ({ page }) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await mockRegister(page);
+  await page.goto("/retention-disposal");
+
+  // The POSITIVE claim is the anchor: the status cell says DPO approved either way, so asserting
+  // silence alone would pass on a cell that had stopped rendering the declaration at all.
+  await expect(page.getByText("DPO approved", { exact: false }).first()).toBeVisible();
+  await expect(page.getByTestId("combined-duty-disposal-db-1")).toHaveCount(0);
 });

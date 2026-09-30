@@ -1,10 +1,15 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../components/ui/CombinedDutyReasonField';
 import {
   applyDsrExtension,
   assignDsr,
@@ -24,6 +29,9 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { DsrClockControl } from '../../../components/pdpl/DsrClockControl';
+import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const LOG_ROLES = [
   'dsr.log',
@@ -60,6 +68,8 @@ export default function DsrPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by record so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [customerId, setCustomerId] = useState('');
   const [type, setType] = useState<string>(DSR_TYPES[0]!);
@@ -75,7 +85,7 @@ export default function DsrPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('dsrNoPermission')
+          ? permissionRefusal(t, 'dsrRefusalAct', 'dsr.log')
           : err instanceof ApiError
             ? err.message
             : t('dsrLoadError'),
@@ -136,7 +146,8 @@ export default function DsrPage() {
           onSubmit={submit}
           style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}
         >
-          <CustomerPicker
+          <EntitySearch
+            kind="customer"
             value={customerId}
             onChange={setCustomerId}
             label={t('dsrCustomerIdLabel')}
@@ -200,12 +211,24 @@ export default function DsrPage() {
                     </td>
                     <td style={cell}>
                       {d.status === 'CLOSED' ? (
-                        '—'
+                        /* A closed request has no actions left, so this cell held a bare em-dash.
+                           Part 4 step 5 — if ONE person both logged and closed it, that is the one
+                           thing still worth saying here, and `closedByUserId` alone cannot say it.
+                           Renders the em-dash when there is no act, which is every ordinary
+                           closure. */
+                        d.combinedDutyAct ? (
+                          <CombinedDutyOnRecord
+                            act={d.combinedDutyAct}
+                            testId={`combined-duty-dsr-${d.id}`}
+                          />
+                        ) : (
+                          '—'
+                        )
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '18rem' }}>
                           {canHandle ? (
                             <input
-                              aria-label={t('dsrTextAria', { id: d.id })}
+                              aria-label={t('dsrTextAria')}
                               placeholder={t('dsrTextPlaceholder')}
                               value={text[d.id] ?? ''}
                               onChange={(e) => setVal(d.id, e.target.value)}
@@ -213,7 +236,7 @@ export default function DsrPage() {
                           ) : null}
                           {canHandle && d.status === 'IN_PROGRESS' ? (
                             <input
-                              aria-label={t('dsrRetentionRefAria', { id: d.id })}
+                              aria-label={t('dsrRetentionRefAria')}
                               placeholder={t('dsrRetentionRefPlaceholder')}
                               value={reference[d.id] ?? ''}
                               onChange={(e) => setRef(d.id, e.target.value)}
@@ -223,7 +246,7 @@ export default function DsrPage() {
                             <label style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                               <input
                                 type="checkbox"
-                                aria-label={t('dsrNoRetentionHoldAria', { id: d.id })}
+                                aria-label={t('dsrNoRetentionHoldAria')}
                                 checked={confirmNoHold[d.id] ?? false}
                                 onChange={(e) =>
                                   setConfirmNoHold((c) => ({
@@ -235,6 +258,16 @@ export default function DsrPage() {
                               {t('dsrNoRetentionHold')}
                             </label>
                           ) : null}
+                          {/* The statutory clock, controlled from the request itself —
+                            * the DPO holds `sla.timer.pause` and cannot open the
+                            * deadlines dashboard (IMPROVEMENTS § 1.61). Gated on that
+                            * permission inside the component, not on `dsr.handle`:
+                            * stopping a compliance clock is the same act here as
+                            * anywhere else. */}
+                          <DsrClockControl
+                            requestId={d.id}
+                            closed={d.closedAt !== null}
+                          />
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                             {canHandle && d.status === 'RECEIVED' ? (
                               <button
@@ -320,13 +353,41 @@ export default function DsrPage() {
                             ['FULFILLED', 'PARTIALLY_FULFILLED', 'REJECTED'].includes(
                               d.status,
                             ) ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => closeDsr(d.id))}
-                              >
-                                {t('dsrCloseButton')}
-                              </button>
+                              (() => {
+                                // Part 4 — the person who performed the first half may complete it themselves in an office
+                                // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                                const needs = needsCombinedDutyDeclaration({
+                                  mode: user.dutySegregationMode,
+                                  makerUserId: d.processedByUserId,
+                                  currentUserId: user.id,
+                                  alreadyDecided: d.closedByUserId != null,
+                                });
+                                const declaration = declarations[d.id] ?? '';
+                                return (
+                                  <>
+                                    {needs ? (
+                                      <CombinedDutyReasonField
+                                        id={d.id}
+                                        value={declaration}
+                                        onChange={(next) =>
+                                          setDeclarations((prev) => ({ ...prev, [d.id]: next }))
+                                        }
+                                      />
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      disabled={busy || (needs && combinedDutyTooShort(declaration))}
+                                      onClick={() =>
+                                        void run(() =>
+                                          closeDsr(d.id, needs ? declaration.trim() : undefined),
+                                        )
+                                      }
+                                    >
+                                      {t('dsrCloseButton')}
+                                    </button>
+                                  </>
+                                );
+                              })()
                             ) : null}
                           </div>
                         </div>

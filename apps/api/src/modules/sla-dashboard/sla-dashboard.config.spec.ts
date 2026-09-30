@@ -390,7 +390,18 @@ describe('dashboard rows carry pause-aware status and provenance', () => {
   const now = new Date('2027-01-11T00:00:00.000Z');
   const cutoff = new Date('2027-01-13T00:00:00.000Z');
 
-  it('reports a PAUSED clock as paused, where the legacy state would say breached', () => {
+  it('reports a PAUSED clock as paused in the state bucketing too, not breached', () => {
+    // This assertion USED TO READ `toBe('breached')`, commented "the older
+    // bucketing, kept for continuity". That was defensible only while nothing
+    // could pause a timer: `state` is what the dashboard screen renders, what
+    // `tally` counts and what `breachRate` is computed from, so a paused clock
+    // bucketed as breached is a breach reported that has not happened.
+    // `POST /sla/timers/:id/pause` gained a caller in the same commit as this
+    // change, which is what turned a latent divergence into a live one.
+    //
+    // The continuity that actually mattered is preserved elsewhere: `paused` is
+    // in the `open` filter group, so a paused timer still appears under the
+    // screen's default view rather than disappearing.
     const row = deriveSlaTimerRow(
       {
         ...base,
@@ -401,8 +412,47 @@ describe('dashboard rows carry pause-aware status and provenance', () => {
       cutoff,
     );
     expect(row.slaStatus).toBe('PAUSED');
-    expect(row.state).toBe('breached'); // the older bucketing, kept for continuity
+    expect(row.state).toBe('paused');
     expect(row.remainingMs).toBeNull();
+    // And it is not charged overdue days for a deadline it has not passed.
+    expect(row.overdueDays).toBeNull();
+  });
+
+  it('does not report a timer resolved inside its adjusted deadline as late', () => {
+    // THE PERMANENT ONE. `resolved_late` never changes again and feeds
+    // `breachRate` forever, so a false late resolution is not a display glitch
+    // that clears on the next render — it is a wrong compliance figure on the
+    // record. Paused four days, resolved two days after the ORIGINAL dueAt and
+    // therefore two days INSIDE the deadline it actually had.
+    const row = deriveSlaTimerRow(
+      {
+        ...base,
+        pausedAt: null,
+        pausedTotalMs: 4 * 24 * 3600 * 1000,
+        resolvedAt: new Date('2027-01-12T00:00:00.000Z'),
+      },
+      now,
+      cutoff,
+    );
+    expect(row.state).toBe('resolved_on_time');
+    expect(row.overdueDays).toBeNull();
+  });
+
+  it('charges overdue days from the adjusted deadline, not from dueAt', () => {
+    // Genuinely breached, so the figure must be RIGHT rather than null: due
+    // 10 Jan, paused for 4 days, read on 16 Jan. The adjusted deadline is
+    // 14 Jan, so it is 2 days overdue — not the 6 that raw `dueAt` gives.
+    const row = deriveSlaTimerRow(
+      {
+        ...base,
+        pausedAt: null,
+        pausedTotalMs: 4 * 24 * 3600 * 1000,
+      },
+      new Date('2027-01-16T00:00:00.000Z'),
+      new Date('2027-01-18T00:00:00.000Z'),
+    );
+    expect(row.state).toBe('breached');
+    expect(row.overdueDays).toBe(2);
   });
 
   it('shifts the effective deadline by accumulated pause without moving dueAt', () => {

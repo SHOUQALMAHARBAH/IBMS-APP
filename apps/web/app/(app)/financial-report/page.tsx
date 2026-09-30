@@ -12,6 +12,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatMoney } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -63,7 +64,7 @@ export default function FinancialReportPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('frNoPermission')
+          ? permissionRefusal(t, 'frRefusalAct', 'financial-report.view')
           : err instanceof ApiError
             ? err.message
             : t('frLoadError'),

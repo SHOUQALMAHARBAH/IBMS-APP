@@ -163,7 +163,7 @@ test("shows a friendly message when the user lacks list permission", async ({ pa
 
   await page.goto("/prospects");
 
-  await expect(page.locator('p[role="alert"]')).toContainText("don't hold the prospect.read");
+  await expect(page.locator('p[role="alert"]')).toContainText("(prospect.read)");
 });
 
 test("prospects list and profile screens have no serious/critical accessibility violations @a11y", async ({

@@ -21,6 +21,7 @@ import { rfqBadgeStyle } from '../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 /**
  * The claims queue.
@@ -95,7 +96,7 @@ export default function ClaimsQueuePage() {
         setClaims(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? t('claimsQueueNoPermission')
+            ? permissionRefusal(t, 'claimsQueueRefusalAct', 'claim.read')
             : err instanceof ApiError
               ? err.message
               : t('claimsQueueLoadError'),

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { CommissionAgreementService } from './commission-agreement.service';
 import { CommissionLedgerService } from './commission-ledger.service';
@@ -97,9 +98,10 @@ export class CommissionController {
   @Post('entries/:id/override/approve')
   approveOverride(
     @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.ledger.approveOverride(id, user.id);
+    return this.ledger.approveOverride(id, user.id, dto.combinedDutyReason);
   }
 
   /** Process 36 — reconcile the entry against an insurer statement and mark it

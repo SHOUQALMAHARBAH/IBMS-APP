@@ -210,7 +210,7 @@ export default function CrossSellOpportunityDetailPage() {
                     style={{ ...buttonStyle, width: 'auto' }}
                     onClick={() => setDismissing(false)}
                   >
-                    Cancel
+                    {t('commonCancel')}
                   </button>
                 </>
               ) : (

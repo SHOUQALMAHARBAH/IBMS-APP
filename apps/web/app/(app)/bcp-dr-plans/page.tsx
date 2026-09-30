@@ -17,6 +17,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -61,7 +62,7 @@ export default function BcpDrPlansPage() {
       setCoverage(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('bcpNoPermission')
+          ? permissionRefusal(t, 'bcpRefusalAct', 'bcp-dr.manage')
           : err instanceof ApiError
             ? err.message
             : t('bcpLoadError'),
@@ -129,6 +130,29 @@ export default function BcpDrPlansPage() {
         </p>
       ) : null}
 
+      <form onSubmit={onCreate} style={formStyle}>
+        <h2>{t('bcpCreateHeading')}</h2>
+        <label style={labelStyle}>
+          {t('bcpScenario')}
+          <select value={scenario} onChange={(e) => setScenario(e.target.value as BcpDrScenario)}>
+            {BCP_DR_SCENARIOS.map((s) => (
+              <option key={s} value={s}>
+                {t(ENUM_LABEL.BcpDrScenario[s])}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={labelStyle}>
+          {t('bcpRtoHours')}
+          <input type="number" min={0} value={rtoHours} onChange={(e) => setRtoHours(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          {t('bcpRpoHours')}
+          <input type="number" min={0} value={rpoHours} onChange={(e) => setRpoHours(e.target.value)} />
+        </label>
+        <button type="submit">{t('bcpSubmitButton')}</button>
+      </form>
+
       {coverage ? (
         coverage.map((entry) => (
           <section key={entry.scenario} style={sectionStyle}>
@@ -194,28 +218,6 @@ export default function BcpDrPlansPage() {
         <p>{t('bcpLoading')}</p>
       )}
 
-      <form onSubmit={onCreate} style={formStyle}>
-        <h2>{t('bcpCreateHeading')}</h2>
-        <label style={labelStyle}>
-          {t('bcpScenario')}
-          <select value={scenario} onChange={(e) => setScenario(e.target.value as BcpDrScenario)}>
-            {BCP_DR_SCENARIOS.map((s) => (
-              <option key={s} value={s}>
-                {t(ENUM_LABEL.BcpDrScenario[s])}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={labelStyle}>
-          {t('bcpRtoHours')}
-          <input type="number" min={0} value={rtoHours} onChange={(e) => setRtoHours(e.target.value)} />
-        </label>
-        <label style={labelStyle}>
-          {t('bcpRpoHours')}
-          <input type="number" min={0} value={rpoHours} onChange={(e) => setRpoHours(e.target.value)} />
-        </label>
-        <button type="submit">{t('bcpSubmitButton')}</button>
-      </form>
     </main>
   );
 }

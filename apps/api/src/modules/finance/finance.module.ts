@@ -60,7 +60,7 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
  * (invoice / remittance amounts are Confidential, the #31 decision).
  *
  * `PaymentChannelService` (#38) maintains the approved `PaymentChannel` list
- * (`payment-channel.manage` / Finance) — a governed reference list; #32's
+ * (`payment-channel.read`/`.create`/`.deactivate` / Finance) — a governed reference list; #32's
  * `CollectionService` validates a supplied `paymentChannelId` against it and
  * records it on the `Receipt` / `Remittance`.
  *

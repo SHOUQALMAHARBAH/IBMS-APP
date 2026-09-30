@@ -166,7 +166,7 @@ test("shows a friendly message when the user lacks read permission", async ({ pa
 
   await page.goto("/risk-profiles?customerId=cust-1");
   await expect(page.locator('p[role="alert"]')).toContainText(
-    "don't hold the risk-profile.read",
+    "(risk-profile.read)",
   );
 });
 

@@ -72,6 +72,7 @@ export const POLICY = {
     endorsementApplyButton: 'تطبيق',
     endorsementApproveRefundButton: 'الموافقة على الاسترجاع',
     endorsementNotifyButton: 'إخطار العميل',
+    endorsementDisburseRefundButton: 'صرف المبلغ المسترد',
     endorsementWorkingButton: 'جارٍ العمل…',
     endorsementActionError: 'تعذر إتمام هذا الإجراء — حاول مرة أخرى.',
     endorsementCancellationReasonLabel: 'السبب',
@@ -160,8 +161,7 @@ export const POLICY = {
       'لا توجد مطالبات بعد. تظهر المطالبة هنا فور الإبلاغ عنها على وثيقة صادرة.',
     claimsQueueNoneMatch: 'لا توجد مطالبة تطابق هذا البحث. جرّب مرجعاً أو حالة أخرى.',
     claimsQueueCountLabel: '{count} مطالبة',
-    claimsQueueNoPermission:
-      'لا تملك صلاحية claim.read اللازمة لعرض المطالبات.',
+    claimsQueueRefusalAct: 'عرض المطالبات',
     claimsQueueLoadError: 'تعذر تحميل المطالبات — حاول مرة أخرى.',
     claimsQueueViewAria: 'فتح المطالبة {name}',
     claimsQueueNoNumberYet: 'لم يُسجَّل رقم مطالبة بعد',
@@ -175,6 +175,7 @@ export const POLICY = {
     claimsDetailNotFound:
       'لا توجد مطالبة بهذا المعرّف ضمن نطاق عملك.',
     claimsDetailHeading: 'المطالبة {name}',
+    claimsDetailHeadingByLoss: 'مطالبة عن خسارة بتاريخ {at}',
     claimLossOnLabel: 'الخسارة بتاريخ',
     claimLargeClaimSuffix: 'مطالبة كبيرة',
     claimDeductibleShort: 'التحمّل',
@@ -276,8 +277,7 @@ export const POLICY = {
     policiesNoneYet:
       'لا توجد وثائق لعرضها. تظهر الوثيقة هنا بعد وضع فرصة مقبولة من العميل وإصدارها.',
     policiesNoneMatch: 'لا توجد وثيقة تطابق هذا البحث. جرّب رقم وثيقة أو اسم عميل آخر.',
-    policiesNoPermission:
-      'لا تملك صلاحية policy.read اللازمة لعرض الوثائق. راجع مسؤول النظام.',
+    policiesRefusalAct: 'عرض الوثائق',
     policiesLoadError: 'تعذر تحميل الوثائق — حاول مرة أخرى.',
     policiesCapNotice:
       'تعرض هذه القائمة أحدث {count} وثيقة. ضيّق البحث أو الحالة للوصول إلى وثائق أقدم.',
@@ -393,6 +393,7 @@ export const POLICY = {
     endorsementApplyButton: 'Apply',
     endorsementApproveRefundButton: 'Approve refund',
     endorsementNotifyButton: 'Notify client',
+    endorsementDisburseRefundButton: 'Pay refund',
     endorsementWorkingButton: 'Working…',
     endorsementActionError: 'That action could not be completed — try again.',
     endorsementCancellationReasonLabel: 'Reason',
@@ -481,8 +482,7 @@ export const POLICY = {
       'No claims yet. A claim appears here as soon as one is notified against an issued policy.',
     claimsQueueNoneMatch: 'No claim matches this search. Try another reference or status.',
     claimsQueueCountLabel: '{count} claims',
-    claimsQueueNoPermission:
-      "You don't hold the claim.read permission needed to view claims.",
+    claimsQueueRefusalAct: 'view claims',
     claimsQueueLoadError: 'Could not load claims — try again.',
     claimsQueueViewAria: 'Open claim {name}',
     claimsQueueNoNumberYet: 'No claim number yet',
@@ -496,6 +496,7 @@ export const POLICY = {
     claimsDetailNotFound:
       'No claim with that id is in your book.',
     claimsDetailHeading: 'Claim {name}',
+    claimsDetailHeadingByLoss: 'Claim for a loss on {at}',
     claimLossOnLabel: 'Loss',
     claimLargeClaimSuffix: 'large claim',
     claimDeductibleShort: 'deductible',
@@ -598,8 +599,7 @@ export const POLICY = {
       'No policies to show. A policy appears here once an accepted opportunity has been placed and issued.',
     policiesNoneMatch:
       'No policy matches that search. Try a different policy number or client name.',
-    policiesNoPermission:
-      "You don't hold the policy.read permission needed to view policies. Ask your system administrator.",
+    policiesRefusalAct: 'view policies',
     policiesLoadError: 'Could not load policies — try again.',
     policiesCapNotice:
       'Showing the most recent {count} policies. Narrow the search or status to reach older ones.',

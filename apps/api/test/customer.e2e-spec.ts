@@ -208,6 +208,105 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
     if (app) await app.close();
   });
 
+  describe('PATCH /customers/:id — correcting contact details', () => {
+    it('corrects a phone number, and REFUSES every screening identifier by construction', async () => {
+      // IMPROVEMENTS § 3.14. A customer record had no update path at all, which is also why a PDPL
+      // CORRECTION request could only be closed by a staff member attesting to a change the system gave
+      // them no way to make.
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-correct-a',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const customer = await createIndividualCustomer(
+        app,
+        sales.accessToken,
+        'Correctable Customer',
+      );
+
+      // The half that works: three fields with no screening consequence.
+      await request(app.getHttpServer())
+        .patch(`/customers/${customer.id}`)
+        .set(bearer(sales.accessToken))
+        .send({ contactPhone: '+962-7-9111-1111' })
+        .expect(200);
+
+      // THE HALF THAT MATTERS MORE. Jordan's AMLU requires screening "upon KYC reviews or changes to a
+      // customer's information", so a name or a date of birth is a screening event, not an edit:
+      // https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions
+      //
+      // The DTO omits those fields, so `forbidNonWhitelisted` refuses them with a 400 naming the field.
+      // Asserted one at a time rather than as a set, because a single request carrying all of them would
+      // pass if only ONE were still rejected — and the refusal must hold for each.
+      for (const forbidden of [
+        { givenName: 'Renamed' },
+        { familyName: 'Renamed' },
+        { dateOfBirth: '1990-01-01' },
+        { nationality: 'JO' },
+        { nationalId: '9901019999' },
+        { legalName: 'Renamed Entirely' },
+      ]) {
+        await request(app.getHttpServer())
+          .patch(`/customers/${customer.id}`)
+          .set(bearer(sales.accessToken))
+          .send(forbidden)
+          .expect(400);
+      }
+
+      // An empty correction is a 422, not a silent 200: "nothing to correct" and "corrected" must not look
+      // the same to a caller answering a data subject.
+      await request(app.getHttpServer())
+        .patch(`/customers/${customer.id}`)
+        .set(bearer(sales.accessToken))
+        .send({})
+        .expect(422);
+
+      // An individual has no registered-address column, so accepting it and dropping it would be a field
+      // that looks saved and is not.
+      await request(app.getHttpServer())
+        .patch(`/customers/${customer.id}`)
+        .set(bearer(sales.accessToken))
+        .send({ registeredAddress: 'Somewhere' })
+        .expect(422);
+    }, 180_000);
+
+    it('is refused without customer.update, and 404s across owners', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-correct-b',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const claims = await makeUser(app, 'cust-correct-c', 'CLAIMS_OFFICER');
+      const customer = await createIndividualCustomer(
+        app,
+        sales.accessToken,
+        'Owned Customer',
+      );
+
+      // No `customer.update`.
+      await request(app.getHttpServer())
+        .patch(`/customers/${customer.id}`)
+        .set(bearer(claims.accessToken))
+        .send({ contactPhone: '+962-7-9222-2222' })
+        .expect(403);
+
+      // Another Sales officer HOLDS the permission and does not own this customer: 404, not 403, so the
+      // refusal does not confirm the record exists.
+      const other = await makeUser(
+        app,
+        'cust-correct-d',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      await request(app.getHttpServer())
+        .patch(`/customers/${customer.id}`)
+        .set(bearer(other.accessToken))
+        .send({ contactPhone: '+962-7-9333-3333' })
+        .expect(404);
+    }, 180_000);
+  });
+
   describe('POST /customers', () => {
     it('is forbidden without customer.create (e.g. a Claims Officer)', async () => {
       const app = await boot();

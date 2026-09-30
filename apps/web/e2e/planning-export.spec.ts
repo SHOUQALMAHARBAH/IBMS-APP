@@ -95,7 +95,7 @@ test("a user without the permission sees a friendly message", async ({
   await page.goto("/planning-export");
   await page.getByRole("button", { name: "Generate export" }).click();
   await expect(
-    page.getByText("planning-export.generate permission", { exact: false }),
+    page.getByText("(planning-export.generate)", { exact: false }),
   ).toBeVisible();
 });
 

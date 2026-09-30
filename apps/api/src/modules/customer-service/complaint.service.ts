@@ -9,7 +9,6 @@ import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import { ComplaintRepository } from '../../repositories/complaint.repository';
 import type { ComplaintWithDetail } from '../../repositories/complaint.repository';
 import {
@@ -29,6 +28,7 @@ import type { ComplaintActionDto } from './dto/complaint-action.dto';
 import type { ResolveComplaintDto } from './dto/resolve-complaint.dto';
 import type { EscalateComplaintDto } from './dto/escalate-complaint.dto';
 import type { ListComplaintsQueryDto } from './dto/list-complaints-query.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /**
  * Process 42 — Complaints Management (backlog Part C #42, Domain E). Logs a
@@ -55,6 +55,7 @@ export class ComplaintService {
     private readonly workflow: WorkflowTransitionService,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   // --- 1. create -----------------------------------------------------
@@ -423,7 +424,12 @@ export class ComplaintService {
 
   // --- 7. close (RESOLVED -> CLOSED; mandatory supervisor sign-off) --
 
-  async close(id: string, actorUserId: string): Promise<ComplaintView> {
+  async close(
+    id: string,
+    actorUserId: string,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
+  ): Promise<ComplaintView> {
     const complaint = await this.load(id);
     if (isTerminalComplaintStatus(complaint.status)) {
       return deriveComplaintView(complaint); // idempotent
@@ -449,11 +455,15 @@ export class ComplaintService {
     // only, and neither `resolve` nor `close` rewrites it), so this pre-check is
     // race-safe; the Complaint_closure_maker_checker_distinct CHECK is the DB
     // backstop.
-    assertDifferentActors(
-      complaint.resolvedByUserId,
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'Complaint_closure_maker_checker_distinct',
+      makerId: complaint.resolvedByUserId,
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'Complaint.close',
       actorUserId,
-      'Complaint.close',
-    );
+      reason: combinedDutyReason,
+    });
 
     await this.workflow.transition({
       entityType: 'Complaint',
@@ -468,6 +478,7 @@ export class ComplaintService {
       data: {
         closureApprovedByUserId: actorUserId,
         closedAt: new Date(),
+        closureCombinedDutyActId: combinedDutyActId,
       },
       sideEffect: () => this.resolveSlaTimerBestEffort(id, actorUserId),
     });

@@ -66,7 +66,7 @@ test("a user without the permission sees the translated 403 message", async ({ p
   // asserted exactly that. The absence check is what makes it a proof:
   // without it the old behaviour satisfies the new assertion too.
   await expect(
-    page.getByText("ropa.manage permission", { exact: false }),
+    page.getByText("(ropa.manage)", { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),

@@ -9,10 +9,14 @@ import type { DataSubjectRequest } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import { hasExactlyOneOwner } from '../../common/dto.util';
-import { DsrRepository } from '../../repositories/dsr.repository';
+import {
+  DsrRepository,
+  type DataSubjectRequestWithAct,
+} from '../../repositories/dsr.repository';
+import { CustomerRepository } from '../../repositories/customer.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
   applyDsrExtension,
@@ -32,6 +36,7 @@ import type { FulfilDsrDto } from './dto/fulfil-dsr.dto';
 import type { PartiallyFulfilDsrDto } from './dto/partially-fulfil-dsr.dto';
 import type { RejectDsrDto } from './dto/reject-dsr.dto';
 import type { ListDsrQueryDto } from './dto/list-dsr-query.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /** Cap on a book-wide `DataSubjectRequest` list. */
 const DSR_READ_LIMIT = 5000;
@@ -86,6 +91,10 @@ export class DsrService {
     private readonly workflow: WorkflowTransitionService,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
+    // A shared REPOSITORY across modules, which is this codebase's rule — never a service. The gate needs
+    // one fact: whether a correction was recorded against this request.
+    private readonly customers: CustomerRepository,
   ) {}
 
   // --- 1. create (RECEIVED, "logged the same business day") ---------
@@ -391,6 +400,26 @@ export class DsrService {
         );
       }
     }
+    if (dsr.type === 'CORRECTION') {
+      // NO FALSE CLOSURE. The owner's requirement 4.
+      //
+      // A CORRECTION request could be marked FULFILLED on a staff member's word alone, with nothing in
+      // the system able to verify the data changed — and until this week nothing COULD change it
+      // (IMPROVEMENTS § 3.14). A closed request with nothing behind it is worse than an open one: the
+      // open one is visible, and the falsely closed one is the record a regulator reads.
+      //
+      // A LIVE check, deliberately, and not a confirmation flag. The DELETION branch above uses both — a
+      // live Legal Hold read AND an attestation — because a hold can exist that the officer must
+      // acknowledge. Here there is nothing to acknowledge: either a correction was recorded against this
+      // request or it was not, and asking the officer to confirm it would reintroduce exactly the
+      // attestation this replaces.
+      const corrections = await this.customers.countCorrectionsForDsr(id);
+      if (corrections === 0) {
+        throw new UnprocessableEntityException(
+          `Data Subject Request ${id} is a CORRECTION request and no correction has been recorded against it. Correct the customer's details first (the correction records this request's id), or use partially-fulfil to say what was done and why the rest could not be.`,
+        );
+      }
+    }
 
     const workflowName = dsrSlaWorkflowFor(dsr.type);
     try {
@@ -525,6 +554,8 @@ export class DsrService {
   async close(
     id: string,
     actorUserId: string,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<DataSubjectRequestView> {
     const dsr = await this.load(id);
     if (isDsrClosed(dsr.status)) {
@@ -547,11 +578,15 @@ export class DsrService {
         `Data Subject Request ${id} is ${dsr.status} but has no recorded processor — closure sign-off cannot be verified.`,
       );
     }
-    assertDifferentActors(
-      dsr.processedByUserId,
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'DataSubjectRequest_closure_maker_checker_distinct',
+      makerId: dsr.processedByUserId,
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'DataSubjectRequest.close',
       actorUserId,
-      'DataSubjectRequest.close',
-    );
+      reason: combinedDutyReason,
+    });
 
     try {
       await this.workflow.transition({
@@ -559,7 +594,11 @@ export class DsrService {
         entityId: id,
         toStatus: 'CLOSED',
         actorUserId,
-        data: { closedByUserId: actorUserId, closedAt: new Date() },
+        data: {
+          closedByUserId: actorUserId,
+          closedAt: new Date(),
+          closureCombinedDutyActId: combinedDutyActId,
+        },
       });
     } catch (err) {
       if (err instanceof ConflictException) {
@@ -574,6 +613,47 @@ export class DsrService {
 
   // --- reads -----------------------------------------------------
 
+  /**
+   * Stop this request's clock — every open timer on it, for one stated reason.
+   *
+   * A request does not have A clock: measured, one carries four `SlaTimer` rows (two
+   * escalation stages, and a second pair once an extension re-bases the deadline). The
+   * engine's `pauseForEntity` covers all of them, because pausing one of four looks
+   * exactly like a control that worked while the request still escalates.
+   */
+  async pauseSla(
+    id: string,
+    reason: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ paused: number; alreadyPaused: number; open: number }> {
+    const dsr = await this.load(id);
+    if (dsr.closedAt !== null) {
+      throw new UnprocessableEntityException(
+        `Request ${id} is closed. A closed request's clock has already stopped — there is nothing to pause.`,
+      );
+    }
+    const result = await this.slaTimer.pauseForEntity(
+      'DataSubjectRequest',
+      id,
+      reason,
+      actor.id,
+    );
+    if (result.open === 0) {
+      throw new UnprocessableEntityException(
+        `Request ${id} has no running clock to pause.`,
+      );
+    }
+    return result;
+  }
+
+  async resumeSla(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ resumed: number; notPaused: number }> {
+    await this.load(id);
+    return this.slaTimer.resumeForEntity('DataSubjectRequest', id, actor.id);
+  }
+
   async get(id: string, actorUserId: string): Promise<DataSubjectRequestView> {
     const dsr = await this.load(id);
     await this.safeAudit({
@@ -584,7 +664,13 @@ export class DsrService {
       afterValue: { dataSubjectRequestId: id },
       isSensitiveDataAccess: true,
     });
-    return deriveDsrView(dsr, new Date());
+    // The clock state on the DETAIL read only — a list would pay one timer query per row
+    // for a figure no list shows.
+    const slaClock = await this.slaTimer.entityClockState(
+      'DataSubjectRequest',
+      id,
+    );
+    return { ...deriveDsrView(dsr, new Date()), slaClock };
   }
 
   async list(
@@ -620,7 +706,15 @@ export class DsrService {
 
   // --- helpers -------------------------------------------------
 
-  private async load(id: string): Promise<DataSubjectRequest> {
+  /**
+   * One read, one shape — including the combined-duty relation.
+   *
+   * Widened here rather than making the row type's field optional. An optional field would have kept
+   * every existing caller compiling and let the next one pass a row whose act state nobody knows;
+   * requiring it turned this into a handful of compile errors that named each site, which is the
+   * whole value of the strict shape.
+   */
+  private async load(id: string): Promise<DataSubjectRequestWithAct> {
     const dsr = await this.repo.findById(id);
     if (!dsr) {
       throw new NotFoundException(`Data Subject Request ${id} not found.`);

@@ -1,10 +1,16 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../components/ui/CombinedDutyReasonField';
 import {
   DISPOSAL_METHODS,
   closeDisposalBatch,
@@ -31,6 +37,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusalAllOf } from '../../../lib/i18n/permission-refusal';
 
 const SCHEDULE_ROLES = [
   'retention-schedule.manage',
@@ -70,6 +77,8 @@ export default function RetentionDisposalPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by record so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [category, setCategory] = useState('');
   const [months, setMonths] = useState('');
@@ -102,7 +111,7 @@ export default function RetentionDisposalPage() {
       setBatches(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('rdNoPermission')
+          ? permissionRefusalAllOf(t, 'rdRefusalAct', ['retention-schedule.manage', 'legal-hold.manage', 'retention.dispose.nominate / retention.dispose.approve'])
           : err instanceof ApiError
             ? err.message
             : t('rdLoadError'),
@@ -346,7 +355,8 @@ export default function RetentionDisposalPage() {
                 onChange={(e) => setHoldCategoryId(e.target.value)}
               />
             </label>
-            <CustomerPicker
+            <EntitySearch
+            kind="customer"
               value={holdCustomerId}
               onChange={setHoldCustomerId}
               label={t('rdHoldCustomerIdLabel')}
@@ -391,7 +401,7 @@ export default function RetentionDisposalPage() {
                         {h.customerId
                           ? `Customer ${h.customerId.slice(0, 8)}…`
                           : h.insuredPersonId
-                            ? `Insured person ${h.insuredPersonId.slice(0, 8)}…`
+                            ? t('rdInsuredPersonGeneric')
                             : '—'}
                       </td>
                       <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>
@@ -471,7 +481,16 @@ export default function RetentionDisposalPage() {
                       <td style={cell}>
                         {b.retentionScheduleItemId ? b.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
                       </td>
-                      <td style={cell}>{t(ENUM_LABEL.DisposalBatchStatus[b.status])}</td>
+                      <td style={cell}>
+                        {t(ENUM_LABEL.DisposalBatchStatus[b.status])}
+                        {/* Part 4 step 5 — in the STATUS cell, because the status says DPO_APPROVED
+                            whether one person or two agreed, and this pair authorises irreversible
+                            destruction of personal data. Shared renderer. */}
+                        <CombinedDutyOnRecord
+                          act={b.combinedDutyAct}
+                          testId={`combined-duty-disposal-${b.id}`}
+                        />
+                      </td>
                       <td style={cell}>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</td>
                       <td style={cell}>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</td>
                       <td style={cell}>
@@ -489,18 +508,46 @@ export default function RetentionDisposalPage() {
                               </button>
                             ) : null}
                             {canApprove && b.status === 'MANAGER_APPROVED' ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => dpoApproveDisposalBatch(b.id))}
-                              >
-                                {t('rdDpoApproveButton')}
-                              </button>
+                              (() => {
+                                // Part 4 — the person who performed the first half may complete it themselves in an office
+                                // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                                const needs = needsCombinedDutyDeclaration({
+                                  mode: user.dutySegregationMode,
+                                  makerUserId: b.nominatedByUserId,
+                                  currentUserId: user.id,
+                                  alreadyDecided: b.dpoApprovedByUserId != null,
+                                });
+                                const declaration = declarations[b.id] ?? '';
+                                return (
+                                  <>
+                                    {needs ? (
+                                      <CombinedDutyReasonField
+                                        id={b.id}
+                                        value={declaration}
+                                        onChange={(next) =>
+                                          setDeclarations((prev) => ({ ...prev, [b.id]: next }))
+                                        }
+                                      />
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      disabled={busy || (needs && combinedDutyTooShort(declaration))}
+                                      onClick={() =>
+                                        void run(() =>
+                                          dpoApproveDisposalBatch(b.id, needs ? declaration.trim() : undefined),
+                                        )
+                                      }
+                                    >
+                                      {t('rdDpoApproveButton')}
+                                    </button>
+                                  </>
+                                );
+                              })()
                             ) : null}
                             {canApprove && b.status === 'DPO_APPROVED' ? (
                               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                                 <select
-                                  aria-label={t('rdDestructionMethodAria', { id: b.id })}
+                                  aria-label={t('rdDestructionMethodAria')}
                                   value={method}
                                   onChange={(e) => setMethod(e.target.value)}
                                 >

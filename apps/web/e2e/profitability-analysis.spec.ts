@@ -103,7 +103,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/profitability-analysis");
   await expect(
-    page.getByText("profitability-analysis.view permission", {
+    page.getByText("(profitability-analysis.view)", {
       exact: false,
     }),
   ).toBeVisible();

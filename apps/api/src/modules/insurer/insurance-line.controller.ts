@@ -33,7 +33,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  *
  * Reading is `insurer.read` — the code already held by every role that picks an
  * insurer, which is the same population that picks a line. Adding and correcting are
- * `insurer.relationship.manage`, so an addition is an administrator's act. That is a
+ * `insurance-line.create`, so an addition is an administrator's act. That is a
  * deliberate control rather than an oversight: an addition changes the vocabulary the
  * whole office then reports against, and a Placement Officer who needs a missing type
  * asks for it once instead of every officer minting near-duplicates under deadline.
@@ -57,7 +57,7 @@ export class InsuranceLineController {
 
   /** Adds a type the standard list does not have. Refused if a standard line already
    *  means the same thing, or if this office already added it. */
-  @RequirePermissions('insurer.relationship.manage')
+  @RequirePermissions('insurance-line.create')
   @Post()
   add(
     @Body() dto: AddInsuranceLineDto,
@@ -68,7 +68,7 @@ export class InsuranceLineController {
 
   /** Corrects one of this office's own additions. A standard line's id reads as
    *  absent here, which is what it is: not an office addition. */
-  @RequirePermissions('insurer.relationship.manage')
+  @RequirePermissions('insurance-line.update')
   @Patch(':id')
   rename(
     @Param('id', ParseUUIDPipe) id: string,

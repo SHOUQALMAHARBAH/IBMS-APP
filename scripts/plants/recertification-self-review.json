@@ -1,0 +1,38 @@
+{
+  "self-review-created-without-its-act": {
+    "file": "apps/api/src/modules/rbac/services/access-recertification.service.ts",
+    "from": "          combinedDutyActId: act,",
+    "to": "          combinedDutyActId: null,"
+  },
+  "refusal-aborts-the-whole-cycle": {
+    "file": "apps/api/src/modules/rbac/services/access-recertification.service.ts",
+    "from": "      } catch (err) {\n        // A SEGREGATED office, or a COMBINED one with no reason given: the engine refuses, and this subject",
+    "to": "      } catch (err) {\n        throw err;\n        // A SEGREGATED office, or a COMBINED one with no reason given: the engine refuses, and this subject"
+  },
+  "decision-act-never-recorded": {
+    "file": "apps/api/src/modules/rbac/services/access-recertification.service.ts",
+    "from": "      decision,\n      decisionAct,\n    );",
+    "to": "      decision,\n      null,\n    );"
+  },
+  "decide-control-never-asks": {
+    "file": "apps/web/components/access-recertification/RecertificationItemsTable.tsx",
+    "from": "      makerUserId: item.subjectUserId,",
+    "to": "      makerUserId: null,"
+  },
+  "decide-buttons-not-gated-on-the-floor": {
+    "file": "apps/web/components/access-recertification/RecertificationItemsTable.tsx",
+    "from": "combinedDutyTooShort(dutyReasons[item.id] ?? \"\")",
+    "to": "false",
+    "why": "The three decision buttons stop being disabled below the ten-character floor, so a subject can review their own access with a one-word reason — or none. recertification-self-review.spec.ts dies. REPOINTED: the original anchor used SINGLE quotes and this file uses double, so it broke on quote style rather than on anything changing. Anchored on the call alone, without the enclosing condition, so a reflow of that condition cannot break it either."
+  },
+  "report-flags-only-what-it-can-classify": {
+    "file": "apps/api/src/modules/internal-controls/combined-duty-report.service.ts",
+    "from": "      accessSelfReview:\n        act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT &&\n        !arrangementActIds.has(act.id),",
+    "to": "      accessSelfReview: arrangementActIds.has(act.id),"
+  },
+  "evidence-column-counted-as-an-escape": {
+    "file": "apps/api/test/duty-segregation-schema.e2e-spec.ts",
+    "from": "      'decisionCombinedDutyActId', // AccessRecertificationItem — the act on the review",
+    "to": "      // planted: the evidence column is no longer excluded"
+  }
+}

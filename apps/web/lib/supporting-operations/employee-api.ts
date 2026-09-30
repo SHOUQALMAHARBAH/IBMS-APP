@@ -56,9 +56,19 @@ export interface EmployeeDetail {
   updatedAt: string;
   trainings: SecurityAwarenessTraining[];
   deprovisioningChecklist: AccessDeprovisioningChecklist | null;
+  /** The login this person holds, when they hold one. Here so the screen never offers to create a
+   *  second one and then be refused — User.employeeId is unique. */
+  account: { id: string; email: string } | null;
 }
 
-export interface CreateEmployeeInput {
+/**
+ * A PERSON, as the form collects one — shared with the account route.
+ *
+ * The same fields are accepted by `POST /employees` (a person with no login) and by the `employee`
+ * block of `POST /admin/users` (a person and their login, in one transaction). One type, because the
+ * unified form fills one set of fields and only the destination changes.
+ */
+export interface PersonInput {
   /** Jordanian national-ID-convention name parts (Part F item #4) — an
    * Employee is always a real individual. `fullName` is computed
    * server-side from these, not accepted directly. */
@@ -66,13 +76,26 @@ export interface CreateEmployeeInput {
   fatherName?: string;
   grandfatherName?: string;
   familyName: string;
+  /** The same four in English, optional as a SET. Left empty they are stored as NULL — nothing
+   *  transliterates an Arabic name on a person's behalf. */
+  givenNameEn?: string;
+  fatherNameEn?: string;
+  grandfatherNameEn?: string;
+  familyNameEn?: string;
   nationalId: string;
   position?: string;
   hireDate: string;
   licensedRole?: string;
   confidentialityAgreementSignedAt?: string;
   backgroundCheckCompletedAt?: string;
+}
+
+export interface CreateEmployeeInput extends PersonInput {
   userId?: string;
+  /** §4.1.2 / §4.2.2 — the org chart and the location. One pair of fields on the form feeds both the
+   *  person and, when there is one, the account. */
+  departmentId?: string;
+  branchId?: string;
 }
 
 export function listEmployees(): Promise<EmployeeListRow[]> {
@@ -87,6 +110,67 @@ export function createEmployee(
   input: CreateEmployeeInput,
 ): Promise<EmployeeDetail> {
   return apiPost('/employees', input);
+}
+
+/**
+ * Correct an employee record — `PATCH /employees/:id`, which had no web caller, so a person's
+ * record could be created and never corrected. Only the training and de-provisioning paths were
+ * reachable.
+ *
+ * ## What is absent is the control
+ *
+ * The DTO carries no name, no national ID and no hire date. Those identify the person and the
+ * employment; changing them is not a correction of a clerical field. `UpdateEmployeeDto` simply
+ * does not declare them and `forbidNonWhitelisted` refuses each by name — the same construction
+ * the customer contact correction uses for the screening identifiers.
+ *
+ * `departmentId` IS accepted by the route and is NOT sent from here: `EmployeeDetail` extends
+ * `MaskedEmployee`, which does not carry it, so no screen can show which department a person is
+ * in — and a field whose current value the reader cannot see is one they cannot tell they are
+ * changing. Recorded as § 1.73 rather than papered over with a write-only picker.
+ *
+ * ## Both dates are HISTORICAL
+ *
+ * `parseHistoricalInstant` refuses a future value outright — "it is a record of something that
+ * already happened" — so the inputs carry today as their maximum rather than letting the reader
+ * discover it through a 422.
+ */
+export function updateEmployee(
+  id: string,
+  patch: {
+    position?: string;
+    licensedRole?: string;
+    confidentialityAgreementSignedAt?: string;
+    backgroundCheckCompletedAt?: string;
+  },
+): Promise<EmployeeDetail> {
+  return apiPatch(`/employees/${encodeURIComponent(id)}`, patch);
+}
+
+/**
+ * What the narrow search returns — IMPROVEMENTS § 1.83. Mirrors the api's `EmployeeSearchResultView`.
+ *
+ * FIVE fields, and deliberately not the employee record: this is what a Compliance Officer may learn about
+ * staff WITHOUT holding `employee.read`, which that role does not. Enough to pick the right person out of
+ * three of the same name; nothing more.
+ */
+export interface EmployeeSearchResult {
+  id: string;
+  fullName: string;
+  fullNameEn: string | null;
+  position: string | null;
+  isCurrentEmployee: boolean;
+}
+
+/**
+ * `GET /employees/search?q=` — gated on `employee.national-id.reveal`, NOT on `employee.read`.
+ *
+ * The term is MANDATORY server-side (two characters, trimmed first), so there is no "list everyone" call to
+ * make. This function does not default it, and must not: a caller that sends `q=''` should see the 400
+ * rather than have the client quietly widen the request.
+ */
+export function searchEmployees(q: string): Promise<EmployeeSearchResult[]> {
+  return apiGet(`/employees/search?q=${encodeURIComponent(q)}`);
 }
 
 export function revealEmployeeField(

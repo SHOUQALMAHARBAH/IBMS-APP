@@ -1,0 +1,14 @@
+{
+  "load-error-drops-its-way-forward": {
+    "file": "apps/web/lib/i18n/translations/insurers.ts",
+    "from": "insListLoadError: 'Could not load insurers — try again.',",
+    "to": "insListLoadError: 'Could not load insurers.',",
+    "why": "One load-error message goes back to stopping at the failure. screen-copy.test.ts 'every load-error message names a way forward, in both languages' must die reporting 1 in ONE language only — the ENGLISH half alone, which also proves the guard sees each language separately rather than reading whichever it finds first."
+  },
+  "bare-english-label-returns": {
+    "file": "apps/web/app/(app)/documents/page.tsx",
+    "from": "{t('commonCancel')}",
+    "to": "Cancel",
+    "why": "One button label goes back to bare English JSX text. The rule-6 guard in screen-copy.test.ts must die — this is failure mode 6, which stood on 14 screens while the same guard reported 0 across 102."
+  }
+}

@@ -8,6 +8,7 @@ import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { SKIP_MFA_REQUIRED_KEY } from '../decorators/skip-mfa-required.decorator';
 import { UserRepository } from '../../../repositories/user.repository';
+import { MfaCredentialRepository } from '../../../repositories/mfa-credential.repository';
 import {
   MfaRequiredException,
   OnboardingIncompleteException,
@@ -25,6 +26,7 @@ export class MfaRequiredGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly users: UserRepository,
+    private readonly mfaCredentials: MfaCredentialRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -57,7 +59,19 @@ export class MfaRequiredGuard implements CanActivate {
     if (user?.mustChangePassword) {
       throw new OnboardingIncompleteException();
     }
+    // Keyed on an ACTIVE CREDENTIAL, not on `mfaEnabled` alone, because `login` now lets a
+    // flag-without-credential user reach a session so they can enrol. If this guard still trusted
+    // the flag, that user would walk into the whole application with no second factor — the flag
+    // would be granting what the credential is supposed to grant. Both sides ask the same question
+    // now, which is the only reason letting them in is safe.
+    //
+    // An INACTIVE credential (created by `enroll`, never confirmed by `verify`) deliberately does
+    // not count: it has never proven the user holds the secret.
     if (!user?.mfaEnabled) {
+      throw new MfaRequiredException();
+    }
+    const active = await this.mfaCredentials.findActiveByUser(user.id);
+    if (active.length === 0) {
       throw new MfaRequiredException();
     }
     return true;

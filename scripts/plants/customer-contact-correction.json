@@ -1,0 +1,32 @@
+{
+  "empty-fields-sent-as-empty-strings": {
+    "file": "apps/web/lib/customer/customer-api.ts",
+    "from": "    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();",
+    "to": "    if (typeof v === 'string') body[k] = v.trim();"
+  },
+  "correction-values-sent-untrimmed": {
+    "file": "apps/web/lib/customer/customer-api.ts",
+    "from": "    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();",
+    "to": "    if (typeof v === 'string' && v.trim() !== '') body[k] = v;"
+  },
+  "dsr-type-sent-without-a-reference": {
+    "file": "apps/web/components/customer/CustomerContactCorrection.tsx",
+    "from": "        ...(form.answersRequestId?.trim()\n          ? { answersRequestType: 'dsr' as const }\n          : {}),",
+    "to": "        answersRequestType: 'dsr' as const,"
+  },
+  "submit-allows-an-empty-correction": {
+    "file": "apps/web/components/customer/CustomerContactCorrection.tsx",
+    "from": "          disabled={busy || !hasSomethingToCorrect(form)}",
+    "to": "          disabled={busy}"
+  },
+  "correction-ignores-the-permission": {
+    "file": "apps/web/components/customer/CustomerContactCorrection.tsx",
+    "from": "  const canUpdate = hasPermission(user, 'customer.update');",
+    "to": "  const canUpdate = true;"
+  },
+  "server-refusal-swallowed": {
+    "file": "apps/web/components/customer/CustomerContactCorrection.tsx",
+    "from": "      setError(err instanceof ApiError ? err.message : t('customerCorrectError'));",
+    "to": "      setError(t('customerCorrectError'));"
+  }
+}

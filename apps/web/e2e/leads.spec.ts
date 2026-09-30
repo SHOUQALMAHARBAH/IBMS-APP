@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectNone } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -106,7 +107,7 @@ test("shows a friendly message when the user lacks list permission", async ({ pa
 
   await page.goto("/leads");
 
-  await expect(page.locator('p[role="alert"]')).toContainText("don't hold the lead.list.read");
+  await expect(page.locator('p[role="alert"]')).toContainText("(lead.list.read)");
 });
 
 test("only offers a transition action on the officer's own lead, and moving it updates the board", async ({ page }) => {
@@ -125,7 +126,12 @@ test("only offers a transition action on the officer's own lead, and moving it u
 
   await page.goto("/leads");
 
-  await expect(page.getByRole("button", { name: /Not Mine/ })).toHaveCount(0);
+  // Anchored on the officer's OWN action, which must be present: otherwise "no button on someone
+  // else's lead" and "the board has not rendered" are indistinguishable.
+  await expectNone(
+    page.getByRole("button", { name: /Not Mine/ }),
+    page.getByRole("button", { name: "Mark contacted — Ahmad Al-Test" }),
+  );
   await page.getByRole("button", { name: "Mark contacted — Ahmad Al-Test" }).click();
 
   await expect(page.getByRole("button", { name: "Mark contacted — Ahmad Al-Test" })).toHaveCount(0);

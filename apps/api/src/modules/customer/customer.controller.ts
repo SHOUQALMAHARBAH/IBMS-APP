@@ -1,7 +1,16 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerContactDto } from './dto/update-customer-contact.dto';
 import { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import { CreateUboDto } from './dto/create-ubo.dto';
 import { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
@@ -29,13 +38,42 @@ export class CustomerController {
     return this.customers.create(dto, user.id);
   }
 
-  @RequirePermissions('customer.360-view.read')
+  /**
+   * FINDING a customer is not READING one — so the list has its own code.
+   *
+   * This was gated on `customer.360-view.read`, the same code as `@Get(':id')` below, because no narrower
+   * customer read existed. Measured consequence: PLACEMENT/CLAIMS/FINANCE hold `interaction.log` and could
+   * not list customers, and the two administrator roles hold `customer.bulk-import` and could not see a
+   * customer after importing hundreds.
+   *
+   * Widening `customer.360-view.read` instead would have been one line and would have handed those roles the
+   * history, programmes, risk profiles, UBO register and reveal endpoint. Every other route in this
+   * controller keeps `customer.360-view.read`.
+   */
+  @RequirePermissions('customer.read')
   @Get()
   list(
     @Query() query: ListCustomersQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.customers.list(query, user);
+  }
+
+  /**
+   * IMPROVEMENTS § 3.14 — the first write to a customer record other than its creation.
+   *
+   * `customer.update` gates exactly the three fields that trigger no screening. The identifier fields are
+   * refused by the DTO, because changing one is a screening event under the AMLU rules and ships with the
+   * re-screening mechanism: https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions
+   */
+  @RequirePermissions('customer.update')
+  @Patch(':id')
+  updateContactDetails(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerContactDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.customers.updateContactDetails(id, dto, user);
   }
 
   @RequirePermissions('customer.360-view.read')

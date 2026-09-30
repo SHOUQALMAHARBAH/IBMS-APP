@@ -80,6 +80,10 @@ export class InsurerPerformanceRepository {
       where: {
         createdAt: { gte: from, lt: to },
         policy: { insurerId },
+        // An insurer is not answerable for a claim we withdrew as raised in error. Filtered in BOTH halves of
+        // this ratio (see `countClaimsWithNoFollowUpAlert`) — a discarded claim has no follow-up alert, so
+        // filtering only the denominator would move the score in the insurer's favour.
+        discardedAt: null,
       },
     });
   }
@@ -95,6 +99,8 @@ export class InsurerPerformanceRepository {
       where: {
         createdAt: { gte: from, lt: to },
         policy: { insurerId },
+        // The numerator's half of the pair above. Both filter, or the ratio moves.
+        discardedAt: null,
         followUpAlerts: { none: {} },
       },
     });

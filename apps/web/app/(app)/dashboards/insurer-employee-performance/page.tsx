@@ -15,6 +15,7 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { permissionRefusalAllOf } from '../../../../lib/i18n/permission-refusal';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const cell: CSSProperties = { padding: '0.35rem 0.75rem', borderBottom: '1px solid var(--border-subtle)', textAlign: 'start' };
@@ -67,7 +68,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
       setEmployeeRecords(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('diepNoPermission')
+          ? permissionRefusalAllOf(t, 'diepRefusalAct', ['insurer-performance.view', 'employee-performance.view'])
           : err instanceof ApiError
             ? err.message
             : t('diepLoadError'),

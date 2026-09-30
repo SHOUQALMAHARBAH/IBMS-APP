@@ -12,6 +12,7 @@ import {
 } from '../../lib/pdpl/consent-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { hasPermission } from '../../lib/auth/permissions';
+import { permissionRefusal } from '../../lib/i18n/permission-refusal';
 
 // Part D §5.1 — the shared, reusable consent-capture control mounted at each
 // of the backlog's named touchpoints that already has an existing customer-
@@ -64,7 +65,7 @@ export function ConsentCaptureWidget({
       setRecord(null);
       setError(
         err instanceof ApiError && err.status === 403
-          ? t('consWidgetNoPermission')
+          ? permissionRefusal(t, 'consWidgetRefusalAct', 'consent.manage')
           : err instanceof ApiError
             ? err.message
             : t('consStatusLoadError'),
@@ -129,7 +130,7 @@ export function ConsentCaptureWidget({
       >
         <h3 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>{label}</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)' }}>
-          {t('consWidgetNoPermission')}
+          {permissionRefusal(t, 'consWidgetRefusalAct', 'consent.manage')}
         </p>
       </section>
     );

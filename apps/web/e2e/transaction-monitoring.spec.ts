@@ -103,7 +103,7 @@ test("a user without the permission sees a friendly message", async ({
 
   await page.goto("/transaction-monitoring");
   await expect(
-    page.getByText("aml.monitor permission", { exact: false }),
+    page.getByText("(aml.monitor)", { exact: false }),
   ).toBeVisible();
 });
 

@@ -1066,7 +1066,7 @@ describe('Part V — an office insurance-line addition does not cross offices (i
         lineIds: [addition.id],
       });
     // `isolationAdmin` holds SYSTEM_SECURITY_ADMINISTRATOR, which does not hold
-    // `insurer.relationship.manage` — so the permission gate answers first. Either
+    // the office-side insurer codes — so the permission gate answers first. Either
     // answer proves the point (the row is never written), and asserting the actual one
     // keeps this test honest about what it measured.
     expect([403, 422]).toContain(refused.status);

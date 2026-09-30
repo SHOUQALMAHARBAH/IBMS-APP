@@ -1,0 +1,14 @@
+-- Class B piece 1 — the audit action a discard is recorded under.
+--
+-- Its own migration rather than a column on the previous one, because `ALTER TYPE ... ADD VALUE` cannot be
+-- used in the same transaction that adds it, and because an enum value is a separate kind of change from
+-- four tables' columns.
+--
+-- WHY A NEW VALUE AND NOT ONE OF THE NINE THAT EXIST.
+--   DELETE is a lie: nothing is deleted. The whole point of a discard is that the row stays, carrying who
+--   withdrew it, when, and why — a DELETE action on a row still present would tell a reader the opposite of
+--   what happened.
+--   UPDATE is true and useless: it makes withdrawing a wrongly raised endorsement indistinguishable, in a
+--   filtered audit list, from correcting its premium. This feature exists so that a record raised in error is
+--   legible as an error afterwards; an action name that erases the distinction gives that up at the last step.
+ALTER TYPE "AuditAction" ADD VALUE 'DISCARD';

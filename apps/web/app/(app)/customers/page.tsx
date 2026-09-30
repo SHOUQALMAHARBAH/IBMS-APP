@@ -13,6 +13,7 @@ import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../lib/customer/customer-api';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -63,7 +64,7 @@ export default function CustomersPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('customersNoPermission')
+          ? permissionRefusal(t, 'customersRefusalAct', 'customer.read')
           : err instanceof ApiError
             ? err.message
             : t('commonTryAgain'),
@@ -90,6 +91,8 @@ export default function CustomersPage() {
   if (isLoading || !user) return null;
 
   const canCreateCustomer = hasPermission(user, 'customer.create');
+  // The DETAIL page's code, not this list's — see the row below.
+  const canOpenProfile = hasPermission(user, 'customer.360-view.read');
 
   return (
     <main style={pageStyle}>
@@ -131,23 +134,41 @@ export default function CustomersPage() {
           </p>
         ) : (
           <div style={listGridStyle}>
-            {customers.map((customer) => (
-              <button
-                key={customer.id}
-                type="button"
-                style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
-                aria-label={t('customersViewProfileAria', { name: customer.legalName })}
-                onClick={() => router.push(`/customers/${customer.id}`)}
-              >
-                <strong>
-                  <bdi>{customer.legalName}</bdi>
-                </strong>
-                <div style={cardMetaStyle}>{t(TYPE_LABEL_KEY[customer.customerType])}</div>
-                <div style={cardMetaStyle}>
-                  {t('customerStatusLabel', { status: t(STATUS_LABEL_KEY[customer.status]) })}
+            {customers.map((customer) => {
+              const card = (
+                <>
+                  <strong>
+                    <bdi>{customer.legalName}</bdi>
+                  </strong>
+                  <div style={cardMetaStyle}>{t(TYPE_LABEL_KEY[customer.customerType])}</div>
+                  <div style={cardMetaStyle}>
+                    {t('customerStatusLabel', { status: t(STATUS_LABEL_KEY[customer.status]) })}
+                  </div>
+                </>
+              );
+              // A ROW IS ONLY A CONTROL IF ITS DESTINATION OPENS.
+              //
+              // `customer.read` gates this list; `/customers/[id]` stays on `customer.360-view.read`. So
+              // PLACEMENT/CLAIMS/FINANCE and the two administrator roles can now FIND a customer and cannot
+              // read one — which is the whole point of the split — and a clickable row would take them to a
+              // refusal. The frontend directive's rule is that a control a role cannot use does not exist on
+              // their screen, so the card stays and the button does not.
+              return canOpenProfile ? (
+                <button
+                  key={customer.id}
+                  type="button"
+                  style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
+                  aria-label={t('customersViewProfileAria', { name: customer.legalName })}
+                  onClick={() => router.push(`/customers/${customer.id}`)}
+                >
+                  {card}
+                </button>
+              ) : (
+                <div key={customer.id} style={{ ...cardStyle, textAlign: 'start', width: '100%' }}>
+                  {card}
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )
       ) : null}

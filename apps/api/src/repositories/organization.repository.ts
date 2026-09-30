@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Organization } from '@ibms/db';
+import type { DutySegregationMode, Organization } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -94,5 +94,25 @@ export class OrganizationRepository {
       );
     }
     return organizations[0].id;
+  }
+  /**
+   * Part 4 — declare this office's duty-segregation mode, stamping who declared it and when.
+   *
+   * The three columns move together. A mode with no declaration date would read as "segregated because that is
+   * the default" even after somebody chose it, which is exactly the distinction the report has to show.
+   */
+  declareDutySegregationMode(
+    id: string,
+    mode: DutySegregationMode,
+    declaredByUserId: string,
+  ): Promise<Organization> {
+    return this.prisma.client.organization.update({
+      where: { id },
+      data: {
+        dutySegregationMode: mode,
+        dutySegregationModeDeclaredAt: new Date(),
+        dutySegregationModeDeclaredByUserId: declaredByUserId,
+      },
+    });
   }
 }

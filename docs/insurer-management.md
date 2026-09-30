@@ -177,8 +177,13 @@ the precedence rule for "which form do I submit against", in
 
 ## 11. Not built, deliberately
 
-- No screens for the insurance-line vocabulary, Q9's form templates, or the read-only master
-  registry. `IMPROVEMENTS.md` § 1.44 has the measured list of every API surface with no UI.
+- No screens for Q9's form templates or the read-only master registry. `IMPROVEMENTS.md` § 1.44
+  has the measured list of every API surface with no UI, and § 1.67 is why these two are NOT a
+  missing screen but a form builder whose prerequisite nobody has decided — it is question 11 on
+  `docs/broker-session-money-questions.md` and his answer may remove both build options. One was
+  built anyway on 2026-09-28 and reverted; § 1.70 has the mechanism.
+  (The insurance-line vocabulary DOES have a screen since 2026-09-28 — `/settings/insurance-lines`,
+  § 1.66. This line claimed otherwise for as long as README's own corrected copy did not.)
 - The commission rate DTO takes a line as a STRING resolved at the boundary, not a line ID — so
   an office's own added line is not yet reachable on the rate table. Closing it means the DTO
   taking `lineId`; the picker already has the ids.

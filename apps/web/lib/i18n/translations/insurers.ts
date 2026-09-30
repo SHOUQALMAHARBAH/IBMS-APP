@@ -8,13 +8,49 @@
 // person deciding what to type into a field is the last line of that boundary.
 export const INSURERS = {
   AR: {
+    // /settings/insurance-lines — the office's own additions to the line vocabulary.
+    lineAdminHeading: 'فروع التأمين',
+    lineAdminIntro:
+      'المفردات التي تُصنَّف بها الأعمال. القائمة القياسية منشورة على مستوى المنصة، ' +
+      'ويمكن لمكتبك أن يضيف فرعاً لا تغطيه — والإضافات وحدها قابلة للتصحيح من هنا.',
+    lineAdminStandard: 'قياسي',
+    lineAdminOwn: 'إضافة هذا المكتب',
+    lineAdminColName: 'الاسم',
+    lineAdminColCategory: 'الفئة',
+    lineAdminColOrigin: 'المصدر',
+    lineAdminColActions: 'إجراءات',
+    lineAdminAddHeading: 'إضافة فرع تأمين',
+    lineAdminNameEn: 'الاسم بالإنجليزية',
+    lineAdminNameAr: 'الاسم بالعربية',
+    lineAdminCategory: 'الفئة',
+    lineAdminBothNamesNote:
+      'الاسمان مطلوبان: العربية هي اللغة الأساسية لهذا النظام، واسم الفرع يظهر في ' +
+      'مستندات يقرأها العميل.',
+    lineAdminNoCodeNote:
+      'لا يمكن للمكتب إنشاء رمز للفرع: الرمز مُعرِّف على مستوى المنصة، ولو أنشأ ' +
+      'مكتبان الرمز نفسه لمعنيين مختلفين لأصبح كل تقرير يجمع حسب الرمز خاطئاً.',
+    lineAdminAdd: 'إضافة',
+    lineAdminEdit: 'تصحيح',
+    lineAdminSave: 'حفظ',
+    lineAdminCancel: 'إلغاء',
+    lineAdminStandardLocked: 'فرع قياسي — لا يُصحَّح من هنا',
+    lineAdminAddError: 'تعذّرت إضافة الفرع.',
+    lineAdminSaveError: 'تعذّر حفظ التصحيح.',
+    lineAdminLoadError: 'تعذّر تحميل فروع التأمين — حاول مرة أخرى.',
+    lineAdminRefusalAct: 'إضافة فرع تأمين',
+    lineAdminLoading: 'جارٍ التحميل…',
     // page.tsx — the list
     insListHeading: 'شركات التأمين',
     insListIntro:
       'شركات التأمين التي يتعامل معها مكتبك. يمكن تسجيل شركة من الدليل العام، أو شركة ' +
       'لا يعرفها أي دليل — كلتا الحالتين تمرّان من هنا.',
-    insListNoPermission: 'لا تملك صلاحية insurer.read، لذا لا يوجد ما يمكن عرضه هنا.',
-    insListLoadError: 'تعذر تحميل شركات التأمين.',
+    insListRefusalAct: 'عرض شركات التأمين الخاصة بمكتبك',
+    // A 403 has two very different causes and telling a person the wrong one costs them an
+    // afternoon: the MFA guard refuses EVERY screen until an authenticator is paired, and it looks
+    // identical to a missing permission unless the response code is read.
+    insMfaRequired:
+      'لم تُسجِّل بعد تطبيق المصادقة، والنظام يمنع كل الشاشات حتى تفعل. هذه ليست مشكلة صلاحيات: افتح «الأمان» من أسفل القائمة الجانبية، وامسح رمز QR بتطبيق مصادقة، وأدخل الرمز المكوَّن من ستة أرقام — ثم عُد إلى هنا.',
+    insListLoadError: 'تعذر تحميل شركات التأمين — حاول مرة أخرى.',
     insListEmpty: 'لم يسجّل مكتبك أي شركة تأمين بعد.',
     insListEmptyFiltered: 'لا توجد شركة تأمين مطابقة لهذا البحث.',
     insListLoading: 'جارٍ التحميل…',
@@ -69,7 +105,7 @@ export const INSURERS = {
     insNewClaimsEmailLabel: 'بريد جهة اتصال المطالبات',
     insNewSubmitButton: 'سجّل',
     insNewSavingButton: 'جارٍ الحفظ…',
-    insNewNoPermission: 'لا تملك صلاحية insurer.relationship.manage لتسجيل شركة تأمين.',
+    insNewRefusalAct: 'تسجيل شركة تأمين',
     insNewError: 'تعذر إكمال التسجيل.',
 
     // [id]/page.tsx — detail
@@ -123,8 +159,8 @@ export const INSURERS = {
     insDirBoundaryNote:
       'يُظهر الدليل بيانات الشركة العامة فقط: لا شروط سداد، ولا تصنيفاً، ولا جهات اتصال خاصة بمكتب، ' +
       'ولا أي إشارة إلى المكاتب الأخرى.',
-    insDirNoPermission: 'لا تملك صلاحية insurer.directory.read، لذا لا يوجد ما يمكن عرضه هنا.',
-    insDirLoadError: 'تعذر تحميل الدليل.',
+    insDirRefusalAct: 'البحث في دليل شركات التأمين المشترك بين المكاتب',
+    insDirLoadError: 'تعذر تحميل الدليل — حاول مرة أخرى.',
     insDirSearchLabel: 'ابحث باسم الشركة',
     insDirLineLabel: 'الخط التأميني',
     insDirLineAny: 'أي خط',
@@ -139,14 +175,48 @@ export const INSURERS = {
       'اختر خطاً من القائمة.',
   },
   EN: {
+    // /settings/insurance-lines — the office's own additions to the line vocabulary.
+    lineAdminHeading: 'Lines of business',
+    lineAdminIntro:
+      'The vocabulary business is classified by. The standard list is published ' +
+      'platform-wide; your office can add a line it does not cover — and only your ' +
+      "office's own additions can be corrected here.",
+    lineAdminStandard: 'Standard',
+    lineAdminOwn: "This office's addition",
+    lineAdminColName: 'Name',
+    lineAdminColCategory: 'Category',
+    lineAdminColOrigin: 'Origin',
+    lineAdminColActions: 'Actions',
+    lineAdminAddHeading: 'Add a line of business',
+    lineAdminNameEn: 'Name (English)',
+    lineAdminNameAr: 'Name (Arabic)',
+    lineAdminCategory: 'Category',
+    lineAdminBothNamesNote:
+      "Both names are required: Arabic is this system's primary language, and a line " +
+      'name appears on documents a client reads.',
+    lineAdminNoCodeNote:
+      'An office cannot mint a line CODE: a code is a platform-wide identifier, and ' +
+      'two offices inventing the same code for different things would make every ' +
+      'report that groups by code wrong.',
+    lineAdminAdd: 'Add',
+    lineAdminEdit: 'Correct',
+    lineAdminSave: 'Save',
+    lineAdminCancel: 'Cancel',
+    lineAdminStandardLocked: 'Standard line — not corrected here',
+    lineAdminAddError: 'Could not add that line.',
+    lineAdminSaveError: 'Could not save the correction.',
+    lineAdminLoadError: 'Could not load the lines of business — try again.',
+    lineAdminRefusalAct: 'add a line of business',
+    lineAdminLoading: 'Loading…',
     // page.tsx — the list
     insListHeading: 'Insurers',
     insListIntro:
       "The insurance companies your office deals with. You can register one from the shared " +
       'catalogue, or one no catalogue has heard of — both paths run through here.',
-    insListNoPermission:
-      'You do not hold insurer.read, so there is nothing to show here.',
-    insListLoadError: 'Could not load insurers.',
+    insListRefusalAct: "view this office's insurers",
+    insMfaRequired:
+      'You have not paired an authenticator app yet, and the system blocks every screen until you do. This is NOT a permissions problem: open Security at the bottom of the sidebar, scan the QR code with an authenticator app, enter the six-digit code — then come back here.',
+    insListLoadError: 'Could not load insurers — try again.',
     insListEmpty: 'Your office has not registered an insurer yet.',
     insListEmptyFiltered: 'No insurer matches that search.',
     insListLoading: 'Loading…',
@@ -199,8 +269,7 @@ export const INSURERS = {
     insNewClaimsEmailLabel: 'Claims contact email',
     insNewSubmitButton: 'Register',
     insNewSavingButton: 'Saving…',
-    insNewNoPermission:
-      'You do not hold insurer.relationship.manage, so you cannot register an insurer.',
+    insNewRefusalAct: 'register an insurer',
     insNewError: 'Could not complete the registration.',
 
     // [id]/page.tsx — detail
@@ -251,9 +320,8 @@ export const INSURERS = {
       'Every company any office on the platform has registered, one entry per company. For finding who writes cover nobody on your panel writes — and it never says which offices deal with any of them.',
     insDirBoundaryNote:
       'The directory shows public company facts only: no credit terms, no rating, no office-specific contacts, and nothing at all about other offices.',
-    insDirNoPermission:
-      'You do not hold insurer.directory.read, so there is nothing to show here.',
-    insDirLoadError: 'Could not load the directory.',
+    insDirRefusalAct: 'search the cross-office insurer directory',
+    insDirLoadError: 'Could not load the directory — try again.',
     insDirSearchLabel: 'Search by company name',
     insDirLineLabel: 'Insurance line',
     insDirLineAny: 'Any line',

@@ -197,6 +197,32 @@ describe('CommissionAgreementService.create (Process 35)', () => {
     ).rejects.toThrow(/earlier/i);
   });
 
+  it('refuses an effectiveFrom that is shaped like a date but is not one', async () => {
+    // `2026-02-30` is the case a NaN check misses: it parses cleanly to 2 MARCH.
+    // On this field that decides which agreement governs a policy — what the
+    // broker is PAID — so a silent rollover sets the rate's start date to a day
+    // nobody typed. The other three are refused too, and were already.
+    const { service } = makeService();
+    for (const bad of [
+      '2026-02-30',
+      '2026-04-31',
+      '2026-13-01',
+      '2032-04-00',
+    ]) {
+      await expect(
+        service.create(
+          {
+            insurerId: 'ins-1',
+            insuranceLine: 'Property All Risks',
+            ratePercent: '15',
+            effectiveFrom: bad,
+          },
+          'mgr-1',
+        ),
+      ).rejects.toThrow(/not a valid calendar date/i);
+    }
+  });
+
   it('404s an unknown insurer', async () => {
     const { service } = makeService({
       insurerExists: vi.fn().mockResolvedValue(false),

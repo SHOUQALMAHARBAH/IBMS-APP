@@ -34,6 +34,7 @@ import {
   summaryPanelStyle,
 } from '../../../components/risk-profile/risk-profile.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
 function Figure({ label, value }: { label: string; value: string }) {
@@ -108,7 +109,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('rpNoPermission')
+          ? permissionRefusal(t, 'rpRefusalAct', 'risk-profile.read')
           : err instanceof ApiError && err.status === 404
             ? t('rpCustomerNotFound')
             : err instanceof ApiError
@@ -175,15 +176,23 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
               key={profile.id}
               type="button"
               style={siteCardStyle}
-              aria-label={t('rpOpenSurveyAria', { name: profile.siteLabel ?? profile.id })}
+              aria-label={t('rpOpenSurveyAria', { name: profile.siteLabel })}
               onClick={() => router.push(`/risk-profiles/${profile.id}`)}
             >
               <strong>
-                {profile.siteLabel ?? `Risk profile ${profile.id.slice(0, 8)}`}
+                {/*
+                  No fallback. `siteLabel` is REQUIRED as of migration 20261104100000, so there is no
+                  unlabelled state to render — the branch was deleted rather than given better text,
+                  because nothing else on this row is a name a person recognises. It printed a truncated
+                  uuid, and the aria-label above printed the FULL uuid to a screen reader.
+                */}
+                {profile.siteLabel}
               </strong>
               {profile.priorClaimsHistorySummary ? (
                 <div style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-                  Prior claims: {profile.priorClaimsHistorySummary}
+                  {t('rpPriorClaims', {
+                    summary: profile.priorClaimsHistorySummary,
+                  })}
                 </div>
               ) : null}
             </button>

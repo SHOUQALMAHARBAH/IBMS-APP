@@ -221,6 +221,7 @@ for (const lang of LANGS) {
 
 const POLICY: Policy = {
   id: "pol-1",
+  discard: null,
   opportunityId: "opp-1",
   customerId: "cust-1",
   insurerId: "ins-1",
@@ -327,6 +328,7 @@ const OPPORTUNITY: OpportunityWithContext = {
 
 const CLAIM: Claim = {
   id: "clm-1",
+  discard: null,
   policyId: "pol-1",
   customerId: "cust-1",
   policyNumber: "POL-2026-0451",

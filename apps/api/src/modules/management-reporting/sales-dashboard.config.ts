@@ -48,7 +48,8 @@ import type { PeriodWindow } from '../../common/period.util';
 export interface LeadsMetric {
   newLeadsCount: number;
   convertedToProspectCount: number;
-  conversionRatePercent: number;
+  /** NULL when the cohort is empty — there is no rate, rather than a rate of zero. */
+  conversionRatePercent: number | null;
 }
 
 export interface PremiumWrittenMetric {
@@ -60,7 +61,8 @@ export interface PremiumWrittenMetric {
 export interface ConversionMetric {
   totalCount: number;
   convertedCount: number;
-  conversionRatePercent: number;
+  /** NULL when the cohort is empty — there is no rate, rather than a rate of zero. */
+  conversionRatePercent: number | null;
 }
 
 export interface SalesDashboardSummary {
@@ -75,13 +77,32 @@ export interface SalesDashboardSummary {
   upSell: ConversionMetric;
 }
 
-/** Pure: a percentage rounded to 2dp; 0 (not NaN) when there is nothing to
- * convert from — an empty cohort has a 0% conversion rate, not undefined. */
+/**
+ * Pure: a percentage rounded to 2dp, and **NULL when there is nothing to convert from**.
+ *
+ * ~~0 (not NaN) when there is nothing to convert from — an empty cohort has a 0% conversion rate, not
+ * undefined.~~ **That position is reversed, on the owner's ruling (item 5 batch 1).** An empty cohort has
+ * NO conversion rate. Two reasons, and the first is the one that decided it:
+ *
+ *   0% IS A CLAIM ABOUT PERFORMANCE WHERE NO PERFORMANCE WAS MEASURED. On the employee-performance
+ *   screens this number sits beside a person's NAME and reads as a judgement of them rather than as "no
+ *   data". The system must not describe an employee who received no leads as having converted none of
+ *   them. Same principle as the access-recertification record: do not report "there was nothing to do" in
+ *   the shape of "it was done badly".
+ *
+ *   AND A ZERO ENTERS AN AVERAGE WHERE A NULL DOES NOT. The moment anyone means conversion across
+ *   employees, or charts it, the substituted zeros drag the figure down — and the denominator displayed
+ *   beside each one on the screen saves nobody downstream.
+ *
+ * `employee-performance`, `sales-performance` and `dashboards/insurer-employee-performance` already
+ * rendered `null` as an em dash; this makes the sales and executive dashboards agree with them rather than
+ * having two conventions for one concept.
+ */
 export function computeConversionRatePercent(
   convertedCount: number,
   totalCount: number,
-): number {
-  if (totalCount === 0) return 0;
+): number | null {
+  if (totalCount === 0) return null;
   return Math.round((convertedCount / totalCount) * 10000) / 100;
 }
 

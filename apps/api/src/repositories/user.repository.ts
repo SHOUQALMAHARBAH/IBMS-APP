@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { MfaMethod, Role, User, UserRoleAssignment } from '@ibms/db';
+import type {
+  MfaMethod,
+  RegistrationType,
+  Role,
+  User,
+  UserRoleAssignment,
+} from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import type { TenantTransactionClient } from '../prisma/tenant-scope.extension';
 import { OrgContextService } from '../common/org-context/org-context.service';
 
 /** One of a caller's active roles. `id` is what authorization resolves from;
@@ -16,6 +23,24 @@ export interface RoleRef {
   /** Part 10.1 — this role is flagged for the WebAuthn hardware-token
    *  requirement. Same shape, same reason. */
   requiresHardwareToken: boolean;
+}
+
+/**
+ * "This account can act today": active, and inside its access window.
+ *
+ * ONE definition, shared by the lockout guard and the reviewer picker. The
+ * window half is the part that is easy to omit and the one that bit before — a
+ * time-boxed account whose window had closed still satisfied the guard, which
+ * is how the one genuinely usable administrator could revoke their own role.
+ */
+function canActToday(now: Date) {
+  return {
+    isActive: true,
+    AND: [
+      { OR: [{ accessValidFrom: null }, { accessValidFrom: { lte: now } }] },
+      { OR: [{ accessValidUntil: null }, { accessValidUntil: { gt: now } }] },
+    ],
+  };
 }
 
 @Injectable()
@@ -253,23 +278,29 @@ export class UserRepository {
    * `accessValidFrom`/`accessValidUntil` exist for the EXTERNAL_AUDITOR role's
    * time-boxed access window (backlog A.1) — `AuthService.assertAccessWindow
    * Active` enforces them at login. */
-  provision(data: {
-    fullName: string;
-    email: string;
-    passwordHash: string;
-    languagePreference?: 'AR' | 'EN';
-    /** Part II §4.2.2 — separate from `roleIds`, and required by the DTO. */
-    departmentId?: string;
-    employeeId?: string;
-    /** Part II §4.2.2 — the organizational location, likewise required by the
-     * DTO and likewise distinct from both Department and Role. */
-    branchId?: string;
-    roleIds: string[];
-    accessValidFrom?: Date;
-    accessValidUntil?: Date;
-  }): Promise<User> {
+  provision(
+    data: {
+      fullName: string;
+      email: string;
+      passwordHash: string;
+      languagePreference?: 'AR' | 'EN';
+      /** Part II §4.2.2 — separate from `roleIds`, and required by the DTO. */
+      departmentId?: string;
+      employeeId?: string;
+      /** Part II §4.2.2 — the organizational location, likewise required by the
+       * DTO and likewise distinct from both Department and Role. */
+      branchId?: string;
+      /** Recorded only — no authentication path reads it. See `ProvisionUserDto`. */
+      registrationType?: RegistrationType;
+      roleIds: string[];
+      accessValidFrom?: Date;
+      accessValidUntil?: Date;
+    },
+    /** Joins a caller's transaction — the person-and-account pair. See `EmployeeRepository.create`. */
+    tx?: TenantTransactionClient,
+  ): Promise<User> {
     const { roleIds, ...user } = data;
-    return this.prisma.client.user.create({
+    return (tx ?? this.prisma.client).user.create({
       data: {
         ...user,
         passwordUpdatedAt: new Date(),
@@ -490,26 +521,50 @@ export class UserRepository {
       where: {
         roleId: { in: [...new Set(grants.map((g) => g.roleId))] },
         revokedAt: null,
-        user: {
-          isActive: true,
-          AND: [
-            {
-              OR: [
-                { accessValidFrom: null },
-                { accessValidFrom: { lte: now } },
-              ],
-            },
-            {
-              OR: [
-                { accessValidUntil: null },
-                { accessValidUntil: { gt: now } },
-              ],
-            },
-          ],
-        },
+        user: canActToday(now),
       },
       select: { userId: true, roleId: true },
     });
+  }
+
+  /**
+   * The same eligibility question, answered WITH NAMES — for a picker that has
+   * to offer somebody to assign work to.
+   *
+   * Its own method rather than a wider `select` on the one above, because that
+   * one feeds the last-administrator lockout guard and a guard should not start
+   * loading personal names it has no use for. What the two MUST share is the
+   * definition of "can act today", which is why `canActToday` is extracted: two
+   * copies of an access-window predicate is two chances for a picker to offer a
+   * reviewer whose account expired last night.
+   *
+   * Ordered by name so the list a reader sees is stable between requests.
+   */
+  async findActiveHolderProfilesOfPermission(
+    code: string,
+    now = new Date(),
+  ): Promise<{ id: string; fullName: string }[]> {
+    const grants = await this.prisma.client.rolePermission.findMany({
+      where: { permission: { code }, role: { status: 'ACTIVE' } },
+      select: { roleId: true },
+    });
+    if (grants.length === 0) return [];
+
+    const assignments = await this.prisma.client.userRoleAssignment.findMany({
+      where: {
+        roleId: { in: [...new Set(grants.map((g) => g.roleId))] },
+        revokedAt: null,
+        user: canActToday(now),
+      },
+      select: { user: { select: { id: true, fullName: true } } },
+    });
+
+    // One person can hold the code through more than one role.
+    const byId = new Map<string, { id: string; fullName: string }>();
+    for (const a of assignments) byId.set(a.user.id, a.user);
+    return [...byId.values()].sort((x, y) =>
+      x.fullName.localeCompare(y.fullName),
+    );
   }
 
   /** Whether this role grants `code` — the question "is the role being revoked

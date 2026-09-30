@@ -2,31 +2,46 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { PolicyCheckingBlock } from '../../../../components/policy/PolicyCheckingBlock';
+import { NotifyClaimForm } from '../../../../components/claim/NotifyClaimForm';
 import { hasAnyPermission } from '../../../../lib/auth/permissions';
-import type { PolicyChecking, PolicyStatus } from '../../../../lib/policy/policy-api';
+import type {
+  Policy,
+  PolicyChecking,
+  PolicyStatus,
+} from '../../../../lib/policy/policy-api';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { policyStatusLabelKey } from '../../../../lib/policy/policy-status';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
-import { profileFieldLabelStyle, profileFieldValueStyle, profileGridStyle } from '../../../../components/prospect/prospect.styles';
+import {
+  pageStyle,
+  smallButtonStyle,
+} from '../../../../components/lead/lead.styles';
+import {
+  profileFieldLabelStyle,
+  profileFieldValueStyle,
+  profileGridStyle,
+} from '../../../../components/prospect/prospect.styles';
 
-interface PolicyDetail {
-  id: string;
-  policyNumber: string | null;
-  // The real vocabulary, not `string`: PolicyCheckingBlock decides whether a
-  // check may be recorded from it.
-  status: PolicyStatus;
-  /** Populated once a check has been recorded. The endpoint has always
-   *  returned it; this page simply never declared it. */
-  checking: PolicyChecking | null;
-  inceptionDate: string;
-  customer?: {
-    id: string;
-    legalName: string;
-  };
+/**
+ * DERIVED from the API client's own `Policy`, not re-declared beside it.
+ *
+ * This interface used to list its fields by hand, and twice that cost the page a capability the endpoint
+ * was already returning: `checking` (recorded in the comment that used to sit here) and then
+ * `issuanceComplete`, which the claim-notify control needs to know whether a policy has been issued. An
+ * interface that merely LACKS a field the payload carries is not a type error, so nothing fails — the
+ * field simply never arrives. The comment recording the first instance did not prevent the second, which
+ * is the shape this codebase keeps retiring: a note where a structure was needed.
+ *
+ * Deriving makes the page unable to CONTRADICT the API on any shared field, and unable to miss one. The
+ * same move the insurer work made for the same reason, which is what caught the nameless-insurer case.
+ *
+ * `recommendation` is intersected because it is genuinely absent from `Policy` — this detail read returns
+ * it and the list read does not. That is the only field this page may declare for itself.
+ */
+type PolicyDetail = Policy & {
   recommendation?: {
     id: string;
     recommendedQuotation?: {
@@ -36,9 +51,7 @@ interface PolicyDetail {
       commission?: string;
     };
   };
-  createdAt: string;
-  updatedAt: string;
-}
+};
 
 export default function PolicyDetailPage() {
   const router = useRouter();
@@ -59,10 +72,10 @@ export default function PolicyDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 404
-          ? (t('poldNotFound'))
+          ? t('poldNotFound')
           : err instanceof ApiError
             ? err.message
-            : (t('poldPleaseTryAgain')),
+            : t('poldPleaseTryAgain'),
       );
     } finally {
       setIsLoading2(false);
@@ -97,7 +110,16 @@ export default function PolicyDetailPage() {
   if (loadError) {
     return (
       <div style={pageStyle}>
-        <div style={errorStyle}>{loadError}</div>
+        {/*
+          `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
+          role, so a sighted reader saw the error and a screen-reader user was never told — the screen
+          lying by omission to one class of user, and the affected reader has no way to notice. Every
+          other screen in this app announces it; `test/load-error-alert.test.ts` now fails a load-error
+          branch that does not.
+        */}
+        <p role="alert" style={errorStyle}>
+          {loadError}
+        </p>
         <button
           type="button"
           style={smallButtonStyle}
@@ -128,7 +150,8 @@ export default function PolicyDetailPage() {
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: '1.5rem' }}>
-        {t('poldPolicyDetails')} {policy.policyNumber && `— ${policy.policyNumber}`}
+        {t('poldPolicyDetails')}{' '}
+        {policy.policyNumber && `— ${policy.policyNumber}`}
       </h1>
 
       {/* Core Policy Information */}
@@ -156,7 +179,19 @@ export default function PolicyDetailPage() {
           <div>
             <div style={profileFieldLabelStyle}>{t('poldInceptionDate')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.inceptionDate).toLocaleDateString(t('poldEnUs'))}</bdi>
+              {/*
+                `inceptionDate` is NULLABLE on the API and this page rendered it as though it were not —
+                found by deriving `PolicyDetail` from `Policy` rather than re-declaring it. A policy that
+                is PLACED but not yet ISSUED has none, and `new Date(null)` formats as "Invalid Date",
+                which tells the reader the system is broken rather than that the date is not set yet.
+              */}
+              <bdi>
+                {policy.inceptionDate
+                  ? new Date(policy.inceptionDate).toLocaleDateString(
+                      t('poldEnUs'),
+                    )
+                  : t('poldInceptionNotSet')}
+              </bdi>
             </div>
           </div>
 
@@ -172,14 +207,18 @@ export default function PolicyDetailPage() {
           <div>
             <div style={profileFieldLabelStyle}>{t('poldCreated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.createdAt).toLocaleDateString(t('poldEnUs2'))}</bdi>
+              <bdi>
+                {new Date(policy.createdAt).toLocaleDateString(t('poldEnUs2'))}
+              </bdi>
             </div>
           </div>
 
           <div>
             <div style={profileFieldLabelStyle}>{t('poldUpdated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.updatedAt).toLocaleDateString(t('poldEnUs3'))}</bdi>
+              <bdi>
+                {new Date(policy.updatedAt).toLocaleDateString(t('poldEnUs3'))}
+              </bdi>
             </div>
           </div>
         </div>
@@ -188,7 +227,9 @@ export default function PolicyDetailPage() {
       {/* Recommendation & Commercial Terms */}
       {policy.recommendation?.recommendedQuotation && (
         <div style={{ marginBottom: '2rem' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
+          <h2
+            style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}
+          >
             {t('poldCommercialTerms')}
           </h2>
           <div style={profileGridStyle}>
@@ -196,7 +237,9 @@ export default function PolicyDetailPage() {
               <div>
                 <div style={profileFieldLabelStyle}>{t('poldInsurer')}</div>
                 <div style={profileFieldValueStyle}>
-                  <bdi>{policy.recommendation.recommendedQuotation.insurer.name}</bdi>
+                  <bdi>
+                    {policy.recommendation.recommendedQuotation.insurer.name}
+                  </bdi>
                 </div>
               </div>
             )}
@@ -212,7 +255,9 @@ export default function PolicyDetailPage() {
               <div>
                 <div style={profileFieldLabelStyle}>{t('poldDeductible')}</div>
                 <div style={profileFieldValueStyle}>
-                  <bdi>{policy.recommendation.recommendedQuotation.deductible}</bdi>
+                  <bdi>
+                    {policy.recommendation.recommendedQuotation.deductible}
+                  </bdi>
                 </div>
               </div>
             )}
@@ -221,7 +266,9 @@ export default function PolicyDetailPage() {
               <div>
                 <div style={profileFieldLabelStyle}>{t('poldCommission')}</div>
                 <div style={profileFieldValueStyle}>
-                  <bdi>{policy.recommendation.recommendedQuotation.commission}</bdi>
+                  <bdi>
+                    {policy.recommendation.recommendedQuotation.commission}
+                  </bdi>
                 </div>
               </div>
             )}
@@ -237,6 +284,22 @@ export default function PolicyDetailPage() {
         policy={policy}
         canCheck={hasAnyPermission(user, ['policy.check'])}
         onChecked={load}
+      />
+
+      {/*
+        IMPROVEMENTS § 1.84 — the same argument as the block above, for a different role, and this page is
+        now the third instance of it. `claim.notify` is held by SALES_RELATIONSHIP_OFFICER and
+        CLAIMS_OFFICER; Sales holds `opportunity.read` and works in the pipeline, Claims does not and works
+        from the policy. The only surface offering the notify form was `/opportunities/[id]`, so a Claims
+        Officer could not raise a claim from anywhere they could navigate to.
+
+        ONE implementation, two mount points — `ClaimSection` on the opportunity consumes the same
+        component. Not a second place claim notification is written.
+      */}
+      <NotifyClaimForm
+        policy={policy}
+        canNotify={hasAnyPermission(user, ['claim.notify'])}
+        onDone={load}
       />
 
       <button

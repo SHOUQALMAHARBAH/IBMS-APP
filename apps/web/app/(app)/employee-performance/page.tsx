@@ -12,6 +12,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -74,7 +75,7 @@ export default function EmployeePerformancePage() {
       setHistory(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('epNoPermission')
+          ? permissionRefusal(t, 'epRefusalAct', 'employee-performance.view')
           : err instanceof ApiError
             ? err.message
             : t('epLoadError'),
@@ -169,8 +170,8 @@ export default function EmployeePerformancePage() {
             />
           </div>
           <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-            Most recent period: {latest.periodLabel}. A dash means no outcomes
-            existed to rate that period, not a computed 0%.
+            {t('epMostRecentPeriod', { period: latest.periodLabel })}{' '}
+            {t('epDashMeaning')}
           </p>
 
           <h2>{t('dashHistory')}</h2>

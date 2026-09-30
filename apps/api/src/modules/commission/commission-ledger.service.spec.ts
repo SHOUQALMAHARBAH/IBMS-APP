@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import { Prisma } from '@ibms/db';
 import { CommissionLedgerService } from './commission-ledger.service';
 import type { CommissionRepository } from '../../repositories/commission.repository';
@@ -72,10 +73,15 @@ function makeService(
     ...over.commission,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
+
   const service = new CommissionLedgerService(
     commission as unknown as CommissionRepository,
     policies as unknown as PolicyRepository,
     audit as unknown as AuditService,
+    dutySegregation,
   );
   return { service, commission, policies, audit };
 }
@@ -340,6 +346,10 @@ describe('CommissionLedgerService override (Process 35 — maker/checker)', () =
       'cle-1',
       'mgr-1',
       expect.objectContaining({ requestedByUserId: 'fin-1' }),
+      // The combined-duty escape column, pinned as null on the ordinary two-person path. This is the
+      // assertion that would catch a call site sending an act id when the approver differs from the
+      // requester — and lint caught the mirror image of it, a resolve() whose id was never threaded here.
+      null,
     );
     const approveArg = commission.recordOverrideApproval.mock.calls[0]?.[2] as {
       overrideAmount: Prisma.Decimal;

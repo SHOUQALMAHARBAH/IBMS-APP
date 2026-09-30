@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   BadRequestException,
   ConflictException,
@@ -99,6 +100,10 @@ function makeDeps() {
     resolve,
   } as unknown as SlaTimerService;
 
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
+
   return {
     service: new KycService(
       kycRecords,
@@ -108,6 +113,7 @@ function makeDeps() {
       screening,
       holds,
       sla,
+      dutySegregation,
     ),
     mocks: {
       findById,

@@ -192,7 +192,7 @@ export class InsurerService {
       dto.legalName !== undefined || dto.legalNameAr !== undefined;
     if (renames && row.insurerMasterId !== null) {
       // The company's name belongs to the shared catalogue, and this endpoint
-      // deliberately cannot write it: `insurer.relationship.manage` covers the
+      // deliberately cannot write it: the office-side insurer codes cover the
       // office's own record, never the platform's.
       throw new UnprocessableEntityException(
         "This insurer's name comes from the shared catalogue and cannot be changed here. Only a company this office registered itself can be renamed.",
@@ -273,7 +273,7 @@ export class InsurerService {
    * that can drift apart. If the preview and the trail ever disagreed, nobody could tell
    * which was right.
    *
-   * Gated on `insurer.relationship.manage` rather than `insurer.read`: this exists to
+   * Gated on `insurer.deactivate` rather than `insurer.read`: this exists to
    * inform a decision, and only somebody who can take that decision needs it.
    */
   async statusImpact(id: string): Promise<InsurerStatusImpact> {

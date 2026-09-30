@@ -10,6 +10,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/prospect/prospect.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 export default function ProspectsPage() {
   const { t } = useLanguage();
@@ -31,7 +32,7 @@ export default function ProspectsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('prosNoPermission')
+          ? permissionRefusal(t, 'prosRefusalAct', 'prospect.read')
           : err instanceof ApiError
             ? err.message
             : t('prosLoadError'),
@@ -66,7 +67,7 @@ export default function ProspectsPage() {
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
         <label htmlFor="prospect-search" style={{ marginInlineEnd: '0.5rem' }}>
-          Search
+          {t('commonSearch')}
         </label>
         <input
           id="prospect-search"
@@ -76,7 +77,7 @@ export default function ProspectsPage() {
           placeholder={t('prosSearchPlaceholder')}
         />
         <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
-          Search
+          {t('commonSearch')}
         </button>
       </form>
 

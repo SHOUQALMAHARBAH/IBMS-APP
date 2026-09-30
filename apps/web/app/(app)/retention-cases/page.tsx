@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -19,6 +19,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const REASON_LABEL_KEY: Record<string, TranslationKey> = {
   renewal_inactivity: 'retReasonRenewalInactivity',
@@ -65,7 +66,7 @@ export default function RetentionCasesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('retNoPermission')
+          ? permissionRefusal(t, 'retRefusalAct', 'retention-case.manage')
           : err instanceof ApiError
             ? err.message
             : t('retLoadError'),
@@ -111,7 +112,12 @@ export default function RetentionCasesPage() {
     await run(async () => {
       const result = await runRetentionSweep();
       setSweepMessage(
-        `Scanned ${result.scanned} renewal case(s) — opened ${result.openedRenewalInactivity} for inactivity, ${result.openedLapseRisk} for lapse risk, ${result.failed} failed.`,
+        t('retScanSummary', {
+          scanned: result.scanned,
+          inactivity: result.openedRenewalInactivity,
+          lapse: result.openedLapseRisk,
+          failed: result.failed,
+        }),
       );
     });
   }
@@ -136,7 +142,8 @@ export default function RetentionCasesPage() {
               maxWidth: '30rem',
             }}
           >
-            <CustomerPicker
+            <EntitySearch
+            kind="customer"
               value={customerId}
               onChange={setCustomerId}
               label={t('retCustomerIdLabel')}

@@ -1,9 +1,11 @@
+import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOnRecord";
 // Process 16 — Broker Recommendation (backlog Part C #16, Domain B). Talks to
 // apps/api's recommendation module (recommendation.controller.ts): draft the
 // documented recommendation, clear the senior-officer approval gate and the
 // mandatory conflict-of-interest disclosure, then send it to the client.
 
-import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
+import { apiFetchBlob, apiGet, apiPost } from "../auth/api-client";
+import type { DiscardBlock } from "../discard/discard-api";
 
 export interface RecommendationInsurer {
   id: string;
@@ -33,12 +35,12 @@ export const RATIONALE_FACTOR_FIELDS: {
   key: keyof RationaleFactors;
   label: string;
 }[] = [
-  { key: 'coverage', label: 'Coverage' },
-  { key: 'price', label: 'Price' },
-  { key: 'financialStrength', label: 'Insurer financial strength' },
-  { key: 'claimsService', label: 'Claims service' },
-  { key: 'deductible', label: 'Deductible' },
-  { key: 'policyConditions', label: 'Policy conditions' },
+  { key: "coverage", label: "Coverage" },
+  { key: "price", label: "Price" },
+  { key: "financialStrength", label: "Insurer financial strength" },
+  { key: "claimsService", label: "Claims service" },
+  { key: "deductible", label: "Deductible" },
+  { key: "policyConditions", label: "Policy conditions" },
 ];
 
 export interface ConflictOfInterestDisclosure {
@@ -67,6 +69,12 @@ export interface Recommendation {
   rationaleFactors: RationaleFactors;
   approvalRequired: boolean;
   approvedByUserId: string | null;
+  /**
+   * Part 4 step 5 — present when ONE person both drafted this recommendation and approved it for sending,
+   * in an office that declared COMBINED. This is the advice the client acts on when buying insurance, and
+   * the approval line reads "Approved" either way.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
   approvedAt: string | null;
   conflictOfInterestFlagged: boolean;
   coiCompetingQuotationId: string | null;
@@ -77,6 +85,11 @@ export interface Recommendation {
   draftedByUserId: string;
   createdAt: string;
   blockedFromSend: string[];
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface DraftRecommendationInput {
@@ -97,11 +110,21 @@ export function listRecommendationsForOpportunity(
 export function draftRecommendation(
   input: DraftRecommendationInput,
 ): Promise<Recommendation> {
-  return apiPost('/recommendations', input);
+  return apiPost("/recommendations", input);
 }
 
-export function approveRecommendation(id: string): Promise<Recommendation> {
-  return apiPost(`/recommendations/${id}/approve`);
+export function approveRecommendation(
+  id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<Recommendation> {
+  return apiPost(
+    `/recommendations/${id}/approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 export function discloseConflictOfInterest(
@@ -127,8 +150,8 @@ export function sendRecommendation(id: string): Promise<Recommendation> {
 // `blockedFromSend` is empty (see RecommendationSection.tsx).
 export function downloadRecommendationDocument(
   id: string,
-  language?: 'AR' | 'EN' | 'DUAL',
+  language?: "AR" | "EN" | "DUAL",
 ): Promise<Blob> {
-  const qs = language ? `?language=${language}` : '';
+  const qs = language ? `?language=${language}` : "";
   return apiFetchBlob(`/recommendations/${id}/document${qs}`);
 }

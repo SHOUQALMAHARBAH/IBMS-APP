@@ -29,8 +29,10 @@ describe('MAKER_CHECKER_REGISTRY', () => {
   });
 
   it('every dbCheckConstraint is either null or a non-empty, unique string', () => {
+    // No type predicate: the registry is `as const` now, so dbCheckConstraint is a literal union and a
+    // predicate naming `string` is wider than the parameter. The test only counts, so filtering is enough.
     const named = MAKER_CHECKER_REGISTRY.map((p) => p.dbCheckConstraint).filter(
-      (c): c is string => c !== null,
+      (c) => c !== null,
     );
     expect(new Set(named).size).toBe(named.length);
   });

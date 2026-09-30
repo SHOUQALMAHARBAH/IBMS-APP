@@ -357,6 +357,108 @@ export class SlaTimerService {
     return timer;
   }
 
+  /**
+   * Stop EVERY open clock on one record, for one stated reason.
+   *
+   * ## WHY THIS IS NOT "PAUSE A TIMER" CALLED IN A LOOP BY A SCREEN
+   *
+   * A record does not have a clock; it has several. Measured on db-test: one data-subject
+   * request carries **four** `SlaTimer` rows — two escalation stages (`::data_protection_officer`,
+   * `::general_manager`) and a second pair created when an extension re-bases the
+   * deadline. Pausing one of them leaves the others running, so the request still
+   * escalates on a deadline the office believes it stopped. **A control that pauses one
+   * of four looks exactly like a control that worked.**
+   *
+   * So the act is "stop this request's clock", it takes one reason, and it covers every
+   * open timer. Each timer is paused through `pause` itself rather than in a single
+   * `updateMany`, deliberately: that keeps the per-timer audit row, which is the record
+   * of what was actually stopped, and it keeps the status-conditional write that makes a
+   * concurrent pause a conflict rather than a silent overwrite.
+   *
+   * A timer already paused is SKIPPED rather than treated as an error — the caller asked
+   * for the record's clock to be stopped, and it is. Reporting a conflict because one of
+   * four was already stopped would be describing a success as a failure.
+   */
+  async pauseForEntity(
+    entityType: string,
+    entityId: string,
+    reason: string,
+    actorUserId: string,
+  ): Promise<{ paused: number; alreadyPaused: number; open: number }> {
+    const open = await this.prisma.client.slaTimer.findMany({
+      where: { entityType, entityId, resolvedAt: null },
+      select: { id: true, pausedAt: true },
+    });
+    let paused = 0;
+    let alreadyPaused = 0;
+    for (const t of open) {
+      if (t.pausedAt !== null) {
+        alreadyPaused += 1;
+        continue;
+      }
+      await this.pause(t.id, reason, actorUserId);
+      paused += 1;
+    }
+    return { paused, alreadyPaused, open: open.length };
+  }
+
+  /** The inverse. Restarts every paused clock on the record, banking each one's own
+   * elapsed pause — the runs differ per timer, because a timer paused later has less to
+   * bank. */
+  async resumeForEntity(
+    entityType: string,
+    entityId: string,
+    actorUserId: string,
+  ): Promise<{ resumed: number; notPaused: number }> {
+    const rows = await this.prisma.client.slaTimer.findMany({
+      where: { entityType, entityId, resolvedAt: null },
+      select: { id: true, pausedAt: true },
+    });
+    let resumed = 0;
+    let notPaused = 0;
+    for (const t of rows) {
+      if (t.pausedAt === null) {
+        notPaused += 1;
+        continue;
+      }
+      await this.resume(t.id, actorUserId);
+      resumed += 1;
+    }
+    return { resumed, notPaused };
+  }
+
+  /**
+   * The pause state of a record's clocks, for a screen that offers the control.
+   *
+   * Reports the COUNTS rather than a boolean, because "two of four paused" is a real
+   * state — an extension can add a timer after a pause — and a boolean would round it to
+   * either "paused" or "running" and be wrong about the rest.
+   */
+  async entityClockState(
+    entityType: string,
+    entityId: string,
+  ): Promise<{
+    open: number;
+    paused: number;
+    pauseReason: string | null;
+    pausedAt: string | null;
+  }> {
+    const rows = await this.prisma.client.slaTimer.findMany({
+      where: { entityType, entityId, resolvedAt: null },
+      select: { pausedAt: true, pauseReason: true },
+      orderBy: { pausedAt: 'desc' },
+    });
+    const pausedRows = rows.filter((r) => r.pausedAt !== null);
+    return {
+      open: rows.length,
+      paused: pausedRows.length,
+      // The most recent stated basis. One act sets them all, so they agree in practice;
+      // when they do not, the newest is the one that explains the current state.
+      pauseReason: pausedRows[0]?.pauseReason ?? null,
+      pausedAt: pausedRows[0]?.pausedAt?.toISOString() ?? null,
+    };
+  }
+
   /** RESUME, banking the elapsed pause into `pausedTotalMs`. */
   async resume(timerId: string, actorUserId: string): Promise<SlaTimer> {
     const existing = await this.prisma.client.slaTimer.findUnique({

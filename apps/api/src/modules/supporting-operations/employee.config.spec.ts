@@ -11,6 +11,15 @@ function employee(over: Partial<Employee> = {}): Employee {
     id: 'emp-1',
     organizationId: 'org-1',
     fullName: 'Jane Doe',
+    // The English name parts and the branch start NULL, which is what every existing employee row
+    // looks like: nothing was backfilled, because a transliterated name is a guess about someone's
+    // own spelling and a guess in a compliance record reads as a fact.
+    givenNameEn: null,
+    fatherNameEn: null,
+    grandfatherNameEn: null,
+    familyNameEn: null,
+    fullNameEn: null,
+    branchId: null,
     givenName: 'Jane',
     fatherName: null,
     grandfatherName: null,

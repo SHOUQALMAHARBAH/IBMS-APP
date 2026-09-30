@@ -13,6 +13,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { Language } from '../../../lib/i18n/translations';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function oldest(
   daysOutstanding: number,
@@ -53,7 +54,7 @@ export default function InsurerAccountingPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('iaNoPermission')
+          ? permissionRefusal(t, 'iaRefusalAct', 'insurer-accounting.read')
           : err instanceof ApiError
             ? err.message
             : t('iaLoadError'),

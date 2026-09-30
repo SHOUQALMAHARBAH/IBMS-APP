@@ -14,6 +14,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const ROLES = [
   'ropa.manage',
@@ -61,7 +62,7 @@ export default function RopaEntriesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('ropaNoPermission')
+          ? permissionRefusal(t, 'ropaRefusalAct', 'ropa.manage')
           : err instanceof ApiError
             ? err.message
             : t('ropaLoadError'),

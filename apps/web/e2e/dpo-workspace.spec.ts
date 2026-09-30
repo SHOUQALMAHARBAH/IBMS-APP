@@ -88,7 +88,7 @@ test("a user without the permission sees a friendly message", async ({ page }) =
   // asserted exactly that. The absence check is what makes it a proof:
   // without it the old behaviour satisfies the new assertion too.
   await expect(
-    page.getByText("dpo-workspace.view permission", { exact: false }),
+    page.getByText("(dpo-workspace.view)", { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),

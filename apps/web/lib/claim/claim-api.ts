@@ -13,7 +13,9 @@
 // receipt is confirmed (-> CLOSED, triggering a Loss Ratio recompute).
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 import type { Paginated } from '../api/paginated';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export const CLAIM_DOC_TYPE_OPTIONS = [
   'claim_form',
@@ -138,6 +140,14 @@ export interface Claim {
     brokerProcessedPayment: boolean;
     approvedByUserId: string | null;
     secondApproverUserId: string | null;
+    /**
+     * Set when ONE person both recorded this settlement and gave the mandatory second approval, in an
+     * office that declared COMBINED duty segregation and stated why. Null on every ordinary one.
+     *
+     * The card prints ` · second-approved` once an approver exists, and that claim is only true of a
+     * two-person approval — the same half-truth the commission override had.
+     */
+    combinedDutyAct: CombinedDutyActOnRecord | null;
     secondApproverRequired: boolean;
     settled: boolean;
     clientPaymentConfirmedAt: string | null;
@@ -146,6 +156,11 @@ export interface Claim {
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface RecordSettlementInput {
@@ -328,10 +343,17 @@ export function recordClaimSettlement(
 }
 
 /** Process 28 — the mandatory second approval (never the first approver). */
-export function secondApproveClaimSettlement(claimId: string): Promise<Claim> {
+export function secondApproveClaimSettlement(
+  claimId: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<Claim> {
   return apiPost(
     `/claims/${encodeURIComponent(claimId)}/settlement/second-approve`,
-    {},
+    combinedDutyReason ? { combinedDutyReason } : {},
   );
 }
 

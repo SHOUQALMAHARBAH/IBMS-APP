@@ -49,7 +49,11 @@ export class InteractionRepository {
 
   findPoliciesForTimeline(customerId: string): Promise<TimelinePolicy[]> {
     return this.prisma.client.policy.findMany({
-      where: { customerId },
+      // A record withdrawn as raised in error is not something this client has. It stays in the policy
+      // register, where somebody looking for it can find it; it leaves the 360° view, which exists to tell
+      // whoever is on the phone what cover this customer actually holds. A discarded policy is
+      // PLACEMENT_CONFIRMED forever, so left in it would read as an ongoing placement indefinitely.
+      where: { customerId, discardedAt: null },
       select: {
         id: true,
         policyNumber: true,
@@ -65,7 +69,8 @@ export class InteractionRepository {
 
   findClaimsForTimeline(customerId: string): Promise<TimelineClaim[]> {
     return this.prisma.client.claim.findMany({
-      where: { customerId },
+      // Same rule as the policies above: out of the derived view, still in its own register.
+      where: { customerId, discardedAt: null },
       // HIGHLY_CONFIDENTIAL — ids / status / dates only, never loss detail,
       // money, or a money-derived flag like `isLargeClaim`
       // (ibms-brain/meta/lex/sensitive-data-handling.md).

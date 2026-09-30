@@ -22,7 +22,7 @@ import {
 /**
  * Configurable SLA policies (task Part A).
  *
- * `sla.policy.read` to see them, `sla.policy.manage` to create/edit/activate,
+ * `sla.policy.read` to see them, `sla.policy.create` / `.update` / `.deactivate` to configure them,
  * and `sla.policy.regulatory` on top for the fields that assert an SLA is
  * legally required. The split is deliberate: "shorten this deadline" and
  * "declare this deadline the law" are different decisions.
@@ -47,7 +47,7 @@ export class SlaPolicyController {
     return this.policies.get(id);
   }
 
-  @RequirePermissions('sla.policy.manage')
+  @RequirePermissions('sla.policy.create')
   @Post()
   create(
     @Body() dto: CreateSlaPolicyDto,
@@ -65,7 +65,7 @@ export class SlaPolicyController {
    * "these two things need different authority", and it keeps the check in the
    * guard rather than duplicated in a service argument.
    */
-  @RequirePermissions('sla.policy.manage')
+  @RequirePermissions('sla.policy.update')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -93,13 +93,13 @@ export class SlaPolicyController {
     return this.policies.update(id, dto, user, true);
   }
 
-  @RequirePermissions('sla.policy.manage')
+  @RequirePermissions('sla.policy.deactivate')
   @Post(':id/activate')
   activate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.policies.activate(id, user);
   }
 
-  @RequirePermissions('sla.policy.manage')
+  @RequirePermissions('sla.policy.deactivate')
   @Post(':id/deactivate')
   deactivate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.policies.deactivate(id, user);

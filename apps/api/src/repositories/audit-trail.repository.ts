@@ -104,6 +104,35 @@ export class AuditTrailRepository {
     });
   }
 
+  /**
+   * Users who appear as an actor in THIS office's audit log, by name.
+   *
+   * `auditLogEntries: { some: {} }` compiles to an EXISTS, which takes an index seek per candidate user
+   * against `AuditLogEntry(userId)`. The alternative — DISTINCT over the audit table — reads the
+   * fastest-growing table in the system to answer a question about the smallest one; on the test
+   * database that is 5.9M rows to find at most a few dozen people.
+   *
+   * Both reads are tenant-scoped by the extension, so "this office's" needs no clause here.
+   */
+  findActors(
+    search: string | undefined,
+    take: number,
+  ): Promise<{ id: string; fullName: string }[]> {
+    return this.prisma.client.user.findMany({
+      where: {
+        auditLogEntries: { some: {} },
+        ...(search
+          ? { fullName: { contains: search, mode: 'insensitive' as const } }
+          : {}),
+      },
+      select: { id: true, fullName: true },
+      // A total order. `fullName` alone is not unique — two people can share a name, and which of them
+      // came first would then be decided by the query plan (§ 1.42).
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take,
+    });
+  }
+
   countAuditLog(filter: AuditLogFilter): Promise<number> {
     return this.prisma.client.auditLogEntry.count({
       where: this.auditLogWhere(filter),

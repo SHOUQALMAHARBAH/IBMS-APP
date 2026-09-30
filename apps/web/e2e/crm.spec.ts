@@ -147,7 +147,14 @@ test("a role that can log but not read the 360 view still gets the log form", as
   });
 
   await page.goto("/crm?customerId=cust-1");
-  await expect(page.getByText("The 360° timeline needs the")).toBeVisible();
+  // The SECOND decided shape: what they can do, what they cannot, and who administers it — named by
+  // FUNCTION. The old sentence led with the permission code and named no grantor.
+  await expect(
+    page.getByText("but not see their full history", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("ask whoever manages permissions in your office", { exact: false }),
+  ).toBeVisible();
   await page.getByLabel("What happened?").fill("Chased the insurer for the schedule");
   await page.getByRole("button", { name: "Log interaction" }).click();
   await expect.poll(() => logged).toBe(true);
@@ -162,7 +169,7 @@ test("a role with neither permission sees a friendly message and no form", async
 
   await page.goto("/crm?customerId=cust-1");
   await expect(page.locator('p[role="alert"]')).toContainText(
-    "don't hold the customer.360-view.read",
+    "(customer.360-view.read)",
   );
   await expect(page.getByLabel("What happened?")).toHaveCount(0);
 });

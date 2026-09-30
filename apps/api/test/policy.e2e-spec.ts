@@ -56,6 +56,8 @@ interface PolicyBody {
     discrepancyFound: boolean;
     discrepancyLoggedAsPiRiskEvent: boolean;
     discrepancyDetail: string | null;
+    /** Part 4 step 5 — the declared combined-duty act, or null on an ordinary two-person check. */
+    combinedDutyAct: { reason: string; pair: string } | null;
   } | null;
   delivery: {
     deliveredAt: string;
@@ -566,6 +568,17 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     expect(vBody.checking?.discrepancyFound).toBe(false);
     expect(vBody.checking?.checkedByUserId).toBe(chk.userId);
     expect(vBody.checking?.placedByUserId).toBe(plc.userId);
+    // Part 4 step 5 — the act is PROJECTED onto the policy, not only written to the escape column
+    // and left for the report at `/internal-controls`.
+    //
+    // THIS ASSERTION CANNOT PROVE THE RELATION IS READ, and an earlier comment here claimed it
+    // could. Planting `checking: true` back into `POLICY_INCLUDE` left this green: with the relation
+    // absent the field is `undefined`, and `combinedDutyActView` normalises that to `null` — so the
+    // ordinary two-person path gives the same answer either way. What would prove it is a
+    // COMBINED-path case, where an act exists and must come back non-null; that is
+    // `duty-segregation-combined.e2e-spec.ts`'s shape and this pair does not have one yet
+    // (§ 1.77). Asserted anyway, because it pins the field's PRESENCE and its ordinary value.
+    expect(vBody.checking?.combinedDutyAct).toBeNull();
 
     // --- discrepant check -> DISCREPANCY + a PI risk event ---
     const dirtyId = await issuedPolicy(

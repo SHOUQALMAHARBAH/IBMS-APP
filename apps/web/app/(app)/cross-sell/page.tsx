@@ -14,7 +14,10 @@ import {
   type CrossSellOpportunity,
 } from '../../../lib/cross-sell/cross-sell-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { buttonStyle, errorStyle } from '../../../components/auth/auth-form.styles';
+import {
+  buttonStyle,
+  errorStyle,
+} from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import {
   crossSellActionsStyle,
@@ -25,7 +28,7 @@ import {
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
 import { hasPermission } from '../../../lib/auth/permissions';
-
+import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 function OpportunityRow({
   opportunity,
@@ -42,7 +45,10 @@ function OpportunityRow({
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function run(fn: () => Promise<CrossSellOpportunity>, fallback: string) {
+  async function run(
+    fn: () => Promise<CrossSellOpportunity>,
+    fallback: string,
+  ) {
     setError(null);
     setBusy(true);
     try {
@@ -65,7 +71,9 @@ function OpportunityRow({
         }}
       >
         <strong>{opportunity.gapLine}</strong>
-        <span style={crossSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[opportunity.status])}</span>
+        <span style={crossSellBadgeStyle}>
+          {t(ENUM_LABEL.UpSellStatus[opportunity.status])}
+        </span>
       </div>
       <div style={cardMetaStyle}>
         Flagged {formatDate(opportunity.detectedAt, language)}
@@ -108,7 +116,10 @@ function OpportunityRow({
                 onClick={() =>
                   void run(
                     () =>
-                      dismissCrossSellOpportunity(opportunity.id, reason.trim()),
+                      dismissCrossSellOpportunity(
+                        opportunity.id,
+                        reason.trim(),
+                      ),
                     t('xsDismissError'),
                   )
                 }
@@ -120,7 +131,7 @@ function OpportunityRow({
                 style={{ ...buttonStyle, width: 'auto' }}
                 onClick={() => setDismissing(false)}
               >
-                Cancel
+                {t('commonCancel')}
               </button>
             </>
           ) : (
@@ -148,8 +159,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const canConvert = hasPermission(user, 'cross-sell.convert');
-  const canScan =
-    hasPermission(user, 'cross-sell.detect');
+  const canScan = hasPermission(user, 'cross-sell.detect');
 
   const [opportunities, setOpportunities] = useState<
     CrossSellOpportunity[] | null
@@ -166,7 +176,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? t('xsNoPermission')
+          ? permissionRefusal(t, 'xsRefusalAct', 'cross-sell.read')
           : err instanceof ApiError && err.status === 404
             ? t('xsCustomerNotFound')
             : err instanceof ApiError
@@ -192,7 +202,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setScanError(
         err instanceof ApiError && err.status === 403
-          ? t('xsNoPermissionDetect')
+          ? permissionRefusal(t, 'xsDetectRefusalAct', 'cross-sell.detect')
           : err instanceof ApiError
             ? err.message
             : t('xsScanError'),
@@ -243,12 +253,17 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
             {scan.heldLines.length ? scan.heldLines.join(', ') : 'none'}
           </div>
           <div style={cardMetaStyle}>
-            Benchmark: {scan.benchmarkLines.join(', ')}
+            {t('xsBenchmarkLabel')} {scan.benchmarkLines.join(', ')}
           </div>
           <div style={cardMetaStyle}>
             {scan.heldLines.length === 0
               ? t('xsNoInForceCover')
-              : `Gaps: ${scan.gapLines.length ? scan.gapLines.join(', ') : 'none'} · ${scan.newlyFlagged.length} newly flagged`}
+              : t('xsScanGaps', {
+                  gaps: scan.gapLines.length
+                    ? scan.gapLines.join(', ')
+                    : t('xsScanNoGaps'),
+                  count: scan.newlyFlagged.length,
+                })}
           </div>
         </div>
       ) : null}
@@ -308,9 +323,7 @@ export default function CrossSellPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('xsHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('xsIntro')}
-      </p>
+      <p style={{ opacity: 0.8 }}>{t('xsIntro')}</p>
       <Suspense fallback={null}>
         <CrossSellFlow />
       </Suspense>

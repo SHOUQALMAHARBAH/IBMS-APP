@@ -34,6 +34,8 @@ const ROWS = [
     isRegulatoryChannel: false,
     requestedByUserId: "user-2",
     approvedByUserId: null,
+    // The endpoint returns this now. Null: nothing has decided this request.
+    combinedDutyAct: null,
     slaDueAt: "2026-09-10T00:00:00.000Z",
     decidedAt: null,
     createdAt: "2026-09-07T00:00:00.000Z",
@@ -97,4 +99,79 @@ test("data-sharing-approvals screen has no serious/critical accessibility violat
   expect(
     results.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),
   ).toEqual([]);
+});
+
+/*
+ * THE COMBINED-DUTY ACT ON A DATA-SHARING APPROVAL — Part 4 step 5.
+ *
+ * `DataSharingApproval_maker_checker_distinct` requires that whoever requests an approval is not
+ * whoever decides it, and **this pair guards personal data leaving the office to a third party**.
+ *
+ * The status cell asserts "Approved", which is only true of a two-person decision — the same shape as
+ * the commission override's `(approved)` and the settlement's ` · second-approved`.
+ */
+
+/** Decided by the SAME person who requested it, with the reason they gave. */
+const SELF_DECIDED = {
+  id: "dsa-2",
+  vendorId: null,
+  description: "Policy schedules shared with a reinsurance broker.",
+  classification: "CONFIDENTIAL",
+  channel: "ENCRYPTED_EMAIL",
+  isRegulatoryChannel: false,
+  requestedByUserId: "user-2",
+  approvedByUserId: "user-2",
+  combinedDutyAct: {
+    id: "cda-dsa-1",
+    at: "2026-09-09T00:00:00.000Z",
+    actorUserId: "user-2",
+    reason: "Sole DPO available and the reinsurer's deadline fell inside the closure.",
+    pair: "DataSharingApproval_maker_checker_distinct",
+    roles: ["DATA_PROTECTION_OFFICER"],
+    hatAmbiguous: false,
+  },
+  slaDueAt: "2026-09-10T00:00:00.000Z",
+  decidedAt: "2026-09-09T00:00:00.000Z",
+  createdAt: "2026-09-07T00:00:00.000Z",
+  isApproved: true,
+  isDeclined: false,
+  isPending: false,
+};
+
+test("shows that one person both requested and approved a data-sharing decision", async ({
+  page,
+}) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await page.route("http://localhost:4000/data-sharing-approvals**", (route) =>
+    route.fulfill({ status: 200, json: [SELF_DECIDED] }),
+  );
+  await page.goto("/data-sharing-approvals");
+
+  const declared = page.getByTestId("combined-duty-sharing-dsa-2");
+  await expect(declared).toContainText("DATA_PROTECTION_OFFICER");
+  await expect(declared).toContainText("Sole DPO available");
+  // Tied to the database rule it excuses, so the record and the constraint cannot drift apart.
+  await expect(declared).toHaveAttribute(
+    "data-combined-duty-pair",
+    "DataSharingApproval_maker_checker_distinct",
+  );
+});
+
+test("prints Approved and declares nothing when two people decided it", async ({
+  page,
+}) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await page.route("http://localhost:4000/data-sharing-approvals**", (route) =>
+    route.fulfill({
+      status: 200,
+      // Requested by one person, approved by ANOTHER — the ordinary case.
+      json: [{ ...SELF_DECIDED, id: "dsa-3", approvedByUserId: "user-9", combinedDutyAct: null }],
+    }),
+  );
+  await page.goto("/data-sharing-approvals");
+
+  // The POSITIVE claim is the anchor: the cell asserts "Approved", which is only true of a two-person
+  // decision. Asserting silence alone would pass on a cell that had stopped printing anything.
+  await expect(page.getByText("Approved")).toBeVisible();
+  await expect(page.getByTestId("combined-duty-sharing-dsa-3")).toHaveCount(0);
 });

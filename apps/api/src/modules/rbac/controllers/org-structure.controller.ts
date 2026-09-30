@@ -1,10 +1,18 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { OrgStructureService } from '../services/org-structure.service';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/auth.types';
-import { CreateOrgUnitDto } from '../dto/org-structure.dto';
+import { CreateOrgUnitDto, RenameOrgUnitDto } from '../dto/org-structure.dto';
 
 const orgUnitSchema = {
   type: 'object' as const,
@@ -36,7 +44,7 @@ const orgUnitSchema = {
 export class OrgStructureController {
   constructor(private readonly orgStructure: OrgStructureService) {}
 
-  @RequirePermissions('user.manage')
+  @RequirePermissions('department.read')
   @Get('departments')
   @ApiOkResponse({
     description: "This office's departments, by name.",
@@ -46,7 +54,7 @@ export class OrgStructureController {
     return this.orgStructure.listDepartments();
   }
 
-  @RequirePermissions('user.manage')
+  @RequirePermissions('department.create')
   @Post('departments')
   @ApiOkResponse({
     description: 'The created department.',
@@ -59,7 +67,7 @@ export class OrgStructureController {
     return this.orgStructure.createDepartment(dto, user.id);
   }
 
-  @RequirePermissions('user.manage')
+  @RequirePermissions('branch.read')
   @Get('branches')
   @ApiOkResponse({
     description: "This office's branches, by name.",
@@ -69,7 +77,7 @@ export class OrgStructureController {
     return this.orgStructure.listBranches();
   }
 
-  @RequirePermissions('user.manage')
+  @RequirePermissions('branch.create')
   @Post('branches')
   @ApiOkResponse({ description: 'The created branch.', schema: orgUnitSchema })
   createBranch(
@@ -77,5 +85,62 @@ export class OrgStructureController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.orgStructure.createBranch(dto, user.id);
+  }
+
+  /**
+   * Rename. Four separate codes per entity is the owner's scheme, and `.update` is the one a role
+   * can be given without `.create` or `.deactivate` — which is the entire point of splitting them.
+   */
+  @RequirePermissions('department.update')
+  @Patch('departments/:id')
+  @ApiOkResponse({
+    description: 'The renamed department.',
+    schema: orgUnitSchema,
+  })
+  renameDepartment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RenameOrgUnitDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orgStructure.renameDepartment(id, dto, user.id);
+  }
+
+  @RequirePermissions('branch.update')
+  @Patch('branches/:id')
+  @ApiOkResponse({ description: 'The renamed branch.', schema: orgUnitSchema })
+  renameBranch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RenameOrgUnitDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orgStructure.renameBranch(id, dto, user.id);
+  }
+
+  /**
+   * Retire, never delete. `User.departmentId` and `Employee.departmentId` point here, so a unit a
+   * person was once assigned to stays readable on that person's record; it simply stops being
+   * offered for new ones.
+   */
+  @RequirePermissions('department.deactivate')
+  @Post('departments/:id/deactivate')
+  @ApiOkResponse({
+    description: 'The retired department.',
+    schema: orgUnitSchema,
+  })
+  deactivateDepartment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orgStructure.deactivateDepartment(id, user.id);
+  }
+
+  @RequirePermissions('branch.deactivate')
+  @Post('branches/:id/deactivate')
+  @ApiOkResponse({ description: 'The retired branch.', schema: orgUnitSchema })
+  deactivateBranch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orgStructure.deactivateBranch(id, user.id);
   }
 }
