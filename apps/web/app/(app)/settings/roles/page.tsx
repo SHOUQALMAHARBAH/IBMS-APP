@@ -448,7 +448,7 @@ export default function RoleAdminPage() {
       <p>{t('roleIntro')}</p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
+        <p role="alert" style={errorStyle} data-testid="roles-load-error">
           {loadError}
         </p>
       ) : null}
@@ -484,7 +484,7 @@ export default function RoleAdminPage() {
           editor, then the table — which is also the users screen's arrangement. */}
 
       {readinessError ? (
-        <p role="alert" style={errorStyle}>
+        <p role="alert" style={errorStyle} data-testid="duty-segregation-load-error">
           {readinessError}
         </p>
       ) : null}

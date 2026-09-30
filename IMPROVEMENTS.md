@@ -5449,6 +5449,51 @@ because the test still runs and produces a confident wrong answer.
 red is a failure; this session has been red and recovered several times and said so. Because **a rule
 followed only while the news is good is not a rule, and nobody outside can tell the difference.**
 
+### 1.85 — A PLAYWRIGHT FILTER THAT MATCHED NOTHING, READ AS COVERAGE, THREE TIMES
+
+`npx playwright test roles.spec.ts users.spec.ts settings` runs the two named files and **silently ignores
+`settings`**, because no spec filename contains it: the screens live at `app/(app)/settings/…` while their
+specs are `roles.spec.ts`, `users.spec.ts`, `org-units.spec.ts`, `email-integration.spec.ts`,
+`customer-import.spec.ts`, `insurance-lines.spec.ts`, `duty-segregation-mode.spec.ts`. Playwright does not
+warn. The run passes, the count looks plausible, and the verification claim is false.
+
+Measured after the fact: `settings` selects **0 tests in 0 files**.
+
+It was used in three reported runs — a "62/62" for batch 4, a "15/15" and a "41/41" for batch 6 — each of
+which therefore covered **none of the eight `settings/*` screens**, including the eight that batch 6 named as
+its own. The published numbers were real; what they measured was smaller than what was claimed.
+
+**CI caught the consequence and local runs could not.** `/settings/roles` had a strict-mode violation:
+`roles.spec.ts` asserted `getByText(/تعذّر تحميل الأدوار|Could not load/i)` page-wide, and that screen has TWO
+error surfaces — the roles list and the duty-segregation readiness panel. It passed for years only because the
+second one was phrased PASSIVELY ("the list … could not be loaded"). Batch 4's rule-7 fix made it active, like
+its 104 siblings, and the loose regex then matched both.
+
+Both halves were fixed and the second is the one that matters:
+
+  * the two error surfaces are addressable (`data-testid="roles-load-error"` /
+    `"duty-segregation-load-error"`) and the assertion is scoped to the one it means. **Weakening the regex
+    would have let it pass on the wrong element**, which is the tempting fix and the wrong one — the house
+    rule from the watchlist-sync incident is "scope to the element, never weaken the assertion".
+  * `scripts/playwright-specs.mjs` resolves filters and **exits non-zero naming any that matches nothing.**
+
+#### The class, which is now four incidents deep
+
+    a grep truncated by `head`                 a search that found nothing, read as nothing to find
+    an extractor that returned a blank line    three times, until `test-summary.mjs` made blank fail
+    a plant whose anchor no longer matched     `plant.mjs` refuses it
+    a test filter that matched no file         this one
+
+**In every case the tool answered "nothing" and the reader heard "nothing wrong".** The house treatment is
+that the tool refuses rather than returning empty, and the standing instruction is the owner's: *an extractor
+that matches nothing fails loudly instead of returning a blank line. Blank is not zero.* A filter is an
+extractor over files.
+
+**What `test-summary.mjs` cannot do here, and why a second tool was needed:** it checks that a run reached
+its own summary line. This run did — it passed. Nothing in the output says which files were *intended*, so
+the omission is invisible at that layer. The check has to live where the intent is expressed, which is the
+argument list.
+
 ### 1.83 — THE REFUSAL DENOMINATOR WAS WRONG THREE TIMES, AND EVERY TIME IT WAS THE KEY NAME
 
 100 refusal strings across 89 files refused a reader for want of a permission, and the count moved three

@@ -603,7 +603,15 @@ test("says so when the API answers with something it cannot parse", async ({ pag
   await page.goto("/settings/roles");
 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByText(/تعذّر تحميل الأدوار|Could not load/i)).toBeVisible();
+  // SCOPED to the roles list's own error, not a page-wide text match. This screen has TWO error surfaces —
+  // the roles list and the duty-segregation readiness panel — so a loose `/Could not load/i` is ambiguous
+  // BY CONSTRUCTION. It passed only because the second one happened to be phrased passively ("the list …
+  // could not be loaded"); a rule-7 fix that made it active, like its 104 siblings, turned the assertion
+  // into a strict-mode violation. Weakening the regex would have let it pass on the wrong element.
+  await expect(page.getByTestId("roles-load-error")).toBeVisible();
+  await expect(page.getByTestId("roles-load-error")).toContainText(
+    /تعذّر تحميل الأدوار|Could not load roles/i,
+  );
 });
 
 /**
