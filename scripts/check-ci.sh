@@ -17,13 +17,28 @@
 #                                      trigger on this branch, which is the same blind spot.
 #   HEAD is pushed, a run failed     -> FAIL, and print which job, so the failure is named not counted.
 #   HEAD is pushed, runs in progress -> FAIL. An unfinished run is not evidence.
-#   HEAD is pushed, all succeeded    -> pass.
+#   HEAD is pushed, all succeeded    -> pass, ONLY IF the check-runs also pass (see below).
+#
+# ## WORKFLOW RUNS ARE NOT THE WHOLE STORY, and this gate reported a false green on 2026-09-30
+#
+# `gh run list` lists WORKFLOW runs. A CHECK-RUN is a different object, and an app can post one with no
+# workflow behind it — GitHub Advanced Security posts `CodeQL` that way to report code-scanning alerts.
+# On `b366561` both workflow runs concluded `success` while the `CodeQL` check-run was `failure` with one
+# new high-severity alert, and this script printed "2 run(s), all green". It was believed and reported.
+#
+# So there are two passes now, and the second is the one that catches a scanner: every check-run attached
+# to the commit must have concluded, and must have concluded `success`, `neutral` or `skipped`. The first
+# pass is kept rather than replaced — a workflow that never started posts no check-run at all, which the
+# check-run pass alone would read as a clean commit.
 #
 # `gh` missing or unauthenticated is a FAILURE, deliberately: "I could not check" is precisely the state
 # that produced the incident above.
 set -uo pipefail
 
-sha="$(git rev-parse HEAD)"
+# An optional commit-ish, so this gate can be run against a PAST commit and thereby be TESTED. It was
+# not, and the false green it printed on `b366561` could only be reproduced by checking that commit out.
+# `verify.sh` passes nothing and gets HEAD, which is the only use that matters in a run.
+sha="$(git rev-parse "${1:-HEAD}")"
 short="${sha:0:7}"
 
 if ! command -v gh >/dev/null 2>&1; then
@@ -75,5 +90,43 @@ if (unfinished.length > 0) {
   console.log(`check-ci: ${short} has ${unfinished.length} run(s) still going. An unfinished run is not evidence.`);
   process.exit(1);
 }
-console.log(`check-ci: ${short} — ${ok.length} run(s), all green.`);
+console.log(`check-ci: ${short} — ${ok.length} workflow run(s), all green.`);
 NODE
+runs_status=$?
+
+# PASS 2 — the check-runs. See the header: a scanner's check-run can fail while every workflow succeeds.
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)"
+checks="$(gh api "repos/${repo}/commits/${sha}/check-runs" --paginate \
+  --jq '.check_runs[] | "\(.conclusion // "pending")\t\(.name)\t\(.html_url)"' 2>/dev/null)"
+
+checks_status=0
+if [ -z "$checks" ]; then
+  echo "check-ci: no check-runs are attached to ${short}. The workflow pass above is the only signal,"
+  echo "check-ci: which is weaker than it looks — treat a green as provisional."
+else
+  bad=0
+  while IFS="$(printf '\t')" read -r conclusion name url; do
+    [ -z "$name" ] && continue
+    case "$conclusion" in
+      success|neutral|skipped) ;;
+      *)
+        echo "check-ci: check-run '${name}' is ${conclusion} on ${short} — ${url}"
+        bad=$((bad + 1))
+        ;;
+    esac
+  done <<EOF
+$checks
+EOF
+  if [ "$bad" -gt 0 ]; then
+    echo "check-ci: ${bad} check-run(s) are not green on ${short}. A failing check-run with every workflow"
+    echo "check-ci: green is exactly the false green this gate produced once — read it, do not count it."
+    checks_status=1
+  else
+    echo "check-ci: ${short} — every check-run green too."
+  fi
+fi
+
+if [ "$runs_status" -ne 0 ] || [ "$checks_status" -ne 0 ]; then
+  exit 1
+fi
+exit 0
