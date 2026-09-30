@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { PERMISSIONS } from "../lib/i18n/translations/permissions";
+import { codeFromPermissionKey } from "../lib/i18n/permission-key";
 
 /*
  * HOW LONG A PERMISSION DESCRIPTION THE ROLE SCREEN CAN ACTUALLY SHOW.
@@ -22,9 +24,15 @@ import { expect, test, type Page } from "@playwright/test";
  *                       `min-width: auto` is the classic way long content overflows its container.
  *   page overflow       the repo's own responsive rule: the page body must never scroll sideways.
  *
- * The descriptions reach the screen through the CATALOGUE mock rather than through the descriptions map,
- * because `describePermission` falls back to `Permission.description` for any code with no written line —
- * which is every code but five. That makes the length question answerable without touching the map.
+ * The ladder's own rungs reach the screen through the CATALOGUE mock rather than through the dictionary,
+ * because `describePermission` falls back to `Permission.description` for any code with no written line.
+ * That is what made the length question answerable BEFORE the text existed — the point of the exercise.
+ *
+ * ANSWERED, 2026-09-30: it wraps. Nothing is clipped at any rung up to 720 characters, no row overflows,
+ * the page never scrolls sideways, and height grows with length. The owner wrote the 219 lines on that
+ * basis; the longest is 265 characters and renders as two lines. The second test below measures THAT one,
+ * through the dictionary, so the answer stays true for the text actually shipped rather than only for the
+ * synthetic ladder it was established on.
  */
 
 const ME_BASE = {
@@ -52,6 +60,18 @@ function arabicOfLength(target: number): string {
 
 /** The rungs. 68 is the longest line the map holds today, so it is the baseline rather than a rung. */
 const LENGTHS = [68, 140, 240, 360, 480, 720];
+
+/**
+ * THE REAL WORST CASE, resolved at runtime from the dictionary rather than pinned as a literal.
+ *
+ * The ladder above answered the question before the lines existed; they exist now, and the longest of the
+ * 219 is what a reader actually meets. Computed rather than copied for two reasons: a pinned string breaks
+ * the moment the owner rewords that one line, which teaches everyone to loosen the test; and a computed one
+ * keeps measuring the worst case as the text changes, including a line added years from now.
+ */
+const AR_LINES = Object.entries(PERMISSIONS.AR as Record<string, string>);
+const LONGEST = AR_LINES.reduce((worst, entry) => (entry[1].length > worst[1].length ? entry : worst));
+const LONGEST_CODE = codeFromPermissionKey(LONGEST[0]) ?? "unknown";
 
 const CUSTOM_ROLE = {
   id: "role-custom",
@@ -98,11 +118,17 @@ async function mockScreen(page: Page) {
   await page.route("http://localhost:4000/rbac/permissions", (route) =>
     route.fulfill({
       status: 200,
-      json: LENGTHS.map((n) => ({
-        code: `claims.len${n}`,
-        module: "claims",
-        description: arabicOfLength(n),
-      })),
+      json: [
+        ...LENGTHS.map((n) => ({
+          code: `claims.len${n}`,
+          module: "claims",
+          description: arabicOfLength(n),
+        })),
+        // The real longest line, under its real code. Its `description` here is the STORED English hint —
+        // the screen must ignore it and render the dictionary's Arabic, which is also what makes this a
+        // second reading of `describePermission` preferring the written line over the fallback.
+        { code: LONGEST_CODE, module: "claims", description: "stored English hint, must not render" },
+      ],
     }),
   );
 }
@@ -177,4 +203,47 @@ test("a long permission description wraps rather than truncating, and does not b
     longest!.height,
     "the longest description is no taller than a single line, so it is not wrapping",
   ).toBeGreaterThan(oneLine * 2);
+});
+
+test("the longest line the owner actually wrote renders in full, from the dictionary", async ({
+  page,
+}) => {
+  await mockScreen(page);
+  await page.goto("/settings/roles");
+  await page
+    .locator('[data-role="CLAIMS_TRIAGE_DESK"]')
+    .getByRole("button", { name: /Permissions|الصلاحيات/ })
+    .click();
+  await expect(page.locator("[data-matrix-for]")).toHaveCount(1);
+  // Searching the CODE, not the text: the search has to find the row before anything can be measured, and
+  // matching on the Arabic would make this test pass or fail on the search's own matching rules.
+  await page.locator("[data-matrix-search]").fill(LONGEST_CODE);
+
+  const el = page.locator(`[data-describes="${LONGEST_CODE}"]`);
+  await expect(el).toBeVisible();
+  const box = await el.boundingBox();
+  expect(box, "the longest description has no box — the row did not render").not.toBeNull();
+
+  const measured = await el.evaluate((node) => {
+    const row = node.closest("label");
+    return {
+      text: node.textContent ?? "",
+      clipped: node.scrollHeight > node.clientHeight + 1,
+      rowOverflow: row ? row.scrollWidth > row.clientWidth + 1 : false,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    };
+  });
+
+  console.log(
+    `longest written line: ${LONGEST_CODE}, ${LONGEST[1].length} chars -> ${box!.height.toFixed(0)}px, ` +
+      `clipped=${measured.clipped}, rowOverflow=${measured.rowOverflow}, pageOverflow=${measured.pageOverflow}`,
+  );
+
+  // Byte for byte, so a truncation that CSS hides rather than removes is caught.
+  expect(measured.text.trim()).toBe(LONGEST[1].trim());
+  // AND the stored English hint is not what rendered — the dictionary wins over the fallback.
+  expect(measured.text).not.toContain("stored English hint");
+  expect(measured.clipped, "the longest written line is clipped by its own box").toBe(false);
+  expect(measured.rowOverflow, "the longest written line overflows its row").toBe(false);
+  expect(measured.pageOverflow, "the longest written line makes the page scroll sideways").toBe(false);
 });

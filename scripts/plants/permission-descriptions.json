@@ -1,26 +1,32 @@
 {
   "description-gap-grew": {
     "file": "apps/web/lib/i18n/translations/permissions.ts",
-    "from": "    'perm:user.manage':\n      'إنشاء حسابات الدخول وإسناد الأدوار أو سحبها وتفعيل الحساب أو إلغاؤه.',",
-    "to": "    'perm:user.manage': '',",
-    "why": "A written Arabic line is emptied, so the gap grows from 214 to 215. permission-descriptions.test.ts 'has no more codes without a description than the recorded budget' must die on the FIRST assertion (above the budget) — which is the direction that matters, because it is what stops a new permission shipping without its line."
+    "from": "    'perm:role.read': 'يرى أدوار المكتب وما يمنحه كل دور',",
+    "to": "    'perm:role.read': '',",
+    "why": "A written Arabic line is REMOVED, so the gap grows from 0 to 1. permission-descriptions.test.ts 'has no more codes without a description than the recorded budget' must die on the FIRST assertion (above the budget) naming `role.read`. With the budget at 0 this is the whole point of the guard: a permission that ships without its line fails the build, rather than the office manager finding a blank cell while deciding a grant. It also dies in the dictionary's own AR/EN parity check, which is the guard the move to the dictionary bought for free."
   },
   "description-budget-left-stale": {
     "file": "apps/web/lib/admin/permission-descriptions.test.ts",
-    "from": "const MISSING_DESCRIPTION_BUDGET = 214;",
-    "to": "const MISSING_DESCRIPTION_BUDGET = 219;",
-    "why": "The budget is raised above the real gap, which is how a ratchet quietly becomes a ceiling nobody lowers. The SECOND assertion in the same test must die ('only 214 codes are missing, so lower the budget'), proving the ratchet holds in both directions rather than only against growth. Without this half, 219 lines could land and the guard would still report a clean 214-code gap."
+    "from": "const MISSING_DESCRIPTION_BUDGET = 0;",
+    "to": "const MISSING_DESCRIPTION_BUDGET = 5;",
+    "why": "The budget is raised above the real gap, which is how a ratchet quietly becomes a ceiling nobody lowers. The SECOND assertion in the same test must die ('only 0 codes are missing, so lower MISSING_DESCRIPTION_BUDGET to 0'). This half is not hypothetical: it is what actually brought the number down when the owner's 219 lines landed — the suite refused to pass at 214 with a real gap of 0."
+  },
+  "carried-english-budget-left-stale": {
+    "file": "apps/web/lib/i18n/translations/permissions.ts",
+    "from": "    'perm:risk-profile.read': 'List/read Risk Profiles',",
+    "to": "    'perm:risk-profile.read': 'See the risk surveys captured for a customer, including the assets listed on each.',",
+    "why": "One carried English hint is replaced with reviewed copy, so the carried count falls from 214 to 213. 'has no more codes showing the carried English hint than the recorded budget' must die on its SECOND assertion. That proves the English ratchet measures the real gap rather than a written-down number, and that the detection is MECHANICAL — nothing was added to a list, the value simply stopped equalling the catalogue's stored description. Without this, 219 reviewed English lines could land and the guard would still report 214 carried."
   },
   "orphan-description-left-behind": {
     "file": "apps/web/lib/i18n/translations/permissions.ts",
-    "from": "    'perm:role.read': 'الاطّلاع على أدوار المكتب وصلاحيات كل دور، دون تعديلها.',",
-    "to": "    'perm:role.read': 'الاطّلاع على أدوار المكتب وصلاحيات كل دور، دون تعديلها.',\n    'perm:role.manage': 'إنشاء الأدوار وتعديل صلاحياتها وإيقافها.',",
-    "why": "A line is left behind for `role.manage` — the umbrella four-action Phase 1 split into three, so the code no longer exists. 'has no description for a code the catalogue does not have' must die naming it. This is the REAL shape of the failure: the wording was reviewed work, the code was renamed, and a stale sentence sits in the dictionary looking like coverage while the three successors have none. It also dies in the EN block's parity check, which is the dictionary guard earning its keep on the same mistake."
+    "from": "    'perm:role.read': 'يرى أدوار المكتب وما يمنحه كل دور',",
+    "to": "    'perm:role.read': 'يرى أدوار المكتب وما يمنحه كل دور',\n    'perm:role.manage': 'إنشاء الأدوار وتعديل صلاحياتها وإيقافها.',",
+    "why": "A line is left behind for `role.manage` — the umbrella four-action Phase 1 split into three, so the code no longer exists. 'has no description for a code the catalogue does not have' must die naming it. This is the REAL shape of the failure: the wording was reviewed work, the code was renamed, and a stale sentence sits in the dictionary looking like coverage while the three successors have none. The verbatim `perm:<code>` key is what makes it detectable at all — a pattern-matched key would keep pairing the renamed code with the old sentence and report nothing."
   },
   "fallback-is-reachable-from-the-catalogue": {
     "file": "apps/web/lib/admin/permission-descriptions.ts",
     "from": "  if (written !== undefined && written.trim().length > 0) return written;",
     "to": "  if (false) return written as string;",
-    "why": "The written line is never returned, so EVERY code falls through to the stored developer-facing English — the state the move to the dictionary exists to end. permission-descriptions.test.ts 'is used for a code with no written line, and is not used when one exists' must die on `role.read` returning the stored hint. This is the plant that makes the fallback's reachability a MEASURED claim rather than an assumption: the fallback is kept on purpose, and this proves the written line wins whenever there is one."
+    "why": "The written line is never returned, so EVERY code falls through to the stored developer-facing English — the state the move to the dictionary exists to end. permission-descriptions.test.ts 'is used for a code with no written line, and is not used when one exists' must die on `role.read` returning the stored hint. This is the plant that makes the fallback's reachability a MEASURED claim rather than an assumption: the fallback is kept on purpose for a code the catalogue does not contain, and this proves the written line wins whenever there is one."
   }
 }

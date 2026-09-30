@@ -138,11 +138,27 @@ describe('render', () => {
     }
   });
 
-  it('tells her to skip a code that is not yet enforced', () => {
+  it('offers no exemption for a code that is not yet enforced, and says there is none', () => {
+    // This test asserted the OPPOSITE until 2026-09-30 — the header told her to skip the three
+    // NOT YET ENFORCED codes. The owner withdrew that exemption when the 219 lines landed, on the
+    // reasoning that guardedness rather than location is the shape by which a rule erodes: an
+    // exempt code is a code the gap stops counting, and the three carry a real line saying holding
+    // one does nothing today. Removing the sentence from the header is what failed this test, which
+    // is the assertion doing its job rather than an inconvenience.
     const out = render(CATALOGUE, {});
-    expect(out).toContain('NOT YET ENFORCED needs NO Arabic line');
+    expect(out).not.toContain('needs NO Arabic line');
+    expect(out).toContain('EVERY code has a line, with no exemptions');
     // And the code itself still appears, because vanishing it would leave her wondering.
     expect(out).toContain('      refund.raise');
+  });
+
+  it('tells a reader not to write in the mirror, and where the text actually lives', () => {
+    // The file stopped being the input and became a mirror in the same change. Somebody who does not
+    // know that will type into it — that is the whole failure mode — so the file has to say so
+    // itself, and name the one home rather than just forbidding this one.
+    const out = render(CATALOGUE, {});
+    expect(out).toContain('DO NOT WRITE IN THIS FILE');
+    expect(out).toContain('apps/web/lib/i18n/translations/permissions.ts');
   });
 
   it('marks a CRUD-shaped family as one screen row and a lone code as a toggle', () => {
