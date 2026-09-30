@@ -33,3 +33,5 @@ export function codeFromPermissionKey(key: string): string | null {
     ? key.slice(PERMISSION_KEY_PREFIX.length)
     : null;
 }
+
+// Throwaway probe line: a code change that introduces no alert.
