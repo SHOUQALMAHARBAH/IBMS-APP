@@ -32,14 +32,15 @@ import { DETAIL_PAGES } from './translations/detail-pages';
 import { ENUMS } from './translations/enums';
 import { INSURERS } from './translations/insurers';
 import { EMAIL } from './translations/email';
+import { PERMISSIONS } from './translations/permissions';
 
 export type Language = 'AR' | 'EN';
 
 export const LANGUAGES: readonly Language[] = ['AR', 'EN'];
 
 const translations = {
-  AR: { ...COMMON.AR, ...AUTH.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR, ...COMPLAINTS.AR, ...CUSTOMER_SERVICE.AR, ...PDPL.AR, ...FINANCE.AR, ...COMPLIANCE_SCREENING.AR, ...COMPLIANCE_RISK.AR, ...DASHBOARDS.AR, ...OPERATIONS.AR, ...DETAIL_PAGES.AR, ...ENUMS.AR, ...INSURERS.AR, ...EMAIL.AR },
-  EN: { ...COMMON.EN, ...AUTH.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN, ...COMPLAINTS.EN, ...CUSTOMER_SERVICE.EN, ...PDPL.EN, ...FINANCE.EN, ...COMPLIANCE_SCREENING.EN, ...COMPLIANCE_RISK.EN, ...DASHBOARDS.EN, ...OPERATIONS.EN, ...DETAIL_PAGES.EN, ...ENUMS.EN, ...INSURERS.EN, ...EMAIL.EN },
+  AR: { ...COMMON.AR, ...AUTH.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR, ...COMPLAINTS.AR, ...CUSTOMER_SERVICE.AR, ...PDPL.AR, ...FINANCE.AR, ...COMPLIANCE_SCREENING.AR, ...COMPLIANCE_RISK.AR, ...DASHBOARDS.AR, ...OPERATIONS.AR, ...DETAIL_PAGES.AR, ...ENUMS.AR, ...INSURERS.AR, ...EMAIL.AR, ...PERMISSIONS.AR },
+  EN: { ...COMMON.EN, ...AUTH.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN, ...COMPLAINTS.EN, ...CUSTOMER_SERVICE.EN, ...PDPL.EN, ...FINANCE.EN, ...COMPLIANCE_SCREENING.EN, ...COMPLIANCE_RISK.EN, ...DASHBOARDS.EN, ...OPERATIONS.EN, ...DETAIL_PAGES.EN, ...ENUMS.EN, ...INSURERS.EN, ...EMAIL.EN, ...PERMISSIONS.EN },
 } as const;
 
 export type TranslationKey = keyof (typeof translations)['EN'];
@@ -49,6 +50,23 @@ export type TranslationKey = keyof (typeof translations)['EN'];
  * for `Lead "{name}" added to your pipeline.` A key with no placeholders
  * ignores `params` entirely, so existing zero-arg call sites need no
  * change. */
+/**
+ * A lookup for a key built at RUNTIME, which `translate` deliberately cannot take.
+ *
+ * `translate` accepts only a `TranslationKey`, so a compile-time typo cannot reach it — that is the point
+ * of the union and it should not be widened. But a permission description's key is `perm:` + a code that
+ * arrives from the API, so it cannot be in the union by construction. This returns `undefined` for a key
+ * the dictionary does not hold, rather than the `string` a cast would claim.
+ *
+ * Use it only where the key genuinely cannot be known at compile time. Everywhere else, `translate`.
+ */
+export function lookupOptional(
+  language: Language,
+  key: string,
+): string | undefined {
+  return (translations[language] as Record<string, string | undefined>)[key];
+}
+
 export function translate(
   language: Language,
   key: TranslationKey,

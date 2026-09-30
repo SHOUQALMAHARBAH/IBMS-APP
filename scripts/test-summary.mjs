@@ -89,13 +89,17 @@ export function summarise(rawOutput) {
       const f = PLAYWRIGHT_FAILED.exec(text);
       failed = f ? Number(f[1]) : 0;
     }
-    // A FILE that failed to load counts as a failure even though no test did. Added to `failed` rather
-    // than reported separately, so every existing caller — including `--expect-fail` and the exit code —
-    // treats it as what it is: a run that did not happen.
+    // A FILE that failed to LOAD is a failure even though no test did. But a file containing a failing
+    // TEST is also counted as a failed file by vitest, so adding the two together double-counts the
+    // ordinary case — which is the bug the first version of this had, caught on its own first real use:
+    // one failing test in one file printed "2 failed".
+    //
+    // So the file count only contributes what the test failures do not already explain. With failing
+    // tests present the run is red anyway; the file count matters when it is red and the Tests line is not.
     let fileFailures = 0;
     if (p.runner === 'vitest') {
       const ff = VITEST_FILES_FAILED_FIRST.exec(text) ?? VITEST_FILES_FAILED.exec(text);
-      fileFailures = ff ? Number(ff[1]) : 0;
+      fileFailures = ff ? Math.max(0, Number(ff[1]) - failed) : 0;
     }
     return {
       runner: p.runner,
@@ -142,6 +146,15 @@ function selfTest() {
         ' Test Files  1 failed | 12 passed (13)' + String.fromCharCode(10) +
         '       Tests  118 passed (118)' + String.fromCharCode(10),
       expect: { passed: 118, failed: 1 },
+    },
+    {
+      // The DOUBLE-COUNT case, from this tool's own first real use: one failing test in one file makes
+      // vitest report that FILE as failed too, so adding the two printed "2 failed" for one failure.
+      name: 'vitest, one failing test in one file is ONE failure, not two',
+      input:
+        ' Test Files  1 failed | 12 passed (13)' + String.fromCharCode(10) +
+        '       Tests  1 failed | 122 passed (123)' + String.fromCharCode(10),
+      expect: { passed: 122, failed: 1 },
     },
     {
       name: 'vitest, all passed',

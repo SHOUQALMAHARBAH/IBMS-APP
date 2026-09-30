@@ -1,0 +1,26 @@
+{
+  "description-gap-grew": {
+    "file": "apps/web/lib/i18n/translations/permissions.ts",
+    "from": "    'perm:user.manage':\n      'إنشاء حسابات الدخول وإسناد الأدوار أو سحبها وتفعيل الحساب أو إلغاؤه.',",
+    "to": "    'perm:user.manage': '',",
+    "why": "A written Arabic line is emptied, so the gap grows from 214 to 215. permission-descriptions.test.ts 'has no more codes without a description than the recorded budget' must die on the FIRST assertion (above the budget) — which is the direction that matters, because it is what stops a new permission shipping without its line."
+  },
+  "description-budget-left-stale": {
+    "file": "apps/web/lib/admin/permission-descriptions.test.ts",
+    "from": "const MISSING_DESCRIPTION_BUDGET = 214;",
+    "to": "const MISSING_DESCRIPTION_BUDGET = 219;",
+    "why": "The budget is raised above the real gap, which is how a ratchet quietly becomes a ceiling nobody lowers. The SECOND assertion in the same test must die ('only 214 codes are missing, so lower the budget'), proving the ratchet holds in both directions rather than only against growth. Without this half, 219 lines could land and the guard would still report a clean 214-code gap."
+  },
+  "orphan-description-left-behind": {
+    "file": "apps/web/lib/i18n/translations/permissions.ts",
+    "from": "    'perm:role.read': 'الاطّلاع على أدوار المكتب وصلاحيات كل دور، دون تعديلها.',",
+    "to": "    'perm:role.read': 'الاطّلاع على أدوار المكتب وصلاحيات كل دور، دون تعديلها.',\n    'perm:role.manage': 'إنشاء الأدوار وتعديل صلاحياتها وإيقافها.',",
+    "why": "A line is left behind for `role.manage` — the umbrella four-action Phase 1 split into three, so the code no longer exists. 'has no description for a code the catalogue does not have' must die naming it. This is the REAL shape of the failure: the wording was reviewed work, the code was renamed, and a stale sentence sits in the dictionary looking like coverage while the three successors have none. It also dies in the EN block's parity check, which is the dictionary guard earning its keep on the same mistake."
+  },
+  "fallback-is-reachable-from-the-catalogue": {
+    "file": "apps/web/lib/admin/permission-descriptions.ts",
+    "from": "  if (written !== undefined && written.trim().length > 0) return written;",
+    "to": "  if (false) return written as string;",
+    "why": "The written line is never returned, so EVERY code falls through to the stored developer-facing English — the state the move to the dictionary exists to end. permission-descriptions.test.ts 'is used for a code with no written line, and is not used when one exists' must die on `role.read` returning the stored hint. This is the plant that makes the fallback's reachability a MEASURED claim rather than an assumption: the fallback is kept on purpose, and this proves the written line wins whenever there is one."
+  }
+}
