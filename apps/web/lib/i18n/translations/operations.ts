@@ -591,7 +591,7 @@ export const OPERATIONS = {
     dutySegStatusSingle: 'شخص واحد فقط — تتعطّل إن كان هو من سجّل الإجراء',
     dutySegStatusReady: 'جاهزة',
     dutySegRefusalAct: 'عرض توزيع الفصل بين المهام على أدوار المكتب',
-    dutySegLoadError: 'تعذّر تحميل قائمة العمليات التي تحتاج شخصين.',
+    dutySegLoadError: 'تعذّر تحميل قائمة العمليات التي تحتاج شخصين — حاول مرة أخرى.',
     roleCreateHeading: 'إنشاء دور',
     roleFieldName: 'الاسم البرمجي',
     roleFieldNameHint: 'ثابت، ويُكتب في سجلّ التدقيق. لا يمكن تغييره بعد الإنشاء.',
@@ -1198,7 +1198,7 @@ export const OPERATIONS = {
     dutySegStatusSingle: 'Only one person — blocked whenever they are the one who recorded it',
     dutySegStatusReady: 'Ready',
     dutySegRefusalAct: 'view how this office separates duties across its roles',
-    dutySegLoadError: 'The list of operations needing two people could not be loaded.',
+    dutySegLoadError: 'Could not load the list of operations needing two people — try again.',
     roleCreateHeading: 'Create a role',
     roleFieldName: 'Machine name',
     roleFieldNameHint:

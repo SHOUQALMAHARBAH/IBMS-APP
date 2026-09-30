@@ -363,7 +363,7 @@ export const COMPLIANCE_SCREENING = {
     slapCreateBornDraft:
       'A new policy is created as a DRAFT. Activation is its own recorded decision, so the duration does not apply until then.',
     slapCreateSave: 'Save the policy',
-    slapCreateCancel: 'Discard',
+    slapCreateCancel: 'Cancel',
     slapCreateFailed: 'Could not create the policy.',
     slap247: '24/7',
     slapCustom: 'Custom',
@@ -406,7 +406,7 @@ export const COMPLIANCE_SCREENING = {
       'These thresholds are configurable and represent the broker’s own risk appetite. They are not a regulatory rule.',
     shHigh: 'High',
     shReview: 'Review',
-    shDiscardBelow: 'Discard below',
+    shDiscardBelow: 'Ignore below',
     shSendIdentifiersToProvider: 'Send identifiers to provider',
     shYes: 'Yes',
     shNo: 'No',

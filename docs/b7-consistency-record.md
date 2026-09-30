@@ -54,6 +54,10 @@ differently — the disagreement is the evidence, not somebody's taste.
 | Who the reader should ask for a grant | **whoever manages permissions in your office** (by FUNCTION) | Office Administrator, System Administrator, your Manager, any role name | An office defines its own role names — that is what office-scoped RBAC is for — so any role name is a sentence that can be false in some office. Asserted as an ABSENCE in `e2e/permission-refusal.spec.ts`, because absence is the only form that can fail. |
 | A permission code shown to a reader | **alongside the sentence, in a parenthetical** | inside the sentence; as the whole sentence | The code is what the administrator types into the Role screen, so it is worth showing — but a reader being told what they cannot do should not have to parse an identifier to find out. |
 | Several codes where holding ONE is enough | **any one of these permissions grants it** | naming them as a pair the reader needs both of | `PermissionsGuard` is `required.some`, so a route declaring two admits a holder of either. Four screens. |
+| A data subject taking back CONSENT | **withdraw** | revoke, cancel | A FOURTH sense of withdraw and a legitimate one: it is a statutory PDPL act by the data subject, not the office withdrawing a record it raised in error. Seven strings on `/consent` and `/dpo-workspace` use it; recorded so nobody "corrects" them onto the discard concept. |
+| Abandoning a form that was never submitted | **cancel** | discard, withdraw | Nothing was raised, so there is no record to withdraw. `/sla-policies` said "Discard" while `/watchlist-sync` said "Cancel" for the identical affordance — batch 4, fixed to Cancel, which is also what the Arabic already said («إلغاء الإدخال»). |
+| Not surfacing matches below a score | **ignore** | discard, drop | A THRESHOLD, not a deletion: the matches still exist and are still screened, they are just not shown. `/screening-health` said "Discard below" in English while its own Arabic said «تجاهل دون» — ignore. Fixed to the Arabic's meaning in batch 4. |
+| Deciding a sanctions match is not the person | **clear** | resolve, dismiss | A DELIBERATE exception to the resolve row above, on the same ground as "Suspended": in AML a match is *cleared*, it is the word an examiner expects, and it is a decision about the match's MERITS rather than the closing of a task. Checked in batch 4 and kept. |
 | Several codes where ALL are needed | **needs all of these permissions** | any one of these | A screen loading several endpoints with `Promise.all` closes if any one refuses. Two screens. The opposite claim from the row above, and telling a reader the wrong one sends them to ask for a grant they do not need — which is why the two are separate FUNCTIONS with no default mode, rather than one function with a flag. |
 
 ### What batch 3 changed, and what it did not
@@ -126,11 +130,128 @@ Format: `screen · rule N · what is wrong` — and `[FIXED <commit>]` when it w
 
 ---
 
+## BATCH 4 — the compliance surface, 20 screens (2026-09-30)
+
+Rules read: **1, 3, 4, 5, 7.** Rule 2 and rule 6 are guards now (`apps/web/test/screen-copy.test.ts`) and
+cover all 102 screens continuously, so a per-batch sweep of them would re-measure what the build measures.
+
+### FIRST, THE DENOMINATOR — and it is not what the earlier batches reported
+
+**"76 of 102 remain" cannot be substantiated, and the reason is a process defect rather than an arithmetic
+one: batches 1–3 reported their coverage in conversation and never wrote it into this file.** Files
+*touched* is recoverable from git; screens *read* is not, and a screen read and found correct touches
+nothing. So the honest position is that the covered set before batch 4 is unknown, and the numbers 16 + 26
++ 12 = 54 do not reconcile with 102 − 76 = 26 either.
+
+That is fixed here rather than argued about: the table below is per-screen, it lives in this file, and from
+now on a screen is covered when a row says so. **102 screens under `app/(app)`** — measured, and the
+"93 screens" figure elsewhere in this document is stale.
+
+### The 20 screens of batch 4
+
+`access-recertification` · `audit-trail` · `consent` · `cross-border-transfers` ·
+`data-sharing-approvals` · `dpia-screenings` · `dpo-workspace` · `dsr` · `incidents` ·
+`internal-audit-findings` · `internal-controls` · `operational-pi-risk` · `privacy-notices` ·
+`regulatory-compliance` · `retention-disposal` · `ropa-entries` · `screening-health` ·
+`screening-matches` · `transaction-monitoring` · `watchlist-sync`
+
+Chosen as a group because it is the surface a regulator opens, so a contradiction between two of these
+screens costs more than one between two dashboards.
+
+| Rule | Result |
+|---|---|
+| **1** — create form above its table | **CLEAN on all 20.** Read as PAIRS, which is what the formal pass warned about: `retention-disposal` has three (form, table) pairs and all three are ordered correctly (211<253, 328<382, 446<468); `operational-pi-risk` likewise. Four screens are read-only (`dpo-workspace`, `internal-controls`, `screening-health`, `screening-matches`) and have no form — n/a, not a violation. |
+| **3** — four states | **CLEAN on all 20**, after reading three flags that were all false positives (below). |
+| **4** — every refusal names the way forward | **One real finding, fixed, and it was app-wide** (below). The permission half of rule 4 is now structural for all 102 screens, because every refusal renders one sentence that names the grantor. |
+| **5** — delete means deactivate, same words | **CLEAN.** `slapDeactivate` is the glossary's word; `empColTerminated` is the relationship sense, correctly. |
+| **7** — one action, one name | **Two collisions, fixed**, plus two senses recorded as deliberate (below). |
+
+### Rule 4 — the fourth state was half-built on 5 keys, and the finding is app-wide
+
+Rule 3's fourth state is **two things**: "something went wrong" AND the way to retry. Every earlier pass
+measured whether the error BRANCH exists. Nobody measured whether the message tells the reader anything
+they can act on — which is rule 4 applied to the same state.
+
+Measured over the whole app: **104 of 109 load-error messages already read `<what failed> — try again.`**
+in both languages. Five stopped at the failure, **and all five failed in BOTH languages**, so there was no
+bilingual asymmetry to argue about — just drift. 104-against-5 is what makes it drift rather than a
+decision, the same standard the glossary uses.
+
+    consStatusLoadError   dutySegLoadError   emailLoadFailed   insDirLoadError   insListLoadError
+
+All five fixed to the house convention; `dutySegLoadError` also went from passive ("The list … could not be
+loaded") to the active form all 104 siblings use, because the shape of the sentence is part of the name.
+**Zero screens in this app have a retry CONTROL** — measured — so the sentence is not a nicety a button
+makes redundant. It is the only way forward there is.
+
+Guarded by `scripts/measurements/load-error-way-forward.py`, wired into the web unit suite, planted: putting
+one message back to its old wording fails the guard reporting **`in ONE language only 1`**, which also
+proves the guard reads each language separately rather than whichever half it finds first.
+
+**THE FIRST VERSION OF THIS MEASUREMENT WAS WRONG IN THE COMFORTABLE DIRECTION.** It keyed on
+`commonTryAgain`, the shared key, and reported 4 of 102 — true, and useless, because 98 screens use a
+screen-specific key and almost all of them say "try again" in their own words. It was measuring which
+screens share a string, not which screens help a reader. I had seen `commonTryAgain` on `/leads` and
+generalised from one site, which is the same mistake as taking a rule measured at a route guard and
+applying it to a screen.
+
+### Rule 7 — two collisions fixed, two senses kept
+
+| Screen | Was | Now | Why |
+|---|---|---|---|
+| `/sla-policies` | "Discard" | **"Cancel"** | A form-abandon button. `/watchlist-sync` already said "Cancel" for the identical affordance, and the Arabic here already said «إلغاء الإدخال». "Discard" is the withdraw concept's word, and a draft never submitted is not a record raised in error. |
+| `/screening-health` | "Discard below" | **"Ignore below"** | A screening THRESHOLD. The matches still exist and are still screened — they are not shown. The screen's own Arabic already said «تجاهل دون», ignore; the English contradicted it. |
+
+Kept deliberately, with reasons now in the glossary: **withdraw** in its fourth sense (a data subject taking
+back consent — a statutory act, not the office withdrawing its own record), and **clear** for deciding a
+sanctions match is not the person (an AML term of art and a decision about merits, not the closing of a
+task — the same kind of exception as "Suspended" as a customer status).
+
+### The three flags that were false positives, and what each taught the detector
+
+Every one was caught by reading, none by the script, and the script now carries all three in its header.
+
+1. **`/audit-trail` — "form below table".** The `<table>` at line 93 is inside `AuditLogTable`, a rendering
+   helper defined above `export default`. The formal pass hit this same class on this same screen.
+2. **`/audit-trail` — "no error branch".** It has `browseError`, `wfError` and `docError` — three, because
+   it loads three independent things. A fixed name list saw none of them.
+3. **`/access-recertification` — "no empty state".** It renders one, in the child component
+   `RecertificationItemsTable`. The detector now follows local component imports one level deep, which
+   fixes the count without making it reliable: a state two components down is still invisible.
+
+`/regulatory-compliance` flagged for rule 1 as well and is the false positive the formal pass already
+recorded by hand — its first table is the single current licence rendered as label/value rows, not a list.
+Confirmed independently here.
+
+### A STANDING EXCEPTION found while measuring, which must not be "fixed"
+
+Ten screens have **no permission-refusal state**, and on the detail pages among them that is correct and
+load-bearing: `claims/[id]`, `leads/[id]`, `policies/[id]`, `prospects/[id]`, `risk-profiles/[id]`,
+`insurance-programs/[id]`. They branch on **404**, not 403, and say things like *"No claim with that id is
+in your book."*
+
+**A 403 there would disclose that the record exists.** That is the same tenancy property that keeps 18
+"may not exist, or you may not have access" strings out of the refusal sweep. Completing rule 3's third
+state on a detail page would turn a deliberate ambiguity into an existence oracle, so rule 3's third state
+is **n/a by design** on any screen addressed by an id it did not itself list.
+
+---
+
 ## Not yet surveyed
 
-Everything else. 93 screens exist; the ones above are the ones passed through while doing other work. The
-formal pass produces the full table — one row per screen, one column per rule, deliberate exceptions written
-down **with their reason** rather than left blank.
+**102 screens exist under `app/(app)`** — measured; the "93" this paragraph used to claim was stale, and the
+five `(auth)` screens sit outside the count because they render before sign-in and have no permission
+concept.
+
+Rules 2 and 6 are GUARDS now (`apps/web/test/screen-copy.test.ts`) and cover all 102 continuously, so they
+need no per-batch sweep. Rule 4's permission half is structural for all 102 as well, because every refusal
+renders one sentence from `lib/i18n/permission-refusal.ts` that names the grantor — and its load-error half
+is guarded by `scripts/measurements/load-error-way-forward.py`.
+
+What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batch 4's 20 are listed above
+by name.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
+substantiated — batch 5 onwards names its screens in this file, which is the only form of that claim anybody
+can check.
 
 ---
 

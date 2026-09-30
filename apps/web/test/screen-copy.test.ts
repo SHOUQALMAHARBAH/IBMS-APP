@@ -423,3 +423,69 @@ describe('every act key is reachable, and every reachable key exists', () => {
     ).toEqual([]);
   });
 });
+
+/*
+ * RULE 3'S FOURTH STATE IS TWO THINGS, and the second half had never been measured.
+ *
+ * Rule 3 ends a screen in one of four states, the fourth being "something went wrong" WITH THE WAY TO
+ * RETRY. The formal pass measured whether the error BRANCH exists — it does, on 89 of 102 screens. Whether
+ * the message tells the reader anything they can act on is rule 4, and nothing checked it.
+ *
+ * Measured: 104 of 109 load-error messages already read `<what failed> — try again.` in both languages.
+ * Five stopped at the failure, and all five failed in BOTH languages, so there was no bilingual asymmetry
+ * to argue about — just drift. The 104-against-5 disagreement is what makes it drift rather than a
+ * decision, which is the same standard the glossary uses.
+ *
+ * ZERO SCREENS IN THE APP HAVE A RETRY CONTROL, measured separately. So the sentence is not a nicety that
+ * a button makes redundant — today it is the only way forward there is.
+ *
+ * THE FIRST VERSION OF THIS MEASUREMENT WAS WRONG IN THE USEFUL-LOOKING DIRECTION: it keyed on
+ * `commonTryAgain`, the shared key, and reported 4 of 102. True, and useless — 98 screens use a
+ * screen-specific key and most of them say "try again" in their own words. It was measuring which screens
+ * share a string, not which screens help a reader.
+ */
+describe('a load failure tells the reader what to do (rules 3 and 4)', () => {
+  it('every load-error message names a way forward, in both languages', () => {
+    let output = '';
+    let failed = false;
+    try {
+      output = execFileSync(
+        'python',
+        ['scripts/measurements/load-error-way-forward.py'],
+        { cwd: REPO, encoding: 'utf8' },
+      );
+    } catch (err) {
+      failed = true;
+      output = String((err as { stdout?: string }).stdout ?? err);
+    }
+    const found = /keys found\s+(\d+)/.exec(output);
+    expect(
+      found,
+      `The load-error scan produced no total, so it did not run. Blank is not zero. Output:\n${output.slice(-1200)}`,
+    ).not.toBeNull();
+    expect(failed, `the scan exited non-zero:\n${output.slice(-1200)}`).toBe(false);
+    // The script carries its own floor (it refuses below 80 keys), so a drifted extraction fails above
+    // rather than reporting a clean sweep of nothing.
+    expect(Number(found?.[1]), 'far fewer keys than this codebase has').toBeGreaterThan(95);
+
+    // LITERAL regexes, not ones built from a string: this host mangles backslashes in a heredoc, so the
+    // first version of this loop arrived with `'\s+'` where it needed `'\\s+'` — and in a JS string
+    // literal `\s` is just the letter s. Both patterns matched nothing, and the assertion that caught it
+    // was the null check rather than the count. Fifth occurrence of that trap in one session.
+    const ONE_LANGUAGE = /in ONE language only\s+(\d+)/;
+    const NEITHER = /in NEITHER\s+(\d+)/;
+    for (const [label, pattern, what] of [
+      ['in ONE language only', ONE_LANGUAGE, 'name one in only ONE language'],
+      ['in NEITHER', NEITHER, 'name no way forward'],
+    ] as Array<[string, RegExp, string]>) {
+      const m = pattern.exec(output);
+      expect(m, `the scan did not report "${label}"`).not.toBeNull();
+      expect(
+        Number(m?.[1]),
+        `${Number(m?.[1])} load-error message(s) ${what}. ` +
+          'The house convention is `<what failed> — try again.` / `<...> — حاول مرة أخرى.` — 109 of 109 ' +
+          `follow it. Full output:\n${output}`,
+      ).toBe(0);
+    }
+  });
+});

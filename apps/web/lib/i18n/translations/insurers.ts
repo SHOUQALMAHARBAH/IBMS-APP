@@ -50,7 +50,7 @@ export const INSURERS = {
     // identical to a missing permission unless the response code is read.
     insMfaRequired:
       'لم تُسجِّل بعد تطبيق المصادقة، والنظام يمنع كل الشاشات حتى تفعل. هذه ليست مشكلة صلاحيات: افتح «الأمان» من أسفل القائمة الجانبية، وامسح رمز QR بتطبيق مصادقة، وأدخل الرمز المكوَّن من ستة أرقام — ثم عُد إلى هنا.',
-    insListLoadError: 'تعذر تحميل شركات التأمين.',
+    insListLoadError: 'تعذر تحميل شركات التأمين — حاول مرة أخرى.',
     insListEmpty: 'لم يسجّل مكتبك أي شركة تأمين بعد.',
     insListEmptyFiltered: 'لا توجد شركة تأمين مطابقة لهذا البحث.',
     insListLoading: 'جارٍ التحميل…',
@@ -160,7 +160,7 @@ export const INSURERS = {
       'يُظهر الدليل بيانات الشركة العامة فقط: لا شروط سداد، ولا تصنيفاً، ولا جهات اتصال خاصة بمكتب، ' +
       'ولا أي إشارة إلى المكاتب الأخرى.',
     insDirRefusalAct: 'البحث في دليل شركات التأمين المشترك بين المكاتب',
-    insDirLoadError: 'تعذر تحميل الدليل.',
+    insDirLoadError: 'تعذر تحميل الدليل — حاول مرة أخرى.',
     insDirSearchLabel: 'ابحث باسم الشركة',
     insDirLineLabel: 'الخط التأميني',
     insDirLineAny: 'أي خط',
@@ -216,7 +216,7 @@ export const INSURERS = {
     insListRefusalAct: "view this office's insurers",
     insMfaRequired:
       'You have not paired an authenticator app yet, and the system blocks every screen until you do. This is NOT a permissions problem: open Security at the bottom of the sidebar, scan the QR code with an authenticator app, enter the six-digit code — then come back here.',
-    insListLoadError: 'Could not load insurers.',
+    insListLoadError: 'Could not load insurers — try again.',
     insListEmpty: 'Your office has not registered an insurer yet.',
     insListEmptyFiltered: 'No insurer matches that search.',
     insListLoading: 'Loading…',
@@ -321,7 +321,7 @@ export const INSURERS = {
     insDirBoundaryNote:
       'The directory shows public company facts only: no credit terms, no rating, no office-specific contacts, and nothing at all about other offices.',
     insDirRefusalAct: 'search the cross-office insurer directory',
-    insDirLoadError: 'Could not load the directory.',
+    insDirLoadError: 'Could not load the directory — try again.',
     insDirSearchLabel: 'Search by company name',
     insDirLineLabel: 'Insurance line',
     insDirLineAny: 'Any line',
