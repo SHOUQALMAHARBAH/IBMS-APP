@@ -61,8 +61,27 @@ TABLE = re.compile(r'<table\b')
 # while the create form sat below the list. `/vendors` (onSearchSubmit above, onCreate below) and
 # `/employees/[id]` (the training table above, onRecordTraining below) were both inside a pass that reported
 # rule 1 as 0 violations.
-CREATE_FORM = re.compile(r'<form[^>]*onSubmit=\{(on(?:Create|Add|Record|Submit|Save|Register|Log|Raise)\w*)\}')
-FILTER_FORM = re.compile(r'<form[^>]*onSubmit=\{(on(?:Search|Filter|Browse|Query|Lookup)\w*)\}')
+CREATE_FORM = re.compile(
+    r'<form[^>]*onSubmit=\{[^}]*\b(?:onCreate|onAdd|onRecord|onRegister|onLog|onRaise|onSave'
+    r'|handleCreate|createPr)\w*'
+)
+FILTER_FORM = re.compile(
+    r'<form[^>]*onSubmit=\{[^}]*\b(?:onSearch|onFilter|onBrowse|onQuery|onLookup|applyFilters'
+    r'|runBrowse|runWorkflowHistory|runDocumentHistory|runSearch)\w*'
+)
+# Every form with a handler at all, so the two above can be measured against the TOTAL.
+ANY_FORM = re.compile(r'<form[^>]*onSubmit=\{')
+# WHAT THIS CANNOT CLASSIFY IS PART OF THE OUTPUT.
+#
+# Measured after the two rule-1 violations were found: 77 forms in the app carry an onSubmit handler and the
+# first version of these patterns recognised 22. The two violations happened to use `onCreate` and
+# `onRecordTraining` — which is LUCK, not coverage, and a check whose blind spot is two thirds of the
+# population must not report "none found" as if it had looked at all of them.
+#
+# The residue is mostly a bare `submit` (14 screens) or an inline arrow calling it, which carries no
+# information about the form's KIND at all. So the report prints an UNCLASSIFIED count and the rule-1 line
+# says when a screen's forms are among them. A zero with 55 unclassified forms behind it is not a clean
+# result; it is an unmeasured one.
 # Local component imports, so a state rendered by a child is seen. One level only, deliberately: following
 # the whole tree turns this into a bundler and the extra depth has not been needed.
 IMPORT = re.compile(r"import\s*\{[^}]*\}\s*from\s*'((?:\.\.?/)[^']+)'")
@@ -103,6 +122,7 @@ def probe(page_src, child_src):
         'tables': [page_src[:m.start()].count('\n') + 1 for m in TABLE.finditer(page_src)],
         'creates': [page_src[:m.start()].count('\n') + 1 for m in CREATE_FORM.finditer(page_src)],
         'filters': [page_src[:m.start()].count('\n') + 1 for m in FILTER_FORM.finditer(page_src)],
+        'handlers': len(ANY_FORM.findall(page_src)),
     }
 
 
@@ -135,6 +155,11 @@ def main():
             # inside a pass that reported rule 1 as 0 violations.
             elif p['creates'] and p['tables'] and min(p['creates']) > min(p['tables']):
                 pairs += '   <-- CREATE form below a table, filter form above it: READ IT'
+            elif (p['tables'] and p['handlers']
+                  and p['handlers'] > len(p['creates']) + len(p['filters'])):
+                # Not a finding and not a clean bill either: this screen has a form whose KIND cannot be
+                # told from its handler name, so rule 1 was not decided for it.
+                pairs += '   (unclassified form — rule 1 UNDECIDED here)'
         print(header % (rel,
                         'y' if p['loading'] else '.',
                         'y' if p['empty'] else '.',
@@ -147,6 +172,10 @@ def main():
                        ('no empty-state signal', 'empty')):
         missing = [rel for rel, p in rows if not p[key]]
         print('%-24s %3d   %s' % (label, len(missing), ' '.join(missing[:8])))
+    handlers = sum(p['handlers'] for _, p in rows)
+    classified = sum(len(p['creates']) + len(p['filters']) for _, p in rows)
+    print('%-24s %3d   of %d forms carrying a handler — rule 1 is UNDECIDED for the rest'
+          % ('forms classified', classified, handlers))
     print('\nEach count is a WORKLIST. Batch 4 flagged three screens and all three were correct — read before\n'
           'calling anything a violation.')
     return 0

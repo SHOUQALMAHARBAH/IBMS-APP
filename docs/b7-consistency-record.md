@@ -426,6 +426,61 @@ it, and explain the design where a grant would not. `/settings/security` is a th
 nothing, because a reader who came to pair an authenticator has no reason to learn a key inventory exists.
 Choose by asking what the reader came for.
 
+## BATCH 7 — the reporting surfaces, 16 screens (2026-09-30)
+
+Rules read: **1, 3, 4, 5, 7.**
+
+`dashboards/claims` · `dashboards/compliance` · `dashboards/executive` · `dashboards/financial` ·
+`dashboards/insurer-employee-performance` · `dashboards/policy` · `dashboards/sales` ·
+`employee-performance` · `financial-report` · `insurer-performance` · `kpi-dashboard` ·
+`planning-export` · `portfolio-analysis` · `profitability-analysis` · `sales-performance` · `sla-dashboard`
+
+These are the screens batch 1 claimed and never recorded. Reading them makes that coverage checkable.
+
+| Rule | Result |
+|---|---|
+| **1** | **CLEAN.** Four flag on the coarse first-form-vs-first-table rule and all four are the rendering-helper class (`dashboards/claims`, `/compliance`, `/financial`, `planning-export` — their first table sits inside a helper defined above `export default`). Two more needed a judgement, below. |
+| **3** | **CLEAN on all 16** — every one has all four states, which is what a reporting surface most easily lacks. |
+| **4** | Clean; the shared sentence and the load-error guard cover it. |
+| **5** | **CLEAN.** |
+| **7** | **CLEAN**, with two judgements recorded below. |
+
+### The rule-1 judgement: an ACTION that appends to a history is not a create form
+
+`employee-performance` and `insurer-performance` each put an `onCompute` form ("Compute now") BELOW a table
+headed "History". Read rather than counted, and recorded as **not violations**:
+
+  * the table is a record of past computations, not a list the form maintains;
+  * "Compute now" is an action on the report, closer to the dashboards' own controls than to a create form;
+  * **the two screens agree with each other**, which is what rules 1 and 7 are ultimately for.
+
+### THE DETECTOR CLASSIFIES 33 OF 77 FORMS, and now says so
+
+Found while checking whether the create-vs-filter rule from batch 6 actually covered this batch. It did not:
+
+    forms in the app carrying an onSubmit handler   77
+    classified by the create/filter patterns        33   (22 before this batch widened them)
+
+**The two violations batch 6 found happened to use `onCreate` and `onRecordTraining` — that is luck, not
+coverage.** The residue is mostly a bare `submit` (14 screens) or an inline arrow calling it, which carries no
+information about the form's kind at all.
+
+So `four-states.py` now prints `(unclassified form — rule 1 UNDECIDED here)` per screen and a coverage line,
+because **a zero with 55 unclassified forms behind it is not a clean result, it is an unmeasured one.** 26
+screens are undecided by the script; 16 of those have been read by hand in batches 4–6 and rule 1 is decided
+for them by the reading. Ten remain, two of which are this batch's `onCompute` pair — judged above. The other
+eight fall to batches 8 and 9, and they are now NAMED rather than silently absent.
+
+### Two vocabulary judgements
+
+  * **"Pick an employee or a branch above."** `Pick` reads against the glossary's *search / find* row until
+    you read that row: it governs **finding a named thing to attach to a record** — the `EntitySearch`
+    control. Choosing from a closed `<select>` is not that. Three screens use `Pick` for exactly this and
+    they agree, so rule 7 is satisfied rather than violated.
+  * **"Cancelled policies" / "Cancelled at"** on `dashboards/policy` is the cancellation ENDORSEMENT, the
+    domain act the glossary already protects when it explains why the withdraw concept could not use «إلغاء».
+    Correct as written.
+
 ---
 
 ## Not yet surveyed
@@ -439,8 +494,8 @@ need no per-batch sweep. Rule 4's permission half is structural for all 102 as w
 renders one sentence from `lib/i18n/permission-refusal.ts` that names the grantor — and its load-error half
 is guarded by `scripts/measurements/load-error-way-forward.py`.
 
-What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batches 4, 5 and 6 (20 + 23 + 17)
-are listed above by name — 60 of 102 covered with a checkable list.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
+What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batches 4, 5, 6 and 7 (20 + 23 + 17 + 16)
+are listed above by name — 76 of 102 covered with a checkable list.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
 substantiated — batch 5 onwards names its screens in this file, which is the only form of that claim anybody
 can check.
 
