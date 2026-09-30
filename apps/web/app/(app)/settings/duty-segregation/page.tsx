@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { permissionRefusalAnyOf } from '../../../../lib/i18n/permission-refusal';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   declareDutySegregationMode,
@@ -67,7 +68,21 @@ export default function DutySegregationPage() {
     } catch (err) {
       setView(null);
       setLoadError(
-        err instanceof ApiError ? err.message : t('dutyModeLoadError'),
+        // THE ONLY SCREEN IN THE APP WITHOUT A 403 BRANCH, found in batch 6. The nav entry is gated on
+        // either code, so the eight roles holding neither never see the link — but a reader who types the
+        // URL got the API's own English message, which is written for the caller and names no way forward.
+        //
+        // `anyOf`, because the READ genuinely accepts either code: this is the one place `PermissionsGuard`'s
+        // OR semantics are what you want, and telling a Compliance Officer they need the DECLARE permission
+        // would send them to ask for the control this screen deliberately withholds from them.
+        err instanceof ApiError && err.status === 403
+          ? permissionRefusalAnyOf(t, 'dutyModeRefusalAct', [
+              'duty-segregation.mode.declare',
+              'internal-controls.view',
+            ])
+          : err instanceof ApiError
+            ? err.message
+            : t('dutyModeLoadError'),
       );
     }
   }, [t]);

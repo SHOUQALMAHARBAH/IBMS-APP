@@ -100,6 +100,7 @@ export const COMMON = {
     dutyModeDeclareButton: 'إعلان الوضع',
     dutyModeWorkingButton: 'جارٍ الحفظ…',
     dutyModeLoadError: 'تعذّر تحميل وضع الفصل بين المهام. حاول مرة أخرى.',
+    dutyModeRefusalAct: 'الاطلاع على كيفية فصل المهام في هذا المكتب',
     dutyModeSaveError: 'تعذّر إعلان الوضع. حاول مرة أخرى.',
     dutyModeReadOnly:
       'لديك صلاحية الاطلاع على هذا الوضع دون تغييره. من يعلن الوضع ليس من يراجع الأعمال التي يسمح بها.',
@@ -195,6 +196,7 @@ export const COMMON = {
     dutyModeDeclareButton: 'Declare setting',
     dutyModeWorkingButton: 'Saving…',
     dutyModeLoadError: 'Could not load the separation-of-duties setting. Try again.',
+    dutyModeRefusalAct: 'view how this office separates duties',
     dutyModeSaveError: 'Could not declare the setting. Try again.',
     dutyModeReadOnly:
       'You can see this setting but not change it. Whoever declares it is not whoever reviews the acts it permits.',

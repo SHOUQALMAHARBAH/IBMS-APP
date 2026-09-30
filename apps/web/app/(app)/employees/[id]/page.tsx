@@ -439,6 +439,27 @@ export default function EmployeeDetailPage() {
 
           <section style={sectionStyle}>
             <h2>{t('empdTrainingHeading')}</h2>
+            <form onSubmit={onRecordTraining} style={formStyle}>
+              <h3>{t('empdAssignTrainingHeading')}</h3>
+              <label style={labelStyle}>
+                {t('empdTrainingName')}
+                <input
+                  value={trainingName}
+                  onChange={(e) => setTrainingName(e.target.value)}
+                  required
+                />
+              </label>
+              <label style={labelStyle}>
+                {t('empdTrainingDueDate')}
+                <input
+                  type="date"
+                  value={trainingDueAt}
+                  onChange={(e) => setTrainingDueAt(e.target.value)}
+                />
+              </label>
+              <button type="submit">{t('empdAssignButton')}</button>
+            </form>
+
             {employee.trainings.length === 0 ? (
               <p style={{ color: 'var(--ink-secondary)' }}>{t('empdNoTraining')}</p>
             ) : (
@@ -470,26 +491,6 @@ export default function EmployeeDetailPage() {
               </table>
             )}
 
-            <form onSubmit={onRecordTraining} style={formStyle}>
-              <h3>{t('empdAssignTrainingHeading')}</h3>
-              <label style={labelStyle}>
-                {t('empdTrainingName')}
-                <input
-                  value={trainingName}
-                  onChange={(e) => setTrainingName(e.target.value)}
-                  required
-                />
-              </label>
-              <label style={labelStyle}>
-                {t('empdTrainingDueDate')}
-                <input
-                  type="date"
-                  value={trainingDueAt}
-                  onChange={(e) => setTrainingDueAt(e.target.value)}
-                />
-              </label>
-              <button type="submit">{t('empdAssignButton')}</button>
-            </form>
           </section>
 
           {employee.deprovisioningChecklist ? (

@@ -24,6 +24,17 @@ something, and the first two are why the header is this long:
      correct. This script now follows local component imports one level deep, which fixes the count but
      does NOT make it reliable: a state two components down is still invisible.
 
+  4. **A FILTER FORM ABOVE THE TABLE MASKS A CREATE FORM BELOW IT** — batch 6, and the only one of these
+     that hid REAL violations rather than producing noise. The formal pass reported rule 1 as *0 violations*
+     while `/vendors` had `onSearchSubmit` above the list and `onCreate` below it, and `/employees/[id]` had
+     its training table above the form that records a training. A first-form-vs-first-table comparison is
+     satisfied by the filter form, so the create form's position is never examined.
+
+     The pass had documented "a filter form was mistaken for a create form" as a FALSE-POSITIVE class and
+     corrected for it. That correction is what created this blind spot: telling the two apart stopped the
+     noise and also stopped the check looking at the one that matters. Both are found now by comparing
+     CREATE-form offsets against table offsets separately, keyed on the submit handler's name.
+
 **So a flag here is a worklist row, not a finding.** A detail page has no "empty"; a create-only screen has
 no table; a read-only screen has no form. None of those is a violation.
 
@@ -44,6 +55,14 @@ ERROR = re.compile(r'\b\w*(?:[Ee]rror|[Ff]ailed)\b\s*\?|\{\s*\w*(?:[Ee]rror|[Ff]
 REFUSAL = re.compile(r'permissionRefusal(?:AnyOf|AllOf)?\(')
 FORM = re.compile(r'<form\b')
 TABLE = re.compile(r'<table\b')
+# A CREATE form, told apart from a FILTER form by its submit handler. This is the fifth false-positive class
+# the formal pass documented — "a filter form was mistaken for a create form" — and correcting for it is what
+# hid two REAL violations: a filter form above the table satisfied a first-form-vs-first-table comparison
+# while the create form sat below the list. `/vendors` (onSearchSubmit above, onCreate below) and
+# `/employees/[id]` (the training table above, onRecordTraining below) were both inside a pass that reported
+# rule 1 as 0 violations.
+CREATE_FORM = re.compile(r'<form[^>]*onSubmit=\{(on(?:Create|Add|Record|Submit|Save|Register|Log|Raise)\w*)\}')
+FILTER_FORM = re.compile(r'<form[^>]*onSubmit=\{(on(?:Search|Filter|Browse|Query|Lookup)\w*)\}')
 # Local component imports, so a state rendered by a child is seen. One level only, deliberately: following
 # the whole tree turns this into a bundler and the extra depth has not been needed.
 IMPORT = re.compile(r"import\s*\{[^}]*\}\s*from\s*'((?:\.\.?/)[^']+)'")
@@ -82,6 +101,8 @@ def probe(page_src, child_src):
         # Rule 1 is about the PAGE's own layout, so offsets come from the page file alone.
         'forms': [page_src[:m.start()].count('\n') + 1 for m in FORM.finditer(page_src)],
         'tables': [page_src[:m.start()].count('\n') + 1 for m in TABLE.finditer(page_src)],
+        'creates': [page_src[:m.start()].count('\n') + 1 for m in CREATE_FORM.finditer(page_src)],
+        'filters': [page_src[:m.start()].count('\n') + 1 for m in FILTER_FORM.finditer(page_src)],
     }
 
 
@@ -109,6 +130,11 @@ def main():
             pairs = 'forms %s | tables %s' % (p['forms'] or '-', p['tables'] or '-')
             if p['forms'] and p['tables'] and min(p['forms']) > min(p['tables']):
                 pairs += '   <-- first form below first table: READ IT'
+            # THE MASKED CASE, and the one that matters most: a CREATE form below a table, where a FILTER
+            # form above it made the comparison on the line above pass. Two screens were wrong this way
+            # inside a pass that reported rule 1 as 0 violations.
+            elif p['creates'] and p['tables'] and min(p['creates']) > min(p['tables']):
+                pairs += '   <-- CREATE form below a table, filter form above it: READ IT'
         print(header % (rel,
                         'y' if p['loading'] else '.',
                         'y' if p['empty'] else '.',

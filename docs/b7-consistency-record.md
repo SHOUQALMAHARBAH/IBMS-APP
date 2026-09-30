@@ -330,6 +330,102 @@ known, recorded exception ("which business function owns this", not "who may do 
 `needs-assessments/[id]`'s `isPlacement` is `hasPermission(user, 'program.assemble')` — correctly
 permission-based, just named after a role, which is where somebody later "simplifies" it into a role check.
 
+## BATCH 6 — the administration surface, 17 screens (2026-09-30)
+
+Rules read: **1, 3, 4, 5, 7.**
+
+`bcp-dr-plans` · `documents` · `employees` · `employees/[id]` · `employees/reveal` · `information-assets` ·
+`knowledge-base` · `settings/customer-import` · `settings/duty-segregation` · `settings/email` ·
+`settings/insurance-lines` · `settings/org-units` · `settings/roles` · `settings/security` ·
+`settings/users` · `vendors` · `vendors/[id]`
+
+| Rule | Result |
+|---|---|
+| **1** — create form above its table | **TWO REAL VIOLATIONS, fixed** — and rule 1 had been reported as *0 violations* by the formal pass. Details below. |
+| **3** — four states | **One real gap, fixed** (`settings/duty-segregation`). `settings/security`'s absent refusal is the recorded deliberate one; `vendors/[id]` has no empty state and is a detail page. |
+| **4** — refusal names the way forward | Closed by the same fix. |
+| **5** — delete means deactivate | **CLEAN.** |
+| **7** — one action, one name | **CLEAN.** |
+
+### RULE 1 WAS NOT CLEAN, and the reason is that the pass corrected for the right thing
+
+The formal pass reported **34 comply, 67 n/a, 0 violations**. Two screens were wrong:
+
+    /vendors           onSearchSubmit at 121, TABLE at 149, onCreate at 197
+    /employees/[id]    training H2 at 441, TABLE at 445, onRecordTraining at 473
+
+**The pass had documented "a filter form was mistaken for a create form" as a false-positive class and
+corrected for it. That correction is what created the blind spot.** Once a filter form is no longer counted
+as a create form, a first-form-vs-first-table comparison is *satisfied* by the filter form sitting above the
+list — and the create form below it is never examined. Telling the two apart stopped the noise and also
+stopped the check looking at the case that matters.
+
+Both fixed by moving the create form above its own table, which is what the pass did for its own four
+(`/employees`, `/knowledge-base`, `/information-assets`, `/bcp-dr-plans`). `/vendors` was not among them.
+
+`four-states.py` now compares CREATE-form offsets against table offsets separately, keyed on the submit
+handler's name. Swept over all 102: **no other screen has this shape.** Seven screens still flag on the
+coarse first-form-vs-first-table rule and all seven are the rendering-helper class — `audit-trail`, three
+dashboards, `regulatory-compliance`, `settings/roles`, and `planning-export`, whose first table is inside a
+helper and whose `onGenerate` form sits above the results table it produces.
+
+### RULE 3 — the only screen in the app with no 403 branch
+
+`settings/duty-segregation` did `setLoadError(err instanceof ApiError ? err.message : …)` with no permission
+case, so a reader got the API's own English message — written for the caller, naming no way forward.
+
+Measured before calling it live, per § 1.61's discipline:
+
+    duty-segregation.mode.declare   OFFICE_ADMINISTRATOR alone
+    internal-controls.view          COMPLIANCE, EXECUTIVE, EXTERNAL_AUDITOR
+
+Eight of twelve roles hold neither, and the nav entry is gated on both (OR), so the state is reached by
+typing the URL — rarer, not acceptable. Fixed with `permissionRefusalAnyOf`, because the READ genuinely
+accepts either code: this is the one place `PermissionsGuard`'s OR semantics are what you want, and telling a
+Compliance Officer they need the DECLARE permission would send them to ask for the one control this screen
+deliberately withholds from them.
+
+### A SECOND KIND OF THIRD STATE, and it must not be replaced by the shared sentence
+
+The same screen already handled the reader who can SEE the mode but not declare it, and it does something
+better than refusing:
+
+> "You can see this setting but not change it. **Whoever declares it is not whoever reviews the acts it
+> permits.**"
+
+That explains the DESIGN rather than naming a missing grant — and the design is the segregation principle one
+level up, applied to the control that weakens a control. Replacing it with "you do not hold permission to …
+— ask whoever manages permissions in your office" would be a downgrade: the reader is not missing a grant
+somebody could give them, they are on the wrong side of a deliberate split.
+
+### A GUARD THAT WAS MEASURED AND DELIBERATELY NOT BUILT
+
+The `settings/duty-segregation` fix was planted — disabling the 403 branch — and **all eleven unit guards
+still passed**, which establishes that nothing checks for a missing 403 branch. So the next question is
+whether one can be pinned, and it was measured rather than assumed:
+
+    screens that catch an ApiError and report it   98
+    of those, NO 403 branch                        8   and all 8 are CORRECT
+
+    claims/[id]  leads/[id]  policies/[id]     the standing 404 exception — a 403 would disclose the record
+    settings/security                          deliberately ungated, or ten roles can never enrol in MFA
+    settings/customer-import  settings/email
+    settings/insurance-lines  settings/org-units    refuse CLIENT-SIDE, before the call is made
+
+**A "must have a 403 branch" guard would therefore be eight false positives on its first run** — the
+cry-wolf direction, which gets a check switched off rather than fixed. Not built, and the reason is recorded
+here so nobody re-derives it. What IS guarded covers the same class from the other side: every code named in
+a refusal must exist, no act key may be rendered outside the shared sentence, and every load-error message
+must name a way forward.
+
+The four client-side refusals are a latent inconsistency rather than a defect: if a server gate ever moves
+away from the code the screen checks, the reader gets the API's raw message. Recorded, not changed.
+
+**So rule 3's third state has two legitimate forms:** name the missing permission where a grant would fix
+it, and explain the design where a grant would not. `/settings/security` is a third case again — it renders
+nothing, because a reader who came to pair an authenticator has no reason to learn a key inventory exists.
+Choose by asking what the reader came for.
+
 ---
 
 ## Not yet surveyed
@@ -343,8 +439,8 @@ need no per-batch sweep. Rule 4's permission half is structural for all 102 as w
 renders one sentence from `lib/i18n/permission-refusal.ts` that names the grantor — and its load-error half
 is guarded by `scripts/measurements/load-error-way-forward.py`.
 
-What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batch 4's 20 and batch 5's 23
-are listed above by name — 43 of 102 covered with a checkable list.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
+What remains per-batch is rules 1, 3, 5 and 7, which need a screen read. **Batches 4, 5 and 6 (20 + 23 + 17)
+are listed above by name — 60 of 102 covered with a checkable list.** Coverage before batch 4 was reported in conversation and never written here, so it cannot be
 substantiated — batch 5 onwards names its screens in this file, which is the only form of that claim anybody
 can check.
 
@@ -362,7 +458,7 @@ the first result.** A survey that guesses at rule 4 is worse than one that decla
 
 | Rule | Decidable from source? | Result |
 |---|---|---|
-| 1 · create form above the table | **yes** | **CLEAN** — 34 comply, 67 n/a, 0 violations. Four were found and fixed; two more were flagged and are correct |
+| 1 · create form above the table | **yes** | ~~**CLEAN** — 34 comply, 67 n/a, 0 violations~~ — **NOT CLEAN, corrected by BATCH 6**, which found two: `/vendors` and `/employees/[id]`. This pass could not see them *because* it correctly stopped counting a filter form as a create form — once it does that, a filter form above the list satisfies the check and the create form below is never examined. Four were found and fixed here; two more were flagged and are correct |
 | 2 · no field asks for an identifier | no | a label reading "Entity id" is greppable, but whether a RENDERED value is an identifier needs the data shape, not the markup. Two known open cases already in the table above |
 | 3 · no screen leaves a person facing nothing | **partly** | 80 of 103 branch on all three non-data states. 23 flagged, and the majority are n/a — see below |
 | 4 · every refusal names the way forward | no | requires reading the sentence |
