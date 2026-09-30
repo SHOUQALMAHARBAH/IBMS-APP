@@ -70,7 +70,9 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
           key={program.id}
           type="button"
           style={programListCardStyle}
-          aria-label={t('iprogOpenProgramAria', { id: program.id })}
+          aria-label={t('iprogOpenProgramAria', {
+            at: formatDate(program.createdAt, language),
+          })}
           onClick={() => router.push(`/insurance-programs/${program.id}`)}
         >
           <strong>

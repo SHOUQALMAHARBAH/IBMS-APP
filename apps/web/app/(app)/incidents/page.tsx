@@ -460,7 +460,7 @@ export default function IncidentsPage() {
                       {canContain && inc.status === "RECOVERED" ? (
                         <div style={{ display: "flex", gap: "0.3rem" }}>
                           <input
-                            aria-label={t("incRootCauseAria", { id: inc.id })}
+                            aria-label={t("incRootCauseAria")}
                             placeholder={t("incRootCauseLabel")}
                             value={rootCauseDrafts[inc.id] ?? ""}
                             onChange={(e) =>

@@ -38,7 +38,7 @@ export const COMPLAINTS = {
     // Row actions
     complaintsDownloadAckButton: 'تنزيل إشعار الاستلام (PDF)',
     complaintsTextPlaceholder: 'معرّف المُسنَد إليه / الإجراء / الحل / السبب',
-    complaintsTextAria: 'نص الشكوى {id}',
+    complaintsTextAria: 'نص الشكوى',
     complaintsAssignButton: 'إسناد',
     complaintsStartButton: 'بدء المعالجة',
     complaintsAddActionButton: 'إضافة إجراء',
@@ -91,7 +91,7 @@ export const COMPLAINTS = {
 
     complaintsDownloadAckButton: 'Download acknowledgement (PDF)',
     complaintsTextPlaceholder: 'assignee id / action / resolution / reason',
-    complaintsTextAria: 'Text for {id}',
+    complaintsTextAria: 'Complaint text',
     complaintsAssignButton: 'Assign',
     complaintsStartButton: 'Start',
     complaintsAddActionButton: 'Add action',

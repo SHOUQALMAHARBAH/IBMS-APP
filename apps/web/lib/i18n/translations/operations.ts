@@ -344,7 +344,7 @@ export const OPERATIONS = {
     iprogLoadError: 'تعذّر تحميل برامج التأمين — حاول مرة أخرى.',
     iprogNoPermission: 'لا تملك صلاحية program.read اللازمة لعرض برامج التأمين.',
     iprogNoneForCustomer: 'لا يوجد برنامج تأمين لهذا العميل بعد — جمِّع واحداً من تقييم احتياجات معتمد.',
-    iprogOpenProgramAria: 'فتح برنامج التأمين {id}',
+    iprogOpenProgramAria: 'فتح برنامج التأمين المُجمَّع في {at}',
 
     // ---- Needs assessments (#5) --------------------------------------------------------------------
     naHeading: 'تقييمات الاحتياجات',
@@ -352,7 +352,7 @@ export const OPERATIONS = {
     naNone: 'لا توجد تقييمات احتياجات بعد.',
     naLoadError: 'تعذّر تحميل تقييمات الاحتياجات — حاول مرة أخرى.',
     naNoPermission: 'لا تملك صلاحية needs-assessment.read اللازمة لعرض تقييمات الاحتياجات.',
-    naViewAssessmentAria: 'عرض تقييم الاحتياجات {id}',
+    naViewAssessmentAria: 'عرض تقييم الاحتياجات المُسجَّل في {at}',
 
     // ---- Prospects (#2) -----------------------------------------------------------------------------
     prosHeading: 'العملاء المرتقبون',
@@ -959,14 +959,14 @@ export const OPERATIONS = {
     iprogLoadError: 'Could not load insurance programs — try again.',
     iprogNoPermission: "You don't hold the program.read permission.",
     iprogNoneForCustomer: 'No insurance program yet for this customer — assemble one from an approved needs assessment.',
-    iprogOpenProgramAria: 'Open insurance program {id}',
+    iprogOpenProgramAria: 'Open the insurance program assembled on {at}',
 
     naHeading: 'Needs assessments',
     naLoading: 'Loading…',
     naNone: 'No needs assessments yet.',
     naLoadError: 'Could not load needs assessments — try again.',
     naNoPermission: "You don't hold the needs-assessment.read permission.",
-    naViewAssessmentAria: 'View needs assessment {id}',
+    naViewAssessmentAria: 'View the needs assessment recorded on {at}',
 
     prosHeading: 'Prospects',
     prosLoading: 'Loading…',

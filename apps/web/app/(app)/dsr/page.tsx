@@ -227,7 +227,7 @@ export default function DsrPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '18rem' }}>
                           {canHandle ? (
                             <input
-                              aria-label={t('dsrTextAria', { id: d.id })}
+                              aria-label={t('dsrTextAria')}
                               placeholder={t('dsrTextPlaceholder')}
                               value={text[d.id] ?? ''}
                               onChange={(e) => setVal(d.id, e.target.value)}
@@ -235,7 +235,7 @@ export default function DsrPage() {
                           ) : null}
                           {canHandle && d.status === 'IN_PROGRESS' ? (
                             <input
-                              aria-label={t('dsrRetentionRefAria', { id: d.id })}
+                              aria-label={t('dsrRetentionRefAria')}
                               placeholder={t('dsrRetentionRefPlaceholder')}
                               value={reference[d.id] ?? ''}
                               onChange={(e) => setRef(d.id, e.target.value)}
@@ -245,7 +245,7 @@ export default function DsrPage() {
                             <label style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                               <input
                                 type="checkbox"
-                                aria-label={t('dsrNoRetentionHoldAria', { id: d.id })}
+                                aria-label={t('dsrNoRetentionHoldAria')}
                                 checked={confirmNoHold[d.id] ?? false}
                                 onChange={(e) =>
                                   setConfirmNoHold((c) => ({

@@ -89,11 +89,17 @@ describe('every screen speaks both languages (rule 6)', () => {
  * `t('claimsDetailHeading', { name: … ?? claim.id.slice(0, 8) })`. Rule 6's guard reported that screen
  * clean, correctly, and rule 2 had nothing looking at it at all — it had only ever been swept by hand.
  *
- * The threshold is CURRENT, not zero: 44 sites exist and each needs a decision about what identifies that
- * record to a person, several needing a name the API does not yet return. So this pins the count so it
- * cannot GROW while those are settled, and the number comes down as they are.
+ * The threshold is CURRENT, not zero. 16 sites were display-only and are fixed; **29 remain**, and each
+ * needs a decision about what identifies that record to a person — several need a name the API does not
+ * return, two record types (an opportunity, a needs assessment) have NO NAME AT ALL, and one is a privacy
+ * decision. That is broker question 16, so the 29 are deferred rather than pending.
+ *
+ * 44 minus 16 is 28, and the real number is 29: a SIXTH blind spot in the detector was hiding one, and it
+ * was introduced by a REFORMAT — prettier wrapped a line and `{r.entityId}` moved to a JSX-text position
+ * the rule did not recognise. The violation never changed; only its formatting did. So this budget pins
+ * what the detector can currently see, which is not the same as what exists.
  */
-const RENDERED_IDENTIFIER_BUDGET = 44;
+const RENDERED_IDENTIFIER_BUDGET = 29;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

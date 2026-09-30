@@ -25,7 +25,9 @@ import { EntitySearch } from '../../../components/ui/EntitySearch';
  * That order is roughly "what happened to a record" before "what happened to a session", which is how
  * somebody scanning the list thinks about it; sorting it would interleave `LOGIN_FAILED` with `EXPORT`.
  */
-const AUDIT_ACTION_OPTIONS = Object.keys(ENUM_LABEL.AuditAction) as AuditAction[];
+const AUDIT_ACTION_OPTIONS = Object.keys(
+  ENUM_LABEL.AuditAction,
+) as AuditAction[];
 
 interface BrowseFilters {
   userId?: string;
@@ -58,11 +60,24 @@ const cell: CSSProperties = {
   textAlign: 'start',
   verticalAlign: 'top',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: '2px solid var(--border-default)',
+};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const formStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '0.75rem 0' };
+const formStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.5rem',
+  margin: '0.75rem 0',
+};
 
-function messageFor(err: unknown, noPermission: string, fallback: string): string {
+function messageFor(
+  err: unknown,
+  noPermission: string,
+  fallback: string,
+): string {
   return err instanceof ApiError && err.status === 403
     ? noPermission
     : err instanceof ApiError
@@ -94,10 +109,13 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
           ) : (
             rows.map((r) => (
               <tr key={r.id}>
-                <td style={cell}>{r.occurredAt.replace('T', ' ').slice(0, 19)}</td>
+                <td style={cell}>
+                  {r.occurredAt.replace('T', ' ').slice(0, 19)}
+                </td>
                 <td style={cell}>{t(ENUM_LABEL.AuditAction[r.action])}</td>
                 <td style={cell}>
-                  {r.entityType} <span style={{ opacity: 0.7 }}>· {r.entityId}</span>
+                  {r.entityType}{' '}
+                  <span style={{ opacity: 0.7 }}>· {r.entityId}</span>
                 </td>
                 <td style={cell} data-audit-actor={r.userId}>
                   {/*
@@ -107,11 +125,20 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                     audit trail exists for, who is being asked to review who did what. The name is
                     resolved per page by the API.
 
-                    The fallback is defence, not a state reachable today: `userId` is NOT NULL and the
-                    actor FK is ON DELETE RESTRICT, so an actor cannot be deleted out from under their
-                    rows. If that ever changes, this cell shows the id rather than reading as "nobody".
+                    ~~The fallback is defence, not a state reachable today~~ — THE FALLBACK IS GONE, and
+                    the FK argument in it was only half the story. `userId` is NOT NULL with ON DELETE
+                    RESTRICT, so an actor cannot be deleted out from under their rows — true, and it was
+                    never the way `actorName` could be null. TWO of the three api paths that build this
+                    view (`documentHistory`, `workflowHistory`) passed NO name map at all, so every row
+                    they produced had a null name. This comment could say "unreachable" truthfully only
+                    because the BROWSE path — the one this table uses — happened to resolve them.
+
+                    All three paths now resolve through one `actorNames()` helper, so the null is
+                    structurally impossible rather than accidentally absent, and a `?? id` branch here
+                    would be dead code that displays a uuid. See
+                    `scripts/measurements/rendered-identifiers.py` on that class.
                   */}
-                  <bdi>{r.actorName ?? r.userId}</bdi>
+                  <bdi>{r.actorName}</bdi>
                 </td>
                 <td style={cell}>{r.isSensitiveDataAccess ? 'Yes' : ''}</td>
               </tr>
@@ -208,7 +235,13 @@ export default function AuditTrailPage() {
       setBrowsePage(result.page);
     } catch (err) {
       setBrowseRows(null);
-      setBrowseError(messageFor(err, t('atNoPermissionFor', { permission: 'audit-log.read' }), t('atLogLoadError')));
+      setBrowseError(
+        messageFor(
+          err,
+          t('atNoPermissionFor', { permission: 'audit-log.read' }),
+          t('atLogLoadError'),
+        ),
+      );
     } finally {
       setBrowseBusy(false);
     }
@@ -222,7 +255,13 @@ export default function AuditTrailPage() {
       setWfRows(await getWorkflowHistory(wfEntityType, wfEntityId));
     } catch (err) {
       setWfRows(null);
-      setWfError(messageFor(err, t('atNoPermissionFor', { permission: 'workflow-history.read' }), t('atWorkflowLoadError')));
+      setWfError(
+        messageFor(
+          err,
+          t('atNoPermissionFor', { permission: 'workflow-history.read' }),
+          t('atWorkflowLoadError'),
+        ),
+      );
     } finally {
       setWfBusy(false);
     }
@@ -236,7 +275,13 @@ export default function AuditTrailPage() {
       setDocHistory(await getDocumentHistory(documentId));
     } catch (err) {
       setDocHistory(null);
-      setDocError(messageFor(err, t('atNoPermissionFor', { permission: 'document-history.read' }), t('atDocumentLoadError')));
+      setDocError(
+        messageFor(
+          err,
+          t('atNoPermissionFor', { permission: 'document-history.read' }),
+          t('atDocumentLoadError'),
+        ),
+      );
     } finally {
       setDocBusy(false);
     }
@@ -247,9 +292,7 @@ export default function AuditTrailPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('atHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('atIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('atIntro')}</p>
 
       <section style={sectionStyle}>
         <h2>{t('atAuditLogHeading')}</h2>
@@ -422,8 +465,12 @@ export default function AuditTrailPage() {
                         {v.isRequestedVersion ? ' (requested)' : ''}
                       </td>
                       <td style={cell}>{v.fileName}</td>
-                      <td style={cell}>{t(ENUM_LABEL.DocumentCategory[v.category])}</td>
-                      <td style={cell}>{t(ENUM_LABEL.DataClassification[v.classification])}</td>
+                      <td style={cell}>
+                        {t(ENUM_LABEL.DocumentCategory[v.category])}
+                      </td>
+                      <td style={cell}>
+                        {t(ENUM_LABEL.DataClassification[v.classification])}
+                      </td>
                       <td style={cell}>{v.uploadedByUserId}</td>
                       <td style={cell}>{v.createdAt.slice(0, 10)}</td>
                     </tr>

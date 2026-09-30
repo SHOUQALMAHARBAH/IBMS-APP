@@ -238,7 +238,7 @@ export default function BankReconciliationPage() {
                             </button>
                           ) : null}
                           <input
-                            aria-label={t('brResolutionNoteRowAria', { id: r.id })}
+                            aria-label={t('brResolutionNoteRowAria')}
                             placeholder={t('brResolutionNoteAria')}
                             value={notes[r.id] ?? ''}
                             onChange={(e) =>
@@ -246,7 +246,7 @@ export default function BankReconciliationPage() {
                             }
                           />
                           <select
-                            aria-label={t('brResumeInvoiceRowAria', { id: r.id })}
+                            aria-label={t('brResumeInvoiceRowAria')}
                             value={resumes[r.id] ?? ''}
                             onChange={(e) =>
                               setResumes((s) => ({

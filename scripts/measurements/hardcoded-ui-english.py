@@ -19,6 +19,28 @@ sweep that misses violations reports a screen as clean.
 So the scan is here, with a self-test whose cases are those three real misses rather than invented ones.
 `--self-test` is what makes a future refinement provable rather than hopeful.
 
+## WHAT A ZERO FROM THIS SCRIPT MEANS, AND WHAT IT DOES NOT
+
+**Zero means zero of what this detector can see.** FIVE blind spots were found during one sweep, and
+every single one was found by READING a screen for some other reason — none by the guard, and none by
+reasoning about the patterns:
+
+    1  a date inside a template literal            (compliance dashboard)
+    2  prose on a line that also calls t()         (insurance-programs/new)
+    3  prose after a backtick                      (risk-profiles)
+    4  LOWERCASE prose, which no capital-initial rule can see
+    5  a ONE-WORD label before a colon             (13 strings on 8 screens, while this read 0/102)
+
+Number 5 is the one to keep in mind: this script reported **0 across 102 screens** while thirteen
+violations stood, including a third miss on a screen already reported clean twice.
+
+**So this guard PREVENTS REGRESSION; it does not PROVE COMPLIANCE.** Nobody knows whether there is a
+sixth blind spot. A reader who takes "0/102" as "there are none" is building on something that was not
+measured — the honest reading is "none of the five known shapes remain".
+
+If you find a sixth: add the pattern, add its real case to `--self-test` (never an invented one), and add
+a line above. The list getting longer is the point.
+
 Run:  python scripts/measurements/hardcoded-ui-english.py [<screen-glob> ...]
       python scripts/measurements/hardcoded-ui-english.py --self-test
 """

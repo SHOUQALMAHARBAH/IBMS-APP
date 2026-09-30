@@ -127,9 +127,7 @@ export default function InternalControlsPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('icHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('icIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('icIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -159,7 +157,10 @@ export default function InternalControlsPage() {
         ) : null}
         {declared ? (
           <>
-            <p data-testid="declared-office-mode" style={{ margin: '0.4rem 0' }}>
+            <p
+              data-testid="declared-office-mode"
+              style={{ margin: '0.4rem 0' }}
+            >
               {declared.office.mode === 'COMBINED'
                 ? t('icDeclaredOfficeCombined')
                 : t('icDeclaredOfficeSegregated')}{' '}
@@ -178,7 +179,9 @@ export default function InternalControlsPage() {
               <p data-testid="declared-empty">{t('icDeclaredEmpty')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '48rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={leftHead}>{t('icDeclaredColWhen')}</th>
@@ -208,7 +211,16 @@ export default function InternalControlsPage() {
                           {formatDateTime(row.at, language)}
                         </td>
                         <td style={leftCell}>
-                          {row.actorName ?? row.actorUserId}
+                          {/*
+                            No `?? id` fallback. `CombinedDutyAct.actor` is a REQUIRED relation, so
+                            Prisma's default `onDelete: Restrict` applies and the actor cannot be deleted
+                            out from under an act — and the single path that builds this row resolves every
+                            distinct actor on the page. So the null branch is structurally impossible, and
+                            a fallback for it would be dead code that displays a uuid: it never renders, so
+                            nobody reads it, so nobody notices what it shows. Third instance of that class
+                            — see `scripts/measurements/rendered-identifiers.py`.
+                          */}
+                          {row.actorName}
                         </td>
                         <td style={leftCell}>
                           {row.entity} · <code>{row.pair}</code>
@@ -225,7 +237,12 @@ export default function InternalControlsPage() {
                   </tbody>
                 </table>
                 {declared.truncated ? (
-                  <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
+                  <p
+                    style={{
+                      color: 'var(--ink-secondary)',
+                      fontSize: '0.85rem',
+                    }}
+                  >
                     {t('icDeclaredTruncated')}
                   </p>
                 ) : null}
@@ -242,15 +259,22 @@ export default function InternalControlsPage() {
           <section style={sectionStyle}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               <Stat label={t('icPairsScanned')} value={report.pairsScanned} />
-              <Stat label={t('icColRowsChecked')} value={report.totalRowsChecked} />
+              <Stat
+                label={t('icColRowsChecked')}
+                value={report.totalRowsChecked}
+              />
               <Stat
                 label={t('icColViolations')}
-                value={
-                  violationCount === 0 ? 'None' : String(violationCount)
-                }
+                value={violationCount === 0 ? 'None' : String(violationCount)}
               />
             </div>
-            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <p
+              style={{
+                color: 'var(--ink-secondary)',
+                fontSize: '0.85rem',
+                marginTop: '0.5rem',
+              }}
+            >
               Generated {report.generatedAt.replace('T', ' ').slice(0, 16)}.
             </p>
           </section>
@@ -263,11 +287,11 @@ export default function InternalControlsPage() {
 
           {violationCount > 0 ? (
             <section style={sectionStyle}>
-              <h2 style={{ color: '#b91c1c' }}>
-                {t('icViolationsHeading')}
-              </h2>
+              <h2 style={{ color: '#b91c1c' }}>{t('icViolationsHeading')}</h2>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+                <table
+                  style={{ borderCollapse: 'collapse', minWidth: '48rem' }}
+                >
                   <thead>
                     <tr>
                       <th style={leftHead}>{t('icColEntity')}</th>

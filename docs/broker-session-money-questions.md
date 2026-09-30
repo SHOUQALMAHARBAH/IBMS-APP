@@ -261,3 +261,46 @@ NULL and restoring an optional field is one migration, and the display question 
 with a readable label rather than the uuid it used to show.
 
 Raised from measurement 2026-09-29 (item 5 batch 2).
+
+### ١٦. بماذا تسمّي هذه الأشياء عندما تتحدّث عنها؟ / What do you CALL these things when you talk about them?
+
+**ليس سؤالًا عن المال — مُدرَج هنا لأن جلسته هي الفرصة، ولأن جوابه يحسم ٢٨ موضعًا في الواجهة.**
+
+**ما الذي يقرره / What it decides.** Twenty-eight places in the interface identify a record to a person by
+a **uuid** — `3f8a1c2b…` in a table cell, a page heading, or an accessible name. Measured 2026-09-30 by
+`scripts/measurements/rendered-identifiers.py`; the other sixteen were display-only and are fixed.
+
+**Why this is a question and not a field addition.** It would be easy to read this as "add a `customerName`
+to eleven payloads and be done". Two of the record types **have no name at all**, and nobody has decided
+what they are called:
+
+  * an **OPPORTUNITY** — `/opportunities` and `/opportunities/[id]` both head the record with
+    `{opportunity.id.slice(0, 8)}`. It has a customer, a programme and a status, and no name.
+  * a **NEEDS ASSESSMENT** — the same, on `/insurance-programs/[id]`.
+
+**So the question is what a person SAYS, not which column to add.** When he refers to a live piece of new
+business on the phone, does he say the client's name? the line and the client? a reference number his
+office assigns? If his office gives these things numbers, that is a field and a format. If he says
+"the Rawabi renewal", the display is the customer plus the line and there is no number to add.
+
+**Building first means inventing a naming convention and then discovering he uses another** — and the
+convention would be baked into twenty-eight screens by then.
+
+**What the answer has to cover**, because these are the sites waiting on it:
+
+| Record | Where it is shown as a uuid |
+|---|---|
+| a customer | 6 screens — communications, complaints, feedback, retention-cases, service-requests, transaction-monitoring. **Zero of eleven payloads carry a customer name today** |
+| a user (an actor, an uploader, an approver, an owner) | audit-trail, cross-border-transfers, information-assets, internal-controls |
+| an insurer / an employee | two dashboards and planning-export |
+| an opportunity | `/opportunities`, `/opportunities/[id]` — **no name exists** |
+| a needs assessment | `/insurance-programs/[id]` — **no name exists** |
+| a policy with no number yet | `/dashboards/policy` — the fallback is reachable before issuance |
+| a retention schedule item, an insured person | `/retention-disposal` — and the insured person is also a PRIVACY decision about whose name belongs on a disposal screen |
+| a polymorphic audit entity | `/audit-trail` — resolving a name per `entityType` is a design problem, not a field |
+
+**Nothing is being built before his answer.** `apps/web/test/screen-copy.test.ts` pins the count at 28 so
+it cannot grow, and fails if it drops without the budget coming down — so the deferral is enforced rather
+than remembered.
+
+Raised from measurement 2026-09-30 (item 5 batch 3).

@@ -119,9 +119,9 @@ export const PDPL = {
     dsrTypeCorrection: 'تصحيح',
     dsrTypeDeletion: 'حذف',
     dsrTypeObjection: 'اعتراض',
-    dsrTextAria: 'النص لـ {id}',
-    dsrRetentionRefAria: 'مرجع جدول الاحتفاظ لـ {id}',
-    dsrNoRetentionHoldAria: 'لا يوجد تعليق احتفاظ مفتوح لـ {id}',
+    dsrTextAria: 'نص الطلب',
+    dsrRetentionRefAria: 'مرجع جدول الاستبقاء',
+    dsrNoRetentionHoldAria: 'لا يوجد حجز استبقاء مفتوح',
 
     // ---- Retention & Disposal (M06) -------------------------------------
     rdHeading: 'الاحتفاظ والإتلاف',
@@ -188,7 +188,7 @@ export const PDPL = {
     rdHoldCustomerIdAria: 'معرّف العميل للحجز القانوني',
     rdHoldInsuredPersonIdAria: 'معرّف الشخص المؤمَّن عليه للحجز القانوني',
     rdMonthsAria: 'عدد الأشهر لـ {name}',
-    rdDestructionMethodAria: 'طريقة الإتلاف لـ {id}',
+    rdDestructionMethodAria: 'طريقة الإتلاف',
 
     // ---- Cross-border transfer (M07) ------------------------------------
     cbtHeading: 'النقل عبر الحدود',
@@ -447,9 +447,9 @@ export const PDPL = {
     dsrTypeCorrection: 'Correction',
     dsrTypeDeletion: 'Deletion',
     dsrTypeObjection: 'Objection',
-    dsrTextAria: 'Text for {id}',
-    dsrRetentionRefAria: 'Retention schedule reference for {id}',
-    dsrNoRetentionHoldAria: 'No open retention hold for {id}',
+    dsrTextAria: 'Request text',
+    dsrRetentionRefAria: 'Retention schedule reference',
+    dsrNoRetentionHoldAria: 'No open retention hold',
 
     rdHeading: 'Retention & Disposal',
     rdIntro:
@@ -512,7 +512,7 @@ export const PDPL = {
     rdHoldCustomerIdAria: 'Legal hold customer ID',
     rdHoldInsuredPersonIdAria: 'Legal hold insured person ID',
     rdMonthsAria: 'Months for {name}',
-    rdDestructionMethodAria: 'Destruction method for {id}',
+    rdDestructionMethodAria: 'Destruction method',
 
     cbtHeading: 'Cross-Border Transfer',
     cbtIntro:

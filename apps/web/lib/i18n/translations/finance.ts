@@ -139,8 +139,8 @@ export const FINANCE = {
     brNoPermission: 'لا تملك صلاحية reconciliation-exception.investigate اللازمة لعرض هذه الشاشة.',
     brStatusReconciled: 'مُسوّاة',
     brResumeInvoiceAs: 'استئناف الفاتورة كـ…',
-    brResolutionNoteRowAria: 'ملاحظة الإغلاق لـ {id}',
-    brResumeInvoiceRowAria: 'استئناف الفاتورة كـ لـ {id}',
+    brResolutionNoteRowAria: 'ملاحظة المعالجة',
+    brResumeInvoiceRowAria: 'رقم الفاتورة لإعادة الربط',
     brDetectReconciled: '{count} مُسوّاة',
 
     // ---- Financial report (#40) ------------------------------------------
@@ -310,8 +310,8 @@ export const FINANCE = {
     brNoPermission: "You don't hold the reconciliation-exception.investigate permission.",
     brStatusReconciled: 'Reconciled',
     brResumeInvoiceAs: 'Resume invoice as…',
-    brResolutionNoteRowAria: 'Resolution note for {id}',
-    brResumeInvoiceRowAria: 'Resume invoice as for {id}',
+    brResolutionNoteRowAria: 'Resolution note',
+    brResumeInvoiceRowAria: 'Invoice to resume as',
     brDetectReconciled: '{count} reconciled',
 
     frHeading: 'Financial report',

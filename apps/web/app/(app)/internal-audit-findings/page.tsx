@@ -173,7 +173,7 @@ export default function InternalAuditFindingsPage() {
                       {canRecord && f.status === 'open' ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
-                            aria-label={t('iafRemediationActionAria', { id: f.id })}
+                            aria-label={t('iafRemediationActionAria')}
                             placeholder={t('iafRemediationActionLabel')}
                             value={remediationDrafts[f.id] ?? ''}
                             onChange={(e) =>

@@ -546,7 +546,7 @@ export default function RetentionDisposalPage() {
                             {canApprove && b.status === 'DPO_APPROVED' ? (
                               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                                 <select
-                                  aria-label={t('rdDestructionMethodAria', { id: b.id })}
+                                  aria-label={t('rdDestructionMethodAria')}
                                   value={method}
                                   onChange={(e) => setMethod(e.target.value)}
                                 >

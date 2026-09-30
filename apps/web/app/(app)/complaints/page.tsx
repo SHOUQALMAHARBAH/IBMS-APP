@@ -322,7 +322,7 @@ export default function ComplaintsPage() {
                           }}
                         >
                           <input
-                            aria-label={t("complaintsTextAria", { id: c.id })}
+                            aria-label={t("complaintsTextAria")}
                             placeholder={t("complaintsTextPlaceholder")}
                             dir="auto"
                             value={text[c.id] ?? ""}

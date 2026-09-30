@@ -85,7 +85,9 @@ export default function NeedsAssessmentsPage() {
                   width: '100%',
                   cursor: 'pointer',
                 }}
-                aria-label={t('naViewAssessmentAria', { id: assessment.id })}
+                aria-label={t('naViewAssessmentAria', {
+                  at: formatDate(assessment.createdAt, language),
+                })}
                 onClick={() =>
                   router.push(`/needs-assessments/${assessment.id}`)
                 }

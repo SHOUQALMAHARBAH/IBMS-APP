@@ -104,16 +104,7 @@ export class AuditTrailService {
       this.repo.countAuditLog(filter),
     ]);
 
-    // One lookup for the whole page, keyed on the DISTINCT actors in it — never one per row. A page of
-    // 50 rows written by one person is one id, and this is the read that turns a column of uuids into a
-    // column of names.
-    const distinctActors = [...new Set(rows.map((r) => r.userId))];
-    const names = new Map(
-      (await this.users.findSummariesByIds(distinctActors)).map((u) => [
-        u.id,
-        u.fullName,
-      ]),
-    );
+    const names = await this.actorNames(rows);
 
     await this.recordReadBestEffort(
       'AuditLogEntry',
@@ -172,10 +163,13 @@ export class AuditTrailService {
       actorUserId,
     );
 
+    const docNames = await this.actorNames(auditRows);
     return {
       requestedDocumentId: documentId,
       versions,
-      auditTrail: auditRows.map((row) => deriveAuditLogEntryView(row)),
+      auditTrail: auditRows.map((row) =>
+        deriveAuditLogEntryView(row, docNames),
+      ),
     };
   }
 
@@ -200,7 +194,8 @@ export class AuditTrailService {
       actorUserId,
     );
 
-    return rows.map((row) => deriveAuditLogEntryView(row));
+    const names = await this.actorNames(rows);
+    return rows.map((row) => deriveAuditLogEntryView(row, names));
   }
 
   private warnIfTruncated(loaded: number, view: string): void {
@@ -232,5 +227,29 @@ export class AuditTrailService {
         `Audit trail READ row (${entityType}/${entityId}) did not write: ${(err as Error).message}`,
       );
     }
+  }
+  /**
+   * The actor ids on a page of audit rows, resolved to names in ONE lookup.
+   *
+   * Extracted because TWO of the three paths that build an audit view did not call it — `documentHistory`
+   * and `workflowHistory` both passed no map, so every `actorName` they produced was null and any screen
+   * rendering one would have shown a uuid. The browse path resolved names and the other two did not, which
+   * is why `/audit-trail`'s own comment could truthfully say the fallback was unreachable: it was, FOR
+   * THAT CONSUMER. A second consumer would have found it live.
+   *
+   * Keyed on the DISTINCT actors — never one lookup per row. A page of 50 rows written by one person is
+   * one id.
+   */
+  private async actorNames(
+    rows: { userId: string }[],
+  ): Promise<Map<string, string>> {
+    const distinct = [...new Set(rows.map((r) => r.userId))];
+    if (distinct.length === 0) return new Map();
+    return new Map(
+      (await this.users.findSummariesByIds(distinct)).map((u) => [
+        u.id,
+        u.fullName,
+      ]),
+    );
   }
 }
