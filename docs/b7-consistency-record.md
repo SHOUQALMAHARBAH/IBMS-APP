@@ -9,6 +9,17 @@ that B.7 becomes reading a list somebody already holds rather than reading 93 sc
 
 One line per violation: screen · rule · what is wrong. Add to it as you go. Do not tidy it.
 
+**THE SWEEP IS COMPLETE as of 2026-09-30 — batches 4 through 9 name all 102 screens** (the "93" above is
+stale and so was every other count in this file before that date). Rules 1, 3, 5 and 7 are CLOSED; rules 2,
+4 and 6 are GUARDED app-wide by `apps/web/test/screen-copy.test.ts`. The coverage claim is checkable:
+`python scripts/measurements/b7-coverage.py` exits non-zero if any screen is unnamed. **Read the table at the
+end of batch 9 for what is and is not claimed** — three rules are guarded rather than proven, and the guard
+for rule 6 has six recorded blind spots.
+
+Batches 1-3 reported their coverage in conversation and never wrote it here, which is why the sweep's own
+first finding was that its denominator could not be substantiated. From batch 4 onward a screen is covered
+when a row in this file says so, and not before.
+
 ---
 
 ## The seven rules
@@ -736,10 +747,25 @@ the judgement.
 never used is a real, different act the glossary explicitly allows, and removing a grant is not
 deactivation.
 
-### What the pass did NOT do
+### What the pass did NOT do — ALL OF IT IS NOW DONE, and two of its own claims were wrong
 
-Rules 2, 4, 6 and 7 are **not measured and not claimed**. They need 103 screens read, which is the
-remaining work, and the four categories above say what reading them is for. The value delivered here is
-that rule 1 is now provably clean, rule 5 is clean with its one judgement recorded, rule 3 has its 23
-flags triaged into n/a and a nine-screen read list, and the survey is repeatable with five false-positive
-classes already paid for.
+Written 2026-09-26 and true then: *"Rules 2, 4, 6 and 7 are not measured and not claimed. They need 103
+screens read, which is the remaining work."* Corrected 2026-09-30 rather than deleted, because the statement
+of what was missing is what made the sweep possible:
+
+  * **rule 2** is guarded app-wide with a ratcheting budget (28 sites deferred to broker question 16);
+  * **rule 4** is structural for permissions — one sentence, 102 act keys, 106 call sites — and guarded for
+    load errors at 109 of 109;
+  * **rule 6** is guarded app-wide at 0 of 102, bounded by a detector with six recorded blind spots;
+  * **rule 7** is closed, with a 19-row glossary in which every row carries the disagreement that produced it.
+
+And the screen count is **102**, not 103.
+
+**Two claims in this pass were wrong, and both are corrected where they stand rather than here.** Rule 1's
+"0 violations" missed two, for a reason this pass itself created by correctly declining to count a filter form
+as a create form. Rule 3's clean bill was measured on whether the error BRANCH exists, not on whether its
+message tells the reader anything to do — the second half of that state had never been looked at, and five
+messages stopped at the failure.
+
+What this pass got right and what still stands: the decision to declare four rules UNMEASURED rather than
+guess at them. A survey that says what it did not look at is what the later batches were able to build on.
