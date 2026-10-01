@@ -1,0 +1,32 @@
+{
+  "search-runs-below-the-floor": {
+    "file": "apps/web/components/ui/EntitySearch.tsx",
+    "from": "  const pastFloor = trimmed.length >= source.minChars;",
+    "to": "  const pastFloor = trimmed.length >= 0;",
+    "why": "The three-character floor is removed, so the field searches on one character AND on an empty term — which returns a page of the customer book before anybody has typed, the exact state the previous two-field version was in. `entity-search.spec.ts` 'sends NOTHING before three characters, and nothing at all on an empty query' must die on the mount assertion, naming a search that happened before any keystroke. This is condition 1 and condition 3 together: an empty term is below every floor, so one plant kills both."
+  },
+  "field-reaches-the-unfiltered-list": {
+    "file": "apps/web/lib/customer/customer-api.ts",
+    "from": "  return apiGet(`/customers/search?q=${encodeURIComponent(term)}`);",
+    "to": "  return apiGet(`/customers?search=${encodeURIComponent(term)}`);",
+    "why": "The field goes back to the LIST route, which has an unfiltered mode, no floor, no result bound and no audit row — so every one of the four conditions is defeated at once while the screen looks identical. 'sends NOTHING before three characters' must die on `listCalls`, which is routed separately in the spec for exactly this: without that second route the list call would 404 in the background and the only symptom would be an empty dropdown. This is the plant for the whole point of the second route existing."
+  },
+  "chosen-customer-displays-its-identifier": {
+    "file": "apps/web/components/ui/EntitySearch.tsx",
+    "from": "  const shown = selected ? selected.name : term;",
+    "to": "  const shown = selected ? (selected.detail ?? []).filter((p) => typeof p === 'string').join(' ') || selected.name : term;",
+    "why": "The chosen customer displays its REGISTRATION NUMBER instead of its name — the owner's third requirement inverted, and the way this change would have reopened rule 2 (an identifier rendered at a reader) one keystroke after fixing the usability. 'finds a company by its REGISTRATION NUMBER, and still shows the name once chosen' must die on the final assertion, with the field holding REG-2 where the company's name belongs."
+  },
+  "keyboard-cannot-reach-the-list": {
+    "file": "apps/web/components/ui/EntitySearch.tsx",
+    "from": "    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {",
+    "to": "    if (false) {",
+    "why": "Arrow keys stop moving through the options. The field still WORKS with a mouse and looks correct, which is why this needs a test rather than a review: a combobox is the easiest control in a UI to make unreachable, and giving up the native `<select>` gave up the arrow-key handling it carried for free. 'is driveable by KEYBOARD alone' must die on the ArrowDown assertion. The a11y suite does NOT catch this — axe checks roles and labels, not whether a key does anything."
+  },
+  "a-failed-search-reads-as-nobody-matching": {
+    "file": "apps/web/components/ui/EntitySearch.tsx",
+    "from": "          setResults(null);\n          setError(t(source.error));",
+    "to": "          setResults([]);\n          setError(t(source.error));",
+    "why": "THE REAL DEFECT THIS CAUGHT, replanted. `[]` is how 'nobody by that name' is represented, so setting it on a failure makes the field say the search failed AND that no customer matches — a server fault reading as a customer who does not exist. 'says the search FAILED, rather than reading as nobody matching' must die in `expectNone`, which is why that assertion is anchored on the error element: without the anchor it would pass on a field that rendered neither sentence."
+  }
+}

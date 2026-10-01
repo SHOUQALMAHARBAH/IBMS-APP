@@ -2,16 +2,31 @@ import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
 /*
- * The picker that replaced ten raw customer-UUID fields.
+ * THE ONE FIELD, on a second screen and in both languages.
  *
- * What matters here is that a person can find a customer by NAME — the field
- * used to demand a UUID, which nobody knows, so filling it in meant opening
- * another screen and copying one out of the address bar.
+ * Named after `CustomerPicker`, which is long deleted. Kept under that name because what it holds in
+ * place is the same promise the picker was built for: a person finds a customer by NAME, where the field
+ * used to demand a uuid nobody knows.
  *
- * Also proves the search actually reaches the server with `?search=`, since
- * the endpoint behind it is what supplies the bilingual and transliteration
- * matching ("Ahmad" finds "أحمد") — that behaviour is the api's own e2e to
- * prove, not this one's.
+ * What this file covers that `entity-search.spec.ts` does not, which is why both exist:
+ *
+ *   1. A SECOND CALL SITE. `entity-search.spec.ts` drives `/dsr`; this drives `/service-requests`. One
+ *      component on eleven screens is a claim that needs more than one of them exercised.
+ *   2. ARABIC. The field, its placeholder and its result list in the reader's own script and direction —
+ *      and this platform is Arabic-first, so an English-only spec proves the less important half.
+ *   3. The screenshot evidence captures (Part F item #8), theme × language.
+ *
+ * ## It was REWRITTEN on 2026-10-01, and CI is what found it
+ *
+ * It tested the two-field design — a search box labelled "Find a customer" and a separate `<select>`
+ * labelled "Customer" — which the owner's one-field decision removed. My scope search for that change
+ * looked for `EntitySearch` USAGES and never for specs asserting the UI it renders, so a targeted local
+ * run of `entity-search` alone was green while this file was broken.
+ *
+ * It also found a real defect rather than only a stale test: the listbox carried the FIELD's label, so
+ * `getByLabel('Customer', { exact: true })` matched two elements. That is a strict-mode violation in a
+ * test and an ambiguity for a screen reader, which would announce the input and its results by the same
+ * name. The listbox has its own label now.
  */
 
 const ROLES = ["CUSTOMER_SERVICE_OFFICER", "BRANCH_DEPARTMENT_MANAGER"];
@@ -31,29 +46,17 @@ const me = (languagePreference: "AR" | "EN") => ({
   stepUpFresh: true,
 });
 
-const customer = (id: string, legalName: string) => ({
+/** The narrow row `GET /customers/search` returns — not a full customer. */
+const row = (id: string, legalName: string) => ({
   id,
-  prospectId: null,
-  customerType: "CORPORATE",
   legalName,
-  givenName: null,
-  fatherName: null,
-  grandfatherName: null,
-  familyName: null,
-  dateOfBirth: null,
-  nationality: null,
+  customerType: "CORPORATE",
+  status: "ACTIVE",
   registrationNumber: `REG-${id}`,
   taxRegistrationNumber: null,
-  registeredAddress: null,
-  natureOfBusiness: null,
-  languagePreference: "EN",
-  status: "ACTIVE",
-  ownerUserId: "user-1",
-  createdAt: "2026-08-26T00:00:00.000Z",
-  updatedAt: "2026-08-26T00:00:00.000Z",
 });
 
-const ALL = [customer("cust-1", "Al-Ufuq Trading Co."), customer("cust-2", "Sara Odeh")];
+const ALL = [row("cust-1", "Al-Ufuq Trading Co."), row("cust-2", "Sara Odeh")];
 
 async function open(
   page: Page,
@@ -70,18 +73,25 @@ async function open(
   await page.route("**/auth/me", (route) =>
     route.fulfill({ status: 200, json: me(lang) }),
   );
-  // Registered BEFORE goto: the picker fetches on mount, so a route added
-  // afterwards would miss that first call and leave the select empty.
-  await page.route("http://localhost:4000/customers**", (route) => {
+  // The SEARCH route. Registered before `goto` as before, though the reason changed: the field no
+  // longer fetches on mount — it fetches on the third character — so this is about not racing the
+  // first keystroke rather than about not missing a mount request.
+  await page.route("http://localhost:4000/customers/search**", (route) => {
     const url = new URL(route.request().url());
     seen.push(url.search);
-    const term = url.searchParams.get("search");
-    const items = term
-      ? ALL.filter((c) => c.legalName.includes(term))
-      : ALL;
+    const term = url.searchParams.get("q") ?? "";
+    const items = ALL.filter((c) =>
+      c.legalName.toLowerCase().includes(term.toLowerCase()),
+    );
+    return route.fulfill({ status: 200, json: items });
+  });
+  // The LIST route, which this field must never reach. Routed separately so reaching it is a visible
+  // event rather than a 404 in the background whose only symptom is an empty dropdown.
+  await page.route("http://localhost:4000/customers?**", (route) => {
+    seen.push(`LIST${url(route.request().url())}`);
     return route.fulfill({
       status: 200,
-      json: { items, total: items.length, page: 0, pageSize: 50 },
+      json: { items: [], total: 0, page: 0, pageSize: 50 },
     });
   });
   await page.route("http://localhost:4000/service-requests**", (route) =>
@@ -90,37 +100,53 @@ async function open(
   await page.goto("/service-requests");
 }
 
+function url(full: string): string {
+  return new URL(full).search;
+}
+
 test("finds a customer by name and selects it, without anyone typing a UUID", async ({
   page,
 }) => {
   const seen: string[] = [];
   await open(page, "EN", seen);
 
-  const select = page.getByLabel("Customer", { exact: true });
-  await expect(select).toBeVisible();
-  // Both customers are offered before any search: for most books the first
-  // page IS the whole list, so the field is usable without typing.
-  await expect(select.locator("option")).toHaveCount(3); // 2 + the placeholder
+  const field = page.getByLabel("Customer", { exact: true });
+  await expect(field).toBeVisible();
 
-  await page.getByLabel("Find a customer").fill("Sara");
-  await page.getByRole("button", { name: "Search" }).click();
+  // NOTHING IS OFFERED BEFORE ANYBODY TYPES. The two-field version listed the first page of the book on
+  // mount, which is what the owner's conditions 1 and 3 removed — so this assertion is the inverse of
+  // the one it replaces, and deliberately so.
+  expect(seen).toEqual([]);
+  await expect(page.locator('[data-entity-search-list="customer"]')).toBeHidden();
 
-  await expect(select.locator("option")).toHaveCount(2);
-  expect(seen.at(-1)).toContain("search=Sara");
+  await field.fill("Sara");
+  await expect(page.locator('[data-entity-search-option="cust-2"]')).toBeVisible();
+  expect(seen.at(-1)).toContain("q=Sara");
+  // And it asked the SEARCH route, never the register.
+  expect(seen.filter((s) => s.startsWith("LIST"))).toEqual([]);
 
-  await select.selectOption("cust-2");
-  await expect(select).toHaveValue("cust-2");
+  await page.locator('[data-entity-search-option="cust-2"]').click();
+  // The NAME, not the id — the owner's third requirement.
+  await expect(field).toHaveValue("Sara Odeh");
 });
 
-test("the picker renders in Arabic", async ({ page }) => {
+test("the field renders in Arabic", async ({ page }) => {
   const seen: string[] = [];
   await open(page, "AR", seen);
 
-  await expect(page.getByLabel("ابحث عن عميل")).toBeVisible();
-  const select = page.getByLabel("العميل", { exact: true });
-  await expect(select).toBeVisible();
-  // The placeholder is the Arabic one, not a leftover English string.
-  await expect(select.locator("option").first()).toHaveText("— اختر عميلاً —");
+  // The caller's own label, in Arabic. `/service-requests` passes it, which is why this is the Arabic
+  // assertion that matters: the component's fallback label would hide a screen that forgot to translate.
+  const field = page.getByLabel("العميل", { exact: true });
+  await expect(field).toBeVisible();
+  // The placeholder tells an Arabic reader what may be typed — including a number, which is half of
+  // what this field now accepts.
+  await expect(field).toHaveAttribute("placeholder", /رقم السجل/);
+
+  await field.fill("Sara");
+  const option = page.locator('[data-entity-search-option="cust-2"]');
+  await expect(option).toBeVisible();
+  // The result list is labelled in Arabic too, and NOT by the same name as the field.
+  await expect(page.getByLabel("نتائج البحث")).toBeVisible();
 });
 
 test("says so when a name matches nothing, rather than showing an empty box", async ({
@@ -129,39 +155,46 @@ test("says so when a name matches nothing, rather than showing an empty box", as
   const seen: string[] = [];
   await open(page, "EN", seen);
 
-  await page.getByLabel("Find a customer").fill("zzz-no-such-customer");
-  await page.getByRole("button", { name: "Search" }).click();
-
-  await expect(page.getByText("No customer matches that name.")).toBeVisible();
+  await page.getByLabel("Customer", { exact: true }).fill("zzz-no-such-customer");
+  // "what you entered", not "that name" — the field matches a registration number too, and telling a
+  // clerk searching a number that no customer has that NAME is the wrong sentence.
+  await expect(page.getByText("No customer matches what you entered.")).toBeVisible();
 });
 
-test("Enter searches and does not submit the surrounding form", async ({ page }) => {
+test("Enter picks the active option and does not submit the surrounding form", async ({
+  page,
+}) => {
   const seen: string[] = [];
   await open(page, "EN", seen);
 
-  // The picker sits inside a <form>; without preventDefault, Enter in its
-  // search box would submit the request being drafted.
-  await page.getByLabel("Find a customer").fill("Sara");
-  await page.getByLabel("Find a customer").press("Enter");
+  // The field sits inside a `<form>`; without `preventDefault`, Enter would submit the request being
+  // drafted. Here Enter PICKS, so if it submitted instead the selection would never land — the
+  // assertion fails for the right reason rather than on a form the browser blocked anyway.
+  const field = page.getByLabel("Customer", { exact: true });
+  await field.fill("Sara");
+  await expect(page.locator('[data-entity-search-option="cust-2"]')).toBeVisible();
+  await field.press("Enter");
 
-  await expect
-    .poll(() => seen.at(-1) ?? "")
-    .toContain("search=Sara");
+  await expect(field).toHaveValue("Sara Odeh");
   await expect(page).toHaveURL(/\/service-requests$/);
 });
 
-// Evidence captures: the control replaced ten text inputs, so how it reads in
-// both themes and both languages is the thing to look at.
+// Evidence captures: the control replaced ten text inputs and then two, so how it reads in both themes
+// and both languages is the thing to look at. Captured WITH THE LIST OPEN, which is the state the
+// two-field version could not show.
 for (const theme of ["light", "dark"] as const) {
   for (const lang of ["AR", "EN"] as const) {
-    test(`customer picker — ${theme} / ${lang}`, async ({ page }) => {
+    test(`customer field — ${theme} / ${lang}`, async ({ page }) => {
       const seen: string[] = [];
       await open(page, lang, seen, theme);
-      await expect(
-        page.getByLabel(lang === "AR" ? "ابحث عن عميل" : "Find a customer"),
-      ).toBeVisible();
+      const field = page.getByLabel(lang === "AR" ? "العميل" : "Customer", {
+        exact: true,
+      });
+      await expect(field).toBeVisible();
+      await field.fill("Sara");
+      await expect(page.locator('[data-entity-search-option="cust-2"]')).toBeVisible();
       await page.screenshot({
-        path: `test-results/customer-picker/${theme}-${lang}.png`,
+        path: `test-results/customer-field/${theme}-${lang}.png`,
         fullPage: true,
       });
     });

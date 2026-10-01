@@ -307,6 +307,278 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
     }, 180_000);
   });
 
+  /** What `GET /customers/search` returns. Declared so `res.body` is not read as `any` — an untyped
+   *  body is how a response-shape change stops being checked, which is what the file's other casts
+   *  exist to prevent. */
+  interface SearchRow {
+    id: string;
+    legalName: string;
+    customerType: string;
+    status: string;
+    registrationNumber: string | null;
+    taxRegistrationNumber: string | null;
+  }
+
+  describe('GET /customers/search — the one field that finds a named customer', () => {
+    /**
+     * The owner's four anti-browsing conditions, through real HTTP. Every one is asserted on the SERVER
+     * rather than on the screen: a condition only the client enforces is a condition the next client
+     * forgets, and this field's whole risk is that it becomes a customer directory by increments.
+     */
+    it('refuses an empty term and anything below three characters, with no "list everyone" mode', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-floor',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+
+      // Condition 3 — nothing at all on an empty query. `q` is MANDATORY, so this is a 400 rather than
+      // an unfiltered page, which is the whole difference from `GET /customers`.
+      await request(app.getHttpServer())
+        .get('/customers/search')
+        .set(bearer(sales.accessToken))
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/customers/search?q=')
+        .set(bearer(sales.accessToken))
+        .expect(400);
+
+      // Condition 1 — below the floor.
+      await request(app.getHttpServer())
+        .get('/customers/search?q=ab')
+        .set(bearer(sales.accessToken))
+        .expect(400);
+
+      // AND WHITESPACE IS THE TRAP: a bare `@IsString()` accepts three spaces, which then match
+      // everything. `@Transform(trimIfString)` runs BEFORE validation, so this is a 400 and not a wide
+      // scan of the book. Asserted separately from the empty case because they reach the floor by
+      // different routes, and only one of them is obvious.
+      await request(app.getHttpServer())
+        .get('/customers/search?q=%20%20%20')
+        .set(bearer(sales.accessToken))
+        .expect(400);
+    });
+
+    it('finds a company by NAME and by REGISTRATION NUMBER, and records every search', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-find',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const reg = `RSRCH-${Date.now()}`;
+      const name = `Yarmouk Search Test ${Date.now()}`;
+
+      const created = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: name,
+          registrationNumber: reg,
+          registeredAddress: 'Amman',
+          natureOfBusiness: 'Trading',
+          contactPhone: '+962-7-9999999',
+          contactEmail: `search-${Date.now()}@example.test`,
+          languagePreference: 'AR',
+        })
+        .expect(201);
+
+      const byName = await request(app.getHttpServer())
+        .get(`/customers/search?q=${encodeURIComponent('Yarmouk Search Test')}`)
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect((byName.body as SearchRow[]).map((r) => r.id)).toContain(
+        (created.body as SearchRow).id,
+      );
+
+      // BY NUMBER — the clerk holding a document knows the number and not the spelling, which is the
+      // owner's stated reason for this half of the field.
+      const byNumber = await request(app.getHttpServer())
+        .get(`/customers/search?q=${encodeURIComponent(reg)}`)
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect((byNumber.body as SearchRow[]).map((r) => r.id)).toContain(
+        (created.body as SearchRow).id,
+      );
+
+      // The row is NARROWER than a list row: no contact fields, no screening discriminators, no owner.
+      // Asserted as an absence of each ONE AT A TIME, because a single comparison of the whole object
+      // would pass on a row carrying an extra field the moment the expected shape was widened.
+      const row = (byNumber.body as SearchRow[]).find(
+        (r) => r.id === (created.body as SearchRow).id,
+      );
+      // THROWN, not `row!`. A non-null assertion would silence the compiler and leave the six absence
+      // assertions below running against `undefined` — where every one of them PASSES, because
+      // `undefined` has no `contactPhone` either. That is the whole of this block proving nothing.
+      if (row === undefined) {
+        throw new Error(
+          'the customer just created was not in its own search results — the assertions below would pass on undefined',
+        );
+      }
+      expect(row.legalName).toBe(name);
+      expect(row.registrationNumber).toBe(reg);
+      expect(row).not.toHaveProperty('contactPhone');
+      expect(row).not.toHaveProperty('contactEmail');
+      expect(row).not.toHaveProperty('nationalId');
+      expect(row).not.toHaveProperty('nationalIdEnc');
+      expect(row).not.toHaveProperty('ownerUserId');
+      expect(row).not.toHaveProperty('dateOfBirth');
+
+      // CONDITION 4 — every search recorded, naming the term and what it matched. Scoped to this
+      // actor rather than counted globally: db-test is cumulative.
+      const compliance = await makeUser(
+        app,
+        'cust-search-audit',
+        'COMPLIANCE_OFFICER',
+      );
+      const audit = await request(app.getHttpServer())
+        .get(`/audit-trail?entityType=CustomerSearch&userId=${sales.userId}`)
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const auditBody = audit.body as {
+        items: {
+          afterValue: { term?: string } | null;
+          isSensitiveDataAccess: boolean;
+        }[];
+      };
+      const terms = auditBody.items.map((e) => e.afterValue?.term);
+      expect(terms).toContain(reg);
+      expect(auditBody.items.every((e) => e.isSensitiveDataAccess)).toBe(true);
+    });
+
+    it('CANNOT find a customer by national ID or phone — both carry a random IV per value', async () => {
+      // NOT a gap being papered over: the same national ID stored twice is two different ciphertexts,
+      // so there is no equality to test. This asserts the LIMIT so nobody later reports it as a bug and
+      // closes it by making a Highly Confidential identifier deterministically searchable, which is the
+      // decision the masked national ID exists to refuse. If this ever starts matching, that is a change
+      // to the encryption posture and has to be a decision rather than a side effect.
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-nid',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const nationalId = `9${Date.now()}`.slice(0, 10);
+      const phone = '+962-7-7654321';
+
+      const created = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'INDIVIDUAL',
+          givenName: 'Searchable',
+          familyName: 'Person',
+          nationalId,
+          contactPhone: phone,
+          contactEmail: `nid-${Date.now()}@example.test`,
+          languagePreference: 'AR',
+        })
+        .expect(201);
+
+      const byNationalId = await request(app.getHttpServer())
+        .get(`/customers/search?q=${encodeURIComponent(nationalId)}`)
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect((byNationalId.body as SearchRow[]).map((r) => r.id)).not.toContain(
+        (created.body as SearchRow).id,
+      );
+
+      const byPhone = await request(app.getHttpServer())
+        .get(`/customers/search?q=${encodeURIComponent(phone)}`)
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect((byPhone.body as SearchRow[]).map((r) => r.id)).not.toContain(
+        (created.body as SearchRow).id,
+      );
+
+      // ANCHORED: the same customer IS findable by name, so the two absences above are the encryption
+      // and not a search that returns nothing for an unrelated reason.
+      const byName = await request(app.getHttpServer())
+        .get('/customers/search?q=Searchable')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect((byName.body as SearchRow[]).map((r) => r.id)).toContain(
+        (created.body as SearchRow).id,
+      );
+    });
+
+    it('discloses no more than the list: one officer cannot find another officer customer', async () => {
+      // A search is a shortcut to the list, so it must disclose no more than the list. The owner filter
+      // sits OUTSIDE the OR in the repository for exactly this: inside it, a registration-number match
+      // would ignore it and hand over a colleague's record.
+      const app = await boot();
+      const mine = await makeUser(
+        app,
+        'cust-search-mine',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const theirs = await makeUser(
+        app,
+        'cust-search-theirs',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const reg = `XSRCH-${Date.now()}`;
+
+      const created = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(theirs.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: `Colleague Only ${Date.now()}`,
+          registrationNumber: reg,
+          registeredAddress: 'Irbid',
+          natureOfBusiness: 'Trading',
+          contactPhone: '+962-7-1112222',
+          contactEmail: `xs-${Date.now()}@example.test`,
+          languagePreference: 'AR',
+        })
+        .expect(201);
+
+      const byName = await request(app.getHttpServer())
+        .get('/customers/search?q=Colleague')
+        .set(bearer(mine.accessToken))
+        .expect(200);
+      expect((byName.body as SearchRow[]).map((r) => r.id)).not.toContain(
+        (created.body as SearchRow).id,
+      );
+
+      const byNumber = await request(app.getHttpServer())
+        .get(`/customers/search?q=${encodeURIComponent(reg)}`)
+        .set(bearer(mine.accessToken))
+        .expect(200);
+      expect((byNumber.body as SearchRow[]).map((r) => r.id)).not.toContain(
+        (created.body as SearchRow).id,
+      );
+
+      // ANCHORED on the OWNER finding it, so the two absences are the visibility rule rather than an
+      // empty index. Without this, a search broken for everybody would satisfy both assertions above.
+      const owner = await request(app.getHttpServer())
+        .get(`/customers/search?q=${encodeURIComponent(reg)}`)
+        .set(bearer(theirs.accessToken))
+        .expect(200);
+      expect((owner.body as SearchRow[]).map((r) => r.id)).toContain(
+        (created.body as SearchRow).id,
+      );
+
+      // AND a holder of the all-owners read does find it, which is the other half of the same proof.
+      const compliance = await makeUser(
+        app,
+        'cust-search-all',
+        'COMPLIANCE_OFFICER',
+      );
+      const wide = await request(app.getHttpServer())
+        .get(`/customers/search?q=${encodeURIComponent(reg)}`)
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      expect((wide.body as SearchRow[]).map((r) => r.id)).toContain(
+        (created.body as SearchRow).id,
+      );
+    });
+  });
+
   describe('POST /customers', () => {
     it('is forbidden without customer.create (e.g. a Claims Officer)', async () => {
       const app = await boot();

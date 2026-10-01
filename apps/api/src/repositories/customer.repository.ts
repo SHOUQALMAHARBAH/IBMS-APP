@@ -223,6 +223,79 @@ export class CustomerRepository {
     return rows.map((r) => r.id);
   }
 
+  /**
+   * The BOUNDED search behind `GET /customers/search` — the one field that finds a named customer.
+   *
+   * ## Three things it matches, and why the third is not the second
+   *
+   * The name, through the same bilingual full-text vector and transliteration expansion `searchIds`
+   * uses, so "Ahmad" still finds "أحمد". Then the two CLEARTEXT identifier columns a corporate record
+   * carries — the commercial registration number and the tax registration number — because a clerk
+   * holding a document knows the number and not the spelling, which is the whole case for the field.
+   *
+   * The identifier match is a PREFIX (`startsWith`), not a contains. A contains on a number turns every
+   * three-digit fragment into a wide scan of the book, which is condition 1 defeated by the thing meant
+   * to satisfy condition 1. Case-insensitive because a registration number is printed with letters in
+   * some series and nobody reads them off a document in a consistent case.
+   *
+   * ## WHAT IT CANNOT MATCH, and this is not an oversight
+   *
+   * An individual's NATIONAL ID and the contact PHONE are unreachable here. `nationalIdEnc`,
+   * `contactPhoneEnc` and `contactEmailEnc` are encrypted with a RANDOM IV PER VALUE
+   * (`randomBytes(12)`), so the same national ID stored twice is two different ciphertexts: there is no
+   * equality to test and nothing to prefix-match. Making them searchable would mean a deterministic
+   * encoding of a Highly Confidential identifier, which is the decision the masked national ID exists
+   * to refuse. So the clerk's case is served for a company and NOT for a person, and that gap is a
+   * decision for the owner rather than something to close quietly here.
+   *
+   * ## The window is REQUIRED
+   *
+   * Same argument as `findMany` above, and here it is the owner's condition 2 rather than a preference:
+   * an optional bound would let the next caller read the whole book by leaving an argument off.
+   */
+  async searchForPicker(
+    term: string,
+    take: number,
+    ownerUserId: string | undefined,
+  ): Promise<Customer[]> {
+    const terms = [term, ...expandSearchTerms(term)];
+    const nameMatches = await this.prisma.client.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Customer"
+      WHERE (${Prisma.join(
+        terms.map(
+          (t) => Prisma.sql`"searchVector" @@ (
+            websearch_to_tsquery('arabic', ${t}) ||
+            websearch_to_tsquery('english', ${t})
+          )`,
+        ),
+        ' OR ',
+      )})
+      LIMIT ${take}
+    `;
+
+    // Through the extension, NOT the raw client: this is the office-scoped read, and it is also what
+    // re-applies tenancy to the ids the raw name query returned.
+    return this.prisma.client.customer.findMany({
+      where: {
+        // The OWNER filter sits OUTSIDE the OR, deliberately. Inside it, a registration-number match
+        // would ignore it and hand a Sales officer a customer belonging to a colleague — a search that
+        // discloses more than the list it is a shortcut to. `undefined` means "every owner", which is
+        // what a holder of the all-owners read gets and nobody else.
+        ownerUserId,
+        OR: [
+          { id: { in: nameMatches.map((r) => r.id) } },
+          { registrationNumber: { startsWith: term, mode: 'insensitive' } },
+          { taxRegistrationNumber: { startsWith: term, mode: 'insensitive' } },
+        ],
+      },
+      // A TOTAL order. `legalName` alone is not one — two customers of the same name would come back in
+      // whatever order the plan chose, so which of them a bounded search truncated away would change
+      // between identical requests. Same rule as `findActiveUserIdsWithPermission`, same reason.
+      orderBy: [{ legalName: 'asc' }, { id: 'asc' }],
+      take,
+    });
+  }
+
   /** Every ACTIVE customer — used by the recurring screening batch
    * (screening-batch.scheduler.ts) to find who a "material change" rerun
    * should cover. */
