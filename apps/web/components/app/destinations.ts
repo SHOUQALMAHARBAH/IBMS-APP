@@ -95,7 +95,19 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
       // `interaction.log` and not the 360° read. `hasAnyPermission` is an OR, so this is one line.
       // Measured by `scripts/measurements/permission-reachability.py`.
       { href: '/crm', labelKey: 'navCrm', permissions: ['customer.360-view.read', 'interaction.log'] },
-      { href: '/customers/kyc-queue', labelKey: 'navKycQueue', permissions: ['customer.360-view.read'] },
+      // DEFECT 3 of `docs/kyc-path.md`. `GET /kyc-records` requires `kyc.capture` OR `kyc.approve`, and
+      // this entry asked for `customer.360-view.read` — a different code. Not broken today only by
+      // coincidence: both holders happen to hold the 360 read as well. It was wrong in BOTH directions.
+      // Too WIDE: three roles hold the 360 read and neither KYC code (Manager, Executive, external
+      // auditor), so each got a nav entry leading to a refusal. Too NARROW the moment an office defines
+      // a role holding `kyc.approve` without the 360 read, which RBAC Phase 3 made possible — the queue
+      // would be invisible to them while the API served it. A nav entry is gated on what its route
+      // requires; `hasAnyPermission` is an OR, so this is one line.
+      {
+        href: '/customers/kyc-queue',
+        labelKey: 'navKycQueue',
+        permissions: ['kyc.capture', 'kyc.approve'],
+      },
       { href: '/cross-sell', labelKey: 'navCrossSell', permissions: ['cross-sell.read'] },
       { href: '/up-sell', labelKey: 'navUpSell', permissions: ['up-sell.read'] },
     ],

@@ -150,6 +150,83 @@ describe('Notifications (e2e) — the derived notification centre', () => {
     );
   });
 
+  it('DEFECT 2 — a KYC file awaiting a decision reaches whoever may DECIDE it', async () => {
+    // `docs/kyc-path.md` defect 2, and the heavier half of the pair that left a customer NEVER
+    // ACTIVATED. The only pending-KYC source was scoped to the customer's OWNER — the Sales officer who
+    // captured the file — so a clean file waiting for approval announced itself to nobody who could
+    // approve it, and the only thing that ever summoned a Compliance Officer was a match already
+    // raised.
+    const app = await boot();
+
+    // The count BEFORE, read by the person the notification is for, so the assertion below can be a
+    // delta. See it for why a floor could not tell this count from one over already-decided files.
+    const compliance = await makeUser(
+      app,
+      'notif-kyc-comp',
+      'COMPLIANCE_OFFICER',
+    );
+    const before =
+      (await feedFor(app, compliance.accessToken)).items.find(
+        (i) => i.kind === 'kyc_awaiting_decision',
+      )?.count ?? 0;
+
+    // A Sales Officer captures a customer and submits its KYC file for review. Through real HTTP, so
+    // the count is derived from a record the application actually wrote.
+    const sales = await makeUser(
+      app,
+      'notif-kyc-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const customer = await request(app.getHttpServer())
+      .post('/customers')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerType: 'INDIVIDUAL',
+        givenName: 'Awaiting',
+        familyName: 'Decision',
+        nationalId: `${Date.now()}`.slice(0, 10),
+        contactPhone: '+962-7-5550000',
+        contactEmail: `awaiting-${Date.now()}@example.test`,
+        languagePreference: 'AR',
+      })
+      .expect(201);
+
+    const kyc = await request(app.getHttpServer())
+      .post(`/customers/${(customer.body as { id: string }).id}/kyc`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/kyc-records/${(kyc.body as { id: string }).id}/submit`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+
+    // THE COMPLIANCE OFFICER IS TOLD, and by EXACTLY ONE MORE than before this file was submitted.
+    //
+    // A DELTA, not a floor. `>= 1` was the first version and it could not observe its own claim: db-test
+    // is cumulative and already holds decided files, so a count switched to APPROVED/REJECTED still
+    // satisfied it — the plant for exactly that change killed nothing, which is how the weakness
+    // surfaced. A delta of one is true only for a count over the AWAITING set. Safe to measure this way
+    // because api e2e specs share one database and do not run concurrently.
+    const compFeed = await feedFor(app, compliance.accessToken);
+    const awaiting = compFeed.items.find(
+      (i) => i.kind === 'kyc_awaiting_decision',
+    );
+    expect(awaiting).toBeDefined();
+    expect(awaiting!.count).toBe(before + 1);
+    expect(awaiting!.href).toBe('/customers/kyc-queue');
+    expect(awaiting!.severity).toBe('action');
+
+    // AND THE SALES OFFICER IS NOT — not through this source. They keep the owner-scoped one, which
+    // tells them something true about their own book; the two answer different questions and both
+    // stand. Without this half, "add a notification" would pass by sending it to everybody.
+    const salesFeed = await feedFor(app, sales.accessToken);
+    const salesKinds = salesFeed.items.map((i) => i.kind);
+    expect(salesKinds).not.toContain('kyc_awaiting_decision');
+    // Anchored: the owner-scoped source IS in their feed, so the absence above is the permission gate
+    // rather than an empty feed. The customer they just created is PENDING_KYC and owned by them.
+    expect(salesKinds).toContain('customer_pending_kyc');
+  });
+
   it('refuses an unauthenticated caller', async () => {
     const app = await boot();
     await request(app.getHttpServer()).get('/notifications').expect(401);

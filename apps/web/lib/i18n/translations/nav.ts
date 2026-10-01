@@ -119,6 +119,7 @@ export const NAV = {
     notifScreeningMatch: 'نتائج فحص بحاجة إلى مراجعة',
     notifServiceRequestAssigned: 'طلبات خدمة مُسنَدة إليك',
     notifCustomerPendingKyc: 'عملاؤك بانتظار اعتماد اعرف عميلك',
+    notifKycAwaitingDecision: 'ملفات اعرف عميلك بانتظار قرار',
   },
   EN: {
     language: 'Language',
@@ -235,5 +236,6 @@ export const NAV = {
     notifScreeningMatch: 'Screening matches to review',
     notifServiceRequestAssigned: 'Service requests assigned to you',
     notifCustomerPendingKyc: 'Your customers awaiting KYC approval',
+    notifKycAwaitingDecision: 'KYC files awaiting a decision',
   },
 } as const;

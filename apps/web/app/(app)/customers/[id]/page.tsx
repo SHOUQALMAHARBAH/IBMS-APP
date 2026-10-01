@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -31,6 +32,11 @@ import type { TranslationKey } from '../../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../../lib/customer/customer-api';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { listKycRecords, type KycQueueRecord } from '../../../../lib/kyc/kyc-api';
+import {
+  KYC_AWAITING_DECISION,
+  KYC_STATUS_LABEL_KEY,
+} from '../../../../lib/kyc/kyc-status-labels';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -96,6 +102,10 @@ export default function CustomerProfilePage() {
   const [revealReason, setRevealReason] = useState('');
   const [revealTarget, setRevealTarget] = useState<RevealableField | null>(null);
   const [revealError, setRevealError] = useState<string | null>(null);
+  const [kyc, setKyc] = useState<KycQueueRecord | null>(null);
+  // The same codes `GET /kyc-records` requires — `PermissionsGuard` ORs them, so either is enough.
+  const canReadKyc =
+    hasPermission(user, 'kyc.capture') || hasPermission(user, 'kyc.approve');
 
   const load = useCallback(async () => {
     try {
@@ -127,6 +137,32 @@ export default function CustomerProfilePage() {
       await load();
     })();
   }, [user, load, t]);
+
+  // DEFECT 1 of `docs/kyc-path.md`. Its OWN effect rather than folded into `load()`: that read is gated
+  // on `customer.360-view.read` and this one on the KYC codes, so a reader holding the first and not the
+  // second must still get the page. Folded in, one 403 would close the whole screen — the failure
+  // `/settings/org-units` already solved by rendering the half the reader holds.
+  useEffect(() => {
+    if (!user || !canReadKyc) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const records = await listKycRecords({ customerId: params.id });
+        // The MOST RECENT file, which is what "what stage is this customer at" means. A customer can
+        // hold several over time — a rejection followed by a fresh capture, or a periodic re-review —
+        // and the api returns them newest first.
+        if (!cancelled) setKyc(records[0] ?? null);
+      } catch {
+        // Deliberately silent. The stage is a read ALONGSIDE the file, not the reason the page exists,
+        // and an error banner for it would report the customer as unloadable when the customer loaded
+        // fine. The section simply does not appear.
+        if (!cancelled) setKyc(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, canReadKyc, params.id]);
 
   async function handleReveal(field: RevealableField) {
     setRevealError(null);
@@ -184,6 +220,35 @@ export default function CustomerProfilePage() {
               status: t(STATUS_LABEL_KEY[customer.status]),
             })}
           </p>
+
+          {/* DEFECT 1 of `docs/kyc-path.md`. Directly under the customer's own status because the two
+              are halves of one fact: `PENDING_KYC` says the customer is not active, and the stage says
+              why. A reader seeing the first and not the second is the state the defect describes —
+              including the officer who has just pressed "submit for review" and is sent here. */}
+          {canReadKyc ? (
+            <p data-kyc-stage={kyc?.status ?? 'none'} style={{ opacity: 0.8 }}>
+              {kyc ? (
+                <>
+                  {t('customerKycStageLine', {
+                    stage: t(KYC_STATUS_LABEL_KEY[kyc.status]),
+                  })}
+                  {KYC_AWAITING_DECISION.includes(kyc.status) ? (
+                    <>
+                      {' '}
+                      <Link href="/customers/kyc-queue" data-kyc-queue-link="">
+                        {t('customerKycStageQueueLink')}
+                      </Link>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                /* No file at all is a real state, not an error: a customer imported from a back-book
+                   has none until somebody opens one. Saying so beats rendering nothing, which is the
+                   whole complaint. */
+                t('customerKycStageNone')
+              )}
+            </p>
+          ) : null}
 
           <ConsentCaptureWidget
             customerId={customer.id}
