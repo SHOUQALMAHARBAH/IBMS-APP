@@ -140,6 +140,27 @@ IMMEDIATELY before a pipe, which yields five cell boundaries where a row has fou
 plant that kills no test, and as the length ladder that had to grow rather than merely not clip: run
 the broken version first and watch it fail, or the proof is decoration.
 
+## A flaky test observed once, recorded rather than explained away
+
+**2026-10-01.** `permission-refusal.spec.ts:157` — *"ANY ONE of several codes — a route guard, which ORs
+them"* — failed **all three attempts** in one full web e2e run, and passed in the run before it, in the
+run after it, and 4/4 in isolation. Three readings, not one, which is what makes this a flake rather
+than a regression.
+
+Recorded because the alternative was to call it flaky on a single data point and move on, and because a
+growing flaky count is a different problem from a stable one (§ 1.47). The baseline is now **one known
+flaky test, observed once**. If it recurs, that is a trend; if a second appears, read § 1.47 before
+reaching for a timeout, because raising one is § 1.1's mistake.
+
+What it is NOT: it cannot be the one-field customer search that landed the same day. The test drives
+`/customers/kyc-queue`, which carries no customer field at all, and it passed in a full run against the
+identical component.
+
+What it has in common with the four `rfq.spec.ts` flakes § 1.47 diagnosed: **six sequential awaits
+before its first assertion**, against a 30s budget, on a machine where the full suite runs 640 tests
+across two workers. That is the shape — several interactions, one assertion at the end — and the fix
+when it recurs is to wait on each step's own settled state rather than to widen the budget.
+
 ## The standing rule for every number this file publishes
 
 > **A figure that cannot be moved by a plant is published as an ESTIMATE, and says so.**
