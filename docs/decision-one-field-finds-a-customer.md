@@ -85,17 +85,26 @@ document knows the number and not the spelling."*
 the clear, matched as a case-insensitive PREFIX (a *contains* on a number turns every three-digit
 fragment into a wide scan, which is condition 1 defeated by the thing meant to satisfy it).
 
-**NOT delivered, and not closeable here,** for an individual's national ID or anyone's phone number.
-`nationalIdEnc`, `contactPhoneEnc` and `contactEmailEnc` are encrypted with a **random IV per value**
-(`randomBytes(12)`), so the same national ID stored twice is two different ciphertexts: there is no
-equality to test and nothing to prefix-match. Making them searchable means a deterministic encoding of
-a Highly Confidential identifier — which is the decision the masked national ID exists to refuse, and
-which she confirmed as correct on the same day (item 4 of the same message).
+**WITHDRAWN** for an individual's national ID or anyone's phone number — by the owner, the same day,
+and the reasoning is the part to keep.
 
-So the clerk's case is served for a company and not for a person, **which is precisely the case she
-described**. It is an owner decision, not a technical one, and the limit is asserted by a test so that
-nobody later reports it as a bug and closes it by weakening the encryption. If that assertion ever
-starts failing, the encryption posture changed.
+Those columns are encrypted with a **random IV per value** (`randomBytes(12)`), so the same national ID
+stored twice is two different ciphertexts: there is no equality to test and nothing to prefix-match.
+Making them searchable means a **guessable encoding of a Highly Confidential field**, which is precisely
+what the masked national ID exists to refuse.
+
+**And the thing the requirement missed: the document in the clerk's hand carries the NAME too.** Nobody
+was ever blocked. The requirement was a convenience, and a convenience does not buy a weakening of that
+field's protection.
+
+So the clerk's case is served for a company and deliberately not for a person. The limit is asserted by
+a test, which now pins a DECISION rather than a pending gap — if that assertion ever starts failing, the
+encryption posture changed and that has to be a decision rather than a side effect.
+
+**A different question stayed**, and it is a need rather than a convenience: does the system prevent the
+same person being registered twice? It hits the same encrypted column and has nothing to do with search
+comfort. Measured in `docs/customer-duplicate-prevention-measured.md` — **there is no duplicate
+prevention on customers at all**, and the PDPL consequence is the heavy one.
 
 ## The chosen customer displays as a NAME
 
@@ -106,9 +115,10 @@ The field shows the name. The identifier appears only on an **option line**, whe
 companies of the same name apart — and what a person searching BY a number needs echoed back to confirm
 the right record came up.
 
-**One interaction to watch**: if the corporate identifier becomes masked and reveal-gated (the direction
-of the item-4 decision taken the same day), that option line is the ONE place it would still be rendered
-in the clear, and it would have to change with it.
+**One interaction, now SETTLED rather than watched**: the item-4 decision to mask the corporate
+identifier was reversed the same day — a company's registration number is public, so masking it is
+theatre at the cost of searching and screening on it. The option line stays exactly as it is, and it is
+no longer the loose end it was written as.
 
 ## Keyboard and a11y
 

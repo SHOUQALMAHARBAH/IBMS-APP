@@ -118,12 +118,13 @@ export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
    * transliteration expansion, so "Ahmad" finds "أحمد", plus a PREFIX match on the two cleartext
    * identifier columns — because a clerk holding a document knows the number and not the spelling.
    *
-   * IT CANNOT FIND AN INDIVIDUAL BY NATIONAL ID OR ANYONE BY PHONE, and that is not an oversight.
-   * `nationalIdEnc`, `contactPhoneEnc` and `contactEmailEnc` are encrypted with a random IV per value,
-   * so the same number stored twice is two different ciphertexts: there is nothing to match. Making
-   * them searchable would mean a deterministic encoding of a Highly Confidential identifier, which is
-   * the decision the masked national ID exists to refuse. Raised with the owner rather than closed
-   * here.
+   * IT CANNOT FIND AN INDIVIDUAL BY NATIONAL ID OR ANYONE BY PHONE, and that is a DECISION rather
+   * than an oversight or a pending gap. Those columns are encrypted with a random IV per value, so the
+   * same number stored twice is two different ciphertexts and there is nothing to match. The owner
+   * asked for the identity-number search and then withdrew the requirement: making those columns
+   * searchable means a guessable encoding of a Highly Confidential field, and the document in a
+   * clerk's hand carries the NAME too, so nobody was blocked. A convenience does not buy a weakening
+   * of that field's protection.
    *
    * The disambiguation line carries the registration number because that is what tells two companies of
    * the same name apart, and it is what a person searching BY that number needs echoed back to confirm

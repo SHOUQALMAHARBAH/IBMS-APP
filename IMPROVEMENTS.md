@@ -24,6 +24,9 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Reading "all green" off a gate that sees only workflow runs | A gate that also reads check-runs and names both passes |
 | Trusting a sweep that reported success over empty output | A non-vacuity check that aborts when rows < commits |
 | A scanner's alert list as the set of instances | Reading the line's other person-authored values |
+| Actioning a usability complaint | Measuring it — the leak was behind one |
+| Protecting a field because of its neighbour | Deriving protection from the fact it holds |
+| Searching for the component you changed | Searching for the screens, from the inventory you already hold |
 
 The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
 THE SAME, and only care separates them. Care is not a control — it is the thing that was
@@ -160,6 +163,64 @@ What it has in common with the four `rfq.spec.ts` flakes § 1.47 diagnosed: **si
 before its first assertion**, against a 30s budget, on a machine where the full suite runs 640 tests
 across two workers. That is the shape — several interactions, one assertion at the end — and the fix
 when it recurs is to wait on each step's own settled state rather than to widen the budget.
+
+## A usability complaint deserves measurement as much as a correctness complaint
+
+**2026-10-01, and this is the one to generalise from.** The owner reported a two-field customer picker
+as *"right but not practical."* A usability complaint. Measuring it rather than just actioning it found
+that the field **searched on mount with an EMPTY term**, which returns the first page of the whole
+customer book, and that **nothing recorded the search** — so opening `/complaints` listed customers
+before anybody typed.
+
+That is the customer directory her own four anti-browsing conditions exist to forbid, **already
+running**. And no automated check could have found it: the screen worked, the request succeeded, the
+result was correct, every test passed. A privacy leak was sitting behind a complaint about ergonomics.
+
+So: **a complaint about usability gets the same measurement a complaint about correctness gets.** The
+reason is structural rather than motivational — a usability complaint is a report from the one position
+no test occupies, which is a person using the thing for its purpose. "It works but it is awkward" and
+"it works and it should not" produce the same sentence from a user and are told apart only by measuring.
+
+### The three rules from the same exchange
+
+**A field's protection is derived from the nature of the fact it holds, not from sitting next to a
+sensitive field.** Two reversals in one day came from this. A corporate registration number was going to
+be masked and reveal-gated because it sits in the next column to a national ID — but it is on a public
+register, so masking it hides a number anybody can look up, at the cost of searching and screening on
+it. "Treat it the same" across two fields of different nature produces theatre at a real cost. The same
+error is available in reverse: putting that public number behind `sendIdentifiers`, a flag built to
+protect Highly Confidential identifiers, would make every default deployment screen companies by name
+alone.
+
+**When you already hold an inventory, the search runs against the inventory.** The one-field change broke
+three specs. The scope search had looked for the COMPONENT (`EntitySearch`, `entity-search`,
+`customerPickerSearch`) in the test directory and found one of them — while the eleven-screen inventory
+the change was built from had been sitting there the whole time. Grepping the e2e directory for those
+eleven ROUTES finds every spec that touches one, including
+`retention-disposal.spec.ts`, which drives the field through
+`getByLabel("Customer (optional)").selectOption(...)` and names neither the component nor its test
+hooks. The rule is not "search harder": it is that an inventory already paid for is the thing the next
+search is keyed on.
+
+**A block that reads as a thorough check and proves nothing is the most expensive kind of green**, and it
+is found by fixing things that look cosmetic. 52 api lint errors looked like formatting. Fixing them
+surfaced that `row` was possibly `undefined`, and that `row!` would have silenced it while leaving six
+`expect(row).not.toHaveProperty(...)` assertions running against `undefined` — where **every one of them
+passes**, because `undefined` has no `contactPhone` either. Six assertions reading as a careful
+narrowness check, proving nothing. `no-unsafe-member-access` on a response body is not a style rule.
+
+### And the handover sentence, kept deliberately
+
+The one-field control replaced a native `<select>` that had been chosen BECAUSE it carries ARIA roles,
+focus management and keyboard handling for free. Two a11y defects got through that handover — a listbox
+carrying the field's own label, and the field's accessible name becoming "Customer Clear" the moment
+somebody selected a customer — and **axe caught neither, passing 80/80 throughout**. Both were found by
+specs driving the control, and one of those specs was written only because CI failed.
+
+**So: the combobox in `EntitySearch.tsx` is the least-proven part of that change rather than the
+best-proven.** Said here rather than in a commit message because it is the sentence a future reader
+needs before touching it, and because an a11y suite passing is not the same claim as an a11y behaviour
+being verified.
 
 ## The standing rule for every number this file publishes
 
