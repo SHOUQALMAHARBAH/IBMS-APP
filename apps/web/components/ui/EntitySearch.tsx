@@ -354,7 +354,11 @@ export function EntitySearch({
   const showBusy = busy && pastFloor && selected === null;
   const showError = pastFloor && selected === null ? error : null;
   const showNoMatches =
-    pastFloor && selected === null && !busy && results !== null && results.length === 0;
+    pastFloor &&
+    selected === null &&
+    !busy &&
+    results !== null &&
+    results.length === 0;
   /**
    * THE CHOSEN CUSTOMER DISPLAYS AS A NAME — the owner's third requirement, and the one that would
    * quietly undo rule 2 while fixing the usability. The identifier never enters this box: it appears
@@ -406,64 +410,73 @@ export function EntitySearch({
 
   return (
     <div style={wrapStyle} data-entity-search={kind}>
-      <label style={wrapStyle}>
+      {/* THE LABEL WRAPS THE INPUT AND NOTHING ELSE, bound by `htmlFor` rather than by nesting.
+          Nesting it put the Clear button INSIDE the label, so the field's accessible name became
+          "Customer Clear" the moment somebody selected a customer — the name changing under a screen
+          reader as a side effect of choosing. CI found it through a spec I had not run; it is a real
+          defect and not a test detail, and a button inside a label is an anti-pattern besides (the
+          label's own click handler fights the button's). */}
+      <label style={{ display: 'block' }} htmlFor={`${listId}-input`}>
         {label || t(source.searchLabel)}
-        <span style={chosenStyle}>
-          <input
-            // ARIA 1.2 combobox. The native `<select>` this replaces carried all of it for free; having
-            // merged the two controls, each piece is now explicit and asserted by keyboard in
-            // `entity-search.spec.ts`.
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={
-              open && active >= 0 ? optionId(active) : undefined
-            }
-            aria-describedby={describedBy.length ? describedBy.join(' ') : undefined}
-            // `required` on the INPUT, not on a hidden mirror of the id: the browser then points its
-            // own validation message at the control a person is looking at.
-            required={required && value === ''}
-            value={shown}
-            onChange={(e) => {
-              // Typing after choosing starts a new search rather than editing the chosen name into
-              // something that no longer names the selection.
-              if (selected) {
-                setChosen(null);
-                onChange('');
-              }
-              setTerm(e.target.value);
-            }}
-            onKeyDown={onKeyDown}
-            onFocus={() => {
-              if (!selected && options.length > 0) setOpen(true);
-            }}
-            onBlur={() => {
-              // A click on an option fires blur first, so the close is deferred past the mousedown that
-              // chooses. `onMouseDown` on the option (rather than onClick) is the other half.
-              setTimeout(() => setOpen(false), 0);
-            }}
-            placeholder={t(source.placeholder)}
-            data-entity-search-term={kind}
-          />
-          {selected ? (
-            <button
-              type="button"
-              onClick={clear}
-              data-entity-search-clear={kind}
-            >
-              {t('commonClear')}
-            </button>
-          ) : null}
-        </span>
       </label>
+      <span style={chosenStyle}>
+        <input
+          id={`${listId}-input`}
+          // ARIA 1.2 combobox. The native `<select>` this replaces carried all of it for free; having
+          // merged the two controls, each piece is now explicit and asserted by keyboard in
+          // `entity-search.spec.ts`.
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            open && active >= 0 ? optionId(active) : undefined
+          }
+          aria-describedby={
+            describedBy.length ? describedBy.join(' ') : undefined
+          }
+          // `required` on the INPUT, not on a hidden mirror of the id: the browser then points its
+          // own validation message at the control a person is looking at.
+          required={required && value === ''}
+          value={shown}
+          onChange={(e) => {
+            // Typing after choosing starts a new search rather than editing the chosen name into
+            // something that no longer names the selection.
+            if (selected) {
+              setChosen(null);
+              onChange('');
+            }
+            setTerm(e.target.value);
+          }}
+          onKeyDown={onKeyDown}
+          onFocus={() => {
+            if (!selected && options.length > 0) setOpen(true);
+          }}
+          onBlur={() => {
+            // A click on an option fires blur first, so the close is deferred past the mousedown that
+            // chooses. `onMouseDown` on the option (rather than onClick) is the other half.
+            setTimeout(() => setOpen(false), 0);
+          }}
+          placeholder={t(source.placeholder)}
+          data-entity-search-term={kind}
+        />
+        {selected ? (
+          <button type="button" onClick={clear} data-entity-search-clear={kind}>
+            {t('commonClear')}
+          </button>
+        ) : null}
+      </span>
 
       {/* The listbox is always in the DOM so `aria-controls` never dangles, and is emptied rather than
           unmounted when closed — a reference to a missing id is an a11y failure axe reports. */}
       <ul
         role="listbox"
         id={listId}
-        aria-label={label || t(source.searchLabel)}
+        // ITS OWN LABEL, not the field's. Reusing the field label put two elements called "Customer"
+        // in the accessibility tree — a strict-mode violation in a test, and an ambiguity for a screen
+        // reader, which then announces the input and its result list by the same name. CI caught this
+        // on a spec I had not found; the fix is the right one either way.
+        aria-label={t('entitySearchResultsLabel')}
         style={open && options.length > 0 ? listStyle : { display: 'none' }}
         data-entity-search-list={kind}
       >
