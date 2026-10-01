@@ -10,6 +10,8 @@ import {
 import {
   Prisma,
   type Customer,
+  type CustomerStatus,
+  type CustomerType,
   type Document,
   type UltimateBeneficialOwner,
 } from '@ibms/db';
@@ -36,6 +38,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { UpdateCustomerContactDto } from './dto/update-customer-contact.dto';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
+import type { SearchCustomersDto } from './dto/search-customers.dto';
 import type { CreateUboDto } from './dto/create-ubo.dto';
 import type { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
 import type { RevealFieldDto } from './dto/reveal-field.dto';
@@ -46,6 +49,34 @@ import type { RevealFieldDto } from './dto/reveal-field.dto';
  *  is per-route. Exported for the unit-test fixture that derives an actor's
  *  permissions from their roles. */
 export const CUSTOMER_NATIONAL_ID_REVEAL = 'customer.national-id.reveal';
+
+/**
+ * The owner's condition 2 — a bounded number of results, never the whole set.
+ *
+ * Ten, against the employee search's twenty-five, and the smaller number is the point: this field
+ * completes names as somebody types, so the list is read at a glance rather than scrolled. A result set
+ * long enough to scroll is a page of the customer book, which is what the bound exists to refuse.
+ *
+ * `truncated` is reported on the audit row and to the screen, because a silently cut list reads as a
+ * complete answer — "these are the only three customers called Ahmad" when there are forty.
+ */
+export const CUSTOMER_SEARCH_MAX_RESULTS = 10;
+
+/**
+ * What a narrow customer search returns. Narrower than a list row, on purpose.
+ *
+ * No contact fields, no screening discriminators, no owner. The two identifier columns are here because
+ * they are what tells two companies of the same name apart, and they are the only customer identifiers
+ * stored in the clear — the national ID is `nationalIdEnc` and is not reachable from a search at all.
+ */
+export interface CustomerSearchResultView {
+  id: string;
+  legalName: string;
+  customerType: CustomerType;
+  status: CustomerStatus;
+  registrationNumber: string | null;
+  taxRegistrationNumber: string | null;
+}
 
 /** Masked view of a Customer's own `-- ENCRYPT` fields for the profile
  * screen (Part 10.6 — masked-by-default, full reveal only via
@@ -277,6 +308,67 @@ export class CustomerService {
    * decrypted is not a value that gets to round-trip into the response
    * either. Only the single-record profile (get()) decrypts-then-masks, and
    * only for that one record. */
+  /**
+   * The NARROW search behind `GET /customers/search` — the one field that finds a named customer.
+   *
+   * The owner's four conditions, each enforced here or in the DTO rather than in the screen, because a
+   * condition a client enforces is a condition the next client forgets:
+   *
+   *   1. nothing before three characters   `SearchCustomersDto` — mandatory `q`, trimmed, `@MinLength(3)`
+   *   2. a bounded result set              `CUSTOMER_SEARCH_MAX_RESULTS`, a required repository argument
+   *   3. nothing at all on an empty query  the same mandatory `q` — there IS no unfiltered mode
+   *   4. every search recorded             the audit row below
+   *
+   * ## The audit row is NOT best-effort
+   *
+   * Every other audit call on this service is `safeAudit`, because losing the record of a contact
+   * correction is worse than failing the correction. Here the record of who searched for whom IS the
+   * control — a field that completes customer names is closer to a directory by nature, and the record
+   * is what makes using it as one visible — so a failure to write it fails the request. Same decision as
+   * `EmployeeService.search`, same sentence.
+   *
+   * ## What it returns is narrower than the list row
+   *
+   * A name, a type, a status, and the two cleartext identifier columns. NOT the contact fields, not the
+   * screening discriminators, not the owner — a picker needs enough to tell two entries apart and
+   * nothing else, and this is reachable by every holder of `customer.read`, which is ten roles.
+   */
+  async search(
+    dto: SearchCustomersDto,
+    actor: AuthenticatedUser,
+  ): Promise<CustomerSearchResultView[]> {
+    const rows = await this.customers.searchForPicker(
+      dto.q,
+      CUSTOMER_SEARCH_MAX_RESULTS,
+      canReadAllCustomerOwners(actor) ? undefined : actor.id,
+    );
+
+    await this.audit.record({
+      userId: actor.id,
+      action: 'READ',
+      entityType: 'CustomerSearch',
+      // The actor, not a customer: this row is about a person SEARCHING, and there is no single
+      // customer it happened to. Same shape as the employee search.
+      entityId: actor.id,
+      afterValue: {
+        term: dto.q,
+        matchedCustomerIds: rows.map((r) => r.id),
+        matchCount: rows.length,
+        truncated: rows.length === CUSTOMER_SEARCH_MAX_RESULTS,
+      },
+      isSensitiveDataAccess: true,
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      legalName: r.legalName,
+      customerType: r.customerType,
+      status: r.status,
+      registrationNumber: r.registrationNumber,
+      taxRegistrationNumber: r.taxRegistrationNumber,
+    }));
+  }
+
   async list(
     query: ListCustomersQueryDto,
     actor: AuthenticatedUser,

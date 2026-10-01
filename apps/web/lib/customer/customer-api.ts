@@ -130,6 +130,36 @@ export function createCustomer(input: CreateCustomerInput): Promise<Customer> {
   return apiPost('/customers', input);
 }
 
+/**
+ * What `GET /customers/search` returns — narrower than a list row, on purpose.
+ *
+ * No contact fields and no screening discriminators: a picker needs enough to tell two entries apart
+ * and nothing more, and this endpoint is reachable by every holder of `customer.read`.
+ */
+export interface CustomerSearchResult {
+  id: string;
+  legalName: string;
+  customerType: 'INDIVIDUAL' | 'CORPORATE';
+  status: Customer['status'];
+  registrationNumber: string | null;
+  taxRegistrationNumber: string | null;
+}
+
+/**
+ * The one field that finds a named customer — NOT the list route with a filter.
+ *
+ * `q` is mandatory with a three-character floor server-side, the result is bounded at ten, and every
+ * call writes an audit row. Those are the owner's four anti-browsing conditions and they are enforced by
+ * the SERVER: this function exists so a screen cannot accidentally reach the unfiltered list instead.
+ *
+ * It matches a name, a commercial registration number or a tax registration number. It CANNOT match an
+ * individual's national ID or a phone number — both are encrypted with a random IV per value, so there
+ * is no equality to test. See `customer.repository.ts#searchForPicker`.
+ */
+export function searchCustomers(term: string): Promise<CustomerSearchResult[]> {
+  return apiGet(`/customers/search?q=${encodeURIComponent(term)}`);
+}
+
 export function listCustomers(
   filter: ListCustomersFilter = {},
 ): Promise<Paginated<Customer>> {
