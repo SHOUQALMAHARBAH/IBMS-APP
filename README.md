@@ -1517,6 +1517,49 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### OPEN — the bulk import's screen is broken, and its report has no screen at all
+
+Both introduced 2026-10-02 by Phase 2 item 1, found 2026-10-02 while preparing
+`docs/phase-2-walkthrough.md`. Recorded rather than fixed: the owner is walking Phase 2 and the system
+must not change under her.
+
+1. **`apps/web/app/(app)/settings/customer-import/page.tsx` reads two fields the API no longer sends.**
+   Item 1 replaced `rejections` and `failures` on `LegacyImportResult` with a single `issues` list plus
+   `refusedDuplicates` and `batchId`; the web side was not updated. Line 221 evaluates
+   `result.rejections.length + result.failures.length`, both now `undefined`, which throws during
+   render. **The rows import; the result panel crashes.** `apps/web/lib/customer/legacy-import-api.ts`
+   still declares the old `ImportResult` shape.
+
+   TypeScript cannot see it: the web declares its own interface over an HTTP response, and a value
+   arriving over HTTP is never checked against a declared type. **The same drift class as
+   `audit-action-parity.spec.ts` and `notification-kinds-parity.spec.ts`** — item 5 of the same pass
+   built a guard for one hand-copied list while this one shipped unguarded. A third parity guard over
+   the import's response shape would close it, and is the shape of the fix rather than a patch to line
+   221.
+
+2. **No screen calls `GET /imports/customers/batches` or `/batches/:id`.** The durable report, its
+   `batchId`, and the `DUPLICATE`-versus-`BAD_DATA` separation all exist and are proven by
+   `legacy-import-report.e2e-spec.ts` and `walkthrough-fixtures.e2e-spec.ts` over real HTTP. Nothing
+   reachable by clicking reads them, so item 1's actual deliverable — the report that tells a duplicate
+   from a typo — is a capability nobody can exercise. Same class as the routes
+   `scripts/measurements/unreachable-routes.py` measures, in work added after the last run of it.
+
+### OPEN — two import validations that differ from the single-customer route
+
+Measured 2026-10-02 by putting `docs/walkthrough/import-with-known-defects.csv` through the real
+endpoint. Neither is a crash; both are asymmetries worth a decision rather than a patch.
+
+* **A company's `nationality` is DROPPED, not refused.** `POST /customers` refuses a nationality on a
+  CORPORATE body (`CustomerTypeFieldCoherence`). The import never reaches that rule: `legacyRowAsDto`
+  builds a corporate DTO from the corporate fields only, so the column disappears before validation.
+* **The import does not validate `contactEmail` at all.** It is in
+  `LEGACY_IMPORT_UNVALIDATABLE_FIELDS`, so `not-an-email` lands in the customer record. The
+  single-customer route does validate it, which makes the import the one way a malformed address gets
+  into the book.
+
+Both are asserted as they stand in `walkthrough-fixtures.e2e-spec.ts`, so a future change to either
+fails a test that explains what the old behaviour was.
+
 ### OPEN — two typed identifiers no picker can reach
 
 Both on `/audit-trail`, and both REQUIRED, so that screen still cannot be used without
