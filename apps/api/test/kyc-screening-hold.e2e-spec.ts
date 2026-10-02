@@ -673,7 +673,11 @@ describe('Part B §12 — a subject added after screening is not a screened subj
       .send({
         customerType: 'CORPORATE',
         legalName: 'Identity Change E2E Trading LLC',
-        registrationNumber: 'CR-IDENTITY-E2E',
+        // DERIVED FROM THE RUN, not a literal. `Customer_one_company_per_registration_number`
+        // (migration 20261107100000) refuses a second company with this number in the office, so a
+        // fixed value here passed on the first run of the suite and 409'd on every run after it.
+        // db-test is cumulative; an identifying value has to come from the run.
+        registrationNumber: `CR-IDENTITY-E2E-${Date.now()}${Math.floor(Math.random() * 1000)}`,
         registeredAddress: 'Amman',
         natureOfBusiness: 'Trading',
         contactPhone: '+962-7-9000-0000',

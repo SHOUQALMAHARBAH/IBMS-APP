@@ -1,0 +1,26 @@
+{
+  "warning-does-not-replace-the-submit-button": {
+    "file": "apps/web/components/customer/CustomerOnboardingWizard.tsx",
+    "from": "          ) : (\n            <button type=\"submit\" disabled={isSubmitting} style={buttonStyle}>\n              {isSubmitting ? t('customerWizardCreatingButton') : t('customerWizardCreateButton')}\n            </button>\n          )}",
+    "to": "          ) : null}\n          {duplicateMatches !== undefined ? (\n            <button type=\"submit\" disabled={isSubmitting} style={buttonStyle}>\n              {isSubmitting ? t('customerWizardCreatingButton') : t('customerWizardCreateButton')}\n            </button>\n          ) : null}",
+    "why": "Leaves 'Create customer & start KYC' live BESIDE the warning, which is the realistic regression — somebody adds the warning as an extra panel and leaves the button where it was. The warning still renders and still names the match, so every assertion except the absence one passes; `warns about an existing customer with the same name` dies on `toHaveCount(0)`. That assertion is the one that distinguishes a warning from a warning that can be clicked past."
+  },
+  "create-drops-the-officers-answer": {
+    "file": "apps/web/components/customer/CustomerOnboardingWizard.tsx",
+    "from": "        duplicateNameSamePerson: answer?.samePerson,",
+    "to": "        duplicateNameSamePerson: undefined,",
+    "why": "The create still succeeds and the officer still reaches the documents step, so the feature LOOKS correct — and the measurement behind the deferred layer-2 decision is empty. `'a different person' creates the customer and sends the officer's answer` dies; nothing else does."
+  },
+  "abandoned-create-is-not-recorded": {
+    "file": "apps/web/components/customer/CustomerOnboardingWizard.tsx",
+    "from": "      await recordAbandonedDuplicate({\n        legalName: duplicateName,\n        matchCount: matches.length,\n      });",
+    "to": "      await Promise.resolve();",
+    "why": "The screen behaves identically — no customer is created and the officer is told so — while the one outcome the warning exists to produce goes unrecorded. The measurement then counts only ignored warnings, which reads as a useless warning when it may be a working one. `'same person' creates nothing, and the abandoned create is still recorded` dies on `expect(abandoned).not.toBeNull()`."
+  },
+  "api-records-nothing": {
+    "file": "apps/api/src/modules/customer/customer.service.ts",
+    "from": "    if (dto.duplicateNameSamePerson !== undefined) {",
+    "to": "    if (false) {",
+    "why": "The web half can be correct and the row still never written. Proven at the API level by `duplicate-name-warning.e2e-spec.ts`, which reads the row back rather than asserting the request was accepted — a 201 is returned either way."
+  }
+}

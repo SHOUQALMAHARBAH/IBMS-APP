@@ -1,5 +1,21 @@
 # Identifiers on screen — two different defects, measured per screen
 
+> **CORRECTION, 2026-10-02 — defect B is now mostly CLOSED, and the numbers below are the BEFORE
+> state. Left in place rather than edited, because the before state is what explains why the pickers
+> were built.**
+>
+> Seven of the nine REQUIRED typed identifiers now point at a picker, and `/payment-channels`'
+> insurer branch went with them. Re-measured: **32 typed identifiers → 25, and 9 REQUIRED → 2.**
+>
+> The two that remain are both on `/audit-trail` and neither is fixable by the six pickers that now
+> exist: `wfEntityId` is POLYMORPHIC across fifteen workflow entities, and `documentId` names a
+> `Document`, which has no search route at all. Both are recorded in README § Known gaps with what
+> closing each would need.
+>
+> Defect A — identifiers RENDERED in table cells — is UNCHANGED and still waits on broker question 16.
+>
+> Re-run `python scripts/measurements/typed-identifier-inputs.py` rather than quoting either figure.
+
 **Measured 2026-10-01. NOTHING FIXED.** The owner named thirteen screens and asked what an employee is
 supposed to do with an id. The per-screen answer is below; the order is hers, and some of it waits on
 broker question 16, which decides what these things are called.

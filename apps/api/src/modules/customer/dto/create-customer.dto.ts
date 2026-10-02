@@ -1,9 +1,12 @@
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   Length,
+  Min,
   Validate,
   ValidateIf,
   ValidatorConstraint,
@@ -180,4 +183,36 @@ export class CreateCustomerDto {
   @Transform(emptyStringToUndefined)
   @IsString()
   prospectId?: string;
+
+  /**
+   * LAYER 1 of duplicate prevention: the officer's answer to "a customer with this name already
+   * exists — is this the same person?"
+   *
+   * OPTIONAL, deliberately. A create where no warning fired must behave exactly as it did before, and
+   * a required field here would make every existing caller — including the bulk import and ~80 spec
+   * fixtures — send an answer to a question nobody asked them.
+   *
+   * `false` means "a different person", and the create proceeds: two real people share a name, 7 of
+   * dev's 1,634 individuals collide on the ordered canonical key, and refusing one of them would refuse
+   * a real customer. **So layer 1 does not prevent** — it asks, records the answer, and lets the
+   * officer decide. The HARD refusal lives on the bulk import, where there is nobody to ask.
+   *
+   * It is recorded whichever way it is answered, because the measurement is the input to the deferred
+   * layer-2 decision: see `DuplicateNameWarning` and migration 20261109100000.
+   */
+  @IsOptional()
+  @IsBoolean()
+  duplicateNameSamePerson?: boolean;
+
+  /**
+   * How many existing customers the warning showed. Carried from the client because the count the
+   * officer actually SAW is the measurement — re-deriving it here would record the count at submit time,
+   * and a second customer created by a colleague in between would silently rewrite what they were told.
+   *
+   * Only read when `duplicateNameSamePerson` is present.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  duplicateNameMatchCount?: number;
 }

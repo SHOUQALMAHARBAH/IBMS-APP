@@ -433,6 +433,15 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
     route.fulfill({ status: 200, json: { notice: null } }),
   );
+  // LAYER 1's lookup, answering "nobody of that name" — the ordinary path, which must reach the create
+  // with no extra click. Routed explicitly rather than left to fall through: an unrouted call would
+  // exercise the lookup's own failure branch, and this test would then be passing through a path it is
+  // not about.
+  await page.route(
+    "http://localhost:4000/customers/duplicate-name-check**",
+    (route) =>
+      route.fulfill({ status: 200, json: { canonicalKey: "k", matches: [] } }),
+  );
 
   await page.goto("/customers/new");
   await page.getByRole("button", { name: "Individual" }).click();
@@ -456,6 +465,147 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.getByRole("button", { name: "Submit for compliance review" }).click();
 
   await expect(page).toHaveURL("/customers/cust-1");
+});
+
+/**
+ * LAYER 1 of duplicate prevention, on the screen.
+ *
+ * Three tests, and each is about a different one of the three outcomes — because any two of them pass
+ * on an implementation that gets the third wrong:
+ *
+ *   1. A MATCH WARNS, AND THE CREATE IS NOT REACHABLE PAST IT. The warning replacing the submit button
+ *      is the assertion that matters; a warning rendered beside a live "Create customer" is a warning
+ *      that can be clicked past, which is how one fails while appearing to work.
+ *   2. "A DIFFERENT PERSON" PROCEEDS, CARRYING THE ANSWER. Layer 1 does not prevent — two real people
+ *      share a name — so the create must go through, and the body must carry the answer or the
+ *      measurement behind the deferred layer-2 decision has nothing in it.
+ *   3. "SAME PERSON" CREATES NOTHING AND IS STILL RECORDED. This is the outcome the warning exists to
+ *      produce and the one a flag on the customer row could never hold.
+ */
+async function mockDuplicateWizard(
+  page: Page,
+  matches: { id: string; legalName: string; status: string }[],
+) {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route(
+    "http://localhost:4000/customers/duplicate-name-check**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: { canonicalKey: "ahmad al-fulani", matches },
+      }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/kyc", (route) =>
+    route.fulfill({ status: 201, json: KYC_RECORD }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+}
+
+async function fillIndividualProfile(page: Page) {
+  await page.goto("/customers/new");
+  await page.getByRole("button", { name: "Individual" }).click();
+  await page.getByLabel("Given name").fill("Ahmad");
+  await page.getByLabel("Family name").fill("Al-Fulani");
+  await page.getByLabel("National ID").fill("9901012345");
+  await page.getByLabel("Contact phone").fill("+962-7-9000-0000");
+  await page.getByLabel("Contact email").fill("ahmad@example.test");
+}
+
+const SAME_NAME_MATCH = {
+  id: "cust-existing",
+  legalName: "Ahmad Al-Fulani",
+  status: "ACTIVE",
+};
+
+test("warns about an existing customer with the same name, and the create is not reachable past it", async ({
+  page,
+}) => {
+  let created = 0;
+  await mockDuplicateWizard(page, [SAME_NAME_MATCH]);
+  await page.route("http://localhost:4000/customers", (route) => {
+    created += 1;
+    return route.fulfill({ status: 201, json: CUSTOMER });
+  });
+
+  await fillIndividualProfile(page);
+  await page.getByRole("button", { name: "Create customer & start KYC" }).click();
+
+  const warning = page.getByTestId("duplicate-name-warning");
+  await expect(warning).toBeVisible();
+  // It NAMES the person and links to the record, because "a duplicate exists" gives somebody nothing to
+  // judge, and the judgement is the whole mechanism.
+  await expect(page.getByTestId("duplicate-name-match")).toHaveText(
+    "Ahmad Al-Fulani",
+  );
+  await expect(page.getByTestId("duplicate-name-match")).toHaveAttribute(
+    "href",
+    "/customers/cust-existing",
+  );
+
+  // THE SUBMIT BUTTON IS GONE, not merely covered. Anchored on the warning being visible above, so an
+  // unmounted form cannot satisfy this absence.
+  await expect(
+    page.getByRole("button", { name: "Create customer & start KYC" }),
+  ).toHaveCount(0);
+  expect(created).toBe(0);
+});
+
+test("'a different person' creates the customer and sends the officer's answer", async ({
+  page,
+}) => {
+  let body: Record<string, unknown> | null = null;
+  await mockDuplicateWizard(page, [SAME_NAME_MATCH]);
+  await page.route("http://localhost:4000/customers", (route) => {
+    body = route.request().postDataJSON() as Record<string, unknown>;
+    return route.fulfill({ status: 201, json: CUSTOMER });
+  });
+
+  await fillIndividualProfile(page);
+  await page.getByRole("button", { name: "Create customer & start KYC" }).click();
+  await page.getByTestId("duplicate-different-person").click();
+
+  // The create went through — layer 1 asks, it does not prevent.
+  await expect(
+    page.getByRole("heading", { name: "Supporting documents" }),
+  ).toBeVisible();
+  expect(body).not.toBeNull();
+  // AND THE ANSWER IS ON THE REQUEST. Without this the create would still work and the measurement
+  // would be empty, which is the failure that looks exactly like success.
+  expect(body!.duplicateNameSamePerson).toBe(false);
+  expect(body!.duplicateNameMatchCount).toBe(1);
+});
+
+test("'same person' creates nothing, and the abandoned create is still recorded", async ({
+  page,
+}) => {
+  let created = 0;
+  let abandoned: Record<string, unknown> | null = null;
+  await mockDuplicateWizard(page, [SAME_NAME_MATCH]);
+  await page.route("http://localhost:4000/customers", (route) => {
+    created += 1;
+    return route.fulfill({ status: 201, json: CUSTOMER });
+  });
+  await page.route(
+    "http://localhost:4000/customers/duplicate-name-abandoned",
+    (route) => {
+      abandoned = route.request().postDataJSON() as Record<string, unknown>;
+      return route.fulfill({ status: 201, json: { recorded: true } });
+    },
+  );
+
+  await fillIndividualProfile(page);
+  await page.getByRole("button", { name: "Create customer & start KYC" }).click();
+  await page.getByTestId("duplicate-same-person").click();
+
+  await expect(page.getByTestId("duplicate-name-abandoned")).toBeVisible();
+  expect(created).toBe(0);
+  // THE RECORD IS THE POINT. An abandoned create that goes unrecorded makes the measurement count only
+  // the warnings that were ignored — which reads as a useless warning when it may be a working one.
+  expect(abandoned).not.toBeNull();
+  expect(abandoned!.matchCount).toBe(1);
+  expect(abandoned!.legalName).toBe("Ahmad Al-Fulani");
 });
 
 test("captures onboarding/KYC consent from the customer profile screen (Part D §5.1 touchpoint #2)", async ({

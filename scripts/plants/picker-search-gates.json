@@ -1,0 +1,32 @@
+{
+  "employee-search-narrowed-back": {
+    "file": "apps/api/src/common/picker-search.config.ts",
+    "from": "export const EMPLOYEE_SEARCH_CODES = [\n  'employee.national-id.reveal',\n  'employee-performance.view',\n  'insurer-performance.view',\n] as const;",
+    "to": "export const EMPLOYEE_SEARCH_CODES = ['employee.national-id.reveal'] as const;",
+    "why": "The original defect, restored: an Executive cannot find an employee on the employee performance screen. `AN EXECUTIVE CAN NOW FIND AN EMPLOYEE` dies with 403 against 200 — and so would the BRANCH_DEPARTMENT_MANAGER half, which is why both are in one test rather than one standing in for the other."
+  },
+  "customer-search-narrowed-back": {
+    "file": "apps/api/src/common/picker-search.config.ts",
+    "from": "export const CUSTOMER_SEARCH_CODES = ['customer.read', 'dsr.log'] as const;",
+    "to": "export const CUSTOMER_SEARCH_CODES = ['customer.read'] as const;",
+    "why": "The second instance, restored: the DPO cannot find a customer on `/dsr`, which is their own screen. `THE DPO CAN NOW FIND A CUSTOMER` dies. Nothing else does — nine of the ten roles are unaffected, which is exactly why this shipped."
+  },
+  "insurer-picker-leaks-relationship-contacts": {
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "    return rows.map((r) => ({\n      id: r.id,",
+    "to": "    return rows.map((r) => ({\n      ...r,\n      id: r.id,",
+    "why": "PLANTED AT THE SERVICE, not at the repository, and that repointing is itself the finding. The first version widened the repository's `select` to `INSURER_RECORD_SELECT` and killed NOTHING — because the service maps three fields by name, so the extra columns never reach the wire. The boundary is held by the explicit map, not by the select, so that is where the plant has to be. `the insurer picker never returns this office RELATIONSHIP contacts` dies on the exact key-set assertion."
+  },
+  "user-picker-maps-the-whole-row": {
+    "file": "apps/api/src/modules/rbac/services/user-admin.service.ts",
+    "from": "    return rows.map((r) => ({\n      id: r.id,",
+    "to": "    return rows.map((r) => ({\n      ...r,\n      id: r.id,",
+    "why": "Spreading the row instead of naming the two fields. `the user picker returns a name and an id, and NEVER an email` dies on `not.toHaveProperty('lastLoginAt')`-class assertions — and dies on `isActive` even without the email plant, which is the evidence that an explicit map is what holds this boundary rather than the select alone."
+  },
+  "policy-picker-includes-discarded": {
+    "file": "apps/api/src/repositories/policy.repository.ts",
+    "from": "      where: {\n        discardedAt: null,\n        ...(ownerUserId === undefined ? {} : { customer: { ownerUserId } }),",
+    "to": "      where: {\n        ...(ownerUserId === undefined ? {} : { customer: { ownerUserId } }),",
+    "why": "A policy withdrawn as raised-in-error stays in its own register and leaves every derived view (`docs/discard.md` § 3). A filter control is a derived view, so offering a withdrawn policy invites a report on one the office has withdrawn. NOT covered by a test today — recorded here as a known gap rather than left unstated, because the e2e would need a discarded policy fixture on db-test and the four-picker spec deliberately creates no policies."
+  }
+}

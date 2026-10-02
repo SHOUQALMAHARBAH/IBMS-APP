@@ -9,6 +9,25 @@ import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
+/**
+ * A SUFFIX PER RUN FOR EVERY PERSON NAME THIS FILE CREATES.
+ *
+ * Added 2026-10-02, when `Employee_one_active_person_per_office` (migration 20261107100000) started
+ * refusing a second ACTIVE person whose ordered canonical name matches one already in the office —
+ * which is exactly what it is for. Three fixtures here carried literal names (`Rania Samir Fouad
+ * Hijazi`, `سلمى المحاربة`, `Tariq Odeh`), so the FIRST run of the suite created them and every run
+ * after that collided.
+ *
+ * `db-test` is cumulative, so a fixture's identifying values have to come from the run. Same rule the
+ * SLA holiday fixtures learned: a fixed date collided on the second local run ever, and the failure
+ * wore the costume of a permission defect.
+ *
+ * The suffix is appended to the FAMILY name rather than the given name, so the rest of each assertion —
+ * which is about how `fullName` is composed from the parts — still reads as a real Jordanian name with
+ * the parts in the right order.
+ */
+const RUN = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
 function uniqueEmail(label: string): string {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@ibms.test`;
 }
@@ -130,7 +149,7 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
         givenName: 'Rania',
         fatherName: 'Samir',
         grandfatherName: 'Fouad',
-        familyName: 'Hijazi',
+        familyName: `Hijazi${RUN}`,
         nationalId: '9911223344',
         hireDate: '2022-03-01',
       })
@@ -142,11 +161,11 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       grandfatherName: string;
       familyName: string;
     };
-    expect(employee.fullName).toBe('Rania Samir Fouad Hijazi');
+    expect(employee.fullName).toBe(`Rania Samir Fouad Hijazi${RUN}`);
     expect(employee.givenName).toBe('Rania');
     expect(employee.fatherName).toBe('Samir');
     expect(employee.grandfatherName).toBe('Fouad');
-    expect(employee.familyName).toBe('Hijazi');
+    expect(employee.familyName).toBe(`Hijazi${RUN}`);
   });
 
   it('stores the English name set and the branch the unified form sends', async () => {
@@ -174,9 +193,9 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       .set(bearer(admin.accessToken))
       .send({
         givenName: 'سلمى',
-        familyName: 'المحاربة',
+        familyName: `المحاربة${RUN}`,
         givenNameEn: 'Salma',
-        familyNameEn: 'Almaharbah',
+        familyNameEn: `Almaharbah${RUN}`,
         nationalId: '9933445566',
         hireDate: '2022-03-01',
         branchId,
@@ -195,10 +214,10 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
         branchId: true,
       },
     });
-    expect(stored.fullName).toBe('سلمى المحاربة');
+    expect(stored.fullName).toBe(`سلمى المحاربة${RUN}`);
     // Composed from the two parts given. The father's English name was not sent and stays NULL —
     // nothing transliterates the Arabic on a person's behalf.
-    expect(stored.fullNameEn).toBe('Salma Almaharbah');
+    expect(stored.fullNameEn).toBe(`Salma Almaharbah${RUN}`);
     expect(stored.givenNameEn).toBe('Salma');
     expect(stored.fatherNameEn).toBeNull();
     expect(stored.branchId).toBe(branchId);
@@ -241,13 +260,13 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       .set(bearer(admin.accessToken))
       .send({
         givenName: 'Tariq',
-        familyName: 'Odeh',
+        familyName: `Odeh${RUN}`,
         nationalId: '9922334455',
         hireDate: '2022-03-01',
       })
       .expect(201);
     const employee = res.body as { fullName: string };
-    expect(employee.fullName).toBe('Tariq Odeh');
+    expect(employee.fullName).toBe(`Tariq Odeh${RUN}`);
   });
 
   it('rejects a create with no familyName (required, not just givenName)', async () => {

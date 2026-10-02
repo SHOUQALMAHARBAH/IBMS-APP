@@ -1,5 +1,7 @@
 import {
   Body,
+  Get,
+  Param,
   Controller,
   Post,
   UnprocessableEntityException,
@@ -33,6 +35,28 @@ import { LEGACY_IMPORT_MAX_BYTES } from './legacy-import.config';
 export class LegacyImportController {
   constructor(private readonly legacyImport: LegacyImportService) {}
 
+  /**
+   * THE DURABLE REPORT. `GET /imports/customers/batches` and `.../batches/:id`.
+   *
+   * The report used to be the response body of the POST below and nothing else, so an office importing
+   * 2,000 rows read its refusals once. These two routes are what make it readable tomorrow, which is
+   * the whole reason `LegacyImportBatch` exists.
+   *
+   * Gated on the same `customer.bulk-import` the import itself needs: whoever may run one may read what
+   * theirs did, and nobody else has any use for it.
+   */
+  @RequirePermissions('customer.bulk-import')
+  @Get('customers/batches')
+  listBatches() {
+    return this.legacyImport.listBatches();
+  }
+
+  @RequirePermissions('customer.bulk-import')
+  @Get('customers/batches/:id')
+  getBatch(@Param('id') id: string) {
+    return this.legacyImport.getBatch(id);
+  }
+
   @RequirePermissions('customer.bulk-import')
   @Post('customers')
   @ApiConsumes('multipart/form-data')
@@ -62,6 +86,9 @@ export class LegacyImportController {
       file,
       mapping: dto.mapping,
       actorUserId: user.id,
+      // The duplicate lookup is `$queryRaw` and so bypasses `tenantScopeExtension`; the office id
+      // comes from the session rather than being derived inside the service.
+      organizationId: user.organizationId,
     });
   }
 }

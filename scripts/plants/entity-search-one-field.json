@@ -13,9 +13,9 @@
   },
   "chosen-customer-displays-its-identifier": {
     "file": "apps/web/components/ui/EntitySearch.tsx",
-    "from": "  const shown = selected ? selected.name : term;",
-    "to": "  const shown = selected ? (selected.detail ?? []).filter((p) => typeof p === 'string').join(' ') || selected.name : term;",
-    "why": "The chosen customer displays its REGISTRATION NUMBER instead of its name — the owner's third requirement inverted, and the way this change would have reopened rule 2 (an identifier rendered at a reader) one keystroke after fixing the usability. 'finds a company by its REGISTRATION NUMBER, and still shows the name once chosen' must die on the final assertion, with the field holding REG-2 where the company's name belongs."
+    "from": "  const shown = selected ? nameFor(selected.name) : term;",
+    "to": "  const shown = selected\n    ? (selected.detail ?? []).filter((x) => typeof x === 'string').join(' ') ||\n      nameFor(selected.name)\n    : term;",
+    "why": "The chosen customer displays its REGISTRATION NUMBER instead of its name — the owner's third requirement inverted, and the way this change would have reopened rule 2 (an identifier rendered at a reader) one keystroke after fixing the usability. 'finds a company by its REGISTRATION NUMBER, and still shows the name once chosen' must die on the final assertion, with the field holding REG-2 where the company's name belongs. REPOINTED 2026-10-02: the line gained a `nameFor(...)` call when `EntityOption.name` widened to carry both language forms (an insurer and a branch each have two). The code the plant is about did not move; the expression around it did, which is the formatter-and-refactor rot this self-test exists to catch."
   },
   "keyboard-cannot-reach-the-list": {
     "file": "apps/web/components/ui/EntitySearch.tsx",

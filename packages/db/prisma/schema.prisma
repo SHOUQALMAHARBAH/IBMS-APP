@@ -371,6 +371,9 @@ model Organization {
   dutySegregationModeDeclaredByUserId String?
   combinedDutyActs                    CombinedDutyAct[]
   identifierCorrections               CustomerIdentifierCorrection[]
+  legacyImportBatches                 LegacyImportBatch[]
+  legacyImportIssues                  LegacyImportIssue[]
+  duplicateNameWarnings               DuplicateNameWarning[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -1297,6 +1300,8 @@ model Customer {
   legalHolds                  LegalHold[]
   /// Every recorded correction of a screening identifier on this customer.
   identifierCorrections       CustomerIdentifierCorrection[]
+  legacyImportCollisions      LegacyImportIssue[]            @relation("LegacyImportCollision")
+  duplicateNameWarnings       DuplicateNameWarning[]         @relation("DuplicateNameWarningCreated")
 
   @@index([legalName])
   @@index([status])
@@ -6082,4 +6087,109 @@ model CombinedDutyAct {
   @@index([organizationId, actedAt(sort: Desc)])
   @@index([entity, entityId])
   @@index([actorUserId])
+}
+
+/// WHY A ROW WAS NOT IMPORTED, OR WAS IMPORTED WITH A PROBLEM.
+///
+/// An ENUM rather than a prose difference, and that is the point: "a duplicate is reported
+/// differently from bad data" has to be machine-checkable, or it decays into two sentences that read
+/// alike and a screen that lists them together. One needs an IDENTITY DECISION from a person; the
+/// other needs a typo fixed. "Forty rows failed" sends an office hunting forty typos.
+enum LegacyImportIssueKind {
+  /// The canonical key already exists. Refused, and the row it collided with is named.
+  DUPLICATE
+  /// A missing required field, an unparseable value, an unknown column.
+  BAD_DATA
+  /// IMPORTED, but something after the write needs a person: screening failed, or its candidate
+  /// queue was truncated so the review is incomplete. Kept apart from both of the above because the
+  /// customer IS in the book — treating it as a rejection would understate what was written.
+  IMPORTED_NEEDS_REVIEW
+}
+
+/// ONE LEGACY IMPORT RUN, kept so its report outlives the HTTP response.
+///
+/// The report used to be the response body and an audit row carrying counts. Forty refusals in a
+/// response is a report nobody can act on an hour later, and the audit row holds the numbers without
+/// the lines. An office importing 2,000 rows needs to come back to the list tomorrow.
+model LegacyImportBatch {
+  id             String              @id @default(uuid())
+  organizationId String              @default(dbgenerated())
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  /// Who ran it. Not nullable: an import with no actor is not a thing this system can produce.
+  actorUserId    String
+  fileName       String
+  startedAt      DateTime            @default(now())
+  /// Counts, denormalised so a list of batches needs no join to be useful.
+  totalDataRows  Int
+  imported       Int
+  refused        Int
+  screened       Int
+  needsReview    Int
+  issues         LegacyImportIssue[]
+
+  @@index([organizationId, startedAt(sort: Desc)])
+  @@index([actorUserId])
+}
+
+/// ONE LINE of a legacy import that needs somebody's attention, by line number and kind.
+model LegacyImportIssue {
+  id                     String                @id @default(uuid())
+  organizationId         String                @default(dbgenerated())
+  organization           Organization          @relation(fields: [organizationId], references: [id])
+  batchId                String
+  batch                  LegacyImportBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  /// 1-based, counting the header as line 1, so it names the line the office sees in their own
+  /// spreadsheet rather than an index into a parsed array.
+  lineNumber             Int
+  kind                   LegacyImportIssueKind
+  detail                 String
+  /// For a DUPLICATE: the customer the row collided with, so the officer can open it and decide.
+  /// `onDelete: SetNull` rather than Restrict — the report is a record of what happened, and a
+  /// customer being discarded later must not make the report undeletable.
+  collidedWithCustomerId String?
+  collidedWithCustomer   Customer?             @relation("LegacyImportCollision", fields: [collidedWithCustomerId], references: [id], onDelete: SetNull)
+
+  @@index([batchId, kind])
+  @@index([organizationId])
+}
+
+/// WHAT AN OFFICER ANSWERED WHEN THE SYSTEM ASKED "IS THIS THE SAME PERSON?"
+///
+/// LAYER 1 of duplicate prevention, and the instrumentation is the reason this is a table rather than a
+/// flag. The owner deferred layer 2 — a keyed fingerprint of the identity number — with a written wake
+/// condition, and decided that **the number decides whether the fingerprint earns its key-management
+/// burden**. That number is: how often did the warning fire, and how often did the officer say "yes,
+/// the same person"? It has to exist from the first day, or the wake condition has no input when
+/// somebody asks.
+///
+/// LAYER 1 DOES NOT PREVENT. The officer may answer "different person" and proceed, and the system
+/// writes the customer. That is the design — two real people share a name, and a hard block on the
+/// create screen would refuse a real customer — but it means this table is a RECORD, not a control.
+/// The hard refusal lives on the bulk import, where there is nobody to ask.
+model DuplicateNameWarning {
+  id                String       @id @default(uuid())
+  organizationId    String       @default(dbgenerated())
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  /// The officer who was asked and who answered.
+  actorUserId       String
+  /// `canonical_person_key` of the name being entered — the ORDERED key, because the sorted one merges
+  /// two cousins. Stored so the measurement can tell a name that warns repeatedly from many distinct
+  /// ones warning once.
+  canonicalKey      String
+  /// How many existing customers matched when the warning fired.
+  matchCount        Int
+  /// The officer's answer. `true` = "yes, this is the same person" — which means they went on to do
+  /// something other than create a duplicate, or created one knowingly. `false` = "a different person",
+  /// and the create proceeded.
+  samePerson        Boolean
+  /// The customer that was created DESPITE the warning, when one was. Null when the officer answered
+  /// "same person" and abandoned the create — which is the outcome the warning exists to produce, so it
+  /// must be representable.
+  createdCustomerId String?
+  createdCustomer   Customer?    @relation("DuplicateNameWarningCreated", fields: [createdCustomerId], references: [id], onDelete: SetNull)
+  warnedAt          DateTime     @default(now())
+
+  @@index([organizationId, warnedAt(sort: Desc)])
+  @@index([canonicalKey])
+  @@index([samePerson])
 }

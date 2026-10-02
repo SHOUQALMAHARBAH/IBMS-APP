@@ -13,6 +13,11 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerContactDto } from './dto/update-customer-contact.dto';
 import { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import { SearchCustomersDto } from './dto/search-customers.dto';
+import { CUSTOMER_SEARCH_CODES } from '../../common/picker-search.config';
+import {
+  CheckDuplicateNameDto,
+  RecordAbandonedDuplicateDto,
+} from './dto/duplicate-name.dto';
 import { CreateUboDto } from './dto/create-ubo.dto';
 import { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
 import { RevealFieldDto } from './dto/reveal-field.dto';
@@ -36,7 +41,7 @@ export class CustomerController {
     @Body() dto: CreateCustomerDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.customers.create(dto, user.id);
+    return this.customers.create(dto, user);
   }
 
   /**
@@ -74,20 +79,68 @@ export class CustomerController {
    * on purpose. The conditions are the opposite of that, so they live on their own route, exactly as
    * `GET /employees/search` stands beside `GET /employees`. One route per intent.
    *
-   * Gated on `customer.read`, the same code as the list: finding a customer here is the same act as
-   * finding one there, and a narrower code would make the field unusable for the roles the list exists
-   * for. The RESULT is narrower than a list row — see `CustomerSearchResultView`.
+   * The RESULT is narrower than a list row — see `CustomerSearchResultView`.
    *
    * Declared BEFORE `@Get(':id')` so `search` is never parsed as a customer id — the same ordering
    * `GET /employees/search` needs and says so.
+   *
+   * ## The gate: WIDENED 2026-10-02, and the first version was wrong
+   *
+   * This shipped gated on `customer.read` alone, with a comment arguing that finding a customer is the
+   * same act as listing one. Right for nine of the ten roles that need it and wrong for the one whose
+   * screen it matters most to: **the DATA_PROTECTION_OFFICER holds `dsr.log` and NOT `customer.read`**,
+   * and `/dsr` — logging a data-subject request against a named customer — is theirs. So the field
+   * built to stop every screen showing a search box AND a select was unusable by the DPO the day after
+   * it shipped.
+   *
+   * Found by `scripts/measurements/picker-route-reachability.mjs`, which is the measurement behind the
+   * owner's rule that a picker's route is gated on ANY OF the permissions of the screens that use it.
+   * See `common/picker-search.config.ts` for that rule and for the other instance of it.
    */
-  @RequirePermissions('customer.read')
+  @RequirePermissions(...CUSTOMER_SEARCH_CODES)
   @Get('search')
   search(
     @Query() query: SearchCustomersDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.customers.search(query, user);
+  }
+
+  /**
+   * LAYER 1 of duplicate prevention: is there already a customer with this person's name?
+   *
+   * Gated on `customer.create`, NOT on `customer.read`. The two gates differ because the question
+   * differs: this route exists only to be called from the create form, and a reader who cannot create a
+   * customer has no use for it. Gating it on the read would hand the ordered-key lookup — which answers
+   * "is this exact person on the book" — to every role that may browse the register, which is a narrower
+   * version of the directory problem the search route was built to close.
+   *
+   * Declared BEFORE `@Get(':id')` for the same reason `search` is.
+   */
+  @RequirePermissions('customer.create')
+  @Get('duplicate-name-check')
+  checkDuplicateName(
+    @Query() query: CheckDuplicateNameDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.customers.checkDuplicateName(query.legalName, user);
+  }
+
+  /**
+   * THE OTHER HALF OF THE MEASUREMENT: the officer saw the warning and did not create the customer.
+   *
+   * A separate route because there is no create to hang it on — which is the whole point. The warning
+   * working leaves no customer row, so a field on the create body could never record it, and without
+   * this route the measurement would count only the times the warning was ignored. That number read
+   * alone says the warning is useless when it may be the opposite.
+   */
+  @RequirePermissions('customer.create')
+  @Post('duplicate-name-abandoned')
+  recordAbandonedDuplicate(
+    @Body() body: RecordAbandonedDuplicateDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.customers.recordAbandonedDuplicate(body, user.id);
   }
 
   /**

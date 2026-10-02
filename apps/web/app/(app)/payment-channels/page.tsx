@@ -162,27 +162,26 @@ export default function PaymentChannelsPage() {
               <option value="insurer">{t('pcInsurer')}</option>
             </select>
           </label>
-          {/* The insurer branch keeps the id field: insurers are a different
-              list with a different search, and a customer picker there would
-              be worse than the box it replaced. */}
+          {/* ONE FIELD ON EITHER BRANCH, as of 2026-10-02. This used to say the insurer branch keeps a
+              raw id field because "insurers are a different list with a different search" — true when
+              written and false now that `GET /insurers/search` exists. The two branches point at
+              different SOURCES, which is exactly what a source is for; neither is a uuid box. */}
           {ownerType === 'customer' ? (
             <EntitySearch
-            kind="customer"
+              kind="customer"
               value={ownerId}
               onChange={setOwnerId}
               label={t('pcCustomerIdLabel')}
               required
             />
           ) : (
-            <label style={labelStyle}>
-              {t('pcInsurerIdLabel')}
-              <input
-                aria-label={t('pcOwnerIdAria')}
-                value={ownerId}
-                onChange={(e) => setOwnerId(e.target.value)}
-                required
-              />
-            </label>
+            <EntitySearch
+              kind="insurer"
+              value={ownerId}
+              onChange={setOwnerId}
+              label={t('pcInsurerIdLabel')}
+              required
+            />
           )}
           <label style={labelStyle}>
             {t('pcChannelTypeLabel')}

@@ -310,14 +310,50 @@ describe('the narrow employee search (e2e) — IMPROVEMENTS § 1.83', () => {
     expect(after.matchedEmployeeIds).toEqual([]);
   }, 600_000);
 
-  it('is gated on the reveal permission, not on employee.read', async () => {
+  it('is NOT gated on employee.read — which is still true after the widening', async () => {
     const app = await boot();
-    // Holds `employee.read` and NOT `employee.national-id.reveal` — the mirror image of Compliance, and
-    // the assertion that proves the gate is the reveal code rather than the read.
+
+    /**
+     * ## REPOINTED 2026-10-02, and the repointing is the finding
+     *
+     * This test used BRANCH_DEPARTMENT_MANAGER and expected 403, on the reasoning that the manager
+     * holds `employee.read` and not `employee.national-id.reveal` — so a 403 proved the gate was the
+     * reveal rather than the read. Correct when written.
+     *
+     * It then went red on `expected 403, got 200`, and THE TEST WAS WRONG RATHER THAN THE CODE: the
+     * manager also holds `employee-performance.view`, and the route's gate was widened to admit the
+     * two screens that type an `employeeId` — because an Executive could not find an employee on the
+     * employee performance screen, which is one of the two screens that exist for them. See
+     * `common/picker-search.config.ts`.
+     *
+     * So the assertion had encoded the defect as the intended behaviour. What it was ACTUALLY about
+     * survives untouched — reading an employee record does not grant searching for one — and the right
+     * actor for it is a role that holds the read and none of the three search codes.
+     *
+     * SYSTEM_SECURITY_ADMINISTRATOR is that role, measured on the seeded grid: `employee.read` is held
+     * by BRANCH_DEPARTMENT_MANAGER, OFFICE_ADMINISTRATOR and SYSTEM_SECURITY_ADMINISTRATOR, and of
+     * those only the manager holds a performance code. The security administrator rather than the
+     * office administrator because `OFFICE_ADMINISTRATOR` is a per-office ROW and not a member of the
+     * legacy `RoleName` enum this helper takes — the two are equally valid witnesses and only one
+     * typechecks here.
+     */
+    const admin = await makeUser(
+      app,
+      'ns-sec-admin',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+    await request(app.getHttpServer())
+      .get(`/employees/search?q=Zubaydah`)
+      .set(bearer(admin.accessToken))
+      .expect(403);
+
+    // AND THE WIDENING IS A WIDENING. Asserted here as well as in `picker-search-gates.e2e-spec.ts`,
+    // because this file is where somebody narrowing the gate again would come to "fix the test" — and a
+    // 403-only assertion is satisfiable by narrowing it back to nothing.
     const manager = await makeUser(app, 'ns-mgr', 'BRANCH_DEPARTMENT_MANAGER');
     await request(app.getHttpServer())
       .get(`/employees/search?q=Zubaydah`)
       .set(bearer(manager.accessToken))
-      .expect(403);
+      .expect(200);
   }, 600_000);
 });

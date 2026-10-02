@@ -26,6 +26,8 @@ import { RequirePermissions } from '../rbac/decorators/require-permissions.decor
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DiscardDto } from '../../common/dto/discard.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { POLICY_SEARCH_CODES } from '../../common/picker-search.config';
+import { SearchPoliciesDto } from '../../common/picker-search.dto';
 
 /** Process 18-19 — Policy Placement & Issuance (backlog Part C #18-19, Domain
  * B). Create the `Policy` from an accepted Opportunity and set its inception
@@ -47,6 +49,26 @@ export class PolicyController {
   @Post()
   place(@Body() dto: PlacePolicyDto, @CurrentUser() user: AuthenticatedUser) {
     return this.policies.place(dto, user);
+  }
+
+  /**
+   * THE POLICY PICKER's source. Gated on ANY OF `POLICY_SEARCH_CODES`.
+   *
+   * That list is the union of the permissions of the screens that type a `policyId`, per the owner's
+   * rule — and the rule exists because the opposite shipped twice, most sharply when
+   * `GET /employees/search` was gated on `employee.national-id.reveal` and an Executive therefore could
+   * not find an employee on the employee performance screen. `PermissionsGuard` ORs its codes, so the
+   * spread is exactly "any one of these is enough".
+   *
+   * Declared BEFORE any `:id` route so `search` is never parsed as an id.
+   */
+  @RequirePermissions(...POLICY_SEARCH_CODES)
+  @Get('search')
+  searchForPicker(
+    @Query() query: SearchPoliciesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policies.searchForPicker(query, user);
   }
 
   @RequirePermissions('policy.read')

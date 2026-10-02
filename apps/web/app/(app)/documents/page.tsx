@@ -20,6 +20,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionMayBeMissing, permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -149,10 +150,13 @@ export default function DocumentsPage() {
       </p>
 
       <form onSubmit={onLookup} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
-        <label style={labelStyle}>
-          {t('docPolicyIdLabel')}
-          <input value={policyId} onChange={(e) => setPolicyId(e.target.value)} required />
-        </label>
+        <EntitySearch
+          kind="policy"
+          value={policyId}
+          onChange={setPolicyId}
+          label={t('docPolicyIdLabel')}
+          required
+        />
         <button type="submit">{t('docLookUp')}</button>
       </form>
 
@@ -261,10 +265,13 @@ export default function DocumentsPage() {
         <p style={{ opacity: 0.75 }}>
           {t('docClassificationSummaryIntro')}
         </p>
-        <label style={labelStyle}>
-          {t('docPolicyIdLabel')}
-          <input value={summaryPolicyId} onChange={(e) => setSummaryPolicyId(e.target.value)} required />
-        </label>
+        <EntitySearch
+          kind="policy"
+          value={summaryPolicyId}
+          onChange={setSummaryPolicyId}
+          label={t('docPolicyIdLabel')}
+          required
+        />
         <button type="submit">{t('docComputeButton')}</button>
         {summaryError ? (
           <p role="alert" style={errorStyle}>

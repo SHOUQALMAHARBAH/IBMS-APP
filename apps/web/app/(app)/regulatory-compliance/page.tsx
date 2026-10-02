@@ -23,6 +23,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
 
 const cell: CSSProperties = {
@@ -285,15 +286,13 @@ export default function RegulatoryCompliancePage() {
               required
             />
           </label>
-          <label style={labelStyle}>
-            {t('rcOwnerUserId')}
-            <input
-              aria-label={t('rcOwnerUserIdLabel')}
-              value={ownerUserId}
-              onChange={(e) => setOwnerUserId(e.target.value)}
-              required
-            />
-          </label>
+          <EntitySearch
+            kind="user"
+            value={ownerUserId}
+            onChange={setOwnerUserId}
+            label={t('rcOwnerUserId')}
+            required
+          />
           <label style={labelStyle}>
             {t('rcDueDate')}
             <input

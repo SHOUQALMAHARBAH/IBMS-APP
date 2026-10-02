@@ -13,6 +13,13 @@ import type { TranslationKey } from '../../lib/i18n/translations';
 import { searchCustomers } from '../../lib/customer/customer-api';
 import { listAuditActors } from '../../lib/audit-trail/audit-trail-api';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
+import { searchEmployees } from '../../lib/supporting-operations/employee-api';
+import {
+  searchBranches,
+  searchInsurers,
+  searchPolicies,
+  searchUsers,
+} from '../../lib/pickers/picker-api';
 
 /**
  * FIND A NAMED THING. ONE FIELD, every screen.
@@ -79,9 +86,24 @@ import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
  */
 export type DetailPart = string | { key: TranslationKey };
 
+/**
+ * An option's NAME, in one or both languages.
+ *
+ * A plain string is the common case: a customer's legal name and a person's name are one string on the
+ * record, with no second form to choose between. An insurer and a branch each carry two, and which one
+ * a reader should see follows THEIR language — so the choice is made at RENDER, exactly as `DetailPart`
+ * forces for the detail line and for the same measured reason: a source resolving it at fetch time
+ * would pin the label to whatever language was active when the keystroke went out, which on this
+ * Arabic-first platform showed Arabic to an English reader.
+ *
+ * `ar` is nullable because an office may register an insurer or a branch with an English name alone;
+ * the English form is what every record has, so it is the fallback and never the other way round.
+ */
+export type EntityName = string | { en: string; ar: string | null };
+
 export interface EntityOption {
   id: string;
-  name: string;
+  name: EntityName;
   /** What tells two entries of the same name apart. Optional: some entities have nothing to add. */
   detail?: DetailPart[];
 }
@@ -107,7 +129,14 @@ interface EntitySource {
   minChars: number;
 }
 
-export type EntityKind = 'customer' | 'auditActor';
+export type EntityKind =
+  | 'customer'
+  | 'auditActor'
+  | 'employee'
+  | 'insurer'
+  | 'policy'
+  | 'user'
+  | 'branch';
 
 export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
   /**
@@ -168,6 +197,156 @@ export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
    * No detail line: the endpoint returns a name and an id, and an email beside every actor would put a
    * contact list in front of a read-only external auditor for no gain to the question being asked.
    */
+  /**
+   * `GET /employees/search` — the route that was already there and that nobody who needed it could
+   * reach.
+   *
+   * It was built for the national-ID reveal and gated on `employee.national-id.reveal`, held by
+   * COMPLIANCE_OFFICER alone — while the two screens that type an `employeeId` are gated on codes held
+   * by BRANCH_DEPARTMENT_MANAGER and EXECUTIVE_MANAGEMENT. So an Executive could not find an employee.
+   * The gate is widened; the route and its five-field result are unchanged.
+   *
+   * `minChars: 2`, which is the server's own floor for this entity — an office's staff list is tens of
+   * people, where two characters is already narrow.
+   *
+   * The detail line carries the position and whether they still work here. The SECOND is the one that
+   * matters: a former employee of the same name is exactly the case a picker has to disambiguate, and a
+   * list that omitted it would invite assigning work to somebody who has left.
+   */
+  employee: {
+    searchLabel: 'entitySearchEmployeeLabel',
+    placeholder: 'entitySearchEmployeePlaceholder',
+    noMatches: 'entitySearchEmployeeNoMatches',
+    error: 'entitySearchEmployeeError',
+    minChars: 2,
+    async search(term) {
+      const rows = await searchEmployees(term);
+      return rows.map((r) => ({
+        id: r.id,
+        // Both forms where the record has them: `fullName` is the Arabic-convention name and
+        // `fullNameEn` the transliteration, which is nullable because transliterating a real person's
+        // name is a judgement nobody guesses.
+        name: { en: r.fullNameEn ?? r.fullName, ar: r.fullName },
+        detail: [
+          ...(r.position ? [r.position] : []),
+          ...(r.isCurrentEmployee
+            ? []
+            : [{ key: 'entitySearchEmployeeFormer' as const }]),
+        ],
+      }));
+    },
+  },
+
+  /**
+   * `GET /insurers/search` — six dashboard and report screens typed a uuid into an `insurerId` filter.
+   *
+   * ACTIVE insurers only, which is the OPPOSITE of what `/insurers` shows and deliberate: that list
+   * shows deactivated companies by default because they keep their policies and are the row an
+   * administrator most needs to find, while offering one in a filter would invite a report on a company
+   * the office has stopped placing with.
+   *
+   * `minChars: 1`. An office works with tens of insurers, so a floor on that set refuses a short name
+   * for no gain; the bound on results is what keeps it from being a browse.
+   *
+   * No detail line: an insurer's name IS the disambiguator, and the relationship contacts — the named
+   * people who answer this office — never reach this route at all. That is what makes its widened gate
+   * safe.
+   */
+  insurer: {
+    searchLabel: 'entitySearchInsurerLabel',
+    placeholder: 'entitySearchInsurerPlaceholder',
+    noMatches: 'entitySearchInsurerNoMatches',
+    error: 'entitySearchInsurerError',
+    minChars: 1,
+    async search(term) {
+      const rows = await searchInsurers(term);
+      return rows.map((r) => ({
+        id: r.id,
+        name: { en: r.name, ar: r.nameAr },
+      }));
+    },
+  },
+
+  /**
+   * `GET /policies/search` — `/documents` carries TWO required `policyId` fields, so that screen could
+   * not be used at all without pasting a uuid.
+   *
+   * `minChars: 3`, matching the customer floor rather than the insurer one, because a policy book is
+   * the one set among these four as large as the customer book.
+   *
+   * The detail line carries the customer's name, the line and the status — the number alone does not
+   * tell two policies apart when somebody is searching by customer. A policy with NO number yet is a
+   * real state (placed, not issued), and `entitySearchPolicyUnnumbered` says so rather than leaving a
+   * blank that reads as a data fault.
+   */
+  policy: {
+    searchLabel: 'entitySearchPolicyLabel',
+    placeholder: 'entitySearchPolicyPlaceholder',
+    noMatches: 'entitySearchPolicyNoMatches',
+    error: 'entitySearchPolicyError',
+    minChars: 3,
+    async search(term) {
+      const rows = await searchPolicies(term);
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.policyNumber ?? '',
+        // The status is a KEY (translated at render); the customer name and line are literal text off
+        // the record. An unnumbered policy gets a key too, so the reason is stated in the reader's own
+        // language rather than as an empty first column.
+        detail: [
+          ...(r.policyNumber ? [] : [{ key: 'entitySearchPolicyUnnumbered' as const }]),
+          r.customerLegalName,
+          r.insuranceLine,
+        ],
+      }));
+    },
+  },
+
+  /**
+   * `GET /admin/users/search` — five screens name an OWNER of something and every one typed a uuid.
+   *
+   * NOT the same source as `auditActor`, and the difference is the point: that one returns only people
+   * who already appear in this office's audit log, so a read-only auditor cannot enumerate staff
+   * through a filter control. These five screens need the office's actual people, because the question
+   * is who OWNS a record rather than who touched one.
+   *
+   * No detail line: the route returns a name and an id by design — see `UserPickerResult`, and
+   * `GET /audit-trail/actors` for the precedent on withholding the email.
+   */
+  user: {
+    searchLabel: 'entitySearchUserLabel',
+    placeholder: 'entitySearchUserPlaceholder',
+    noMatches: 'entitySearchUserNoMatches',
+    error: 'entitySearchUserError',
+    minChars: 1,
+    async search(term) {
+      const rows = await searchUsers(term);
+      return rows.map((r) => ({ id: r.id, name: r.name }));
+    },
+  },
+
+  /**
+   * `GET /admin/branches/search` — eleven screens filter by branch, the widest of the six pickers.
+   *
+   * LIVE branches only. A retired one keeps every existing assignment readable on a person's record and
+   * simply stops being offered for new work, which is the same rule `BranchRepository.list()` applies
+   * to every other picker.
+   */
+  branch: {
+    searchLabel: 'entitySearchBranchLabel',
+    placeholder: 'entitySearchBranchPlaceholder',
+    noMatches: 'entitySearchBranchNoMatches',
+    error: 'entitySearchBranchError',
+    minChars: 1,
+    async search(term) {
+      const rows = await searchBranches(term);
+      return rows.map((r) => ({
+        id: r.id,
+        name: { en: r.name, ar: r.nameAr },
+      }));
+    },
+  },
+
   auditActor: {
     searchLabel: 'entitySearchActorLabel',
     placeholder: 'entitySearchActorPlaceholder',
@@ -237,7 +416,7 @@ export function EntitySearch({
   label: string;
   required?: boolean;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const source = ENTITY_SOURCES[kind];
   const listId = useId();
   const optionId = (index: number) => `${listId}-option-${index}`;
@@ -365,7 +544,19 @@ export function EntitySearch({
    * quietly undo rule 2 while fixing the usability. The identifier never enters this box: it appears
    * only on an option line, where it is what tells two companies of the same name apart.
    */
-  const shown = selected ? selected.name : term;
+  /**
+   * A name resolved for THIS reader. One function, used by the input's value, the option list and the
+   * selected label, so the three cannot disagree about which language form to show.
+   *
+   * The English form is the fallback rather than the other way round, because every record has one and
+   * the Arabic form is optional on an insurer and a branch.
+   */
+  const nameFor = (name: EntityName): string =>
+    typeof name === 'string'
+      ? name
+      : (language === 'AR' ? name.ar || name.en : name.en);
+
+  const shown = selected ? nameFor(selected.name) : term;
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -503,7 +694,7 @@ export function EntitySearch({
                   onMouseEnter={() => setActive(index)}
                   data-entity-search-option={option.id}
                 >
-                  <bdi>{option.name}</bdi>
+                  <bdi>{nameFor(option.name)}</bdi>
                   {detail ? (
                     <span style={hintStyle}>
                       {' — '}

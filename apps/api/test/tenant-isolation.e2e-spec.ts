@@ -1166,9 +1166,18 @@ describe('Part V — a session is refused on another office’s subdomain (item 
 describe('Part V — a bulk import cannot write into another office (item 11)', () => {
   it('ignores an organizationId column naming office B and writes into office A', async () => {
     const spoofed = `Spoofed Import ${Date.now()}`;
+    // A REGISTRATION NUMBER, as of 2026-10-02. The import now validates every row against
+    // `CreateCustomerDto` — the same rules the single-customer route enforces — and that DTO requires a
+    // commercial registration number on a CORPORATE row. Without one this row is refused as BAD_DATA,
+    // the POST still answers 201 (refuse-and-report, by design), and the row this test needs in order
+    // to say WHERE it landed is never written at all.
+    //
+    // The number is incidental to what is asserted here, which is that an `organizationId` column in
+    // the FILE cannot redirect the write. CI caught this; the local batch could not, because it was
+    // scoped to the blast radius and `tenant-isolation` is not in it.
     const csv = [
-      'Client Name,Kind,organizationId,organisation_id,org',
-      `${spoofed},CORPORATE,${ORG_B_ID},${ORG_B_ID},${ORG_B_ID}`,
+      'Client Name,Kind,Reg,organizationId,organisation_id,org',
+      `${spoofed},CORPORATE,SPOOF-${Date.now()},${ORG_B_ID},${ORG_B_ID},${ORG_B_ID}`,
     ].join('\n');
 
     await request(app!.getHttpServer())
@@ -1176,7 +1185,11 @@ describe('Part V — a bulk import cannot write into another office (item 11)', 
       .set(bearer(isolationAdmin.accessToken))
       .field(
         'mapping',
-        JSON.stringify({ legalName: 'Client Name', customerType: 'Kind' }),
+        JSON.stringify({
+          legalName: 'Client Name',
+          customerType: 'Kind',
+          registrationNumber: 'Reg',
+        }),
       )
       .attach('file', Buffer.from(csv, 'utf8'), 'spoofed.csv')
       .expect(201);

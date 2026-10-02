@@ -66,6 +66,10 @@ export interface CreateCustomerInput {
   contactEmail: string;
   languagePreference: LanguagePreference;
   prospectId?: string;
+  /** LAYER 1 — the officer's answer to "a customer with this name already exists". Sent only when the
+   * warning actually fired; a create with no warning behind it carries neither field. */
+  duplicateNameSamePerson?: boolean;
+  duplicateNameMatchCount?: number;
 }
 
 export interface ListCustomersFilter {
@@ -128,6 +132,52 @@ export type RevealableField = 'nationalId' | 'contactPhone' | 'contactEmail';
 
 export function createCustomer(input: CreateCustomerInput): Promise<Customer> {
   return apiPost('/customers', input);
+}
+
+/** One same-name customer the officer is shown, so they can recognise the person rather than a count. */
+export interface DuplicateNameMatch {
+  id: string;
+  legalName: string;
+  status: string;
+}
+
+export interface DuplicateNameCheck {
+  canonicalKey: string;
+  matches: DuplicateNameMatch[];
+}
+
+/**
+ * LAYER 1 of duplicate prevention: does a customer with this person's name already exist?
+ *
+ * Keyed on the ORDERED canonical person key, which is a different key from the one behind the insurer
+ * directory: that one SORTS its tokens so two spellings of one company merge, and sorting merges two
+ * cousins who share three of four name parts. Measured on dev before the keys were built — the sorted
+ * key folded 15 individuals into collisions including 8 genuine cousin pairs, the ordered key folded 7
+ * and no cousins.
+ *
+ * INDIVIDUAL only. A company is keyed on its public registration number by a hard unique index, so
+ * there is nothing to ask about — the write is simply refused.
+ */
+export function checkDuplicateCustomerName(
+  legalName: string,
+): Promise<DuplicateNameCheck> {
+  return apiGet(
+    `/customers/duplicate-name-check?legalName=${encodeURIComponent(legalName)}`,
+  );
+}
+
+/**
+ * Records that the warning WORKED — the officer recognised the person and did not create a second row.
+ *
+ * Called instead of `createCustomer`, never beside it. This is the outcome a flag on the customer could
+ * not record, because there is no customer; without it the measurement behind the deferred layer-2
+ * decision would count only the times the warning was ignored.
+ */
+export function recordAbandonedDuplicate(input: {
+  legalName: string;
+  matchCount: number;
+}): Promise<{ recorded: true }> {
+  return apiPost('/customers/duplicate-name-abandoned', input);
 }
 
 /**

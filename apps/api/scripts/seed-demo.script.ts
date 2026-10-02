@@ -421,16 +421,56 @@ const INSURER_SEEDS: InsurerSeed[] = [
   { legalName: 'Al-Manara Insurance (demo)', legalNameAr: 'شركة المنارة للتأمين', lines: ['Group Medical', 'Group Life', 'Public Liability'] },
 ];
 
+/**
+ * Ordered four-part names already handed out by this run, so the generator cannot draw one twice.
+ *
+ * ## Why this exists — a finding about the GENERATOR, not about the data
+ *
+ * Measured on dev: **135 employees, 134 distinct ordered name keys, exactly one collision.** Two
+ * separately-generated people drew `آية ناصر عادل الخوالدة` ten days apart — different positions,
+ * different hire dates, two independent runs.
+ *
+ * That is not bad luck, it is arithmetic. Four independent `pick()` calls over these pools give roughly
+ * twenty-four thousand combinations, so at 135 draws the birthday problem puts a collision at about one
+ * in three. **A generator whose collision rate is the collision rate of its pool will keep producing
+ * these, and the next one lands on whichever table gets a unique key next.** Fixing it once is cheaper
+ * than resolving it per table — which is why this is a `Set` and not a rename of one row.
+ *
+ * The UNIQUENESS IS ON THE ORDERED KEY, matching `canonical_person_key` rather than the sorted company
+ * key: the generator must not produce two people whose names differ only in word order either, since
+ * for a person that IS a different person and the demo data should not contain accidental cousins of
+ * itself.
+ */
+const USED_PERSON_NAMES = new Set<string>();
+
 function personName(): { given: string; father: string; grandfather: string; family: string; gender: 'M' | 'F' } {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const gender: 'M' | 'F' = Math.random() < 0.6 ? 'M' : 'F';
+    const given = gender === 'M' ? pick(GIVEN_NAMES_M) : pick(GIVEN_NAMES_F);
+    const father = pick(MIDDLE_NAMES);
+    // A person is not their own father's namesake twice over: "X Y Y Z" reads as a data error rather
+    // than a name, and it halves the usable space for no gain.
+    const grandfather = MIDDLE_NAMES.filter((n) => n !== father)[
+      Math.floor(Math.random() * (MIDDLE_NAMES.length - 1))
+    ] as string;
+    const family = pick(FAMILY_NAMES);
+    const key = [given, father, grandfather, family].join(' ');
+    if (!USED_PERSON_NAMES.has(key)) {
+      USED_PERSON_NAMES.add(key);
+      return { given, father, grandfather, family, gender };
+    }
+  }
+  // The pool is exhausted rather than unlucky. A DISTINGUISHING FAMILY NAME beats a silent duplicate:
+  // the demo data stays plausible, the uniqueness holds, and the suffix says plainly that the generator
+  // ran out rather than pretending it did not.
   const gender: 'M' | 'F' = Math.random() < 0.6 ? 'M' : 'F';
   const given = gender === 'M' ? pick(GIVEN_NAMES_M) : pick(GIVEN_NAMES_F);
-  return {
-    given,
-    father: pick(MIDDLE_NAMES),
-    grandfather: pick(MIDDLE_NAMES),
-    family: pick(FAMILY_NAMES),
-    gender,
-  };
+  const father = pick(MIDDLE_NAMES);
+  const grandfather = pick(MIDDLE_NAMES);
+  const family = `${pick(FAMILY_NAMES)}-${USED_PERSON_NAMES.size + 1}`;
+  const key = [given, father, grandfather, family].join(' ');
+  USED_PERSON_NAMES.add(key);
+  return { given, father, grandfather, family, gender };
 }
 
 function companyName(): string {

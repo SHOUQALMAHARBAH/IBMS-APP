@@ -24,6 +24,8 @@ import { ProspectRepository } from '../../repositories/prospect.repository';
 import { AuditService } from '../audit/audit.service';
 import { EncryptionService } from '../security/encryption.service';
 import { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
+import { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
+import { duplicatePersonConflict } from '../../common/duplicate-person-conflict';
 import {
   encryptEntityFields,
   decryptEntityFields,
@@ -61,6 +63,14 @@ export const CUSTOMER_NATIONAL_ID_REVEAL = 'customer.national-id.reveal';
  * complete answer — "these are the only three customers called Ahmad" when there are forty.
  */
 export const CUSTOMER_SEARCH_MAX_RESULTS = 10;
+
+/**
+ * How many same-name customers the create screen shows an officer.
+ *
+ * Bounded for the same reason the search is: a name shared by forty people is a list nobody reads, and
+ * the officer needs enough to RECOGNISE the person rather than a complete census.
+ */
+export const DUPLICATE_NAME_MATCH_LIMIT = 5;
 
 /**
  * What a narrow customer search returns. Narrower than a list row, on purpose.
@@ -112,6 +122,7 @@ export class CustomerService {
     private readonly audit: AuditService,
     private readonly encryption: EncryptionService,
     private readonly reveal: SensitiveFieldRevealService,
+    private readonly duplicateWarnings: DuplicateNameWarningRepository,
   ) {}
 
   /** Decrypts and masks the three `-- ENCRYPT` fields for API responses —
@@ -182,10 +193,49 @@ export class CustomerService {
     };
   }
 
+  /**
+   * LAYER 1: does a customer with this person's ORDERED canonical name already exist?
+   *
+   * Called by the create screen BEFORE it submits, so the officer is asked while they can still act on
+   * the answer. Returns the matches rather than a boolean, because "a duplicate exists" gives somebody
+   * nothing to judge and the judgement is the whole mechanism.
+   *
+   * INDIVIDUAL only. A company is keyed on its public registration number by a HARD unique index
+   * (migration 20261107100000), so there is nothing to ask about — the write is simply refused, which
+   * is the right behaviour for a key that cannot have two legitimate holders.
+   */
+  async checkDuplicateName(
+    legalName: string,
+    actor: AuthenticatedUser,
+  ): Promise<{
+    canonicalKey: string;
+    matches: { id: string; legalName: string; status: string }[];
+  }> {
+    const trimmed = legalName.trim();
+    if (trimmed === '') return { canonicalKey: '', matches: [] };
+    const [canonicalKey, matches] = await Promise.all([
+      this.customers.canonicalPersonKey(trimmed),
+      this.customers.findByCanonicalPersonName(
+        actor.organizationId,
+        trimmed,
+        DUPLICATE_NAME_MATCH_LIMIT,
+      ),
+    ]);
+    return { canonicalKey, matches };
+  }
+
+  /**
+   * Takes the ACTOR rather than a bare user id, as of 2026-10-02.
+   *
+   * The duplicate-registration-number pre-check needs the office, and `organizationId` is not derivable
+   * from a user id without a second query. Every other write on this service already takes the actor;
+   * `create` was the outlier because it predates them.
+   */
   async create(
     dto: CreateCustomerDto,
-    actorUserId: string,
+    actor: AuthenticatedUser,
   ): Promise<MaskedCustomer> {
+    const actorUserId = actor.id;
     if (dto.prospectId) {
       const prospect = await this.prospects.findById(dto.prospectId);
       // Same ownership-hiding NotFoundException pattern as
@@ -215,6 +265,38 @@ export class CustomerService {
           familyName: dto.familyName!,
         })
       : dto.legalName!;
+
+    /**
+     * THE PRECISE 409 FOR A DUPLICATE REGISTRATION NUMBER, and it has to be a pre-check.
+     *
+     * `Customer_one_company_per_registration_number` already refuses this row — that index is the real
+     * invariant per `race-safe-invariants.md` and this does not replace it. What a pre-check can do and
+     * the index cannot is SAY WHICH COMPANY: measured, a P2002 arriving through the tenant-extended
+     * client carries `target: null` and the message `Unique constraint failed on the (not available)`,
+     * so from inside a service there is no way to tell this constraint from any other on the table.
+     *
+     * CORPORATE ONLY. The individual key is a WARNING rather than a refusal — two real people share a
+     * name, and 7 of dev's 1,634 individuals collide on the ordered key — so an individual duplicate is
+     * answered by the create screen's question (`checkDuplicateName`), not by a 409. A company's
+     * registration number has exactly one holder, which is why that half is hard.
+     *
+     * Same pattern as `SlaPolicyService.createHoliday`: pre-check for the message, constraint for the
+     * truth.
+     */
+    if (!isIndividual) {
+      const collision = await this.customers.findCanonicalCollision(
+        actor.organizationId,
+        {
+          customerType: 'CORPORATE',
+          registrationNumber: dto.registrationNumber,
+        },
+      );
+      if (collision) {
+        throw new ConflictException(
+          `A company with commercial registration number ${dto.registrationNumber} is already recorded in this office: ${collision.legalName}. Open that customer rather than creating a second record — a registration number identifies exactly one company.`,
+        );
+      }
+    }
 
     const id = randomUUID();
     const encrypted = await encryptEntityFields(
@@ -256,12 +338,24 @@ export class CustomerService {
         ownerUserId: actorUserId,
       });
     } catch (err) {
-      // `Customer.prospectId @unique` — a concurrent (or retried) second
-      // conversion of the same Prospect. The DB constraint is the real
-      // invariant (race-safe-invariants.md); this only turns the resulting
-      // P2002 into the 409 every comparable create in this codebase returns,
-      // instead of an unhandled 500. Mirrors ProspectService.convert().
+      /**
+       * THE ORDER IS THE FIX, and it runs prospect-first.
+       *
+       * This catch used to report *"Prospect <id> has already been converted to a Customer"* for ANY
+       * P2002 — correct while `Customer.prospectId @unique` was the table's only unique constraint, and
+       * wrong the moment `Customer_one_company_per_registration_number` landed with migration
+       * 20261107100000: a duplicate registration number was reported as a prospect-conversion conflict,
+       * and as `Prospect undefined` when no prospect was involved. Found by the api e2e suite's own
+       * fixtures the day the index shipped.
+       *
+       * The prospect branch stays FIRST because it is the precise one and it is conditional on
+       * `dto.prospectId` being present. `duplicatePersonConflict` is the generic backstop beneath it —
+       * it can name the entity and not the constraint, because a P2002 arriving through the tenant
+       * extension carries `target: null`. The PRECISE registration-number message comes from the
+       * pre-check above the write, not from here.
+       */
       if (
+        dto.prospectId &&
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
@@ -269,6 +363,9 @@ export class CustomerService {
           `Prospect ${dto.prospectId} has already been converted to a Customer.`,
         );
       }
+
+      const duplicatePerson = duplicatePersonConflict(err);
+      if (duplicatePerson) throw duplicatePerson;
       throw err;
     }
 
@@ -293,7 +390,51 @@ export class CustomerService {
       // best-effort — see comment above
     }
 
+    // LAYER 1's RECORD. Written only when the screen actually asked — `undefined` means no warning
+    // fired, and recording a row for every ordinary create would make the measurement meaningless.
+    //
+    // Best-effort for the same reason as the audit row above: the customer is already written, and
+    // failing the request now would report a failure for work that succeeded. The cost of losing one is
+    // one data point in a measurement, which is the right thing to lose here.
+    if (dto.duplicateNameSamePerson !== undefined) {
+      try {
+        await this.duplicateWarnings.record({
+          actorUserId,
+          canonicalKey: await this.customers.canonicalPersonKey(legalName),
+          matchCount: dto.duplicateNameMatchCount ?? 0,
+          samePerson: dto.duplicateNameSamePerson,
+          createdCustomerId: customer.id,
+        });
+      } catch {
+        // best-effort — see above
+      }
+    }
+
     return this.toMasked(customer, actorUserId);
+  }
+
+  /**
+   * LAYER 1's OTHER HALF: the officer saw the warning and did NOT create the customer.
+   *
+   * This is the outcome the warning exists to produce, and it is the one a flag on `Customer` could
+   * never record — there is no customer row to carry it. Without this route the measurement would count
+   * only the times the warning was ignored, which inverts what it is for: a high "ignored" count with no
+   * "heeded" count reads as a useless warning when it may be a working one.
+   */
+  async recordAbandonedDuplicate(
+    input: { legalName: string; matchCount: number },
+    actorUserId: string,
+  ): Promise<{ recorded: true }> {
+    await this.duplicateWarnings.record({
+      actorUserId,
+      canonicalKey: await this.customers.canonicalPersonKey(
+        input.legalName.trim(),
+      ),
+      matchCount: input.matchCount,
+      samePerson: true,
+      // No `createdCustomerId` — that null IS the finding.
+    });
+    return { recorded: true };
   }
 
   /** A Sales Officer sees only their own book of customers regardless of
@@ -733,25 +874,49 @@ export class CustomerService {
       familyName: dto.familyName,
     });
 
-    const ubo = await this.customers.createUbo({
-      id,
+    // THE PRECISE 409 FOR A DUPLICATE BENEFICIAL OWNER. Pre-check for the message, index for the truth
+    // — the same split as the registration number above, and for the same measured reason.
+    const existingUbo = await this.customers.findUboByCanonicalPersonName(
       customerId,
       fullName,
-      givenName: dto.givenName,
-      fatherName: dto.fatherName,
-      grandfatherName: dto.grandfatherName,
-      familyName: dto.familyName,
-      nationalIdEnc: encrypted.nationalIdEnc,
-      ownershipPercent:
-        dto.ownershipPercent !== undefined
-          ? new Prisma.Decimal(dto.ownershipPercent)
-          : undefined,
-      isAuthorizedSignatory: dto.isAuthorizedSignatory ?? false,
-      isPep: dto.isPep,
-      // Part B §11 — screening discriminators.
-      dateOfBirth: parseDateOnly(dto.dateOfBirth),
-      nationality: dto.nationality,
-    });
+    );
+    if (existingUbo) {
+      throw new ConflictException(
+        `${existingUbo.fullName} is already recorded as a beneficial owner of this customer. Check that entry rather than adding a second one.`,
+      );
+    }
+
+    // THE UBO INDEX MUST NOT SURFACE AS A 500 EITHER.
+    // `UltimateBeneficialOwner_one_person_per_customer` (migration 20261107100000) refuses a second
+    // beneficial owner whose ordered canonical name matches one already recorded against this customer
+    // — and a 500 tells an officer the system is broken when the answer is "that person is already
+    // listed". Same treatment as the employee create; see `common/duplicate-person-conflict.ts`.
+    let ubo: UltimateBeneficialOwner;
+    try {
+      ubo = await this.customers.createUbo({
+        id,
+        customerId,
+        fullName,
+        givenName: dto.givenName,
+        fatherName: dto.fatherName,
+        grandfatherName: dto.grandfatherName,
+        familyName: dto.familyName,
+        nationalIdEnc: encrypted.nationalIdEnc,
+        ownershipPercent:
+          dto.ownershipPercent !== undefined
+            ? new Prisma.Decimal(dto.ownershipPercent)
+            : undefined,
+        isAuthorizedSignatory: dto.isAuthorizedSignatory ?? false,
+        isPep: dto.isPep,
+        // Part B §11 — screening discriminators.
+        dateOfBirth: parseDateOnly(dto.dateOfBirth),
+        nationality: dto.nationality,
+      });
+    } catch (err) {
+      const conflict = duplicatePersonConflict(err);
+      if (conflict) throw conflict;
+      throw err;
+    }
 
     try {
       await this.audit.record({

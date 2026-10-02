@@ -61,6 +61,24 @@ forgets, and this field's only real risk is becoming a customer directory by inc
 | nothing at all on an empty query | the same mandatory `q` — the route has no unfiltered mode |
 | every search recorded | an audit row that is **not** `safeAudit` |
 
+### A FIFTH thing that had to be enforced, and it was missed — 2026-10-02
+
+**Who may reach the route at all.** It shipped gated on `customer.read`, with a comment arguing that
+finding a customer is the same act as listing one. Right for nine of the ten roles that need it and
+wrong for the one whose screen it matters most to: **the DATA_PROTECTION_OFFICER holds `dsr.log` and
+NOT `customer.read`, and `/dsr` — logging a data-subject request against a named customer — is their
+screen.** So the field built to fix a usability complaint was unusable by the DPO the day after it
+shipped.
+
+Found by `scripts/measurements/picker-route-reachability.mjs`, written for the four pickers added the
+next day. The gate is now `CUSTOMER_SEARCH_CODES` in `apps/api/src/common/picker-search.config.ts`,
+which is the union of the permissions of the screens that use the field — the owner's rule, applied
+retroactively to the route that prompted it.
+
+The four conditions above are unaffected: a widened GATE and a relaxed CONDITION are different things,
+and `picker-search-gates.e2e-spec.ts` asserts the three-character floor still refuses two characters
+and a whitespace-only query for the DPO specifically.
+
 **The audit row is deliberately not best-effort.** Every other audit call on `CustomerService` is, because
 losing the record of a contact correction is worse than failing the correction. Here the record of who
 searched for whom IS the control, so a failure to write it fails the request. Same decision, same

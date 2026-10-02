@@ -306,6 +306,91 @@ export class CustomerRepository {
     });
   }
 
+  /**
+   * Does a customer with this canonical key already exist in this office? Returns the row it would
+   * collide with, so the import can NAME it in its report rather than saying "duplicate".
+   *
+   * TWO KEYS, chosen by the row's TYPE, and that choice is the whole correctness of this method:
+   *
+   *   INDIVIDUAL  `canonical_person_key(legalName)` — ORDER PRESERVED, because a Jordanian name is
+   *               given + father + grandfather + family and swapping the middle two names a different
+   *               ancestry. Using the sorted key here merges two cousins into one person.
+   *   CORPORATE   `canonical_name_key(registrationNumber)` — the public registration number, where
+   *               token order is noise and the sort is correct.
+   *
+   * ONE TEST FOR BOTH would be the cousin mistake in a new place, which is why this takes the type.
+   *
+   * Raw SQL because both keys are SQL functions with no Prisma equivalent. The office filter is
+   * explicit rather than relying on the extension: `$queryRaw` does not go through it.
+   */
+  async findCanonicalCollision(
+    organizationId: string,
+    row:
+      | { customerType: 'INDIVIDUAL'; legalName: string }
+      | { customerType: 'CORPORATE'; registrationNumber: string | undefined },
+  ): Promise<{ id: string; legalName: string } | null> {
+    const rows =
+      row.customerType === 'INDIVIDUAL'
+        ? await this.prisma.client.$queryRaw<
+            { id: string; legalName: string }[]
+          >`
+            SELECT id, "legalName" FROM "Customer"
+            WHERE "organizationId" = ${organizationId}
+              AND "customerType" = 'INDIVIDUAL'
+              AND canonical_person_key("legalName") = canonical_person_key(${row.legalName})
+            LIMIT 1`
+        : row.registrationNumber === undefined ||
+            row.registrationNumber.trim() === ''
+          ? // No number is not a collision. The index is partial on `registrationNumber IS NOT NULL`
+            // for the same reason, and claiming a duplicate here would refuse every numberless row
+            // after the first.
+            []
+          : await this.prisma.client.$queryRaw<
+              { id: string; legalName: string }[]
+            >`
+              SELECT id, "legalName" FROM "Customer"
+              WHERE "organizationId" = ${organizationId}
+                AND "customerType" = 'CORPORATE'
+                AND "registrationNumber" IS NOT NULL
+                AND canonical_name_key("registrationNumber") = canonical_name_key(${row.registrationNumber})
+              LIMIT 1`;
+    return rows[0] ?? null;
+  }
+
+  /**
+   * LAYER 1's lookup: which existing customers share this person's ORDERED canonical name?
+   *
+   * Distinct from `findCanonicalCollision` above, which answers yes/no for the import's hard refusal.
+   * This one is for the create screen and returns the MATCHES, because the officer is being asked to
+   * judge whether one of them is the same person and a bare "a duplicate exists" gives them nothing to
+   * judge with.
+   *
+   * Bounded. A name shared by forty people is a list nobody reads, and the officer needs enough to
+   * recognise the person rather than a complete census.
+   */
+  async findByCanonicalPersonName(
+    organizationId: string,
+    legalName: string,
+    take: number,
+  ): Promise<{ id: string; legalName: string; status: string }[]> {
+    return this.prisma.client.$queryRaw<
+      { id: string; legalName: string; status: string }[]
+    >`
+      SELECT id, "legalName", status::text AS status FROM "Customer"
+      WHERE "organizationId" = ${organizationId}
+        AND "customerType" = 'INDIVIDUAL'
+        AND canonical_person_key("legalName") = canonical_person_key(${legalName})
+      ORDER BY "createdAt" ASC
+      LIMIT ${take}`;
+  }
+
+  /** The ordered canonical key of a name, as the database computes it — never recomputed in TS. */
+  async canonicalPersonKey(legalName: string): Promise<string> {
+    const rows = await this.prisma.client.$queryRaw<{ k: string }[]>`
+      SELECT canonical_person_key(${legalName}) AS k`;
+    return rows[0]?.k ?? '';
+  }
+
   /** Every ACTIVE customer — used by the recurring screening batch
    * (screening-batch.scheduler.ts) to find who a "material change" rerun
    * should cover. */
@@ -326,6 +411,32 @@ export class CustomerRepository {
       where: { customerId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Is this person already a beneficial owner of this customer? — the PRE-CHECK for the precise 409.
+   *
+   * `UltimateBeneficialOwner_one_person_per_customer` already refuses the row, and that index is the
+   * real invariant. What a pre-check adds is the message: a P2002 arriving through the tenant-extended
+   * client carries `target: null`, so from inside a service there is no way to tell which constraint
+   * fired. Measured, not assumed — see `common/duplicate-person-conflict.ts`.
+   *
+   * Keyed on the ORDERED person key, the same one the index uses. The sorted key would merge two
+   * cousins who share three of four name parts, which on a UBO register is a real pair and not an edge
+   * case.
+   */
+  async findUboByCanonicalPersonName(
+    customerId: string,
+    fullName: string,
+  ): Promise<{ id: string; fullName: string } | null> {
+    const rows = await this.prisma.client.$queryRaw<
+      { id: string; fullName: string }[]
+    >`
+      SELECT id, "fullName" FROM "UltimateBeneficialOwner"
+      WHERE "customerId" = ${customerId}
+        AND canonical_person_key("fullName") = canonical_person_key(${fullName})
+      LIMIT 1`;
+    return rows[0] ?? null;
   }
 
   createDocument(input: CreateCustomerDocumentInput): Promise<Document> {

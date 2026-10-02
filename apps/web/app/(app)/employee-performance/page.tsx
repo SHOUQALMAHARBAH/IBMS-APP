@@ -13,6 +13,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -123,14 +124,13 @@ export default function EmployeePerformancePage() {
 
       <form onSubmit={onLookup} style={formStyle}>
         <h2>{t('epLookUp')}</h2>
-        <label style={labelStyle}>
-          {t('epEmployeeIdLabel')}
-          <input
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-            required
-          />
-        </label>
+        <EntitySearch
+          kind="employee"
+          value={employeeId}
+          onChange={setEmployeeId}
+          label={t('epEmployeeIdLabel')}
+          required
+        />
         <button type="submit">{t('epViewButton')}</button>
       </form>
 

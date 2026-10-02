@@ -36,6 +36,9 @@ import {
 } from '../checker-roles.config';
 import { DepartmentRepository } from '../../../repositories/department.repository';
 import { BranchRepository } from '../../../repositories/branch.repository';
+import { PICKER_MAX_RESULTS } from '../../../common/picker-search.config';
+import type { AuthenticatedUser } from '../../auth/auth.types';
+import type { SearchUsersDto } from '../../../common/picker-search.dto';
 
 /** A book-wide admin list is a console view, not a report — capped like every
  * other unbounded read in this codebase (`ANALYTICS_POLICY_LIMIT` et al). */
@@ -93,6 +96,17 @@ export interface AdminUserView {
 }
 
 /**
+ * What the user picker returns. TWO fields — an id and the name a colleague would recognise.
+ *
+ * No email, no roles, no account state. `GET /audit-trail/actors` set the precedent and said why; this
+ * route is reachable by more readers than that one, so the same restraint applies with more force.
+ */
+export interface UserPickerResult {
+  id: string;
+  name: string;
+}
+
+/**
  * Backlog A.2 — "Seed the 11 roles ... Build the full permission grid ...
  * Permission-check middleware on every sensitive endpoint". Those three
  * shipped, but nothing ever granted a role to a user: `POST /auth/signup`
@@ -111,6 +125,50 @@ export interface AdminUserView {
 @Injectable()
 export class UserAdminService {
   private readonly logger = new Logger(UserAdminService.name);
+
+  /**
+   * THE USER PICKER. Five screens name an OWNER of something — an information asset, a licence, a
+   * payment channel, a consent record, a sales target — and every one of them typed a uuid.
+   *
+   * AUDITED, because the result names COLLEAGUES. The same reasoning as the employee search: a record
+   * of who went looking for whom is the control over a route that enumerates staff, and this one is
+   * reachable by more readers than `GET /admin/users` is.
+   *
+   * Three fields and no email — see `UserRepository.searchForPicker`. The precedent is
+   * `GET /audit-trail/actors`, which withholds the email for the same reason.
+   */
+  async searchForPicker(
+    dto: SearchUsersDto,
+    actor: AuthenticatedUser,
+  ): Promise<UserPickerResult[]> {
+    const rows = await this.users.searchForPicker(
+      dto.q,
+      PICKER_MAX_RESULTS.user,
+    );
+
+    await this.audit.record({
+      userId: actor.id,
+      action: 'READ',
+      entityType: 'UserSearch',
+      entityId: actor.id,
+      afterValue: {
+        term: dto.q,
+        matchedUserIds: rows.map((r) => r.id),
+        matchCount: rows.length,
+        truncated: rows.length === PICKER_MAX_RESULTS.user,
+      },
+      isSensitiveDataAccess: true,
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      // The linked HR record's name wins, because that is the name the person sees in their own navbar
+      // and the one a colleague would recognise; `User.fullName` is free text typed at provisioning.
+      // Same rule as `common/display-name.util.ts`, which this deliberately mirrors rather than
+      // re-deciding.
+      name: r.employee?.fullName ?? r.fullName,
+    }));
+  }
 
   constructor(
     private readonly departments: DepartmentRepository,

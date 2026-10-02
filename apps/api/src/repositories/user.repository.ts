@@ -316,6 +316,62 @@ export class UserRepository {
 
   /** One page of users with their ACTIVE roles, for the admin console.
    * Never selects `passwordHash`. */
+  /**
+   * The USER PICKER's read — five screens name an OWNER of something and every one typed a uuid.
+   *
+   * ## Narrower in CONTENT than `listWithRoles`, not merely in filtering
+   *
+   * Three fields: id, the display name, and whether the account is active. NO EMAIL and no role list.
+   * The precedent is `GET /audit-trail/actors`, whose own comment explains why an email beside every
+   * actor would put a contact list in front of a read-only auditor for no gain to the question asked —
+   * and this route is reachable by more readers than that one, on five screens whose question is only
+   * "who owns this record".
+   *
+   * ## It searches the EMPLOYEE's name as well as the account's
+   *
+   * `User.fullName` is free text typed at provisioning; the linked HR record's name is the one the
+   * person sees in their own navbar and the one a colleague would type. Searching only the account name
+   * would make somebody unfindable by the name the rest of the system shows for them — the display-name
+   * split `common/display-name.util.ts` exists for, applied to a search.
+   *
+   * ## Active accounts only
+   *
+   * A deactivated account keeps every record it already owns readable, and offering it in a picker
+   * would invite assigning new work to somebody who has left. Same split as the branch and insurer
+   * pickers. Within the access window is NOT checked here, deliberately: `canActToday` is the predicate
+   * for being asked to DO something (assigning a screening reviewer), while owning an information asset
+   * is a standing fact that survives a few days outside a window.
+   */
+  searchForPicker(
+    term: string,
+    take: number,
+  ): Promise<
+    {
+      id: string;
+      fullName: string;
+      isActive: boolean;
+      employee: { fullName: string } | null;
+    }[]
+  > {
+    const contains = { contains: term, mode: 'insensitive' } as const;
+    return this.prisma.client.user.findMany({
+      where: {
+        isActive: true,
+        OR: [{ fullName: contains }, { employee: { fullName: contains } }],
+      },
+      select: {
+        id: true,
+        fullName: true,
+        isActive: true,
+        employee: { select: { fullName: true } },
+      },
+      // A TOTAL order — two colleagues can share a name, and which one a bounded search truncated away
+      // must not change between identical requests.
+      orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+      take,
+    });
+  }
+
   async listWithRoles(
     take: number,
     skip: number,
