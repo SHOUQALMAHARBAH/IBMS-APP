@@ -95,6 +95,22 @@ async function grantRole(userId: string, roleName: RoleName): Promise<void> {
   }
 }
 
+/**
+ * A value unique to THIS RUN, for any fixture a unique index now constrains.
+ *
+ * `REG-001` and `REG-002` were fixed literals against a CUMULATIVE database, so every run added another
+ * row holding the same number — ten of each by 2026-10-01, which is what blocked migration
+ * 20261107100000's pre-flight check locally. The index is correct and the fixture was wrong: a fixed
+ * value plus a new unique constraint is a test that passes exactly once.
+ *
+ * Identical lesson to the holiday fixture, which created holidays on fixed DATES and hit the
+ * one-per-date constraint on its second local run — a test-hygiene failure wearing the costume of a
+ * permission defect.
+ */
+function uniqueSuffix(): string {
+  return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
 async function makeUser(
   app: INestApplication<App>,
   label: string,
@@ -1095,8 +1111,8 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .set(bearer(sales.accessToken))
         .send({
           customerType: 'CORPORATE',
-          legalName: 'UBO Trading Co.',
-          registrationNumber: 'REG-001',
+          legalName: `UBO Trading Co. ${uniqueSuffix()}`,
+          registrationNumber: `REG-UBO-${uniqueSuffix()}`,
           registeredAddress: 'Amman, Jordan',
           natureOfBusiness: 'Trading',
           contactPhone: '+962-7-1111111',
@@ -1143,8 +1159,8 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .set(bearer(sales.accessToken))
         .send({
           customerType: 'CORPORATE',
-          legalName: 'UBO Name Parts Co.',
-          registrationNumber: 'REG-002',
+          legalName: `UBO Name Parts Co. ${uniqueSuffix()}`,
+          registrationNumber: `REG-PARTS-${uniqueSuffix()}`,
           registeredAddress: 'Amman, Jordan',
           natureOfBusiness: 'Trading',
           contactPhone: '+962-7-2222222',

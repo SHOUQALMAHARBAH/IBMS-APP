@@ -27,6 +27,8 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Actioning a usability complaint | Measuring it — the leak was behind one |
 | Protecting a field because of its neighbour | Deriving protection from the fact it holds |
 | Searching for the component you changed | Searching for the screens, from the inventory you already hold |
+| Explaining a fault you did not read the tool's output for | Reading it — the tool probably said it |
+| Anchoring a negative on its container | Anchoring it on something the role actually holds |
 
 The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
 THE SAME, and only care separates them. Care is not a control — it is the thing that was
@@ -221,6 +223,55 @@ specs driving the control, and one of those specs was written only because CI fa
 best-proven.** Said here rather than in a commit message because it is the sentence a future reader
 needs before touching it, and because an a11y suite passing is not the same claim as an a11y behaviour
 being verified.
+
+## A tool whose output you discard cannot be said not to complain
+
+**2026-10-01.** Running the plant tool as `node scripts/plant.mjs --revert` is a USAGE ERROR — it needs
+the plants file and the plant name. The tool said so, every single time, and exited non-zero. I had
+written `>/dev/null 2>&1` after it.
+
+What made it expensive was not the mistake, it was the explanation. Plants began accumulating in the
+tree, and rather than reading what the tool had printed I **invented a mechanism**: "`--revert` holds one
+backup slot, so the fourth plant's anchor had already been eaten." Plausible, consistent with the
+symptom, and entirely wrong. The tool's own guard — the guard that exists precisely so a plant cannot
+silently fail — was working, and I was throwing the evidence away and then theorising about the result.
+
+It also stranded a plant in the working tree when a background run was killed, found only by checking
+each of five markers by hand.
+
+> **Before inventing an explanation for a fault, read what the tool said. It probably said it.**
+
+And the narrower operational form: **do not redirect a tool's output to `/dev/null` when you are relying
+on it to have succeeded.** `grep -c PLANTED` or an exit-code check costs nothing; a fabricated mechanism
+costs a wrong diagnosis that then gets written down. This is the fifth instance in two days of
+absence-of-output being read as absence-of-finding, and the first where I went on to construct a theory
+on top of it.
+
+## Anchoring a negative on a container that does not hold the thing
+
+**Two instances, both in nav tests, so this is a pattern rather than a slip.**
+
+`expectNone(target, anchor)` exists because an absence assertion passes trivially on an unrendered page,
+and the anchor is what proves the page rendered. **The anchor has to be something that would be present
+in the failing case too** — and a CONTAINER is not that.
+
+  * § 1.61: `getByRole('link', …)` returned 0 whether the DPO was denied `policy.read` or handed it,
+    because a collapsed `<details>` keeps its anchors out of the accessibility tree.
+  * 2026-10-01: `page.locator('nav').first()` is the TOP NAVBAR, not the sidebar — two `<nav>` landmarks
+    exist, each with its own accessible name. A navbar holds no destination links, so an absence
+    assertion against it is **true for free**, whatever the gating does. It surfaced only because the
+    companion POSITIVE test failed; the negative passed happily.
+
+> **Anchor a negative on something the role actually HOLDS, inside the same container — never on the
+> container itself.** A container that cannot hold the thing makes every negative on it true.
+
+The sidebar is addressed by its accessible name (`getByRole('navigation', { name: /^(Primary|…)$/ })`),
+which is what `sidebar-manager.spec.ts` already did; and the absence of the KYC-queue entry is anchored
+on `/customers`, a destination that role does hold.
+
+The general form, because this is not only about nav: **a negative and a positive assertion on the same
+container is one test, not two.** Writing the positive first is what tells you the container is the right
+one.
 
 ## The standing rule for every number this file publishes
 
