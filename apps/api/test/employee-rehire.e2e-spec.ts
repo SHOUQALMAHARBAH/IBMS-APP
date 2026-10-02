@@ -152,7 +152,7 @@ describe('Employee uniqueness (e2e) — active service only, and a rehire is a n
     const admin = await makeUser(
       'rehire-admin',
       'OFFICE_ADMINISTRATOR' as RoleName,
-      'SYSTEM_SECURITY_ADMINISTRATOR' as RoleName,
+      'SYSTEM_SECURITY_ADMINISTRATOR',
     );
 
     const id = runId();

@@ -306,6 +306,57 @@ export class CustomerRepository {
     });
   }
 
+  /**
+   * Does a customer with this canonical key already exist in this office? Returns the row it would
+   * collide with, so the import can NAME it in its report rather than saying "duplicate".
+   *
+   * TWO KEYS, chosen by the row's TYPE, and that choice is the whole correctness of this method:
+   *
+   *   INDIVIDUAL  `canonical_person_key(legalName)` — ORDER PRESERVED, because a Jordanian name is
+   *               given + father + grandfather + family and swapping the middle two names a different
+   *               ancestry. Using the sorted key here merges two cousins into one person.
+   *   CORPORATE   `canonical_name_key(registrationNumber)` — the public registration number, where
+   *               token order is noise and the sort is correct.
+   *
+   * ONE TEST FOR BOTH would be the cousin mistake in a new place, which is why this takes the type.
+   *
+   * Raw SQL because both keys are SQL functions with no Prisma equivalent. The office filter is
+   * explicit rather than relying on the extension: `$queryRaw` does not go through it.
+   */
+  async findCanonicalCollision(
+    organizationId: string,
+    row:
+      | { customerType: 'INDIVIDUAL'; legalName: string }
+      | { customerType: 'CORPORATE'; registrationNumber: string | undefined },
+  ): Promise<{ id: string; legalName: string } | null> {
+    const rows =
+      row.customerType === 'INDIVIDUAL'
+        ? await this.prisma.client.$queryRaw<
+            { id: string; legalName: string }[]
+          >`
+            SELECT id, "legalName" FROM "Customer"
+            WHERE "organizationId" = ${organizationId}
+              AND "customerType" = 'INDIVIDUAL'
+              AND canonical_person_key("legalName") = canonical_person_key(${row.legalName})
+            LIMIT 1`
+        : row.registrationNumber === undefined ||
+            row.registrationNumber.trim() === ''
+          ? // No number is not a collision. The index is partial on `registrationNumber IS NOT NULL`
+            // for the same reason, and claiming a duplicate here would refuse every numberless row
+            // after the first.
+            []
+          : await this.prisma.client.$queryRaw<
+              { id: string; legalName: string }[]
+            >`
+              SELECT id, "legalName" FROM "Customer"
+              WHERE "organizationId" = ${organizationId}
+                AND "customerType" = 'CORPORATE'
+                AND "registrationNumber" IS NOT NULL
+                AND canonical_name_key("registrationNumber") = canonical_name_key(${row.registrationNumber})
+              LIMIT 1`;
+    return rows[0] ?? null;
+  }
+
   /** Every ACTIVE customer — used by the recurring screening batch
    * (screening-batch.scheduler.ts) to find who a "material change" rerun
    * should cover. */
