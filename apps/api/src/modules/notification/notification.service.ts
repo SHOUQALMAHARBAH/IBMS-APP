@@ -121,6 +121,8 @@ export class NotificationService {
         return this.repo.countOpenTransactionMonitoringAlerts();
       case 'screening_match':
         return this.repo.countPendingScreeningMatches();
+      case 'kyc_awaiting_decision':
+        return this.repo.countKycRecordsAwaitingDecision();
       default:
         return Promise.resolve(0);
     }

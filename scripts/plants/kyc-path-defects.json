@@ -1,0 +1,44 @@
+{
+  "notification-goes-to-the-capturer": {
+    "file": "apps/api/src/modules/notification/notification.config.ts",
+    "from": "    kind: 'kyc_awaiting_decision',\n    permission: 'kyc.approve',",
+    "to": "    kind: 'kyc_awaiting_decision',\n    permission: 'kyc.capture',",
+    "why": "DEFECT 2 reinstated in its exact shape: the notification is keyed on the code the CAPTURING officer holds rather than on the one that can decide the file. `notification.e2e-spec.ts` 'a KYC file awaiting a decision reaches whoever may DECIDE it' must die — the Compliance Officer's feed loses the item, because `kyc.capture` is held by SALES_RELATIONSHIP_OFFICER alone. This is the heavier half of the pair that left a customer NEVER ACTIVATED, and it is a one-word change, which is why it needs a test rather than a careful reading."
+  },
+  "awaiting-decision-counts-decided-files": {
+    "file": "apps/api/src/repositories/notification.repository.ts",
+    "from": "        status: { in: ['SUBMITTED', 'SCREENING', 'EDD', 'COMPLIANCE_REVIEW'] },",
+    "to": "        status: { in: ['APPROVED', 'REJECTED'] },",
+    "why": "The count switches to files that are already DECIDED, so the bell shows a permanent non-zero number that no action can reduce — a notification whose count never reaches zero is one everybody learns to ignore, which is the § 1.1 shape. The same test dies on `count` being absent for the Compliance Officer, because the submitted file this test creates is not in the new set. Pairs with the plant above: one proves WHO is told, this one proves WHAT they are told about."
+  },
+  "customer-page-hides-the-kyc-stage": {
+    "file": "apps/web/app/(app)/customers/[id]/page.tsx",
+    "from": "  const canReadKyc =\n    hasPermission(user, 'kyc.capture') || hasPermission(user, 'kyc.approve');",
+    "to": "  const canReadKyc = false;",
+    "why": "DEFECT 1 reinstated: the stage disappears from the one screen a person opens, so the wizard's 'submit for review' lands on a page that says nothing about what just happened. `kyc-path-visible.spec.ts` 'the customer page names the KYC stage and links to the queue' must die on the stage element being absent, and three of the four defect-1 tests die with it — correct, they are about the same section in different states. PLANTED ON THE PERMISSION, not on the JSX condition: a first version replaced `{canReadKyc ? (` with `{false ? (` and broke the BUILD instead (TS stopped narrowing `kyc` inside an unreachable branch), which is a loud failure but proves nothing about what a test observes. A plant has to leave the code compiling or it cannot demonstrate a test dying."
+  },
+  "kyc-stage-renders-the-raw-enum": {
+    "file": "apps/web/lib/kyc/kyc-status-labels.ts",
+    "from": "  SUBMITTED: 'kycStatusSubmitted',",
+    "to": "  SUBMITTED: 'kycStatusDraft',",
+    "why": "The stage is labelled with the WRONG state — a submitted file reads as a draft, which tells the officer their work did not land. It is the § 1.45 class one step removed: the map is total so a MISSING entry is a type error, but a WRONG entry compiles fine and renders a confident falsehood. 'the customer page names the KYC stage' must die on `toContainText('Submitted')`. A plant on the map rather than on the screen, because the map is the thing two screens now share."
+  },
+  "queue-nav-back-on-the-wrong-code": {
+    "file": "apps/web/components/app/destinations.ts",
+    "from": "        href: '/customers/kyc-queue',\n        labelKey: 'navKycQueue',\n        permissions: ['kyc.capture', 'kyc.approve'],",
+    "to": "        href: '/customers/kyc-queue',\n        labelKey: 'navKycQueue',\n        permissions: ['customer.360-view.read'],",
+    "why": "DEFECT 3 reinstated. 'the queue nav entry follows the codes its ROUTE requires' must die: an Executive holds the 360 read and neither KYC code, so the entry reappears and leads them to a refusal. The companion test (a `kyc.approve` holder DOES get it) still passes, which is what makes the pair meaningful — the fix had to be 'gate it correctly', not 'hide it from everybody', and only the two tests together say so."
+  },
+  "clean-result-renders-nothing-again": {
+    "file": "apps/web/components/customer/KycQueue.tsx",
+    "from": "                    {hold?.level === \"NO_HOLD\" ? (",
+    "to": "                    {false ? (",
+    "why": "DEFECT 4 reinstated: a clean screening result goes back to rendering nothing, so 'clean' is once again inferred from two absences — no badge, and a status that has moved on. 'a clean screening result SAYS so, rather than rendering nothing' must die on the element being absent. The HELD companion test still passes, proving the sentence is conditional rather than unconditional."
+  },
+  "false-sentence-renders-unconditionally": {
+    "file": "apps/web/app/(app)/screening-matches/page.tsx",
+    "from": "      {watchlistReady === true ? (",
+    "to": "      {true ? (",
+    "why": "THE FALSE SENTENCE restored. 'Names are checked against the synced OFAC and UN sanctions lists' renders in the present tense even when the list is empty, so the screen asserts it and then retracts it in the alert below. `screening-matches.spec.ts` 'warns when the local sanctions list is EMPTY' must die in `expectNone` — and the assertion is ANCHORED on the warning, so it cannot pass on a page that rendered neither sentence. The populated-list companion still passes, which is what proves the fix was to CONDITION the sentence rather than delete it."
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
+import { KYC_STATUS_LABEL_KEY } from '../../lib/kyc/kyc-status-labels';
 import {
   approveKyc,
   getScreeningHold,
@@ -45,16 +46,6 @@ const STATUS_TONE: Record<
   PERIODIC_REVIEW_DUE: "warn",
 };
 
-const STATUS_LABEL_KEY: Record<KycStatus, TranslationKey> = {
-  DRAFT: "kycStatusDraft",
-  SUBMITTED: "kycStatusSubmitted",
-  SCREENING: "kycStatusScreening",
-  EDD: "kycStatusEdd",
-  COMPLIANCE_REVIEW: "kycStatusComplianceReview",
-  APPROVED: "kycStatusApproved",
-  REJECTED: "kycStatusRejected",
-  PERIODIC_REVIEW_DUE: "kycStatusPeriodicReviewDue",
-};
 
 const TYPE_LABEL_KEY: Record<"INDIVIDUAL" | "CORPORATE", TranslationKey> = {
   INDIVIDUAL: "customerTypeIndividual",
@@ -178,7 +169,7 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
               </td>
               <td style={queueCellStyle}>
                 <span style={badgeStyle(STATUS_TONE[item.status])}>
-                  {t(STATUS_LABEL_KEY[item.status])}
+                  {t(KYC_STATUS_LABEL_KEY[item.status])}
                 </span>
                 {item.isEdd ? (
                   <div style={{ fontSize: "0.75rem", marginTop: "0.25rem" }}>
@@ -267,6 +258,24 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                           </p>
                         ) : null}
                       </div>
+                    ) : null}
+                    {/* DEFECT 4 of `docs/kyc-path.md`. `NO_HOLD` rendered NOTHING, so a clean result
+                        was inferred from two absences — no badge, and a status that had moved on.
+                        Saying it is honest rather than merely kinder, and the chain is worth knowing
+                        because it is what makes the sentence safe: the built-in provider returns
+                        `UNABLE_TO_SCREEN` on an empty table — never `NO_MATCH`, with its own comment
+                        that "answering NO_MATCH from an empty table is false assurance" — and that
+                        outcome raises `UNRESOLVED_SCREENING`, which is `REVIEW_REQUIRED`. So `NO_HOLD`
+                        cannot occur against an empty list, and the hold config says as much in its own
+                        words: "screening ran against a populated source and found nothing."
+                        Without that chain this sentence would be the forbidden claim. */}
+                    {hold?.level === "NO_HOLD" ? (
+                      <p
+                        data-testid={`kyc-no-hold-${item.id}`}
+                        style={{ fontSize: "0.75rem", opacity: 0.8, margin: 0 }}
+                      >
+                        {t("kycHoldNoMatches")}
+                      </p>
                     ) : null}
                     {hold?.configurationProblems.length ? (
                       <p

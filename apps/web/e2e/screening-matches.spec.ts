@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectNone } from "./support/anchored";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
@@ -161,6 +162,13 @@ test("warns that an empty queue means nothing was CHECKED, not nothing matched",
   await expect(warning).toBeVisible();
   await expect(warning).toContainText("has never run");
   await expect(warning).toContainText("does NOT mean there are no matches");
+
+  // AND THE INTRO SENTENCE IS GONE. It reads "Names are checked against the synced OFAC and UN
+  // sanctions lists" in the PRESENT TENSE, and it used to render unconditionally — so with an empty
+  // list the screen asserted it and then retracted it in the alert above, relying on the reader
+  // reaching the second. The alert being louder is not a reason to leave a false sentence standing.
+  // Anchored on the warning, so this cannot pass on a page that rendered neither.
+  await expectNone(page.getByText("Names are checked against", { exact: false }), warning);
   await capture(page, "empty-watchlist-never-synced");
 });
 
@@ -176,6 +184,11 @@ test("does NOT warn when the watchlist is populated and the queue is genuinely c
   await expect(
     page.getByRole("alert").filter({ hasText: "EMPTY" }),
   ).toHaveCount(0);
+  // AND THE INTRO SENTENCE IS PRESENT, because here it is TRUE. Without this half, hiding the sentence
+  // in every state would pass the test above — the fix would be "delete it" rather than "condition it".
+  await expect(
+    page.getByText("Names are checked against", { exact: false }),
+  ).toBeVisible();
   await capture(page, "empty");
 });
 
