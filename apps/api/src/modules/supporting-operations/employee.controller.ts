@@ -20,6 +20,7 @@ import { UpdateDeprovisioningChecklistDto } from './dto/update-deprovisioning-ch
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { EMPLOYEE_SEARCH_CODES } from '../../common/picker-search.config';
 
 /**
  * Process 66 (backlog Part C #66, Domain H — opens Domain H). `employee.
@@ -42,7 +43,7 @@ export class EmployeeController {
     @Body() dto: CreateEmployeeDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.employees.create(dto, user.id);
+    return this.employees.create(dto, user);
   }
 
   /**
@@ -58,7 +59,20 @@ export class EmployeeController {
    * `q` is mandatory with a two-character floor and is trimmed before the check: see
    * `SearchEmployeesDto`. There is no unfiltered mode on this route.
    */
-  @RequirePermissions('employee.national-id.reveal')
+  /**
+   * WIDENED 2026-10-02 from `employee.national-id.reveal` alone, which is the narrowest code in this
+   * family and the one the route was first built for.
+   *
+   * MEASURED, not argued: that code is held by COMPLIANCE_OFFICER alone, while both screens that type
+   * an `employeeId` are gated on codes held by BRANCH_DEPARTMENT_MANAGER and EXECUTIVE_MANAGEMENT. So
+   * an Executive could not find an employee on the employee performance screen — one of the two screens
+   * that exist for them. See `common/picker-search.config.ts`.
+   *
+   * It discloses nothing new. The result carries five fields and no national ID, and
+   * `employee-search-narrowness.inventory.spec.ts` fails if a sixth arrives. The reveal itself stays on
+   * `employee.national-id.reveal`, at its own route.
+   */
+  @RequirePermissions(...EMPLOYEE_SEARCH_CODES)
   @Get('search')
   search(
     @Query() query: SearchEmployeesDto,

@@ -213,10 +213,15 @@ export function mapRows(
     const legalName = cell(raw, 'legalName');
     const rawType = cell(raw, 'customerType');
 
-    if (!legalName) {
-      rejections.push({ lineNumber, reason: 'legalName is empty' });
-      return;
-    }
+    // THE TWO HAND-ROLLED CHECKS THAT USED TO LIVE HERE ARE GONE — "legalName is empty" and
+    // "customerType must be INDIVIDUAL or CORPORATE". `CreateCustomerDto` expresses both and a dozen
+    // more, and the gap between the two copies was measured: the field-shape rule had been copied
+    // across and the required-field rule had not, so a corporate row with no registration number
+    // imported cleanly. See `legacy-import.validation.ts`.
+    //
+    // ONE check survives here and is not a copy of anything: the TYPE has to be narrowed from free
+    // text before a typed row can exist at all. It is a parse, not a validation — `LegacyImportRow`
+    // cannot hold "Individuel", so there is no object for the DTO to judge.
     const customerType = rawType?.toUpperCase();
     if (customerType !== 'INDIVIDUAL' && customerType !== 'CORPORATE') {
       rejections.push({
@@ -228,7 +233,9 @@ export function mapRows(
 
     rows.push({
       lineNumber,
-      legalName,
+      // Empty is allowed THROUGH the parser deliberately: the DTO refuses it with its own message, and
+      // a parser that rejected it first would be the copy this change removed.
+      legalName: legalName ?? '',
       customerType,
       registrationNumber: cell(raw, 'registrationNumber'),
       nationality: cell(raw, 'nationality'),
@@ -243,13 +250,35 @@ export function mapRows(
 
 /** What the endpoint returns, and (minus the per-row detail) what the single
  * batch audit row records. */
+export interface LegacyImportIssueView {
+  lineNumber: number;
+  /** Mirrors the `LegacyImportIssueKind` enum. The separation is a KIND rather than a wording,
+   *  because as prose "a duplicate is reported differently from bad data" decays into two messages
+   *  that read alike and a screen that lists them together. */
+  kind: 'DUPLICATE' | 'BAD_DATA' | 'IMPORTED_NEEDS_REVIEW';
+  detail: string;
+  /** For a DUPLICATE: the customer the row collided with, so an officer can open it and decide. */
+  collidedWithCustomerId?: string;
+}
+
+/** What the endpoint returns. The SAME content is persisted as a `LegacyImportBatch` and its issues —
+ *  the response is a convenience, the batch is the report. `batchId` is what a screen reads it back by.
+ *
+ *  `rejections` and `failures` are GONE, replaced by one `issues` list carrying a `kind`. Two arrays
+ *  distinguished only by their field name is the shape that let a reader treat an imported-but-
+ *  unscreened row as a refusal. */
 export interface LegacyImportResult {
+  batchId: string;
   fileName: string;
   totalDataRows: number;
   imported: number;
+  /** Rows that did NOT land: duplicates plus bad data. Excludes `IMPORTED_NEEDS_REVIEW`, which is in
+   *  the book. */
   rejected: number;
+  /** Of those, how many were refused as duplicates — reported apart from bad data because one needs an
+   *  identity decision and the other a typo fixed. */
+  refusedDuplicates: number;
   screened: number;
   screeningFlagged: number;
-  rejections: LegacyImportRejection[];
-  failures: LegacyImportRejection[];
+  issues: LegacyImportIssueView[];
 }

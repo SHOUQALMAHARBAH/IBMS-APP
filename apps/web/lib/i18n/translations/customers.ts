@@ -160,6 +160,15 @@ export const CUSTOMERS = {
     customerWizardStepDocuments: "المستندات",
     customerWizardStepReview: "المراجعة والإرسال",
     customerWizardCreateError: "تعذر إنشاء العميل — حاول مرة أخرى.",
+    customerDuplicateNameHeading: "يوجد عميل بهذا الاسم بالفعل",
+    customerDuplicateNameIntro:
+      "افتح السجل أدناه وتأكد: إن كان هو نفس الشخص فلا تنشئ سجلاً ثانياً، وإن كان شخصاً آخر يحمل الاسم نفسه فتابع الإنشاء.",
+    customerDuplicateNameSamePerson: "هو نفس الشخص — لا تنشئ سجلاً",
+    customerDuplicateNameDifferentPerson: "شخص آخر — أنشئ السجل",
+    customerDuplicateNameAbandoned:
+      "لم يُنشأ سجل. افتح سجل العميل القائم من القائمة أعلاه لمتابعة العمل عليه.",
+    customerDuplicateCheckFailed:
+      "تعذر التحقق من وجود عميل بالاسم نفسه — تابع بحذر وراجع القائمة يدوياً.",
     customerWizardUboError: "تعذرت إضافة هذا المستفيد الحقيقي — حاول مرة أخرى.",
     customerWizardDocError: "تعذر إرفاق هذا المستند — حاول مرة أخرى.",
     customerWizardKycError: "تعذر إرسال ملف اعرف عميلك — حاول مرة أخرى.",
@@ -418,6 +427,15 @@ export const CUSTOMERS = {
     customerWizardStepDocuments: "Documents",
     customerWizardStepReview: "Review & submit",
     customerWizardCreateError: "Could not create the customer — try again.",
+    customerDuplicateNameHeading: "A customer with this name already exists",
+    customerDuplicateNameIntro:
+      "Open the record below and check: if it is the same person, do not create a second record; if it is somebody else with the same name, carry on.",
+    customerDuplicateNameSamePerson: "Same person — do not create a record",
+    customerDuplicateNameDifferentPerson: "A different person — create the record",
+    customerDuplicateNameAbandoned:
+      "No record was created. Open the existing customer from the list above to carry on with them.",
+    customerDuplicateCheckFailed:
+      "Could not check for a customer with the same name — carry on with care and check the list yourself.",
     customerWizardUboError: "Could not add this beneficial owner — try again.",
     customerWizardDocError: "Could not attach this document — try again.",
     customerWizardKycError: "Could not submit this KYC file — try again.",

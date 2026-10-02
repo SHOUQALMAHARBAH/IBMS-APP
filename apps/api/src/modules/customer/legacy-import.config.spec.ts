@@ -77,16 +77,32 @@ describe('mapRows', () => {
   });
 
   it('rejects bad rows by line number and imports the rest', () => {
-    // The behaviour that matters operationally: 2 good rows out of 4 are still
-    // worth loading, and the office needs the other 2 named — not a blanket
-    // failure telling them to go and find the problem.
+    // The behaviour that matters operationally: good rows are still worth loading, and the office needs
+    // the bad ones NAMED — not a blanket failure telling them to go and find the problem.
+    //
+    // ## REWRITTEN 2026-10-02: the empty-name rule MOVED out of this function
+    //
+    // This test used to expect `{ lineNumber: 3, reason: 'legalName is empty' }` and two rows out of
+    // four. `mapRows` no longer checks that, because the import now validates every row against
+    // `CreateCustomerDto` — the SAME rules the single-customer route enforces — and a hand-rolled copy
+    // of one of those rules here was a second home for it. The hole that closed was wider than the one
+    // rule: the parser checked two things and the DTO checks a dozen, so a corporate row with no
+    // registration number used to import cleanly and the new canonical-key index then tolerated it as
+    // unkeyed.
+    //
+    // So the empty name now passes THROUGH this function and is refused one layer later. That
+    // relocation is asserted in `legacy-import.validation.spec.ts` by a test named for it, and the row
+    // reaches an office as a BAD_DATA issue in the durable report either way.
+    //
+    // What `mapRows` still owns is the TYPE narrowing, which is a parse rather than a validation: a
+    // value that is not one of two enum members cannot be carried as one.
     const table = parseCsv(
       'Client Name,Type\nAcme,CORPORATE\n,CORPORATE\nBad Type,PARTNERSHIP\nAhmad,INDIVIDUAL',
     );
     const { rows, rejections } = mapRows(table, mapping);
-    expect(rows.map((r) => r.legalName)).toEqual(['Acme', 'Ahmad']);
+    // Three rows through, including the nameless one — the DTO refuses it, not this.
+    expect(rows.map((r) => r.legalName)).toEqual(['Acme', '', 'Ahmad']);
     expect(rejections).toEqual([
-      { lineNumber: 3, reason: 'legalName is empty' },
       {
         lineNumber: 4,
         reason:
@@ -96,7 +112,9 @@ describe('mapRows', () => {
   });
 
   it('counts line numbers as the office sees them in their spreadsheet', () => {
-    const table = parseCsv('Client Name,Type\nAcme,CORPORATE\n,CORPORATE');
+    // Keyed on the TYPE rejection, which is the rule this function still owns. It used to be keyed on
+    // the empty name, which moved to the DTO.
+    const table = parseCsv('Client Name,Type\nAcme,CORPORATE\nX,PARTNERSHIP');
     // Header is line 1, so the first data row is line 2 and the bad one is 3.
     expect(mapRows(table, mapping).rejections[0].lineNumber).toBe(3);
   });

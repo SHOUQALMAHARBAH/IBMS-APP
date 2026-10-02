@@ -13,6 +13,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -119,14 +120,14 @@ export default function InsurerPerformancePage() {
 
       <form onSubmit={onLookup} style={formStyle}>
         <h2>{t('ipLookUp')}</h2>
-        <label style={labelStyle}>
-          {t('dashInsurerIdLabel')}
-          <input
-            value={insurerId}
-            onChange={(e) => setInsurerId(e.target.value)}
-            required
-          />
-        </label>
+        {/* The whole screen hung on a uuid nobody has. Now a name. */}
+        <EntitySearch
+          kind="insurer"
+          value={insurerId}
+          onChange={setInsurerId}
+          label={t('dashInsurerIdLabel')}
+          required
+        />
         <button type="submit">{t('ipViewButton')}</button>
       </form>
 

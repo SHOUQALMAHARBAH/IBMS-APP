@@ -1517,6 +1517,27 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### OPEN — two typed identifiers no picker can reach
+
+Both on `/audit-trail`, and both REQUIRED, so that screen still cannot be used without
+pasting a uuid from somewhere else. Measured by
+`python scripts/measurements/typed-identifier-inputs.py` — re-run it rather than quoting
+the number, which moved once already (32 typed identifiers → 25, and 9 required → 2, once
+the six pickers landed on 2026-10-02).
+
+* **`wfEntityId` is POLYMORPHIC.** It names any of fifteen workflow entities, so no single
+  entity picker covers it. Closing it needs either a kind selector in front of a picker, or
+  a route that searches across workflow-carrying entities — which is a design decision about
+  what an audit reader is being offered, not a mechanical fix.
+* **`documentId` names a `Document`, which has no search route at all.** `GET /documents`
+  takes a `policyId` and lists that policy's documents; there is no "find a document by
+  name" read. The nearest existing path is to find the POLICY (which now has a picker) and
+  then its documents, which is a different flow rather than the same one with a better field.
+
+Neither is a gap in the pickers: the six that exist cover every other typed identifier that
+names one entity. Recorded here so the remaining two are not rediscovered as a regression in
+the picker work.
+
 ### OPEN — two small items parked from the password self-service pass
 
 Neither blocks anything; both are recorded so they are not rediscovered as

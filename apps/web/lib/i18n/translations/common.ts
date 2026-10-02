@@ -72,6 +72,34 @@ export const COMMON = {
     entitySearchActorNone: '— كل الأشخاص —',
     entitySearchActorNoMatches: 'لا يوجد شخص بهذا الاسم في سجل التدقيق.',
     entitySearchActorError: 'تعذّر تنفيذ البحث عن الأشخاص. حاول مرة أخرى.',
+    // THE FOUR PICKERS added 2026-10-02 — insurer, policy, user, branch. Each placeholder names what a
+    // person actually HAS in front of them, which is the whole defect being fixed: the screens asked for
+    // a uuid, which is in nobody's hand.
+    entitySearchEmployeeLabel: 'ابحث عن موظف',
+    entitySearchEmployeePlaceholder: 'اسم الموظف — حرفان على الأقل',
+    entitySearchEmployeeNoMatches: 'لا يوجد موظف بهذا الاسم.',
+    entitySearchEmployeeError: 'تعذّر تنفيذ البحث عن الموظفين. حاول مرة أخرى.',
+    // A FORMER employee of the same name is exactly the case a picker has to disambiguate.
+    entitySearchEmployeeFormer: 'لم يعد على رأس عمله',
+    entitySearchInsurerLabel: 'ابحث عن شركة تأمين',
+    entitySearchInsurerPlaceholder: 'اسم الشركة بالعربية أو بالإنجليزية',
+    entitySearchInsurerNoMatches: 'لا توجد شركة تأمين مطابقة لما أدخلته.',
+    entitySearchInsurerError: 'تعذّر تنفيذ البحث عن شركات التأمين. حاول مرة أخرى.',
+    entitySearchPolicyLabel: 'ابحث عن وثيقة',
+    entitySearchPolicyPlaceholder: 'رقم الوثيقة أو اسم العميل — ثلاثة أحرف على الأقل',
+    entitySearchPolicyNoMatches: 'لا توجد وثيقة مطابقة لما أدخلته.',
+    entitySearchPolicyError: 'تعذّر تنفيذ البحث عن الوثائق. حاول مرة أخرى.',
+    // A policy is placed before it is issued, and the number arrives with issuance. Stated as a state
+    // rather than left as an empty first column, which reads as a fault in the data.
+    entitySearchPolicyUnnumbered: 'لم يُصدر لها رقم بعد',
+    entitySearchUserLabel: 'ابحث عن مستخدم',
+    entitySearchUserPlaceholder: 'اسم الموظف',
+    entitySearchUserNoMatches: 'لا يوجد مستخدم بهذا الاسم.',
+    entitySearchUserError: 'تعذّر تنفيذ البحث عن المستخدمين. حاول مرة أخرى.',
+    entitySearchBranchLabel: 'ابحث عن فرع',
+    entitySearchBranchPlaceholder: 'اسم الفرع',
+    entitySearchBranchNoMatches: 'لا يوجد فرع مطابق لما أدخلته.',
+    entitySearchBranchError: 'تعذّر تنفيذ البحث عن الفروع. حاول مرة أخرى.',
     // DiscardControl.tsx — withdrawing a record raised in error, shared by policy / claim / endorsement /
     // recommendation. NOT «إلغاء» anywhere: that word is this product's CANCELLATION (a cancellation
     // endorsement on a live policy), and reusing it here would make a withdrawal read as cancelling the
@@ -181,6 +209,30 @@ export const COMMON = {
     entitySearchActorNone: '— everyone —',
     entitySearchActorNoMatches: 'Nobody by that name appears in the audit log.',
     entitySearchActorError: 'The person search could not be run. Try again.',
+    // THE FOUR PICKERS added 2026-10-02 — see the note in the Arabic block above.
+    entitySearchEmployeeLabel: 'Find an employee',
+    entitySearchEmployeePlaceholder: "The person's name — at least two characters",
+    entitySearchEmployeeNoMatches: 'No employee by that name.',
+    entitySearchEmployeeError: 'The employee search could not run. Try again.',
+    entitySearchEmployeeFormer: 'no longer employed here',
+    entitySearchInsurerLabel: 'Find an insurer',
+    entitySearchInsurerPlaceholder: 'The company name, in Arabic or English',
+    entitySearchInsurerNoMatches: 'No insurer matches what you entered.',
+    entitySearchInsurerError: 'The insurer search could not run. Try again.',
+    entitySearchPolicyLabel: 'Find a policy',
+    entitySearchPolicyPlaceholder:
+      "Policy number or the customer's name — at least three characters",
+    entitySearchPolicyNoMatches: 'No policy matches what you entered.',
+    entitySearchPolicyError: 'The policy search could not run. Try again.',
+    entitySearchPolicyUnnumbered: 'no number issued yet',
+    entitySearchUserLabel: 'Find a user',
+    entitySearchUserPlaceholder: "The person's name",
+    entitySearchUserNoMatches: 'No user by that name.',
+    entitySearchUserError: 'The user search could not run. Try again.',
+    entitySearchBranchLabel: 'Find a branch',
+    entitySearchBranchPlaceholder: 'The branch name',
+    entitySearchBranchNoMatches: 'No branch matches what you entered.',
+    entitySearchBranchError: 'The branch search could not run. Try again.',
     // DiscardControl.tsx — see the note in the Arabic block above on why «إلغاء» is not used there.
     discardButton: 'Withdraw as raised in error',
     discardHeading: 'Withdraw a record raised in error',

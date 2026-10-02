@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { pickEntity } from "./support/pick-entity";
 
 const ME_BASE = {
   id: "user-1",
@@ -40,6 +41,20 @@ const DOC = {
   createdAt: "2026-09-20T09:00:00.000Z",
 };
 
+/**
+ * `/documents` carried TWO REQUIRED `policyId` text boxes — the worst of the measured identifier
+ * defects, because the screen could not be used at all without pasting a uuid from somewhere else. Both
+ * are pickers now, so these specs select a policy instead of typing its id.
+ */
+const POLICY_SEARCH = "http://localhost:4000/policies/search**";
+const POLICY_OPTION = {
+  id: "policy-1",
+  policyNumber: "POL-1",
+  customerLegalName: "Acme Trading",
+  insuranceLine: "MOTOR",
+  status: "ACTIVE",
+};
+
 test("looks up a policy's documents and shows the create-version form", async ({ page }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   await page.route("http://localhost:4000/documents?policyId=policy-1", (route) =>
@@ -48,7 +63,7 @@ test("looks up a policy's documents and shows the create-version form", async ({
 
   await page.goto("/documents");
   await expect(page.getByRole("heading", { name: "Documents" })).toBeVisible();
-  await page.getByLabel("Policy ID").first().fill("policy-1");
+  await pickEntity(page, "policy", POLICY_OPTION, { route: POLICY_SEARCH, nth: 0 });
   await page.getByRole("button", { name: "Look up documents" }).click();
   await expect(page.getByRole("cell", { name: "wording.pdf" })).toBeVisible();
   await page.getByRole("button", { name: "New version" }).click();
@@ -62,7 +77,7 @@ test("a user without the permission sees a friendly message", async ({ page }) =
   );
 
   await page.goto("/documents");
-  await page.getByLabel("Policy ID").first().fill("policy-1");
+  await pickEntity(page, "policy", POLICY_OPTION, { route: POLICY_SEARCH, nth: 0 });
   await page.getByRole("button", { name: "Look up documents" }).click();
   await expect(
     page.getByText("(document.read)", { exact: false }),
@@ -92,7 +107,7 @@ test("unlocks and deletes a document", async ({ page }) => {
   });
 
   await page.goto("/documents");
-  await page.getByLabel("Policy ID").first().fill("policy-1");
+  await pickEntity(page, "policy", POLICY_OPTION, { route: POLICY_SEARCH, nth: 0 });
   await page.getByRole("button", { name: "Look up documents" }).click();
   await expect(page.getByRole("cell", { name: "Locked" })).toBeVisible();
   await page.getByRole("button", { name: "Unlock for deletion" }).click();
@@ -111,7 +126,7 @@ test("computes a policy's highest-classification-present summary", async ({ page
   );
 
   await page.goto("/documents");
-  await page.getByLabel("Policy ID").nth(1).fill("policy-1");
+  await pickEntity(page, "policy", POLICY_OPTION, { route: POLICY_SEARCH, nth: 1 });
   await page.getByRole("button", { name: "Compute" }).click();
   // "2 document(s)" before the plural pass; the count now selects a real
   // form, so English reads "2 documents" and Arabic would read "مستندان".
@@ -126,7 +141,7 @@ test("documents screen has no serious/critical accessibility violations @a11y", 
   );
 
   await page.goto("/documents");
-  await page.getByLabel("Policy ID").first().fill("policy-1");
+  await pickEntity(page, "policy", POLICY_OPTION, { route: POLICY_SEARCH, nth: 0 });
   await page.getByRole("button", { name: "Look up documents" }).click();
   await expect(page.getByRole("cell", { name: "wording.pdf" })).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();

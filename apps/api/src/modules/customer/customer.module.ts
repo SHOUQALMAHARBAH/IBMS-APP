@@ -15,6 +15,8 @@ import { ScreeningMatchService } from './screening-match.service';
 import { ScreeningBatchScheduler } from './screening-batch.scheduler';
 import { KycPeriodicReviewScheduler } from './kyc-periodic-review.scheduler';
 import { CustomerRepository } from '../../repositories/customer.repository';
+import { LegacyImportBatchRepository } from '../../repositories/legacy-import-batch.repository';
+import { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
@@ -53,6 +55,10 @@ import { ProspectModule } from '../prospect/prospect.module';
     KycService,
     ScreeningService,
     LegacyImportService,
+    // Created 2026-10-02 with migration 20261108100000 — the import's report, which used to be the
+    // HTTP response body and an audit row carrying counts.
+    LegacyImportBatchRepository,
+    DuplicateNameWarningRepository,
     ProviderScreeningService,
     ScreeningHoldService,
     ScreeningOperationsService,

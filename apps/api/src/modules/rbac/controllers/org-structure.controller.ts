@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { OrgStructureService } from '../services/org-structure.service';
@@ -13,6 +14,8 @@ import { RequirePermissions } from '../decorators/require-permissions.decorator'
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { CreateOrgUnitDto, RenameOrgUnitDto } from '../dto/org-structure.dto';
+import { BRANCH_SEARCH_CODES } from '../../../common/picker-search.config';
+import { SearchBranchesDto } from '../../../common/picker-search.dto';
 
 const orgUnitSchema = {
   type: 'object' as const,
@@ -65,6 +68,23 @@ export class OrgStructureController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.orgStructure.createDepartment(dto, user.id);
+  }
+
+  /**
+   * THE BRANCH PICKER's source. Gated on ANY OF `BRANCH_SEARCH_CODES`.
+   *
+   * That list is the union of the permissions of the screens that type a `branchId`, per the owner's
+   * rule — and the rule exists because the opposite shipped twice, most sharply when
+   * `GET /employees/search` was gated on `employee.national-id.reveal` and an Executive therefore could
+   * not find an employee on the employee performance screen. `PermissionsGuard` ORs its codes, so the
+   * spread is exactly "any one of these is enough".
+   *
+   * Declared BEFORE any `:id` route so `search` is never parsed as an id.
+   */
+  @RequirePermissions(...BRANCH_SEARCH_CODES)
+  @Get('branches/search')
+  searchBranchesForPicker(@Query() query: SearchBranchesDto) {
+    return this.orgStructure.searchBranchesForPicker(query);
   }
 
   @RequirePermissions('branch.read')

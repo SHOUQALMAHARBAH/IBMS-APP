@@ -11,6 +11,7 @@ import type { ProspectRepository } from '../../repositories/prospect.repository'
 import type { AuditService } from '../audit/audit.service';
 import type { EncryptionService } from '../security/encryption.service';
 import type { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
+import type { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
@@ -43,6 +44,11 @@ function makeDeps() {
     .fn()
     .mockImplementation((input) => Promise.resolve({ ...input }));
   const findUbosByCustomerId = vi.fn().mockResolvedValue([]);
+  // THE PRE-CHECKS. Default to "no collision" — the duplicate paths are asserted end to end in
+  // `duplicate-name-warning.e2e-spec.ts`, against the real indexes, because a unit test over a mocked
+  // collision proves the mock. What matters here is that every OTHER test is not changed by them.
+  const findUboByCanonicalPersonName = vi.fn().mockResolvedValue(null);
+  const findCanonicalCollision = vi.fn().mockResolvedValue(null);
   const createDocument = vi
     .fn()
     .mockImplementation((input) => Promise.resolve({ id: 'doc-1', ...input }));
@@ -54,6 +60,8 @@ function makeDeps() {
     countMany,
     createUbo,
     findUbosByCustomerId,
+    findUboByCanonicalPersonName,
+    findCanonicalCollision,
     createDocument,
     findDocumentsByCustomerId,
   } as unknown as CustomerRepository;
@@ -87,6 +95,14 @@ function makeDeps() {
     reveal: revealFn,
   } as unknown as SensitiveFieldRevealService;
 
+  // LAYER 1's record. A double rather than `undefined`: `create()` writes a warning row whenever the
+  // body carries an answer, and a missing collaborator would make every such test fail on a TypeError
+  // instead of on the behaviour it is about.
+  const recordWarning = vi.fn().mockResolvedValue({ id: 'warning-1' });
+  const duplicateWarnings = {
+    record: recordWarning,
+  } as unknown as DuplicateNameWarningRepository;
+
   return {
     service: new CustomerService(
       customers,
@@ -94,6 +110,7 @@ function makeDeps() {
       audit,
       encryption,
       reveal,
+      duplicateWarnings,
     ),
     mocks: {
       create,
@@ -102,10 +119,13 @@ function makeDeps() {
       countMany,
       createUbo,
       findUbosByCustomerId,
+      findUboByCanonicalPersonName,
+      findCanonicalCollision,
       createDocument,
       findDocumentsByCustomerId,
       findProspectById,
       record,
+      recordWarning,
       encrypt,
       decrypt,
       mask,
@@ -129,7 +149,7 @@ describe('CustomerService', () => {
     it('encrypts the three -- ENCRYPT fields before persisting, never the raw plaintext', async () => {
       const { service, mocks } = makeDeps();
 
-      const customer = await service.create(INDIVIDUAL_DTO, 'sales-1');
+      const customer = await service.create(INDIVIDUAL_DTO, makeUser());
 
       expect(mocks.encrypt).toHaveBeenCalledTimes(3);
       expect(mocks.create).toHaveBeenCalledWith(
@@ -163,7 +183,7 @@ describe('CustomerService', () => {
       await expect(
         service.create(
           { ...INDIVIDUAL_DTO, prospectId: 'prospect-1' },
-          'sales-1',
+          makeUser(),
         ),
       ).rejects.toThrow(NotFoundException);
       expect(mocks.create).not.toHaveBeenCalled();
@@ -178,7 +198,7 @@ describe('CustomerService', () => {
 
       await service.create(
         { ...INDIVIDUAL_DTO, prospectId: 'prospect-1' },
-        'sales-1',
+        makeUser(),
       );
 
       expect(mocks.create).toHaveBeenCalledWith(

@@ -19,6 +19,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -135,14 +136,13 @@ export default function InformationAssetsPage() {
             ))}
           </select>
         </label>
-        <label style={labelStyle}>
-          {t('iassetOwnerUserId')}
-          <input
-            value={ownerUserId}
-            onChange={(e) => setOwnerUserId(e.target.value)}
-            required
-          />
-        </label>
+        <EntitySearch
+          kind="user"
+          value={ownerUserId}
+          onChange={setOwnerUserId}
+          label={t('iassetOwnerUserId')}
+          required
+        />
         <label style={labelStyle}>
           {t('iassetColClassification')}
           <select

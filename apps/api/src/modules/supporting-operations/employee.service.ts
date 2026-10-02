@@ -13,6 +13,7 @@ import type {
   SecurityAwarenessTraining,
 } from '@ibms/db';
 import { EmployeeRepository } from '../../repositories/employee.repository';
+import { duplicatePersonConflict } from '../../common/duplicate-person-conflict';
 import { SearchEmployeesDto } from './dto/search-employees.dto';
 import { DepartmentRepository } from '../../repositories/department.repository';
 import { BranchRepository } from '../../repositories/branch.repository';
@@ -98,10 +99,15 @@ export class EmployeeService {
     private readonly sessions: SessionService,
   ) {}
 
+  /**
+   * Takes the ACTOR rather than a bare user id, as of 2026-10-02 — the duplicate-person pre-check needs
+   * the office, and `organizationId` is not derivable from a user id without a second query.
+   */
   async create(
     dto: CreateEmployeeDto,
-    actorUserId: string,
+    actor: AuthenticatedUser,
   ): Promise<MaskedEmployee> {
+    const actorUserId = actor.id;
     const hireDate = parseHistoricalInstant(dto.hireDate, 'hireDate');
     const confidentialityAgreementSignedAt =
       dto.confidentialityAgreementSignedAt
@@ -191,27 +197,50 @@ export class EmployeeService {
       familyName: dto.familyNameEn,
     });
 
-    const employee = await this.employees.create({
-      id,
+    // THE PRECISE 409 FOR A DUPLICATE PERSON. Pre-check for the message, index for the truth — see
+    // `EmployeeRepository.findActiveByCanonicalPersonName` and `common/duplicate-person-conflict.ts`.
+    const alreadyHere = await this.employees.findActiveByCanonicalPersonName(
+      actor.organizationId,
       fullName,
-      givenName: dto.givenName,
-      fatherName: dto.fatherName,
-      grandfatherName: dto.grandfatherName,
-      familyName: dto.familyName,
-      givenNameEn: dto.givenNameEn,
-      fatherNameEn: dto.fatherNameEn,
-      grandfatherNameEn: dto.grandfatherNameEn,
-      familyNameEn: dto.familyNameEn,
-      fullNameEn,
-      nationalIdEnc: encrypted.nationalIdEnc,
-      position: dto.position,
-      departmentId: dto.departmentId,
-      branchId: dto.branchId,
-      hireDate,
-      licensedRole: dto.licensedRole,
-      confidentialityAgreementSignedAt,
-      backgroundCheckCompletedAt,
-    });
+    );
+    if (alreadyHere) {
+      throw new ConflictException(
+        `${alreadyHere.fullName} already works here. Open that employee record rather than creating a second one — and if this is a different person who happens to share the name, record a distinguishing name part.`,
+      );
+    }
+
+    // THE PERSON INDEX MUST NOT SURFACE AS A 500. `Employee_one_active_person_per_office`
+    // (migration 20261107100000) refuses a second ACTIVE person whose ordered canonical name matches
+    // one already here — which is the whole point — and without this mapping an office entering a
+    // colleague twice was told the system had broken. See `common/duplicate-person-conflict.ts`.
+    let employee: Awaited<ReturnType<EmployeeRepository['create']>>;
+    try {
+      employee = await this.employees.create({
+        id,
+        fullName,
+        givenName: dto.givenName,
+        fatherName: dto.fatherName,
+        grandfatherName: dto.grandfatherName,
+        familyName: dto.familyName,
+        givenNameEn: dto.givenNameEn,
+        fatherNameEn: dto.fatherNameEn,
+        grandfatherNameEn: dto.grandfatherNameEn,
+        familyNameEn: dto.familyNameEn,
+        fullNameEn,
+        nationalIdEnc: encrypted.nationalIdEnc,
+        position: dto.position,
+        departmentId: dto.departmentId,
+        branchId: dto.branchId,
+        hireDate,
+        licensedRole: dto.licensedRole,
+        confidentialityAgreementSignedAt,
+        backgroundCheckCompletedAt,
+      });
+    } catch (err) {
+      const conflict = duplicatePersonConflict(err);
+      if (conflict) throw conflict;
+      throw err;
+    }
 
     if (dto.userId) {
       const link = await this.employees.linkUser(employee.id, dto.userId);

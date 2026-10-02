@@ -1,0 +1,20 @@
+{
+  "api-gains-a-kind-the-web-cannot-word": {
+    "file": "apps/api/src/modules/notification/notification.config.ts",
+    "from": "  'kyc_awaiting_decision',\n] as const;",
+    "to": "  'kyc_awaiting_decision',\n  'policy_renewal_due',\n] as const;",
+    "why": "THE REALISTIC REGRESSION, and the whole reason this guard exists: somebody adds a notification kind in the api and does not copy it into the web. IT COMPILES — both packages typecheck clean, because `LABEL_KEY` is total over the WEB's union and the web's union did not change. The bell then renders a count with no words. `the web can WORD every kind the api sends` and `every kind the api sends has a LABEL_KEY in the bell` both die, naming `policy_renewal_due`."
+  },
+  "web-keeps-a-kind-the-api-dropped": {
+    "file": "apps/api/src/modules/notification/notification.config.ts",
+    "from": "  'service_request_assigned',\n",
+    "to": "",
+    "why": "The other direction: a kind withdrawn from the api and left in the web. Also compiles — an extra member in the web union with a label is valid TypeScript, and `tsc` reports 0 errors on both sides, which is the finding the audit-action guard recorded one level down. `the web declares no kind the api cannot send` and `the bell labels nothing the api cannot send` die. NOTE: the api's own service still produces this kind, so its unit spec dies too — which is correct and is not what this plant is about."
+  },
+  "parser-reads-nothing": {
+    "file": "apps/web/lib/notification/notification-api.ts",
+    "from": "export const NOTIFICATION_KINDS = [",
+    "to": "export const NOTIFICATION_KIND_LIST = [",
+    "why": "A guard that parses source can be defeated by a rename, and then it passes by finding no drift — the exact failure this repo has hit three times (a heredoc-mangled regex, a semicolon-truncated union, a `jq` that was not installed). This plant proves the parse FAILS LOUDLY rather than silently: `kindsIn` asserts the anchor was found, so the whole file errors with a message naming apps/web. It does NOT compile afterwards (`NotificationKind` loses its source), which is why it is a plant on the GUARD rather than on the product."
+  }
+}

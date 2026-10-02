@@ -222,6 +222,67 @@ export class PolicyRepository {
     });
   }
 
+  /**
+   * The POLICY PICKER's read. `/documents` carries TWO required `policyId` fields, so that screen
+   * could not be used at all without pasting a uuid from somewhere else.
+   *
+   * ## It searches the POLICY NUMBER and the customer's name, and not the id
+   *
+   * The number is what a person has — it is on the schedule, the certificate and the invoice — and the
+   * customer's name is what they have when they do not have the number. The id is in neither place,
+   * which is the whole defect.
+   *
+   * ## `policyNumber` is NULLABLE and that is a real state, not a gap
+   *
+   * A policy is placed before it is issued, and the number arrives with issuance. Such a row is still
+   * findable here BY CUSTOMER NAME, and the view reports the missing number rather than rendering an
+   * empty cell that reads like a data fault — the same decision `/dashboards/policy` already took with
+   * `policyNumber ?? policyId`.
+   *
+   * ## The OWNER filter sits outside the OR
+   *
+   * Exactly as it does on the customer picker, and for the same reason: inside the OR, a policy-number
+   * match would ignore it and hand a Sales officer a colleague's policy — a search that discloses more
+   * than the list it is a shortcut to. `undefined` means every owner, which is what a holder of the
+   * all-owners read gets and nobody else.
+   *
+   * DISCARDED ROWS ARE EXCLUDED. A policy withdrawn as raised-in-error stays in its own register and
+   * leaves every derived view (`docs/discard.md` § 3), and a filter control is a derived view: offering
+   * one would invite a report on a policy the office has withdrawn.
+   */
+  searchForPicker(
+    term: string,
+    take: number,
+    ownerUserId: string | undefined,
+  ): Promise<
+    {
+      id: string;
+      policyNumber: string | null;
+      insuranceLine: string;
+      status: PolicyStatus;
+      customer: { legalName: string };
+    }[]
+  > {
+    const contains = { contains: term, mode: 'insensitive' } as const;
+    return this.prisma.client.policy.findMany({
+      where: {
+        discardedAt: null,
+        ...(ownerUserId === undefined ? {} : { customer: { ownerUserId } }),
+        OR: [{ policyNumber: contains }, { customer: { legalName: contains } }],
+      },
+      select: {
+        id: true,
+        policyNumber: true,
+        insuranceLine: true,
+        status: true,
+        customer: { select: { legalName: true } },
+      },
+      // A TOTAL order, and `policyNumber` is nullable so it cannot carry one alone.
+      orderBy: [{ policyNumber: 'asc' }, { id: 'asc' }],
+      take,
+    });
+  }
+
   findByOpportunityId(
     opportunityId: string,
   ): Promise<PolicyWithContext | null> {

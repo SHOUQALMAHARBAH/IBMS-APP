@@ -196,6 +196,51 @@ export class InsurerRepository {
   }
 
   /**
+   * The INSURER PICKER's read — six dashboard and report screens typed a uuid into a filter.
+   *
+   * NARROW BY CONSTRUCTION: four fields, not `INSURER_RECORD_SELECT`. That select carries the
+   * RELATIONSHIP half of the row — the named people who answer this office, their direct emails and
+   * phone numbers — and this route is now reachable by ten roles rather than by the two that hold
+   * `insurer.relationship.manage`. A picker needs enough to tell two companies apart; handing it the
+   * relationship contacts would widen a disclosure boundary to serve a dropdown.
+   *
+   * Reuses `whereFor`'s own search shape so a picker and the list answer the same question: either
+   * local name, or either name of the global master the row points at. A row carries ONE of those
+   * identities (the `Insurer_has_identity` CHECK), so both halves are needed or a catalogue-registered
+   * insurer is unfindable by name.
+   *
+   * ACTIVE ONLY, which is the opposite of the list screen and deliberate: `/insurers` shows deactivated
+   * companies by default because they keep their policies and are the row an administrator most needs
+   * to find, while offering one in a filter would invite a report on a company the office has stopped
+   * placing with. Same split as the branch picker.
+   */
+  searchForPicker(
+    term: string,
+    take: number,
+  ): Promise<
+    {
+      id: string;
+      legalName: string | null;
+      legalNameAr: string | null;
+      insurerMaster: { legalName: string; legalNameAr: string | null } | null;
+    }[]
+  > {
+    return this.prisma.client.insurer.findMany({
+      where: this.whereFor({ isActive: true, search: term }),
+      select: {
+        id: true,
+        legalName: true,
+        legalNameAr: true,
+        insurerMaster: { select: { legalName: true, legalNameAr: true } },
+      },
+      // A TOTAL order. `legalName` is NULLABLE here — a catalogue-registered row carries none — so it
+      // is not even a partial order on its own, and the id is what makes the truncation repeatable.
+      orderBy: [{ legalName: 'asc' }, { id: 'asc' }],
+      take,
+    });
+  }
+
+  /**
    * Registers an insurer by EITHER path.
    *
    * `organizationId` is absent on purpose — see this file's header. `insurerMasterId`

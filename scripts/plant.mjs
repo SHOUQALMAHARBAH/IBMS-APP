@@ -101,11 +101,30 @@ export function applyPlant({ file, from, to }) {
   };
 }
 
-export function revertPlant({ file }) {
+export function revertPlant({ file, from, to }) {
   const target = resolve(file);
   const backup = `${target}${BACKUP_SUFFIX}`;
   if (!existsSync(backup)) {
     throw `no backup for ${file}. Revert would be a guess, and a half-reverted plant is worse than a planted file.`;
+  }
+  // A STALE BACKUP MAKES REVERT A SILENT ROLLBACK OF REAL WORK, and that is not hypothetical: found
+  // 2026-10-02, two `.plant-backup` files left on disk from an earlier session, each frozen at the
+  // content from BEFORE a CI fix that had since been committed. Reverting either would have put the
+  // pre-fix file back, byte for byte, reported success, and deleted the only evidence.
+  //
+  // So revert now refuses unless the file on disk is what this plant WROTE — the same check `applyPlant`
+  // already makes in the other direction. `from`/`to` are optional so `--self-test`'s own calls and any
+  // caller holding only a filename still work; the guard engages whenever the plant is identifiable,
+  // which is every real invocation through the CLI.
+  if (typeof to === "string" && typeof from === "string") {
+    const onDisk = readFileSync(target, "utf8");
+    if (!onDisk.includes(to)) {
+      throw (
+        `${file} is NOT in the state this plant left it in, so its backup is STALE — reverting would ` +
+        `overwrite whatever changed since, byte for byte, and report success. Delete ` +
+        `${file}${BACKUP_SUFFIX} by hand once you have checked that nothing in it is wanted.`
+      );
+    }
   }
   const original = readFileSync(backup, "utf8");
   writeFileSync(target, original);
@@ -272,6 +291,31 @@ function selfTest() {
     () => revertPlant({ file }),
     "throws",
   );
+
+  // A STALE BACKUP MUST NOT BE REVERTED. Found on 2026-10-02 as two real leftover files, each frozen
+  // before a CI fix that had since been committed — a revert would have rolled the fix back, byte for
+  // byte, reported success, and deleted the backup that was the only trace.
+  writeFileSync(file, "const gate = true;\n");
+  applyPlant({ file, from: "const gate = true;", to: "const gate = false;" });
+  // The file moves on WITHOUT a revert, which is exactly how a stale backup comes to exist.
+  writeFileSync(file, "const gate = somethingElse();\n");
+  check(
+    "revert REFUSES when the file is no longer in the state the plant left it in",
+    () =>
+      revertPlant({
+        file,
+        from: "const gate = true;",
+        to: "const gate = false;",
+      }),
+    "throws",
+  );
+  if (readFileSync(file, "utf8") !== "const gate = somethingElse();\n") {
+    console.log("  FAIL  the refused revert still overwrote the file");
+    failures += 1;
+  } else {
+    console.log("  ok    the refused revert left the file untouched");
+  }
+  unlinkSync(`${file}${BACKUP_SUFFIX}`);
 
   // THE ORIGINAL BUG, as a test: no name given.
   const plantsFile = join(dir, "plants.json");

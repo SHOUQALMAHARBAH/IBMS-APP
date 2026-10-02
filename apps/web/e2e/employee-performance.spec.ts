@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { pickEntity } from "./support/pick-entity";
 
 const ME_BASE = {
   id: "user-1",
@@ -57,6 +58,19 @@ async function mockList(page: Page, opts: { status?: number } = {}) {
   });
 }
 
+/**
+ * The employee picker over `GET /employees/search` — the route that already existed and that neither
+ * screen needing it could reach, because it was gated on the national-ID reveal.
+ */
+const EMPLOYEE_SEARCH = "http://localhost:4000/employees/search**";
+const EMPLOYEE_OPTION = {
+  id: "employee-1",
+  fullName: "Ahmad Al-Test",
+  fullNameEn: "Ahmad Al-Test",
+  position: "Officer",
+  isCurrentEmployee: true,
+};
+
 test("looks up an employee and renders latest stats plus history, with a dash for no-data rates", async ({
   page,
 }) => {
@@ -67,7 +81,7 @@ test("looks up an employee and renders latest stats plus history, with a dash fo
   await expect(
     page.getByRole("heading", { name: "Employee Performance" }),
   ).toBeVisible();
-  await page.getByLabel("Employee ID").fill("employee-1");
+  await pickEntity(page, "employee", EMPLOYEE_OPTION, { route: EMPLOYEE_SEARCH });
   await page.getByRole("button", { name: "View performance" }).click();
 
   await expect(page.getByText("80.00%").first()).toBeVisible();
@@ -81,7 +95,7 @@ test("a user without the permission sees a friendly message", async ({
   await mockList(page, { status: 403 });
 
   await page.goto("/employee-performance");
-  await page.getByLabel("Employee ID").fill("employee-1");
+  await pickEntity(page, "employee", EMPLOYEE_OPTION, { route: EMPLOYEE_SEARCH });
   await page.getByRole("button", { name: "View performance" }).click();
   await expect(
     page.getByText("(employee-performance.view)", { exact: false }),
@@ -97,7 +111,7 @@ test("triggers a compute and refreshes the history", async ({ page }) => {
   );
 
   await page.goto("/employee-performance");
-  await page.getByLabel("Employee ID").fill("employee-1");
+  await pickEntity(page, "employee", EMPLOYEE_OPTION, { route: EMPLOYEE_SEARCH });
   await page.getByRole("button", { name: "Compute" }).click();
   await expect(page.getByText("Record computed.")).toBeVisible();
 });
@@ -109,7 +123,7 @@ test("employee performance screen has no serious/critical accessibility violatio
   await mockList(page);
 
   await page.goto("/employee-performance");
-  await page.getByLabel("Employee ID").fill("employee-1");
+  await pickEntity(page, "employee", EMPLOYEE_OPTION, { route: EMPLOYEE_SEARCH });
   await page.getByRole("button", { name: "View performance" }).click();
   await expect(page.getByText("80.00%").first()).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { pickEntity } from "./support/pick-entity";
 
 const ME_BASE = {
   id: "user-1",
@@ -57,6 +58,10 @@ async function mockList(page: Page, opts: { status?: number } = {}) {
   });
 }
 
+/** The screen's one required field was an `insurerId` box and nothing else. It is a picker now. */
+const INSURER_SEARCH = "http://localhost:4000/insurers/search**";
+const INSURER_OPTION = { id: "insurer-1", name: "Acme Insurance", nameAr: null };
+
 test("looks up an insurer and renders its latest scores plus history", async ({
   page,
 }) => {
@@ -67,7 +72,7 @@ test("looks up an insurer and renders its latest scores plus history", async ({
   await expect(
     page.getByRole("heading", { name: "Insurer Performance" }),
   ).toBeVisible();
-  await page.getByLabel("Insurer ID").fill("insurer-1");
+  await pickEntity(page, "insurer", INSURER_OPTION, { route: INSURER_SEARCH });
   await page.getByRole("button", { name: "View performance" }).click();
 
   await expect(page.getByText("92.50").first()).toBeVisible();
@@ -81,7 +86,7 @@ test("a user without the permission sees a friendly message", async ({
   await mockList(page, { status: 403 });
 
   await page.goto("/insurer-performance");
-  await page.getByLabel("Insurer ID").fill("insurer-1");
+  await pickEntity(page, "insurer", INSURER_OPTION, { route: INSURER_SEARCH });
   await page.getByRole("button", { name: "View performance" }).click();
   await expect(
     page.getByText("(insurer-performance.view)", { exact: false }),
@@ -96,7 +101,7 @@ test("triggers a compute and refreshes the history", async ({ page }) => {
   );
 
   await page.goto("/insurer-performance");
-  await page.getByLabel("Insurer ID").fill("insurer-1");
+  await pickEntity(page, "insurer", INSURER_OPTION, { route: INSURER_SEARCH });
   await page.getByRole("button", { name: "Compute" }).click();
   await expect(page.getByText("Score computed.")).toBeVisible();
 });
@@ -108,7 +113,7 @@ test("insurer performance screen has no serious/critical accessibility violation
   await mockList(page);
 
   await page.goto("/insurer-performance");
-  await page.getByLabel("Insurer ID").fill("insurer-1");
+  await pickEntity(page, "insurer", INSURER_OPTION, { route: INSURER_SEARCH });
   await page.getByRole("button", { name: "View performance" }).click();
   await expect(page.getByText("92.50").first()).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();

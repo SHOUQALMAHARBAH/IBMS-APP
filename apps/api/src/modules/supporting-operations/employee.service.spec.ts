@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   BadRequestException,
   ConflictException,
@@ -58,6 +59,11 @@ function makeService(
   const repo = {
     findUserById: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(baseEmployee()),
+    // THE DUPLICATE-PERSON PRE-CHECK. Defaults to "nobody of that name" — the duplicate path is
+    // asserted end to end in `employee-rehire.e2e-spec.ts` against the real partial index, because a
+    // unit test over a mocked collision proves the mock. What matters here is that it does not change
+    // every other test in this file.
+    findActiveByCanonicalPersonName: vi.fn().mockResolvedValue(null),
     linkUser: vi.fn().mockResolvedValue({
       outcome: 'LINKED',
       user: { id: 'user-1', employeeId: 'emp-1' },
@@ -169,10 +175,27 @@ const CREATE_DTO: CreateEmployeeDto = {
   hireDate: '2024-01-15',
 };
 
+/**
+ * `EmployeeService.create` takes the ACTOR as of 2026-10-02 — the duplicate-person pre-check needs the
+ * office. One helper rather than an inline object at nine call sites, so the id each test asserts on
+ * stays readable beside the actor it belongs to.
+ */
+function actor(id: string): AuthenticatedUser {
+  return {
+    id,
+    organizationId: 'org-1',
+    email: `${id}@ibms.test`,
+    roles: [],
+    roleIds: [],
+    permissions: [],
+    sessionId: 'session-1',
+  } as unknown as AuthenticatedUser;
+}
+
 describe('EmployeeService.create', () => {
   it('encrypts the national id, creates the employee, and returns a masked view', async () => {
     const { service, repo, encryption, audit } = makeService();
-    const result = await service.create(CREATE_DTO, 'actor-1');
+    const result = await service.create(CREATE_DTO, actor('actor-1'));
 
     expect(encryption.encrypt).toHaveBeenCalledWith(
       'pii',
@@ -199,7 +222,7 @@ describe('EmployeeService.create', () => {
           .mockResolvedValue({ id: 'user-1', employeeId: null }),
       },
     });
-    await service.create({ ...CREATE_DTO, userId: 'user-1' }, 'actor-1');
+    await service.create({ ...CREATE_DTO, userId: 'user-1' }, actor('actor-1'));
     expect(repo.linkUser).toHaveBeenCalledWith('emp-1', 'user-1');
   });
 
@@ -208,13 +231,19 @@ describe('EmployeeService.create', () => {
       departments: { findById: vi.fn().mockResolvedValue(null) },
     });
     await expect(
-      service.create({ ...CREATE_DTO, departmentId: 'other-office' }, 'a-1'),
+      service.create(
+        { ...CREATE_DTO, departmentId: 'other-office' },
+        actor('a-1'),
+      ),
     ).rejects.toThrow(UnprocessableEntityException);
   });
 
   it('passes the org-chart department through to the created row', async () => {
     const { service, repo } = makeService();
-    await service.create({ ...CREATE_DTO, departmentId: 'dept-1' }, 'a-1');
+    await service.create(
+      { ...CREATE_DTO, departmentId: 'dept-1' },
+      actor('a-1'),
+    );
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ departmentId: 'dept-1' }),
     );
@@ -235,7 +264,7 @@ describe('EmployeeService.create', () => {
     await expect(
       service.create(
         { ...CREATE_DTO, userId: 'user-1', departmentId: 'dept-1' },
-        'actor-1',
+        actor('actor-1'),
       ),
     ).rejects.toThrow(ConflictException);
     expect(repo.create).not.toHaveBeenCalled();
@@ -254,7 +283,7 @@ describe('EmployeeService.create', () => {
     });
     await service.create(
       { ...CREATE_DTO, userId: 'user-1', departmentId: 'dept-1' },
-      'actor-1',
+      actor('actor-1'),
     );
     expect(repo.linkUser).toHaveBeenCalledWith('emp-1', 'user-1');
   });
@@ -273,7 +302,7 @@ describe('EmployeeService.create', () => {
       },
     });
     await expect(
-      service.create({ ...CREATE_DTO, userId: 'user-1' }, 'actor-1'),
+      service.create({ ...CREATE_DTO, userId: 'user-1' }, actor('actor-1')),
     ).rejects.toThrow(ConflictException);
   });
 
@@ -282,7 +311,7 @@ describe('EmployeeService.create', () => {
       repo: { findUserById: vi.fn().mockResolvedValue(null) },
     });
     await expect(
-      service.create({ ...CREATE_DTO, userId: 'nope' }, 'actor-1'),
+      service.create({ ...CREATE_DTO, userId: 'nope' }, actor('actor-1')),
     ).rejects.toThrow(NotFoundException);
   });
 
@@ -295,7 +324,7 @@ describe('EmployeeService.create', () => {
       },
     });
     await expect(
-      service.create({ ...CREATE_DTO, userId: 'user-1' }, 'actor-1'),
+      service.create({ ...CREATE_DTO, userId: 'user-1' }, actor('actor-1')),
     ).rejects.toThrow(ConflictException);
   });
 });

@@ -26,6 +26,8 @@ import { isBrokerLicenseCurrentlyLapsed } from '../compliance-risk/broker-licens
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { canReadAllPolicyOwners } from '../../common/rbac-visibility.util';
+import { PICKER_MAX_RESULTS } from '../../common/picker-search.config';
+import type { SearchPoliciesDto } from '../../common/picker-search.dto';
 import {
   compareMoney,
   formatMoney,
@@ -167,6 +169,24 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 /**
+ * What the policy picker returns. FIVE fields, each earning its place.
+ *
+ * `policyNumber` is NULLABLE and that is a real state rather than a gap: a policy is placed before it
+ * is issued, and the number arrives with issuance. Such a row is findable by its CUSTOMER's name, and
+ * the screen states the number is not yet assigned rather than rendering an empty cell that reads like
+ * a data fault — the same decision `/dashboards/policy` already took with `policyNumber ?? policyId`.
+ *
+ * The customer's name, the line and the status are what tell two policies apart; nothing else is here.
+ */
+export interface PolicyPickerResult {
+  id: string;
+  policyNumber: string | null;
+  customerLegalName: string;
+  insuranceLine: string;
+  status: PolicyStatus;
+}
+
+/**
  * Process 18-19 — Policy Placement & Issuance (backlog Part C #18-19, Domain
  * B).
  *
@@ -209,6 +229,56 @@ function isUniqueViolation(err: unknown): boolean {
 @Injectable()
 export class PolicyService {
   private readonly logger = new Logger(PolicyService.name);
+
+  /**
+   * THE POLICY PICKER. `/documents` carries TWO required `policyId` fields, so without this that screen
+   * cannot be used at all — the worst of the measured identifier defects.
+   *
+   * AUDITED, unlike the insurer and branch pickers, because the result NAMES CUSTOMERS. A row here is
+   * the same kind of record the customer search writes: who went looking, with what term, and which
+   * customers' policies came back. Nothing about a policy number is sensitive; the customer beside it
+   * is, and the result carries both.
+   *
+   * The OWNER restriction is the same predicate the list uses, so the picker cannot show a policy the
+   * list would hide. A search that discloses more than the screen it is a shortcut to is the defect
+   * this whole family of routes has to avoid.
+   */
+  async searchForPicker(
+    dto: SearchPoliciesDto,
+    actor: AuthenticatedUser,
+  ): Promise<PolicyPickerResult[]> {
+    const rows = await this.policies.searchForPicker(
+      dto.q,
+      PICKER_MAX_RESULTS.policy,
+      this.canReachAnyCustomer(actor) ? undefined : actor.id,
+    );
+
+    await this.audit.record({
+      userId: actor.id,
+      action: 'READ',
+      entityType: 'PolicySearch',
+      // The actor, not a policy: this row is about a person SEARCHING and there is no single policy it
+      // happened to. Same shape as the customer and employee searches.
+      entityId: actor.id,
+      afterValue: {
+        term: dto.q,
+        matchedPolicyIds: rows.map((r) => r.id),
+        matchCount: rows.length,
+        // A silently cut list reads as a complete answer — "these are the only three policies for this
+        // customer" when there are forty.
+        truncated: rows.length === PICKER_MAX_RESULTS.policy,
+      },
+      isSensitiveDataAccess: true,
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      policyNumber: r.policyNumber,
+      customerLegalName: r.customer.legalName,
+      insuranceLine: r.insuranceLine,
+      status: r.status,
+    }));
+  }
 
   constructor(
     private readonly policies: PolicyRepository,

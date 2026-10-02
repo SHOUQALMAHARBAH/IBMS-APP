@@ -16,6 +16,8 @@ import {
   type InsurerStatusImpact,
 } from '../../repositories/insurer.repository';
 import { pageWindow, type Paginated } from '../../common/pagination';
+import { PICKER_MAX_RESULTS } from '../../common/picker-search.config';
+import type { SearchInsurersDto } from '../../common/picker-search.dto';
 import {
   auditDelta,
   collisionMessage,
@@ -36,6 +38,20 @@ import type {
 export interface InsurerStatusChange {
   insurer: InsurerView;
   impact: InsurerStatusImpact;
+}
+
+/**
+ * What the insurer picker returns. THREE fields, and the omissions are the point — see
+ * `InsurerRepository.searchForPicker` for why the relationship contacts are not here.
+ *
+ * Both name forms, because the component translates at RENDER: returning one already-resolved name
+ * would pin the label to whatever language was active when the keystroke went out, which is the bug the
+ * customer picker's `DetailPart` split was built to fix.
+ */
+export interface InsurerPickerResult {
+  id: string;
+  name: string;
+  nameAr: string | null;
 }
 
 /**
@@ -76,6 +92,36 @@ export class InsurerService {
     private readonly lines: InsuranceLineRepository,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * THE INSURER PICKER. Six dashboard and report screens typed a uuid into an `insurerId` filter.
+   *
+   * NOT AUDITED, and the contrast with the customer search is the decision rather than an omission.
+   * That one writes a row because the record of who searched for whom IS the control over a register of
+   * people. An insurer is a company: its name and both language forms are already readable across
+   * offices through `GET /insurer-directory`, by design, so a row recording that somebody typed three
+   * letters of a company name would record a non-event and dilute what the audit log is for.
+   *
+   * The RELATIONSHIP half of the row never reaches this result — see the repository's own note. That is
+   * what makes the widened gate safe: ten roles can now find an insurer by name, and none of them sees
+   * the named people who answer this office.
+   */
+  async searchForPicker(
+    dto: SearchInsurersDto,
+  ): Promise<InsurerPickerResult[]> {
+    const rows = await this.insurers.searchForPicker(
+      dto.q,
+      PICKER_MAX_RESULTS.insurer,
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      // The local name when the office registered the company itself, the catalogue's otherwise. A row
+      // carries exactly one identity (the `Insurer_has_identity` CHECK), so this coalesce cannot be
+      // empty — and `legalName` is only nullable because of that split, not because a name is optional.
+      name: r.legalName ?? r.insurerMaster?.legalName ?? '',
+      nameAr: r.legalNameAr ?? r.insurerMaster?.legalNameAr ?? null,
+    }));
+  }
 
   async list(query: ListInsurersQueryDto): Promise<Paginated<InsurerView>> {
     const filter = { isActive: query.isActive, search: query.search };

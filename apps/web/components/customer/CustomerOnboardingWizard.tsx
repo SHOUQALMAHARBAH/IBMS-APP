@@ -5,8 +5,12 @@ import { useRouter } from 'next/navigation';
 import {
   addCustomerDocument,
   addUbo,
+  checkDuplicateCustomerName,
   createCustomer,
+  recordAbandonedDuplicate,
   type Customer,
+  type DuplicateNameCheck,
+  type DuplicateNameMatch,
   type CustomerDocument,
   type CustomerType,
   type DocumentClassification,
@@ -131,19 +135,37 @@ export function CustomerOnboardingWizard() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // LAYER 1. `null` means no question has been asked; an empty array would mean "asked, nothing found",
+  // which is a different state and is why this is not a bare array defaulting to empty.
+  const [duplicateMatches, setDuplicateMatches] = useState<
+    DuplicateNameMatch[] | null
+  >(null);
+  const [duplicateName, setDuplicateName] = useState('');
+  const [duplicateAbandoned, setDuplicateAbandoned] = useState(false);
+
   function goTo(target: Step) {
     const idx = steps.indexOf(target);
     if (idx >= 0) setStepIndex(idx);
   }
 
-  async function handleProfileSubmit(e: FormEvent) {
-    e.preventDefault();
+  /**
+   * LAYER 1 — the write, with the officer's answer attached when there was a question.
+   *
+   * Split out of `handleProfileSubmit` so the duplicate warning's "a different person" button and an
+   * ordinary submit reach the SAME code: two copies would be two places for the answer to stop being
+   * sent, and the answer not being sent is indistinguishable from no warning having fired.
+   */
+  async function createAndStartKyc(
+    answer?: { samePerson: boolean; matchCount: number },
+  ) {
     if (!customerType) return;
     setError(null);
     setIsSubmitting(true);
     try {
       const createdCustomer = await createCustomer({
         customerType,
+        duplicateNameSamePerson: answer?.samePerson,
+        duplicateNameMatchCount: answer?.matchCount,
         legalName: customerType === 'CORPORATE' ? legalName : undefined,
         givenName: customerType === 'INDIVIDUAL' ? givenName : undefined,
         fatherName: customerType === 'INDIVIDUAL' ? (fatherName || undefined) : undefined,
@@ -161,9 +183,75 @@ export function CustomerOnboardingWizard() {
       const createdKyc = await startKyc(createdCustomer.id);
       setCustomer(createdCustomer);
       setKyc(createdKyc);
+      setDuplicateMatches(null);
       goTo(customerType === 'CORPORATE' ? 'ubos' : 'documents');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('customerWizardCreateError'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleProfileSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!customerType) return;
+
+    // CORPORATE goes straight through: a company is keyed on its registration number by a hard unique
+    // index, so there is no judgement to ask for — a collision is refused by the database and surfaces
+    // as the create's own error. Only a PERSON gets a warning, because only a person can legitimately
+    // share a name with somebody else.
+    if (customerType !== 'INDIVIDUAL') {
+      await createAndStartKyc();
+      return;
+    }
+
+    const enteredName = [givenName, fatherName, grandfatherName, familyName]
+      .filter((part) => part.trim() !== '')
+      .join(' ');
+
+    setError(null);
+    setIsSubmitting(true);
+    let check: DuplicateNameCheck;
+    try {
+      check = await checkDuplicateCustomerName(enteredName);
+    } catch (err) {
+      // THE CHECK FAILING MUST NOT BLOCK THE CREATE. It is a warning, not a control — the hard
+      // refusals live on the database indexes and on the bulk import. Refusing a real customer because
+      // a warning lookup was unavailable would make layer 1 stricter when it breaks than when it works,
+      // which is the wrong direction for something that cannot prevent a duplicate anyway.
+      setIsSubmitting(false);
+      setError(
+        err instanceof ApiError ? err.message : t('customerDuplicateCheckFailed'),
+      );
+      await createAndStartKyc();
+      return;
+    }
+    setIsSubmitting(false);
+
+    if (check.matches.length === 0) {
+      await createAndStartKyc();
+      return;
+    }
+    setDuplicateName(enteredName);
+    setDuplicateMatches(check.matches);
+  }
+
+  /** The officer recognised the person. Nothing is created, and that is RECORDED. */
+  async function handleSamePerson() {
+    const matches = duplicateMatches;
+    if (!matches || matches.length === 0) return;
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await recordAbandonedDuplicate({
+        legalName: duplicateName,
+        matchCount: matches.length,
+      });
+      setDuplicateAbandoned(true);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : t('customerDuplicateCheckFailed'),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -475,9 +563,81 @@ export function CustomerOnboardingWizard() {
             </div>
           </div>
 
-          <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-            {isSubmitting ? t('customerWizardCreatingButton') : t('customerWizardCreateButton')}
-          </button>
+          {/* LAYER 1's WARNING. It sits above the submit button, because a warning below the control it
+              is about is a warning read after the click. It REPLACES the button rather than sitting
+              beside it: leaving "Create customer" live next to "is this the same person?" lets the
+              question be clicked past, which is the one way a warning fails while appearing to work. */}
+          {duplicateMatches && duplicateMatches.length > 0 ? (
+            <div
+              data-testid="duplicate-name-warning"
+              role="alert"
+              style={{
+                border: '1px solid var(--warning-border, var(--border-strong))',
+                background: 'var(--warning-bg, var(--surface-sunken))',
+                borderRadius: '0.4rem',
+                padding: '0.75rem',
+                marginTop: '1rem',
+              }}
+            >
+              <strong>{t('customerDuplicateNameHeading')}</strong>
+              <p style={{ marginTop: '0.4rem' }}>
+                {t('customerDuplicateNameIntro')}
+              </p>
+              <ul style={{ marginTop: '0.4rem', paddingInlineStart: '1.2rem' }}>
+                {duplicateMatches.map((match) => (
+                  <li key={match.id}>
+                    <a
+                      href={`/customers/${match.id}`}
+                      data-testid="duplicate-name-match"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <bdi>{match.legalName}</bdi>
+                    </a>{' '}
+                    — {match.status}
+                  </li>
+                ))}
+              </ul>
+
+              {duplicateAbandoned ? (
+                // The warning WORKED. Say so plainly and leave the officer on the open record rather
+                // than silently resetting the form, which would read as the create having failed.
+                <p data-testid="duplicate-name-abandoned" style={{ marginTop: '0.6rem' }}>
+                  {t('customerDuplicateNameAbandoned')}
+                </p>
+              ) : (
+                <div style={{ ...formRowStyle, marginTop: '0.75rem' }}>
+                  <button
+                    type="button"
+                    data-testid="duplicate-same-person"
+                    disabled={isSubmitting}
+                    style={buttonStyle}
+                    onClick={() => void handleSamePerson()}
+                  >
+                    {t('customerDuplicateNameSamePerson')}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="duplicate-different-person"
+                    disabled={isSubmitting}
+                    style={buttonStyle}
+                    onClick={() =>
+                      void createAndStartKyc({
+                        samePerson: false,
+                        matchCount: duplicateMatches.length,
+                      })
+                    }
+                  >
+                    {t('customerDuplicateNameDifferentPerson')}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button type="submit" disabled={isSubmitting} style={buttonStyle}>
+              {isSubmitting ? t('customerWizardCreatingButton') : t('customerWizardCreateButton')}
+            </button>
+          )}
         </form>
       ) : null}
 

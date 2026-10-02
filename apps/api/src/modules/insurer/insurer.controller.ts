@@ -21,6 +21,8 @@ import {
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { INSURER_SEARCH_CODES } from '../../common/picker-search.config';
+import { SearchInsurersDto } from '../../common/picker-search.dto';
 
 /**
  * Insurer management — this office's OWN insurer records.
@@ -51,6 +53,23 @@ export class InsurerController {
   /** The office's insurers, ACTIVE and inactive. `?isActive=` narrows it; absent
    *  means both, because an office that cannot see what it deactivated cannot
    *  offer to reactivate it. */
+  /**
+   * THE INSURER PICKER's source. Gated on ANY OF `INSURER_SEARCH_CODES`.
+   *
+   * That list is the union of the permissions of the screens that type a `insurerId`, per the owner's
+   * rule — and the rule exists because the opposite shipped twice, most sharply when
+   * `GET /employees/search` was gated on `employee.national-id.reveal` and an Executive therefore could
+   * not find an employee on the employee performance screen. `PermissionsGuard` ORs its codes, so the
+   * spread is exactly "any one of these is enough".
+   *
+   * Declared BEFORE any `:id` route so `search` is never parsed as an id.
+   */
+  @RequirePermissions(...INSURER_SEARCH_CODES)
+  @Get('search')
+  searchForPicker(@Query() query: SearchInsurersDto) {
+    return this.insurers.searchForPicker(query);
+  }
+
   @RequirePermissions('insurer.read')
   @Get()
   list(@Query() query: ListInsurersQueryDto) {

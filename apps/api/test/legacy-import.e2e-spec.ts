@@ -31,7 +31,13 @@ interface ImportBody {
   rejected: number;
   screened: number;
   screeningFlagged: number;
-  rejections: { lineNumber: number; reason: string }[];
+  refusedDuplicates: number;
+  issues: {
+    lineNumber: number;
+    kind: 'DUPLICATE' | 'BAD_DATA' | 'IMPORTED_NEEDS_REVIEW';
+    detail: string;
+    collidedWithCustomerId?: string;
+  }[];
   failures: { lineNumber: number; reason: string }[];
 }
 
@@ -114,10 +120,16 @@ describe('Legacy customer bulk import (e2e) — spec Part III §7', () => {
 
     const acme = uniqueLabel('Acme Trading');
     const ahmad = uniqueLabel('Ahmad Ali');
+    // THE CORPORATE ROW NOW CARRIES A REGISTRATION NUMBER. It did not, and this test asserted
+    // `rejected: 0` — which was documenting the hole: the import hand-rolled two checks and the
+    // intake DTO's required-registration-number rule was not one of them, so a corporate row with no
+    // number imported cleanly and the partial unique then tolerated it as UNKEYED. Validation now runs
+    // against the DTO itself, so the row is refused. The format has the column; supplying it is the
+    // honest fix rather than weakening the assertion.
     const csv = [
-      'Client Name,Kind,Country,Email',
-      `${acme},CORPORATE,,ops@acme.test`,
-      `${ahmad},individual,JO,`,
+      'Client Name,Kind,Country,Email,Reg',
+      `${acme},CORPORATE,,ops@acme.test,${uniqueLabel('REG')}`,
+      `${ahmad},individual,JO,,`,
     ].join('\n');
 
     const res = await request(app.getHttpServer())
@@ -130,6 +142,7 @@ describe('Legacy customer bulk import (e2e) — spec Part III §7', () => {
           customerType: 'Kind',
           nationality: 'Country',
           contactEmail: 'Email',
+          registrationNumber: 'Reg',
         }),
       )
       .attach('file', Buffer.from(csv, 'utf8'), 'legacy-book.csv')
@@ -195,10 +208,12 @@ describe('Legacy customer bulk import (e2e) — spec Part III §7', () => {
     );
     const good = uniqueLabel('Good Co');
     const csv = [
-      'Client Name,Kind',
-      `${good},CORPORATE`,
-      ',CORPORATE',
-      'Bad Kind,PARTNERSHIP',
+      'Client Name,Kind,Reg',
+      // The good row needs its registration number now — see the note on the first test.
+      `${good},CORPORATE,${uniqueLabel('REG')}`,
+      // Still deliberately bad: no name, and a type the vocabulary does not have.
+      ',CORPORATE,R-EMPTY-NAME',
+      'Bad Kind,PARTNERSHIP,R-BAD-KIND',
     ].join('\n');
 
     const res = await request(app.getHttpServer())
@@ -206,7 +221,11 @@ describe('Legacy customer bulk import (e2e) — spec Part III §7', () => {
       .set(bearer(admin.accessToken))
       .field(
         'mapping',
-        JSON.stringify({ legalName: 'Client Name', customerType: 'Kind' }),
+        JSON.stringify({
+          legalName: 'Client Name',
+          customerType: 'Kind',
+          registrationNumber: 'Reg',
+        }),
       )
       .attach('file', Buffer.from(csv, 'utf8'), 'partial.csv')
       .expect(201);
@@ -214,7 +233,12 @@ describe('Legacy customer bulk import (e2e) — spec Part III §7', () => {
     const body = res.body as ImportBody;
     expect(body.imported).toBe(1);
     expect(body.rejected).toBe(2);
-    expect(body.rejections.map((r) => r.lineNumber)).toEqual([3, 4]);
+    // `rejections` and `failures` are replaced by ONE `issues` list carrying a KIND — two arrays
+    // distinguished only by their field name is what let an imported-but-unscreened row read as a
+    // refusal. Both of these are BAD_DATA; the duplicate case is in `legacy-import-report.e2e-spec.ts`.
+    expect(
+      body.issues.filter((i) => i.kind === 'BAD_DATA').map((i) => i.lineNumber),
+    ).toEqual([3, 4]);
     expect(await prisma.customer.count({ where: { legalName: good } })).toBe(1);
   });
 

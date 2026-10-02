@@ -8,6 +8,8 @@ import {
 import { AuditService } from '../../audit/audit.service';
 import type { RecordAuditEntryInput } from '../../audit/audit.service';
 import { BranchRepository } from '../../../repositories/branch.repository';
+import { PICKER_MAX_RESULTS } from '../../../common/picker-search.config';
+import type { SearchBranchesDto } from '../../../common/picker-search.dto';
 import { DepartmentRepository } from '../../../repositories/department.repository';
 import type {
   CreateOrgUnitDto,
@@ -15,6 +17,16 @@ import type {
 } from '../dto/org-structure.dto';
 
 export interface OrgUnitView {
+  id: string;
+  name: string;
+  nameAr: string | null;
+}
+
+/**
+ * What the branch picker returns. Both name forms, so the component can translate at RENDER rather
+ * than at fetch — the bug the customer picker's `DetailPart` split was built to fix.
+ */
+export interface OrgUnitPickerResult {
   id: string;
   name: string;
   nameAr: string | null;
@@ -48,6 +60,29 @@ export class OrgStructureService {
     private readonly branches: BranchRepository,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * THE BRANCH PICKER. Eleven screens filter by branch and every one typed a uuid — the widest of the
+   * six pickers by number of screens.
+   *
+   * ITS OWN ROUTE rather than a widened `GET /admin/branches`, and the reason is a disclosure boundary
+   * rather than tidiness: that list is an administrative register returning every branch including the
+   * deactivated ones, and widening its `branch.read` gate to the ten codes these screens carry would
+   * hand nine roles an administration screen's data in order to serve a dropdown. This returns live
+   * branches, two name fields, and nothing else.
+   *
+   * NOT AUDITED. A branch is the office's own structure, not a person and not a counterparty; a row
+   * recording that somebody typed two letters of their own branch's name would record a non-event.
+   */
+  async searchBranchesForPicker(
+    dto: SearchBranchesDto,
+  ): Promise<OrgUnitPickerResult[]> {
+    const rows = await this.branches.searchForPicker(
+      dto.q,
+      PICKER_MAX_RESULTS.branch,
+    );
+    return rows.map((b) => ({ id: b.id, name: b.name, nameAr: b.nameAr }));
+  }
 
   async listDepartments(): Promise<OrgUnitView[]> {
     return (await this.departments.list()).map(toOrgUnitView);

@@ -123,6 +123,37 @@ export class EmployeeRepository {
     return (tx ?? this.prisma.client).employee.create({ data: input });
   }
 
+  /**
+   * Does somebody of this name already work here? — the PRE-CHECK for the precise 409.
+   *
+   * `Employee_one_active_person_per_office` already refuses the row, and that partial index is the real
+   * invariant. What a pre-check adds is the message: a P2002 arriving through the tenant-extended client
+   * carries `target: null`, so from inside a service there is no way to tell which constraint fired.
+   * Measured, not assumed — see `common/duplicate-person-conflict.ts`. Before this, registering a second
+   * person of the same name returned a 500.
+   *
+   * ACTIVE service only, matching the index's own `WHERE terminationDate IS NULL`. A rehire is a
+   * legitimate second row and must not be refused — proven by `employee-rehire.e2e-spec.ts`, which
+   * terminates somebody, rehires them, and then asserts a THIRD active row is still refused.
+   *
+   * Takes the `tx` so the person-and-account pair can check inside its own transaction rather than
+   * before it, where a concurrent write could land in between.
+   */
+  async findActiveByCanonicalPersonName(
+    organizationId: string,
+    fullName: string,
+    tx?: TenantTransactionClient,
+  ): Promise<{ id: string; fullName: string } | null> {
+    const client = tx ?? this.prisma.client;
+    const rows = await client.$queryRaw<{ id: string; fullName: string }[]>`
+      SELECT id, "fullName" FROM "Employee"
+      WHERE "organizationId" = ${organizationId}
+        AND "terminationDate" IS NULL
+        AND canonical_person_key("fullName") = canonical_person_key(${fullName})
+      LIMIT 1`;
+    return rows[0] ?? null;
+  }
+
   /** Correct an existing record. Deliberately narrow — see `UpdateEmployeeDto`
    *  for what it refuses and why. */
   update(
