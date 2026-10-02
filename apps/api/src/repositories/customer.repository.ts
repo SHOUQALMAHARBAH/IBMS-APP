@@ -240,13 +240,23 @@ export class CustomerRepository {
    *
    * ## WHAT IT CANNOT MATCH, and this is not an oversight
    *
-   * An individual's NATIONAL ID and the contact PHONE are unreachable here. `nationalIdEnc`,
-   * `contactPhoneEnc` and `contactEmailEnc` are encrypted with a RANDOM IV PER VALUE
-   * (`randomBytes(12)`), so the same national ID stored twice is two different ciphertexts: there is no
-   * equality to test and nothing to prefix-match. Making them searchable would mean a deterministic
-   * encoding of a Highly Confidential identifier, which is the decision the masked national ID exists
-   * to refuse. So the clerk's case is served for a company and NOT for a person, and that gap is a
-   * decision for the owner rather than something to close quietly here.
+   * An individual's NATIONAL ID and the contact PHONE are unreachable here, and that is now a
+   * DECIDED POSITION rather than a pending gap. `nationalIdEnc`, `contactPhoneEnc` and
+   * `contactEmailEnc` are encrypted with a RANDOM IV PER VALUE (`randomBytes(12)`), so the same
+   * national ID stored twice is two different ciphertexts: there is no equality to test and nothing to
+   * prefix-match.
+   *
+   * The owner asked for an identity-number search and then WITHDREW the requirement, on her own
+   * reasoning: making those columns searchable means a guessable encoding of a Highly Confidential
+   * field, which is precisely what the masked national ID exists to refuse — and the document in a
+   * clerk's hand carries the NAME as well as the number, so nobody was ever blocked. A convenience does
+   * not buy a weakening of that field's protection.
+   *
+   * So do not add it. `customer.e2e-spec.ts` asserts the limit, and if that assertion ever starts
+   * failing it means the encryption posture changed, which has to be a decision rather than a side
+   * effect. What stays open is a different question with a different purpose — duplicate prevention,
+   * which needs the same equality test for DATA INTEGRITY rather than for search comfort. See
+   * `docs/customer-duplicate-prevention-measured.md`.
    *
    * ## The window is REQUIRED
    *

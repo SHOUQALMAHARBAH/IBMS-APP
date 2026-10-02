@@ -450,11 +450,18 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
     });
 
     it('CANNOT find a customer by national ID or phone — both carry a random IV per value', async () => {
-      // NOT a gap being papered over: the same national ID stored twice is two different ciphertexts,
-      // so there is no equality to test. This asserts the LIMIT so nobody later reports it as a bug and
-      // closes it by making a Highly Confidential identifier deterministically searchable, which is the
-      // decision the masked national ID exists to refuse. If this ever starts matching, that is a change
-      // to the encryption posture and has to be a decision rather than a side effect.
+      // THIS ASSERTS A DECISION, not a pending gap. The owner asked for an identity-number search and
+      // then WITHDREW the requirement: making those columns searchable means a guessable encoding of a
+      // Highly Confidential field, which is what the masked national ID exists to refuse — and the
+      // document in a clerk's hand carries the NAME too, so nobody was blocked. A convenience does not
+      // buy a weakening of that field's protection.
+      //
+      // So this test is the thing that stops a future reader "fixing" it. If it ever starts matching,
+      // the encryption posture changed, and that has to be a decision rather than a side effect.
+      //
+      // What it does NOT settle is duplicate prevention, which needs the same equality test for DATA
+      // INTEGRITY rather than for search comfort — a different question, measured in
+      // `docs/customer-duplicate-prevention-measured.md`.
       const app = await boot();
       const sales = await makeUser(
         app,

@@ -1,132 +1,127 @@
-# The corporate customer's official identifier — measured before building
+# The corporate customer's identifier — NOT masked. A unique key, and a screening determinant.
 
-**Owner decision taken 2026-10-01**, after she confirmed the INDIVIDUAL case works as agreed. **Nothing
-built. The individual case is untouched.**
+**REVERSED 2026-10-01, the same day it was taken.** Nothing has been built under either version.
 
-## Her decision, restated
+## What this replaces, and why the first version was wrong
 
-A corporate customer carries an official identifier that **mirrors the individual behaviour exactly** —
-captured, masked, revealed only with a written justification, every reveal logged as a sensitive read —
-and it joins the screening determinants. Not a new pattern; the same one.
+The first decision was to mirror the national ID exactly: captured, masked, revealed only with a written
+justification, every reveal logged. It was proposed on a recommendation and approved on it, and it was
+wrong.
 
-Which number (national establishment number, commercial registration number, or both) goes to the
-broker as part of question 12.
+**A company's registration number is PUBLIC.** Jordan's Companies Control Department lets anyone look it
+up. Masking it hides a number any person can query, at the cost of searching on it and screening against
+it — theatre with a real price.
 
-## ONE CORRECTION TO THE PREMISE, and it changes the size of the work
+### The rule behind the reversal, which is the part to keep
 
-Her finding was that *a corporate customer shows no identifier at all.* **It shows one.**
+> **A field's protection is derived from the nature of the fact it holds, not from sitting next to a
+> sensitive field.** "Treat it the same" across two fields of different nature produces theatre at a
+> real cost.
 
-* `registrationNumber` is **REQUIRED** for CORPORATE creation (`@ValidateIf` + a 1–100 length), the
-  create wizard asks for it, the API returns it, and `/customers/[id]` renders it.
-* `taxRegistrationNumber` is also captured, optional, and **displayed nowhere** — write-only today.
-* Both are stored **in the clear**. Neither is masked, neither has a reveal control.
+The national ID and the registration number sit in adjacent columns on the same screen and are facts of
+opposite kinds: one identifies a natural person and is Highly Confidential; the other identifies a legal
+entity and is on a public register. Proximity suggested symmetry and symmetry was the error.
 
-So the specification gap she identified is real — nothing anywhere states what identifies a company —
-but the FIELD is not missing. That makes her decision **smaller than adding a field**: it is giving an
-existing, already-required, already-populated column the treatment the national ID has.
+**The same error is available in reverse**, and reversal 3's scoping below finds it already latent: a
+public registration number placed behind `ScreeningProviderConfig.sendIdentifiers`, a flag that exists to
+protect Highly Confidential identifiers, would be the same category mistake with the signs swapped.
 
-It also means something worth knowing before any screen is touched: **every corporate customer in the
-system already has this number on file**, so a masking change has data to mask from day one and no
-backfill question.
+## The decision
 
-## What the system captures for a corporate customer today
+For a company what matters is not confidentiality, it is **UNIQUENESS**.
 
-| field | required? | stored | shown on the detail page? |
-|---|---|---|---|
-| `legalName` | yes | clear | yes, as the heading |
-| `registrationNumber` | **yes** | **clear** | **yes, unmasked, no reveal** |
-| `taxRegistrationNumber` | no | clear | **no — captured and never displayed** |
-| `registeredAddress` | yes | clear | yes |
-| `natureOfBusiness` | yes | clear | yes |
-| `dateOfBirth` / `nationality` | n/a | — | individual only; a company has none of its own |
-| `nationalIdEnc` | n/a | — | refused by construction on the corporate form |
+1. **It stays visible**, as it already is on `/customers/[id]` and on the one-field search's option line.
+2. **It becomes the company's unique key**, under the canonicalisation discipline already applied to
+   insurer names — so the same company cannot be registered twice under a different spelling.
+3. **It joins the screening determinants**, so a corporate screening stops resting on the name alone.
 
-## Does the screening path treat a corporate customer differently? YES — and this is the finding
+**The tax registration number is NOT public, is displayed nowhere today, and that stays as it is.**
 
-`buildScreeningSubjects` (one function, two callers, so the screening and the change-fingerprint cannot
-drift) builds a company as:
+Which number is the official one — Jordan's national establishment number, the commercial registration
+number, or both — remains broker question 12. The establishment number is not a column today, so that
+answer decides between a treatment change and a new field.
 
+## What is already true, measured
+
+* `registrationNumber` is **required** for CORPORATE creation, populated on every corporate customer,
+  returned by the API, rendered unmasked on the detail page, and already **searchable** — it is one of
+  the two cleartext columns the one-field customer search prefix-matches.
+* So items 1 and the search half of 2 need **no work at all**. What is missing is the uniqueness and the
+  screening.
+
+## SCOPING THE SCREENING CHANGE — and a correction to my own earlier report
+
+**I reported that `ScreeningSubject` has no identifier field at all, making this a provider-contract
+change rather than a column. That was wrong.** The contract already carries two:
+
+```ts
+export interface ScreeningSubject {
+  subjectRef: string;          // correlation only, never sent to a provider
+  fullName: string;
+  aliases?: string[];
+  entityType: 'individual' | 'organization';
+  dateOfBirth?: string | null;
+  nationality?: string | null;
+  country?: string | null;
+  /** Highly Confidential. Only sent to a provider configured to receive it —
+   *  see `ScreeningProviderConfig.sendIdentifiers`. */
+  nationalId?: string | null;
+  passportNumber?: string | null;
+}
 ```
-subjectRef:  customer:<id>
-fullName:    legalName
-entityType:  'organization'
-dateOfBirth: null      <- correct: belongs to the natural persons behind it
-nationality: null      <- correct: same
-```
 
-**No identifier is passed at all.** So:
+So the interface change is **one optional field**, not a contract rewrite. The real work is elsewhere,
+and the measurement found three things that matter more than the field:
 
-| | determinants a match is weighed on |
+### 1. THE CONTRACT'S IDENTIFIER FIELDS HAVE NO PRODUCER — for anybody
+
+`buildScreeningSubjects` populates `fullName`, `entityType`, `dateOfBirth` and `nationality`. It sets
+**neither `nationalId` nor `passportNumber`**, for an individual or for a UBO. Measured: zero producers.
+
+So the corporate case is not uniquely deprived — **no subject this system screens carries an identifier
+at all.** The company's name-only screening is the visible instance of a gap that covers every subject.
+
+### 2. THE PROVIDER ACTUALLY IN USE READS NO IDENTIFIER
+
+| provider | identifier handling |
 |---|---|
-| an INDIVIDUAL | name + date of birth + nationality (three), plus a national ID held encrypted |
-| a CORPORATE | **name. One.** |
+| `built-in-watchlist` — **the one in use** | matches on `fullName` only; reads no identifier field |
+| `on-premise` (Yente) | `if (config.sendIdentifiers) props.idNumber = [subject.nationalId]` |
+| `commercial` | the same, spread into the request body |
 
-The null date of birth and nationality are correct and the code says why — those belong to the UBOs, and
-the UBO subjects carry them. But the consequence is that **a company is screened on its name alone**,
-against a list the module's own comment calls the single largest source of false positives when matching
-by name only. That is the measured basis for broker question 12, and it is the half of her decision with
-the most consequence.
+**Adding a field to the contract changes nothing until the matcher reads it.** The built-in provider is
+where the uniqueness and screening benefit is actually bought, and it is the larger half of the work —
+a registration-number comparison is an exact-match branch beside a fuzzy-name one, with its own
+`matchedAttributes` entry so a reviewer can see which identifier agreed.
 
-**And it is not a one-line change.** `ScreeningSubject` — the provider contract — has **no identifier
-field**. Adding the corporate number to screening means changing that contract and every provider that
-implements it, not adding a column. Worth knowing before the work is scoped.
+### 3. `sendIdentifiers` DEFAULTS TO FALSE, AND THE REGISTRATION NUMBER MUST NOT SIT BEHIND IT
 
-## Is there an existing field that could serve?
+`envBool(SCREENING_ENV.sendIdentifiers, false)`. That flag exists to stop a Highly Confidential
+identifier leaving the building for a provider not configured to receive it. A public registration number
+has no such need, and putting it behind that flag would make the corporate screening silently
+name-only in every default deployment — the same category error as masking it, with the signs swapped.
 
-**Yes, two**, and the choice between them is the broker's (question 12):
+So the field is sent unconditionally, and the flag keeps governing exactly the two fields it was built
+for. **This follows directly from the rule behind the reversal**, which is why the rule is worth having
+rather than the individual calls.
 
-* `registrationNumber` — the commercial registration number. Already required, already populated,
-  already displayed. Also already **searchable**: it is one of the two columns the new one-field
-  customer search matches on a prefix, which is what lets a clerk holding a document find a company by
-  its number.
-* `taxRegistrationNumber` — captured, optional, displayed nowhere.
+### What the change therefore involves, in order of size
 
-**Jordan's national establishment number is NOT a column today.** If the broker names that as the
-official identifier, it is a new field; if he names the commercial registration number, it is a
-treatment change to an existing one. The two answers have very different costs, which is why the
-question should not be pre-empted.
+| | work |
+|---|---|
+| 1 | **the built-in provider's matcher** — an exact-match branch on the identifier, a `matchedAttributes` entry, and tests. The largest part, and the part that buys the benefit. |
+| 2 | **`buildScreeningSubjects`** — populate the new field. One function, two callers, and they must agree exactly or the change-fingerprint drifts from the screening (the reason that function exists). |
+| 3 | **`ScreeningSubject`** — one optional field, outside the `sendIdentifiers` gate, with a comment saying why it is outside. |
+| 4 | **the two external providers** — map it, also outside the gate. |
 
-## THE TENSION THIS CREATES WITH TWO THINGS SHIPPED THE SAME DAY
+And a question the scoping raises rather than answers: **the same change would let an individual's
+screening carry a national ID**, since the contract field exists and has no producer. That is a
+different decision — a Highly Confidential value leaving for a provider — and it is governed by
+`sendIdentifiers` precisely because it is. It should not be swept in alongside the public number.
 
-Named here because they are the places masking would have to reach, and both are easy to miss:
+## Nothing built
 
-1. **The one-field customer search shows the registration number on an option line**
-   (`docs/decision-one-field-finds-a-customer.md`). That is deliberate — it is what tells two companies
-   of the same name apart, and what a person searching BY the number needs echoed back. If the number
-   becomes masked and reveal-gated, **this is the one place it would still be rendered in the clear**,
-   and it would have to change with it. It would also remove the only disambiguation that line has.
-2. **The search MATCHES on it.** Masking is about display, not storage, so a prefix match on a cleartext
-   column survives masking — but if the decision ever moves the number into an encrypted column (as
-   `nationalIdEnc` is), the search by number **stops working**, because the IV is random per value. The
-   clerk's case would then be lost for companies as well as for people.
-
-So the decision has a hidden fork: **mask the display and keep the column cleartext** (the search keeps
-working, the number is still at rest in the clear) **or encrypt it like the national ID** (the stronger
-privacy posture, and the number becomes unsearchable). The individual case took the second. Mirroring
-"exactly" therefore has to say which of the two "exactly" means.
-
-## The permission question she raised
-
-Her inclination: the same permission, `customer.national-id.reveal` — same sensitivity, same actor, no
-reason to grow the catalogue.
-
-**Measured, and I found no reason it cannot be the same code:**
-
-* The customer reveal is already split **PER FIELD, not per route** — `POST /customers/:id/reveal-field`
-  takes the field name and the gate is checked inside the service. A second field slots in with no new
-  code and no new route.
-* The holder is the same: `customer.national-id.reveal` is held by COMPLIANCE_OFFICER alone.
-* The audit trail already records which FIELD was revealed, so one code does not blur two reveals in the
-  log.
-
-The only argument the other way is the code's NAME — `customer.national-id.reveal` reads as being about
-a national ID, and an administrator granting it would not expect it to cover a company's registration
-number. That is a naming problem, not a capability one, and the honest fix if it matters is to rename
-the code rather than to add a second.
-
-## What is NOT done
-
-Everything. This is the measurement she asked for, and it stops here. The individual case —masked
-national ID, written justification, logged reveal — is untouched and must stay that way: she has now
-seen it behaving correctly on screen, which is the strongest evidence this system has for any of its
-privacy controls.
+Reported and stopped, as instructed. The uniqueness half connects to
+`docs/customer-duplicate-prevention-measured.md`: for a company, the registration number is the key the
+insurer pattern can be applied to directly, because it is in the clear. For a person it is not, and that
+is a separate decision.
