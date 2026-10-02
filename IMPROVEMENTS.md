@@ -29,6 +29,8 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Searching for the component you changed | Searching for the screens, from the inventory you already hold |
 | Explaining a fault you did not read the tool's output for | Reading it — the tool probably said it |
 | Anchoring a negative on its container | Anchoring it on something the role actually holds |
+| Treating a single collision as a data problem | Computing its rate first — one in three here |
+| Trusting that a reset seeded | Checking 219 permissions AND 502 grants |
 
 The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
 THE SAME, and only care separates them. Care is not a control — it is the thing that was
@@ -272,6 +274,30 @@ on `/customers`, a destination that role does hold.
 The general form, because this is not only about nav: **a negative and a positive assertion on the same
 container is one test, not two.** Writing the positive first is what tells you the container is the right
 one.
+
+## Before treating a single case, compute its rate
+
+**2026-10-02.** One employee name appeared twice on dev and it looked like a data problem to resolve.
+The arithmetic says otherwise: `personName()` drew four independent `pick()`s over pools of roughly
+14 / 11 / 11 / 14, which is about **24,000 combinations**, and at **135 draws** the birthday problem
+puts a collision at **nearly one in three**.
+
+So *135 employees, 134 distinct ordered keys, exactly one collision* is not bad luck — **it is the
+predicted outcome.** A generator whose collision rate is the collision rate of its pool will keep
+producing these, and the next one lands on whichever table gets a unique key next.
+
+> **Compute the rate before treating the case.** A single instance tells you nothing about whether you
+> are looking at an accident or at a distribution; the rate tells you which, and therefore whether to
+> fix the row or the thing that produced it.
+
+Fixing the GENERATOR once is the correct unit. It now tracks the ordered keys it has issued and will
+not reissue one — checked on the **ordered** key rather than the sorted one, so the demo data cannot
+contain accidental cousins of itself either, and it no longer draws the same name for father and
+grandfather, which halved the usable space for nothing.
+
+The same arithmetic is why the colliding dev PAIR was renamed rather than deleted and why the renamed
+value was checked against the existing set first: a replacement drawn from the same pool is as likely
+to collide as the original was.
 
 ## The standing rule for every number this file publishes
 
