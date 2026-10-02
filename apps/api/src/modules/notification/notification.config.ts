@@ -36,6 +36,7 @@ export const NOTIFICATION_KINDS = [
   'screening_match',
   'service_request_assigned',
   'customer_pending_kyc',
+  'kyc_awaiting_decision',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -80,6 +81,19 @@ export const BOOK_WIDE_SOURCES: {
     kind: 'screening_match',
     permission: 'sanctions-pep.screen',
     href: '/screening-matches',
+    severity: 'action',
+  },
+  {
+    // DEFECT 2 of `docs/kyc-path.md`. Keyed on who may ACT on the file — `kyc.approve` — and NOT on the
+    // customer's owner. The owner-scoped count below it stays: it tells the capturing officer something
+    // true about their own book, and the two answer different questions.
+    //
+    // `kyc.approve` rather than `kyc.capture` OR `kyc.approve`: a book-wide source names ONE permission,
+    // and the person who must act on a file awaiting a decision is the one who can decide it. The
+    // capturing officer already has the owner-scoped count.
+    kind: 'kyc_awaiting_decision',
+    permission: 'kyc.approve',
+    href: '/customers/kyc-queue',
     severity: 'action',
   },
 ];

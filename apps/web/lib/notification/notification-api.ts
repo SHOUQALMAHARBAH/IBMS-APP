@@ -16,6 +16,7 @@ export const NOTIFICATION_KINDS = [
   'screening_match',
   'service_request_assigned',
   'customer_pending_kyc',
+  'kyc_awaiting_decision',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];

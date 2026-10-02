@@ -147,9 +147,18 @@ export default function ScreeningMatchesPage() {
       <h1>
         {t('smSanctionsMatchReview')}
       </h1>
-      <p style={{ opacity: 0.75, maxWidth: "46rem" }}>
-        {t('smNamesAreCheckedAgainstThe')}
-      </p>
+      {/* CONDITIONAL, because the sentence is FALSE when the list is empty. It reads "Names are checked
+          against the synced OFAC and UN sanctions lists" in the present tense, and it used to render
+          unconditionally — so with an empty list the screen asserted it and then retracted it in the
+          alert below, relying on the reader reaching the second. The alert being louder is not a reason
+          to leave a false sentence standing.
+          `null` means not yet known, and says nothing rather than guessing — the same default the
+          `watchlistReady` fetch itself takes. */}
+      {watchlistReady === true ? (
+        <p style={{ opacity: 0.75, maxWidth: "46rem" }}>
+          {t('smNamesAreCheckedAgainstThe')}
+        </p>
+      ) : null}
 
       <div style={{ display: "flex", gap: "0.4rem", margin: "1rem 0" }}>
         {STATUSES.map((s) => (

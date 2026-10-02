@@ -34,6 +34,7 @@ const LABEL_KEY: Record<NotificationKind, TranslationKey> = {
   screening_match: 'notifScreeningMatch',
   service_request_assigned: 'notifServiceRequestAssigned',
   customer_pending_kyc: 'notifCustomerPendingKyc',
+  kyc_awaiting_decision: 'notifKycAwaitingDecision',
 };
 
 const triggerStyle: CSSProperties = {

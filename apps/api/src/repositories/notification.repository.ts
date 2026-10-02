@@ -70,6 +70,36 @@ export class NotificationRepository {
     });
   }
 
+  /**
+   * KYC files waiting for somebody to DECIDE them — book-wide.
+   *
+   * The counterpart to `countOwnedCustomersPendingKyc` below, and the two are not alternatives: that
+   * one is scoped to the customer's OWNER, which is the Sales officer who captured the file, and it
+   * tells them something true about their own book. It is the only pending-KYC notification that
+   * existed, and the consequence was measured in `docs/kyc-path.md` as defect 2 — **a clean file
+   * waiting for approval announced itself to nobody who could approve it**, so the only thing that ever
+   * summoned a Compliance Officer was a match already raised. A customer could sit in PENDING_KYC
+   * indefinitely: work stopped, not work annoyed.
+   *
+   * ## The four statuses, and why not the other four
+   *
+   * `SUBMITTED` — screening has not been run; somebody has to run it.
+   * `SCREENING` / `EDD` — mid-flight and awaiting the next human step.
+   * `COMPLIANCE_REVIEW` — screened, awaiting the approve-or-reject.
+   *
+   * `DRAFT` is excluded: the capturing officer has not finished, and nothing is owed to a reviewer yet.
+   * `APPROVED` and `REJECTED` are decided. `PERIODIC_REVIEW_DUE` is excluded deliberately — it is a
+   * RE-review on its own cadence rather than onboarding work, and folding it in here would make a
+   * steady background number out of a count whose whole purpose is that it should reach zero.
+   */
+  countKycRecordsAwaitingDecision(): Promise<number> {
+    return this.prisma.client.kYCRecord.count({
+      where: {
+        status: { in: ['SUBMITTED', 'SCREENING', 'EDD', 'COMPLIANCE_REVIEW'] },
+      },
+    });
+  }
+
   /** Customers this user owns whose KYC has not been approved — the
    *  onboarding work sitting on their own desk. */
   countOwnedCustomersPendingKyc(userId: string): Promise<number> {
