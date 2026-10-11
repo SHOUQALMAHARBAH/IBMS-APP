@@ -1927,6 +1927,9 @@ it('seeds demo data for two Organizations through the real API', async () => {
           legalName: ORG_B_LEGAL_NAME,
           legalNameAr: ORG_B_LEGAL_NAME_AR,
           subdomain: ORG_B_SUBDOMAIN,
+          // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+          // neither kind is a safe fallback for the other, so every creator states which it is.
+          type: 'BROKERAGE_OFFICE',
         },
       });
     }

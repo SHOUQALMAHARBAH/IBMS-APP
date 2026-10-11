@@ -404,6 +404,9 @@ describe('the office boundary', () => {
         legalName: 'Q9 Office B',
         legalNameAr: 'مكتب ب',
         subdomain: `q9-office-b-${tag}`,
+        // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+        // neither kind is a safe fallback for the other, so every creator states which it is.
+        type: 'BROKERAGE_OFFICE',
       },
     });
     const otherOfficeInsurer = await rawPrisma.insurer.create({

@@ -82,6 +82,9 @@ async function ensureDefaultOrganization(): Promise<void> {
       // page the moment the UI switches.
       legalNameAr: "مكتب الوساطة الافتراضي",
       subdomain: "default",
+      // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+      // neither kind is a safe fallback for the other, so every creator states which it is.
+      type: 'BROKERAGE_OFFICE',
     },
   });
   console.log("Seeded the default organization.");

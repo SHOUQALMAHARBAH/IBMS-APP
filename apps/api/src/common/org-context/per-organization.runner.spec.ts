@@ -16,6 +16,9 @@ function org(id: string, legalName = `Office ${id}`): Organization {
     legalNameAr: null,
     brokerLicenseNumber: null,
     subdomain: id,
+    // Module 0 item (a). The compiler asked for this the moment the column landed, which is the
+    // property the comment below already claimed — so it is stated, not defaulted.
+    type: 'BROKERAGE_OFFICE',
     status: 'ACTIVE',
     dpoAlternateApproverUserId: null,
     // Part 4 — every office reads SEGREGATED unless it has declared otherwise, which is what the migration

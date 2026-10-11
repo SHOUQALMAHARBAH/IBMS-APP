@@ -316,6 +316,9 @@ beforeAll(async () => {
       legalName: 'Rawabi Insurance Brokerage (tenant-isolation e2e)',
       legalNameAr: 'شركة الروابي لوساطة التأمين',
       subdomain: ORG_B_SUBDOMAIN,
+      // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+      // neither kind is a safe fallback for the other, so every creator states which it is.
+      type: 'BROKERAGE_OFFICE',
     },
   });
   // Every office needs a route to user administration — see

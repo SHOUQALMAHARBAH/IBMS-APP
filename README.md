@@ -684,6 +684,13 @@ build actually is today:
   office, and multi-tenancy is being retrofitted one phase at a time, deliberately,
   because it changes an assumption nearly every file depends on.
 
+  **An `Organization` now states WHAT KIND it is** (Module 0 item (a), migration
+  `20261110100000`): `OrganizationType` is `BROKERAGE_OFFICE` or `INSURANCE_COMPANY`, NOT NULL
+  with **no default** — neither kind is a safe fallback for the other, so every creator names it
+  and the compiler refuses one that does not. Every pre-existing row was backfilled as a brokerage
+  office. **Tenant isolation is unchanged by it**: `Organization` carries no `organizationId`, so
+  it was never in `TENANT_SCOPED_MODELS` and has no RLS policy (measured: `relrowsecurity = f`).
+
   What exists: the `Organization` model; `organizationId` on every tenant-scoped table
   with every row attributed; a unique-constraint set that is per-office rather than
   per-platform; and — as of Phase 2 step 7 — **application-layer enforcement**. Every

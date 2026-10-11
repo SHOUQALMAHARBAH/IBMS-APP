@@ -197,6 +197,9 @@ beforeAll(async () => {
       id: ORG_ID,
       legalName: 'Last Administrator Lock Office',
       subdomain: SUBDOMAIN,
+      // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+      // neither kind is a safe fallback for the other, so every creator states which it is.
+      type: 'BROKERAGE_OFFICE',
     },
   });
 

@@ -206,19 +206,23 @@ enum MfaCredentialType {
 /// reasoning as `Customer.legalNameAr` / `Insurer.nameAr` elsewhere in this
 /// schema.
 model Organization {
-  id                         String    @id @default(uuid())
+  id                         String           @id @default(uuid())
   legalName                  String
   /// Arabic legal name — see the model comment. Optional only because an
   /// office may be onboarded before its registered Arabic name is confirmed.
   legalNameAr                String?
+  /// Brokerage office or insurance company — see `OrganizationType`. NOT NULL with no default:
+  /// the kind is stated at creation, never inferred. Tenant isolation is UNCHANGED by this column;
+  /// `Organization` carries no `organizationId` and so was never in `TENANT_SCOPED_MODELS`.
+  type                       OrganizationType
   /// This office's own CBJ broker license number. Distinct from the
   /// `BrokerLicense` model, which tracks a license's lifecycle per office.
   brokerLicenseNumber        String?
   /// Tenant resolution key (spec §4.10) — e.g. "alsalam" resolves
   /// alsalam.ibms-app.example to this row BEFORE any login step runs.
   /// Nothing consumes it yet; `GET /orgs/resolve` arrives in Phase 4.
-  subdomain                  String    @unique
-  status                     OrgStatus @default(ACTIVE)
+  subdomain                  String           @unique
+  status                     OrgStatus        @default(ACTIVE)
   /// SUPERSEDED by the per-office duty-segregation MODE — see
   /// `docs/duty-segregation-mode.md`. Kept until the deferred cleanup track removes it, and
   /// deliberately NOT given a consumer in the meantime: two live mechanisms for one problem is how the
@@ -234,8 +238,8 @@ model Organization {
   /// Organization<->User relation would force every other relation in this
   /// file to be explicitly named.
   dpoAlternateApproverUserId String?
-  createdAt                  DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
 
   accessAnomalyAlerts                 AccessAnomalyAlert[]
   accessDeprovisioningChecklists      AccessDeprovisioningChecklist[]
@@ -383,6 +387,24 @@ enum RoleStatus {
   /// Retired. Keeps its history and its name (so an audit row still reads
   /// correctly) and grants nothing.
   INACTIVE
+}
+
+/// WHAT KIND OF ORGANIZATION this row is. Added 2026-10-11 for Module 0.
+///
+/// Until now every `Organization` was a brokerage office and nothing said so — the word "office"
+/// is all over the codebase as a synonym for the tenant. An insurance company now needs a row of
+/// its own, so the kind has to be stated rather than assumed.
+///
+/// DELIBERATELY NOT DEFAULTED on the model. For `dutySegregationMode` a default was right because
+/// SEGREGATED is the stricter value and every existing office genuinely read it. Here neither
+/// value is stricter or safer — they are two different legal entities under different CBJ
+/// licensing — so a default would only decide, silently, which kind a caller forgot to name. The
+/// seven `organization.create` call sites state it instead.
+enum OrganizationType {
+  BROKERAGE_OFFICE
+  /// An insurance company. Its own registration field list and its own agreement with the
+  /// broker; it is NOT a brokerage office with a flag flipped.
+  INSURANCE_COMPANY
 }
 
 enum OrgStatus {
