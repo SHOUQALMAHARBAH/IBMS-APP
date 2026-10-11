@@ -112,6 +112,14 @@ export const COMPLIANCE_RISK = {
     rcNoLicenseBlocksBusiness:
       'لا يوجد لدى هذا المكتب أي مدة ترخيص مسجّلة — وإصدار أعمال جديدة محجوب. ممارسة النشاط دون ترخيص ساري سبب لعقوبة إدارية (تعليمات البنك المركزي الأردني رقم 9 لسنة 2026، المادة 21/أ/9). سجّل الترخيص وشهادته أدناه.',
     rcTermsHeading: 'مدد الترخيص',
+    rcRenewalDueBy: 'آخر موعد لتقديم طلب التجديد',
+    rcExpiryNotEndOfYearWarning:
+      'تاريخ الانتهاء المُدخل ليس 31 كانون الأول/ديسمبر. مدة الترخيص تنتهي في 31 كانون الأول (المادة 10/ب) — تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
+    rcValidByOperationOfLaw:
+      'انتهى تاريخ هذه المدة المطبوع، والترخيص ما زال ساريًا بحكم القانون لأن طلب التجديد قُدّم في موعده (المادة 11). يبقى ساريًا حتى صدور قرار البنك المركزي.',
+    rcRenewalFiledLate:
+      'قُدّم طلب التجديد بعد الموعد المحدّد (المادة 11) — لن يستمر سريان الترخيص بعد تاريخ الانتهاء.',
+    rcExpectedThreeYearExpiry: 'نهاية مدة الثلاث سنوات المتوقّعة',
     rcColRenewalFiled: 'تاريخ تقديم طلب التجديد',
     rcNotFiled: 'لم يُقدَّم',
     rcCurrentTerm: 'المدة الحالية',
@@ -437,6 +445,14 @@ export const COMPLIANCE_RISK = {
     rcNoLicenseBlocksBusiness:
       'This office holds no licence term on record — and new business issuance is blocked. Practising without a current licence is a ground for administrative sanction (CBJ Instructions No. 9 of 2026, art. 21/a/9). Record the licence and its certificate below.',
     rcTermsHeading: 'Licence terms',
+    rcRenewalDueBy: 'Renewal application due by',
+    rcExpiryNotEndOfYearWarning:
+      'The expiry you entered is not a 31 December. A licence term ends on 31 December (art. 10/b) — check it against the date printed on the certificate. The entry was not refused.',
+    rcValidByOperationOfLaw:
+      "This term's printed expiry has passed, and the licence remains valid by operation of law because the renewal application was filed on time (art. 11). It stays valid until the CBJ's decision issues.",
+    rcRenewalFiledLate:
+      'The renewal application was filed after the deadline (art. 11) — the licence will not remain valid past its expiry.',
+    rcExpectedThreeYearExpiry: 'Expected end of a three-year term',
     rcColRenewalFiled: 'Renewal filed',
     rcNotFiled: 'Not filed',
     rcCurrentTerm: 'Current term',

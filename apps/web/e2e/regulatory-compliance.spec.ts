@@ -36,6 +36,13 @@ const LICENSE = {
   isCurrentlyLapsed: false,
   certificateDocumentId: "doc-certificate-1",
   renewalRequestedAt: null,
+  // Module 0 item (d). Shaped from the endpoint: art. 11's deadline is 45 calendar days before
+  // expiry, and 2027-01-01 minus 45 days is 2026-11-17.
+  renewalDueBy: "2026-11-17T00:00:00.000Z",
+  renewalFiledOnTime: false,
+  validByOperationOfLaw: false,
+  expiryIsEndOfCalendarYear: false,
+  expectedExpiryForThreeYearTerm: "2028-12-31T00:00:00.000Z",
 };
 
 /*
@@ -220,4 +227,76 @@ test("the licence is a SERIES: earlier terms stay visible, with the current one 
   await expect(terms.getByText("CBJ-2023-OLD")).toBeVisible();
   // Which term is in force has to be legible, not inferred from row order.
   await expect(terms.getByText(/CBJ-2026-001 \(Current term\)/)).toBeVisible();
+});
+
+test("an expiry that is not a 31 December WARNS and does not block (art. 10/b)", async ({
+  page,
+}) => {
+  /*
+   * Module 0 item (d). The requirement is precise about this: the date is entered as printed on the
+   * certificate, the certificate is the authority, and the system asks a human to verify rather
+   * than refusing. So the assertion is a PAIR — the warning is present AND the term is still
+   * treated as usable.
+   */
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockRegulatoryCompliance(page);
+  await page.goto("/regulatory-compliance");
+
+  const warning = page.locator("[data-expiry-not-end-of-year]");
+  await expect(warning).toContainText("not a 31 December");
+  await expect(warning).toContainText("art. 10/b");
+  // Not refused: the entry stands and the licence still reads active.
+  await expect(warning).toContainText("was not refused");
+  await expect(page.locator("main")).toContainText("CBJ-2026-001");
+});
+
+test("an expired term with a timely application says it is still valid by operation of law (art. 11)", async ({
+  page,
+}) => {
+  // Without this the screen would show an expiry in the past beside a licence the system is
+  // content with, and explain neither.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  const extended = {
+    ...LICENSE,
+    expiresAt: "2026-12-31T00:00:00.000Z",
+    expiryIsEndOfCalendarYear: true,
+    renewalRequestedAt: "2026-11-16T00:00:00.000Z",
+    renewalFiledOnTime: true,
+    validByOperationOfLaw: true,
+    isCurrentlyLapsed: false,
+  };
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: { current: extended, terms: [extended] },
+  });
+  await page.goto("/regulatory-compliance");
+
+  const notice = page.locator("[data-valid-by-operation-of-law]");
+  await expect(notice).toContainText("by operation of law");
+  await expect(notice).toContainText("art. 11");
+  // And the two warnings are distinct states, not one: a 31-December expiry raises no art. 10/b
+  // warning even while this one is showing.
+  await expect(page.locator("[data-expiry-not-end-of-year]")).toHaveCount(0);
+});
+
+test("an application filed AFTER the deadline is called out while there is still time", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  const late = {
+    ...LICENSE,
+    expiresAt: "2026-12-31T00:00:00.000Z",
+    expiryIsEndOfCalendarYear: true,
+    renewalRequestedAt: "2026-12-20T00:00:00.000Z",
+    renewalFiledOnTime: false,
+    validByOperationOfLaw: false,
+  };
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: { current: late, terms: [late] },
+  });
+  await page.goto("/regulatory-compliance");
+
+  const notice = page.locator("[data-renewal-filed-late]");
+  await expect(notice).toContainText("after the deadline");
+  // The consequence, not just the fact: the extension will not apply.
+  await expect(notice).toContainText("will not remain valid");
 });

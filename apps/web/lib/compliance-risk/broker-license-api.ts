@@ -28,6 +28,22 @@ export interface BrokerLicense {
   certificateDocumentId: string;
   /** When the renewal application for the NEXT term was filed, or null. */
   renewalRequestedAt: string | null;
+  /** Module 0 item (d) — art. 11's deadline for this term's renewal application (45 calendar
+   *  days before expiry). */
+  renewalDueBy: string;
+  /** Whether the application was filed by that deadline. False when none was filed. */
+  renewalFiledOnTime: boolean;
+  /** Past its printed expiry yet STILL VALID, because a timely application is pending (art. 11).
+   *  Its own field rather than folded into `isCurrentlyLapsed`, because a screen showing an expiry
+   *  in the past has to be able to explain why the system is content. */
+  validByOperationOfLaw: boolean;
+  /** Art. 10/b — false means the entered expiry is not a 31 December. A WARNING TO VERIFY, never
+   *  a block: the date is entered as printed on the certificate and the certificate is the
+   *  authority. */
+  expiryIsEndOfCalendarYear: boolean;
+  /** Informational only. Nothing refuses on it — see the api config for why three-calendar-years
+   *  is not a second warning condition. */
+  expectedExpiryForThreeYearTerm: string | null;
 }
 
 /**

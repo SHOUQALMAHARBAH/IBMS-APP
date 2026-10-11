@@ -38,6 +38,16 @@ const head: CSSProperties = {
   fontWeight: 600,
   borderBottom: '2px solid var(--border-default)',
 };
+/* A WARNING, not an error. Module 0 item (d) requires the admin be told to verify a non-31-December
+ * expiry and NOT be blocked, so this is visually and semantically distinct from `errorStyle`: the
+ * same shape `settings/roles` uses for its duty-segregation warning. */
+const warningStyle: CSSProperties = {
+  border: '1px solid var(--border-default)',
+  borderInlineStartWidth: '4px',
+  padding: '0.6rem 0.75rem',
+  margin: '0.75rem 0',
+  maxWidth: '48rem',
+};
 const formStyle: CSSProperties = {
   margin: '1rem 0',
   display: 'grid',
@@ -254,6 +264,10 @@ export default function RegulatoryCompliancePage() {
                 <td style={cell}>{license.expiresAt.slice(0, 10)}</td>
               </tr>
               <tr>
+                <td style={cell}>{t('rcRenewalDueBy')}</td>
+                <td style={cell}>{license.renewalDueBy.slice(0, 10)}</td>
+              </tr>
+              <tr>
                 <td style={cell}>{t('rcColRenewalFiled')}</td>
                 <td style={cell}>
                   {license.renewalRequestedAt
@@ -261,8 +275,44 @@ export default function RegulatoryCompliancePage() {
                     : t('rcNotFiled')}
                 </td>
               </tr>
+              {license.expectedExpiryForThreeYearTerm ? (
+                <tr>
+                  <td style={cell}>{t('rcExpectedThreeYearExpiry')}</td>
+                  <td style={cell}>
+                    {license.expectedExpiryForThreeYearTerm.slice(0, 10)}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
+
+          {/* Art. 10/b. A warning to VERIFY, never a refusal — the date is entered as printed on
+              the certificate and the certificate is the authority. */}
+          {!license.expiryIsEndOfCalendarYear ? (
+            <p
+              style={warningStyle}
+              role="status"
+              data-expiry-not-end-of-year=""
+            >
+              {t('rcExpiryNotEndOfYearWarning')}
+            </p>
+          ) : null}
+
+          {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
+              system is content with, and explain neither. */}
+          {license.validByOperationOfLaw ? (
+            <p style={warningStyle} role="status" data-valid-by-operation-of-law="">
+              {t('rcValidByOperationOfLaw')}
+            </p>
+          ) : null}
+
+          {/* Filed, but late — so the extension above will NOT apply when the term runs out. Said
+              while there is still time to do something about it. */}
+          {license.renewalRequestedAt && !license.renewalFiledOnTime ? (
+            <p style={warningStyle} role="status" data-renewal-filed-late="">
+              {t('rcRenewalFiledLate')}
+            </p>
+          ) : null}
           {canManage && !license.isCurrentlyLapsed ? (
             <button
               type="button"

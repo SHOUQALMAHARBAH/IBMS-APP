@@ -39,6 +39,14 @@ interface BrokerLicenseBody {
   renewalRequestedAt: string | null;
   expiresAt: string;
 }
+/** Module 0 item (d) — the derived term/renewal facts the SCREEN reads. */
+interface BrokerLicenseDerivedBody {
+  renewalDueBy: string;
+  renewalFiledOnTime: boolean;
+  validByOperationOfLaw: boolean;
+  expiryIsEndOfCalendarYear: boolean;
+  expectedExpiryForThreeYearTerm: string | null;
+}
 /** Module 0 item (c): `GET /broker-license` answers the current term AND the series. */
 interface BrokerLicenseSeriesBody {
   current: BrokerLicenseBody | null;
@@ -244,6 +252,36 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
         .set(bearer(compliance.accessToken))
         .send({ requestedAt: highestYear + 1 + '-12-20' })
         .expect(409);
+
+      /*
+       * MODULE 0 ITEM (d) — THE DERIVED FACTS ARE ON THE WIRE.
+       *
+       * Asserted over real HTTP rather than trusted from the unit tests, because the screen reads
+       * these five fields through a HAND-COPIED interface that TypeScript cannot check against an
+       * HTTP response. If the api stopped sending one, nothing would fail at compile time and the
+       * screen would render `undefined` — which is how the customer-import result panel broke.
+       * The same reasoning as the duty-segregation wire-shape spec.
+       */
+      const derived = (
+        await request(app.getHttpServer())
+          .get('/broker-license')
+          .set(bearer(compliance.accessToken))
+          .expect(200)
+      ).body as BrokerLicenseSeriesBody;
+      const d = derived.current as unknown as BrokerLicenseDerivedBody;
+
+      // Art. 11: 45 CALENDAR days before this term's expiry. The term expires 31 December of
+      // highestYear+1, so the deadline is 16 November of that year.
+      expect(d.renewalDueBy).toBe(highestYear + 1 + '-11-16T00:00:00.000Z');
+      // Filed on 1 November, which is before that deadline.
+      expect(d.renewalFiledOnTime).toBe(true);
+      // Still inside the term, so nothing is being extended yet — the two are different states
+      // and a screen needs to tell them apart.
+      expect(d.validByOperationOfLaw).toBe(false);
+      // Art. 10/b: this spec's terms all expire on 31 December.
+      expect(d.expiryIsEndOfCalendarYear).toBe(true);
+      // Informational. Issued 2026-01-01, so a three-calendar-year term would end 2028-12-31.
+      expect(d.expectedExpiryForThreeYearTerm).toBe('2028-12-31T00:00:00.000Z');
 
       const lapsed = await request(app.getHttpServer())
         .post('/broker-license/mark-lapsed')

@@ -9208,6 +9208,19 @@ oversight is silent" convention:
   `{ current, terms }` and NO LONGER 404s for an office with no licence — that is a real state the
   screen must render, and it is the state that blocks new business.
 
+  **The term and renewal rules (Module 0 item (d)).** Art. 10/b — a term is three calendar years
+  ending **31 December**; an expiry that is not a 31 December raises a **warning to verify and is
+  never refused**, because the date is entered as printed on the certificate and the certificate is
+  the authority. Art. 11 — the renewal application is due **45 CALENDAR days** before expiry
+  (calendar, not business days: the deadline is a span before a fixed date, and business days would
+  move it earlier and report an on-time filing as late). After expiry, an office that applied **on
+  time stays valid BY OPERATION OF LAW** until the CBJ's decision issues; one that filed nothing, or
+  filed late, expires. A MANUAL lapse outranks all of it — a suspension is not cured by having
+  applied. "Until the decision issues" needs no extra column: the decision IS the next term, and a
+  later term wins `pickCurrentTerm` the moment it exists. `validByOperationOfLaw` is its own flag
+  rather than folded into `isCurrentlyLapsed`, because a screen showing an expiry in the past has to
+  be able to explain why the system is content.
+
   **The lapse check is a pure LIVE recompute
   (`isBrokerLicenseCurrentlyLapsed(license, now) = status === 'lapsed' || expiresAt <=
   now`), not a scheduler-maintained flag** — deliberately: the #16 `@code-reviewer` MAJOR
