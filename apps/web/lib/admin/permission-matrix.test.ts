@@ -88,10 +88,14 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // `diagnostics.view` (the code that replaced a ROLE-NAME read on /settings/email) moves exactly two of
     // the four: it is the only member of a `diagnostics` family, and one CRUD verb is not a family, so it
     // lands in the TOGGLE list. Families and the codes they cover do not move at all.
-    expect(PERMISSION_CATALOGUE.length).toBe(219);
+    // `provider.office-state.read` (Module 0 item (j), the cross-office provider dashboard) moves
+    // exactly two of the four: it is the only member of a `provider` family, and one CRUD verb is
+    // not a family, so it lands in the TOGGLE list. Families and the codes they cover do not move —
+    // the same arithmetic `diagnostics.view` produced, for the same reason.
+    expect(PERMISSION_CATALOGUE.length).toBe(220);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
-    expect(toggles.length).toBe(160);
+    expect(toggles.length).toBe(161);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 

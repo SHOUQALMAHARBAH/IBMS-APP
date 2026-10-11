@@ -36,6 +36,9 @@ import { InternalAuditFindingService } from './internal-audit-finding.service';
 import { InternalAuditFindingRepository } from '../../repositories/internal-audit-finding.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { ProviderOfficeStateRepository } from '../../repositories/provider-office-state.repository';
+import { ProviderOfficeStateService } from './provider-office-state.service';
+import { ProviderOfficeStateController } from './provider-office-state.controller';
 
 /**
  * Domain F — Compliance & Risk (backlog Part C #47–57). Opens with Process
@@ -125,6 +128,7 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [AuditModule, AuthModule],
   controllers: [
+    ProviderOfficeStateController,
     TransactionMonitoringController,
     WatchlistSyncController,
     BrokerLicenseController,
@@ -136,6 +140,10 @@ import { AuthModule } from '../auth/auth.module';
     InternalAuditFindingController,
   ],
   providers: [
+    // Module 0 item (j). The repository reads a `security_invoker = false` VIEW, so it is
+    // deliberately NOT tenant-scoped — see its own header and migration 20261116100000.
+    ProviderOfficeStateService,
+    ProviderOfficeStateRepository,
     TransactionMonitoringService,
     TransactionMonitoringAlertRepository,
     TransactionMonitoringSweepScheduler,

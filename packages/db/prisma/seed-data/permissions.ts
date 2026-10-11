@@ -1733,6 +1733,27 @@ const admin: PermissionSeed[] = [
     roles: [ADMIN],
   },
   {
+    /*
+     * MODULE 0 ITEM (j) — the provider dashboard: a CROSS-OFFICE read of office state.
+     *
+     * Granted to ADMIN alone, the same narrow grant `diagnostics.view` above takes and for a
+     * related reason: this is platform-operator information rather than anything an office needs to
+     * run its own business.
+     *
+     * THE DISCLOSURE IS REAL AND IS STATED IN THE DESCRIPTION, because an office administrator
+     * deciding who holds this needs to know what it shows. It reads facts about OTHER brokerage
+     * offices — who are each other's competitors — and this product has no platform-operator
+     * concept, so "only the provider may hold it" is not expressible: an office granted it sees
+     * every office. What bounds it is the view's column list (no customer, policy, money or
+     * personal data) and this grant.
+     */
+    code: "provider.office-state.read",
+    module: "admin",
+    description:
+      "Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform",
+    roles: [ADMIN],
+  },
+  {
     code: "access-recertification.cycle.start",
     module: "admin",
     description: "Start an access-recertification cycle",

@@ -1,0 +1,32 @@
+{
+  "the-lapse-rule-is-reimplemented-in-the-service": {
+    "file": "apps/api/src/modules/compliance-risk/provider-office-state.service.ts",
+    "from": "    isCurrentlyLapsed:\n      term === null ? null : isBrokerLicenseCurrentlyLapsed(term, now),",
+    "to": "    isCurrentlyLapsed:\n      term === null ? null : term.expiresAt.getTime() <= now.getTime(),"
+  },
+  "no-term-on-record-reads-as-lapsed": {
+    "file": "apps/api/src/modules/compliance-risk/provider-office-state.service.ts",
+    "from": "    isCurrentlyLapsed:\n      term === null ? null : isBrokerLicenseCurrentlyLapsed(term, now),",
+    "to": "    isCurrentlyLapsed:\n      term === null ? true : isBrokerLicenseCurrentlyLapsed(term, now),"
+  },
+  "the-audit-row-copies-what-was-read": {
+    "file": "apps/api/src/modules/compliance-risk/provider-office-state.service.ts",
+    "from": "        officesReturned: rows.length,",
+    "to": "        officesReturned: rows.length,\n        offices: rows.map((r) => ({ legalName: r.legalName, licenseNumber: r.licenseNumber })),"
+  },
+  "the-view-shape-check-is-removed": {
+    "file": "apps/api/src/repositories/provider-office-state.repository.ts",
+    "from": "    await this.assertViewShape();",
+    "to": "    // PLANT: the column boundary is no longer checked against the view."
+  },
+  "the-screen-collapses-the-three-licence-states": {
+    "file": "apps/web/app/(app)/provider-offices/page.tsx",
+    "from": "                  {office.isCurrentlyLapsed === null\n                    ? t('providerOfficesNoTermOnRecord')\n                    : office.isCurrentlyLapsed",
+    "to": "                  {false\n                    ? t('providerOfficesNoTermOnRecord')\n                    : office.isCurrentlyLapsed"
+  },
+  "the-cross-office-banner-is-gone": {
+    "file": "apps/web/app/(app)/provider-offices/page.tsx",
+    "from": "      <p style={bannerStyle} role=\"note\" data-provider-cross-office=\"\">",
+    "to": "      <p style={bannerStyle} role=\"note\" data-provider-cross-office-REMOVED=\"\">"
+  }
+}

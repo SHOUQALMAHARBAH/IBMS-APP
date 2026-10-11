@@ -1542,6 +1542,22 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### OPEN — the provider dashboard discloses office state to any office granted its code
+
+Module 0 item (j)'s `/provider-offices` is a CROSS-OFFICE read, gated on
+`provider.office-state.read` and granted to one seeded role (the systems administrator). It shows
+other brokerage offices' licence state, their dormant licensed branches, their user counts and when
+they were last used — all of which is commercially meaningful between competitors.
+
+**This product has no platform-operator concept**: every user belongs to an `Organization`, so
+"only the provider may hold this code" is not expressible. An office granted it sees every office.
+
+What bounds the disclosure today is the view's column list — no customer, policy, premium,
+commission or personal data, enforced by the migration's own assertions, the repository's runtime
+column check and an api e2e over the response body — and the narrowness of the grant. Closing this
+properly needs a platform-operator identity that sits outside the tenant model, which is a decision
+about the product rather than a patch to the screen.
+
 ### OPEN — the bulk import's screen is broken, and its report has no screen at all
 
 Both introduced 2026-10-02 by Phase 2 item 1, found 2026-10-02 while preparing
@@ -9312,6 +9328,27 @@ oversight is silent" convention:
   from the fixture's own header rather than from a literal — a hand-written count of a generated
   file is a second home for one fact. It reports **502 grants and ten (role, code) pairs with no nav
   route**.
+
+  **THE PROVIDER DASHBOARD (Module 0 item (j)), migration `20261116100000`.**
+  `ProviderOfficeState` is a `security_invoker = false` VIEW — the `InsurerDirectory` pattern — so
+  it sees every office while the app role cannot read another office's rows at all. 18 columns of
+  OFFICE STATE: identity, status, broker kind, the current licence's number / expiry / standing, how
+  many licensed branches carry no business, user counts, and when the office was last used.
+
+  **The column list is the privacy and commercial boundary, and it is enforced in three places**:
+  the migration's own DO block refuses a banned column, the repository refuses a view that disagrees
+  with its declared list (in both directions), and an api e2e asserts the absence of each banned key
+  on the response body. There is no customer, policy, premium or commission data and no personal
+  data — `lastActivityAt` is an office-level MAX with no `userId`, and the user figures are counts.
+
+  **The disclosure is real and is stated rather than discovered**: this shows facts about OTHER
+  brokerage offices, who are each other's competitors. It is gated on `provider.office-state.read`,
+  granted to one seeded role — and because this product has no platform-operator concept, "only the
+  provider may read this" is not expressible today: an office granted the code sees every office.
+
+  The licence standing is DERIVED by the service from `isBrokerLicenseCurrentlyLapsed`, never
+  reimplemented in SQL, and `isCurrentlyLapsed === null` means no term on record — which blocks new
+  business under art. 21/a/9 and is not the same as lapsed.
 
   **The lapse check is a pure LIVE recompute
   (`isBrokerLicenseCurrentlyLapsed(license, now) = status === 'lapsed' || expiresAt <=
