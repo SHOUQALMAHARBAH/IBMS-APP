@@ -50,6 +50,7 @@ import {
   listInsuranceLines,
   type InsuranceLine,
 } from '../../../../lib/insurer/insurance-line-api';
+import { grantsWithNoNavRoute } from '../../../../lib/admin/grant-reachability';
 
 /** Worst first: the row that says nobody can complete an operation is why the list exists. */
 const STATUS_ORDER: Record<DutySegregationReadiness['status'], number> = {
@@ -316,6 +317,14 @@ export default function RoleAdminPage() {
   }, [user, canRead, canReadCatalogue, load]);
 
   const segregationWarning = violatesSegregationPair(selected);
+  /**
+   * MODULE 0 ITEM (i) — the grants that open NO screen in the navigation.
+   *
+   * Computed from the ticked set as it stands, not on save, so an administrator sees it while they
+   * are still deciding rather than after the write. A warning that only appears afterwards is a
+   * report, not a check.
+   */
+  const unreachableGrants = grantsWithNoNavRoute([...selected]);
 
   async function openMatrix(roleId: string) {
     setActionError(null);
@@ -735,6 +744,19 @@ export default function RoleAdminPage() {
           {segregationWarning ? (
             <p style={warningStyle} role="status" data-segregation-warning="">
               {t('roleSegregationWarning')}
+            </p>
+          ) : null}
+
+          {/* MODULE 0 ITEM (i). A WARNING, never a refusal: a grant that opens no screen is often
+              correct — the code may gate a control on a screen reached by another permission (7 do,
+              measured), or be exercised by an integration, or its screen may not be built yet. So
+              this says what it knows and leaves the judgement to the administrator. */}
+          {unreachableGrants.length > 0 ? (
+            <p style={warningStyle} role="status" data-unreachable-grants="">
+              {t('roleUnreachableGrantsWarning', {
+                count: String(unreachableGrants.length),
+                codes: unreachableGrants.join(', '),
+              })}
             </p>
           ) : null}
 

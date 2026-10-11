@@ -644,6 +644,8 @@ export const OPERATIONS = {
     roleMfaHardwareLabel: 'تتطلّب مفتاح أمان',
     roleMfaHeading: 'خصائص الأمان',
     roleScopeHeading: 'نطاق فروع التأمين',
+    roleUnreachableGrantsWarning:
+      'لا تفتح {count} من الصلاحيات المحددة أي شاشة في قائمة التنقل: {codes}. قد يكون هذا صحيحاً — فقد تكون الصلاحية تحكم عنصراً داخل شاشة تُفتح بصلاحية أخرى، أو يستخدمها تكامل خارجي، أو لم تُبنَ شاشتها بعد. هذا تنبيه فقط ولا يمنع الحفظ.',
     roleScopeIntro:
       'يحدِّد النطاق فروع التأمين التي تسري داخلها صلاحيات هذا الدور. الصلاحيات نفسها لا تُكرَّر لكل نوع — النوع خاصية للدور.',
     roleScopeTypeLabel: 'نوع التأمين',
@@ -1293,6 +1295,8 @@ export const OPERATIONS = {
     roleMfaHardwareLabel: 'Require a hardware security key',
     roleMfaHeading: 'Security attributes',
     roleScopeHeading: 'Insurance-line scope',
+    roleUnreachableGrantsWarning:
+      '{count} of the selected permissions open no screen in the navigation: {codes}. That can be correct — the permission may gate a control on a screen reached by another permission, be used by an integration, or its screen may not be built yet. This is a warning only and does not block saving.',
     roleScopeIntro:
       'The scope decides which insurance lines this role’s permissions apply within. The permission codes themselves are not duplicated per type — the type belongs to the role.',
     roleScopeTypeLabel: 'Insurance type',

@@ -9300,6 +9300,19 @@ oversight is silent" convention:
   is the guard: every line-writing service reaches the one decision or is named with a reason, the
   decision exists in exactly one place, and no permission code names an insurance type.
 
+  **GRANT REACHABILITY (Module 0 item (i)).** The Role screen warns when a ticked permission opens
+  no screen in the navigation — a WARNING, never a refusal, because a grant that opens no screen is
+  often correct: the code may gate a control on a screen reached by another permission (7 do,
+  measured), be exercised by an integration, or have no screen yet. Derived from
+  `components/app/destinations.ts` at runtime, so it cannot go stale, and it lives in the web
+  because the navigation map is a web artefact the api has never heard of.
+
+  The same item repaired `scripts/measurements/permission-reachability.py`, which asserted `== 491`
+  grants against a real **502** and so exited 1 before measuring anything. It now reads the count
+  from the fixture's own header rather than from a literal — a hand-written count of a generated
+  file is a second home for one fact. It reports **502 grants and ten (role, code) pairs with no nav
+  route**.
+
   **The lapse check is a pure LIVE recompute
   (`isBrokerLicenseCurrentlyLapsed(license, now) = status === 'lapsed' || expiresAt <=
   now`), not a scheduler-maintained flag** — deliberately: the #16 `@code-reviewer` MAJOR

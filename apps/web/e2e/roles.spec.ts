@@ -1158,3 +1158,58 @@ test('a chosen branch is sent as a STANDARD catalogue id, not an office one', as
       officeInsuranceLineIds: [],
     });
 });
+
+/*
+ * MODULE 0 ITEM (i) — THE GRANT-REACHABILITY WARNING.
+ */
+
+test('warns when a ticked permission opens no screen, and does not block saving', async ({
+  page,
+}) => {
+  /*
+   * A WARNING, never a refusal. A grant that opens no screen is often correct — the code may gate a
+   * control on a screen reached by another permission (7 do, measured), be exercised by an
+   * integration, or have no screen yet. So the sentence says what it knows and the Save button
+   * stays live; this test asserts the PAIR, because a test that only checked the warning would pass
+   * against an implementation that also blocked.
+   */
+  await mockAuthWithPermissions(page, [
+    'role.read',
+    'role.update',
+    'permission.read',
+  ]);
+  // `incident.classify` gates a destination; `claim.read` does too. The catalogue in this fixture is
+  // small, so the warning is driven by a code the nav map genuinely does not list.
+  await mockRoles(page, { grants: ['claim.read'] });
+  await page.goto('/settings/roles');
+  await page
+    .locator(SCOPE_ROW)
+    .getByRole('button', { name: 'Permissions' })
+    .click();
+
+  // No warning on a grant that opens a screen.
+  await expect(page.locator('[data-unreachable-grants]')).toHaveCount(0);
+
+  // Tick one that opens nothing. `incident.classification.co-sign` is in this screen's catalogue
+  // and gates no navigation destination.
+  //
+  // The module panel has to be OPENED first: the matrix renders each module in a `<details>`, so the
+  // checkbox exists in the DOM and is not visible — the click timed out on an element Playwright
+  // could resolve but not reach, which reads like a broken selector and is not one.
+  await page
+    .locator('[data-matrix-for] details[data-module="compliance-risk"] summary')
+    .click();
+  await page
+    .locator('[data-matrix-for] [data-code="incident.classification.co-sign"]')
+    .check();
+  const warning = page.locator('[data-unreachable-grants]');
+  await expect(warning).toContainText('open no screen in the navigation');
+  await expect(warning).toContainText('incident.classification.co-sign');
+  // It says it is a warning, out loud. A warning that reads like a refusal gets escalated.
+  await expect(warning).toContainText('does not block saving');
+
+  // And Save is still available — the half that proves it warns rather than refuses.
+  await expect(
+    page.getByRole('button', { name: 'Save permissions' }),
+  ).toBeEnabled();
+});

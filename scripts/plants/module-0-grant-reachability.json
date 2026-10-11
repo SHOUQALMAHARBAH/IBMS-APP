@@ -1,0 +1,22 @@
+{
+  "the-reachability-warning-never-fires": {
+    "file": "apps/web/app/(app)/settings/roles/page.tsx",
+    "from": "          {unreachableGrants.length > 0 ? (",
+    "to": "          {false ? ("
+  },
+  "every-grant-looks-reachable": {
+    "file": "apps/web/lib/admin/grant-reachability.ts",
+    "from": "  return codes.filter((code) => !reachable.has(code));",
+    "to": "  return codes.filter(() => false);"
+  },
+  "the-nav-map-is-read-as-empty": {
+    "file": "apps/web/lib/admin/grant-reachability.ts",
+    "from": "      for (const code of destination.permissions ?? []) out.add(code);",
+    "to": "      for (const code of [] as string[]) out.add(code);"
+  },
+  "the-stale-grant-pin-comes-back": {
+    "file": "scripts/measurements/permission-reachability.py",
+    "from": "    want_roles, want_grants = int(header.group(1)), int(header.group(2))",
+    "to": "    want_roles, want_grants = 12, 491"
+  }
+}
