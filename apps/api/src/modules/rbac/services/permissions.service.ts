@@ -1,10 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PermissionRepository } from '../../../repositories/permission.repository';
+import type { RoleScope } from '../../../common/role-scope';
 
 const CACHE_TTL_MS = 60_000;
 
 interface CacheEntry {
   codes: string[];
+  expiresAt: number;
+}
+
+/** Module 0 item (h). Cached on the SAME key and TTL as the codes — a scope that went
+ *  stale at a different rate from the grants it scopes would be two answers about one role. */
+interface ScopeCacheEntry {
+  scopes: RoleScope[];
   expiresAt: number;
 }
 
@@ -48,6 +56,7 @@ interface CacheEntry {
 @Injectable()
 export class PermissionsService {
   private readonly cache = new Map<string, CacheEntry>();
+  private readonly scopeCache = new Map<string, ScopeCacheEntry>();
 
   constructor(private readonly permissions: PermissionRepository) {}
 
@@ -65,11 +74,38 @@ export class PermissionsService {
     return new Set(codes);
   }
 
+  /**
+   * MODULE 0 ITEM (h) — the scopes these roles carry.
+   *
+   * An EMPTY array means unrestricted, which is also what no roles at all means — see
+   * `common/role-scope.ts` for why that reading is the only backward-compatible one.
+   */
+  async getScopesForRoles(roleIds: string[]): Promise<RoleScope[]> {
+    if (roleIds.length === 0) return [];
+
+    const key = [...roleIds].sort().join(',');
+    const cached = this.scopeCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.scopes;
+
+    const rows = await this.permissions.findScopesForRoles(roleIds);
+    // Only the roles that actually CARRY a scope. A role with no category and no branches is
+    // unrestricted, and keeping it would make `roleScopes.length === 0` — the "nobody is scoped"
+    // fast path the decision relies on — unreachable for every office in the system.
+    const scopes = rows.filter(
+      (r) => r.category !== null || r.lineIds.length > 0,
+    );
+    this.scopeCache.set(key, { scopes, expiresAt: Date.now() + CACHE_TTL_MS });
+    return scopes;
+  }
+
   /** Called after any admin write to the grid so callers don't wait out
    * the TTL to see their own change take effect. Every write path that can
    * change a role's permissions or a user's role set must call this —
    * role create/edit/deactivate as much as grant/revoke. */
   invalidateCache(): void {
     this.cache.clear();
+    // Item (h): BOTH caches, always. A scope surviving an invalidation that cleared the
+    // codes would leave a role granting one set and scoped by another for up to the TTL.
+    this.scopeCache.clear();
   }
 }

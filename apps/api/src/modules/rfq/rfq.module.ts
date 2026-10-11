@@ -9,6 +9,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CustomerModule } from '../customer/customer.module';
 import { OpportunityModule } from '../opportunity/opportunity.module';
 import { InsuranceProgramModule } from '../insurance-program/insurance-program.module';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 /** Process 11 — RFQ / Market Submission (backlog Part C #11, Domain B).
  *
@@ -35,7 +36,14 @@ import { InsuranceProgramModule } from '../insurance-program/insurance-program.m
     CustomerModule,
   ],
   controllers: [RfqController, RfqInsurerController],
-  providers: [RfqService, RfqRepository, RfqFollowUpScheduler],
+  providers: [
+    RfqService,
+    RfqRepository,
+    RfqFollowUpScheduler,
+    // Module 0 item (h). A missing provider is a RUNTIME DI failure TypeScript cannot see —
+    // item (e) shipped exactly that — so it lands in the SAME commit as the dependency.
+    InsuranceLineRepository,
+  ],
   // QuotationModule (backlog Part C #13) reads the parent RFQ + its insurer
   // shortlist through RfqRepository — a quote can only come from a
   // shortlisted insurer.

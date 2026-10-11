@@ -161,6 +161,8 @@ export class SessionService {
       // stay synchronous predicates. Cached and keyed on role ids, so this is
       // the same lookup `PermissionsGuard` makes rather than an extra query.
       permissions: await this.permissions.getCodesForRoles(roleIds),
+      // Item (h). The same cache, key and TTL as the line above.
+      roleScopes: await this.permissions.getScopesForRoles(roleIds),
       sessionId,
     };
   }

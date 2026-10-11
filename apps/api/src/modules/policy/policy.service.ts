@@ -58,7 +58,9 @@ import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import type { AttachPolicyDocumentsDto } from './dto/attach-policy-documents.dto';
 import type { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
+import { assertWithinRoleScope } from '../../common/role-scope';
 import { insurerIdentity } from '../../repositories/insurer-identity';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 interface PolicyScheduleView {
   id: string;
@@ -292,6 +294,10 @@ export class PolicyService {
     private readonly brokerLicenses: BrokerLicenseRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    // Module 0 item (h). A REPOSITORY across the module boundary — this codebase's one
+    // established cross-module shape — for the line's own `category`, which the role-scope
+    // decision needs and this module has no other way to know.
+    private readonly lines: InsuranceLineRepository,
   ) {}
 
   /** Placement / Manager / Executive work the whole book; a Policy Checking
@@ -617,6 +623,31 @@ export class PolicyService {
       throw new UnprocessableEntityException(
         'expiryDate must be after the inception date.',
       );
+    }
+
+    /*
+     * MODULE 0 ITEM (h) — the role scope, on the line this policy inherits from its RFQ.
+     *
+     * Placement is where business becomes real, so this is the check that matters most; and it is
+     * re-made here rather than trusted from the RFQ for the same reason the RFQ does not trust the
+     * programme — a different person places it. Positioned AFTER the licence gate and the date
+     * checks and BEFORE the write, so a scoped officer gets the scope refusal rather than a
+     * duplicate-policy conflict that tells them nothing about why they cannot proceed.
+     */
+    const scopedLineId =
+      quote.rfq.insuranceLineId ?? quote.rfq.officeInsuranceLineId ?? null;
+    if (scopedLineId !== null) {
+      const category = await this.lines.findCategory(
+        quote.rfq.insuranceLineId,
+        quote.rfq.officeInsuranceLineId,
+      );
+      if (category) {
+        assertWithinRoleScope(
+          actor,
+          { category, lineId: scopedLineId },
+          'place a policy',
+        );
+      }
     }
 
     let created: Policy;

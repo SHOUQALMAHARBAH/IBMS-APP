@@ -24,6 +24,9 @@ import {
 import type { CreateCommissionAgreementDto } from './dto/create-commission-agreement.dto';
 import type { ListCommissionAgreementsQueryDto } from './dto/list-commission-agreements-query.dto';
 import { insurerName } from '../../repositories/insurer-identity';
+import { assertWithinRoleScope } from '../../common/role-scope';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import type { InsuranceLineCategory } from '@ibms/db';
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -74,7 +77,15 @@ export class CommissionAgreementService {
    */
   private async resolveCatalogueLine(
     typed: string,
-  ): Promise<{ id: string; code: string; nameEn: string }> {
+    // `category` is returned since Module 0 item (h): the role-scope decision needs it and the
+    // catalogue row already carries it, so returning it here is free — a second lookup would be
+    // a second place the category could be read differently.
+  ): Promise<{
+    id: string;
+    code: string;
+    nameEn: string;
+    category: InsuranceLineCategory;
+  }> {
     const wanted = typed.trim().toLowerCase();
     const catalogue = await this.lines.listStandard();
     const match = catalogue.find(
@@ -92,12 +103,21 @@ export class CommissionAgreementService {
         `"${typed}" is not a line in the managed catalogue, so a commission agreement cannot be recorded against it — this table decides what the broker is paid, and a rate on a line nothing else can match is a rate that will never be applied. Send a catalogue code (e.g. PROPERTY_ALL_RISKS) or a catalogue name in either language, exactly; GET /insurance-lines lists all 32 with both names. An office's own added line is not yet supported here.`,
       );
     }
-    return { id: match.id, code: match.code, nameEn: match.nameEn };
+    return {
+      id: match.id,
+      code: match.code,
+      nameEn: match.nameEn,
+      category: match.category,
+    };
   }
 
   async create(
     dto: CreateCommissionAgreementDto,
-    actorId: string,
+    // MODULE 0 ITEM (h) widened this from `actorId: string` to the full caller. The scope lives on
+    // the caller's ROLES, so an id alone cannot answer the question — and the alternative, a second
+    // lookup of the actor's roles inside this service, would be a second authorization read in a
+    // module that has no business making one.
+    actor: AuthenticatedUser,
   ): Promise<CommissionAgreementView> {
     if (!(await this.commission.insurerExists(dto.insurerId))) {
       throw new NotFoundException(`Insurer ${dto.insurerId} not found.`);
@@ -126,6 +146,29 @@ export class CommissionAgreementService {
     // is superseded. The typed string is still what gets STORED — this resolves the identity, it
     // does not rewrite what the administrator wrote.
     const line = await this.resolveCatalogueLine(insuranceLine);
+
+    /*
+     * MODULE 0 ITEM (h) — the role scope, on the line this rate governs.
+     *
+     * A commission agreement decides what the broker is PAID for business in a line, so a role
+     * scoped to one insurance type setting the rate for the other is the sharpest case the scope
+     * exists for. `line` is the catalogue row resolved above, so the category is free here.
+     *
+     * FIRST, ahead of the open-window and effective-date checks, and that position was found by a
+     * re-run rather than by reasoning: placed after them, a previous run's open agreement answered
+     * 422 about a superseding date BEFORE the scope was consulted — so an officer who may not touch
+     * the line at all was told about a date instead, and the spec that proves the refusal passed
+     * once and then stopped. Refuse on the thing the caller cannot change by editing the request.
+     *
+     * THIS CHECK WAS ALSO MISSING FOR ONE BUILD and `no-unused-vars` is what said so: the import
+     * landed and the call did not, which compiles cleanly and refuses nothing. The same lint rule
+     * caught two unwired combined-duty act ids once before.
+     */
+    assertWithinRoleScope(
+      actor,
+      { category: line.category, lineId: line.id },
+      'set a commission rate',
+    );
 
     const open = await this.commission.findOpenAgreement(
       dto.insurerId,
@@ -184,7 +227,7 @@ export class CommissionAgreementService {
     }
 
     await this.safeAudit({
-      userId: actorId,
+      userId: actor.id,
       action: 'CREATE',
       entityType: 'CommissionAgreement',
       entityId: created.id,
@@ -201,7 +244,7 @@ export class CommissionAgreementService {
     });
     if (open) {
       await this.safeAudit({
-        userId: actorId,
+        userId: actor.id,
         action: 'UPDATE',
         entityType: 'CommissionAgreement',
         entityId: open.id,

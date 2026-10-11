@@ -17,7 +17,8 @@ export const OPERATIONS = {
     // has no camera, or whose camera cannot focus on it. The key is the same secret in a form a
     // person can type, which is why every authenticator offers manual entry.
     secManualKeyLabel: 'أو أدخل هذا المفتاح يدوياً في التطبيق:',
-    secManualKeyHint: 'استخدم هذا إن كان تطبيق المصادقة على نفس الجهاز، أو إن لم تتمكن من مسح الرمز.',
+    secManualKeyHint:
+      'استخدم هذا إن كان تطبيق المصادقة على نفس الجهاز، أو إن لم تتمكن من مسح الرمز.',
     secScanInstruction:
       'امسح رمز الاستجابة السريعة بتطبيق المصادقة لديك، ثم أدخل الرمز المكوّن من ستة أرقام الذي يعرضه.',
     secSession: 'الجلسة',
@@ -45,7 +46,8 @@ export const OPERATIONS = {
     empColHireDate: 'تاريخ التعيين',
     empColTerminated: 'منتهية خدمته',
     empViewButton: 'عرض',
-    empLicensedRolePlaceholder: 'مثال: ممثل وسيط مرخَّص من البنك المركزي الأردني',
+    empLicensedRolePlaceholder:
+      'مثال: ممثل وسيط مرخَّص من البنك المركزي الأردني',
     empLoading: 'جارٍ التحميل…',
     empLoadError: 'تعذّر تحميل الموظفين — حاول مرة أخرى.',
     empCreateError: 'تعذّر إنشاء سجل الموظف.',
@@ -165,7 +167,8 @@ export const OPERATIONS = {
     docVersionError: 'تعذّر إنشاء إصدار جديد.',
     docUnlockAct: 'فك قفل هذا المستند',
     docDeleteError: 'تعذّر حذف المستند.',
-    docClassificationSummaryIntro: 'أعلى تصنيف موجود عبر الملف الإلكتروني للوثيقة — لا يُحتسب كمتوسط أبداً.',
+    docClassificationSummaryIntro:
+      'أعلى تصنيف موجود عبر الملف الإلكتروني للوثيقة — لا يُحتسب كمتوسط أبداً.',
     docStorageReference: 'مرجع التخزين',
     docFileName: 'اسم الملف',
     docVersionHeading: 'تسجيل إصدار جديد',
@@ -205,7 +208,8 @@ export const OPERATIONS = {
     bcpColRpo: 'نقطة الاسترجاع (ساعات)',
     bcpColLastTested: 'آخر اختبار',
     bcpColNextTestDue: 'الاختبار التالي المستحق',
-    bcpNone: 'لم تُسجَّل أي خطة بعد — أضف خطة لكل سيناريو من السيناريوهات الخمسة.',
+    bcpNone:
+      'لم تُسجَّل أي خطة بعد — أضف خطة لكل سيناريو من السيناريوهات الخمسة.',
     bcpLoading: 'جارٍ التحميل…',
     bcpLoadError: 'تعذّر تحميل خطط استمرارية الأعمال — حاول مرة أخرى.',
     bcpCreateError: 'تعذّر إنشاء الخطة.',
@@ -264,7 +268,8 @@ export const OPERATIONS = {
     acrAdminDecisionConfirmed: 'أُكِّدت',
     acrAdminDecisionRevoked: 'سُحبت',
     acrAdminDecisionChanged: 'عُدِّلت',
-    acrAdminLoadFailed: 'تعذر تحميل سجل مراجعة حسابات المسؤولين.',
+    acrAdminLoadFailed:
+      'تعذر تحميل سجل مراجعة حسابات المسؤولين — حاول مرة أخرى.',
     acrStartCycleError: 'تعذّر بدء الدورة — حاول مرة أخرى.',
     acrCycleDueDate: 'تاريخ الاستحقاق (اختياري — الافتراضي 15 يوماً)',
     acrCycleLabel: 'وسم الدورة',
@@ -275,9 +280,12 @@ export const OPERATIONS = {
     acrAdminNotExempt: 'وصول إداري — غير مستثنى من المراجعة',
     acrStatusDecision: 'الحالة / القرار',
     acrCurrentRoles: 'الأدوار الحالية',
-    acrQueueIntro: 'قائمة إعادة اعتماد الوصول — أكّد أن كل شخص ما زال يحتاج الوصول المُدرج، أو ألغِه أو ضَع عليه وسماً للتغيير.',
-    acrQuarterlyNote: 'تعمل الدورة تلقائياً كل ربع سنة أيضاً. استخدم هذا لبدء دورة عند الطلب — يحصل كل مستخدم يحمل دوراً نشطاً حالياً على عنصر مُسنَد إلى مراجع مؤهَّل.',
-    acrQueueCaption: 'قائمة إعادة اعتماد الوصول — أكّد أن كل شخص ما زال يحتاج الوصول المُدرج، أو ألغِه أو ضَع عليه وسماً.',
+    acrQueueIntro:
+      'قائمة إعادة اعتماد الوصول — أكّد أن كل شخص ما زال يحتاج الوصول المُدرج، أو ألغِه أو ضَع عليه وسماً للتغيير.',
+    acrQuarterlyNote:
+      'تعمل الدورة تلقائياً كل ربع سنة أيضاً. استخدم هذا لبدء دورة عند الطلب — يحصل كل مستخدم يحمل دوراً نشطاً حالياً على عنصر مُسنَد إلى مراجع مؤهَّل.',
+    acrQueueCaption:
+      'قائمة إعادة اعتماد الوصول — أكّد أن كل شخص ما زال يحتاج الوصول المُدرج، أو ألغِه أو ضَع عليه وسماً.',
     acrConfirmAccessAria: 'تأكيد صلاحية الوصول لـ {name}',
     acrRevokeAccessAria: 'سحب صلاحية الوصول من {name}',
     acrFlagAccessAria: 'الإشارة إلى تغيير صلاحية الوصول لـ {name}',
@@ -305,7 +313,8 @@ export const OPERATIONS = {
     rpIntro:
       'الرقم الذي يُبنى عليه برنامج التأمين الواحد للعميل متعدّد المواقع. أما تجميع البرنامج نفسه فهو العملية رقم ٧.',
     rpSitesHeading: 'المواقع',
-    rpSurveysIntro: 'العملية 6 — المسح التفصيلي للأصول لكل موقع، لاشتقاق مبلغ التأمين وفترة التعويض، مجمَّعاً عبر المواقع للعميل متعدد المواقع.',
+    rpSurveysIntro:
+      'العملية 6 — المسح التفصيلي للأصول لكل موقع، لاشتقاق مبلغ التأمين وفترة التعويض، مجمَّعاً عبر المواقع للعميل متعدد المواقع.',
     rpIndemnityPeriod: 'فترة التعويض (بالأشهر)',
     rpAnnualGrossProfit: 'الربح الإجمالي السنوي (دينار أردني)',
     rpDeclaredValue: 'القيمة المصرَّح بها (دينار أردني)',
@@ -313,11 +322,14 @@ export const OPERATIONS = {
     rpAssetDescription: 'الوصف (اختياري)',
     rpAssetType: 'نوع الأصل',
     rpNoAssetsYet: 'لم تُمسح أي أصول لهذا الموقع بعد.',
-    rpSurveyIntro: 'العملية 6 — المسح التفصيلي للمباني والمعدّات والمخزون والأرباح السنوية والأسطول لهذا الموقع.',
-    rsSurveyIntro: 'العملية 6 — المسح التفصيلي للمباني والمعدّات والمخزون والأرباح السنوية والأسطول لهذا الموقع. ويُشتق مبلغ التأمين وفترة التعويض أدناه منه.',
+    rpSurveyIntro:
+      'العملية 6 — المسح التفصيلي للمباني والمعدّات والمخزون والأرباح السنوية والأسطول لهذا الموقع.',
+    rsSurveyIntro:
+      'العملية 6 — المسح التفصيلي للمباني والمعدّات والمخزون والأرباح السنوية والأسطول لهذا الموقع. ويُشتق مبلغ التأمين وفترة التعويض أدناه منه.',
     rpPriorClaimsField: 'ملخّص سجل المطالبات السابقة (اختياري)',
     rpSiteLabelField: 'وسم الموقع (اختياري)',
-    rpNoProfileYet: 'لا يوجد ملف مخاطر لهذا العميل بعد — أضف الموقع الأول أدناه.',
+    rpNoProfileYet:
+      'لا يوجد ملف مخاطر لهذا العميل بعد — أضف الموقع الأول أدناه.',
     rpPriorClaims: 'مطالبات سابقة: {summary}',
     rpAddSiteHeading: 'إضافة موقع',
     rpSurveysHeading: 'مسوحات المخاطر',
@@ -327,7 +339,8 @@ export const OPERATIONS = {
     rpColIndemnityPeriod: 'مدة التعويض',
     rpColFleetVehicles: 'مركبات الأسطول',
     rpSitePlaceholder: 'مثال: المكتب الرئيسي، مستودع العقبة',
-    rpCustomerNotFound: 'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
+    rpCustomerNotFound:
+      'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     rpLoading: 'جارٍ التحميل…',
     rpLoadError: 'تعذّر تحميل ملفات المخاطر — حاول مرة أخرى.',
     rpAddSiteError: 'تعذّرت إضافة الموقع — حاول مرة أخرى.',
@@ -340,10 +353,12 @@ export const OPERATIONS = {
     // ---- Insurance programs (#7) ------------------------------------------------------------------
     iprogHeading: 'برامج التأمين',
     iprogLoading: 'جارٍ التحميل…',
-    iprogCustomerNotFound: 'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
+    iprogCustomerNotFound:
+      'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     iprogLoadError: 'تعذّر تحميل برامج التأمين — حاول مرة أخرى.',
     iprogRefusalAct: 'عرض برامج التأمين',
-    iprogNoneForCustomer: 'لا يوجد برنامج تأمين لهذا العميل بعد — جمِّع واحداً من تقييم احتياجات معتمد.',
+    iprogNoneForCustomer:
+      'لا يوجد برنامج تأمين لهذا العميل بعد — جمِّع واحداً من تقييم احتياجات معتمد.',
     iprogOpenProgramAria: 'فتح برنامج التأمين المُجمَّع في {at}',
 
     // ---- Needs assessments (#5) --------------------------------------------------------------------
@@ -362,22 +377,27 @@ export const OPERATIONS = {
     prosNoneMatch: 'لا يوجد عميل مرتقب يطابق بحثك.',
     prosNone: 'لا يوجد عملاء مرتقبون بعد.',
     prosRefusalAct: 'عرض العملاء المرتقبين',
-    prosIntro: 'العملية 2 — العملاء المحتملون المؤهَّلون الذين حُوِّلوا إلى عملاء مرتقبين. حوِّل عميلاً محتملاً من لوحة المسار لإضافته هنا.',
+    prosIntro:
+      'العملية 2 — العملاء المحتملون المؤهَّلون الذين حُوِّلوا إلى عملاء مرتقبين. حوِّل عميلاً محتملاً من لوحة المسار لإضافته هنا.',
     prosViewProfileAria: 'عرض الملف الشخصي — {name}',
 
     // ---- Home launcher --------------------------------------------------------------------------------
-    homeLeadsBlurb: 'التقط عميلاً محتملاً من أي مصدر استقطاب وانقله عبر مراحل المسار.',
+    homeLeadsBlurb:
+      'التقط عميلاً محتملاً من أي مصدر استقطاب وانقله عبر مراحل المسار.',
     homeProspectsBlurb: 'أهّل عميلاً محتملاً محوَّلاً وسجّل ملفه التجاري.',
     homeCustomersBlurb:
       'استقبل العملاء الأفراد والشركات، وسجّل المستفيدين الحقيقيين، ونفّذ فحص «اعرف عميلك».',
     homeKycQueueTitle: 'قائمة فحص اعرف عميلك',
-    homeKycQueueBlurb: 'راجع سجلات «اعرف عميلك» المعلّقة واعتمدها قبل تفعيل العميل.',
+    homeKycQueueBlurb:
+      'راجع سجلات «اعرف عميلك» المعلّقة واعتمدها قبل تفعيل العميل.',
     homeAccessRecertBlurb: 'نفّذ دورة مراجعة الصلاحيات الدورية وأكملها.',
     homeSecurityBlurb: 'أدر المصادقة متعدّدة العوامل وراجع سياسة جلستك.',
     // The three destinations an office administrator holds and had no card for, plus the heading the
     // launcher needs now that it groups what it shows.
-    homeRolesBlurb: 'أنشئ أدوار مكتبك وحدّد صلاحيات كل دور من مصفوفة الصلاحيات الكاملة.',
-    homeUsersBlurb: 'أنشئ حسابات المستخدمين، وأسند الأدوار أو اسحبها، وفعّل الحساب أو ألغِه.',
+    homeRolesBlurb:
+      'أنشئ أدوار مكتبك وحدّد صلاحيات كل دور من مصفوفة الصلاحيات الكاملة.',
+    homeUsersBlurb:
+      'أنشئ حسابات المستخدمين، وأسند الأدوار أو اسحبها، وفعّل الحساب أو ألغِه.',
     homeEmployeesBlurb: 'سجلات الموظفين والتراخيص والشهادات والتدريب.',
     homeOrgUnitsBlurb: 'أسماء أقسام مكتبك وفروعه — تُنشأ قبل تسجيل أول موظف.',
     homeInsuranceLinesBlurb:
@@ -436,7 +456,8 @@ export const OPERATIONS = {
     usrActivate: 'تفعيل',
     usrRoleToGrantAria: 'الدور المراد منحه لـ {email}',
     renCouldNotLoadRenewalCases: 'تعذّر تحميل حالات التجديد — حاول مرة أخرى.',
-    renScanSummary: 'تم فحص {scanned} وثيقة — فُتحت {opened}، وتُخطِّيت {skipped} لأنها مفتوحة أصلًا، وفشلت {failed}.',
+    renScanSummary:
+      'تم فحص {scanned} وثيقة — فُتحت {opened}، وتُخطِّيت {skipped} لأنها مفتوحة أصلًا، وفشلت {failed}.',
     renThatActionFailedTryAgain: 'فشل الإجراء — حاول مرة أخرى.',
     renRenewalCases: 'حالات التجديد',
     renARenewalCaseOpensAutomatically:
@@ -557,7 +578,8 @@ export const OPERATIONS = {
       'يُشتق من الاسم بالإنجليزية، ولا يمكن تغييره بعد الإنشاء — وهو ما يظهر في سجلّ التدقيق.',
     roleMachineNameUnreadable:
       'لا يمكن اشتقاق اسم برمجي مقروء من هذا الاسم. اكتب الاسم بالإنجليزية بحروف لاتينية (مثال: Claims Triage Desk).',
-    roleEnglishNameRequired: 'الاسم بالإنجليزية مطلوب — منه يُشتق الاسم البرمجي الدائم.',
+    roleEnglishNameRequired:
+      'الاسم بالإنجليزية مطلوب — منه يُشتق الاسم البرمجي الدائم.',
     roleCreatePermissionsHeading: 'صلاحيات هذا الدور',
     roleCreatePermissionsIntro:
       'اختر ما يستطيع هذا الدور عمله. يمكن تعديل الصلاحيات لاحقاً، ويسري التعديل فوراً على كل من يحمل الدور.',
@@ -592,10 +614,12 @@ export const OPERATIONS = {
     dutySegStatusSingle: 'شخص واحد فقط — تتعطّل إن كان هو من سجّل الإجراء',
     dutySegStatusReady: 'جاهزة',
     dutySegRefusalAct: 'عرض توزيع الفصل بين المهام على أدوار المكتب',
-    dutySegLoadError: 'تعذّر تحميل قائمة العمليات التي تحتاج شخصين — حاول مرة أخرى.',
+    dutySegLoadError:
+      'تعذّر تحميل قائمة العمليات التي تحتاج شخصين — حاول مرة أخرى.',
     roleCreateHeading: 'إنشاء دور',
     roleFieldName: 'الاسم البرمجي',
-    roleFieldNameHint: 'ثابت، ويُكتب في سجلّ التدقيق. لا يمكن تغييره بعد الإنشاء.',
+    roleFieldNameHint:
+      'ثابت، ويُكتب في سجلّ التدقيق. لا يمكن تغييره بعد الإنشاء.',
     roleFieldNameEn: 'الاسم بالإنجليزية',
     roleFieldNameAr: 'الاسم بالعربية',
     roleFieldDescription: 'الوصف',
@@ -608,8 +632,7 @@ export const OPERATIONS = {
     roleMatrixHeading: 'صلاحيات {role}',
     roleMatrixIntro:
       'اختر ما يستطيع حاملو هذا الدور فعله. يُحفظ الاختيار بالكامل مرة واحدة.',
-    roleMatrixReadOnly:
-      'هذا دور نظامي، لذلك تُعرض صلاحياته للقراءة فقط.',
+    roleMatrixReadOnly: 'هذا دور نظامي، لذلك تُعرض صلاحياته للقراءة فقط.',
     roleMatrixSave: 'حفظ الصلاحيات',
     roleMatrixSaving: 'جارٍ الحفظ…',
     roleMatrixSaved: 'تم حفظ الصلاحيات.',
@@ -620,6 +643,18 @@ export const OPERATIONS = {
     roleMfaAlwaysLabel: 'تتطلّب المصادقة في كل مرة',
     roleMfaHardwareLabel: 'تتطلّب مفتاح أمان',
     roleMfaHeading: 'خصائص الأمان',
+    roleScopeHeading: 'نطاق فروع التأمين',
+    roleScopeIntro:
+      'يحدِّد النطاق فروع التأمين التي تسري داخلها صلاحيات هذا الدور. الصلاحيات نفسها لا تُكرَّر لكل نوع — النوع خاصية للدور.',
+    roleScopeTypeLabel: 'نوع التأمين',
+    roleScopeEveryType: 'كل الأنواع (غير مقيَّد)',
+    roleScopeEveryTypeNote:
+      'هذا الدور غير مقيَّد: تسري صلاحياته في كل أنواع التأمين وكل فروعها. هذه هي حالة كل دور لم يُحدَّد نطاقه.',
+    roleScopeBranchesIntro:
+      'اختر الفروع — أو لا تختر شيئاً ليسري الدور في كل فروع هذا النوع.',
+    roleScopeEveryBranchNote:
+      'لم يُحدَّد أي فرع، لذا يسري هذا الدور في كل فروع هذا النوع.',
+    roleScopeSave: 'حفظ النطاق',
     roleMfaIntro:
       'كلتا الخصّيتين مشدّدتان تلقائياً. تخفيف أيّ منهما يُضعف ضابطاً أمنياً، لذلك يُطلب منك تأكيد هويتك أولاً ويُسجَّل التغيير.',
     roleMfaSave: 'حفظ خصائص الأمان',
@@ -636,12 +671,14 @@ export const OPERATIONS = {
     secHeading: 'Security',
     secMfaHeading: 'Multi-factor authentication',
     secManualKeyLabel: 'Or type this key into the app by hand:',
-    secManualKeyHint: 'Use this if your authenticator is on the same device as this screen, or you cannot scan the code.',
+    secManualKeyHint:
+      'Use this if your authenticator is on the same device as this screen, or you cannot scan the code.',
     secScanInstruction:
       'Scan this QR code with your authenticator app, then enter the 6-digit code it shows.',
     secSession: 'Session',
     secEnrollError: 'Could not start MFA enrollment.',
-    secEnabledMessage: 'Multi-factor authentication is now enabled on your account.',
+    secEnabledMessage:
+      'Multi-factor authentication is now enabled on your account.',
     secInvalidCode: 'Invalid code — try again.',
     secEnabled: 'Enabled',
     secNotEnrolled: 'Not enrolled — required before you can use most of IBMS',
@@ -729,7 +766,8 @@ export const OPERATIONS = {
     empTempPasswordHint:
       'They will be asked to change it and to enrol a second factor on first sign-in.',
     empRolesHeading: 'Roles',
-    empRolesHint: 'At least one — an account with no roles holds no permissions at all.',
+    empRolesHint:
+      'At least one — an account with no roles holds no permissions at all.',
     empRolesNone: 'No active roles to grant.',
     empRoleRequired: 'Pick at least one role.',
     empRegistrationType: 'How they sign in',
@@ -780,7 +818,8 @@ export const OPERATIONS = {
     docVersionError: 'Could not create a new version.',
     docUnlockAct: 'unlock that document',
     docDeleteError: 'Could not delete the document.',
-    docClassificationSummaryIntro: "The highest classification present across a policy's electronic file — never averaged.",
+    docClassificationSummaryIntro:
+      "The highest classification present across a policy's electronic file — never averaged.",
     docStorageReference: 'Storage reference',
     docFileName: 'File name',
     docVersionHeading: 'Record a new version',
@@ -830,7 +869,8 @@ export const OPERATIONS = {
     bcpCreateHeading: 'Record a new plan',
     bcpRecordTestButton: 'Record test',
     bcpNoPlanOnFile: '— no plan on file',
-    bcpRefusalAct: 'view and maintain the business-continuity and disaster-recovery plans',
+    bcpRefusalAct:
+      'view and maintain the business-continuity and disaster-recovery plans',
 
     iassetHeading: 'Information Assets',
     iassetIntro:
@@ -877,8 +917,8 @@ export const OPERATIONS = {
     acrAdminDecisionConfirmed: 'Confirmed',
     acrAdminDecisionRevoked: 'Revoked',
     acrAdminDecisionChanged: 'Changed',
-    acrAdminLoadFailed: 'Could not load the administrator access review record.'
-    ,
+    acrAdminLoadFailed:
+      'Could not load the administrator access review record — try again.',
     acrStartCycleError: 'Could not start the cycle — try again.',
     acrCycleDueDate: 'Due date (optional — defaults to 15 days)',
     acrCycleLabel: 'Cycle label',
@@ -889,9 +929,12 @@ export const OPERATIONS = {
     acrAdminNotExempt: 'Admin access — not exempt from review',
     acrStatusDecision: 'Status / decision',
     acrCurrentRoles: 'Current roles',
-    acrQueueIntro: 'Access-recertification queue — confirm each person still needs the access listed, or revoke/flag it for change.',
-    acrQuarterlyNote: 'A cycle also runs automatically every quarter. Use this to start one on demand — every user currently holding an active role gets an item, assigned to an eligible reviewer.',
-    acrQueueCaption: 'Access-recertification queue — confirm each person still needs the access listed, or revoke/flag it.',
+    acrQueueIntro:
+      'Access-recertification queue — confirm each person still needs the access listed, or revoke/flag it for change.',
+    acrQuarterlyNote:
+      'A cycle also runs automatically every quarter. Use this to start one on demand — every user currently holding an active role gets an item, assigned to an eligible reviewer.',
+    acrQueueCaption:
+      'Access-recertification queue — confirm each person still needs the access listed, or revoke/flag it.',
     acrConfirmAccessAria: 'Confirm access for {name}',
     acrRevokeAccessAria: 'Revoke access for {name}',
     acrFlagAccessAria: 'Flag access for change for {name}',
@@ -917,7 +960,8 @@ export const OPERATIONS = {
     rpIntro:
       'The figure a multi-site client’s single Insurance Program is built from. Program assembly itself is Process 7.',
     rpSitesHeading: 'Sites / locations',
-    rpSurveysIntro: 'Process 6 — the detailed asset survey per location, deriving the Sum Insured and indemnity period, consolidated across sites for a multi-site client.',
+    rpSurveysIntro:
+      'Process 6 — the detailed asset survey per location, deriving the Sum Insured and indemnity period, consolidated across sites for a multi-site client.',
     rpIndemnityPeriod: 'Indemnity period (months)',
     rpAnnualGrossProfit: 'Annual gross profit (JOD)',
     rpDeclaredValue: 'Declared value (JOD)',
@@ -925,11 +969,14 @@ export const OPERATIONS = {
     rpAssetDescription: 'Description (optional)',
     rpAssetType: 'Asset type',
     rpNoAssetsYet: 'No assets surveyed yet for this location.',
-    rpSurveyIntro: 'Process 6 — the detailed building / equipment / stock / annual-profit / fleet survey for this location.',
-    rsSurveyIntro: 'Process 6 — the detailed building / equipment / stock / annual-profit / fleet survey for this location. The Sum Insured and indemnity period below are derived from it.',
+    rpSurveyIntro:
+      'Process 6 — the detailed building / equipment / stock / annual-profit / fleet survey for this location.',
+    rsSurveyIntro:
+      'Process 6 — the detailed building / equipment / stock / annual-profit / fleet survey for this location. The Sum Insured and indemnity period below are derived from it.',
     rpPriorClaimsField: 'Prior claims history summary (optional)',
     rpSiteLabelField: 'Site label (optional)',
-    rpNoProfileYet: 'No risk profile yet for this customer — add the first site below.',
+    rpNoProfileYet:
+      'No risk profile yet for this customer — add the first site below.',
     rpPriorClaims: 'Prior claims: {summary}',
     rpAddSiteHeading: 'Add a site / location',
     rpSurveysHeading: 'Risk surveys',
@@ -956,7 +1003,8 @@ export const OPERATIONS = {
       'This customer could not be found — it may not exist, or you may not have access to it.',
     iprogLoadError: 'Could not load insurance programs — try again.',
     iprogRefusalAct: 'view insurance programmes',
-    iprogNoneForCustomer: 'No insurance program yet for this customer — assemble one from an approved needs assessment.',
+    iprogNoneForCustomer:
+      'No insurance program yet for this customer — assemble one from an approved needs assessment.',
     iprogOpenProgramAria: 'Open the insurance program assembled on {at}',
 
     naHeading: 'Needs assessments',
@@ -973,28 +1021,38 @@ export const OPERATIONS = {
     prosNoneMatch: 'No prospects match your search.',
     prosNone: 'No prospects yet.',
     prosRefusalAct: 'view prospects',
-    prosIntro: 'Process 2 — qualified leads that have been converted into prospects. Convert a lead from the pipeline board to add one here.',
+    prosIntro:
+      'Process 2 — qualified leads that have been converted into prospects. Convert a lead from the pipeline board to add one here.',
     prosViewProfileAria: 'View profile — {name}',
 
-    homeLeadsBlurb: 'Capture a lead from any acquisition source and move it through the pipeline.',
-    homeProspectsBlurb: 'Qualify a converted lead and record its business profile.',
+    homeLeadsBlurb:
+      'Capture a lead from any acquisition source and move it through the pipeline.',
+    homeProspectsBlurb:
+      'Qualify a converted lead and record its business profile.',
     homeCustomersBlurb:
       'Onboard individual and corporate customers, capture UBOs, and run KYC screening.',
     homeKycQueueTitle: 'KYC compliance queue',
-    homeKycQueueBlurb: 'Review and approve pending KYC records before a customer is activated.',
+    homeKycQueueBlurb:
+      'Review and approve pending KYC records before a customer is activated.',
     homeAccessRecertBlurb: 'Run and complete the periodic access-review cycle.',
-    homeSecurityBlurb: 'Manage multi-factor authentication and review your session policy.',
-    homeRolesBlurb: "Define your office's roles and set each one's permissions from the full matrix.",
-    homeUsersBlurb: 'Create user accounts, grant or revoke roles, activate or deactivate access.',
-    homeEmployeesBlurb: 'Employee records, licences, certifications and training.',
-    homeOrgUnitsBlurb: "Your office's department and branch names — created before the first employee.",
+    homeSecurityBlurb:
+      'Manage multi-factor authentication and review your session policy.',
+    homeRolesBlurb:
+      "Define your office's roles and set each one's permissions from the full matrix.",
+    homeUsersBlurb:
+      'Create user accounts, grant or revoke roles, activate or deactivate access.',
+    homeEmployeesBlurb:
+      'Employee records, licences, certifications and training.',
+    homeOrgUnitsBlurb:
+      "Your office's department and branch names — created before the first employee.",
     homeInsuranceLinesBlurb:
       'The lines of business your work is classified by — add one the standard list does not cover.',
     navGroupAccount: 'Your account',
     homeNoDestinations:
       'No screen is available to your account yet — no permissions have been granted to it. Ask your office administrator.',
     homeWelcome: 'Welcome, {name}',
-    homeSignedInAs: 'Insurance Brokerage Management System. Signed in as {roles}.',
+    homeSignedInAs:
+      'Insurance Brokerage Management System. Signed in as {roles}.',
     homeNoRole: 'no role assigned',
     usrLoading: 'Loading…',
     usrRefusalAct: 'view user accounts',
@@ -1021,7 +1079,8 @@ export const OPERATIONS = {
     usrRoles: 'Roles',
     usrSaving: 'Saving…',
     usrProvisionUser: 'Provision user',
-    usrPickAtLeastOneRole: 'Pick at least one role — a zero-role account can do nothing.',
+    usrPickAtLeastOneRole:
+      'Pick at least one role — a zero-role account can do nothing.',
     usrNoUsers: 'No users.',
     usrName: 'Name',
     usrEmail2: 'Email',
@@ -1041,7 +1100,8 @@ export const OPERATIONS = {
     usrActivate: 'Activate',
     usrRoleToGrantAria: 'Role to grant to {email}',
     renCouldNotLoadRenewalCases: 'Could not load renewal cases — try again.',
-    renScanSummary: 'Scanned {scanned} policy/policies — opened {opened}, skipped {skipped} already open, {failed} failed.',
+    renScanSummary:
+      'Scanned {scanned} policy/policies — opened {opened}, skipped {skipped} already open, {failed} failed.',
     renThatActionFailedTryAgain: 'That action failed — try again.',
     renRenewalCases: 'Renewal cases',
     renARenewalCaseOpensAutomatically:
@@ -1165,7 +1225,8 @@ export const OPERATIONS = {
       'Derived from the English name and permanent once saved — this is what appears in the audit log.',
     roleMachineNameUnreadable:
       'No readable machine name can be derived from this. Enter the English name in Latin letters — for example, Claims Triage Desk.',
-    roleEnglishNameRequired: 'The English name is required — the permanent machine name is derived from it.',
+    roleEnglishNameRequired:
+      'The English name is required — the permanent machine name is derived from it.',
     roleCreatePermissionsHeading: 'What this role can do',
     roleCreatePermissionsIntro:
       'Choose what this role may do. Permissions can be changed later, and a change applies immediately to everyone holding the role.',
@@ -1197,10 +1258,12 @@ export const OPERATIONS = {
     dutySegColHolders: 'People who hold it',
     dutySegColStatus: 'Status',
     dutySegStatusNobody: 'Cannot be completed — nobody holds the permission',
-    dutySegStatusSingle: 'Only one person — blocked whenever they are the one who recorded it',
+    dutySegStatusSingle:
+      'Only one person — blocked whenever they are the one who recorded it',
     dutySegStatusReady: 'Ready',
     dutySegRefusalAct: 'view how this office separates duties across its roles',
-    dutySegLoadError: 'Could not load the list of operations needing two people — try again.',
+    dutySegLoadError:
+      'Could not load the list of operations needing two people — try again.',
     roleCreateHeading: 'Create a role',
     roleFieldName: 'Machine name',
     roleFieldNameHint:
@@ -1229,6 +1292,18 @@ export const OPERATIONS = {
     roleMfaAlwaysLabel: 'Always require MFA',
     roleMfaHardwareLabel: 'Require a hardware security key',
     roleMfaHeading: 'Security attributes',
+    roleScopeHeading: 'Insurance-line scope',
+    roleScopeIntro:
+      'The scope decides which insurance lines this role’s permissions apply within. The permission codes themselves are not duplicated per type — the type belongs to the role.',
+    roleScopeTypeLabel: 'Insurance type',
+    roleScopeEveryType: 'Every type (unrestricted)',
+    roleScopeEveryTypeNote:
+      'This role is unrestricted: its permissions apply in every insurance type and every branch. That is the state of every role whose scope has not been set.',
+    roleScopeBranchesIntro:
+      'Choose the branches — or choose none, and the role applies in every branch of this type.',
+    roleScopeEveryBranchNote:
+      'No branch is chosen, so this role applies in every branch of this type.',
+    roleScopeSave: 'Save scope',
     roleMfaIntro:
       'Both are strict by default. Relaxing either weakens a security control, so you are asked to confirm your identity first and the change is recorded.',
     roleMfaSave: 'Save security attributes',
@@ -1241,6 +1316,5 @@ export const OPERATIONS = {
     roleStepUpCancel: 'Cancel',
     roleStepUpFailed:
       'Could not confirm your identity — check your password and code.',
-
   },
 } as const;

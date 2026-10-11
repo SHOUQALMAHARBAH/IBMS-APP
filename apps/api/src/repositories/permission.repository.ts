@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Permission } from '@ibms/db';
+import type { InsuranceLineCategory, Permission } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -67,6 +67,48 @@ export class PermissionRepository {
    * impossible for a grant to point at another office's role, so the join cannot
    * reach outside the caller's own office to find an ACTIVE row.
    */
+  /**
+   * MODULE 0 ITEM (h) — the SCOPE of each of these roles.
+   *
+   * A second query rather than a widening of `findCodesForRoles`: that one returns a flat
+   * `string[]` of codes and is cached as such, and a scope is a different shape (one row per role,
+   * each with a list). Widening it would have made every cache entry carry both and every caller
+   * destructure something it does not use.
+   *
+   * `status: ACTIVE` and `deletedAt: null` are repeated here deliberately rather than inherited:
+   * this is an AUTHORIZATION read, and a retired role whose scope still resolved would describe a
+   * scope nothing grants. The sibling query makes the same filter for the same reason.
+   */
+  async findScopesForRoles(roleIds: string[]): Promise<
+    {
+      roleId: string;
+      category: InsuranceLineCategory | null;
+      lineIds: string[];
+    }[]
+  > {
+    if (roleIds.length === 0) return [];
+    const roles = await this.prisma.client.role.findMany({
+      where: { id: { in: roleIds }, status: 'ACTIVE', deletedAt: null },
+      select: {
+        id: true,
+        insuranceLineCategory: true,
+        scopeBranches: {
+          select: { insuranceLineId: true, officeInsuranceLineId: true },
+        },
+      },
+    });
+    return roles.map((role) => ({
+      roleId: role.id,
+      category: role.insuranceLineCategory,
+      // Either catalogue's id, flattened: the decision compares an id, and which catalogue a
+      // branch came from is not part of the question. The `_exactly_one_line` CHECK is what makes
+      // exactly one of the two non-null, so this filter cannot silently drop a branch.
+      lineIds: role.scopeBranches
+        .map((b) => b.insuranceLineId ?? b.officeInsuranceLineId)
+        .filter((id): id is string => id !== null),
+    }));
+  }
+
   async findCodesForRoles(roleIds: string[]): Promise<string[]> {
     if (roleIds.length === 0) return [];
     const links = await this.prisma.client.rolePermission.findMany({

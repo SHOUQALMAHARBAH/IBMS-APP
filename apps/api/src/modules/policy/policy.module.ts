@@ -17,6 +17,7 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
 import { ClientDecisionModule } from '../client-decision/client-decision.module';
 import { CustomerModule } from '../customer/customer.module';
 import { DocumentGenerationModule } from '../document-generation/document-generation.module';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 /** Process 18-19 — Policy Placement & Issuance + Process 20 — Policy Checking
  * + Process 21 — Policy Delivery (backlog Part C #18-21, Domain B).
@@ -66,6 +67,10 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
   ],
   controllers: [PolicyController],
   providers: [
+    // Module 0 item (h). A missing provider is a RUNTIME DI failure TypeScript cannot
+    // see — item (e) shipped exactly that and only an e2e found it — so this lands in the
+    // SAME commit as the constructor dependency rather than after a 500.
+    InsuranceLineRepository,
     PolicyService,
     PolicyRepository,
     PolicyCheckingService,

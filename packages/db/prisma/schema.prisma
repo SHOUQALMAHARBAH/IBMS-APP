@@ -394,6 +394,7 @@ model Organization {
   duplicateNameWarnings               DuplicateNameWarning[]
   brokerLicenseScopeLines             BrokerLicenseScopeLine[]
   employeeCbjApprovalBranches         EmployeeCbjApprovalBranch[]
+  roleScopeBranches                   RoleScopeBranch[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -870,7 +871,7 @@ model SecurityConfig {
 /// offices reuse a name. See `PermissionRepository.findCodesForRoles` and
 /// `PermissionsService`, both of which key on id for this reason.
 model Role {
-  id                    String       @id @default(uuid())
+  id                    String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
   ///
@@ -878,8 +879,8 @@ model Role {
   /// scoping at all: `TENANT_SCOPED_MODELS` is derived from the DMMF as
   /// "every model carrying an organizationId", so the extension picks this up
   /// automatically with no change to the isolation code itself.
-  organizationId        String       @default(dbgenerated())
-  organization          Organization @relation(fields: [organizationId], references: [id])
+  organizationId        String                 @default(dbgenerated())
+  organization          Organization           @relation(fields: [organizationId], references: [id])
   /// Free text, not an enum. Was `RoleName` until office-scoped custom roles
   /// landed; the legacy 11 survive as ordinary per-office rows carrying their
   /// old machine name.
@@ -900,12 +901,12 @@ model Role {
   /// question from a hard-coded list of role NAMES (`ALWAYS_MFA_ROLES`), which
   /// matched no custom role and therefore handed it the exemption the list
   /// existed to deny — the control failed OPEN.
-  requiresMfaAlways     Boolean      @default(true)
+  requiresMfaAlways     Boolean                @default(true)
   /// Part 10.1 — this role must present a hardware-token factor once WebAuthn
   /// ships. Same reasoning, same default, same fail-open history
   /// (`PRIVILEGED_ROLES`). Surfaced to the client as `mfaPolicySatisfied`; it
   /// has never blocked a login and still does not.
-  requiresHardwareToken Boolean      @default(true)
+  requiresHardwareToken Boolean                @default(true)
   /// Whether this role still grants anything.
   ///
   /// An office RETIRES a role rather than deleting it: `UserRoleAssignment` and
@@ -921,7 +922,7 @@ model Role {
   /// ever granted — and would let an office retire its only administrator role
   /// and then revoke the grant, with the guard waving both through because it
   /// still saw a "surviving" holder.
-  status                RoleStatus   @default(ACTIVE)
+  status                RoleStatus             @default(ACTIVE)
   /// A role the PLATFORM defines rather than the office: the eleven converted
   /// legacy rows and `OFFICE_ADMINISTRATOR`.
   ///
@@ -931,7 +932,18 @@ model Role {
   /// `if (isSystem) allow` bypass would be smuggled in, so there is a test whose
   /// only job is to prove a user holding an isSystem role with no permissions
   /// reaches nothing.
-  isSystem              Boolean      @default(false)
+  isSystem              Boolean                @default(false)
+  /// MODULE 0 ITEM (h) — the insurance TYPE this role may act in, or NULL for every type.
+  ///
+  /// NULL IS UNRESTRICTED, NOT UNSCOPED-TO-NOTHING. Every role that existed before item (h) reads
+  /// NULL, and reading that as "scoped to nothing" would refuse every write in the system on the
+  /// first deploy. The same non-restricting-backfill call as `Organization.brokerKind`, and the
+  /// opposite of `Organization.type`'s no-default — see `docs/decision-role-scope.md` § 5 for why
+  /// the three differ.
+  insuranceLineCategory InsuranceLineCategory?
+  /// The BRANCHES within that type, or NONE for every branch within it. Empty is likewise
+  /// unrestricted, for the same reason one level down.
+  scopeBranches         RoleScopeBranch[]
   /// Set when the office DELETES the role. The row survives because
   /// `UserRoleAssignment.roleId` is ON DELETE RESTRICT and the historical
   /// assignment rows must keep naming which role they were — see migration
@@ -941,7 +953,7 @@ model Role {
   /// read path, filtered or not. Never reactivated: a CHECK constraint holds it
   /// INACTIVE, and delete is deliberately one-way.
   deletedAt             DateTime?
-  createdAt             DateTime     @default(now())
+  createdAt             DateTime               @default(now())
 
   users       UserRoleAssignment[]
   permissions RolePermission[]
@@ -952,6 +964,38 @@ model Role {
   /// unique target to reference, which is what makes it impossible for a grant
   /// to claim an Organization its role does not belong to. See RolePermission.
   @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+/// MODULE 0 ITEM (h) — ONE branch a role's scope covers.
+///
+/// The same two-nullable-FK shape as the licence scope and the CBJ approval, and for the same
+/// reason: a branch is a row of a managed catalogue, standard or office-added. There is no stored
+/// TYPE here either — `Role.insuranceLineCategory` is the type, and a branch outside it is refused
+/// by the service rather than by a CHECK, because deciding that compares two tables.
+///
+/// An empty list means every branch within the role's type. See `docs/decision-role-scope.md` § 5.
+model RoleScopeBranch {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  roleId         String
+  /// `Cascade`: unlike the CBJ approval, a role's scope is CONFIGURATION rather than evidence —
+  /// `UserRoleAssignment` and `RolePermission` are what record who held what, and they are
+  /// RESTRICTed. A scope branch left behind by a deleted role would describe a scope nothing holds.
+  role           Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  /// NOTE — "the same branch twice for one role" is TWO PARTIAL uniques in raw SQL, never a
+  /// compound unique over these nullable columns (§ 1.25). `db:divergence` cannot see a partial
+  /// index, so the migration asserts both itself.
+
+  @@index([roleId])
   @@index([organizationId])
 }
 
@@ -5401,6 +5445,7 @@ model InsuranceLine {
   offeredBy             InsurerOfferedLine[]
   licenceScopeLines     BrokerLicenseScopeLine[]
   cbjApprovalBranches   EmployeeCbjApprovalBranch[]
+  roleScopeBranches     RoleScopeBranch[]
   formTemplates         InsurerFormTemplate[]
   officeFormTemplates   OfficeInsurerFormTemplate[]
   insuranceProgramLines InsuranceProgramLine[]
@@ -5448,6 +5493,7 @@ model OfficeInsuranceLine {
   offeredBy             InsurerOfferedLine[]
   licenceScopeLines     BrokerLicenseScopeLine[]
   cbjApprovalBranches   EmployeeCbjApprovalBranch[]
+  roleScopeBranches     RoleScopeBranch[]
   insuranceProgramLines InsuranceProgramLine[]
   rfqs                  RFQ[]
   policies              Policy[]

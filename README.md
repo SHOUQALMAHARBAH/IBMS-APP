@@ -9281,6 +9281,25 @@ oversight is silent" convention:
   vacancy; and `requiredBefore < 2` keeps a later suspension from locking an office out of
   correcting a branch list it already legitimately holds.
 
+  **ROLE SCOPE (Module 0 item (h)), migration `20261115100000`.** `Role.insuranceLineCategory`
+  plus `RoleScopeBranch` give a role an insurance type and the branches within it; every permission
+  it grants applies inside that scope only, and the permission codes are NOT duplicated per type —
+  there is no `policy.place.general`, there is `policy.place` held by a scoped role.
+
+  **The design note is `docs/decision-role-scope.md` and it was written before the code.** Two
+  things from it decide everything else. First, **`PermissionsGuard` cannot decide scope**: it runs
+  before the handler and has no resource, so "may this user place a policy in the LIFE line" is
+  unanswerable there. The decision lives in `common/role-scope.ts` and is called where the line is
+  known. Second, **scope does NOT silently filter reads**, and that is a decision with a measured
+  reason: `prisma.policy` is reached from 31 non-spec files, mostly dashboards and the finance
+  report, so a filter would narrow an office's own totals to one insurance type and present them as
+  the office's figures. A wrong number that looks right is a worse failure than a refusal.
+
+  **NULL is UNRESTRICTED**, and the migration asserts both that no existing role came out scoped and
+  that the column carries no DEFAULT. Several roles UNION rather than intersect. `role-scope.inventory.spec.ts`
+  is the guard: every line-writing service reaches the one decision or is named with a reason, the
+  decision exists in exactly one place, and no permission code names an insurance type.
+
   **The lapse check is a pure LIVE recompute
   (`isBrokerLicenseCurrentlyLapsed(license, now) = status === 'lapsed' || expiresAt <=
   now`), not a scheduler-maintained flag** — deliberately: the #16 `@code-reviewer` MAJOR

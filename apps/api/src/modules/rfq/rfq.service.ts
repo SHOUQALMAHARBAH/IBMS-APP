@@ -28,6 +28,8 @@ import type { AddRfqInsurersDto } from './dto/add-rfq-insurers.dto';
 import type { TransitionRfqInsurerDto } from './dto/transition-rfq-insurer.dto';
 import type { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
 import type { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
+import { assertWithinRoleScope } from '../../common/role-scope';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 /** Result of one follow-up sweep run — logged by the scheduler. Only
  * `candidates` and `due` are row counts; the tallies below are per-step and
@@ -121,6 +123,10 @@ export class RfqService {
     private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    // Module 0 item (h). A REPOSITORY across the module boundary — this codebase's one
+    // established cross-module shape — for the line's own `category`, which the role-scope
+    // decision needs and this module has no other way to know.
+    private readonly lines: InsuranceLineRepository,
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
@@ -305,6 +311,40 @@ export class RfqService {
     };
   }
 
+  /**
+   * MODULE 0 ITEM (h) — the role scope, on the line this RFQ inherits.
+   *
+   * Re-checked here even though the programme line was checked when it was designed, and that is
+   * the point rather than belt-and-braces: a different person with a different scope takes the
+   * programme to market, and a scope that was only ever checked upstream would let a LIFE-scoped
+   * officer raise a general RFQ from a programme somebody else designed.
+   *
+   * A line this office cannot resolve (both ids null — an Opportunity with no programme) is not
+   * refused: there is no line to be outside of, and refusing would block a path the RFQ module
+   * already models deliberately.
+   */
+  private async assertLineWithinScope(
+    inherited: {
+      insuranceLineId: string | null;
+      officeInsuranceLineId: string | null;
+    },
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    const lineId =
+      inherited.insuranceLineId ?? inherited.officeInsuranceLineId ?? null;
+    if (lineId === null) return;
+    const category = await this.lines.findCategory(
+      inherited.insuranceLineId,
+      inherited.officeInsuranceLineId,
+    );
+    if (!category) return;
+    assertWithinRoleScope(
+      actor,
+      { category, lineId },
+      'take this line to market',
+    );
+  }
+
   /** Inserts the RFQ row, mapping the `@@unique([opportunityId,
    * insuranceLine])` violation (a concurrent createRfq for the same line
    * lost the race) to the same 409 the pre-check raises. */
@@ -391,6 +431,11 @@ export class RfqService {
       opportunity.insuranceProgramId,
       dto.insuranceLine,
     );
+
+    // Item (h): the role scope, on the line just inherited — before the insurer shortlist is
+    // validated, so a scoped officer gets the scope refusal rather than an insurer error about a
+    // line they were never allowed to take to market.
+    await this.assertLineWithinScope(inheritedLine, actor);
 
     const insurerIds = [...new Set(dto.insurerIds)];
     await this.assertInsurersSelectable(insurerIds);

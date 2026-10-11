@@ -30,6 +30,7 @@ import {
   listPermissionCatalogue,
   listRolesForAdmin,
   setRolePermissions,
+  setRoleScope,
   setRoleSecurityAttributes,
   setRoleStatus,
   updateRole,
@@ -45,6 +46,10 @@ import {
   type DutySegregationReadiness,
 } from '../../../../lib/admin/role-admin-api';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import {
+  listInsuranceLines,
+  type InsuranceLine,
+} from '../../../../lib/insurer/insurance-line-api';
 
 /** Worst first: the row that says nobody can complete an operation is why the list exists. */
 const STATUS_ORDER: Record<DutySegregationReadiness['status'], number> = {
@@ -150,6 +155,12 @@ export default function RoleAdminPage() {
   const [nameAr, setNameAr] = useState('');
   const [description, setDescription] = useState('');
   const [mfaAlways, setMfaAlways] = useState(true);
+  /** Module 0 item (h). '' is the UNRESTRICTED option — see the save handler for why that matters. */
+  const [scopeCategory, setScopeCategory] = useState<'' | 'GENERAL' | 'LIFE'>(
+    '',
+  );
+  const [scopeLineIds, setScopeLineIds] = useState<string[]>([]);
+  const [lines, setLines] = useState<InsuranceLine[]>([]);
   const [hardwareToken, setHardwareToken] = useState(true);
 
   // Create form.
@@ -243,6 +254,28 @@ export default function RoleAdminPage() {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
 
+  /*
+   * MODULE 0 ITEM (h) — the line catalogue the scope section ticks.
+   *
+   * Its OWN effect, and written at the same time as the state it fills: item (e) shipped a section
+   * that rendered nothing at all because the loader was never added to the mount effect — the api,
+   * the client and the markup were all correct, and nothing type-checks "is this loader called".
+   * Only the Playwright tests could catch it, and did.
+   *
+   * A failure here empties the branch list and nothing else: the type select still works, so a role
+   * can still be scoped to every branch within a type, which is the common case.
+   */
+  useEffect(() => {
+    if (!user || !canRead) return;
+    void (async () => {
+      try {
+        setLines(await listInsuranceLines());
+      } catch {
+        setLines([]);
+      }
+    })();
+  }, [user, canRead]);
+
   // The readiness list. Its own effect and its own error line: a failure here must not blank the role
   // catalogue beside it, which is what this screen is actually for.
   useEffect(() => {
@@ -303,6 +336,11 @@ export default function RoleAdminPage() {
       setNameAr(role.nameAr);
       setDescription(role.description ?? '');
       setMfaAlways(role.requiresMfaAlways);
+      // Module 0 item (h). '' is the UNRESTRICTED option and must send an explicit null: omitting
+      // the field means "leave the scope alone", so a blank select that sent nothing would make
+      // "every insurance type" a no-op that looks like it saved.
+      setScopeCategory(role.insuranceLineCategory ?? '');
+      setScopeLineIds([...role.scopeLineIds, ...role.scopeOfficeLineIds]);
       setHardwareToken(role.requiresHardwareToken);
     } catch (err) {
       setActionError(
@@ -369,6 +407,47 @@ export default function RoleAdminPage() {
         nameEn,
         nameAr,
         description: description || undefined,
+      });
+      await load();
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : t('roleCouldNotLoad'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * MODULE 0 ITEM (h) — save the role's insurance-line scope.
+   *
+   * NOT behind a step-up challenge, unlike the MFA attributes beside it: step-up guards those
+   * because relaxing one WEAKENS a security control, and a scope only ever narrows what a role
+   * reaches. Said here because the neighbouring handler has it and a reader would otherwise wonder
+   * whether it was forgotten.
+   *
+   * `null` is sent EXPLICITLY for the unrestricted option. The api treats an absent field as "leave
+   * the scope alone", so sending nothing would make "every insurance type" a no-op that reports
+   * success — the same trap the CBJ approval's status has, and the same resolution.
+   */
+  async function onSaveScope() {
+    if (!editing) return;
+    const roleId = editing.id;
+    setBusy(true);
+    setActionError(null);
+    try {
+      // Which catalogue each id belongs to is decided HERE, from the catalogue itself, because the
+      // api addresses the two by different fields and exactly one may name a given branch.
+      const standard = scopeLineIds.filter(
+        (id) => lines.find((l) => l.id === id)?.isStandard !== false,
+      );
+      const office = scopeLineIds.filter(
+        (id) => lines.find((l) => l.id === id)?.isStandard === false,
+      );
+      await setRoleScope(roleId, {
+        insuranceLineCategory: scopeCategory === '' ? null : scopeCategory,
+        insuranceLineIds: scopeCategory === '' ? [] : standard,
+        officeInsuranceLineIds: scopeCategory === '' ? [] : office,
       });
       await load();
     } catch (err) {
@@ -484,7 +563,11 @@ export default function RoleAdminPage() {
           editor, then the table — which is also the users screen's arrangement. */}
 
       {readinessError ? (
-        <p role="alert" style={errorStyle} data-testid="duty-segregation-load-error">
+        <p
+          role="alert"
+          style={errorStyle}
+          data-testid="duty-segregation-load-error"
+        >
           {readinessError}
         </p>
       ) : null}
@@ -707,6 +790,84 @@ export default function RoleAdminPage() {
                   onClick={() => void onSaveNames()}
                 >
                   {t('roleSaveNamesButton')}
+                </button>
+              </div>
+
+              <h3>{t('roleScopeHeading')}</h3>
+              <p>{t('roleScopeIntro')}</p>
+              <div style={formStyle} data-role-scope="">
+                <label>
+                  {t('roleScopeTypeLabel')}
+                  <select
+                    aria-label={t('roleScopeTypeLabel')}
+                    value={scopeCategory}
+                    onChange={(e) =>
+                      setScopeCategory(
+                        e.target.value as '' | 'GENERAL' | 'LIFE',
+                      )
+                    }
+                  >
+                    {/* The unrestricted option is NAMED, not blank. § 5 of the design note: a role
+                        somebody MEANT to scope and left blank is unrestricted and nothing warns, so
+                        the screen states it in words an administrator can disagree with. */}
+                    <option value="">{t('roleScopeEveryType')}</option>
+                    <option value="GENERAL">
+                      {t(ENUM_LABEL.InsuranceLineCategory.GENERAL)}
+                    </option>
+                    <option value="LIFE">
+                      {t(ENUM_LABEL.InsuranceLineCategory.LIFE)}
+                    </option>
+                  </select>
+                </label>
+
+                {scopeCategory === '' ? (
+                  <p style={{ opacity: 0.75 }} data-role-scope-unrestricted="">
+                    {t('roleScopeEveryTypeNote')}
+                  </p>
+                ) : (
+                  <>
+                    <p>{t('roleScopeBranchesIntro')}</p>
+                    {lines
+                      .filter((line) => line.category === scopeCategory)
+                      .map((line) => (
+                        <label key={line.id} style={codeRowStyle}>
+                          <input
+                            type="checkbox"
+                            checked={scopeLineIds.includes(line.id)}
+                            onChange={(e) =>
+                              setScopeLineIds((prev) =>
+                                e.target.checked
+                                  ? [...prev, line.id]
+                                  : prev.filter((id) => id !== line.id),
+                              )
+                            }
+                          />
+                          <span>
+                            <bdi>
+                              {language === 'AR' ? line.nameAr : line.nameEn}
+                            </bdi>
+                          </span>
+                        </label>
+                      ))}
+                    {/* Ticking nothing is a real and common answer, so it is said rather than
+                        implied by an empty list. */}
+                    {scopeLineIds.length === 0 ? (
+                      <p
+                        style={{ opacity: 0.75 }}
+                        data-role-scope-every-branch=""
+                      >
+                        {t('roleScopeEveryBranchNote')}
+                      </p>
+                    ) : null}
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onSaveScope()}
+                >
+                  {t('roleScopeSave')}
                 </button>
               </div>
 

@@ -1,4 +1,6 @@
 /** What `JwtStrategy.validate` resolves and attaches to `req.user`. */
+import type { RoleScope } from '../../common/role-scope';
+
 export interface AuthenticatedUser {
   id: string;
   /** Multi-tenancy Phase 2 (spec §4.10.2) — the Organization every query made
@@ -31,6 +33,27 @@ export interface AuthenticatedUser {
    * PERMISSION, never on a name.
    */
   roles: string[];
+  /**
+   * MODULE 0 ITEM (h) — the insurance-line scope of the roles above, when any of them carries one.
+   *
+   * EMPTY MEANS UNRESTRICTED, and so does a role carrying no scope: every role that existed before
+   * item (h) carries none, and reading that as "scoped to nothing" would refuse every write in the
+   * system on the first deploy. Only roles that actually carry a scope appear here, so an empty
+   * array is the ordinary case and the fast path.
+   *
+   * Resolved in the same session read as `permissions`, on the same cache key and TTL — a scope
+   * that went stale at a different rate from the grants it scopes would be two answers about one
+   * role.
+   *
+   * Read ONLY through `common/role-scope.ts`. A second copy of the comparison is what
+   * `role-scope.inventory.spec.ts` refuses, because two copies is how one comes back looser.
+   *
+   * Optional, like `dutySegregationMode` on `MeResponse` and for the same reason: ~80 spec files
+   * build an `AuthenticatedUser`, and a required field would fail every one of them over a value
+   * none of them are about. A reader that does not know must assume unrestricted, which is what
+   * the decision function does with `undefined`.
+   */
+  roleScopes?: RoleScope[];
   /**
    * The permission codes these roles grant, resolved once per request.
    *

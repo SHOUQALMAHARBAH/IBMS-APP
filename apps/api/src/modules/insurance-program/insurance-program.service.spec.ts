@@ -82,8 +82,17 @@ function makeDeps() {
     { id: 'line-bi', code: 'BUSINESS_INTERRUPTION' },
     { id: 'line-cyber', code: 'CYBER' },
   ]);
+  /**
+   * Module 0 item (h). Resolves to GENERAL for every line, which is what makes these tests about
+   * the PROGRAMME rather than about the scope: the roles in this spec carry no scope, so
+   * `withinRoleScope` permits everything whatever the category — and a mock returning `undefined`
+   * would have made the scope check throw rather than pass, which is how a missing mock method
+   * reads as a broken feature.
+   */
+  const findCategory = vi.fn().mockResolvedValue('GENERAL');
   const lines = {
     listStandard,
+    findCategory,
   } as unknown as InsuranceLineRepository;
 
   const findAssessmentById = vi.fn().mockResolvedValue({ ...APPROVED_NA });

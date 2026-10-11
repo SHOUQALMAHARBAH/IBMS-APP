@@ -20,6 +20,7 @@ import { DepartmentRepository } from '../../repositories/department.repository';
 import { BranchRepository } from '../../repositories/branch.repository';
 import { EmployeeRepository } from '../../repositories/employee.repository';
 import { SecurityModule } from '../security/security.module';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 @Module({
   // AuthModule exports UserRepository — reused here (the scheduler needs it
@@ -43,6 +44,9 @@ import { SecurityModule } from '../security/security.module';
     OrgStructureController,
   ],
   providers: [
+    // Module 0 item (h). A missing provider is a RUNTIME DI failure `tsc` cannot see —
+    // item (e) shipped exactly that — so it lands in the SAME commit as the dependency.
+    InsuranceLineRepository,
     DepartmentRepository,
     BranchRepository,
     EmployeeRepository,

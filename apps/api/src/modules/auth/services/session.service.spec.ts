@@ -116,6 +116,9 @@ function buildService(
   // ids, which is why an empty role list resolves to an empty set here.
   const permissions = {
     getCodesForRoles: vi.fn().mockResolvedValue(new Set()),
+    // Module 0 item (h). An EMPTY array, which is what every office that has not configured a
+    // scope really returns — and the value `withinRoleScope` reads as unrestricted.
+    getScopesForRoles: vi.fn().mockResolvedValue([]),
   };
 
   // SessionService's constructor types expect the full repository/service
@@ -161,6 +164,10 @@ describe('SessionService.validateAndTouch', () => {
       // can stay synchronous predicates. Empty because this fixture holds no
       // roles; the permission lookup is keyed on role ids.
       permissions: new Set(),
+      // Module 0 item (h). An EXACT-equality assertion, so a field added to the session shows
+      // up here as a failure rather than slipping onto every request unnoticed — which is
+      // exactly what it did, and why this line is part of the same commit.
+      roleScopes: [],
       sessionId: 'session-1',
     });
     // Part II §4.1.5 — the idle ceiling moves forward with the activity, so the

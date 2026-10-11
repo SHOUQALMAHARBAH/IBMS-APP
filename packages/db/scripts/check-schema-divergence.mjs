@@ -119,6 +119,16 @@ const EXPECTED = {
   'ALTER TABLE "EmployeeCbjApprovalBranch" DROP CONSTRAINT "EmployeeCbjApprovalBranch_office_line_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
 
+  // Module 0 item (h)'s role scope. TWO composite FKs, which is one more than the siblings: the
+  // office-line one for the same reason as every other, and the ROLE one because a scope row
+  // claiming a role from another office would make one office's AUTHORIZATION depend on another
+  // office's roles. Prisma models the single-column relation in both cases and cannot express
+  // either composite.
+  'ALTER TABLE "RoleScopeBranch" DROP CONSTRAINT "RoleScopeBranch_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+  'ALTER TABLE "RoleScopeBranch" DROP CONSTRAINT "RoleScopeBranch_role_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // ---- GIN indexes on `Unsupported("tsvector")` ----
   // Prisma cannot index a field whose type it does not model. `canonicalTokens` is a plain
   // `String[]`, which it CAN index — so that one was declared rather than listed here.

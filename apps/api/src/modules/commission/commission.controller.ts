@@ -45,7 +45,8 @@ export class CommissionController {
     @Body() dto: CreateCommissionAgreementDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.agreements.create(dto, user.id);
+    // Item (h) needs the caller's ROLES, not just their id — the scope lives on the role.
+    return this.agreements.create(dto, user);
   }
 
   @RequirePermissions('commission-rate.manage')
