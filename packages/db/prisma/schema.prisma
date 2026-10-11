@@ -3715,19 +3715,45 @@ model RenewalRecommendation {
 // ============================================================================
 
 /// Process 51/Part 7.1 — the broker's own CBJ license status.
+/// ONE LICENCE TERM. Module 0 item (c) restructured this from a singleton into a series.
+///
+/// It used to be ONE ROW PLATFORM-WIDE, not one per office — `BROKER_LICENSE_SINGLETON_ID` was used
+/// as the PRIMARY KEY, so the second office to call `create` collided on `BrokerLicense_pkey` and
+/// could never hold a licence at all, while its `findCurrent` returned null and the new-business
+/// gate then passed silently. Renewal was an `updateMany` over that same row, so the previous term
+/// was erased. Both are gone: a term is a row, and renewal appends.
 model BrokerLicense {
-  id                   String       @id @default(uuid())
+  id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId       String       @default(dbgenerated())
-  organization         Organization @relation(fields: [organizationId], references: [id])
-  licenseNumber        String
-  scopeOfAuthorization String?
-  issuedAt             DateTime?
-  expiresAt            DateTime
-  status               String       @default("active") // active | lapsed
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  licenseNumber         String
+  scopeOfAuthorization  String?
+  issuedAt              DateTime?
+  expiresAt             DateTime
+  status                String       @default("active") // active | lapsed
+  /// The licence certificate as issued by the CBJ — MANDATORY, and NOT NULL is what makes it so.
+  /// A term is the broker's evidence that it may practise; recording one with no certificate
+  /// behind it is recording a claim rather than a fact. `onDelete: Restrict` because the document
+  /// IS the evidence — the same reasoning as `CustomerIdentifierCorrection`'s prior-result FK.
+  certificateDocumentId String
+  certificateDocument   Document     @relation(fields: [certificateDocumentId], references: [id], onDelete: Restrict)
+  /// When the RENEWAL APPLICATION for the term that follows this one was filed, or NULL if none has
+  /// been. Art. 11 requires it 45 days before expiry; art. 10/b sets the term at three calendar
+  /// years ending 31 December. Item (d) is what reads this column — after expiry, an office that
+  /// filed on time stays valid by operation of law until the decision issues, and one that filed
+  /// nothing expires. Stored here rather than derived because "did we apply, and when" is a fact
+  /// about this term that nothing else records.
+  renewalRequestedAt    DateTime?
 
+  /// One term per office per (number, expiry). Not a one-active-per-office rule, deliberately: a
+  /// renewal is filed 45 days BEFORE expiry, so the outgoing and incoming terms can both legitimately
+  /// read `active` for a time.
+  @@unique([organizationId, licenseNumber, expiresAt])
   @@index([organizationId])
+  /// "The office's latest term" is the hot read — the new-business gate asks it on every placement.
+  @@index([organizationId, expiresAt(sort: Desc)])
 }
 
 /// Part 7.1 — the broker's own Professional Indemnity insurance — a broker
@@ -5560,6 +5586,9 @@ model InsurerSlaAgreement {
 // ============================================================================
 
 enum DocumentCategory {
+  /// Module 0 item (c) — the CBJ licence certificate for one `BrokerLicense` TERM. Its own
+  /// category rather than OTHER: a term cannot exist without one, so it has to be findable.
+  BROKER_LICENSE_CERTIFICATE
   APPLICATION_PROPOSAL
   RISK_SURVEY
   QUOTATION
@@ -5606,6 +5635,8 @@ model Document {
   createdAt                DateTime           @default(now())
 
   claimDocuments ClaimDocument[]
+  /// Module 0 item (c) — the terms whose certificate this document is.
+  brokerLicenses BrokerLicense[]
 
   @@index([policyId])
   @@index([customerId])

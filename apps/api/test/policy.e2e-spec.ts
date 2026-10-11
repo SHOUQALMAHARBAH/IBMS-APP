@@ -1172,22 +1172,57 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       'PLACEMENT_TECHNICAL_OFFICER',
       'SALES_RELATIONSHIP_OFFICER',
     );
-    const FAR_FUTURE = '2099-01-01';
-
     interface BrokerLicenseBody {
       status: string;
       isCurrentlyLapsed: boolean;
+      expiresAt: string;
+    }
+    interface BrokerLicenseSeriesBody {
+      current: BrokerLicenseBody | null;
+      terms: BrokerLicenseBody[];
     }
 
-    const created = await request(app.getHttpServer())
+    /*
+     * MODULE 0 ITEM (c) reshaped this setup, and the reasons are worth keeping.
+     *
+     * The licence is a SERIES OF TERMS now, so `renew` APPENDS rather than overwriting one global
+     * row. That breaks fixed values twice over against the cumulative db-test:
+     * `@@unique([organizationId, licenseNumber, expiresAt])` collides on a re-run, and several terms
+     * sharing one expiry makes "the current term" an arbitrary id tie-break — so the restore at the
+     * end could not guarantee it had left an ACTIVE term current, which is what every later e2e
+     * file placing a Policy depends on.
+     *
+     * Each term below therefore gets a run-unique number and an expiry past everything already
+     * recorded. And the certificate is MANDATORY on every term, so each send carries one.
+     */
+    const RUN = Date.now().toString(36);
+    const certificate = {
+      certificateFileName: 'cbj-licence-' + RUN + '.pdf',
+      certificateStorageRef: 'licences/cbj-licence-' + RUN + '.pdf',
+    };
+
+    const existing = await request(app.getHttpServer())
+      .get('/broker-license')
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const highestYear = (existing.body as BrokerLicenseSeriesBody).terms.reduce(
+      (max, t) => Math.max(max, new Date(t.expiresAt).getUTCFullYear()),
+      2030,
+    );
+    const expiryIn = (offset: number) => highestYear + offset + '-12-31';
+
+    // Deterministically a 409: this office already holds a term — the migration kept the
+    // pre-existing one and the seed gives a fresh database one. It used to tolerate 201-or-409
+    // because the row was global and might not have existed.
+    await request(app.getHttpServer())
       .post('/broker-license')
       .set(bearer(compliance.accessToken))
-      .send({ licenseNumber: 'CBJ-E2E-1', expiresAt: FAR_FUTURE });
-    if (created.status !== 201 && created.status !== 409) {
-      throw new Error(
-        `Unexpected POST /broker-license status ${created.status}: ${JSON.stringify(created.body)}`,
-      );
-    }
+      .send({
+        licenseNumber: 'CBJ-E2E-' + RUN,
+        expiresAt: expiryIn(1),
+        ...certificate,
+      })
+      .expect(409);
 
     // No `finally` here (ESLint's `no-unsafe-finally` — a `throw` inside
     // `finally` would silently swallow a genuine assertion failure from the
@@ -1207,7 +1242,11 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       const renewedActive = await request(app.getHttpServer())
         .post('/broker-license/renew')
         .set(bearer(compliance.accessToken))
-        .send({ licenseNumber: 'CBJ-E2E-1', expiresAt: FAR_FUTURE })
+        .send({
+          licenseNumber: 'CBJ-E2E-' + RUN + '-A',
+          expiresAt: expiryIn(1),
+          ...certificate,
+        })
         .expect(201);
       expect((renewedActive.body as BrokerLicenseBody).isCurrentlyLapsed).toBe(
         false,
@@ -1270,7 +1309,11 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     const restored = await request(app.getHttpServer())
       .post('/broker-license/renew')
       .set(bearer(compliance.accessToken))
-      .send({ licenseNumber: 'CBJ-E2E-1', expiresAt: FAR_FUTURE });
+      .send({
+        licenseNumber: 'CBJ-E2E-' + RUN + '-RESTORE',
+        expiresAt: expiryIn(3),
+        ...certificate,
+      });
     if (restored.status !== 201) {
       throw new Error(
         `Broker license restore failed (status ${restored.status}: ${JSON.stringify(restored.body)}) — every subsequent e2e file placing a Policy would now be blocked.` +

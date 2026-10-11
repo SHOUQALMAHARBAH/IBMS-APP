@@ -8,6 +8,7 @@ import {
   createBrokerLicense,
   getBrokerLicense,
   markBrokerLicenseLapsed,
+  recordRenewalRequest,
   renewBrokerLicense,
   type BrokerLicense,
 } from '../../../lib/compliance-risk/broker-license-api';
@@ -55,7 +56,12 @@ export default function RegulatoryCompliancePage() {
   const { t } = useLanguage();
   const canManage = hasPermission(user, 'license.manage');
 
+  // `license` is the CURRENT term; `terms` is the whole series. Module 0 item (c) turned the
+  // licence from one row into a series, and the screen shows both: the term that decides whether
+  // the office may practise, and the history a regulator asks for.
   const [license, setLicense] = useState<BrokerLicense | null>(null);
+  const [terms, setTerms] = useState<BrokerLicense[]>([]);
+  const [licenseLoaded, setLicenseLoaded] = useState(false);
   const [licenseLoadError, setLicenseLoadError] = useState<string | null>(null);
   const [items, setItems] = useState<ComplianceCalendarItem[] | null>(null);
   const [itemsLoadError, setItemsLoadError] = useState<string | null>(null);
@@ -66,6 +72,12 @@ export default function RegulatoryCompliancePage() {
   const [scopeOfAuthorization, setScopeOfAuthorization] = useState('');
   const [issuedAt, setIssuedAt] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
+  // Deliberately NOT pre-filled from the current term, unlike the fields below it: every term has
+  // its OWN certificate, so carrying the previous one's file name forward would assert that the new
+  // term is evidenced by the old document.
+  const [certificateFileName, setCertificateFileName] = useState('');
+  const [certificateStorageRef, setCertificateStorageRef] = useState('');
+  const [renewalRequestedAt, setRenewalRequestedAt] = useState('');
   const [obligationName, setObligationName] = useState('');
   const [ownerUserId, setOwnerUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -75,18 +87,25 @@ export default function RegulatoryCompliancePage() {
 
   const loadLicense = useCallback(async () => {
     try {
-      setLicense(await getBrokerLicense());
+      const series = await getBrokerLicense();
+      setLicense(series.current);
+      setTerms(series.terms);
+      setLicenseLoaded(true);
       setLicenseLoadError(null);
     } catch (err) {
       setLicense(null);
+      setTerms([]);
+      setLicenseLoaded(false);
+      // The 404 branch that used to sit here is GONE because the route no longer returns one: an
+      // office with no licence is answered as `{ current: null, terms: [] }`. A 404 could not be
+      // told apart from a broken page, and this is the state that BLOCKS new business, so it has to
+      // be rendered rather than reported as a load failure.
       setLicenseLoadError(
         err instanceof ApiError && err.status === 403
           ? permissionRefusal(t, 'rcRefusalAct', 'license.manage')
-          : err instanceof ApiError && err.status === 404
-            ? t('rcNoLicense')
-            : err instanceof ApiError
-              ? err.message
-              : t('rcLicenseLoadError'),
+          : err instanceof ApiError
+            ? err.message
+            : t('rcLicenseLoadError'),
       );
     }
   }, [t]);
@@ -158,12 +177,26 @@ export default function RegulatoryCompliancePage() {
         scopeOfAuthorization: scopeOfAuthorization.trim() || undefined,
         issuedAt: issuedAt || undefined,
         expiresAt,
+        certificateFileName: certificateFileName.trim(),
+        certificateStorageRef: certificateStorageRef.trim(),
       };
       if (license) {
         await renewBrokerLicense(payload);
       } else {
         await createBrokerLicense(payload);
       }
+      // Cleared so the next term cannot be recorded against the certificate just filed.
+      setCertificateFileName('');
+      setCertificateStorageRef('');
+    });
+  }
+
+  async function submitRenewalRequest() {
+    await run(async () => {
+      await recordRenewalRequest({
+        requestedAt: renewalRequestedAt || undefined,
+      });
+      setRenewalRequestedAt('');
     });
   }
 
@@ -196,6 +229,11 @@ export default function RegulatoryCompliancePage() {
           {licenseLoadError}
         </p>
       ) : null}
+      {licenseLoaded && !license ? (
+        <p role="alert" style={errorStyle}>
+          {t('rcNoLicenseBlocksBusiness')}
+        </p>
+      ) : null}
       {license ? (
         <div style={{ margin: '0.5rem 0' }}>
           <table style={{ borderCollapse: 'collapse' }}>
@@ -215,6 +253,14 @@ export default function RegulatoryCompliancePage() {
                 <td style={cell}>{t('rcExpires')}</td>
                 <td style={cell}>{license.expiresAt.slice(0, 10)}</td>
               </tr>
+              <tr>
+                <td style={cell}>{t('rcColRenewalFiled')}</td>
+                <td style={cell}>
+                  {license.renewalRequestedAt
+                    ? license.renewalRequestedAt.slice(0, 10)
+                    : t('rcNotFiled')}
+                </td>
+              </tr>
             </tbody>
           </table>
           {canManage && !license.isCurrentlyLapsed ? (
@@ -227,6 +273,69 @@ export default function RegulatoryCompliancePage() {
               {t('rcMarkLapsedButton')}
             </button>
           ) : null}
+          {/* Write-once: art. 11 measures lateness from the filing date, so the control disappears
+              once one is recorded rather than offering an edit the API would refuse. */}
+          {canManage && !license.renewalRequestedAt ? (
+            <div style={{ marginTop: '0.5rem' }}>
+              <label style={labelStyle}>
+                {t('rcColRenewalFiled')}
+                <input
+                  type="date"
+                  aria-label={t('rcColRenewalFiled')}
+                  value={renewalRequestedAt}
+                  onChange={(e) => setRenewalRequestedAt(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void submitRenewalRequest()}
+              >
+                {t('rcRecordRenewalButton')}
+              </button>
+            </div>
+          ) : null}
+          {terms.length > 1 ? (
+            <div style={{ marginTop: '1rem' }}>
+              <h3>{t('rcTermsHeading')}</h3>
+              {/* A stable hook: this screen renders three tables (the current term, this series,
+                  and the compliance calendar), so a positional locator in a test would silently
+                  follow whichever happens to be last. */}
+              <table data-testid="licence-terms" style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={cell}>{t('rcLicenseNumberLabel')}</th>
+                    <th style={cell}>{t('rcIssuedAtLabel')}</th>
+                    <th style={cell}>{t('rcExpiresAtLabel')}</th>
+                    <th style={cell}>{t('rcColStatus')}</th>
+                    <th style={cell}>{t('rcColRenewalFiled')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {terms.map((term) => (
+                    <tr key={term.id}>
+                      <td style={cell}>
+                        {term.licenseNumber}
+                        {term.id === license.id ? ` (${t('rcCurrentTerm')})` : ''}
+                      </td>
+                      <td style={cell}>
+                        {term.issuedAt ? term.issuedAt.slice(0, 10) : '—'}
+                      </td>
+                      <td style={cell}>{term.expiresAt.slice(0, 10)}</td>
+                      <td style={cell}>
+                        {t(ENUM_LABEL.BrokerLicenseStatus[term.status])}
+                      </td>
+                      <td style={cell}>
+                        {term.renewalRequestedAt
+                          ? term.renewalRequestedAt.slice(0, 10)
+                          : t('rcNotFiled')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -238,6 +347,24 @@ export default function RegulatoryCompliancePage() {
               aria-label={t('rcLicenseNumberLabel')}
               value={licenseNumber}
               onChange={(e) => setLicenseNumber(e.target.value)}
+              required
+            />
+          </label>
+          <label style={labelStyle}>
+            {t('rcCertificateFileName')}
+            <input
+              aria-label={t('rcCertificateFileNameLabel')}
+              value={certificateFileName}
+              onChange={(e) => setCertificateFileName(e.target.value)}
+              required
+            />
+          </label>
+          <label style={labelStyle}>
+            {t('rcCertificateStorageRef')}
+            <input
+              aria-label={t('rcCertificateStorageRefLabel')}
+              value={certificateStorageRef}
+              onChange={(e) => setCertificateStorageRef(e.target.value)}
               required
             />
           </label>

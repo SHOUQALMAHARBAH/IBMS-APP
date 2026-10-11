@@ -3,6 +3,7 @@ import {
   brokerLicenseAuditSnapshot,
   deriveBrokerLicenseView,
   isBrokerLicenseCurrentlyLapsed,
+  pickCurrentTerm,
   type BrokerLicenseRow,
 } from './broker-license.config';
 
@@ -10,12 +11,16 @@ const NOW = new Date('2026-09-05T00:00:00.000Z');
 
 function row(overrides: Partial<BrokerLicenseRow> = {}): BrokerLicenseRow {
   return {
-    id: 'the-broker-license',
+    // A uuid-shaped id, not `the-broker-license`: Module 0 item (c) retired that constant, which
+    // had been the table's PRIMARY KEY and therefore allowed one licence row per PLATFORM.
+    id: 'b1f0c0de-0000-4000-8000-000000000001',
     licenseNumber: 'CBJ-2026-001',
     scopeOfAuthorization: 'General insurance brokerage',
     issuedAt: new Date('2026-01-01T00:00:00.000Z'),
     expiresAt: new Date('2027-01-01T00:00:00.000Z'),
     status: 'active',
+    certificateDocumentId: 'doc-certificate-1',
+    renewalRequestedAt: null,
     ...overrides,
   };
 }
@@ -76,5 +81,37 @@ describe('brokerLicenseAuditSnapshot (Process 51)', () => {
     expect(snapshot.scopeOfAuthorization).toBe('General insurance brokerage');
     expect(snapshot.licenseNumber).toBe('CBJ-2026-001');
     expect(snapshot.status).toBe('active');
+  });
+});
+
+describe('pickCurrentTerm (Module 0 item c)', () => {
+  it('is null for an office with no terms', () => {
+    // NOT the same as "not blocked" — `PolicyService.assertLicenseNotLapsed` refuses on this.
+    expect(pickCurrentTerm([])).toBeNull();
+  });
+
+  it('picks the term with the LATEST expiry, whatever order they arrive in', () => {
+    const older = row({ id: 'older', expiresAt: new Date('2025-12-31') });
+    const newer = row({ id: 'newer', expiresAt: new Date('2028-12-31') });
+    expect(pickCurrentTerm([older, newer])?.id).toBe('newer');
+    expect(pickCurrentTerm([newer, older])?.id).toBe('newer');
+  });
+
+  it('prefers the newer term even while the older one still covers today', () => {
+    // The case the choice exists for. A renewal is filed 45 days before expiry (art. 11), so an
+    // office legitimately holds two terms at once; "the term covering today" would answer with the
+    // outgoing one and report an office as lapsing when it has already been renewed.
+    const outgoing = row({ id: 'outgoing', expiresAt: new Date('2026-12-31') });
+    const incoming = row({
+      id: 'incoming',
+      issuedAt: new Date('2026-11-15'),
+      expiresAt: new Date('2029-12-31'),
+    });
+    const duringTheOverlap = new Date('2026-12-01T00:00:00.000Z');
+    const current = pickCurrentTerm([outgoing, incoming]);
+    expect(current?.id).toBe('incoming');
+    expect(isBrokerLicenseCurrentlyLapsed(current!, duringTheOverlap)).toBe(
+      false,
+    );
   });
 });

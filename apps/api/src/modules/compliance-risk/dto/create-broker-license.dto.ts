@@ -1,29 +1,14 @@
-import { IsOptional, IsString, Length } from 'class-validator';
-import { Transform } from 'class-transformer';
-import { emptyStringToUndefined } from '../../../common/dto.util';
+import { BrokerLicenseTermDto } from './broker-license-term.dto';
 
 /**
- * Process 51 — `POST /broker-license` (`license.manage` / Compliance). One
- * per broker (409 if a record already exists — see `renew` to update it).
- * `issuedAt`/`expiresAt` are plain calendar dates (`parseCalendarDate`),
- * not restricted to the past or future.
+ * Module 0 item (c) — `POST /broker-license` (`license.manage` / Compliance). Records this
+ * office's FIRST licence term; 409 if it already holds one (use `renew`, which appends the next).
+ *
+ * "This office's" is the part that changed. The route used to write a row keyed by a global
+ * constant, so the second office to call it collided on the primary key and could never hold a
+ * licence at all. Terms are now per-office rows and this 409 is per-office too.
+ *
+ * `issuedAt`/`expiresAt` are plain calendar dates (`parseCalendarDate`), not restricted to past or
+ * future. Every field is declared on `BrokerLicenseTermDto`.
  */
-export class CreateBrokerLicenseDto {
-  @IsString()
-  @Length(1, 200)
-  licenseNumber!: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  @Length(1, 500)
-  scopeOfAuthorization?: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  issuedAt?: string;
-
-  @IsString()
-  expiresAt!: string;
-}
+export class CreateBrokerLicenseDto extends BrokerLicenseTermDto {}
