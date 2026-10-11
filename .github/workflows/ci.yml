@@ -48,6 +48,15 @@ jobs:
       - name: Build
         run: npx turbo run build --filter=web
 
+      - name: Security tests (dependency audit, web workspace)
+        # This job audited nothing at all until 2026-10-11, which is why a web
+        # dev dependency's advisory surfaced on `backend` instead. LAST in the
+        # job on purpose: an audit reads only the lockfile, so it needs nothing
+        # above it, and placed here it can neither hide a gate nor be hidden by
+        # one -- with `!cancelled()` so a red step above still lets it report.
+        if: ${{ !cancelled() }}
+        run: npm run test:security -- --workspace web
+
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -101,8 +110,13 @@ jobs:
       - name: Unit tests
         run: npx turbo run test --filter=api...
 
-      - name: Security tests (dependency audit)
-        run: npm run test:security
+      - name: Security tests (dependency audit, api workspace)
+        # SCOPED, because this job is named `backend`. Unfiltered, it audited the
+        # whole monorepo, so a front-end-only dev advisory failed a check that
+        # does not own it -- measured on 2026-10-11, when `braces` (reached only
+        # through `eslint-config-next`) was the sole thing failing `backend`.
+        # The web half is audited by the `frontend` job.
+        run: npm run test:security -- --workspace api
 
       # `if: ${{ !cancelled() }}` from here to the end of the job.
       #

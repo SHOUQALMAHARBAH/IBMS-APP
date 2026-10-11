@@ -1,12 +1,18 @@
+import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchTextWithRetry } from './http-retry.util';
 
 const OPTIONS = { timeoutMs: 60, maxRetries: 2 };
 
-let fetchMock: ReturnType<typeof vi.fn>;
+// vitest 5's bare `vi.fn()` defaults to a VOID-returning `Procedure`, so every
+// `mockImplementation` here returning a promise reads as a misused promise. The
+// signature is stated instead of defaulted — which is also what the spec means.
+type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+
+let fetchMock: Mock<FetchLike>;
 
 beforeEach(() => {
-  fetchMock = vi.fn();
+  fetchMock = vi.fn<FetchLike>();
   vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -80,7 +86,7 @@ describe('fetchTextWithRetry', () => {
     // indefinitely rather than failing it.
     fetchMock.mockImplementation(
       (_url: string, init: RequestInit) =>
-        new Promise((_resolve, reject) => {
+        new Promise<Response>((_resolve, reject) => {
           init.signal?.addEventListener('abort', () => {
             const err = new Error('aborted');
             err.name = 'AbortError';

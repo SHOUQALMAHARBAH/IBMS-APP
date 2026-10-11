@@ -411,7 +411,7 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run test` | Vitest unit tests (web + api) |
 | `npm run test:e2e` | API integration tests (Vitest + Supertest) — needs a reachable `DATABASE_URL` |
 | `npm run test:contract` | API contract tests — validates real responses against the OpenAPI schema generated from `@nestjs/swagger` decorators (`apps/api/test/contract.contract-spec.ts`) — needs a reachable `DATABASE_URL` |
-| `npm run test:security` | Dependency audit (`npm audit --audit-level=high`), repo-wide |
+| `npm run test:security` | Dependency audit. **Fails on advisories in what SHIPS** (`npm audit --omit=dev`), and **reports** dev-only ones without failing. Takes npm flags: CI passes `-- --workspace api` / `-- --workspace web` so each job audits what it is named for. See `scripts/audit-check.mjs` for the rule and its stated cost |
 | `npm run test:smoke` | `bash scripts/smoke.sh api` — dispatches to the api service's smoke test (see below) |
 | `npm run e2e` | Playwright functional e2e (web) — **excludes** `@a11y`-tagged specs (`--grep-invert @a11y`) |
 | `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — **only** `@a11y`-tagged specs. A separate gate: a green `npm run e2e` says nothing about accessibility, so run both and report both counts |
@@ -509,10 +509,15 @@ file's hash at that moment and any later edit to it drifts.
 1. **frontend** — installs, then: typecheck → lint → unit/component tests (Vitest +
    Testing Library) → installs Playwright's Chromium → accessibility (`test:a11y`,
    axe-core, `@a11y`-tagged specs, evidence is 0 serious/critical violations) → e2e
-   (`e2e`, functional Playwright flows) → build. Uploads the Playwright HTML report as an
-   artifact on every run (including failures).
-2. **backend** — installs, then: typecheck → lint → unit tests → security (`test:security`
-   — dependency audit) → spins up an ephemeral `postgres:18-alpine` service container
+   (`e2e`, functional Playwright flows) → build → security (`test:security --workspace web`
+   — dependency audit, LAST in the job and `!cancelled()`, so it can neither hide a gate nor
+   be hidden by one). Uploads the Playwright HTML report as an artifact on every run
+   (including failures).
+2. **backend** — installs, then: typecheck → lint → unit tests → security
+   (`test:security --workspace api` — dependency audit, SCOPED to this job's own workspace
+   since 2026-10-11; unfiltered it audited the whole monorepo, so a front-end dev
+   dependency's advisory failed a check named `backend` while the `frontend` job audited
+   nothing) → spins up an ephemeral `postgres:18-alpine` service container
    (database `ibms_test`, ports/network scoped to the job — distinct from both local
    `db` and `db-test`, and destroyed with the runner when the job ends) → database schema
    (`db:validate` — `prisma validate`, schema is internally valid) → migrate deploy →

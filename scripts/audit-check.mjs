@@ -3,18 +3,61 @@
  * `npm run test:security` — the SCA (known-CVE dependency) gate from
  * `ibms-brain/meta/context/verification-contract.md`.
  *
- * Wraps `npm audit --audit-level=high` so that a genuinely unfixable advisory
- * can be acknowledged explicitly instead of leaving the gate permanently red
- * (which trains everyone to ignore it) or claiming a fix that never happened.
+ * ## TWO SETS, AND ONLY ONE OF THEM FAILS THE BUILD (owner decision, 2026-10-11)
+ *
+ * BLOCKING — advisories reachable in what SHIPS. Which those are is decided by
+ * npm's own `--omit=dev`, asked rather than re-derived from the lockfile here.
+ * They fail the build unless listed in ACKNOWLEDGED below.
+ *
+ * REPORTED — advisories that exist ONLY in the dev tree. Printed every run,
+ * never fatal. They need no acknowledgement, which is what keeps ACKNOWLEDGED
+ * meaningful: it is for a SHIPPED advisory with genuinely no fix, and nothing
+ * else.
+ *
+ * ### The cost of that split, written down rather than discovered later
+ *
+ * The commit that introduced this split also fixed `tinypool` — two CRITICAL
+ * prototype-pollution-to-RCE advisories — and `vitest`. BOTH are
+ * devDependencies, so under this policy neither would have failed the build.
+ * They were fixed because somebody read the output. That is the trade being
+ * made here: a dev-side CRITICAL is now something a person must READ, not
+ * something CI refuses on their behalf. So a dev-only critical prints an
+ * extra line saying exactly that, because the one thing this must not become
+ * is quiet.
+ *
+ * ### It also makes the gate honest about its own scope
+ *
+ * `test:security` used to run unfiltered inside the api-scoped `backend` CI
+ * job, while the `frontend` job audited nothing at all. Measured on
+ * 2026-10-11: the only advisory then failing the build was `braces`, reached
+ * solely through `eslint-config-next` — a front-end dev dependency failing a
+ * check named `backend`, while the job that owns it never looked. Both jobs now
+ * pass their own `--workspace`, and any extra flags handed to this script are
+ * forwarded to `npm audit`.
+ *
+ * ## Why this refuses rather than reports when it cannot MEASURE
+ *
+ * Every audit must parse, and must have examined a non-zero dependency tree. A
+ * blank or unparsable audit is a FAILURE, not a clean result: an advisory list
+ * that is empty because nothing ran looks exactly like one that is empty
+ * because nothing is wrong — and "I could not check" is precisely the state
+ * `scripts/check-ci.sh` was written for.
  *
  * RULES for adding an entry to ACKNOWLEDGED below — all four must hold, and
  * the entry must say so in `why`:
  *   1. There is no upgrade path. "The maintainer has not shipped one" —
- *      verified, not assumed.
+ *      verified, not assumed. Read `first_patched_version` off the advisory
+ *      itself (`gh api advisories/<GHSA-id>`) and the package's own published
+ *      version list, not just the latest major of whatever pins it. Two
+ *      advisories on one package are routine and they do not share a fix: on
+ *      2026-10-11 `braces` carried both CVE-2024-4068 (fixed in 3.0.3) and
+ *      CVE-2026-93687 (range `<= 3.0.3`, `first_patched_version: null`), and
+ *      citing the first as evidence about the second would have put a false
+ *      reason in this file.
  *   2. The vulnerable code is UNREACHABLE from this application.
  *   3. `reviewBy` is set. Past that date the gate fails again, so an
  *      acknowledgement cannot quietly become permanent.
- *   4. Anything not listed here still fails the build.
+ *   4. Anything not listed here, in the SHIPPED set, still fails the build.
  */
 import { execFileSync } from 'node:child_process';
 
@@ -63,12 +106,23 @@ const ACKNOWLEDGED = [
 
 const acknowledgedByName = new Map(ACKNOWLEDGED.map((a) => [a.name, a]));
 
-function runAudit() {
+/*
+ * Extra flags from `npm run test:security -- --workspace api`, forwarded to
+ * every `npm audit` call below. The two CI jobs use this so each audits the
+ * workspace it is named for.
+ */
+const passthrough = process.argv.slice(2);
+
+function runAudit(extra) {
   try {
     return execFileSync(
       'npm',
-      ['audit', '--json', '--audit-level=high'],
-      { encoding: 'utf8', shell: process.platform === 'win32' },
+      ['audit', '--json', '--audit-level=high', ...extra, ...passthrough],
+      {
+        encoding: 'utf8',
+        shell: process.platform === 'win32',
+        maxBuffer: 64 * 1024 * 1024,
+      },
     );
   } catch (err) {
     // npm audit exits non-zero when it finds anything at or above the level —
@@ -78,13 +132,41 @@ function runAudit() {
   }
 }
 
-const report = JSON.parse(runAudit());
-const vulns = Object.values(report.vulnerabilities ?? {});
+/**
+ * One audit, and a refusal to return any result this gate cannot stand behind.
+ */
+function auditReport(label, extra) {
+  let raw;
+  try {
+    raw = runAudit(extra);
+  } catch (err) {
+    console.error(
+      `test:security COULD NOT RUN the ${label} audit: ${err?.message ?? err}`,
+    );
+    process.exit(1);
+  }
 
-const blocking = [];
-const acknowledged = [];
-const expired = [];
-const today = new Date().toISOString().slice(0, 10);
+  let report;
+  try {
+    report = JSON.parse(raw);
+  } catch {
+    console.error(
+      `test:security COULD NOT PARSE the ${label} audit. A gate that cannot measure must refuse, not pass.`,
+    );
+    console.error(`First 400 bytes of what it got:\n${String(raw).slice(0, 400)}`);
+    process.exit(1);
+  }
+
+  const examined = report.metadata?.dependencies?.total ?? 0;
+  if (examined === 0) {
+    console.error(
+      `test:security: the ${label} audit examined 0 dependencies. An empty advisory list from an audit that looked at nothing is not a clean result.`,
+    );
+    process.exit(1);
+  }
+
+  return report;
+}
 
 /**
  * `npm audit` reports a package as vulnerable both when it CARRIES an advisory
@@ -97,14 +179,31 @@ const today = new Date().toISOString().slice(0, 10);
  */
 const cascadeOnly = (v) => (v.via ?? []).every((x) => typeof x === 'string');
 
-for (const v of vulns) {
-  if (v.severity !== 'high' && v.severity !== 'critical') continue;
+function realFindings(report) {
+  const found = new Map();
+  for (const v of Object.values(report.vulnerabilities ?? {})) {
+    if (v.severity !== 'high' && v.severity !== 'critical') continue;
+    if (cascadeOnly(v)) continue;
+    found.set(v.name, v);
+  }
+  return found;
+}
 
-  // A cascade row carries no advisory of its own; whichever leaf does is
-  // judged on its own row, so counting this one too would just inflate the
-  // number. Nothing is lost: an unacknowledged leaf still fails the gate.
-  if (cascadeOnly(v)) continue;
+const titlesOf = (v) =>
+  (v.via ?? []).map((x) => (typeof x === 'string' ? x : x.title)).join('; ');
 
+const shipped = realFindings(auditReport('production (--omit=dev)', ['--omit=dev']));
+const everything = realFindings(auditReport('full tree', []));
+
+// In the tree but not in what ships. npm made that call, not this script.
+const devOnly = [...everything.values()].filter((v) => !shipped.has(v.name));
+
+const blocking = [];
+const acknowledged = [];
+const expired = [];
+const today = new Date().toISOString().slice(0, 10);
+
+for (const v of shipped.values()) {
   const ack = acknowledgedByName.get(v.name);
   if (!ack) {
     blocking.push(v);
@@ -115,7 +214,9 @@ for (const v of vulns) {
 }
 
 for (const { v, ack } of acknowledged) {
-  console.log(`ACKNOWLEDGED  ${v.severity.padEnd(8)} ${v.name} (review by ${ack.reviewBy})`);
+  console.log(
+    `ACKNOWLEDGED  ${v.severity.padEnd(8)} ${v.name} (review by ${ack.reviewBy})`,
+  );
 }
 for (const { v, ack } of expired) {
   console.error(
@@ -123,20 +224,48 @@ for (const { v, ack } of expired) {
   );
 }
 for (const v of blocking) {
-  const via = (v.via ?? [])
-    .map((x) => (typeof x === 'string' ? x : x.title))
-    .join('; ');
-  console.error(`BLOCKING      ${v.severity.padEnd(8)} ${v.name} — ${via}`);
+  console.error(`BLOCKING      ${v.severity.padEnd(8)} ${v.name} — ${titlesOf(v)}`);
+}
+
+/*
+ * An acknowledgement matching nothing in the shipped set is one the tree has
+ * outgrown. Said out loud — not fatal, because the trigger for it is an
+ * advisory being FIXED — so the list cannot quietly accumulate entries that
+ * excuse nothing.
+ */
+for (const ack of ACKNOWLEDGED) {
+  if (!shipped.has(ack.name)) {
+    console.log(
+      `STALE ACK     ${'—'.padEnd(8)} ${ack.name} is acknowledged but is no longer a shipped high/critical advisory. Remove the entry.`,
+    );
+  }
+}
+
+for (const v of devOnly) {
+  console.log(`REPORTED      ${v.severity.padEnd(8)} ${v.name} — ${titlesOf(v)}`);
+}
+if (devOnly.length > 0) {
+  const criticals = devOnly.filter((v) => v.severity === 'critical');
+  console.log(
+    `\n${devOnly.length} dev-only high/critical advisory(ies) above. They do NOT ship and do NOT fail this gate. They are printed to be READ, and fixed wherever a fix exists.`,
+  );
+  if (criticals.length > 0) {
+    console.log(
+      `READ THIS: ${criticals.length} of those is CRITICAL (${criticals
+        .map((v) => v.name)
+        .join(', ')}). Nothing here will stop a merge on it. Fix it, or decide not to — deliberately.`,
+    );
+  }
 }
 
 const failures = blocking.length + expired.length;
 if (failures > 0) {
   console.error(
-    `\ntest:security FAILED — ${blocking.length} unacknowledged and ${expired.length} expired high/critical advisories.`,
+    `\ntest:security FAILED — ${blocking.length} unacknowledged and ${expired.length} expired high/critical advisories in what SHIPS.`,
   );
   process.exit(1);
 }
 
 console.log(
-  `\ntest:security OK — 0 unacknowledged high/critical advisories (${acknowledged.length} acknowledged, see scripts/audit-check.mjs).`,
+  `\ntest:security OK — 0 unacknowledged high/critical advisories in what ships (${acknowledged.length} acknowledged, ${devOnly.length} dev-only reported).`,
 );
