@@ -1,9 +1,19 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { BrokerLicenseService } from './broker-license.service';
 import { CreateBrokerLicenseDto } from './dto/create-broker-license.dto';
 import { RenewBrokerLicenseDto } from './dto/renew-broker-license.dto';
 import { RecordRenewalRequestDto } from './dto/record-renewal-request.dto';
+import { AddScopeBranchDto } from './dto/add-scope-branch.dto';
+import { BrokerLicenseScopeService } from './broker-license-scope.service';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -20,7 +30,45 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 @ApiTags('compliance-risk')
 @Controller('broker-license')
 export class BrokerLicenseController {
-  constructor(private readonly licenses: BrokerLicenseService) {}
+  constructor(
+    private readonly licenses: BrokerLicenseService,
+    private readonly scope: BrokerLicenseScopeService,
+  ) {}
+
+  /* ---- Module 0 item (e): WHAT the office is licensed for ----
+   *
+   * On this controller and under `license.manage`, not a surface of their own: the scope IS
+   * part of the licence record, and a separate permission would let an office grant the right
+   * to describe a licence to somebody who cannot see it.
+   */
+
+  /** The current term's types, branches, and the art. 4/a capital assessment. */
+  @RequirePermissions('license.manage')
+  @Get('scope')
+  getScope() {
+    return this.scope.get();
+  }
+
+  /** Adds one licensed branch. 422 when it would give a sole establishment a second
+   *  insurance type (art. 3/a) — a SERVICE-level refusal, because deciding it spans three
+   *  tables and a CHECK sees one row of one. */
+  @RequirePermissions('license.manage')
+  @Post('scope')
+  addScopeBranch(
+    @Body() dto: AddScopeBranchDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.scope.addBranch(dto, user.id);
+  }
+
+  @RequirePermissions('license.manage')
+  @Delete('scope/:id')
+  removeScopeBranch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.scope.removeBranch(id, user.id);
+  }
 
   @RequirePermissions('license.manage')
   @Post()

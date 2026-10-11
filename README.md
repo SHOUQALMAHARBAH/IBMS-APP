@@ -9221,6 +9221,28 @@ oversight is silent" convention:
   rather than folded into `isCurrentlyLapsed`, because a screen showing an expiry in the past has to
   be able to explain why the system is content.
 
+  **The licence SCOPE (Module 0 item (e)), migration `20261113100000`.** `BrokerLicenseScopeLine` is
+  one row per licensed BRANCH on a term, pointing at either `InsuranceLine` (the 32 standard lines)
+  or `OfficeInsuranceLine` (an office's own) — exactly one, held by a CHECK. **The insurance TYPE is
+  DERIVED, never stored**: `InsuranceLineCategory` is already exactly `GENERAL, LIFE`, which is the
+  pair art. 3/a names, so a licence's types are the distinct categories of its branches and a type
+  column would be a second home for one fact. "The same branch twice" is **two PARTIAL uniques**,
+  not a compound one — a compound unique over a nullable column admits unlimited NULL rows
+  (§ 1.25) — and `db:divergence` cannot see a partial index, so the migration asserts both.
+
+  **Art. 3/a's one-type rule for a natural person is enforced at SERVICE grain, and that is a
+  necessity rather than a shortcut**: deciding it needs `Organization.brokerKind`, the scope rows
+  and the catalogue's `category` — three tables — and a Postgres CHECK compares columns of one row
+  of one table. It is proven by an api e2e over real HTTP, not only a unit test, because the service
+  is the only thing holding it. **Art. 4/a's capital bands** (5,000 JOD per type up to 6 branches,
+  7,500 up to 12, 10,000 above 12, read as SUMMED across types) produce a **warning only** — with
+  three distinct states, because "no capital recorded" is a missing fact about the office while
+  "recorded and short" is a finding about its capital. **One assumption is made explicit rather than
+  implicit** in `broker-license-scope-assumptions.spec.ts`: an office cannot be licensed for a type
+  in which it holds no branches. That is an inference from art. 4/a's arithmetic and NOT a reading
+  of a licence form — the forms were not available — and a guard refuses any future schema change
+  that would store a type and let one exist without a branch behind it.
+
   **The lapse check is a pure LIVE recompute
   (`isBrokerLicenseCurrentlyLapsed(license, now) = status === 'lapsed' || expiresAt <=
   now`), not a scheduler-maintained flag** — deliberately: the #16 `@code-reviewer` MAJOR

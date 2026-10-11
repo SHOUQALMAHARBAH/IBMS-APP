@@ -112,6 +112,25 @@ export const COMPLIANCE_RISK = {
     rcNoLicenseBlocksBusiness:
       'لا يوجد لدى هذا المكتب أي مدة ترخيص مسجّلة — وإصدار أعمال جديدة محجوب. ممارسة النشاط دون ترخيص ساري سبب لعقوبة إدارية (تعليمات البنك المركزي الأردني رقم 9 لسنة 2026، المادة 21/أ/9). سجّل الترخيص وشهادته أدناه.',
     rcTermsHeading: 'مدد الترخيص',
+    rcScopeHeading: 'نطاق الترخيص',
+    rcScopeTypes: 'أنواع التأمين',
+    rcScopeBranches: 'الفروع المرخّصة',
+    rcScopeNoBranches: 'لم تُسجّل أي فروع بعد. لا يُحدّد نوع التأمين إلا من فروعه.',
+    rcScopeAddBranch: 'إضافة فرع',
+    rcScopeBranchLabel: 'الفرع',
+    rcScopeRemove: 'إزالة',
+    rcScopeColBranch: 'الفرع',
+    rcScopeColType: 'النوع',
+    rcScopeSoleEstablishmentNote:
+      'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',
+    rcCapitalHeading: 'رأس المال (المادة 4/أ)',
+    rcCapitalRequired: 'رأس المال المطلوب',
+    rcCapitalPaidUp: 'رأس المال المدفوع',
+    rcCapitalUnrecordedWarning:
+      'لم يُسجّل رأس مال لهذا المكتب، لذلك لا يمكن التحقّق من متطلّب المادة 4/أ. هذه ملاحظة للتحقّق ولا تمنع أي إجراء.',
+    rcCapitalShortfallWarning:
+      'رأس المال المدفوع أقل من متطلّب المادة 4/أ لعدد الفروع المرخّصة. هذه ملاحظة للتحقّق ولا تمنع أي إجراء — المرجع هو وثائق تسجيل المكتب.',
+    rcCapitalMeets: 'رأس المال المدفوع يستوفي متطلّب المادة 4/أ لهذا النطاق.',
     rcRenewalDueBy: 'آخر موعد لتقديم طلب التجديد',
     rcExpiryNotEndOfYearWarning:
       'تاريخ الانتهاء المُدخل ليس 31 كانون الأول/ديسمبر. مدة الترخيص تنتهي في 31 كانون الأول (المادة 10/ب) — تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
@@ -445,6 +464,27 @@ export const COMPLIANCE_RISK = {
     rcNoLicenseBlocksBusiness:
       'This office holds no licence term on record — and new business issuance is blocked. Practising without a current licence is a ground for administrative sanction (CBJ Instructions No. 9 of 2026, art. 21/a/9). Record the licence and its certificate below.',
     rcTermsHeading: 'Licence terms',
+    rcScopeHeading: 'Licence scope',
+    rcScopeTypes: 'Insurance types',
+    rcScopeBranches: 'Licensed branches',
+    rcScopeNoBranches:
+      'No branches recorded yet. An insurance type is only ever determined by its branches.',
+    rcScopeAddBranch: 'Add branch',
+    rcScopeBranchLabel: 'Branch',
+    rcScopeRemove: 'Remove',
+    rcScopeColBranch: 'Branch',
+    rcScopeColType: 'Type',
+    rcScopeSoleEstablishmentNote:
+      'This office is registered as a sole establishment (natural person), which may be licensed for ONE insurance type only (art. 3/a). Adding a branch of the other type will be refused.',
+    rcCapitalHeading: 'Capital (art. 4/a)',
+    rcCapitalRequired: 'Required capital',
+    rcCapitalPaidUp: 'Paid-up capital',
+    rcCapitalUnrecordedWarning:
+      'No paid-up capital is recorded for this office, so the art. 4/a requirement cannot be checked. This is a note to verify and blocks nothing.',
+    rcCapitalShortfallWarning:
+      'The recorded paid-up capital is below what art. 4/a requires for this number of licensed branches. This is a note to verify and blocks nothing — the authority is the office’s registration documents.',
+    rcCapitalMeets:
+      'The recorded paid-up capital meets the art. 4/a requirement for this scope.',
     rcRenewalDueBy: 'Renewal application due by',
     rcExpiryNotEndOfYearWarning:
       'The expiry you entered is not a 31 December. A licence term ends on 31 December (art. 10/b) — check it against the date printed on the certificate. The entry was not refused.',

@@ -13,6 +13,16 @@ import {
   type BrokerLicense,
 } from '../../../lib/compliance-risk/broker-license-api';
 import {
+  addLicenseScopeBranch,
+  getLicenseScope,
+  removeLicenseScopeBranch,
+  type LicenseScope,
+} from '../../../lib/compliance-risk/broker-license-scope-api';
+import {
+  listInsuranceLines,
+  type InsuranceLine,
+} from '../../../lib/insurer/insurance-line-api';
+import {
   createComplianceCalendarItem,
   listComplianceCalendarItems,
   recordComplianceSubmission,
@@ -63,7 +73,10 @@ const labelStyle: CSSProperties = {
 export default function RegulatoryCompliancePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  // `language` picks the Arabic or English name of a catalogue line at RENDER, which is the
+  // established fix: resolving it at fetch time pins the label to whichever language was active
+  // when the data arrived.
+  const { t, language } = useLanguage();
   const canManage = hasPermission(user, 'license.manage');
 
   // `license` is the CURRENT term; `terms` is the whole series. Module 0 item (c) turned the
@@ -88,6 +101,12 @@ export default function RegulatoryCompliancePage() {
   const [certificateFileName, setCertificateFileName] = useState('');
   const [certificateStorageRef, setCertificateStorageRef] = useState('');
   const [renewalRequestedAt, setRenewalRequestedAt] = useState('');
+  // Module 0 item (e). The scope is loaded separately from the licence because a reader may hold
+  // `license.manage` and the office may still have no term — in which case the scope route 404s and
+  // the licence panel is the one that explains why.
+  const [scope, setScope] = useState<LicenseScope | null>(null);
+  const [lines, setLines] = useState<InsuranceLine[]>([]);
+  const [branchLineId, setBranchLineId] = useState('');
   const [obligationName, setObligationName] = useState('');
   const [ownerUserId, setOwnerUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -120,6 +139,24 @@ export default function RegulatoryCompliancePage() {
     }
   }, [t]);
 
+  const loadScope = useCallback(async () => {
+    try {
+      setScope(await getLicenseScope());
+    } catch {
+      // A 404 here means the office holds no term yet, which the licence panel above already says
+      // in full. Repeating it as a second error would make one problem look like two.
+      setScope(null);
+    }
+  }, []);
+
+  const loadLines = useCallback(async () => {
+    try {
+      setLines(await listInsuranceLines());
+    } catch {
+      setLines([]);
+    }
+  }, []);
+
   const loadItems = useCallback(async () => {
     try {
       setItems(await listComplianceCalendarItems());
@@ -143,9 +180,15 @@ export default function RegulatoryCompliancePage() {
     if (!user) return;
     void (async () => {
       await loadLicense();
+      // Module 0 item (e). Omitted from this effect in the first version, so the scope section
+      // never rendered at all — the api, the client and the markup were right and the screen was
+      // simply never asked. Caught by the Playwright tests, which is the only layer that could:
+      // nothing type-checks "is this loader actually called on mount".
+      await loadScope();
+      await loadLines();
       await loadItems();
     })();
-  }, [user, loadLicense, loadItems, t]);
+  }, [user, loadLicense, loadScope, loadLines, loadItems, t]);
   // A @code-reviewer MINOR: renew() replaces every field, so pre-filling
   // the form from the current record (rather than starting blank) stops an
   // officer who only means to push out expiresAt from silently wiping a
@@ -169,6 +212,7 @@ export default function RegulatoryCompliancePage() {
     try {
       await fn();
       await loadLicense();
+      await loadScope();
       await loadItems();
     } catch (err) {
       setActionError(
@@ -387,6 +431,153 @@ export default function RegulatoryCompliancePage() {
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {scope ? (
+        <section>
+          <h2>{t('rcScopeHeading')}</h2>
+
+          {/* Art. 3/a. Said BEFORE the add form rather than only in the refusal, so an officer
+              learns the limit before hitting it. */}
+          {scope.brokerKind === 'NATURAL_PERSON' ? (
+            <p style={warningStyle} role="status" data-sole-establishment="">
+              {t('rcScopeSoleEstablishmentNote')}
+            </p>
+          ) : null}
+
+          <p>
+            <strong>{t('rcScopeTypes')}:</strong>{' '}
+            <span data-licence-types="">
+              {scope.types.length > 0
+                ? scope.types
+                    .map(
+                      (type) =>
+                        `${t(ENUM_LABEL.InsuranceLineCategory[type])} (${
+                          scope.branchCountByType[type] ?? 0
+                        })`,
+                    )
+                    .join(' · ')
+                : '—'}
+            </span>
+          </p>
+
+          <h3>{t('rcScopeBranches')}</h3>
+          {scope.branches.length === 0 ? (
+            <p style={{ opacity: 0.75 }}>{t('rcScopeNoBranches')}</p>
+          ) : (
+            <table data-licence-branches="" style={{ borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={cell}>{t('rcScopeColBranch')}</th>
+                  <th style={cell}>{t('rcScopeColType')}</th>
+                  {canManage ? <th style={cell} /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {scope.branches.map((branch) => (
+                  <tr key={branch.id}>
+                    <td style={cell}>
+                      {language === 'AR' ? branch.nameAr : branch.nameEn}
+                    </td>
+                    <td style={cell}>
+                      {t(ENUM_LABEL.InsuranceLineCategory[branch.category])}
+                    </td>
+                    {canManage ? (
+                      <td style={cell}>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => removeLicenseScopeBranch(branch.id))
+                          }
+                        >
+                          {t('rcScopeRemove')}
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {canManage ? (
+            <div style={{ marginTop: '0.5rem' }}>
+              <label style={labelStyle}>
+                {t('rcScopeBranchLabel')}
+                {/* A SELECT over the managed catalogue, not a free-text field: a branch is a
+                    catalogue row, and typing one would invite a name the catalogue does not hold.
+                    `isStandard` decides WHICH id the api is given — the two catalogues are
+                    addressed by different fields and exactly one may be named. */}
+                <select
+                  aria-label={t('rcScopeBranchLabel')}
+                  value={branchLineId}
+                  onChange={(e) => setBranchLineId(e.target.value)}
+                >
+                  <option value="">—</option>
+                  {lines.map((line) => (
+                    <option key={line.id} value={line.id}>
+                      {(language === 'AR' ? line.nameAr : line.nameEn) +
+                        ' · ' +
+                        t(ENUM_LABEL.InsuranceLineCategory[line.category])}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={busy || !branchLineId}
+                onClick={() =>
+                  void run(async () => {
+                    const line = lines.find((l) => l.id === branchLineId);
+                    if (!line) return;
+                    await addLicenseScopeBranch(
+                      line.isStandard
+                        ? { insuranceLineId: line.id }
+                        : { officeInsuranceLineId: line.id },
+                    );
+                    setBranchLineId('');
+                  })
+                }
+              >
+                {t('rcScopeAddBranch')}
+              </button>
+            </div>
+          ) : null}
+
+          <h3>{t('rcCapitalHeading')}</h3>
+          <table style={{ borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr>
+                <td style={cell}>{t('rcCapitalRequired')}</td>
+                <td style={cell} data-required-capital="">
+                  {scope.capital.requiredCapital}
+                </td>
+              </tr>
+              <tr>
+                <td style={cell}>{t('rcCapitalPaidUp')}</td>
+                <td style={cell}>{scope.capital.paidUpCapital ?? '—'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Three STATES, not two. "Nothing recorded" is a missing fact about the office;
+              "recorded and short" is a finding about its capital. Conflating them would tell an
+              office it is undercapitalised when nobody has typed the number. Neither blocks. */}
+          {scope.capital.capitalIsUnrecorded ? (
+            <p style={warningStyle} role="status" data-capital-unrecorded="">
+              {t('rcCapitalUnrecordedWarning')}
+            </p>
+          ) : scope.capital.meetsRequirement ? (
+            <p style={{ opacity: 0.75 }} data-capital-ok="">
+              {t('rcCapitalMeets')}
+            </p>
+          ) : (
+            <p style={warningStyle} role="status" data-capital-shortfall="">
+              {t('rcCapitalShortfallWarning')}
+            </p>
+          )}
+        </section>
       ) : null}
 
       {canManage ? (

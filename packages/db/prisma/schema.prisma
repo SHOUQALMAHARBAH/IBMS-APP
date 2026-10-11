@@ -215,6 +215,16 @@ model Organization {
   /// the kind is stated at creation, never inferred. Tenant isolation is UNCHANGED by this column;
   /// `Organization` carries no `organizationId` and so was never in `TENANT_SCOPED_MODELS`.
   type                       OrganizationType
+  /// PAID-UP CAPITAL in JOD — CBJ Instructions No. 9 of 2026, art. 4/a, which scales the
+  /// requirement by how many branches the office is licensed for. Module 0 item (e) compares the
+  /// two and WARNS; it never refuses, because the authority on an office's capital is its
+  /// registration documents and not this column.
+  ///
+  /// Nullable because an office onboarded before this column existed has not recorded one, and a
+  /// zero would be a false statement rather than a missing one. `money-fields.inventory.ts`
+  /// classifies it as a real JOD amount, so every arithmetic touching it goes through
+  /// `money.util.ts`.
+  paidUpCapital              Decimal?         @db.Decimal(18, 3)
   /// Natural person (sole establishment) or corporate — CBJ Instructions No. 9 of 2026, art. 3/a.
   /// NULL exactly when this is an insurance company; the CHECK constraint
   /// `Organization_broker_kind_matches_type` is what makes that structural rather than a habit.
@@ -382,6 +392,7 @@ model Organization {
   legacyImportBatches                 LegacyImportBatch[]
   legacyImportIssues                  LegacyImportIssue[]
   duplicateNameWarnings               DuplicateNameWarning[]
+  brokerLicenseScopeLines             BrokerLicenseScopeLine[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -409,6 +420,43 @@ enum OrganizationType {
   /// An insurance company. Its own registration field list and its own agreement with the
   /// broker; it is NOT a brokerage office with a flag flipped.
   INSURANCE_COMPANY
+}
+
+/// ONE LICENSED BRANCH on one licence term — Module 0 item (e).
+///
+/// CBJ Instructions No. 9 of 2026 art. 3/a licenses a broker for insurance TYPES (life, general)
+/// and for branches within each. A branch here is a row of the managed line catalogue, so the two
+/// catalogues this system already has are both addressable: `InsuranceLine` (the 32 standard lines,
+/// global) and `OfficeInsuranceLine` (an office's own additions). EXACTLY ONE of the two FKs is
+/// set, held by a CHECK rather than by convention.
+///
+/// THE TYPE IS DERIVED, NEVER STORED. Both catalogues carry `category InsuranceLineCategory`, whose
+/// values are exactly GENERAL and LIFE — measured, not assumed. Copying that onto this row would
+/// create a second place one fact lives, and the copy is the one that drifts.
+model BrokerLicenseScopeLine {
+  id              String        @id @default(uuid())
+  organizationId  String        @default(dbgenerated())
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  brokerLicenseId String
+  brokerLicense   BrokerLicense @relation(fields: [brokerLicenseId], references: [id], onDelete: Restrict)
+
+  /// A standard catalogue line, or null when this branch is an office addition.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  /// An office's own line, or null when this branch is a standard one.
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  /// NOTE — the "a term cannot list the same branch twice" rule is NOT expressible here. A compound
+  /// unique over a nullable column admits unlimited rows whose column is NULL, because Postgres
+  /// treats NULLs as distinct — the § 1.25 trap this repo has already been bitten by on
+  /// `CommissionAgreement`. It is TWO PARTIAL uniques in raw SQL instead
+  /// (`BrokerLicenseScopeLine_one_standard_line_per_term` / `..._one_office_line_per_term`), and
+  /// `db:divergence` cannot see a partial index, so the migration asserts both in its own DO block.
+
+  @@index([brokerLicenseId])
+  @@index([organizationId])
 }
 
 /// WHAT KIND OF BROKER a brokerage office is — CBJ Instructions No. 9 of 2026, art. 3/a.
@@ -3747,6 +3795,12 @@ model BrokerLicense {
   /// about this term that nothing else records.
   renewalRequestedAt    DateTime?
 
+  /// The BRANCHES this term is licensed for — Module 0 item (e). The TYPES (life / general) are
+  /// NOT stored: every line already carries a `category` of exactly GENERAL or LIFE, which is the
+  /// pair art. 3/a names, so a type column beside it would be a second home for the same fact and
+  /// free to disagree with the catalogue.
+  scopeLines BrokerLicenseScopeLine[]
+
   /// One term per office per (number, expiry). Not a one-active-per-office rule, deliberately: a
   /// renewal is filed 45 days BEFORE expiry, so the outgoing and incoming terms can both legitimately
   /// read `active` for a time.
@@ -5271,6 +5325,7 @@ model InsuranceLine {
   createdAt    DateTime              @default(now())
 
   offeredBy             InsurerOfferedLine[]
+  licenceScopeLines     BrokerLicenseScopeLine[]
   formTemplates         InsurerFormTemplate[]
   officeFormTemplates   OfficeInsurerFormTemplate[]
   insuranceProgramLines InsuranceProgramLine[]
@@ -5316,6 +5371,7 @@ model OfficeInsuranceLine {
   createdByUserId String
 
   offeredBy             InsurerOfferedLine[]
+  licenceScopeLines     BrokerLicenseScopeLine[]
   insuranceProgramLines InsuranceProgramLine[]
   rfqs                  RFQ[]
   policies              Policy[]

@@ -20,6 +20,10 @@
 
 /** `Model.field` — every `@db.Decimal(18, 3)` column: a JOD amount at fils precision. */
 export const MONEY_DECIMAL_FIELDS: readonly string[] = [
+  // Module 0 item (e) — the office's own paid-up capital, compared against art. 4/a's branch-count
+  // bands. The first money column that is about the BROKERAGE itself rather than a customer's
+  // business, and a real JOD amount either way, so it is quantized to fils like the rest.
+  'Organization.paidUpCapital',
   'Prospect.expectedPremium',
   'UpSellRecommendation.currentSumInsured',
   'UpSellRecommendation.currentAssetValue',

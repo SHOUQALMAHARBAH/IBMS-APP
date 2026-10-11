@@ -9,6 +9,13 @@ import type { TranslationKey } from './translations';
 type Labels<T extends string> = Record<T, TranslationKey>;
 
 export const ENUM_LABEL = {
+  /** Module 0 item (e) — the two insurance TYPES a broker licence covers (art. 3/a). Added here
+   *  rather than labelled per screen: the licence scope, the insurance-lines admin screen and the
+   *  insurer directory all render this enum. */
+  InsuranceLineCategory: {
+    GENERAL: 'insuranceLineCategoryGeneral',
+    LIFE: 'insuranceLineCategoryLife',
+  } satisfies Labels<'GENERAL' | 'LIFE'>,
   AuditAction: {
     CREATE: 'auditActionCreate',
     READ: 'auditActionRead',

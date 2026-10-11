@@ -10,6 +10,11 @@ export const INSURERS = {
   AR: {
     // /settings/insurance-lines — the office's own additions to the line vocabulary.
     lineAdminHeading: 'فروع التأمين',
+    // The two insurance TYPES art. 3/a names. Here rather than in a screen's own dictionary
+    // because `ENUM_LABEL.InsuranceLineCategory` is shared, and a shared label pointing at a
+    // screen-specific key is how one wording ends up with two homes.
+    insuranceLineCategoryGeneral: 'عام',
+    insuranceLineCategoryLife: 'حياة',
     lineAdminIntro:
       'المفردات التي تُصنَّف بها الأعمال. القائمة القياسية منشورة على مستوى المنصة، ' +
       'ويمكن لمكتبك أن يضيف فرعاً لا تغطيه — والإضافات وحدها قابلة للتصحيح من هنا.',
@@ -177,6 +182,8 @@ export const INSURERS = {
   EN: {
     // /settings/insurance-lines — the office's own additions to the line vocabulary.
     lineAdminHeading: 'Lines of business',
+    insuranceLineCategoryGeneral: 'General',
+    insuranceLineCategoryLife: 'Life',
     lineAdminIntro:
       'The vocabulary business is classified by. The standard list is published ' +
       'platform-wide; your office can add a line it does not cover — and only your ' +

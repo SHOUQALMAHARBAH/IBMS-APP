@@ -56,6 +56,53 @@ const LICENSE = {
  */
 const LICENSE_SERIES = { current: LICENSE, terms: [LICENSE] };
 
+/** Module 0 item (e). `code` is null for an office's own line; `isStandard` decides which id the
+ *  screen sends, because the two catalogues are addressed by different fields. */
+const LINES = [
+  {
+    id: "11111111-1111-4111-8111-111111111111",
+    code: "MOTOR_COMPREHENSIVE",
+    nameEn: "Motor comprehensive",
+    nameAr: "تأمين المركبات الشامل",
+    category: "GENERAL",
+    isStandard: true,
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222222",
+    code: "LIFE_INDIVIDUAL",
+    nameEn: "Individual life",
+    nameAr: "تأمين الحياة الفردي",
+    category: "LIFE",
+    isStandard: true,
+  },
+];
+
+const SCOPE = {
+  brokerLicenseId: LICENSE.id,
+  types: ["GENERAL"],
+  branches: [
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      brokerLicenseId: LICENSE.id,
+      insuranceLineId: LINES[0].id,
+      officeInsuranceLineId: null,
+      category: "GENERAL",
+      nameEn: LINES[0].nameEn,
+      nameAr: LINES[0].nameAr,
+      code: LINES[0].code,
+    },
+  ],
+  branchCountByType: { GENERAL: 1 },
+  brokerKind: "CORPORATE",
+  capital: {
+    requiredCapital: "5000.000",
+    paidUpCapital: null,
+    shortfall: null,
+    meetsRequirement: false,
+    capitalIsUnrecorded: true,
+  },
+};
+
 const CALENDAR_ITEMS = [
   {
     id: "item-1",
@@ -86,8 +133,16 @@ async function mockRegulatoryCompliance(
     calendarStatus?: number;
     /** Module 0 item (c) — override the series to exercise a different licence state. */
     licenseSeries?: unknown;
+    /** Module 0 item (e) — override the scope to exercise a different capital or art. 3/a state. */
+    scope?: unknown;
   } = {},
 ) {
+  await page.route("http://localhost:4000/insurance-lines", (route) =>
+    route.fulfill({ status: 200, json: LINES }),
+  );
+  await page.route("http://localhost:4000/broker-license/scope", (route) =>
+    route.fulfill({ status: 200, json: opts.scope ?? SCOPE }),
+  );
   await page.route("http://localhost:4000/broker-license", (route) => {
     if (opts.licenseStatus && opts.licenseStatus !== 200) {
       return route.fulfill({
@@ -299,4 +354,105 @@ test("an application filed AFTER the deadline is called out while there is still
   await expect(notice).toContainText("after the deadline");
   // The consequence, not just the fact: the extension will not apply.
   await expect(notice).toContainText("will not remain valid");
+});
+
+test("the licence scope shows derived TYPES and its branches", async ({
+  page,
+}) => {
+  // Module 0 item (e). The type is never sent or stored — it is the category of the branch — so
+  // what the screen shows is the derivation's output.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockRegulatoryCompliance(page);
+  await page.goto("/regulatory-compliance");
+
+  await expect(page.locator("[data-licence-types]")).toContainText("General");
+  // The count beside the type, because art. 4/a's requirement is driven by it.
+  await expect(page.locator("[data-licence-types]")).toContainText("(1)");
+  await expect(page.locator("[data-licence-branches]")).toContainText(
+    "Motor comprehensive",
+  );
+  await expect(page.locator("[data-required-capital]")).toContainText(
+    "5000.000",
+  );
+});
+
+test("capital has THREE states, and unrecorded is not the same as too low", async ({
+  page,
+}) => {
+  /*
+   * The distinction the config insists on, asserted on screen: "nobody has typed a capital figure"
+   * is a missing fact about the office, while "the figure is below the requirement" is a finding
+   * about its capital. A screen that conflated them would tell an office it is undercapitalised
+   * when nobody has entered anything.
+   */
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockRegulatoryCompliance(page);
+  await page.goto("/regulatory-compliance");
+  await expect(page.locator("[data-capital-unrecorded]")).toContainText(
+    "No paid-up capital is recorded",
+  );
+  // And it says it blocks nothing — a warning that reads like a refusal gets escalated.
+  await expect(page.locator("[data-capital-unrecorded]")).toContainText(
+    "blocks nothing",
+  );
+  await expect(page.locator("[data-capital-shortfall]")).toHaveCount(0);
+  await expect(page.locator("[data-capital-ok]")).toHaveCount(0);
+
+  // Recorded and SHORT -> a different warning.
+  await mockRegulatoryCompliance(page, {
+    scope: {
+      ...SCOPE,
+      capital: {
+        requiredCapital: "5000.000",
+        paidUpCapital: "3000.000",
+        shortfall: "2000.000",
+        meetsRequirement: false,
+        capitalIsUnrecorded: false,
+      },
+    },
+  });
+  await page.reload();
+  await expect(page.locator("[data-capital-shortfall]")).toContainText(
+    "below what art. 4/a requires",
+  );
+  await expect(page.locator("[data-capital-unrecorded]")).toHaveCount(0);
+
+  // Recorded and SUFFICIENT -> no warning at all.
+  await mockRegulatoryCompliance(page, {
+    scope: {
+      ...SCOPE,
+      capital: {
+        requiredCapital: "5000.000",
+        paidUpCapital: "5000.000",
+        shortfall: "0.000",
+        meetsRequirement: true,
+        capitalIsUnrecorded: false,
+      },
+    },
+  });
+  await page.reload();
+  await expect(page.locator("[data-capital-ok]")).toBeVisible();
+  await expect(page.locator("[data-capital-shortfall]")).toHaveCount(0);
+  await expect(page.locator("[data-capital-unrecorded]")).toHaveCount(0);
+});
+
+test("a sole establishment is told the one-type limit BEFORE it hits the refusal", async ({
+  page,
+}) => {
+  // Art. 3/a. The api refuses a second type with a 422, but a screen that only surfaces the
+  // refusal teaches the limit by failure. This says it while the form is still empty.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockRegulatoryCompliance(page, {
+    scope: { ...SCOPE, brokerKind: "NATURAL_PERSON" },
+  });
+  await page.goto("/regulatory-compliance");
+
+  const note = page.locator("[data-sole-establishment]");
+  await expect(note).toContainText("sole establishment");
+  await expect(note).toContainText("art. 3/a");
+
+  // And it is absent for a corporate broker, which may hold both.
+  await mockRegulatoryCompliance(page);
+  await page.reload();
+  await expect(page.locator("[data-sole-establishment]")).toHaveCount(0);
 });

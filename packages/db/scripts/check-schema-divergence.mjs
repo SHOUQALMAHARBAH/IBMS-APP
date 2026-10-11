@@ -107,6 +107,12 @@ const EXPECTED = {
   'ALTER TABLE "OfficeInsurerFormField" DROP CONSTRAINT "OfficeInsurerFormField_template_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
 
+  // Module 0 item (e)'s licence scope. Same shape, same reason: without the composite, office A's
+  // licence could list office B's private line as one of its licensed branches and the reference
+  // would be structurally valid — which on a REGULATORY record is worse than on a programme line.
+  'ALTER TABLE "BrokerLicenseScopeLine" DROP CONSTRAINT "BrokerLicenseScopeLine_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // ---- GIN indexes on `Unsupported("tsvector")` ----
   // Prisma cannot index a field whose type it does not model. `canonicalTokens` is a plain
   // `String[]`, which it CAN index — so that one was declared rather than listed here.
