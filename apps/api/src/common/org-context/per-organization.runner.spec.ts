@@ -19,6 +19,10 @@ function org(id: string, legalName = `Office ${id}`): Organization {
     // Module 0 item (a). The compiler asked for this the moment the column landed, which is the
     // property the comment below already claimed — so it is stated, not defaulted.
     type: 'BROKERAGE_OFFICE',
+    // Module 0 item (b). NOT NULL for a brokerage office by CHECK constraint, NULL for an
+    // insurance company — so the fixture has to pick one, and a brokerage office is what this
+    // runner is about.
+    brokerKind: 'CORPORATE',
     status: 'ACTIVE',
     dpoAlternateApproverUserId: null,
     // Part 4 — every office reads SEGREGATED unless it has declared otherwise, which is what the migration

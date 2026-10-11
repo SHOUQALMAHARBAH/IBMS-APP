@@ -215,6 +215,10 @@ model Organization {
   /// the kind is stated at creation, never inferred. Tenant isolation is UNCHANGED by this column;
   /// `Organization` carries no `organizationId` and so was never in `TENANT_SCOPED_MODELS`.
   type                       OrganizationType
+  /// Natural person (sole establishment) or corporate — CBJ Instructions No. 9 of 2026, art. 3/a.
+  /// NULL exactly when this is an insurance company; the CHECK constraint
+  /// `Organization_broker_kind_matches_type` is what makes that structural rather than a habit.
+  brokerKind                 BrokerKind?
   /// This office's own CBJ broker license number. Distinct from the
   /// `BrokerLicense` model, which tracks a license's lifecycle per office.
   brokerLicenseNumber        String?
@@ -405,6 +409,24 @@ enum OrganizationType {
   /// An insurance company. Its own registration field list and its own agreement with the
   /// broker; it is NOT a brokerage office with a flag flipped.
   INSURANCE_COMPANY
+}
+
+/// WHAT KIND OF BROKER a brokerage office is — CBJ Instructions No. 9 of 2026, art. 3/a.
+///
+/// The distinction is not cosmetic: it bounds how many insurance types the office may be licensed
+/// for. A natural person (a sole establishment) may hold ONE type only; a corporate broker may
+/// hold both. That rule is enforced where the scope lives — see `BrokerLicense` — not here, because
+/// a column cannot refuse a combination it does not store.
+///
+/// NULL on an insurance company and NOT NULL on a brokerage office, held by the
+/// `Organization_broker_kind_matches_type` CHECK rather than by convention: "broker kind" is
+/// meaningless for an insurer, and a nullable column with no constraint would let one carry a value
+/// nothing reads.
+enum BrokerKind {
+  /// A sole establishment — one natural person. May hold ONE insurance type only (art. 3/a).
+  NATURAL_PERSON
+  /// A company. May hold both insurance types.
+  CORPORATE
 }
 
 enum OrgStatus {

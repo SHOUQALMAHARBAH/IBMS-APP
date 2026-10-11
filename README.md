@@ -691,6 +691,15 @@ build actually is today:
   office. **Tenant isolation is unchanged by it**: `Organization` carries no `organizationId`, so
   it was never in `TENANT_SCOPED_MODELS` and has no RLS policy (measured: `relrowsecurity = f`).
 
+  **And a brokerage office says WHAT KIND of broker it is** (item (b), migration
+  `20261111100000`): `BrokerKind` is `NATURAL_PERSON` (a sole establishment) or `CORPORATE` —
+  CBJ Instructions No. 9 of 2026, art. 3/a. The column is NULL exactly when the organization is an
+  insurance company, held by the `Organization_broker_kind_matches_type` CHECK in **both**
+  directions. That constraint is the only guard, because a nullable column is OPTIONAL in Prisma's
+  `CreateInput` and the compiler therefore cannot ask a caller for it. **The one-type-only rule for
+  a natural person is NOT enforced yet** — it constrains the licence SCOPE, which is item (e); what
+  (b) guarantees is that every brokerage office already has a kind for (e) to check against.
+
   What exists: the `Organization` model; `organizationId` on every tenant-scoped table
   with every row attributed; a unique-constraint set that is per-office rather than
   per-platform; and — as of Phase 2 step 7 — **application-layer enforcement**. Every
