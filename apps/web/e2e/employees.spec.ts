@@ -556,3 +556,35 @@ test('a reader without employee.update sees the approval and no controls', async
   await expect(page.locator('[data-cbj-approval-form]')).toHaveCount(0);
   await expect(page.locator('[data-cbj-approval-withdraw]')).toHaveCount(0);
 });
+
+test('an ABSENT cbjApproval is a stated state, and does not take the page down', async ({
+  page,
+}) => {
+  /*
+   * MODULE 0 ITEM (g), added after CI found it. `EmployeeDetail` is HAND-COPIED over an HTTP
+   * response and TypeScript cannot check it, so a web build paired with an api that does not send
+   * `cbjApproval` threw during render — taking down the reveal, the training list, the correction
+   * form and the de-provisioning checklist along with the panel. Two specs whose mocks lacked the
+   * field failed on CI and passed nowhere locally, because I had only run the specs I touched.
+   *
+   * It renders "the server did not send this" rather than "no approval on record", because those
+   * are different facts and the second would be a wrong claim about a person's regulatory standing.
+   */
+  await mockAuth(page, ['SYSTEM_SECURITY_ADMINISTRATOR']);
+  const { cbjApproval: _omitted, ...withoutApproval } = EMPLOYEE_DETAIL;
+  await mockDetail(page, withoutApproval);
+  await page.goto('/employees/emp-1');
+
+  await expect(page.locator('[data-cbj-approval-unavailable]')).toContainText(
+    'did not send',
+  );
+  // ...and it says it is NOT the same as having no approval, so nobody reads it as a finding.
+  await expect(page.locator('[data-cbj-approval-unavailable]')).toContainText(
+    'not the same as having no approval',
+  );
+
+  // THE REST OF THE PAGE SURVIVES — the half that matters, and the half a test asserting only the
+  // notice would miss.
+  await expect(page.getByTestId('correct-employee-open')).toBeVisible();
+  await expect(page.getByText('Phishing awareness')).toBeVisible();
+});

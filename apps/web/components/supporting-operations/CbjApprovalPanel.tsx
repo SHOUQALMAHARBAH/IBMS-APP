@@ -48,15 +48,34 @@ export function CbjApprovalPanel({
   onChanged,
 }: {
   employeeId: string;
-  approval: CbjApproval;
+  /**
+   * UNDEFINED is a real possibility and a DISTINCT state from "no approval".
+   *
+   * `EmployeeDetail` is HAND-COPIED over an HTTP response and TypeScript cannot check it, so a web
+   * build paired with an api that does not send this field would otherwise throw during render —
+   * taking down the reveal, the training list, the correction form and the de-provisioning
+   * checklist along with this panel. CI caught exactly that shape on two specs whose mocks lacked
+   * the field.
+   *
+   * Rendered as "not available from the server" rather than as "no approval on record", because
+   * those are different facts and the second would be a wrong claim about a person's regulatory
+   * standing. The api e2e is still what guarantees the field is sent; this only bounds the damage.
+   */
+  approval: CbjApproval | undefined;
   onChanged: () => void;
 }) {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const canUpdate = !!user && hasPermission(user, 'employee.update');
 
-  const [status, setStatus] = useState<string>(approval.status ?? '');
-  const [approvalDate, setApprovalDate] = useState(approval.approvalDate ?? '');
+  // Optional-chained because the hooks run BEFORE the absent-approval early return — React requires
+  // every hook on every render, so the guard cannot come first. `tsc` said so, which is the
+  // compiler doing the one thing it can here: this file's props arrive over HTTP and it cannot
+  // check those.
+  const [status, setStatus] = useState<string>(approval?.status ?? '');
+  const [approvalDate, setApprovalDate] = useState(
+    approval?.approvalDate ?? '',
+  );
   const [lines, setLines] = useState<InsuranceLine[]>([]);
   const [branchLineId, setBranchLineId] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +107,17 @@ export function CbjApprovalPanel({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!approval) {
+    return (
+      <section data-cbj-approval="">
+        <h3>{t('cbjApprovalHeading')}</h3>
+        <p role="status" data-cbj-approval-unavailable="">
+          {t('cbjApprovalUnavailable')}
+        </p>
+      </section>
+    );
   }
 
   return (

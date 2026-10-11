@@ -19,6 +19,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
+import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return withDerivedPermissions({
@@ -346,6 +347,13 @@ function makeDeps(opts: Opts = {}) {
       brokerLicenses,
       audit,
       workflow,
+      // Module 0 item (h). Resolves GENERAL for every line, so these tests stay about PLACEMENT:
+      // the actors here carry no role scope, which `withinRoleScope` reads as unrestricted whatever
+      // the category — and a mock returning `undefined` would make the scope check throw rather
+      // than pass, which is how a missing mock method reads as a broken feature.
+      {
+        findCategory: vi.fn().mockResolvedValue('GENERAL'),
+      } as unknown as InsuranceLineRepository,
     ),
     state,
     mocks: {

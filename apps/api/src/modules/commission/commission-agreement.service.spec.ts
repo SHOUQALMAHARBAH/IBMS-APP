@@ -4,6 +4,7 @@ import { CommissionAgreementService } from './commission-agreement.service';
 import type { CommissionRepository } from '../../repositories/commission.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
+import type { AuthenticatedUser } from '../auth/auth.types';
 
 const d = (v: string) => new Prisma.Decimal(v);
 
@@ -59,6 +60,26 @@ const agreementRow = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+/**
+ * MODULE 0 ITEM (h) widened `create`'s second parameter from `actorId: string` to the full caller,
+ * because the role SCOPE lives on the caller's roles and an id alone cannot answer the question.
+ *
+ * ONE constant rather than eleven inline objects: eleven copies of a fixture is eleven places for
+ * the next widening to be missed, and this spec is where that would show up.
+ *
+ * `roleScopes: []` is UNRESTRICTED — the ordinary case for every office that has not configured a
+ * scope, and what keeps these tests about commission rather than about item (h).
+ */
+const ACTOR = {
+  id: 'mgr-1',
+  organizationId: 'org-1',
+  email: 'manager@ibms.test',
+  roleIds: ['role-1'],
+  roles: ['BRANCH_DEPARTMENT_MANAGER'],
+  permissions: new Set<string>(['commission-rate.manage']),
+  roleScopes: [],
+} as unknown as AuthenticatedUser;
+
 describe('CommissionAgreementService.create (Process 35)', () => {
   it('opens a new window for a pair with none, and audits it', async () => {
     const { service, commission, audit } = makeService({
@@ -71,7 +92,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
         insuranceLine: 'Property All Risks',
         ratePercent: '15',
       },
-      'mgr-1',
+      ACTOR,
     );
 
     expect(v).toMatchObject({
@@ -110,7 +131,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
         ratePercent: '15',
         effectiveFrom: '2026-09-03',
       },
-      'mgr-1',
+      ACTOR,
     );
 
     expect(commission.supersedeAndCreateAgreement).toHaveBeenCalledWith(
@@ -134,7 +155,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
           insuranceLine: 'Property All Risks',
           ratePercent: '150',
         },
-        'mgr-1',
+        ACTOR,
       ),
     ).rejects.toThrow(/0\.\.100/);
   });
@@ -149,7 +170,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
           ratePercent: '12',
           vatRatePercent: '150',
         },
-        'mgr-1',
+        ACTOR,
       ),
     ).rejects.toThrow(/vatRatePercent .* 0\.\.100/);
   });
@@ -167,7 +188,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
         ratePercent: '15',
         vatRatePercent: '16',
       },
-      'mgr-1',
+      ACTOR,
     );
     expect(v.vatRatePercent).toBe('16.00');
     const arg = commission.supersedeAndCreateAgreement.mock.calls[0]?.[0] as {
@@ -192,7 +213,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
           ratePercent: '15',
           effectiveFrom: '2026-01-01',
         },
-        'mgr-1',
+        ACTOR,
       ),
     ).rejects.toThrow(/earlier/i);
   });
@@ -217,7 +238,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
             ratePercent: '15',
             effectiveFrom: bad,
           },
-          'mgr-1',
+          ACTOR,
         ),
       ).rejects.toThrow(/not a valid calendar date/i);
     }
@@ -234,7 +255,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
           insuranceLine: 'Property All Risks',
           ratePercent: '15',
         },
-        'mgr-1',
+        ACTOR,
       ),
     ).rejects.toThrow(/not found/i);
   });
@@ -254,7 +275,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
           insuranceLine: 'Property All Risks',
           ratePercent: '15',
         },
-        'mgr-1',
+        ACTOR,
       ),
     ).rejects.toThrow(/concurrently/i);
   });
@@ -269,7 +290,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
         insuranceLine: 'Property All Risks',
         ratePercent: '15',
       },
-      'mgr-1',
+      ACTOR,
     );
     const arg = commission.supersedeAndCreateAgreement.mock.calls[0]?.[0] as {
       create: { effectiveFrom: Date };
@@ -301,7 +322,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
         ratePercent: '15',
         effectiveFrom: '2026-09-03',
       },
-      'mgr-1',
+      ACTOR,
     );
     expect(v.id).toBe('ag-open');
     expect(commission.supersedeAndCreateAgreement).not.toHaveBeenCalled();
@@ -323,7 +344,7 @@ describe('CommissionAgreementService.create — the managed line is resolved, no
           ratePercent: '15',
           effectiveFrom: '2026-01-01',
         },
-        'actor-1',
+        ACTOR,
       ),
     ).rejects.toThrow(/not a line in the managed catalogue/i);
     // And nothing was superseded: the refusal comes before any window is touched.
@@ -343,7 +364,7 @@ describe('CommissionAgreementService.create — the managed line is resolved, no
         ratePercent: '12',
         effectiveFrom: '2026-01-01',
       },
-      'actor-1',
+      ACTOR,
     );
     const call = (
       commission.supersedeAndCreateAgreement as unknown as {
@@ -366,7 +387,7 @@ describe('CommissionAgreementService.create — the managed line is resolved, no
         ratePercent: '10',
         effectiveFrom: '2026-01-01',
       },
-      'actor-1',
+      ACTOR,
     );
     const call = (
       commission.supersedeAndCreateAgreement as unknown as {
@@ -385,7 +406,7 @@ describe('CommissionAgreementService.create — the managed line is resolved, no
           ratePercent: '10',
           effectiveFrom: '2026-01-01',
         },
-        'actor-1',
+        ACTOR,
       ),
     ).rejects.toThrow(/not a line in the managed catalogue/i);
   });
@@ -407,7 +428,7 @@ describe('CommissionAgreementService.create — the line can be named in Arabic'
         ratePercent: '14',
         effectiveFrom: '2026-01-01',
       },
-      'actor-1',
+      ACTOR,
     );
     const call = (
       commission.supersedeAndCreateAgreement as unknown as {

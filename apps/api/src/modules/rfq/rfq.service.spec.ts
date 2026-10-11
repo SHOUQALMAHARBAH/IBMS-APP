@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import {
   ConflictException,
   NotFoundException,
@@ -186,6 +187,11 @@ function makeDeps() {
       customers,
       audit,
       workflow,
+      // Module 0 item (h). Resolves GENERAL for every line, so these tests stay about the RFQ: the
+      // actors carry no role scope, which reads as unrestricted whatever the category.
+      {
+        findCategory: vi.fn().mockResolvedValue('GENERAL'),
+      } as unknown as InsuranceLineRepository,
     ),
     mocks: {
       createRfq,

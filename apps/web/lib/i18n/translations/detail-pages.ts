@@ -34,6 +34,8 @@ export const DETAIL_PAGES = {
     empdHireDateLabel: 'تاريخ التعيين:',
     empdLicensedRoleLabel: 'الدور المرخَّص:',
     cbjApprovalHeading: 'الموافقة من البنك المركزي الأردني',
+    cbjApprovalUnavailable:
+      'لم يُرسل الخادم حالة الموافقة لهذا الشخص، فلا يمكن عرضها. وهذا يختلف عن عدم وجود موافقة — حدِّث الصفحة، وإن تكرّر فأبلغ من يصلّح النظام.',
     cbjApprovalNone: 'لا تُسجَّل لهذا الشخص موافقة من البنك المركزي الأردني.',
     cbjApprovalStatusLabel: 'حالة الموافقة:',
     cbjApprovalStatusCurrent: 'سارية',
@@ -544,6 +546,8 @@ export const DETAIL_PAGES = {
     empdHireDateLabel: 'Hire date:',
     empdLicensedRoleLabel: 'Licensed role:',
     cbjApprovalHeading: 'CBJ approval',
+    cbjApprovalUnavailable:
+      'The server did not send this person’s CBJ approval, so it cannot be shown. That is not the same as having no approval on record — reload, and if it persists tell whoever maintains the system.',
     cbjApprovalNone: 'No CBJ approval is recorded for this person.',
     cbjApprovalStatusLabel: 'Approval status:',
     cbjApprovalStatusCurrent: 'Current',

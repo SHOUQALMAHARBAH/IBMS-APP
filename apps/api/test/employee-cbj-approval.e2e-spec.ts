@@ -4,7 +4,6 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
 import { ensureRole, prisma, rawPrisma } from './tenant-prisma';
-import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
 /**
@@ -98,7 +97,11 @@ let app: INestApplication<App> | null = null;
  *  is a guess, and this helper's route names have already been invented wrong once. */
 async function makeUser(
   label: string,
-  ...roles: RoleName[]
+  // `string[]`, which is what `ensureRole` itself takes. NOT `RoleName[]`: that is the LEGACY
+  // enum from before office-scoped roles, so it cannot name `OFFICE_ADMINISTRATOR` or anything
+  // an office defines for itself — and vitest compiles through swc, which strips types, so this
+  // spec PASSED while the typecheck gate was the only thing that could see it.
+  ...roles: string[]
 ): Promise<{ accessToken: string; userId: string }> {
   const target = app as INestApplication<App>;
   const email = uniqueEmail(label);
