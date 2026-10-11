@@ -35,6 +35,19 @@ export interface ScopedBranch {
  * codebase (`money-decimal-jod.md`), and `5000` written as a numeric literal is exactly the kind
  * that gets added to another one with `+` three commits later.
  */
+/**
+ * The insurance TYPES, in catalogue order.
+ *
+ * Exported because item (g) derives a PERSON's approved types the same way this file derives a
+ * LICENCE's, and two copies of an order are two chances for two screens to list them differently.
+ * It is not `Object.values(InsuranceLineCategory)` because a Prisma enum's runtime order follows the
+ * schema and a reordered schema would silently reorder every screen.
+ */
+export const INSURANCE_LINE_CATEGORIES: readonly InsuranceLineCategory[] = [
+  'GENERAL',
+  'LIFE',
+];
+
 export const CAPITAL_BANDS: readonly {
   upToBranches: number;
   requiredJod: string;
@@ -78,9 +91,7 @@ export function typesInScope(
   branches: readonly ScopedBranch[],
 ): InsuranceLineCategory[] {
   const present = branchCountByType(branches);
-  return (['GENERAL', 'LIFE'] as InsuranceLineCategory[]).filter((t) =>
-    present.has(t),
-  );
+  return INSURANCE_LINE_CATEGORIES.filter((t) => present.has(t));
 }
 
 /**
@@ -103,6 +114,48 @@ export function requiredCapitalForScope(
   );
   // `sumMoney([])` of an empty scope is zero, which is correct: nothing licensed, nothing required.
   return sumMoney(perType);
+}
+
+/**
+ * MODULE 0 ITEM (f) — THE MINIMUM APPROVED STAFF a licence scope requires.
+ *
+ * One approved person for one insurance type; two for both. A whole number, not a per-type map: the
+ * requirement is about the office having enough approved people, and an office licensed for both
+ * types with two approved people satisfies it however those two are themselves scoped.
+ *
+ * ## Why the ZERO case is 1 and not 0
+ *
+ * A scope with no branches at all has no types, and `requiredApprovedStaff([])` returns 0 —
+ * truthfully, because an office that is licensed for nothing needs nobody approved. The moment it
+ * holds one branch it needs one approved person. Returning 1 for the empty scope would refuse the
+ * FIRST branch of a brand-new office forever, which is a gate nothing can satisfy — the § 1.62 shape
+ * this repository has already shipped once.
+ */
+export function requiredApprovedStaff(
+  branches: readonly ScopedBranch[],
+): number {
+  const types = typesInScope(branches).length;
+  if (types === 0) return 0;
+  return types >= 2 ? 2 : 1;
+}
+
+/** What item (f) decided, with both numbers, so a refusal can state them rather than assert them. */
+export interface StaffingAssessment {
+  requiredApprovedStaff: number;
+  currentApprovedStaff: number;
+  meetsRequirement: boolean;
+}
+
+export function assessStaffing(
+  branches: readonly ScopedBranch[],
+  currentApprovedStaff: number,
+): StaffingAssessment {
+  const required = requiredApprovedStaff(branches);
+  return {
+    requiredApprovedStaff: required,
+    currentApprovedStaff,
+    meetsRequirement: currentApprovedStaff >= required,
+  };
 }
 
 export interface CapitalAssessment {

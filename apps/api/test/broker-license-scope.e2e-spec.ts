@@ -276,6 +276,34 @@ describe('Broker licence scope (e2e) — Module 0 item (e)', () => {
         where: { id: TEST_ORGANIZATION_ID },
         data: { brokerKind: 'CORPORATE' },
       });
+
+      /*
+       * ITEM (f)'s PRECONDITION, added when item (f) shipped — and the reason is worth keeping.
+       *
+       * Holding BOTH insurance types now requires at least two CBJ-approved people (item (f)), and
+       * db-test's only office records ZERO (measured: its 7 migrated approval rows all belong to
+       * terminated staff). So this request, which passed before, correctly began answering 422.
+       *
+       * Satisfied by writing the marker DIRECTLY rather than through the approval route: this file
+       * is about art. 3/a, the route is proven in `employee-cbj-approval.e2e-spec.ts`, and a second
+       * copy of that flow here would be two places to maintain one precondition. The rows are put
+       * back below.
+       */
+      const approvedForBothTypes = await rawPrisma.employee.findMany({
+        where: { terminationDate: null, cbjApprovalStatus: null },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+        take: 2,
+      });
+      expect(
+        approvedForBothTypes.length,
+        'db-test has fewer than two active employees to approve, so item (f) cannot be satisfied here',
+      ).toBe(2);
+      await rawPrisma.employee.updateMany({
+        where: { id: { in: approvedForBothTypes.map((e) => e.id) } },
+        data: { cbjApprovalStatus: 'CURRENT' },
+      });
+
       const both = await request(target.getHttpServer())
         .post('/broker-license/scope')
         .set(bearer(compliance.accessToken))
@@ -342,6 +370,16 @@ describe('Broker licence scope (e2e) — Module 0 item (e)', () => {
       where: { id: TEST_ORGANIZATION_ID },
       data: { brokerKind: 'CORPORATE' },
     });
+    /*
+     * ITEM (f): put the approval markers back. Clearing the STATE rather than replaying this test's
+     * own list — the same lesson the branch teardown above records, and it matters more here,
+     * because an office left with two CURRENT approvals would make item (f)'s own e2e unable to see
+     * its refusal at all, in a file that passes.
+     */
+    await rawPrisma.employee.updateMany({
+      where: { cbjApprovalStatus: 'CURRENT', terminationDate: null },
+      data: { cbjApprovalStatus: null },
+    });
 
     if (testError instanceof Error) throw testError;
     if (testError) throw new Error(JSON.stringify(testError));
@@ -355,6 +393,12 @@ describe('Broker licence scope (e2e) — Module 0 item (e)', () => {
       select: { brokerKind: true },
     });
     expect(org.brokerKind).toBe('CORPORATE');
+    // Item (f): and nobody is left holding an approval this file granted.
+    expect(
+      await rawPrisma.employee.count({
+        where: { cbjApprovalStatus: 'CURRENT', terminationDate: null },
+      }),
+    ).toBe(0);
 
     const target = app as INestApplication<App>;
     const compliance = await makeUser('scope-check', 'COMPLIANCE_OFFICER');

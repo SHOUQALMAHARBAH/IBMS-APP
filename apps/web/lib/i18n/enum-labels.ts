@@ -16,6 +16,12 @@ export const ENUM_LABEL = {
     GENERAL: 'insuranceLineCategoryGeneral',
     LIFE: 'insuranceLineCategoryLife',
   } satisfies Labels<'GENERAL' | 'LIFE'>,
+  /** Module 0 item (g) — a person's CBJ approval standing. */
+  CbjApprovalStatus: {
+    CURRENT: 'cbjApprovalStatusCurrent',
+    SUSPENDED: 'cbjApprovalStatusSuspended',
+    CANCELLED: 'cbjApprovalStatusCancelled',
+  } satisfies Labels<'CURRENT' | 'SUSPENDED' | 'CANCELLED'>,
   AuditAction: {
     CREATE: 'auditActionCreate',
     READ: 'auditActionRead',
@@ -351,7 +357,8 @@ export const ENUM_LABEL = {
     explicit_consent: 'cbtBasisExplicitConsent',
   } satisfies Labels<string>,
   DisposalMethod: {
-    certified_secure_wipe_nist_800_88: 'disposalMethodCertifiedSecureWipeNist80088',
+    certified_secure_wipe_nist_800_88:
+      'disposalMethodCertifiedSecureWipeNist80088',
     physical_destruction: 'disposalMethodPhysicalDestruction',
     certified_shredding: 'disposalMethodCertifiedShredding',
   } satisfies Labels<string>,

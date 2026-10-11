@@ -17,6 +17,7 @@ import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { SessionService } from '../auth/services/session.service';
 import type { CreateEmployeeDto } from './dto/create-employee.dto';
 import type { CreateTrainingDto } from './dto/create-training.dto';
+import type { EmployeeCbjApprovalService } from './employee-cbj-approval.service';
 
 function baseEmployee(over: Record<string, unknown> = {}) {
   return {
@@ -54,6 +55,7 @@ function makeService(
     repo?: Record<string, unknown>;
     departments?: Record<string, unknown>;
     branches?: Record<string, unknown>;
+    cbjApprovals?: Record<string, unknown>;
   } = {},
 ) {
   const repo = {
@@ -145,6 +147,17 @@ function makeService(
     ...(over.branches ?? {}),
   };
 
+  const cbjApprovals = {
+    get: vi.fn().mockResolvedValue({
+      status: null,
+      approvalDate: null,
+      types: [],
+      branches: [],
+      countsTowardMinimumStaff: false,
+    }),
+    ...(over.cbjApprovals ?? {}),
+  };
+
   const service = new EmployeeService(
     repo as unknown as EmployeeRepository,
     departments as unknown as DepartmentRepository,
@@ -154,6 +167,10 @@ function makeService(
     reveal as unknown as SensitiveFieldRevealService,
     slaTimers as unknown as SlaTimerService,
     sessions as unknown as SessionService,
+    // Module 0 item (g). A real-shaped double rather than `{} as any`: `get()` is awaited by
+    // `EmployeeService.get`, so a mock returning undefined would make the detail read look like it
+    // dropped the approval rather than failing.
+    cbjApprovals as unknown as EmployeeCbjApprovalService,
   );
   return {
     service,
@@ -165,6 +182,7 @@ function makeService(
     reveal,
     slaTimers,
     sessions,
+    cbjApprovals,
   };
 }
 

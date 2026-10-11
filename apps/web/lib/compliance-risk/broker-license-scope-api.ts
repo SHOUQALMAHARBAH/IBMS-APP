@@ -29,6 +29,15 @@ export interface LicenseScope {
   types: InsuranceLineCategory[];
   branches: LicenseScopeBranch[];
   branchCountByType: Partial<Record<InsuranceLineCategory, number>>;
+  /**
+   * Module 0 item (f). On the view so the screen can state the requirement while the form is still
+   * empty — a rule that only speaks when it refuses teaches by failure.
+   */
+  staffing: {
+    requiredApprovedStaff: number;
+    currentApprovedStaff: number;
+    meetsRequirement: boolean;
+  };
   brokerKind: 'NATURAL_PERSON' | 'CORPORATE' | null;
   /**
    * Art. 4/a. Money arrives as fixed 3dp STRINGS — a JOD figure never crosses the wire as a

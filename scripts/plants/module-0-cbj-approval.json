@@ -1,0 +1,62 @@
+{
+  "approval-counts-a-suspended-person": {
+    "file": "apps/api/src/modules/supporting-operations/employee-cbj-approval.config.ts",
+    "from": "  return status === 'CURRENT';",
+    "to": "  return status != null && status !== 'CANCELLED';"
+  },
+  "approved-types-follow-insertion-order": {
+    "file": "apps/api/src/modules/supporting-operations/employee-cbj-approval.config.ts",
+    "from": "  const present = new Set(branches.map((b) => b.category));\n  return INSURANCE_LINE_CATEGORIES.filter((category) => present.has(category));",
+    "to": "  return [...new Set(branches.map((b) => b.category))];"
+  },
+  "licensed-role-refusal-dropped-from-a-dto": {
+    "file": "apps/api/src/common/person-record.dto.ts",
+    "from": "  @Length(1, 200)\n  @IsNotCbjApproval()\n  licensedRole?: string;",
+    "to": "  @Length(1, 200)\n  licensedRole?: string;"
+  },
+  "the-marker-enters-the-authorization-path": {
+    "file": "apps/api/src/modules/rbac/services/permissions.service.ts",
+    "from": "@Injectable()",
+    "to": "// PLANT: a permission decision that also consults a person's CBJ standing.\n// const _plantedScope = 'cbjApprovalStatus';\n@Injectable()"
+  },
+  "a-branch-may-be-added-to-a-person-with-no-approval": {
+    "file": "apps/api/src/modules/supporting-operations/employee-cbj-approval.service.ts",
+    "from": "    if (employee.cbjApprovalStatus === null) {\n      throw new UnprocessableEntityException(\n        'This person holds no CBJ approval, so there is nothing for a branch to belong to. ' +\n          'Record the approval first.',\n      );\n    }",
+    "to": "    // PLANT: the approval precondition removed."
+  },
+  "clearing-the-status-leaves-the-branches-behind": {
+    "file": "apps/api/src/modules/supporting-operations/employee-cbj-approval.service.ts",
+    "from": "    if (status === null && employee.cbjApprovalStatus !== null) {\n      const existing = await this.approvals.findBranches(employeeId);\n      for (const branch of existing) {\n        await this.approvals.removeBranch(branch.id, employeeId);\n      }\n    }",
+    "to": "    // PLANT: withdrawing the approval no longer withdraws its branches."
+  },
+  "the-minimum-staff-rule-refuses-nothing": {
+    "file": "apps/api/src/modules/compliance-risk/broker-license-scope.service.ts",
+    "from": "      staffing.requiredApprovedStaff === 2 &&\n      requiredBefore < 2 &&\n      !staffing.meetsRequirement",
+    "to": "      false"
+  },
+  "the-minimum-staff-rule-ignores-the-suspension-escape": {
+    "file": "apps/api/src/modules/compliance-risk/broker-license-scope.service.ts",
+    "from": "      requiredBefore < 2 &&\n",
+    "to": ""
+  },
+  "a-suspended-approval-still-counts-in-the-repository": {
+    "file": "apps/api/src/repositories/employee-cbj-approval.repository.ts",
+    "from": "      where: { cbjApprovalStatus: 'CURRENT', terminationDate: null },",
+    "to": "      where: { cbjApprovalStatus: { not: null }, terminationDate: null },"
+  },
+  "the-screen-conflates-the-two-staffing-states": {
+    "file": "apps/web/app/(app)/regulatory-compliance/page.tsx",
+    "from": "          {scope.staffing.meetsRequirement ? (",
+    "to": "          {true ? ("
+  },
+  "a-suspension-is-not-said-to-stop-counting": {
+    "file": "apps/web/components/supporting-operations/CbjApprovalPanel.tsx",
+    "from": "            {approval.countsTowardMinimumStaff ? null : (",
+    "to": "            {true ? null : ("
+  },
+  "a-refusal-loses-its-permission-code": {
+    "file": "apps/web/app/(app)/regulatory-compliance/page.tsx",
+    "from": "              'rcCalendarRefusalAct',\n              'compliance-calendar.manage',",
+    "to": "              'rcCalendarRefusalAct',\n              '',"
+  }
+}

@@ -1,6 +1,7 @@
 import { IsOptional, IsString, Length } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { emptyStringToUndefined } from './dto.util';
+import { IsNotCbjApproval } from './is-not-cbj-approval.validator';
 
 /**
  * A PERSON, as this system records one — shared by the two routes that can create an Employee.
@@ -91,10 +92,13 @@ export class PersonRecordDto {
   @IsString()
   hireDate!: string;
 
+  /** Any regulated certification OTHER THAN the CBJ broker approval, which has had its own
+   *  structured marker since Module 0 item (g) and is refused here by name. */
   @IsOptional()
   @Transform(emptyStringToUndefined)
   @IsString()
   @Length(1, 200)
+  @IsNotCbjApproval()
   licensedRole?: string;
 
   @IsOptional()

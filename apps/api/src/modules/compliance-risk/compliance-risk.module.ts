@@ -15,6 +15,7 @@ import { BrokerLicenseRepository } from '../../repositories/broker-license.repos
 import { BrokerLicenseScopeService } from './broker-license-scope.service';
 import { BrokerLicenseScopeRepository } from '../../repositories/broker-license-scope.repository';
 import { OrganizationRepository } from '../../repositories/organization.repository';
+import { EmployeeCbjApprovalRepository } from '../../repositories/employee-cbj-approval.repository';
 import { ComplianceCalendarController } from './compliance-calendar.controller';
 import { ComplianceCalendarService } from './compliance-calendar.service';
 import { ComplianceCalendarRepository } from '../../repositories/compliance-calendar.repository';
@@ -158,6 +159,11 @@ import { AuthModule } from '../auth/auth.module';
     BrokerLicenseScopeService,
     BrokerLicenseScopeRepository,
     OrganizationRepository,
+    // Item (f) reads how many people in this office hold a CURRENT CBJ approval. A REPOSITORY
+    // across the module boundary, never the service — the same established shape as
+    // `OrganizationRepository` above, and provided in the SAME commit as the dependency rather
+    // than discovered by a 500.
+    EmployeeCbjApprovalRepository,
     ComplianceCalendarService,
     ComplianceCalendarRepository,
     RiskRegisterService,

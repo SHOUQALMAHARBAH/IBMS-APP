@@ -113,6 +113,12 @@ const EXPECTED = {
   'ALTER TABLE "BrokerLicenseScopeLine" DROP CONSTRAINT "BrokerLicenseScopeLine_office_line_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
 
+  // Module 0 item (g)'s per-person CBJ approval branches. Same shape, same reason — and the record
+  // of what a person was approved for is read by the staff-minimum rule, so a branch pointing at
+  // another office's private line would make one office's headcount depend on another's catalogue.
+  'ALTER TABLE "EmployeeCbjApprovalBranch" DROP CONSTRAINT "EmployeeCbjApprovalBranch_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // ---- GIN indexes on `Unsupported("tsvector")` ----
   // Prisma cannot index a field whose type it does not model. `canonicalTokens` is a plain
   // `String[]`, which it CAN index — so that one was declared rather than listed here.

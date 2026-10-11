@@ -349,7 +349,14 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
           nationalId: '9988776655',
           hireDate: '2020-06-01',
           position: 'Placement Officer',
-          licensedRole: 'CBJ-licensed Broker Representative',
+          /*
+           * NOT a CBJ approval any more. Module 0 item (g) gave that fact a structured marker
+           * (status, approval date, approved branches) and the DTO now REFUSES CBJ-ish text here —
+           * this line was a 400 the moment item (g) shipped, which is the refusal working on an
+           * existing caller rather than a regression. `licensedRole` keeps its stated purpose: any
+           * OTHER regulated certification.
+           */
+          licensedRole: 'Chartered Insurance Institute, Dip CII',
           userId: linkedUser.userId,
         })
         .expect(201)

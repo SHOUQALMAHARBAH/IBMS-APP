@@ -176,7 +176,9 @@ describe('a load error announces itself (rule 3)', () => {
           continue;
         }
         if (attrs.includes('role="alert"')) continue;
-        offenders.push(`${rel}  <${m[1]}> renders {${value}} with no role="alert"`);
+        offenders.push(
+          `${rel}  <${m[1]}> renders {${value}} with no role="alert"`,
+        );
       }
     }
     expect(
@@ -257,8 +259,23 @@ describe('a permission refusal is worded in exactly one place', () => {
     // floor below. A regex that cannot be written wrongly beats one that has to be written carefully.
     // The optional second quoted argument covers `reducedCapability(t, can, cannot, code)`, which carries TWO
     // act keys where the refusals carry one.
+    //
+    // THE CODE SLOT MUST CONTAIN A QUOTE, and that is not decoration. A prettier reflow puts a
+    // TRAILING COMMA after the last argument, and with the slot allowed to be empty the optional
+    // act-key group then swallowed the CODE and matched the trailing comma as its separator —
+    // leaving the code slot blank. The call was correct; the matcher read it as codeless, and the
+    // non-vacuity floor below is the only thing that said so (`expected 115 to be 116`). Requiring a
+    // quote makes that match backtrack into the right shape, so the guard survives a reflow instead
+    // of reporting a defect in the formatter's choices.
+    //
+    // The quote inside the code slot excludes `)` as well — `[^')]+` and not `[^']+`. The first
+    // version did not, and `[^']` ADMITS a closing paren, so the quoted run reached past the end of
+    // the call and swallowed the next `t('…LoadError')` on the line below: five screens were
+    // reported as naming a permission code that does not exist, when what they named was a
+    // translation key two expressions away. A greedy class that can cross the thing it is supposed
+    // to stop at is the same defect as a matcher that finds nothing, in the loud direction.
     const pattern =
-      /\b(permissionRefusal|permissionRefusalAnyOf|permissionRefusalAllOf|reducedCapability|permissionMayBeMissing)\(\s*\w+\s*,\s*'([^']+)'(?:\s*,\s*'[^']+')?\s*,\s*([^)]*)\)/g;
+      /\b(permissionRefusal|permissionRefusalAnyOf|permissionRefusalAllOf|reducedCapability|permissionMayBeMissing)\(\s*\w+\s*,\s*'([^']+)'(?:\s*,\s*'[^']+')?\s*,\s*([^)]*'[^')]+'[^)]*)\)/g;
     for (const [file, src] of sources()) {
       for (const m of src.matchAll(pattern)) {
         found.push({
@@ -298,7 +315,9 @@ describe('a permission refusal is worded in exactly one place', () => {
     // sentence around it puts the wording back in 100 places, which is what this replaced.
     const offenders: string[] = [];
     for (const [file, src] of sources()) {
-      for (const m of src.matchAll(/\b(t|tr)\(\s*'(\w*(?:Refusal|Can|Cannot)?Act)'/g)) {
+      for (const m of src.matchAll(
+        /\b(t|tr)\(\s*'(\w*(?:Refusal|Can|Cannot)?Act)'/g,
+      )) {
         offenders.push(`${file}: ${m[1]}('${m[2]}')`);
       }
     }
@@ -326,6 +345,36 @@ describe('a permission refusal is worded in exactly one place', () => {
       'permission-refusal.ts exports a helper the matcher in this file does not name. Add it to the literal ' +
         'regex in calls() as well as to HELPERS, or its call sites are never checked.',
     ).toEqual([...HELPERS].sort());
+  });
+
+  it('the strict matcher reads EVERY call site — none is silently skipped', () => {
+    /*
+     * THE HOLE THE FLOOR BELOW CANNOT SEE, found by planting an empty code.
+     *
+     * The floor asserts that every call the strict pattern FINDS carries a code. A call the pattern
+     * cannot parse at all is not found, so it is not counted, so it is not checked — and the floor
+     * stays green because the calls it did find are all fine. Planting `permissionRefusal(t, act,
+     * '')` proved exactly that: the call vanished from the set and every assertion passed.
+     *
+     * So the call sites are counted a SECOND way, by the helper name alone, and the two counts must
+     * agree. This is the shape that refuses "a matcher that quietly reads fewer things than exist" —
+     * the failure mode behind three separate false-clean results in this repository.
+     */
+    const loose: string[] = [];
+    for (const [file, src] of sources()) {
+      for (const m of src.matchAll(
+        /\b(permissionRefusal|permissionRefusalAnyOf|permissionRefusalAllOf|reducedCapability|permissionMayBeMissing)\(/g,
+      )) {
+        loose.push(`${file}: ${m[1]}`);
+      }
+    }
+    expect(
+      calls().length,
+      `the strict matcher read ${calls().length} refusal calls but ${loose.length} call sites exist. ` +
+        'One of them is in a shape the pattern cannot parse — an empty code, a code held in a ' +
+        'variable, a reflow it does not expect — and an unparsed call is an UNCHECKED call. Fix the ' +
+        'pattern or the call; do not leave them disagreeing.',
+    ).toBe(loose.length);
   });
 
   it('is not vacuous — the calls really are being found', () => {
@@ -416,9 +465,13 @@ describe('every act key is reachable, and every reachable key exists', () => {
     }
     const used = new Set<string>();
     for (const [, src] of sources()) {
-      for (const m of src.matchAll(/'(\w*(?:Refusal|Can|Cannot)?Act)'/g)) used.add(m[1]);
+      for (const m of src.matchAll(/'(\w*(?:Refusal|Can|Cannot)?Act)'/g))
+        used.add(m[1]);
     }
-    expect(declared.size, 'no act keys declared — the matcher has drifted').toBeGreaterThan(95);
+    expect(
+      declared.size,
+      'no act keys declared — the matcher has drifted',
+    ).toBeGreaterThan(95);
     expect(
       [...declared].filter((k) => !used.has(k)).sort(),
       'An act key is declared and no screen uses it. If a screen dropped its refusal, it now renders an empty ' +
@@ -471,10 +524,15 @@ describe('a load failure tells the reader what to do (rules 3 and 4)', () => {
       found,
       `The load-error scan produced no total, so it did not run. Blank is not zero. Output:\n${output.slice(-1200)}`,
     ).not.toBeNull();
-    expect(failed, `the scan exited non-zero:\n${output.slice(-1200)}`).toBe(false);
+    expect(failed, `the scan exited non-zero:\n${output.slice(-1200)}`).toBe(
+      false,
+    );
     // The script carries its own floor (it refuses below 80 keys), so a drifted extraction fails above
     // rather than reporting a clean sweep of nothing.
-    expect(Number(found?.[1]), 'far fewer keys than this codebase has').toBeGreaterThan(95);
+    expect(
+      Number(found?.[1]),
+      'far fewer keys than this codebase has',
+    ).toBeGreaterThan(95);
 
     // LITERAL regexes, not ones built from a string: this host mangles backslashes in a heredoc, so the
     // first version of this loop arrived with `'\s+'` where it needed `'\\s+'` — and in a JS string

@@ -36,7 +36,6 @@ import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 
-
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid var(--border-subtle)',
@@ -165,7 +164,11 @@ export default function RegulatoryCompliancePage() {
       setItems(null);
       setItemsLoadError(
         err instanceof ApiError && err.status === 403
-          ? permissionRefusal(t, 'rcCalendarRefusalAct', 'compliance-calendar.manage')
+          ? permissionRefusal(
+              t,
+              'rcCalendarRefusalAct',
+              'compliance-calendar.manage',
+            )
           : err instanceof ApiError
             ? err.message
             : t('rcCalendarLoadError'),
@@ -273,9 +276,7 @@ export default function RegulatoryCompliancePage() {
   return (
     <main style={pageStyle}>
       <h1>{t('rcHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('rcIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('rcIntro')}</p>
 
       <h2>{t('rcLicenseHeading')}</h2>
       {licenseLoadError ? (
@@ -345,7 +346,11 @@ export default function RegulatoryCompliancePage() {
           {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
               system is content with, and explain neither. */}
           {license.validByOperationOfLaw ? (
-            <p style={warningStyle} role="status" data-valid-by-operation-of-law="">
+            <p
+              style={warningStyle}
+              role="status"
+              data-valid-by-operation-of-law=""
+            >
               {t('rcValidByOperationOfLaw')}
             </p>
           ) : null}
@@ -395,7 +400,10 @@ export default function RegulatoryCompliancePage() {
               {/* A stable hook: this screen renders three tables (the current term, this series,
                   and the compliance calendar), so a positional locator in a test would silently
                   follow whichever happens to be last. */}
-              <table data-testid="licence-terms" style={{ borderCollapse: 'collapse' }}>
+              <table
+                data-testid="licence-terms"
+                style={{ borderCollapse: 'collapse' }}
+              >
                 <thead>
                   <tr>
                     <th style={cell}>{t('rcLicenseNumberLabel')}</th>
@@ -410,7 +418,9 @@ export default function RegulatoryCompliancePage() {
                     <tr key={term.id}>
                       <td style={cell}>
                         {term.licenseNumber}
-                        {term.id === license.id ? ` (${t('rcCurrentTerm')})` : ''}
+                        {term.id === license.id
+                          ? ` (${t('rcCurrentTerm')})`
+                          : ''}
                       </td>
                       <td style={cell}>
                         {term.issuedAt ? term.issuedAt.slice(0, 10) : '—'}
@@ -465,7 +475,10 @@ export default function RegulatoryCompliancePage() {
           {scope.branches.length === 0 ? (
             <p style={{ opacity: 0.75 }}>{t('rcScopeNoBranches')}</p>
           ) : (
-            <table data-licence-branches="" style={{ borderCollapse: 'collapse' }}>
+            <table
+              data-licence-branches=""
+              style={{ borderCollapse: 'collapse' }}
+            >
               <thead>
                 <tr>
                   <th style={cell}>{t('rcScopeColBranch')}</th>
@@ -544,6 +557,25 @@ export default function RegulatoryCompliancePage() {
               </button>
             </div>
           ) : null}
+
+          <h3>{t('rcStaffingHeading')}</h3>
+          {/* Item (f). Stated while the form is still empty: the refusal only fires on the branch
+              that would add a SECOND type, so a screen that waited for it would teach the rule by
+              failure. Both numbers come from the server, computed by the same function the refusal
+              uses, so the two cannot disagree. */}
+          <p data-staffing="">
+            {t('rcStaffingRequired')} {scope.staffing.requiredApprovedStaff} ·{' '}
+            {t('rcStaffingCurrent')} {scope.staffing.currentApprovedStaff}
+          </p>
+          {scope.staffing.meetsRequirement ? (
+            <p style={{ opacity: 0.75 }} data-staffing-ok="">
+              {t('rcStaffingMetNote')}
+            </p>
+          ) : (
+            <p style={warningStyle} role="status" data-staffing-short="">
+              {t('rcStaffingShortNote')}
+            </p>
+          )}
 
           <h3>{t('rcCapitalHeading')}</h3>
           <table style={{ borderCollapse: 'collapse' }}>
@@ -637,7 +669,11 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? t('rcSavingButton') : license ? t('rcRenewButton') : t('rcCreateButton')}
+            {busy
+              ? t('rcSavingButton')
+              : license
+                ? t('rcRenewButton')
+                : t('rcCreateButton')}
           </button>
         </form>
       ) : null}
@@ -690,7 +726,9 @@ export default function RegulatoryCompliancePage() {
 
       {items ? (
         items.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('rcNoCalendarItems')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>
+            {t('rcNoCalendarItems')}
+          </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
@@ -719,7 +757,9 @@ export default function RegulatoryCompliancePage() {
                       {canManage && !it.isSubmitted ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
-                            aria-label={t('rcEvidenceRefAria', { name: it.obligationName })}
+                            aria-label={t('rcEvidenceRefAria', {
+                              name: it.obligationName,
+                            })}
                             value={evidenceDrafts[it.id] ?? ''}
                             onChange={(e) =>
                               setEvidenceDrafts((prev) => ({

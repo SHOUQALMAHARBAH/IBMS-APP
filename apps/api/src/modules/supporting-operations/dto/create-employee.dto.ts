@@ -2,6 +2,7 @@ import { IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { emptyStringToUndefined } from '../../../common/dto.util';
 import { PersonRecordDto } from '../../../common/person-record.dto';
+import { IsNotCbjApproval } from '../../../common/is-not-cbj-approval.validator';
 
 /** Process 66 — `POST /employees` (`employee.create`). `hireDate` and the
  * two Part 8.2 dates are parsed via `parseHistoricalInstant` in the service
@@ -87,10 +88,13 @@ export class UpdateEmployeeDto {
   @Length(1, 200)
   position?: string;
 
+  /** Any regulated certification OTHER THAN the CBJ broker approval, which has had its own
+   *  structured marker since Module 0 item (g) and is refused here by name. */
   @IsOptional()
   @Transform(emptyStringToUndefined)
   @IsString()
   @Length(1, 200)
+  @IsNotCbjApproval()
   licensedRole?: string;
 
   @IsOptional()

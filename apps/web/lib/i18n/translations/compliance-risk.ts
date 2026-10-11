@@ -40,16 +40,19 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'جارٍ التحميل…',
     tmNone: 'لا توجد تنبيهات مراقبة معاملات.',
     tmLoadError: 'تعذّر تحميل تنبيهات مراقبة المعاملات — حاول مرة أخرى.',
-    tmSweepSummary: 'تم فحص {scanned} حالة — أُنشئ {created} تنبيهًا، و{skipped} مرصودة أصلًا، وفشلت {failed}.',
+    tmSweepSummary:
+      'تم فحص {scanned} حالة — أُنشئ {created} تنبيهًا، و{skipped} مرصودة أصلًا، وفشلت {failed}.',
     tmActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     tmRefusalAct: 'عرض تنبيهات مراقبة المعاملات',
 
     // ---- Watchlist sync (#49) --------------------------------------------
     wsHeading: 'مزامنة قوائم العقوبات',
-    shMissingConfig: 'إعدادات ناقصة: {missing}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
+    shMissingConfig:
+      'إعدادات ناقصة: {missing}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
     shScreeningAttempts: 'عمليات الفحص (آخر {days} يومًا)',
     shHoldsReleased: 'حالات رفع الإيقاف (آخر {days} يومًا)',
-    wsRescreenSummary: 'أُعيد فحص {screened} عميلًا نشطًا — {hits} منها بنتيجة مطابقة، وفشلت {failed}.',
+    wsRescreenSummary:
+      'أُعيد فحص {screened} عميلًا نشطًا — {hits} منها بنتيجة مطابقة، وفشلت {failed}.',
     wsIntro:
       'تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة الأمم المتحدة الموحّدة) محلياً كل اثنتَي عشرة ساعة — وهي وتيرة التحديث الفعلية للقائمتين — ويُعاد فحص كل عميل نشط عليهما كل أربع ساعات. ويمكن تشغيل كليهما يدوياً من هنا.',
     wsSyncButton: 'مزامنة القوائم الآن',
@@ -113,9 +116,17 @@ export const COMPLIANCE_RISK = {
       'لا يوجد لدى هذا المكتب أي مدة ترخيص مسجّلة — وإصدار أعمال جديدة محجوب. ممارسة النشاط دون ترخيص ساري سبب لعقوبة إدارية (تعليمات البنك المركزي الأردني رقم 9 لسنة 2026، المادة 21/أ/9). سجّل الترخيص وشهادته أدناه.',
     rcTermsHeading: 'مدد الترخيص',
     rcScopeHeading: 'نطاق الترخيص',
+    rcStaffingHeading: 'الحد الأدنى للكوادر المعتمدة',
+    rcStaffingRequired: 'العدد المطلوب:',
+    rcStaffingCurrent: 'المسجَّل حالياً:',
+    rcStaffingMetNote:
+      'يستوفي هذا المكتب الحد الأدنى للكوادر المعتمدة لنطاق ترخيصه.',
+    rcStaffingShortNote:
+      'عدد الأشخاص الحاملين لموافقة سارية من البنك المركزي أقل من العدد الذي يتطلّبه نطاق الترخيص: شخص واحد لنوع تأمين واحد، وشخصان للنوعين. تُسجَّل الموافقة على سجل كل شخص. وإضافة النوع الثاني ستُرفَض حتى يُسجَّل شخصان.',
     rcScopeTypes: 'أنواع التأمين',
     rcScopeBranches: 'الفروع المرخّصة',
-    rcScopeNoBranches: 'لم تُسجّل أي فروع بعد. لا يُحدّد نوع التأمين إلا من فروعه.',
+    rcScopeNoBranches:
+      'لم تُسجّل أي فروع بعد. لا يُحدّد نوع التأمين إلا من فروعه.',
     rcScopeAddBranch: 'إضافة فرع',
     rcScopeBranchLabel: 'الفرع',
     rcScopeRemove: 'إزالة',
@@ -147,7 +158,8 @@ export const COMPLIANCE_RISK = {
     rcCertificateStorageRef: 'مرجع تخزين الشهادة',
     rcCertificateStorageRefLabel: 'مرجع تخزين الشهادة',
     rcRecordRenewalButton: 'تسجيل تقديم طلب التجديد',
-    rcRenewalAlreadyFiled: 'سُجِّل طلب التجديد لهذه المدة، ولا يمكن تغيير تاريخه.',
+    rcRenewalAlreadyFiled:
+      'سُجِّل طلب التجديد لهذه المدة، ولا يمكن تغيير تاريخه.',
     rcRenewButton: 'تجديد الترخيص',
     rcCreateButton: 'إنشاء ترخيص',
     rcAddObligationButton: 'إضافة التزام',
@@ -195,7 +207,8 @@ export const COMPLIANCE_RISK = {
     opColClaimsHistory: 'سجل المطالبات',
     opSaveButton: 'حفظ',
     opEventsHeading: 'أحداث مخاطر المسؤولية المهنية',
-    opEventPolicyIdLabel: 'معرّف وثيقة المسؤولية المهنية (اختياري — الافتراضي هو الحالية)',
+    opEventPolicyIdLabel:
+      'معرّف وثيقة المسؤولية المهنية (اختياري — الافتراضي هو الحالية)',
     opEventDescriptionLabel: 'وصف حدث مخاطر المسؤولية المهنية',
     opColSource: 'المصدر',
     opSourcePolicyCheckingDiscrepancy: 'اختلاف في تدقيق الوثيقة',
@@ -209,7 +222,8 @@ export const COMPLIANCE_RISK = {
     opNoEvents: 'لا توجد أحداث مخاطر مسجّلة بعد.',
     opRegisterLoadError: 'تعذّر تحميل سجل المخاطر — حاول مرة أخرى.',
     opPiLoadError: 'تعذّر تحميل سجل وثيقة المسؤولية المهنية — حاول مرة أخرى.',
-    opEventsLoadError: 'تعذّر تحميل أحداث مخاطر المسؤولية المهنية — حاول مرة أخرى.',
+    opEventsLoadError:
+      'تعذّر تحميل أحداث مخاطر المسؤولية المهنية — حاول مرة أخرى.',
     opActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     opRefusalAct: 'عرض سجل المخاطر',
     opPiRefusalAct: 'عرض وثيقة المسؤولية المهنية',
@@ -279,7 +293,8 @@ export const COMPLIANCE_RISK = {
     icNone: 'لم يُجرَ أي تدقيق بعد — شغّله لفحص كل ثنائية.',
     // Zero violations is the EXPECTED result, not an absence of data: every
     // pair is backed by a DB constraint. The copy has to read as a pass.
-    icClean: 'لم يُعثر على أي مخالفة موافقة ذاتية. جميع الثنائيات المفحوصة سليمة.',
+    icClean:
+      'لم يُعثر على أي مخالفة موافقة ذاتية. جميع الثنائيات المفحوصة سليمة.',
     icRunButton: 'تشغيل التدقيق الآن',
     icRunningButton: 'جارٍ التشغيل…',
     icPairsScanned: 'الثنائيات المفحوصة',
@@ -292,7 +307,8 @@ export const COMPLIANCE_RISK = {
     icDeclaredIntro:
       'الحالات التي نفّذ فيها شخص واحد طرفي عملية تتطلب شخصين، في مكتب أعلن السماح بذلك. كل حالة مسجّلة بسببها وبالأدوار التي كان يحملها. أي مراجعة لصلاحيات الشخص نفسه تظهر في الأعلى ومُعلَّمة.',
     icDeclaredOfficeSegregated: 'هذا المكتب يفصل بين المهام.',
-    icDeclaredOfficeCombined: 'هذا المكتب أعلن السماح بتنفيذ الشخص نفسه لطرفي العملية.',
+    icDeclaredOfficeCombined:
+      'هذا المكتب أعلن السماح بتنفيذ الشخص نفسه لطرفي العملية.',
     icDeclaredOfficeDeclaredBy: 'أعلنه {who}.',
     icDeclaredOfficeNeverDeclared: 'لم يُعلَن هذا صراحةً — هو الوضع الافتراضي.',
     icDeclaredEmpty: 'لا توجد اعتمادات ذاتية معلنة.',
@@ -304,7 +320,8 @@ export const COMPLIANCE_RISK = {
     icDeclaredAccessFlag: 'مراجعة صلاحيات نفسه —',
     icDeclaredHatAmbiguous: 'أكثر من دور يمنح الاعتماد',
     icDeclaredTruncated: 'تُعرض أحدث الحالات فقط.',
-    icDeclaredLoadError: 'تعذّر تحميل الاعتمادات الذاتية المعلنة. حاول مرة أخرى.',
+    icDeclaredLoadError:
+      'تعذّر تحميل الاعتمادات الذاتية المعلنة. حاول مرة أخرى.',
     icRefusalAct: 'عرض تقرير الضوابط الداخلية',
 
     // ---- Internal audit findings (#57) ---------------------------------------
@@ -393,15 +410,18 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'Loading…',
     tmNone: 'No transaction-monitoring alerts.',
     tmLoadError: 'Could not load transaction-monitoring alerts — try again.',
-    tmSweepSummary: 'Scanned {scanned} candidate(s) — created {created} alert(s), {skipped} already flagged, {failed} failed.',
+    tmSweepSummary:
+      'Scanned {scanned} candidate(s) — created {created} alert(s), {skipped} already flagged, {failed} failed.',
     tmActionError: 'That action failed — try again.',
     tmRefusalAct: 'view the transaction monitoring alerts',
 
     wsHeading: 'Sanctions watchlist sync',
-    shMissingConfig: 'Missing configuration: {missing}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.',
+    shMissingConfig:
+      'Missing configuration: {missing}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.',
     shScreeningAttempts: 'Screening attempts (last {days} days)',
     shHoldsReleased: 'Holds released (last {days} days)',
-    wsRescreenSummary: 'Re-screened {screened} active customer(s) — {hits} produced a HIT, {failed} failed.',
+    wsRescreenSummary:
+      'Re-screened {screened} active customer(s) — {hits} produced a HIT, {failed} failed.',
     wsIntro:
       "Two free public sanctions lists (OFAC SDN, UN Consolidated) are synced locally every 12 hours — the lists' own real-world refresh cadence — and every ACTIVE customer is re-screened against them every 4 hours. Both can also be run on demand here.",
     wsSyncButton: 'Sync watchlists now',
@@ -465,6 +485,13 @@ export const COMPLIANCE_RISK = {
       'This office holds no licence term on record — and new business issuance is blocked. Practising without a current licence is a ground for administrative sanction (CBJ Instructions No. 9 of 2026, art. 21/a/9). Record the licence and its certificate below.',
     rcTermsHeading: 'Licence terms',
     rcScopeHeading: 'Licence scope',
+    rcStaffingHeading: 'Minimum approved staff',
+    rcStaffingRequired: 'Required:',
+    rcStaffingCurrent: 'Currently recorded:',
+    rcStaffingMetNote:
+      'This office meets the minimum approved staff for its licence scope.',
+    rcStaffingShortNote:
+      'Fewer people hold a current CBJ approval than this licence scope requires: one approved person for one insurance type, two for both. The approval is recorded on each person’s own employee record. Adding the second type will be refused until two are on record.',
     rcScopeTypes: 'Insurance types',
     rcScopeBranches: 'Licensed branches',
     rcScopeNoBranches:
@@ -549,7 +576,8 @@ export const COMPLIANCE_RISK = {
     opColClaimsHistory: 'Claims history',
     opSaveButton: 'Save',
     opEventsHeading: 'PI risk events',
-    opEventPolicyIdLabel: 'PI policy id (optional — defaults to the current one)',
+    opEventPolicyIdLabel:
+      'PI policy id (optional — defaults to the current one)',
     opEventDescriptionLabel: 'PI risk event description',
     opColSource: 'Source',
     opSourcePolicyCheckingDiscrepancy: 'Policy Checking discrepancy',

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   assessCapital,
   branchCountByType,
+  assessStaffing,
   breachesNaturalPersonOneTypeRule,
+  requiredApprovedStaff,
   CAPITAL_BANDS,
   requiredCapitalForScope,
   requiredCapitalForType,
@@ -191,5 +193,47 @@ describe('breachesNaturalPersonOneTypeRule (art. 3/a)', () => {
     expect(
       breachesNaturalPersonOneTypeRule(null, [...general(1), ...life(1)]),
     ).toBe(false);
+  });
+});
+
+describe('item (f): the minimum approved staff a scope requires', () => {
+  it('one type needs ONE approved person, both need TWO', () => {
+    expect(requiredApprovedStaff(general(1))).toBe(1);
+    expect(requiredApprovedStaff(general(12))).toBe(1);
+    expect(requiredApprovedStaff([...general(1), ...life(1)])).toBe(2);
+    expect(requiredApprovedStaff([...general(9), ...life(4)])).toBe(2);
+  });
+
+  it('the requirement follows the TYPE count, not the branch count', () => {
+    // The distinction that keeps this from drifting into "more branches, more staff": art. 4/a
+    // scales CAPITAL with branches, and item (f) scales STAFF with types. Twelve general branches
+    // still need one approved person.
+    expect(requiredApprovedStaff(general(12))).toBe(
+      requiredApprovedStaff(general(1)),
+    );
+  });
+
+  it('an EMPTY scope requires nobody — the gate nothing could satisfy', () => {
+    /*
+     * The case worth asserting rather than assuming. Returning 1 here would refuse the FIRST branch
+     * of every brand-new office: it holds no branches, so it needs one approved person, so it can
+     * never add the branch that would justify one. That is IMPROVEMENTS § 1.62's shape — a gate
+     * whose precondition is unreachable — which this repository has shipped once already.
+     */
+    expect(requiredApprovedStaff([])).toBe(0);
+    expect(assessStaffing([], 0).meetsRequirement).toBe(true);
+  });
+
+  it('assessStaffing reports BOTH numbers, so a refusal can state them', () => {
+    const short = assessStaffing([...general(1), ...life(1)], 1);
+    expect(short.requiredApprovedStaff).toBe(2);
+    expect(short.currentApprovedStaff).toBe(1);
+    expect(short.meetsRequirement).toBe(false);
+
+    const met = assessStaffing([...general(1), ...life(1)], 2);
+    expect(met.meetsRequirement).toBe(true);
+
+    // More than enough is not a problem.
+    expect(assessStaffing(general(3), 7).meetsRequirement).toBe(true);
   });
 });

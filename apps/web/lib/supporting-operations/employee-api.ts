@@ -2,7 +2,7 @@
 // apps/api's /employees routes. employee.read / training.record /
 // deprovisioning.execute (all already pre-seeded).
 
-import { apiGet, apiPatch, apiPost } from '../auth/api-client';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../auth/api-client';
 
 export interface EmployeeListRow {
   id: string;
@@ -59,6 +59,41 @@ export interface EmployeeDetail {
   /** The login this person holds, when they hold one. Here so the screen never offers to create a
    *  second one and then be refused — User.employeeId is unique. */
   account: { id: string; email: string } | null;
+  /** Module 0 item (g) — this person's CBJ approval. Always present; a person with none reads as
+   *  nulls and an empty branch list. */
+  cbjApproval: CbjApproval;
+}
+
+/**
+ * MODULE 0 ITEM (g) — a person's CBJ approval, as the screen reads it.
+ *
+ * ⚠️ HAND-COPIED OVER AN HTTP RESPONSE, AND TYPESCRIPT CANNOT CHECK IT — the drift class that broke
+ * the customer-import result panel. When `CbjApprovalView` changes in apps/api, this changes in the
+ * same commit, and `employee-cbj-approval.e2e-spec.ts` asserts these fields on the response body
+ * for exactly that reason.
+ *
+ * `types` is DERIVED from the branches by the server and is never sent back: a type the client could
+ * assert is a type that could disagree with the catalogue.
+ */
+export type CbjApprovalStatus = 'CURRENT' | 'SUSPENDED' | 'CANCELLED';
+
+export interface CbjApprovalBranch {
+  id: string;
+  insuranceLineId: string | null;
+  officeInsuranceLineId: string | null;
+  category: 'GENERAL' | 'LIFE';
+  nameEn: string;
+  nameAr: string;
+  code: string | null;
+}
+
+export interface CbjApproval {
+  status: CbjApprovalStatus | null;
+  /** NULL is a real state — an approval whose date nobody recorded. */
+  approvalDate: string | null;
+  types: ('GENERAL' | 'LIFE')[];
+  branches: CbjApprovalBranch[];
+  countsTowardMinimumStaff: boolean;
 }
 
 /**
@@ -169,6 +204,39 @@ export interface EmployeeSearchResult {
  * make. This function does not default it, and must not: a caller that sends `q=''` should see the 400
  * rather than have the client quietly widen the request.
  */
+/**
+ * Module 0 item (g). `status: null` WITHDRAWS the approval; omitting it leaves it alone — so the
+ * caller must send an explicit null, and the screen's "withdraw" button is the only thing that does.
+ */
+export function setCbjApproval(
+  employeeId: string,
+  body: {
+    status?: CbjApprovalStatus | null;
+    approvalDate?: string | null;
+  },
+): Promise<CbjApproval> {
+  return apiPatch<CbjApproval>(`/employees/${employeeId}/cbj-approval`, body);
+}
+
+export function addCbjApprovalBranch(
+  employeeId: string,
+  body: { insuranceLineId?: string; officeInsuranceLineId?: string },
+): Promise<CbjApproval> {
+  return apiPost<CbjApproval>(
+    `/employees/${employeeId}/cbj-approval/branches`,
+    body,
+  );
+}
+
+export function removeCbjApprovalBranch(
+  employeeId: string,
+  branchId: string,
+): Promise<CbjApproval> {
+  return apiDelete<CbjApproval>(
+    `/employees/${employeeId}/cbj-approval/branches/${branchId}`,
+  );
+}
+
 export function searchEmployees(q: string): Promise<EmployeeSearchResult[]> {
   return apiGet(`/employees/search?q=${encodeURIComponent(q)}`);
 }

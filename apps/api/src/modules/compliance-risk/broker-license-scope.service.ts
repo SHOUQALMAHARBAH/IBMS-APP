@@ -16,12 +16,16 @@ import {
   type ScopeLineRow,
 } from '../../repositories/broker-license-scope.repository';
 import { OrganizationRepository } from '../../repositories/organization.repository';
+import { EmployeeCbjApprovalRepository } from '../../repositories/employee-cbj-approval.repository';
 import { pickCurrentTerm } from './broker-license.config';
 import {
   assessCapital,
+  assessStaffing,
   branchCountByType,
   breachesNaturalPersonOneTypeRule,
+  requiredApprovedStaff,
   typesInScope,
+  type StaffingAssessment,
 } from './broker-license-scope.config';
 import { formatMoney } from '../../common/money.util';
 import type { AddScopeBranchDto } from './dto/add-scope-branch.dto';
@@ -38,6 +42,12 @@ export interface LicenseScopeView {
   types: InsuranceLineCategory[];
   branches: ScopeLineRow[];
   branchCountByType: Record<string, number>;
+  /**
+   * Item (f). On the view because a rule that only speaks when it refuses teaches by failure: the
+   * screen can say "one of the two approved people this scope needs is recorded" while the form is
+   * still empty. Computed from the same function the refusal uses, so the two cannot disagree.
+   */
+  staffing: StaffingAssessment;
   brokerKind: BrokerKind | null;
   /** Art. 4/a. Money as fixed 3dp strings; a JOD figure never crosses the wire as a number. */
   capital: {
@@ -75,6 +85,9 @@ export class BrokerLicenseScopeService {
     private readonly scope: BrokerLicenseScopeRepository,
     private readonly licenses: BrokerLicenseRepository,
     private readonly organizations: OrganizationRepository,
+    // Item (f). A REPOSITORY across a module boundary, which is this codebase's one established
+    // cross-module shape — the approval SERVICE stays inside the employee module.
+    private readonly approvals: EmployeeCbjApprovalRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -144,6 +157,51 @@ export class BrokerLicenseScopeService {
           ' for ONE insurance type only — CBJ Instructions No. 9 of 2026, art. 3/a. It already holds' +
           ` branches in ${typesInScope(existing).join(', ')}, so a ${category} branch cannot be added.` +
           ' A corporate broker may hold both types.',
+      );
+    }
+
+    /*
+     * ITEM (f) — THE MINIMUM APPROVED STAFF, decided the same way and in the same place as art. 3/a:
+     * against the scope the branch WOULD produce, before the write.
+     *
+     * ## THE REFUSAL IS THE BOTH-TYPES CASE ONLY, AND THAT IS THE BRIEF'S OWN WORDING
+     *
+     * "One approved person for one type, two for both; REFUSE TO GRANT BOTH TYPES otherwise." The
+     * refusal clause attaches to both types, and the first version of this code generalised it to
+     * "any branch that raises the requirement" — which MEASURED BADLY: db-test's only office records
+     * 0 CURRENT approvals with no termination date, so the generalised form refused a brand-new
+     * office its FIRST branch, and the branch is the only thing that could ever justify the person.
+     * A gate whose precondition is unreachable is IMPROVEMENTS § 1.62, shipped once here already.
+     *
+     * So the ONE-TYPE requirement is REPORTED, never refused: `staffing` on the view carries both
+     * numbers and the screen says the office is short. The both-types case is refused, because that
+     * is what the instruction says to refuse.
+     *
+     * `requiredBefore < 2` is what keeps this from becoming a trap: once an office legitimately
+     * holds both types, adding a THIRD branch inside a type it already has must not be refused
+     * because a CBJ suspension later dropped the count — that would lock the office out of
+     * correcting its own branch list, and the correction is not what caused the shortfall.
+     *
+     * ONLY `CURRENT` approvals count, and only people who have not left: `countCurrentApprovals`
+     * holds both halves, so an office cannot satisfy a staffing minimum with somebody the CBJ has
+     * stood down or somebody who has resigned.
+     */
+    const staffing = assessStaffing(
+      [...existing, { category }],
+      await this.approvals.countCurrentApprovals(),
+    );
+    const requiredBefore = requiredApprovedStaff(existing);
+    if (
+      staffing.requiredApprovedStaff === 2 &&
+      requiredBefore < 2 &&
+      !staffing.meetsRequirement
+    ) {
+      throw new UnprocessableEntityException(
+        `Adding a ${category} branch would make this office licensed for BOTH insurance types, ` +
+          'which requires at least 2 CBJ-approved people. This office currently records ' +
+          `${staffing.currentApprovedStaff}. Record the CBJ approval on each approved person first ` +
+          '— their employee record carries the status, the CBJ approval date and the approved ' +
+          'branches.',
       );
     }
 
@@ -220,6 +278,10 @@ export class BrokerLicenseScopeService {
       types: typesInScope(branches),
       branches,
       branchCountByType: Object.fromEntries(branchCountByType(branches)),
+      staffing: assessStaffing(
+        branches,
+        await this.approvals.countCurrentApprovals(),
+      ),
       brokerKind: organization?.brokerKind ?? null,
       capital: {
         requiredCapital: formatMoney(capital.requiredCapital),

@@ -393,6 +393,7 @@ model Organization {
   legacyImportIssues                  LegacyImportIssue[]
   duplicateNameWarnings               DuplicateNameWarning[]
   brokerLicenseScopeLines             BrokerLicenseScopeLine[]
+  employeeCbjApprovalBranches         EmployeeCbjApprovalBranch[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -459,6 +460,42 @@ model BrokerLicenseScopeLine {
   @@index([organizationId])
 }
 
+/// Module 0 item (g) — ONE insurance BRANCH a person's CBJ approval covers.
+///
+/// The same shape as `BrokerLicenseScopeLine` one level down, and for the same reason: a branch is a
+/// row of a managed catalogue, standard or office-added, and the TYPE is the branch's own
+/// `category` rather than a second column. Item (e) states that argument in full; storing a type
+/// here would be the same second home for one fact, and
+/// `broker-license-scope-assumptions.spec.ts`' shape guard covers the licence models while
+/// `employee-cbj-approval.guard.spec.ts` covers this one.
+model EmployeeCbjApprovalBranch {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  employeeId     String
+  /// `Restrict`: the record of what a person was approved for is evidence, the same treatment
+  /// `KYCRecord` gives a `Customer`. Measured before choosing it — nothing in this repository
+  /// deletes an `Employee` (0 call sites of `employee.delete`/`deleteMany`), so it refuses nothing
+  /// that happens today.
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  /// A standard catalogue line, or null when this branch is an office addition.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  /// An office's own line, or null when this branch is a standard one.
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  /// NOTE — "the same branch twice for one person" is TWO PARTIAL uniques in raw SQL, never a
+  /// compound unique over these nullable columns: Postgres treats NULLs as distinct, so a compound
+  /// unique would admit unlimited rows whose column is NULL, which here is every row (§ 1.25).
+  /// `db:divergence` cannot see a partial index, so the migration asserts both itself.
+
+  @@index([employeeId])
+  @@index([organizationId])
+}
+
 /// WHAT KIND OF BROKER a brokerage office is — CBJ Instructions No. 9 of 2026, art. 3/a.
 ///
 /// The distinction is not cosmetic: it bounds how many insurance types the office may be licensed
@@ -475,6 +512,21 @@ enum BrokerKind {
   NATURAL_PERSON
   /// A company. May hold both insurance types.
   CORPORATE
+}
+
+/// Module 0 item (g). The standing of ONE PERSON'S CBJ approval to act for the broker.
+///
+/// NULL on `Employee.cbjApprovalStatus` means "not a CBJ-approved person" — the ordinary case for
+/// most staff — so the absence of a row is the absence of an approval, never an unknown.
+enum CbjApprovalStatus {
+  /// Approved and in good standing. The only value item (f) counts toward minimum staff.
+  CURRENT
+  /// Approval suspended by the CBJ. The person stays on the record, which is the point of a status
+  /// rather than a deletion, and stops counting toward minimum staff.
+  SUSPENDED
+  /// Approval cancelled. Kept for the same reason — the record of who was approved and when is
+  /// evidence, and losing it on cancellation is how a vacancy becomes unexplainable.
+  CANCELLED
 }
 
 enum OrgStatus {
@@ -1128,11 +1180,11 @@ model Branch {
 /// Process 66 — Human Resources. Minimal record: licensing/certification
 /// tracking for regulated staff, training records (Part 8.2).
 model Employee {
-  id                               String       @id @default(uuid())
+  id                               String                      @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId                   String       @default(dbgenerated())
-  organization                     Organization @relation(fields: [organizationId], references: [id])
+  organizationId                   String                      @default(dbgenerated())
+  organization                     Organization                @relation(fields: [organizationId], references: [id])
   fullName                         String // computed from the 4 parts below when they're set (see composeFullName) — historical rows keep only this field, parts null
   givenName                        String? // Jordanian national-ID convention (Part F item #4) — given/father's/grandfather's/family name
   fatherName                       String?
@@ -1156,11 +1208,30 @@ model Employee {
   position                         String?
   hireDate                         DateTime?
   terminationDate                  DateTime?
-  licensedRole                     String? // e.g. regulated staff licensing/certification (Part 8.2)
+  /// Free-text licensing/certification OTHER THAN the CBJ broker approval (Part 8.2).
+  ///
+  /// RE-SCOPED by Module 0 item (g). It used to carry the CBJ approval too, as a hand-typed string
+  /// — measured at the time: 47 of 136 employees on dev read `CBJ Licensed Insurance Broker` and 7
+  /// on db-test read `CBJ-licensed Broker Representative`, two spellings of one fact. That fact now
+  /// lives in `cbjApprovalStatus` and its branches, so this field must not carry it again: the
+  /// service refuses CBJ-ish text here and names the structured field instead.
+  licensedRole                     String?
+  /// Module 0 item (g) — this person's CBJ approval to act for the broker. NULL for staff who hold
+  /// none, which is most of them.
+  ///
+  /// DELIBERATELY NOT a permission input. Item (h) puts scope on the ROLE; this marker exists to
+  /// support the vacancy timers and the training counter, and `employee-cbj-approval.guard.spec.ts`
+  /// fails if any permission-evaluation site starts reading it.
+  cbjApprovalStatus                CbjApprovalStatus?
+  /// The date the CBJ granted it. NULL is a real and common state — the 47 + 7 rows migrated from
+  /// free text have no date on record, and recording that as unknown is honest where a stamped
+  /// migration date would be a fact nobody can source.
+  cbjApprovalDate                  DateTime?                   @db.Date
+  cbjApprovalBranches              EmployeeCbjApprovalBranch[]
   confidentialityAgreementSignedAt DateTime? // Part 8.2 NDAs
   backgroundCheckCompletedAt       DateTime? // Part 8.2 screening
-  createdAt                        DateTime     @default(now())
-  updatedAt                        DateTime     @updatedAt
+  createdAt                        DateTime                    @default(now())
+  updatedAt                        DateTime                    @updatedAt
 
   /// Spec §4.1.2 — the employee's functional grouping. Nullable: every
   /// pre-existing Employee row predates Department entirely, and the
@@ -1183,6 +1254,9 @@ model Employee {
   // Declared because the migration CREATES it. Left undeclared, the next `migrate dev` would emit
   // `DROP INDEX "Employee_branchId_idx"` — which is exactly what db:divergence caught in CI.
   @@index([branchId])
+  /// Item (f) counts CURRENT approvals per office; without this it is a sequential scan of
+  /// every employee on every placement that changes the licence scope.
+  @@index([cbjApprovalStatus])
   @@index([organizationId])
 }
 
@@ -5326,6 +5400,7 @@ model InsuranceLine {
 
   offeredBy             InsurerOfferedLine[]
   licenceScopeLines     BrokerLicenseScopeLine[]
+  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
   formTemplates         InsurerFormTemplate[]
   officeFormTemplates   OfficeInsurerFormTemplate[]
   insuranceProgramLines InsuranceProgramLine[]
@@ -5372,6 +5447,7 @@ model OfficeInsuranceLine {
 
   offeredBy             InsurerOfferedLine[]
   licenceScopeLines     BrokerLicenseScopeLine[]
+  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
   insuranceProgramLines InsuranceProgramLine[]
   rfqs                  RFQ[]
   policies              Policy[]

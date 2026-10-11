@@ -33,6 +33,25 @@ export const DETAIL_PAGES = {
     empdStatusLabel: 'الحالة:',
     empdHireDateLabel: 'تاريخ التعيين:',
     empdLicensedRoleLabel: 'الدور المرخَّص:',
+    cbjApprovalHeading: 'الموافقة من البنك المركزي الأردني',
+    cbjApprovalNone: 'لا تُسجَّل لهذا الشخص موافقة من البنك المركزي الأردني.',
+    cbjApprovalStatusLabel: 'حالة الموافقة:',
+    cbjApprovalStatusCurrent: 'سارية',
+    cbjApprovalStatusSuspended: 'موقوفة',
+    cbjApprovalStatusCancelled: 'ملغاة',
+    cbjApprovalDateLabel: 'تاريخ الموافقة:',
+    cbjApprovalDateUnrecorded: 'غير مسجَّل',
+    cbjApprovalTypes: 'أنواع التأمين المعتمدة:',
+    cbjApprovalNoTypes: 'لا يوجد — لم يُسجَّل أي فرع بعد',
+    cbjApprovalNoBranches: 'لم تُسجَّل فروع لهذه الموافقة بعد.',
+    cbjApprovalAddBranchLabel: 'إضافة فرع',
+    cbjApprovalAddBranch: 'إضافة',
+    cbjApprovalRemoveBranch: 'إزالة',
+    cbjApprovalSave: 'حفظ الموافقة',
+    cbjApprovalWithdraw: 'سحب الموافقة',
+    cbjApprovalNotCounted:
+      'لا تُحتسب ضمن الحد الأدنى للكوادر المعتمدة؛ السارية وحدها تُحتسب.',
+    cbjApprovalGenericError: 'تعذَّر تحديث الموافقة — حاول مرة أخرى.',
     // Correcting an employee record. The note says what CANNOT be corrected, because the absent
     // fields are the control: name, national ID and hire date are not on the form at all.
     empdCorrectOpen: 'تصحيح بيانات السجل',
@@ -76,7 +95,8 @@ export const DETAIL_PAGES = {
     empdChecklistUpdateError: 'تعذّر تحديث القائمة.',
     empdChecklistCompleteError: 'تعذّر إكمال القائمة.',
     empdRefusalAct: 'عرض هذا الموظف',
-    empdDeprovisioningTriggered: 'بوشر في {at} — مستحق في يوم العمل نفسه (تصعيد خلال ٢٤ ساعة إلى إدارة تقنية المعلومات إن بقي مفتوحاً).',
+    empdDeprovisioningTriggered:
+      'بوشر في {at} — مستحق في يوم العمل نفسه (تصعيد خلال ٢٤ ساعة إلى إدارة تقنية المعلومات إن بقي مفتوحاً).',
 
     // ---- Up-sell (list + detail) ---------------------------------------------
     upsHeading: 'البيع الإضافي',
@@ -85,7 +105,8 @@ export const DETAIL_PAGES = {
     upsDesignedSi: 'مبلغ التأمين المُصمَّم',
     upsAssetValue: 'القيمة الحالية للأصل',
     upsShortfall: 'النقص',
-    upsUnderinsuredRaised: 'تأمين أقل من اللازم بأكثر من {percent}% — تم رفع توصية.',
+    upsUnderinsuredRaised:
+      'تأمين أقل من اللازم بأكثر من {percent}% — تم رفع توصية.',
     upsAdequate: 'التأمين كافٍ (ضمن {percent}% من قيمة الأصل).',
     upsFlaggedOn: 'رُصد في {at}',
     upsDismissPlaceholder: 'مثال: العميل رفض الزيادة',
@@ -145,7 +166,8 @@ export const DETAIL_PAGES = {
     xsLoading: 'جارٍ التحميل…',
     xsRefusalAct: 'عرض فرص البيع المتبادل',
     xsDetectRefusalAct: 'تشغيل فحص البيع المتبادل',
-    xsNoOpportunities: 'لا توجد فرص بيع متبادل لهذا العميل. يرصد الفحص الليلي فجوة عندما يملك العميل وثيقة سارية وتنقصه أحد الفروع المرجعية.',
+    xsNoOpportunities:
+      'لا توجد فرص بيع متبادل لهذا العميل. يرصد الفحص الليلي فجوة عندما يملك العميل وثيقة سارية وتنقصه أحد الفروع المرجعية.',
     xsConfirmDismiss: 'تأكيد التجاهل',
     xsWhyNotPursued: 'لماذا لا تجري متابعة هذه الفجوة؟',
     xsdFlagged: 'تاريخ الرصد',
@@ -190,7 +212,8 @@ export const DETAIL_PAGES = {
     iprogdDerivedSi: 'مبلغ التأمين المشتق (من مسح المخاطر)',
     iprogdReopenButton: 'إعادة الفتح للمراجعة',
     iprogdReassembleButton: 'إعادة التجميع من النتائج الحالية',
-    iprogdReassemblyNote: 'ستُسنِد إعادة التجميع مبالغ التأمين لفرعَي التأمين على الممتلكات ضد جميع الأخطار وتوقف الأعمال من هذه الأرقام.',
+    iprogdReassemblyNote:
+      'ستُسنِد إعادة التجميع مبالغ التأمين لفرعَي التأمين على الممتلكات ضد جميع الأخطار وتوقف الأعمال من هذه الأرقام.',
     iprogdLines: 'فروع البرنامج',
     iprogdNoLines: 'لا توجد فروع.',
     iprogdColLine: 'فرع التأمين',
@@ -199,7 +222,8 @@ export const DETAIL_PAGES = {
       'تعذّر العثور على برنامج التأمين هذا — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     iprogdLoadError: 'تعذّر تحميل برنامج التأمين — حاول مرة أخرى.',
     iprogdToMarketError: 'تعذّر طرح هذا البرنامج في السوق — حاول مرة أخرى.',
-    iprogdNotStarted: 'لم يبدأ — فروع الممتلكات وتوقّف الأعمال بلا أساس لمبلغ التأمين بعد',
+    iprogdNotStarted:
+      'لم يبدأ — فروع الممتلكات وتوقّف الأعمال بلا أساس لمبلغ التأمين بعد',
     iprogdFinalizeError: 'تعذّر الاعتماد النهائي — حاول مرة أخرى.',
     iprogdWorking: 'جارٍ التنفيذ…',
     iprogdFinalizeButton: 'اعتماد نهائي',
@@ -212,11 +236,13 @@ export const DETAIL_PAGES = {
     iprognHeading: 'تجميع برنامج تأمين',
     iprognRefusalAct: 'تجميع برنامج تأمين',
     iprognCoverageLines: 'فروع التغطية المراد تجميعها',
-    iprognNoLines: 'لا يوصي تقييم الاحتياجات هذا بأي فروع تغطية — لا شيء لتجميعه.',
+    iprognNoLines:
+      'لا يوصي تقييم الاحتياجات هذا بأي فروع تغطية — لا شيء لتجميعه.',
     iprognThisOneIs: 'تقييم الاحتياجات هذا حالته {status}.',
     iprognApprovedWord: 'معتمد',
     iprognOnlyApproved: 'لا يمكن تجميع البرنامج إلا من تقييم احتياجات',
-    iprognNoAssessmentSelected: 'لم يُختَر أي تقييم احتياجات — افتح تقييم احتياجات معتمداً وجمِّع البرنامج من هناك.',
+    iprognNoAssessmentSelected:
+      'لم يُختَر أي تقييم احتياجات — افتح تقييم احتياجات معتمداً وجمِّع البرنامج من هناك.',
     iprognNotFound:
       'تعذّر العثور على تقييم الاحتياجات هذا — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     iprognLoadError: 'تعذّر تحميل تقييم الاحتياجات — حاول مرة أخرى.',
@@ -291,7 +317,8 @@ export const DETAIL_PAGES = {
     nanAddButton: 'إضافة ملف مخاطر',
     nadHeading: 'تقييم الاحتياجات',
     nadRecommendedCoverage: 'التغطية الموصى بها',
-    nadApprovedPlacementNote: 'معتمد — يمكن لمسؤول التسويق/الفني الآن تجميع برنامج التأمين.',
+    nadApprovedPlacementNote:
+      'معتمد — يمكن لمسؤول التسويق/الفني الآن تجميع برنامج التأمين.',
     nadSaveError: 'تعذّر حفظ تقييم الاحتياجات — حاول مرة أخرى.',
     nadQuestionnaireLoadError: 'تعذّر تحميل الاستبيان — حاول مرة أخرى.',
     nadRiskQuestionnaire: 'استبيان المخاطر',
@@ -302,14 +329,18 @@ export const DETAIL_PAGES = {
     nadRecording: 'جارٍ التسجيل…',
     nadActionError: 'تعذّر إتمام هذا الإجراء — حاول مرة أخرى.',
     nadReviewPanelHeading: 'المراجعة والاعتماد',
-    nadReviewedNote: 'رُوجعت هذه التقييمات. اعتمدها لإطلاقها، أو أعِدها للتعديل.',
-    nadPendingReviewNote: 'سجّل مراجعتك للتغطية الموصى بها، ثم اعتمدها أو ارفضها. لا يمكن ربطها بفرصة أو طلب عرض سعر قبل الاعتماد.',
+    nadReviewedNote:
+      'رُوجعت هذه التقييمات. اعتمدها لإطلاقها، أو أعِدها للتعديل.',
+    nadPendingReviewNote:
+      'سجّل مراجعتك للتغطية الموصى بها، ثم اعتمدها أو ارفضها. لا يمكن ربطها بفرصة أو طلب عرض سعر قبل الاعتماد.',
     nadReviewApprovalHeading: 'المراجعة والاعتماد',
     nadReviewReasonLabel: 'السبب (مطلوب لإعادة الطلب للتعديل أو رفضه)',
-    nadGapNotePlaceholder: 'مثال: لا توجد تغطية للأمن السيبراني — العميل يحتفظ ببيانات البطاقات',
+    nadGapNotePlaceholder:
+      'مثال: لا توجد تغطية للأمن السيبراني — العميل يحتفظ ببيانات البطاقات',
     nadAssembleProgramButton: 'تجميع برنامج التأمين ←',
     nadAwaitingManager: 'بانتظار المراجعة والاعتماد من مدير الفرع أو القسم.',
-    nadNoCoverageLines: 'لا توجد فروع تغطية موصى بها بناءً على الإجابات الحالية.',
+    nadNoCoverageLines:
+      'لا توجد فروع تغطية موصى بها بناءً على الإجابات الحالية.',
     nadReviewedBy: 'راجعه',
     nadApprovedBy: 'اعتمده',
     nadAnswers: 'الإجابات',
@@ -338,13 +369,16 @@ export const DETAIL_PAGES = {
       'تعذّر العثور على هذا العميل المرتقب — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     prosdLoadError: 'تعذّر تحميل بيانات هذا العميل المرتقب — حاول مرة أخرى.',
     prosnHeading: 'تأهيل عميل مرتقب',
-    prosnIntro: 'العملية 2 — تحويل عميل محتمل مؤهَّل إلى عميل مرتقب، وتسجيل ملف تأهيله (القطاع، النشاط، الحجم، الموقع، جهة الاتصال، المنتجات محل الاهتمام، القسط المتوقع).',
+    prosnIntro:
+      'العملية 2 — تحويل عميل محتمل مؤهَّل إلى عميل مرتقب، وتسجيل ملف تأهيله (القطاع، النشاط، الحجم، الموقع، جهة الاتصال، المنتجات محل الاهتمام، القسط المتوقع).',
     prosnConverting: 'جارٍ التحويل…',
-    prosnConvertError: 'تعذّر تحويل هذا العميل المحتمل إلى عميل مرتقب — حاول مرة أخرى.',
+    prosnConvertError:
+      'تعذّر تحويل هذا العميل المحتمل إلى عميل مرتقب — حاول مرة أخرى.',
     prosnIndustryPlaceholder: 'مثال: الصناعات التحويلية',
     prosnSegmentPlaceholder: 'مثال: المنشآت الصغيرة والمتوسطة، الشركات الكبرى',
     prosnPremiumPlaceholder: 'مثال: 1250.500',
-    prosnLinesPlaceholder: 'مثال: التأمين الطبي، تأمين المركبات، تأمين الممتلكات',
+    prosnLinesPlaceholder:
+      'مثال: التأمين الطبي، تأمين المركبات، تأمين الممتلكات',
     prosnProductsOfInterest: 'المنتجات محل الاهتمام (اختياري، مفصولة بفواصل)',
     prosnExpectedPremium: 'القسط المتوقَّع بالدينار الأردني (اختياري)',
     prosnContactPerson: 'جهة الاتصال (اختياري)',
@@ -389,7 +423,6 @@ export const DETAIL_PAGES = {
     rsRemoveError: 'تعذّرت إزالة الأصل — حاول مرة أخرى.',
     rsAdding: 'جارٍ الإضافة…',
     rsAddButton: 'إضافة أصل',
-
 
     // ---- policies/[id] + leads/[id] — CONVERTED, not rewritten ----------
     // Both were already bilingual via inline ternaries; this Arabic is that
@@ -510,6 +543,25 @@ export const DETAIL_PAGES = {
     empdStatusLabel: 'Status:',
     empdHireDateLabel: 'Hire date:',
     empdLicensedRoleLabel: 'Licensed role:',
+    cbjApprovalHeading: 'CBJ approval',
+    cbjApprovalNone: 'No CBJ approval is recorded for this person.',
+    cbjApprovalStatusLabel: 'Approval status:',
+    cbjApprovalStatusCurrent: 'Current',
+    cbjApprovalStatusSuspended: 'Suspended',
+    cbjApprovalStatusCancelled: 'Cancelled',
+    cbjApprovalDateLabel: 'CBJ approval date:',
+    cbjApprovalDateUnrecorded: 'not recorded',
+    cbjApprovalTypes: 'Approved insurance types:',
+    cbjApprovalNoTypes: 'none — no branch recorded yet',
+    cbjApprovalNoBranches: 'No branches are recorded for this approval yet.',
+    cbjApprovalAddBranchLabel: 'Add a branch',
+    cbjApprovalAddBranch: 'Add',
+    cbjApprovalRemoveBranch: 'Remove',
+    cbjApprovalSave: 'Save approval',
+    cbjApprovalWithdraw: 'Withdraw approval',
+    cbjApprovalNotCounted:
+      'does not count toward the minimum approved staff — only a current approval does.',
+    cbjApprovalGenericError: 'Could not update the approval — try again.',
     // Correcting an employee record.
     empdCorrectOpen: 'Correct this record',
     empdCorrectLegend: 'Correct this record',
@@ -553,7 +605,8 @@ export const DETAIL_PAGES = {
     empdChecklistUpdateError: 'Could not update the checklist.',
     empdChecklistCompleteError: 'Could not complete the checklist.',
     empdRefusalAct: 'view this employee',
-    empdDeprovisioningTriggered: 'Triggered {at} — due the same business day (24h escalation to IT management if still open).',
+    empdDeprovisioningTriggered:
+      'Triggered {at} — due the same business day (24h escalation to IT management if still open).',
 
     upsHeading: 'Up-sell',
     upsUnderInsuranceFlagged: 'Under-insurance flagged',
@@ -561,7 +614,8 @@ export const DETAIL_PAGES = {
     upsDesignedSi: 'Designed Sum Insured',
     upsAssetValue: 'Current asset value',
     upsShortfall: 'Shortfall',
-    upsUnderinsuredRaised: 'Under-insured by more than {percent}% — a recommendation was raised.',
+    upsUnderinsuredRaised:
+      'Under-insured by more than {percent}% — a recommendation was raised.',
     upsAdequate: 'Adequately insured (within {percent}% of asset value).',
     upsFlaggedOn: 'Flagged {at}',
     upsDismissPlaceholder: 'e.g. client declined the increase',
@@ -620,7 +674,8 @@ export const DETAIL_PAGES = {
     xsLoading: 'Loading…',
     xsRefusalAct: 'view cross-sell opportunities',
     xsDetectRefusalAct: 'run the cross-sell scan',
-    xsNoOpportunities: 'No cross-sell opportunities for this customer. The nightly scan flags a gap when the customer holds an in-force policy but is missing a benchmark line.',
+    xsNoOpportunities:
+      'No cross-sell opportunities for this customer. The nightly scan flags a gap when the customer holds an in-force policy but is missing a benchmark line.',
     xsConfirmDismiss: 'Confirm dismiss',
     xsWhyNotPursued: 'Why is this gap not being pursued?',
     xsdFlagged: 'Flagged',
@@ -663,7 +718,8 @@ export const DETAIL_PAGES = {
     iprogdDerivedSi: 'Derived Sum Insured (from the risk survey)',
     iprogdReopenButton: 'Reopen for revision',
     iprogdReassembleButton: 'Re-assemble from current results',
-    iprogdReassemblyNote: 'A re-assembly would seed the Property All Risks and Business Interruption lines from these figures.',
+    iprogdReassemblyNote:
+      'A re-assembly would seed the Property All Risks and Business Interruption lines from these figures.',
     iprogdLines: 'Program lines',
     iprogdNoLines: 'No lines.',
     iprogdColLine: 'Insurance line',
@@ -672,7 +728,8 @@ export const DETAIL_PAGES = {
       'This insurance program could not be found — it may not exist, or you may not have access to it.',
     iprogdLoadError: 'Could not load this insurance program — try again.',
     iprogdToMarketError: 'Could not take this program to market — try again.',
-    iprogdNotStarted: 'Not started — Property / BI lines have no Sum Insured basis yet',
+    iprogdNotStarted:
+      'Not started — Property / BI lines have no Sum Insured basis yet',
     iprogdFinalizeError: 'Could not finalize — try again.',
     iprogdWorking: 'Working…',
     iprogdFinalizeButton: 'Finalize',
@@ -685,11 +742,13 @@ export const DETAIL_PAGES = {
     iprognHeading: 'Assemble an insurance program',
     iprognRefusalAct: 'assemble an insurance programme',
     iprognCoverageLines: 'Coverage lines to assemble',
-    iprognNoLines: 'This needs assessment recommends no coverage lines — nothing to assemble.',
+    iprognNoLines:
+      'This needs assessment recommends no coverage lines — nothing to assemble.',
     iprognThisOneIs: 'This one is {status}.',
     iprognApprovedWord: 'approved',
     iprognOnlyApproved: 'A program can only be assembled from an',
-    iprognNoAssessmentSelected: 'No needs assessment selected — open an approved needs assessment and assemble the program from there.',
+    iprognNoAssessmentSelected:
+      'No needs assessment selected — open an approved needs assessment and assemble the program from there.',
     iprognNotFound:
       'That needs assessment could not be found — it may not exist, or you may not have access to it.',
     iprognLoadError: 'Could not load the needs assessment — try again.',
@@ -748,7 +807,8 @@ export const DETAIL_PAGES = {
     nanLoadingRiskProfiles: 'Loading risk profiles…',
     nanHeading: 'New needs assessment',
     nanRefusalAct: 'start a needs assessment',
-    nanSelectToStart: 'Select or add a risk profile to start the questionnaire.',
+    nanSelectToStart:
+      'Select or add a risk profile to start the questionnaire.',
     nanPriorClaims: 'Prior claims history summary (optional)',
     nanNewProfileSite: 'New risk profile — site label (optional)',
     nanExistingProfile: 'Existing risk profile',
@@ -762,7 +822,8 @@ export const DETAIL_PAGES = {
     nanAddButton: 'Add risk profile',
     nadHeading: 'Needs assessment',
     nadRecommendedCoverage: 'Recommended coverage',
-    nadApprovedPlacementNote: 'Approved — a Placement/Technical Officer can now assemble the insurance program.',
+    nadApprovedPlacementNote:
+      'Approved — a Placement/Technical Officer can now assemble the insurance program.',
     nadSaveError: 'Could not save the needs assessment — try again.',
     nadQuestionnaireLoadError: 'Could not load the questionnaire — try again.',
     nadRiskQuestionnaire: 'Risk questionnaire',
@@ -773,14 +834,19 @@ export const DETAIL_PAGES = {
     nadRecording: 'Recording…',
     nadActionError: 'Could not complete that action — try again.',
     nadReviewPanelHeading: 'Review and approval',
-    nadReviewedNote: 'This assessment has been reviewed. Approve it to release it, or send it back for changes.',
-    nadPendingReviewNote: 'Record your review of the recommended cover, then approve or reject it. It cannot be linked to an opportunity or RFQ until approved.',
+    nadReviewedNote:
+      'This assessment has been reviewed. Approve it to release it, or send it back for changes.',
+    nadPendingReviewNote:
+      'Record your review of the recommended cover, then approve or reject it. It cannot be linked to an opportunity or RFQ until approved.',
     nadReviewApprovalHeading: 'Review & approval',
     nadReviewReasonLabel: 'Reason (required to return for changes or reject)',
-    nadGapNotePlaceholder: 'e.g. Cyber cover is missing — client stores card data',
+    nadGapNotePlaceholder:
+      'e.g. Cyber cover is missing — client stores card data',
     nadAssembleProgramButton: 'Assemble insurance program →',
-    nadAwaitingManager: 'Awaiting review and approval by a Branch/Department Manager.',
-    nadNoCoverageLines: 'No coverage lines recommended from the current answers.',
+    nadAwaitingManager:
+      'Awaiting review and approval by a Branch/Department Manager.',
+    nadNoCoverageLines:
+      'No coverage lines recommended from the current answers.',
     nadReviewedBy: 'Reviewed by',
     nadApprovedBy: 'Approved by',
     nadAnswers: 'Answers',
@@ -808,7 +874,8 @@ export const DETAIL_PAGES = {
       'This prospect could not be found — it may not exist, or you may not have access to it.',
     prosdLoadError: 'Could not load this prospect — try again.',
     prosnHeading: 'Qualify prospect',
-    prosnIntro: 'Process 2 — convert a qualified lead into a prospect and capture its qualification profile (sector, activity, size, location, contact, products of interest, expected premium).',
+    prosnIntro:
+      'Process 2 — convert a qualified lead into a prospect and capture its qualification profile (sector, activity, size, location, contact, products of interest, expected premium).',
     prosnConverting: 'Converting…',
     prosnConvertError: 'Could not convert this lead to a prospect — try again.',
     prosnIndustryPlaceholder: 'e.g. Manufacturing',
@@ -859,7 +926,6 @@ export const DETAIL_PAGES = {
     rsRemoveError: 'Could not remove the asset — try again.',
     rsAdding: 'Adding…',
     rsAddButton: 'Add asset',
-
 
     // ---- policies/[id] + leads/[id] — CONVERTED, not rewritten ----------
     // Both were already bilingual via inline ternaries; this Arabic is that

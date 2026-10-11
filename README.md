@@ -9243,6 +9243,44 @@ oversight is silent" convention:
   of a licence form — the forms were not available — and a guard refuses any future schema change
   that would store a type and let one exist without a branch behind it.
 
+  **A PERSON'S CBJ APPROVAL (Module 0 item (g)), migration `20261114100000`.** `Employee` carries
+  `cbjApprovalStatus` (`CURRENT` / `SUSPENDED` / `CANCELLED`, NULL for the staff who hold none) and
+  `cbjApprovalDate`, with `EmployeeCbjApprovalBranch` holding the branches it covers — the same
+  two-nullable-FK shape as the licence scope one level up, and the approved TYPE is likewise the
+  branch's own `category` rather than a stored column.
+
+  **It is on the PERSON, not on the login, and that is a correction to the brief.** The item was
+  written as "a marker on the user"; the CBJ approves a natural person, item (f) counts approved
+  PERSONS, an approved broker may hold no login at all, and this system already has a `User` with no
+  `Employee` behind it (the external auditor) — on `User` a login would have become a precondition
+  of CBJ approval.
+
+  **It is not new, either.** `Employee.licensedRole` is free text meaning "regulated staff
+  licensing/certification" and was already carrying exactly this, in two different spellings:
+  measured before anything was built, 47 of 136 employees on dev read `CBJ Licensed Insurance
+  Broker` and 7 of 147 on db-test read `CBJ-licensed Broker Representative`. All 54 are migrated,
+  the free-text column is **re-scoped to any OTHER certification**, and `@IsNotCbjApproval()` on
+  every DTO that declares it refuses CBJ-ish text by name so the second home cannot come back one
+  record at a time. The migrated rows carry a status and a **NULL date** — stamping them with the
+  migration date would record a fact nobody can source — and the screen says "not recorded" rather
+  than an em dash.
+
+  **The marker is deliberately NOT an authorization input.** Item (h) puts scope on the ROLE;
+  `employee-cbj-approval.guard.spec.ts` reads the six files of the authorization path and fails if
+  any of them mentions the marker, because a capability that depended on it would be withdrawn by a
+  CBJ suspension with nothing on the Role screen to show it.
+
+  **MINIMUM APPROVED STAFF (Module 0 item (f)).** One approved person for one insurance type, two
+  for both. **The refusal is the both-types case only**, which is the brief's own wording and was
+  narrowed by measurement: the generalised form ("any branch that raises the requirement") refused a
+  brand-new office its FIRST branch, because db-test's only office records 0 CURRENT approvals with
+  no termination date and the branch is the only thing that could ever justify the person — § 1.62's
+  unreachable-precondition shape. So the one-type shortfall is REPORTED on `GET
+  /broker-license/scope`'s `staffing` block and on the screen, never refused. Only `CURRENT` counts,
+  and only somebody who has not left, so an office cannot meet a minimum with a suspension or a
+  vacancy; and `requiredBefore < 2` keeps a later suspension from locking an office out of
+  correcting a branch list it already legitimately holds.
+
   **The lapse check is a pure LIVE recompute
   (`isBrokerLicenseCurrentlyLapsed(license, now) = status === 'lapsed' || expiresAt <=
   now`), not a scheduler-maintained flag** — deliberately: the #16 `@code-reviewer` MAJOR
