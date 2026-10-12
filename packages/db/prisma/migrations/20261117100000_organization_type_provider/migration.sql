@@ -1,0 +1,42 @@
+-- MODULE 0 ITEM (j), GAP CLOSURE — a third OrganizationType: PROVIDER.
+--
+-- Its own migration, carrying nothing else, for the recorded Postgres reason: `ALTER TYPE ... ADD
+-- VALUE` cannot be used in the SAME transaction that then uses the new label, and the next
+-- migration's partial unique index names 'PROVIDER' in its WHERE clause. The
+-- `20261027110000_discard_audit_action` precedent, met for the second time.
+--
+-- ============================================================================================
+-- WHY A THIRD TYPE AND NOT A FLAG
+-- ============================================================================================
+-- Item (j) shipped the provider dashboard with a declared gap: "only the provider may read this" is
+-- not expressible, because every user belongs to an Organization and there is no platform-operator
+-- identity. The owner's decision is to MAKE IT EXPRESSIBLE rather than hide the control.
+--
+-- A `isProvider` boolean beside `type` would be a second place the same fact lives, and the two
+-- could disagree — a BROKERAGE_OFFICE flagged as the provider. The type already answers "what kind
+-- of thing is this organization", which is exactly the question, so it gains a value rather than a
+-- companion.
+--
+-- NO DEFAULT, consistent with item (a): `Organization.type` has never had one, because neither
+-- value is stricter and a default silently decides a fact somebody forgot to state. Adding a third
+-- value does not change that argument.
+--
+-- ============================================================================================
+-- WHAT THIS DOES NOT NEED TO CHANGE, AND WHY — measured, not assumed
+-- ============================================================================================
+-- `Organization_broker_kind_matches_type` (item (b)) reads:
+--
+--   CHECK ((type = 'BROKERAGE_OFFICE' AND "brokerKind" IS NOT NULL)
+--       OR (type <> 'BROKERAGE_OFFICE' AND "brokerKind" IS NULL))
+--
+-- It was written as the NEGATION rather than naming `INSURANCE_COMPANY`, so a PROVIDER row with a
+-- NULL `brokerKind` satisfies it unchanged. That was not foresight about this migration — it was
+-- the two-sided form item (b) chose so an insurer could not carry a broker kind — and it happens to
+-- generalise correctly. Verified by reading `pg_get_constraintdef`, not by reading the migration
+-- that created it.
+--
+-- The provider organization is created by the SEED, never here. A migration that invents an
+-- organization is a migration that invents a tenant: it would arrive in production with no decision
+-- behind it, and `SEED_SAMPLE_DATA` is what keeps it out of production.
+
+ALTER TYPE "OrganizationType" ADD VALUE 'PROVIDER';

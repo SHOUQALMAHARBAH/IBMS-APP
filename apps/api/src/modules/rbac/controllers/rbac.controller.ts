@@ -24,6 +24,7 @@ import {
 } from '../dto/role-crud.dto';
 import { PermissionRepository } from '../../../repositories/permission.repository';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
+import { SetRoleScopeDto } from '../dto/role-scope.dto';
 
 const roleListSchema = {
   type: 'array' as const,
@@ -143,6 +144,24 @@ export class RbacController {
    * This is the FIRST consumer of `@RequireStepUp`. The gate has existed since
    * backlog A.1 with no business endpoint to attach to; its own comment said so.
    */
+  /**
+   * MODULE 0 ITEM (h) — a role's insurance-line scope.
+   *
+   * `role.update`, the same code as the rest of role configuration, and NO `@RequireStepUp()`:
+   * step-up guards the MFA attributes because relaxing one WEAKENS a security control, and a scope
+   * only ever narrows what a role reaches. Stated because the neighbouring route has it and a
+   * reader would otherwise wonder whether it was forgotten.
+   */
+  @RequirePermissions('role.update')
+  @Patch('roles/:id/scope')
+  setRoleScope(
+    @Param('id') id: string,
+    @Body() dto: SetRoleScopeDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.roleAdmin.setScope(id, dto, user.id);
+  }
+
   @RequirePermissions('role.update')
   @RequireStepUp()
   @Patch('roles/:id/security-attributes')

@@ -22,7 +22,10 @@ import { RecommendationRepository } from '../../repositories/recommendation.repo
 import { ClientDecisionRepository } from '../../repositories/client-decision.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
-import { isBrokerLicenseCurrentlyLapsed } from '../compliance-risk/broker-license.config';
+import {
+  isBrokerLicenseCurrentlyLapsed,
+  pickCurrentTerm,
+} from '../compliance-risk/broker-license.config';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { canReadAllPolicyOwners } from '../../common/rbac-visibility.util';
@@ -55,7 +58,9 @@ import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import type { AttachPolicyDocumentsDto } from './dto/attach-policy-documents.dto';
 import type { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
+import { assertWithinRoleScope } from '../../common/role-scope';
 import { insurerIdentity } from '../../repositories/insurer-identity';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 interface PolicyScheduleView {
   id: string;
@@ -289,6 +294,10 @@ export class PolicyService {
     private readonly brokerLicenses: BrokerLicenseRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    // Module 0 item (h). A REPOSITORY across the module boundary — this codebase's one
+    // established cross-module shape — for the line's own `category`, which the role-scope
+    // decision needs and this module has no other way to know.
+    private readonly lines: InsuranceLineRepository,
   ) {}
 
   /** Placement / Manager / Executive work the whole book; a Policy Checking
@@ -354,29 +363,46 @@ export class PolicyService {
   /** Process 51 (backlog Part C #51's first checkbox) — "automatically
    * block new business issuance once the license lapses." Checked first in
    * `place()`, before any other precondition — the cheapest, most
-   * fail-fast gate, and logically prior to everything else (a lapsed
+   * fail-fast gate, and logically prior to everything else (an unlicensed
    * broker may not even begin placing new business, regardless of how
    * complete its opportunity/recommendation/decision chain is).
    *
-   * No `BrokerLicense` record configured at all is treated as **not
-   * blocked** — deliberately, not an oversight: this system is built for an
-   * already-operating, already-licensed brokerage, and dozens of existing
-   * policy/endorsement/claim/finance e2e and unit tests place a Policy
-   * without ever configuring one. Treating "unconfigured" the same as
-   * "lapsed" would make every one of them fail the moment this gate
-   * shipped, for a condition none of them are testing. Once Compliance
-   * creates the record (`POST /broker-license`), the live check below
-   * takes over immediately — see `isBrokerLicenseCurrentlyLapsed` for why it
-   * is a live recompute, not a stored-flag read. */
+   * ## ABSENCE BLOCKS. It used to pass, and the regulation is why that was wrong.
+   *
+   * **CBJ Instructions No. 9 of 2026, art. 21/a/9** makes practising after a licence has ended a
+   * ground for administrative sanction. An office with NO licence term on record is not a milder
+   * case of that — it is further from compliant than one whose licence merely lapsed, because the
+   * lapsed office can at least show what it once held.
+   *
+   * What stood here before was a fourteen-line argument for treating "no record configured" as
+   * "not blocked". Its reasoning was TEST CONVENIENCE: that dozens of policy/endorsement/claim/
+   * finance specs place a Policy without configuring a licence, and that blocking absence would
+   * fail all of them for a condition none of them are testing. That is a true observation about the
+   * test suite and not a reason to leave a regulatory gate open — so the suites and the seed now
+   * provide a licence, and this refuses.
+   *
+   * Nothing is derived from the stored `status` column alone — see
+   * `isBrokerLicenseCurrentlyLapsed` for why it is a live recompute rather than a stored-flag read,
+   * so the block is correct the INSTANT `expiresAt` passes rather than after some sweep has run. */
   private async assertLicenseNotLapsed(): Promise<void> {
-    const license = await this.brokerLicenses.findCurrent();
-    if (!license) return;
-    if (isBrokerLicenseCurrentlyLapsed(license, new Date())) {
+    // The office's LATEST term, not the one covering today: between filing a renewal (due 45 days
+    // before expiry, art. 11) and the old term running out, an office legitimately holds two, and
+    // the newer one is what says whether it may practise.
+    const current = pickCurrentTerm(await this.brokerLicenses.findTerms());
+    if (!current) {
       throw new UnprocessableEntityException(
-        `New business issuance is blocked — the broker's CBJ license (${license.licenseNumber}) has lapsed` +
-          (license.status === 'lapsed'
+        'New business issuance is blocked — this office holds no CBJ broker license term on record.' +
+          ' Practising without a current licence is a ground for administrative sanction (CBJ' +
+          " Instructions No. 9 of 2026, art. 21/a/9). Record the office's licence and its" +
+          ' certificate at Compliance before placing new business.',
+      );
+    }
+    if (isBrokerLicenseCurrentlyLapsed(current, new Date())) {
+      throw new UnprocessableEntityException(
+        `New business issuance is blocked — the broker's CBJ license (${current.licenseNumber}) has lapsed` +
+          (current.status === 'lapsed'
             ? '.'
-            : ` (expired ${license.expiresAt.toISOString()}).`) +
+            : ` (expired ${current.expiresAt.toISOString()}).`) +
           ' Contact Compliance to renew it before placing new business.',
       );
     }
@@ -597,6 +623,31 @@ export class PolicyService {
       throw new UnprocessableEntityException(
         'expiryDate must be after the inception date.',
       );
+    }
+
+    /*
+     * MODULE 0 ITEM (h) — the role scope, on the line this policy inherits from its RFQ.
+     *
+     * Placement is where business becomes real, so this is the check that matters most; and it is
+     * re-made here rather than trusted from the RFQ for the same reason the RFQ does not trust the
+     * programme — a different person places it. Positioned AFTER the licence gate and the date
+     * checks and BEFORE the write, so a scoped officer gets the scope refusal rather than a
+     * duplicate-policy conflict that tells them nothing about why they cannot proceed.
+     */
+    const scopedLineId =
+      quote.rfq.insuranceLineId ?? quote.rfq.officeInsuranceLineId ?? null;
+    if (scopedLineId !== null) {
+      const category = await this.lines.findCategory(
+        quote.rfq.insuranceLineId,
+        quote.rfq.officeInsuranceLineId,
+      );
+      if (category) {
+        assertWithinRoleScope(
+          actor,
+          { category, lineId: scopedLineId },
+          'place a policy',
+        );
+      }
     }
 
     let created: Policy;

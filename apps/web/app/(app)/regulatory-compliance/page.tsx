@@ -8,9 +8,20 @@ import {
   createBrokerLicense,
   getBrokerLicense,
   markBrokerLicenseLapsed,
+  recordRenewalRequest,
   renewBrokerLicense,
   type BrokerLicense,
 } from '../../../lib/compliance-risk/broker-license-api';
+import {
+  addLicenseScopeBranch,
+  getLicenseScope,
+  removeLicenseScopeBranch,
+  type LicenseScope,
+} from '../../../lib/compliance-risk/broker-license-scope-api';
+import {
+  listInsuranceLines,
+  type InsuranceLine,
+} from '../../../lib/insurer/insurance-line-api';
 import {
   createComplianceCalendarItem,
   listComplianceCalendarItems,
@@ -25,7 +36,6 @@ import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 
-
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid var(--border-subtle)',
@@ -36,6 +46,16 @@ const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
   borderBottom: '2px solid var(--border-default)',
+};
+/* A WARNING, not an error. Module 0 item (d) requires the admin be told to verify a non-31-December
+ * expiry and NOT be blocked, so this is visually and semantically distinct from `errorStyle`: the
+ * same shape `settings/roles` uses for its duty-segregation warning. */
+const warningStyle: CSSProperties = {
+  border: '1px solid var(--border-default)',
+  borderInlineStartWidth: '4px',
+  padding: '0.6rem 0.75rem',
+  margin: '0.75rem 0',
+  maxWidth: '48rem',
 };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
@@ -52,10 +72,18 @@ const labelStyle: CSSProperties = {
 export default function RegulatoryCompliancePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  // `language` picks the Arabic or English name of a catalogue line at RENDER, which is the
+  // established fix: resolving it at fetch time pins the label to whichever language was active
+  // when the data arrived.
+  const { t, language } = useLanguage();
   const canManage = hasPermission(user, 'license.manage');
 
+  // `license` is the CURRENT term; `terms` is the whole series. Module 0 item (c) turned the
+  // licence from one row into a series, and the screen shows both: the term that decides whether
+  // the office may practise, and the history a regulator asks for.
   const [license, setLicense] = useState<BrokerLicense | null>(null);
+  const [terms, setTerms] = useState<BrokerLicense[]>([]);
+  const [licenseLoaded, setLicenseLoaded] = useState(false);
   const [licenseLoadError, setLicenseLoadError] = useState<string | null>(null);
   const [items, setItems] = useState<ComplianceCalendarItem[] | null>(null);
   const [itemsLoadError, setItemsLoadError] = useState<string | null>(null);
@@ -66,6 +94,18 @@ export default function RegulatoryCompliancePage() {
   const [scopeOfAuthorization, setScopeOfAuthorization] = useState('');
   const [issuedAt, setIssuedAt] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
+  // Deliberately NOT pre-filled from the current term, unlike the fields below it: every term has
+  // its OWN certificate, so carrying the previous one's file name forward would assert that the new
+  // term is evidenced by the old document.
+  const [certificateFileName, setCertificateFileName] = useState('');
+  const [certificateStorageRef, setCertificateStorageRef] = useState('');
+  const [renewalRequestedAt, setRenewalRequestedAt] = useState('');
+  // Module 0 item (e). The scope is loaded separately from the licence because a reader may hold
+  // `license.manage` and the office may still have no term — in which case the scope route 404s and
+  // the licence panel is the one that explains why.
+  const [scope, setScope] = useState<LicenseScope | null>(null);
+  const [lines, setLines] = useState<InsuranceLine[]>([]);
+  const [branchLineId, setBranchLineId] = useState('');
   const [obligationName, setObligationName] = useState('');
   const [ownerUserId, setOwnerUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -75,21 +115,46 @@ export default function RegulatoryCompliancePage() {
 
   const loadLicense = useCallback(async () => {
     try {
-      setLicense(await getBrokerLicense());
+      const series = await getBrokerLicense();
+      setLicense(series.current);
+      setTerms(series.terms);
+      setLicenseLoaded(true);
       setLicenseLoadError(null);
     } catch (err) {
       setLicense(null);
+      setTerms([]);
+      setLicenseLoaded(false);
+      // The 404 branch that used to sit here is GONE because the route no longer returns one: an
+      // office with no licence is answered as `{ current: null, terms: [] }`. A 404 could not be
+      // told apart from a broken page, and this is the state that BLOCKS new business, so it has to
+      // be rendered rather than reported as a load failure.
       setLicenseLoadError(
         err instanceof ApiError && err.status === 403
           ? permissionRefusal(t, 'rcRefusalAct', 'license.manage')
-          : err instanceof ApiError && err.status === 404
-            ? t('rcNoLicense')
-            : err instanceof ApiError
-              ? err.message
-              : t('rcLicenseLoadError'),
+          : err instanceof ApiError
+            ? err.message
+            : t('rcLicenseLoadError'),
       );
     }
   }, [t]);
+
+  const loadScope = useCallback(async () => {
+    try {
+      setScope(await getLicenseScope());
+    } catch {
+      // A 404 here means the office holds no term yet, which the licence panel above already says
+      // in full. Repeating it as a second error would make one problem look like two.
+      setScope(null);
+    }
+  }, []);
+
+  const loadLines = useCallback(async () => {
+    try {
+      setLines(await listInsuranceLines());
+    } catch {
+      setLines([]);
+    }
+  }, []);
 
   const loadItems = useCallback(async () => {
     try {
@@ -99,7 +164,11 @@ export default function RegulatoryCompliancePage() {
       setItems(null);
       setItemsLoadError(
         err instanceof ApiError && err.status === 403
-          ? permissionRefusal(t, 'rcCalendarRefusalAct', 'compliance-calendar.manage')
+          ? permissionRefusal(
+              t,
+              'rcCalendarRefusalAct',
+              'compliance-calendar.manage',
+            )
           : err instanceof ApiError
             ? err.message
             : t('rcCalendarLoadError'),
@@ -114,9 +183,15 @@ export default function RegulatoryCompliancePage() {
     if (!user) return;
     void (async () => {
       await loadLicense();
+      // Module 0 item (e). Omitted from this effect in the first version, so the scope section
+      // never rendered at all — the api, the client and the markup were right and the screen was
+      // simply never asked. Caught by the Playwright tests, which is the only layer that could:
+      // nothing type-checks "is this loader actually called on mount".
+      await loadScope();
+      await loadLines();
       await loadItems();
     })();
-  }, [user, loadLicense, loadItems, t]);
+  }, [user, loadLicense, loadScope, loadLines, loadItems, t]);
   // A @code-reviewer MINOR: renew() replaces every field, so pre-filling
   // the form from the current record (rather than starting blank) stops an
   // officer who only means to push out expiresAt from silently wiping a
@@ -140,6 +215,7 @@ export default function RegulatoryCompliancePage() {
     try {
       await fn();
       await loadLicense();
+      await loadScope();
       await loadItems();
     } catch (err) {
       setActionError(
@@ -158,12 +234,26 @@ export default function RegulatoryCompliancePage() {
         scopeOfAuthorization: scopeOfAuthorization.trim() || undefined,
         issuedAt: issuedAt || undefined,
         expiresAt,
+        certificateFileName: certificateFileName.trim(),
+        certificateStorageRef: certificateStorageRef.trim(),
       };
       if (license) {
         await renewBrokerLicense(payload);
       } else {
         await createBrokerLicense(payload);
       }
+      // Cleared so the next term cannot be recorded against the certificate just filed.
+      setCertificateFileName('');
+      setCertificateStorageRef('');
+    });
+  }
+
+  async function submitRenewalRequest() {
+    await run(async () => {
+      await recordRenewalRequest({
+        requestedAt: renewalRequestedAt || undefined,
+      });
+      setRenewalRequestedAt('');
     });
   }
 
@@ -186,14 +276,17 @@ export default function RegulatoryCompliancePage() {
   return (
     <main style={pageStyle}>
       <h1>{t('rcHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('rcIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('rcIntro')}</p>
 
       <h2>{t('rcLicenseHeading')}</h2>
       {licenseLoadError ? (
         <p role="alert" style={errorStyle}>
           {licenseLoadError}
+        </p>
+      ) : null}
+      {licenseLoaded && !license ? (
+        <p role="alert" style={errorStyle}>
+          {t('rcNoLicenseBlocksBusiness')}
         </p>
       ) : null}
       {license ? (
@@ -215,8 +308,60 @@ export default function RegulatoryCompliancePage() {
                 <td style={cell}>{t('rcExpires')}</td>
                 <td style={cell}>{license.expiresAt.slice(0, 10)}</td>
               </tr>
+              <tr>
+                <td style={cell}>{t('rcRenewalDueBy')}</td>
+                <td style={cell}>{license.renewalDueBy.slice(0, 10)}</td>
+              </tr>
+              <tr>
+                <td style={cell}>{t('rcColRenewalFiled')}</td>
+                <td style={cell}>
+                  {license.renewalRequestedAt
+                    ? license.renewalRequestedAt.slice(0, 10)
+                    : t('rcNotFiled')}
+                </td>
+              </tr>
+              {license.expectedExpiryForThreeYearTerm ? (
+                <tr>
+                  <td style={cell}>{t('rcExpectedThreeYearExpiry')}</td>
+                  <td style={cell}>
+                    {license.expectedExpiryForThreeYearTerm.slice(0, 10)}
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
+
+          {/* Art. 10/b. A warning to VERIFY, never a refusal — the date is entered as printed on
+              the certificate and the certificate is the authority. */}
+          {!license.expiryIsEndOfCalendarYear ? (
+            <p
+              style={warningStyle}
+              role="status"
+              data-expiry-not-end-of-year=""
+            >
+              {t('rcExpiryNotEndOfYearWarning')}
+            </p>
+          ) : null}
+
+          {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
+              system is content with, and explain neither. */}
+          {license.validByOperationOfLaw ? (
+            <p
+              style={warningStyle}
+              role="status"
+              data-valid-by-operation-of-law=""
+            >
+              {t('rcValidByOperationOfLaw')}
+            </p>
+          ) : null}
+
+          {/* Filed, but late — so the extension above will NOT apply when the term runs out. Said
+              while there is still time to do something about it. */}
+          {license.renewalRequestedAt && !license.renewalFiledOnTime ? (
+            <p style={warningStyle} role="status" data-renewal-filed-late="">
+              {t('rcRenewalFiledLate')}
+            </p>
+          ) : null}
           {canManage && !license.isCurrentlyLapsed ? (
             <button
               type="button"
@@ -227,7 +372,244 @@ export default function RegulatoryCompliancePage() {
               {t('rcMarkLapsedButton')}
             </button>
           ) : null}
+          {/* Write-once: art. 11 measures lateness from the filing date, so the control disappears
+              once one is recorded rather than offering an edit the API would refuse. */}
+          {canManage && !license.renewalRequestedAt ? (
+            <div style={{ marginTop: '0.5rem' }}>
+              <label style={labelStyle}>
+                {t('rcColRenewalFiled')}
+                <input
+                  type="date"
+                  aria-label={t('rcColRenewalFiled')}
+                  value={renewalRequestedAt}
+                  onChange={(e) => setRenewalRequestedAt(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void submitRenewalRequest()}
+              >
+                {t('rcRecordRenewalButton')}
+              </button>
+            </div>
+          ) : null}
+          {terms.length > 1 ? (
+            <div style={{ marginTop: '1rem' }}>
+              <h3>{t('rcTermsHeading')}</h3>
+              {/* A stable hook: this screen renders three tables (the current term, this series,
+                  and the compliance calendar), so a positional locator in a test would silently
+                  follow whichever happens to be last. */}
+              <table
+                data-testid="licence-terms"
+                style={{ borderCollapse: 'collapse' }}
+              >
+                <thead>
+                  <tr>
+                    <th style={cell}>{t('rcLicenseNumberLabel')}</th>
+                    <th style={cell}>{t('rcIssuedAtLabel')}</th>
+                    <th style={cell}>{t('rcExpiresAtLabel')}</th>
+                    <th style={cell}>{t('rcColStatus')}</th>
+                    <th style={cell}>{t('rcColRenewalFiled')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {terms.map((term) => (
+                    <tr key={term.id}>
+                      <td style={cell}>
+                        {term.licenseNumber}
+                        {term.id === license.id
+                          ? ` (${t('rcCurrentTerm')})`
+                          : ''}
+                      </td>
+                      <td style={cell}>
+                        {term.issuedAt ? term.issuedAt.slice(0, 10) : '—'}
+                      </td>
+                      <td style={cell}>{term.expiresAt.slice(0, 10)}</td>
+                      <td style={cell}>
+                        {t(ENUM_LABEL.BrokerLicenseStatus[term.status])}
+                      </td>
+                      <td style={cell}>
+                        {term.renewalRequestedAt
+                          ? term.renewalRequestedAt.slice(0, 10)
+                          : t('rcNotFiled')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
+      ) : null}
+
+      {scope ? (
+        <section>
+          <h2>{t('rcScopeHeading')}</h2>
+
+          {/* Art. 3/a. Said BEFORE the add form rather than only in the refusal, so an officer
+              learns the limit before hitting it. */}
+          {scope.brokerKind === 'NATURAL_PERSON' ? (
+            <p style={warningStyle} role="status" data-sole-establishment="">
+              {t('rcScopeSoleEstablishmentNote')}
+            </p>
+          ) : null}
+
+          <p>
+            <strong>{t('rcScopeTypes')}:</strong>{' '}
+            <span data-licence-types="">
+              {scope.types.length > 0
+                ? scope.types
+                    .map(
+                      (type) =>
+                        `${t(ENUM_LABEL.InsuranceLineCategory[type])} (${
+                          scope.branchCountByType[type] ?? 0
+                        })`,
+                    )
+                    .join(' · ')
+                : '—'}
+            </span>
+          </p>
+
+          <h3>{t('rcScopeBranches')}</h3>
+          {scope.branches.length === 0 ? (
+            <p style={{ opacity: 0.75 }}>{t('rcScopeNoBranches')}</p>
+          ) : (
+            <table
+              data-licence-branches=""
+              style={{ borderCollapse: 'collapse' }}
+            >
+              <thead>
+                <tr>
+                  <th style={cell}>{t('rcScopeColBranch')}</th>
+                  <th style={cell}>{t('rcScopeColType')}</th>
+                  {canManage ? <th style={cell} /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {scope.branches.map((branch) => (
+                  <tr key={branch.id}>
+                    <td style={cell}>
+                      {language === 'AR' ? branch.nameAr : branch.nameEn}
+                    </td>
+                    <td style={cell}>
+                      {t(ENUM_LABEL.InsuranceLineCategory[branch.category])}
+                    </td>
+                    {canManage ? (
+                      <td style={cell}>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => removeLicenseScopeBranch(branch.id))
+                          }
+                        >
+                          {t('rcScopeRemove')}
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {canManage ? (
+            <div style={{ marginTop: '0.5rem' }}>
+              <label style={labelStyle}>
+                {t('rcScopeBranchLabel')}
+                {/* A SELECT over the managed catalogue, not a free-text field: a branch is a
+                    catalogue row, and typing one would invite a name the catalogue does not hold.
+                    `isStandard` decides WHICH id the api is given — the two catalogues are
+                    addressed by different fields and exactly one may be named. */}
+                <select
+                  aria-label={t('rcScopeBranchLabel')}
+                  value={branchLineId}
+                  onChange={(e) => setBranchLineId(e.target.value)}
+                >
+                  <option value="">—</option>
+                  {lines.map((line) => (
+                    <option key={line.id} value={line.id}>
+                      {(language === 'AR' ? line.nameAr : line.nameEn) +
+                        ' · ' +
+                        t(ENUM_LABEL.InsuranceLineCategory[line.category])}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={busy || !branchLineId}
+                onClick={() =>
+                  void run(async () => {
+                    const line = lines.find((l) => l.id === branchLineId);
+                    if (!line) return;
+                    await addLicenseScopeBranch(
+                      line.isStandard
+                        ? { insuranceLineId: line.id }
+                        : { officeInsuranceLineId: line.id },
+                    );
+                    setBranchLineId('');
+                  })
+                }
+              >
+                {t('rcScopeAddBranch')}
+              </button>
+            </div>
+          ) : null}
+
+          <h3>{t('rcStaffingHeading')}</h3>
+          {/* Item (f). Stated while the form is still empty: the refusal only fires on the branch
+              that would add a SECOND type, so a screen that waited for it would teach the rule by
+              failure. Both numbers come from the server, computed by the same function the refusal
+              uses, so the two cannot disagree. */}
+          <p data-staffing="">
+            {t('rcStaffingRequired')} {scope.staffing.requiredApprovedStaff} ·{' '}
+            {t('rcStaffingCurrent')} {scope.staffing.currentApprovedStaff}
+          </p>
+          {scope.staffing.meetsRequirement ? (
+            <p style={{ opacity: 0.75 }} data-staffing-ok="">
+              {t('rcStaffingMetNote')}
+            </p>
+          ) : (
+            <p style={warningStyle} role="status" data-staffing-short="">
+              {t('rcStaffingShortNote')}
+            </p>
+          )}
+
+          <h3>{t('rcCapitalHeading')}</h3>
+          <table style={{ borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr>
+                <td style={cell}>{t('rcCapitalRequired')}</td>
+                <td style={cell} data-required-capital="">
+                  {scope.capital.requiredCapital}
+                </td>
+              </tr>
+              <tr>
+                <td style={cell}>{t('rcCapitalPaidUp')}</td>
+                <td style={cell}>{scope.capital.paidUpCapital ?? '—'}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Three STATES, not two. "Nothing recorded" is a missing fact about the office;
+              "recorded and short" is a finding about its capital. Conflating them would tell an
+              office it is undercapitalised when nobody has typed the number. Neither blocks. */}
+          {scope.capital.capitalIsUnrecorded ? (
+            <p style={warningStyle} role="status" data-capital-unrecorded="">
+              {t('rcCapitalUnrecordedWarning')}
+            </p>
+          ) : scope.capital.meetsRequirement ? (
+            <p style={{ opacity: 0.75 }} data-capital-ok="">
+              {t('rcCapitalMeets')}
+            </p>
+          ) : (
+            <p style={warningStyle} role="status" data-capital-shortfall="">
+              {t('rcCapitalShortfallWarning')}
+            </p>
+          )}
+        </section>
       ) : null}
 
       {canManage ? (
@@ -238,6 +620,24 @@ export default function RegulatoryCompliancePage() {
               aria-label={t('rcLicenseNumberLabel')}
               value={licenseNumber}
               onChange={(e) => setLicenseNumber(e.target.value)}
+              required
+            />
+          </label>
+          <label style={labelStyle}>
+            {t('rcCertificateFileName')}
+            <input
+              aria-label={t('rcCertificateFileNameLabel')}
+              value={certificateFileName}
+              onChange={(e) => setCertificateFileName(e.target.value)}
+              required
+            />
+          </label>
+          <label style={labelStyle}>
+            {t('rcCertificateStorageRef')}
+            <input
+              aria-label={t('rcCertificateStorageRefLabel')}
+              value={certificateStorageRef}
+              onChange={(e) => setCertificateStorageRef(e.target.value)}
               required
             />
           </label>
@@ -269,7 +669,11 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? t('rcSavingButton') : license ? t('rcRenewButton') : t('rcCreateButton')}
+            {busy
+              ? t('rcSavingButton')
+              : license
+                ? t('rcRenewButton')
+                : t('rcCreateButton')}
           </button>
         </form>
       ) : null}
@@ -322,7 +726,9 @@ export default function RegulatoryCompliancePage() {
 
       {items ? (
         items.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('rcNoCalendarItems')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>
+            {t('rcNoCalendarItems')}
+          </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
@@ -351,7 +757,9 @@ export default function RegulatoryCompliancePage() {
                       {canManage && !it.isSubmitted ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
-                            aria-label={t('rcEvidenceRefAria', { name: it.obligationName })}
+                            aria-label={t('rcEvidenceRefAria', {
+                              name: it.obligationName,
+                            })}
                             value={evidenceDrafts[it.id] ?? ''}
                             onChange={(e) =>
                               setEvidenceDrafts((prev) => ({

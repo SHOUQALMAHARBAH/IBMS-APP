@@ -68,6 +68,8 @@ export interface PermissionSeed {
   code: string;
   module: string;
   description: string;
+  /** Module 0 item (j). Omitted = OFFICE, which is the non-widening default — see the header. */
+  scope?: "OFFICE" | "PLATFORM";
   /** Role machine names. Typed as `string`, not `RoleName`, because
    *  `OFFICE_ADMINISTRATOR` is a seeded role deliberately outside the legacy
    *  enum — see `roles.ts`. `permissions.spec.ts` still checks every entry
@@ -1731,6 +1733,53 @@ const admin: PermissionSeed[] = [
     description:
       "See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence",
     roles: [ADMIN],
+  },
+  {
+    /*
+     * MODULE 0 ITEM (j) — the provider dashboard: a CROSS-OFFICE read of office state.
+     *
+     * Granted to ADMIN alone, the same narrow grant `diagnostics.view` above takes and for a
+     * related reason: this is platform-operator information rather than anything an office needs to
+     * run its own business.
+     *
+     * THE DISCLOSURE IS REAL AND IS STATED IN THE DESCRIPTION, because an office administrator
+     * deciding who holds this needs to know what it shows. It reads facts about OTHER brokerage
+     * offices — who are each other's competitors — and this product has no platform-operator
+     * concept, so "only the provider may hold it" is not expressible: an office granted it sees
+     * every office. What bounds it is the view's column list (no customer, policy, money or
+     * personal data) and this grant.
+     */
+    code: "provider.office-state.read",
+    module: "admin",
+    // MODULE 0 ITEM (j)'s GAP CLOSURE — THE FIRST AND ONLY PLATFORM-SCOPED CODE.
+    //
+    // This file's own header states the invariant ("no code in this grid may have an effect outside
+    // the granting office") and records the deferred cure: "a `Permission.scope` column with a
+    // server-side refusal and a matrix filter... if a genuinely platform-wide capability is ever
+    // needed, the column is the same work then, WITH A REAL CASE TO TEST AGAINST." This is that case
+    // and that column.
+    //
+    // Unlike `insurer.form.map`, where the cure belonged at the TABLE, there is nothing to re-scope:
+    // the dashboard's whole purpose is to span tenants, which is why it reads a SECURITY DEFINER
+    // view. `RoleAdminService.setPermissions` refuses this code for any non-PROVIDER organization,
+    // and the office role matrix never offers it.
+    scope: "PLATFORM",
+    description:
+      "Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform",
+    /*
+     * NO SEEDED ROLE IN A BROKERAGE OFFICE, since item (j)'s gap closure. It shipped as
+     * `roles: [ADMIN]` before the PROVIDER organization type existed to hold it — which left a
+     * brokerage office's own administrator role holding a code whose effect reaches every other
+     * office, the exact state this file's header forbids.
+     *
+     * The PROVIDER organization's `PLATFORM_OPERATOR` role holds it, granted by
+     * `ensureProviderOrganization()` in the seed. An empty list here is not an oversight: this grid
+     * is "granted BY an office TO its own roles", and no office may hold this.
+     *
+     * `20261117120000_withdraw_platform_grant_from_offices` removes the grants that already exist,
+     * because the seed upserts and never revokes.
+     */
+    roles: [],
   },
   {
     code: "access-recertification.cycle.start",

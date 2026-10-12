@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Role, RoleStatus } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import type { InsuranceLineCategory } from '@ibms/db';
 
 @Injectable()
 export class RoleRepository {
@@ -37,7 +38,13 @@ export class RoleRepository {
    * grants because those are history rather than access.
    */
   async findAllForAdmin(): Promise<
-    (Role & { holderCount: number; permissionCount: number })[]
+    (Role & {
+      holderCount: number;
+      permissionCount: number;
+      /** Module 0 item (h). Counted here with the other two rather than fetched per row, because
+       *  the list renders every role and N+1 on a screen is how a screen becomes slow quietly. */
+      scopeBranchCount: number;
+    })[]
   > {
     const roles = await this.prisma.client.role.findMany({
       // Retired roles stay — an office must be able to reactivate one. DELETED roles do not: delete
@@ -50,6 +57,7 @@ export class RoleRepository {
           select: {
             users: { where: { revokedAt: null } },
             permissions: true,
+            scopeBranches: true,
           },
         },
       },
@@ -58,6 +66,7 @@ export class RoleRepository {
       ...role,
       holderCount: _count.users,
       permissionCount: _count.permissions,
+      scopeBranchCount: _count.scopeBranches,
     }));
   }
 
@@ -167,6 +176,82 @@ export class RoleRepository {
         });
       }
     });
+  }
+
+  /**
+   * MODULE 0 ITEM (h) — replace a role's scope: the type and the whole branch set, in ONE
+   * transaction.
+   *
+   * A wholesale replace rather than add/remove, which is the difference between a configuration and
+   * a register: the licence scope and the CBJ approval RECORD what a regulator granted one branch at
+   * a time, each with its own audit row, while this is a setting an administrator tunes on a matrix
+   * screen. "These four, not those two" should be one act with one audit row, not six.
+   *
+   * The delete-then-create shape is `replacePermissions`' exactly, and for the same reason: the
+   * branch set has no stable identity to diff against, so computing a minimal diff would be more
+   * code reaching the same state with more ways to be wrong.
+   */
+  async replaceScope(
+    roleId: string,
+    organizationId: string,
+    scope: {
+      insuranceLineCategory: InsuranceLineCategory | null;
+      insuranceLineIds: string[];
+      officeInsuranceLineIds: string[];
+    },
+  ): Promise<void> {
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.role.update({
+        where: { id: roleId },
+        data: { insuranceLineCategory: scope.insuranceLineCategory },
+      });
+      await tx.roleScopeBranch.deleteMany({ where: { roleId } });
+      const rows = [
+        ...scope.insuranceLineIds.map((insuranceLineId) => ({
+          organizationId,
+          roleId,
+          insuranceLineId,
+          officeInsuranceLineId: null,
+        })),
+        ...scope.officeInsuranceLineIds.map((officeInsuranceLineId) => ({
+          organizationId,
+          roleId,
+          insuranceLineId: null,
+          officeInsuranceLineId,
+        })),
+      ];
+      if (rows.length > 0) {
+        await tx.roleScopeBranch.createMany({ data: rows });
+      }
+    });
+  }
+
+  /** The scope as the Role screen reads it. Both catalogues flattened with their own ids kept,
+   *  because the screen has to know which list to pre-tick. */
+  async findScope(roleId: string): Promise<{
+    insuranceLineCategory: InsuranceLineCategory | null;
+    insuranceLineIds: string[];
+    officeInsuranceLineIds: string[];
+  } | null> {
+    const role = await this.prisma.client.role.findUnique({
+      where: { id: roleId },
+      select: {
+        insuranceLineCategory: true,
+        scopeBranches: {
+          select: { insuranceLineId: true, officeInsuranceLineId: true },
+        },
+      },
+    });
+    if (!role) return null;
+    return {
+      insuranceLineCategory: role.insuranceLineCategory,
+      insuranceLineIds: role.scopeBranches
+        .map((b) => b.insuranceLineId)
+        .filter((id): id is string => id !== null),
+      officeInsuranceLineIds: role.scopeBranches
+        .map((b) => b.officeInsuranceLineId)
+        .filter((id): id is string => id !== null),
+    };
   }
 
   /**

@@ -79,7 +79,22 @@ function describeDatabase(): string {
 }
 
 async function assertOneOrganization(): Promise<void> {
+  /*
+   * ONE BROKERAGE OFFICE, since Module 0 item (j)'s gap closure — not one Organization.
+   *
+   * The invariant this guards is "anonymous signup can resolve the office", which is what
+   * `OrganizationRepository.soleOrganizationIdOrThrow` answers; that query now excludes every type
+   * but BROKERAGE_OFFICE, because nobody signs up into the PROVIDER organization.
+   *
+   * Narrowed here rather than in the seed, and that direction matters: the alternative was to stop
+   * seeding the provider in db-test, which would have left the four provider-boundary tests unable
+   * to run at all — a harness invariant deciding what the product may contain.
+   *
+   * A leaked BROKERAGE OFFICE still fails exactly as loudly as before; only the provider (and an
+   * insurance company, for the same reason) is now permitted beside it.
+   */
   const orgs = await rawPrisma.organization.findMany({
+    where: { type: 'BROKERAGE_OFFICE' },
     select: { id: true, legalName: true, subdomain: true },
     orderBy: { createdAt: 'asc' },
   });

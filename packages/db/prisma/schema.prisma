@@ -206,19 +206,37 @@ enum MfaCredentialType {
 /// reasoning as `Customer.legalNameAr` / `Insurer.nameAr` elsewhere in this
 /// schema.
 model Organization {
-  id                         String    @id @default(uuid())
+  id                         String           @id @default(uuid())
   legalName                  String
   /// Arabic legal name — see the model comment. Optional only because an
   /// office may be onboarded before its registered Arabic name is confirmed.
   legalNameAr                String?
+  /// Brokerage office or insurance company — see `OrganizationType`. NOT NULL with no default:
+  /// the kind is stated at creation, never inferred. Tenant isolation is UNCHANGED by this column;
+  /// `Organization` carries no `organizationId` and so was never in `TENANT_SCOPED_MODELS`.
+  type                       OrganizationType
+  /// PAID-UP CAPITAL in JOD — CBJ Instructions No. 9 of 2026, art. 4/a, which scales the
+  /// requirement by how many branches the office is licensed for. Module 0 item (e) compares the
+  /// two and WARNS; it never refuses, because the authority on an office's capital is its
+  /// registration documents and not this column.
+  ///
+  /// Nullable because an office onboarded before this column existed has not recorded one, and a
+  /// zero would be a false statement rather than a missing one. `money-fields.inventory.ts`
+  /// classifies it as a real JOD amount, so every arithmetic touching it goes through
+  /// `money.util.ts`.
+  paidUpCapital              Decimal?         @db.Decimal(18, 3)
+  /// Natural person (sole establishment) or corporate — CBJ Instructions No. 9 of 2026, art. 3/a.
+  /// NULL exactly when this is an insurance company; the CHECK constraint
+  /// `Organization_broker_kind_matches_type` is what makes that structural rather than a habit.
+  brokerKind                 BrokerKind?
   /// This office's own CBJ broker license number. Distinct from the
   /// `BrokerLicense` model, which tracks a license's lifecycle per office.
   brokerLicenseNumber        String?
   /// Tenant resolution key (spec §4.10) — e.g. "alsalam" resolves
   /// alsalam.ibms-app.example to this row BEFORE any login step runs.
   /// Nothing consumes it yet; `GET /orgs/resolve` arrives in Phase 4.
-  subdomain                  String    @unique
-  status                     OrgStatus @default(ACTIVE)
+  subdomain                  String           @unique
+  status                     OrgStatus        @default(ACTIVE)
   /// SUPERSEDED by the per-office duty-segregation MODE — see
   /// `docs/duty-segregation-mode.md`. Kept until the deferred cleanup track removes it, and
   /// deliberately NOT given a consumer in the meantime: two live mechanisms for one problem is how the
@@ -234,8 +252,8 @@ model Organization {
   /// Organization<->User relation would force every other relation in this
   /// file to be explicitly named.
   dpoAlternateApproverUserId String?
-  createdAt                  DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
 
   accessAnomalyAlerts                 AccessAnomalyAlert[]
   accessDeprovisioningChecklists      AccessDeprovisioningChecklist[]
@@ -374,6 +392,9 @@ model Organization {
   legacyImportBatches                 LegacyImportBatch[]
   legacyImportIssues                  LegacyImportIssue[]
   duplicateNameWarnings               DuplicateNameWarning[]
+  brokerLicenseScopeLines             BrokerLicenseScopeLine[]
+  employeeCbjApprovalBranches         EmployeeCbjApprovalBranch[]
+  roleScopeBranches                   RoleScopeBranch[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -383,6 +404,154 @@ enum RoleStatus {
   /// Retired. Keeps its history and its name (so an audit row still reads
   /// correctly) and grants nothing.
   INACTIVE
+}
+
+/// WHAT KIND OF ORGANIZATION this row is. Added 2026-10-11 for Module 0.
+///
+/// Until now every `Organization` was a brokerage office and nothing said so — the word "office"
+/// is all over the codebase as a synonym for the tenant. An insurance company now needs a row of
+/// its own, so the kind has to be stated rather than assumed.
+///
+/// DELIBERATELY NOT DEFAULTED on the model. For `dutySegregationMode` a default was right because
+/// SEGREGATED is the stricter value and every existing office genuinely read it. Here neither
+/// value is stricter or safer — they are two different legal entities under different CBJ
+/// licensing — so a default would only decide, silently, which kind a caller forgot to name. The
+/// seven `organization.create` call sites state it instead.
+enum OrganizationType {
+  BROKERAGE_OFFICE
+  /// An insurance company. Its own registration field list and its own agreement with the
+  /// broker; it is NOT a brokerage office with a flag flipped.
+  INSURANCE_COMPANY
+  /// MODULE 0 ITEM (j)'s GAP CLOSURE — the platform operator itself.
+  ///
+  /// EXACTLY ONE may exist, held by the partial unique `Organization_one_provider` rather than by
+  /// service code: this is a rule one row of one table can answer, unlike art. 3/a and the role
+  /// scope, which need three and are therefore service-grain.
+  ///
+  /// It exists so "only the provider may read the cross-office dashboard" is EXPRESSIBLE. A
+  /// `isProvider` boolean beside this column would be a second home for one fact, free to disagree
+  /// with it.
+  PROVIDER
+}
+
+/// MODULE 0 ITEM (j)'s GAP CLOSURE — how far a permission's effect may reach.
+///
+/// `permissions.ts`'s own header states the invariant and records this column as the deferred cure,
+/// to be built "if a genuinely platform-wide capability is ever needed... with a real case to test
+/// against". `provider.office-state.read` is that case.
+enum PermissionScope {
+  /// Granted BY an office TO its own roles, and its effect stops there. Every code but one.
+  OFFICE
+  /// Reaches across offices. May only be granted to a role of the PROVIDER organization, refused by
+  /// `RoleAdminService.setPermissions` and hidden by the matrix — the flag hides it, the server
+  /// refuses it.
+  PLATFORM
+}
+
+/// ONE LICENSED BRANCH on one licence term — Module 0 item (e).
+///
+/// CBJ Instructions No. 9 of 2026 art. 3/a licenses a broker for insurance TYPES (life, general)
+/// and for branches within each. A branch here is a row of the managed line catalogue, so the two
+/// catalogues this system already has are both addressable: `InsuranceLine` (the 32 standard lines,
+/// global) and `OfficeInsuranceLine` (an office's own additions). EXACTLY ONE of the two FKs is
+/// set, held by a CHECK rather than by convention.
+///
+/// THE TYPE IS DERIVED, NEVER STORED. Both catalogues carry `category InsuranceLineCategory`, whose
+/// values are exactly GENERAL and LIFE — measured, not assumed. Copying that onto this row would
+/// create a second place one fact lives, and the copy is the one that drifts.
+model BrokerLicenseScopeLine {
+  id              String        @id @default(uuid())
+  organizationId  String        @default(dbgenerated())
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  brokerLicenseId String
+  brokerLicense   BrokerLicense @relation(fields: [brokerLicenseId], references: [id], onDelete: Restrict)
+
+  /// A standard catalogue line, or null when this branch is an office addition.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  /// An office's own line, or null when this branch is a standard one.
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  /// NOTE — the "a term cannot list the same branch twice" rule is NOT expressible here. A compound
+  /// unique over a nullable column admits unlimited rows whose column is NULL, because Postgres
+  /// treats NULLs as distinct — the § 1.25 trap this repo has already been bitten by on
+  /// `CommissionAgreement`. It is TWO PARTIAL uniques in raw SQL instead
+  /// (`BrokerLicenseScopeLine_one_standard_line_per_term` / `..._one_office_line_per_term`), and
+  /// `db:divergence` cannot see a partial index, so the migration asserts both in its own DO block.
+
+  @@index([brokerLicenseId])
+  @@index([organizationId])
+}
+
+/// Module 0 item (g) — ONE insurance BRANCH a person's CBJ approval covers.
+///
+/// The same shape as `BrokerLicenseScopeLine` one level down, and for the same reason: a branch is a
+/// row of a managed catalogue, standard or office-added, and the TYPE is the branch's own
+/// `category` rather than a second column. Item (e) states that argument in full; storing a type
+/// here would be the same second home for one fact, and
+/// `broker-license-scope-assumptions.spec.ts`' shape guard covers the licence models while
+/// `employee-cbj-approval.guard.spec.ts` covers this one.
+model EmployeeCbjApprovalBranch {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  employeeId     String
+  /// `Restrict`: the record of what a person was approved for is evidence, the same treatment
+  /// `KYCRecord` gives a `Customer`. Measured before choosing it — nothing in this repository
+  /// deletes an `Employee` (0 call sites of `employee.delete`/`deleteMany`), so it refuses nothing
+  /// that happens today.
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  /// A standard catalogue line, or null when this branch is an office addition.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  /// An office's own line, or null when this branch is a standard one.
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  /// NOTE — "the same branch twice for one person" is TWO PARTIAL uniques in raw SQL, never a
+  /// compound unique over these nullable columns: Postgres treats NULLs as distinct, so a compound
+  /// unique would admit unlimited rows whose column is NULL, which here is every row (§ 1.25).
+  /// `db:divergence` cannot see a partial index, so the migration asserts both itself.
+
+  @@index([employeeId])
+  @@index([organizationId])
+}
+
+/// WHAT KIND OF BROKER a brokerage office is — CBJ Instructions No. 9 of 2026, art. 3/a.
+///
+/// The distinction is not cosmetic: it bounds how many insurance types the office may be licensed
+/// for. A natural person (a sole establishment) may hold ONE type only; a corporate broker may
+/// hold both. That rule is enforced where the scope lives — see `BrokerLicense` — not here, because
+/// a column cannot refuse a combination it does not store.
+///
+/// NULL on an insurance company and NOT NULL on a brokerage office, held by the
+/// `Organization_broker_kind_matches_type` CHECK rather than by convention: "broker kind" is
+/// meaningless for an insurer, and a nullable column with no constraint would let one carry a value
+/// nothing reads.
+enum BrokerKind {
+  /// A sole establishment — one natural person. May hold ONE insurance type only (art. 3/a).
+  NATURAL_PERSON
+  /// A company. May hold both insurance types.
+  CORPORATE
+}
+
+/// Module 0 item (g). The standing of ONE PERSON'S CBJ approval to act for the broker.
+///
+/// NULL on `Employee.cbjApprovalStatus` means "not a CBJ-approved person" — the ordinary case for
+/// most staff — so the absence of a row is the absence of an approval, never an unknown.
+enum CbjApprovalStatus {
+  /// Approved and in good standing. The only value item (f) counts toward minimum staff.
+  CURRENT
+  /// Approval suspended by the CBJ. The person stays on the record, which is the point of a status
+  /// rather than a deletion, and stops counting toward minimum staff.
+  SUSPENDED
+  /// Approval cancelled. Kept for the same reason — the record of who was approved and when is
+  /// evidence, and losing it on cancellation is how a vacancy becomes unexplainable.
+  CANCELLED
 }
 
 enum OrgStatus {
@@ -726,7 +895,7 @@ model SecurityConfig {
 /// offices reuse a name. See `PermissionRepository.findCodesForRoles` and
 /// `PermissionsService`, both of which key on id for this reason.
 model Role {
-  id                    String       @id @default(uuid())
+  id                    String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
   ///
@@ -734,8 +903,8 @@ model Role {
   /// scoping at all: `TENANT_SCOPED_MODELS` is derived from the DMMF as
   /// "every model carrying an organizationId", so the extension picks this up
   /// automatically with no change to the isolation code itself.
-  organizationId        String       @default(dbgenerated())
-  organization          Organization @relation(fields: [organizationId], references: [id])
+  organizationId        String                 @default(dbgenerated())
+  organization          Organization           @relation(fields: [organizationId], references: [id])
   /// Free text, not an enum. Was `RoleName` until office-scoped custom roles
   /// landed; the legacy 11 survive as ordinary per-office rows carrying their
   /// old machine name.
@@ -756,12 +925,12 @@ model Role {
   /// question from a hard-coded list of role NAMES (`ALWAYS_MFA_ROLES`), which
   /// matched no custom role and therefore handed it the exemption the list
   /// existed to deny — the control failed OPEN.
-  requiresMfaAlways     Boolean      @default(true)
+  requiresMfaAlways     Boolean                @default(true)
   /// Part 10.1 — this role must present a hardware-token factor once WebAuthn
   /// ships. Same reasoning, same default, same fail-open history
   /// (`PRIVILEGED_ROLES`). Surfaced to the client as `mfaPolicySatisfied`; it
   /// has never blocked a login and still does not.
-  requiresHardwareToken Boolean      @default(true)
+  requiresHardwareToken Boolean                @default(true)
   /// Whether this role still grants anything.
   ///
   /// An office RETIRES a role rather than deleting it: `UserRoleAssignment` and
@@ -777,7 +946,7 @@ model Role {
   /// ever granted — and would let an office retire its only administrator role
   /// and then revoke the grant, with the guard waving both through because it
   /// still saw a "surviving" holder.
-  status                RoleStatus   @default(ACTIVE)
+  status                RoleStatus             @default(ACTIVE)
   /// A role the PLATFORM defines rather than the office: the eleven converted
   /// legacy rows and `OFFICE_ADMINISTRATOR`.
   ///
@@ -787,7 +956,18 @@ model Role {
   /// `if (isSystem) allow` bypass would be smuggled in, so there is a test whose
   /// only job is to prove a user holding an isSystem role with no permissions
   /// reaches nothing.
-  isSystem              Boolean      @default(false)
+  isSystem              Boolean                @default(false)
+  /// MODULE 0 ITEM (h) — the insurance TYPE this role may act in, or NULL for every type.
+  ///
+  /// NULL IS UNRESTRICTED, NOT UNSCOPED-TO-NOTHING. Every role that existed before item (h) reads
+  /// NULL, and reading that as "scoped to nothing" would refuse every write in the system on the
+  /// first deploy. The same non-restricting-backfill call as `Organization.brokerKind`, and the
+  /// opposite of `Organization.type`'s no-default — see `docs/decision-role-scope.md` § 5 for why
+  /// the three differ.
+  insuranceLineCategory InsuranceLineCategory?
+  /// The BRANCHES within that type, or NONE for every branch within it. Empty is likewise
+  /// unrestricted, for the same reason one level down.
+  scopeBranches         RoleScopeBranch[]
   /// Set when the office DELETES the role. The row survives because
   /// `UserRoleAssignment.roleId` is ON DELETE RESTRICT and the historical
   /// assignment rows must keep naming which role they were — see migration
@@ -797,7 +977,7 @@ model Role {
   /// read path, filtered or not. Never reactivated: a CHECK constraint holds it
   /// INACTIVE, and delete is deliberately one-way.
   deletedAt             DateTime?
-  createdAt             DateTime     @default(now())
+  createdAt             DateTime               @default(now())
 
   users       UserRoleAssignment[]
   permissions RolePermission[]
@@ -811,15 +991,57 @@ model Role {
   @@index([organizationId])
 }
 
+/// MODULE 0 ITEM (h) — ONE branch a role's scope covers.
+///
+/// The same two-nullable-FK shape as the licence scope and the CBJ approval, and for the same
+/// reason: a branch is a row of a managed catalogue, standard or office-added. There is no stored
+/// TYPE here either — `Role.insuranceLineCategory` is the type, and a branch outside it is refused
+/// by the service rather than by a CHECK, because deciding that compares two tables.
+///
+/// An empty list means every branch within the role's type. See `docs/decision-role-scope.md` § 5.
+model RoleScopeBranch {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  roleId         String
+  /// `Cascade`: unlike the CBJ approval, a role's scope is CONFIGURATION rather than evidence —
+  /// `UserRoleAssignment` and `RolePermission` are what record who held what, and they are
+  /// RESTRICTed. A scope branch left behind by a deleted role would describe a scope nothing holds.
+  role           Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  /// NOTE — "the same branch twice for one role" is TWO PARTIAL uniques in raw SQL, never a
+  /// compound unique over these nullable columns (§ 1.25). `db:divergence` cannot see a partial
+  /// index, so the migration asserts both itself.
+
+  @@index([roleId])
+  @@index([organizationId])
+}
+
 /// Part 4.1 core entity ("User / Role / Permission", n..n Role<->Permission)
 /// / Process 40 (staff permissions management) — the granular can/cannot
 /// grid illustrated per role in Part 5.1 (e.g. Sales Officer can create
 /// Lead/Customer/RFQ but cannot approve refunds or delete claims).
 model Permission {
-  id          String  @id @default(uuid())
-  code        String  @unique // e.g. "policy.check", "refund.approve", "claim.delete"
+  id          String          @id @default(uuid())
+  code        String          @unique // e.g. "policy.check", "refund.approve", "claim.delete"
   module      String // maps to a Part 2 domain / PCMS module, e.g. "claims", "finance", "m04_dsr"
   description String?
+  /// MODULE 0 ITEM (j)'s GAP CLOSURE — how far this code's effect may reach.
+  ///
+  /// DEFAULTS TO `OFFICE`, and that default is honest where `Organization.type`'s absence of one
+  /// was: OFFICE is the NON-WIDENING value, so a code added later without a decision cannot become
+  /// platform-wide by omission. The same call as `dutySegregationMode` defaulting to SEGREGATED.
+  ///
+  /// A `PLATFORM` code may only be granted to a role of the PROVIDER organization. That is enforced
+  /// in `RoleAdminService.setPermissions` — the office role matrix also hides it, but the flag hides
+  /// it and the SERVER refuses it, because a hidden control the API still honours is not a boundary.
+  scope       PermissionScope @default(OFFICE)
 
   roles RolePermission[]
 }
@@ -1036,11 +1258,11 @@ model Branch {
 /// Process 66 — Human Resources. Minimal record: licensing/certification
 /// tracking for regulated staff, training records (Part 8.2).
 model Employee {
-  id                               String       @id @default(uuid())
+  id                               String                      @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId                   String       @default(dbgenerated())
-  organization                     Organization @relation(fields: [organizationId], references: [id])
+  organizationId                   String                      @default(dbgenerated())
+  organization                     Organization                @relation(fields: [organizationId], references: [id])
   fullName                         String // computed from the 4 parts below when they're set (see composeFullName) — historical rows keep only this field, parts null
   givenName                        String? // Jordanian national-ID convention (Part F item #4) — given/father's/grandfather's/family name
   fatherName                       String?
@@ -1064,11 +1286,30 @@ model Employee {
   position                         String?
   hireDate                         DateTime?
   terminationDate                  DateTime?
-  licensedRole                     String? // e.g. regulated staff licensing/certification (Part 8.2)
+  /// Free-text licensing/certification OTHER THAN the CBJ broker approval (Part 8.2).
+  ///
+  /// RE-SCOPED by Module 0 item (g). It used to carry the CBJ approval too, as a hand-typed string
+  /// — measured at the time: 47 of 136 employees on dev read `CBJ Licensed Insurance Broker` and 7
+  /// on db-test read `CBJ-licensed Broker Representative`, two spellings of one fact. That fact now
+  /// lives in `cbjApprovalStatus` and its branches, so this field must not carry it again: the
+  /// service refuses CBJ-ish text here and names the structured field instead.
+  licensedRole                     String?
+  /// Module 0 item (g) — this person's CBJ approval to act for the broker. NULL for staff who hold
+  /// none, which is most of them.
+  ///
+  /// DELIBERATELY NOT a permission input. Item (h) puts scope on the ROLE; this marker exists to
+  /// support the vacancy timers and the training counter, and `employee-cbj-approval.guard.spec.ts`
+  /// fails if any permission-evaluation site starts reading it.
+  cbjApprovalStatus                CbjApprovalStatus?
+  /// The date the CBJ granted it. NULL is a real and common state — the 47 + 7 rows migrated from
+  /// free text have no date on record, and recording that as unknown is honest where a stamped
+  /// migration date would be a fact nobody can source.
+  cbjApprovalDate                  DateTime?                   @db.Date
+  cbjApprovalBranches              EmployeeCbjApprovalBranch[]
   confidentialityAgreementSignedAt DateTime? // Part 8.2 NDAs
   backgroundCheckCompletedAt       DateTime? // Part 8.2 screening
-  createdAt                        DateTime     @default(now())
-  updatedAt                        DateTime     @updatedAt
+  createdAt                        DateTime                    @default(now())
+  updatedAt                        DateTime                    @updatedAt
 
   /// Spec §4.1.2 — the employee's functional grouping. Nullable: every
   /// pre-existing Employee row predates Department entirely, and the
@@ -1091,6 +1332,9 @@ model Employee {
   // Declared because the migration CREATES it. Left undeclared, the next `migrate dev` would emit
   // `DROP INDEX "Employee_branchId_idx"` — which is exactly what db:divergence caught in CI.
   @@index([branchId])
+  /// Item (f) counts CURRENT approvals per office; without this it is a sequential scan of
+  /// every employee on every placement that changes the licence scope.
+  @@index([cbjApprovalStatus])
   @@index([organizationId])
 }
 
@@ -3671,19 +3915,51 @@ model RenewalRecommendation {
 // ============================================================================
 
 /// Process 51/Part 7.1 — the broker's own CBJ license status.
+/// ONE LICENCE TERM. Module 0 item (c) restructured this from a singleton into a series.
+///
+/// It used to be ONE ROW PLATFORM-WIDE, not one per office — `BROKER_LICENSE_SINGLETON_ID` was used
+/// as the PRIMARY KEY, so the second office to call `create` collided on `BrokerLicense_pkey` and
+/// could never hold a licence at all, while its `findCurrent` returned null and the new-business
+/// gate then passed silently. Renewal was an `updateMany` over that same row, so the previous term
+/// was erased. Both are gone: a term is a row, and renewal appends.
 model BrokerLicense {
-  id                   String       @id @default(uuid())
+  id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId       String       @default(dbgenerated())
-  organization         Organization @relation(fields: [organizationId], references: [id])
-  licenseNumber        String
-  scopeOfAuthorization String?
-  issuedAt             DateTime?
-  expiresAt            DateTime
-  status               String       @default("active") // active | lapsed
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  licenseNumber         String
+  scopeOfAuthorization  String?
+  issuedAt              DateTime?
+  expiresAt             DateTime
+  status                String       @default("active") // active | lapsed
+  /// The licence certificate as issued by the CBJ — MANDATORY, and NOT NULL is what makes it so.
+  /// A term is the broker's evidence that it may practise; recording one with no certificate
+  /// behind it is recording a claim rather than a fact. `onDelete: Restrict` because the document
+  /// IS the evidence — the same reasoning as `CustomerIdentifierCorrection`'s prior-result FK.
+  certificateDocumentId String
+  certificateDocument   Document     @relation(fields: [certificateDocumentId], references: [id], onDelete: Restrict)
+  /// When the RENEWAL APPLICATION for the term that follows this one was filed, or NULL if none has
+  /// been. Art. 11 requires it 45 days before expiry; art. 10/b sets the term at three calendar
+  /// years ending 31 December. Item (d) is what reads this column — after expiry, an office that
+  /// filed on time stays valid by operation of law until the decision issues, and one that filed
+  /// nothing expires. Stored here rather than derived because "did we apply, and when" is a fact
+  /// about this term that nothing else records.
+  renewalRequestedAt    DateTime?
 
+  /// The BRANCHES this term is licensed for — Module 0 item (e). The TYPES (life / general) are
+  /// NOT stored: every line already carries a `category` of exactly GENERAL or LIFE, which is the
+  /// pair art. 3/a names, so a type column beside it would be a second home for the same fact and
+  /// free to disagree with the catalogue.
+  scopeLines BrokerLicenseScopeLine[]
+
+  /// One term per office per (number, expiry). Not a one-active-per-office rule, deliberately: a
+  /// renewal is filed 45 days BEFORE expiry, so the outgoing and incoming terms can both legitimately
+  /// read `active` for a time.
+  @@unique([organizationId, licenseNumber, expiresAt])
   @@index([organizationId])
+  /// "The office's latest term" is the hot read — the new-business gate asks it on every placement.
+  @@index([organizationId, expiresAt(sort: Desc)])
 }
 
 /// Part 7.1 — the broker's own Professional Indemnity insurance — a broker
@@ -5201,6 +5477,9 @@ model InsuranceLine {
   createdAt    DateTime              @default(now())
 
   offeredBy             InsurerOfferedLine[]
+  licenceScopeLines     BrokerLicenseScopeLine[]
+  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
+  roleScopeBranches     RoleScopeBranch[]
   formTemplates         InsurerFormTemplate[]
   officeFormTemplates   OfficeInsurerFormTemplate[]
   insuranceProgramLines InsuranceProgramLine[]
@@ -5246,6 +5525,9 @@ model OfficeInsuranceLine {
   createdByUserId String
 
   offeredBy             InsurerOfferedLine[]
+  licenceScopeLines     BrokerLicenseScopeLine[]
+  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
+  roleScopeBranches     RoleScopeBranch[]
   insuranceProgramLines InsuranceProgramLine[]
   rfqs                  RFQ[]
   policies              Policy[]
@@ -5516,6 +5798,9 @@ model InsurerSlaAgreement {
 // ============================================================================
 
 enum DocumentCategory {
+  /// Module 0 item (c) — the CBJ licence certificate for one `BrokerLicense` TERM. Its own
+  /// category rather than OTHER: a term cannot exist without one, so it has to be findable.
+  BROKER_LICENSE_CERTIFICATE
   APPLICATION_PROPOSAL
   RISK_SURVEY
   QUOTATION
@@ -5562,6 +5847,8 @@ model Document {
   createdAt                DateTime           @default(now())
 
   claimDocuments ClaimDocument[]
+  /// Module 0 item (c) — the terms whose certificate this document is.
+  brokerLicenses BrokerLicense[]
 
   @@index([policyId])
   @@index([customerId])

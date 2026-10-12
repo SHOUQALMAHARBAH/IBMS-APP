@@ -1,0 +1,52 @@
+{
+  "policy-place-bypasses-the-scope": {
+    "file": "apps/api/src/modules/policy/policy.service.ts",
+    "from": "        assertWithinRoleScope(\n          actor,\n          { category, lineId: scopedLineId },\n          'place a policy',\n        );",
+    "to": "        // PLANT: placement no longer decides the role scope."
+  },
+  "commission-rate-bypasses-the-scope": {
+    "file": "apps/api/src/modules/commission/commission-agreement.service.ts",
+    "from": "    assertWithinRoleScope(\n      actor,\n      { category: line.category, lineId: line.id },\n      'set a commission rate',\n    );",
+    "to": "    // PLANT: the commission rate no longer decides the role scope."
+  },
+  "a-null-category-scopes-to-nothing": {
+    "file": "apps/api/src/common/role-scope.ts",
+    "from": "  if (scope.category === null) return true;",
+    "to": "  if (scope.category === null) return false;"
+  },
+  "several-roles-intersect-instead-of-union": {
+    "file": "apps/api/src/common/role-scope.ts",
+    "from": "  return scopes.some((scope) => scopeCovers(scope, resource));",
+    "to": "  return scopes.every((scope) => scopeCovers(scope, resource));"
+  },
+  "an-unscoped-user-is-refused-everything": {
+    "file": "apps/api/src/common/role-scope.ts",
+    "from": "  if (scopes.length === 0) return true;",
+    "to": "  if (scopes.length === 0) return false;"
+  },
+  "a-branch-outside-the-roles-own-type-is-accepted": {
+    "file": "apps/api/src/modules/rbac/services/role-admin.service.ts",
+    "from": "      if (actual !== category) {\n        throw new UnprocessableEntityException(\n          `Insurance line ${id} is ${actual}, but this role is scoped to ${category}. A branch ` +\n            'outside the role’s own insurance type would be a scope that contradicts itself.',\n        );\n      }\n    }\n    for (const id of officeInsuranceLineIds) {",
+    "to": "    }\n    for (const id of officeInsuranceLineIds) {"
+  },
+  "the-scope-cache-is-not-invalidated": {
+    "file": "apps/api/src/modules/rbac/services/permissions.service.ts",
+    "from": "    this.scopeCache.clear();",
+    "to": "    // PLANT: the scope cache survives an invalidation that cleared the codes."
+  },
+  "a-second-copy-of-the-scope-comparison": {
+    "file": "apps/api/src/modules/policy/policy.service.ts",
+    "from": "    let created: Policy;",
+    "to": "    // PLANT: a hand-rolled second copy of the decision.\n    // const _bypass = actor.roleScopes?.some((s) => s.category === 'GENERAL');\n    let created: Policy;"
+  },
+  "the-unrestricted-option-sends-nothing": {
+    "file": "apps/web/app/(app)/settings/roles/page.tsx",
+    "from": "        insuranceLineCategory: scopeCategory === '' ? null : scopeCategory,",
+    "to": "        insuranceLineCategory: scopeCategory === '' ? undefined : scopeCategory,"
+  },
+  "the-branch-list-is-not-filtered-by-type": {
+    "file": "apps/web/app/(app)/settings/roles/page.tsx",
+    "from": "                      .filter((line) => line.category === scopeCategory)",
+    "to": "                      .filter(() => true)"
+  }
+}

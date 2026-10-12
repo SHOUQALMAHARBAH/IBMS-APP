@@ -1,0 +1,16 @@
+-- MODULE 0, ITEM (c), PART 1 OF 2: the document category a licence certificate is filed under.
+--
+-- Its own migration, not a line in the restructure that follows, because `ALTER TYPE ... ADD VALUE`
+-- cannot be USED in the transaction that adds it — and the next migration needs to insert
+-- `Document` rows carrying this value. Same reason `20261027110000_discard_audit_action` stands
+-- alone.
+--
+-- WHY A NEW CATEGORY AND NOT `OTHER`.
+--   A licence term cannot exist without its certificate (the next migration makes
+--   `certificateDocumentId` NOT NULL), so the certificate is the one document in this system whose
+--   absence is a compliance defect rather than a gap. Filing it under OTHER — a bucket shared with
+--   everything nobody classified — means the question "show me this office's licence certificates"
+--   cannot be answered, which is precisely the question a CBJ inspection asks.
+--   The thirteen existing values are all about a CUSTOMER's business (proposal, quotation, policy,
+--   claim, invoice...). This is the first document category about the BROKER itself.
+ALTER TYPE "DocumentCategory" ADD VALUE 'BROKER_LICENSE_CERTIFICATE';

@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { EmployeeController } from './employee.controller';
 import { EmployeeService } from './employee.service';
 import { EmployeeRepository } from '../../repositories/employee.repository';
+import { EmployeeCbjApprovalService } from './employee-cbj-approval.service';
+import { EmployeeCbjApprovalRepository } from '../../repositories/employee-cbj-approval.repository';
+import { BrokerLicenseScopeRepository } from '../../repositories/broker-license-scope.repository';
 import { DepartmentRepository } from '../../repositories/department.repository';
 import { BranchRepository } from '../../repositories/branch.repository';
 import { AuditModule } from '../audit/audit.module';
@@ -41,6 +44,12 @@ import { AuthModule } from '../auth/auth.module';
     EmployeeRepository,
     DepartmentRepository,
     BranchRepository,
+    // Module 0 item (g). `BrokerLicenseScopeRepository` is here because the approval reuses its
+    // catalogue read rather than writing a second one — a repository shared across modules, which
+    // is this codebase's one established cross-module shape; a shared SERVICE is not.
+    EmployeeCbjApprovalService,
+    EmployeeCbjApprovalRepository,
+    BrokerLicenseScopeRepository,
   ],
 })
 export class EmployeeModule {}

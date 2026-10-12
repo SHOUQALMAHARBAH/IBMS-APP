@@ -23,10 +23,44 @@ describe("permission grid — every code is independent and traceable", () => {
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  it("grants every permission to at least one role", () => {
+  it("grants every OFFICE-SCOPED permission to at least one role", () => {
+    /*
+     * A code granted to nobody is a checkbox that removes nothing — the same family as the
+     * enforcement inventory, and the reason this check exists.
+     *
+     * NARROWED by Module 0 item (j)'s gap closure, and narrowed precisely rather than skipped. This
+     * grid is "granted BY an office TO its own roles" (see the file header), and a PLATFORM-scoped
+     * code may not be held by an office at all: `RoleAdminService.setPermissions` refuses it and
+     * migration `20261117120000` withdrew the grants that existed. It is granted to the PROVIDER
+     * organization's own `PLATFORM_OPERATOR` role by `ensureProviderOrganization()` in the seed,
+     * which is not part of this grid.
+     *
+     * So a platform code with an EMPTY role list is correct here — and the second half below is
+     * what stops that becoming a hole: a platform code with a role list is refused by name, because
+     * naming an office role beside a platform code is precisely the mistake this file's header
+     * warns about.
+     */
     for (const permission of PERMISSIONS) {
-      expect(permission.roles.length).toBeGreaterThan(0);
+      if (permission.scope === "PLATFORM") {
+        expect(
+          permission.roles,
+          `${permission.code} is PLATFORM-scoped and names office role(s) in this grid. No office may hold it — it is granted to the provider organization by ensureProviderOrganization() in the seed.`,
+        ).toEqual([]);
+        continue;
+      }
+      expect(
+        permission.roles.length,
+        `${permission.code} is granted to no role, so the Role screen shows a checkbox that removes nothing.`,
+      ).toBeGreaterThan(0);
     }
+  });
+
+  it("has at least one PLATFORM code, so the branch above is not vacuous", () => {
+    // Without this, deleting the scope field from every entry would make the narrowing above
+    // unreachable and the test would still pass.
+    expect(
+      PERMISSIONS.filter((p) => p.scope === "PLATFORM").map((p) => p.code),
+    ).toEqual(["provider.office-state.read"]);
   });
 
   it("only references roles the seed actually installs", () => {

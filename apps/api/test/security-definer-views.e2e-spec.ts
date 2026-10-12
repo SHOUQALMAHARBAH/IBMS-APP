@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { rawPrisma } from './tenant-prisma';
 import { INSURER_DIRECTORY_COLUMNS } from '../src/repositories/insurer-directory.repository';
+import { PROVIDER_OFFICE_STATE_COLUMNS } from '../src/repositories/provider-office-state.repository';
 
 /**
  * The inventory of SECURITY DEFINER views, and what each one owes.
@@ -65,6 +66,18 @@ const SECURITY_DEFINER_VIEWS: Record<string, SecurityDefinerViewContract> = {
     columns: INSURER_DIRECTORY_COLUMNS,
     refusedWrite: 'DELETE FROM "InsurerDirectory"',
     why: "The cross-office insurer directory. Aggregates every office's Insurer rows into one entry per company, exposing only public company facts — see docs/insurer-directory.md.",
+  },
+  /*
+   * MODULE 0 ITEM (j) — and this registry's own header predicted it exactly: "its entire value is
+   * what happens on the day somebody adds the second one". That day was today, and this guard is
+   * what caught the view being added without a declaration. I had written three layers of column
+   * boundary for it — the migration's DO block, the repository's runtime check, an api e2e over the
+   * response body — and still missed the ONE place the codebase already asks for a registration.
+   */
+  ProviderOfficeState: {
+    columns: PROVIDER_OFFICE_STATE_COLUMNS,
+    refusedWrite: 'DELETE FROM "ProviderOfficeState"',
+    why: "The provider dashboard: every brokerage office's own STATE — licence, expiry, licensed branches with no business, user counts and the office's last activity. No customer, policy, premium or commission data and no personal data; `lastActivityAt` is an office-level MAX, never a person's sign-in. The disclosure it does create — office state visible to any office granted `provider.office-state.read` — is named in README § Known gaps, because this product has no platform-operator identity. See migration 20261116100000.",
   },
 };
 

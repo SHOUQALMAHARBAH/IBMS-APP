@@ -1,0 +1,27 @@
+{
+  "a-brokerage-caller-is-served-the-dashboard": {
+    "file": "apps/api/src/modules/compliance-risk/provider-office-state.service.ts",
+    "from": "    if (org?.type !== 'PROVIDER') {",
+    "to": "    if (false) {"
+  },
+  "the-refusal-is-an-empty-list-instead": {
+    "file": "apps/api/src/modules/compliance-risk/provider-office-state.service.ts",
+    "from": "      throw new ForbiddenException(",
+    "to": "      return [];\n      throw new ForbiddenException("
+  },
+  "the-office-role-builder-offers-a-platform-code": {
+    "file": "apps/web/lib/admin/permission-matrix.ts",
+    "from": "    if (entry.scope === 'PLATFORM') continue;",
+    "to": "    // PLANT: the office matrix now offers platform codes."
+  },
+  "the-role-save-path-accepts-a-platform-code": {
+    "file": "apps/api/src/modules/rbac/services/role-admin.service.ts",
+    "from": "    if (platformCodes.length > 0) {",
+    "to": "    if (false) {"
+  },
+  "signup-counts-the-provider-as-an-office": {
+    "file": "apps/api/src/repositories/organization.repository.ts",
+    "from": "      where: { type: 'BROKERAGE_OFFICE' },\n      select: { id: true },",
+    "to": "      select: { id: true },"
+  }
+}

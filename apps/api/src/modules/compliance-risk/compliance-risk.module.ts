@@ -12,6 +12,10 @@ import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.rep
 import { BrokerLicenseController } from './broker-license.controller';
 import { BrokerLicenseService } from './broker-license.service';
 import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
+import { BrokerLicenseScopeService } from './broker-license-scope.service';
+import { BrokerLicenseScopeRepository } from '../../repositories/broker-license-scope.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
+import { EmployeeCbjApprovalRepository } from '../../repositories/employee-cbj-approval.repository';
 import { ComplianceCalendarController } from './compliance-calendar.controller';
 import { ComplianceCalendarService } from './compliance-calendar.service';
 import { ComplianceCalendarRepository } from '../../repositories/compliance-calendar.repository';
@@ -32,6 +36,9 @@ import { InternalAuditFindingService } from './internal-audit-finding.service';
 import { InternalAuditFindingRepository } from '../../repositories/internal-audit-finding.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { ProviderOfficeStateRepository } from '../../repositories/provider-office-state.repository';
+import { ProviderOfficeStateService } from './provider-office-state.service';
+import { ProviderOfficeStateController } from './provider-office-state.controller';
 
 /**
  * Domain F — Compliance & Risk (backlog Part C #47–57). Opens with Process
@@ -121,6 +128,7 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [AuditModule, AuthModule],
   controllers: [
+    ProviderOfficeStateController,
     TransactionMonitoringController,
     WatchlistSyncController,
     BrokerLicenseController,
@@ -132,6 +140,10 @@ import { AuthModule } from '../auth/auth.module';
     InternalAuditFindingController,
   ],
   providers: [
+    // Module 0 item (j). The repository reads a `security_invoker = false` VIEW, so it is
+    // deliberately NOT tenant-scoped — see its own header and migration 20261116100000.
+    ProviderOfficeStateService,
+    ProviderOfficeStateRepository,
     TransactionMonitoringService,
     TransactionMonitoringAlertRepository,
     TransactionMonitoringSweepScheduler,
@@ -143,6 +155,23 @@ import { AuthModule } from '../auth/auth.module';
     UnConsolidatedFetcher,
     BrokerLicenseService,
     BrokerLicenseRepository,
+    // Module 0 item (e). `OrganizationRepository` is provided HERE rather than imported from
+    // another module: it is a stateless wrapper over `PrismaService`, safe to instantiate per
+    // module, and five other modules already provide their own copy for the same reason (the
+    // `WatchlistEntryRepository` shape — duplication over a cross-module dependency for one read).
+    //
+    // It is needed because art. 3/a is decided from `Organization.brokerKind` and art. 4/a from
+    // `Organization.paidUpCapital`. A first version of this comment claimed the module already
+    // provided it; it did not, and TypeScript could not see that — a missing provider is a RUNTIME
+    // DI failure, so only booting the app or an e2e would have caught it.
+    BrokerLicenseScopeService,
+    BrokerLicenseScopeRepository,
+    OrganizationRepository,
+    // Item (f) reads how many people in this office hold a CURRENT CBJ approval. A REPOSITORY
+    // across the module boundary, never the service — the same established shape as
+    // `OrganizationRepository` above, and provided in the SAME commit as the dependency rather
+    // than discovered by a 500.
+    EmployeeCbjApprovalRepository,
     ComplianceCalendarService,
     ComplianceCalendarRepository,
     RiskRegisterService,

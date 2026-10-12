@@ -40,16 +40,19 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'جارٍ التحميل…',
     tmNone: 'لا توجد تنبيهات مراقبة معاملات.',
     tmLoadError: 'تعذّر تحميل تنبيهات مراقبة المعاملات — حاول مرة أخرى.',
-    tmSweepSummary: 'تم فحص {scanned} حالة — أُنشئ {created} تنبيهًا، و{skipped} مرصودة أصلًا، وفشلت {failed}.',
+    tmSweepSummary:
+      'تم فحص {scanned} حالة — أُنشئ {created} تنبيهًا، و{skipped} مرصودة أصلًا، وفشلت {failed}.',
     tmActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     tmRefusalAct: 'عرض تنبيهات مراقبة المعاملات',
 
     // ---- Watchlist sync (#49) --------------------------------------------
     wsHeading: 'مزامنة قوائم العقوبات',
-    shMissingConfig: 'إعدادات ناقصة: {missing}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
+    shMissingConfig:
+      'إعدادات ناقصة: {missing}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
     shScreeningAttempts: 'عمليات الفحص (آخر {days} يومًا)',
     shHoldsReleased: 'حالات رفع الإيقاف (آخر {days} يومًا)',
-    wsRescreenSummary: 'أُعيد فحص {screened} عميلًا نشطًا — {hits} منها بنتيجة مطابقة، وفشلت {failed}.',
+    wsRescreenSummary:
+      'أُعيد فحص {screened} عميلًا نشطًا — {hits} منها بنتيجة مطابقة، وفشلت {failed}.',
     wsIntro:
       'تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة الأمم المتحدة الموحّدة) محلياً كل اثنتَي عشرة ساعة — وهي وتيرة التحديث الفعلية للقائمتين — ويُعاد فحص كل عميل نشط عليهما كل أربع ساعات. ويمكن تشغيل كليهما يدوياً من هنا.',
     wsSyncButton: 'مزامنة القوائم الآن',
@@ -109,6 +112,78 @@ export const COMPLIANCE_RISK = {
     rcEvidenceRefLabel: 'مرجع الإثبات',
     rcNoCalendarItems: 'لا توجد بنود في تقويم الالتزامات.',
     rcNoLicense: 'لا يوجد سجل ترخيص بعد.',
+    rcNoLicenseBlocksBusiness:
+      'لا يوجد لدى هذا المكتب أي مدة ترخيص مسجّلة — وإصدار أعمال جديدة محجوب. ممارسة النشاط دون ترخيص ساري سبب لعقوبة إدارية (تعليمات البنك المركزي الأردني رقم 9 لسنة 2026، المادة 21/أ/9). سجّل الترخيص وشهادته أدناه.',
+    rcTermsHeading: 'مدد الترخيص',
+    rcScopeHeading: 'نطاق الترخيص',
+    providerOfficesHeading: 'مكاتب الوساطة على المنصّة',
+    providerOfficesRefusalAct: 'يقرأ حالة مكاتب الوساطة على المنصّة',
+    providerOfficesCrossOfficeNote:
+      'تنبيه: هذه الشاشة تعبُر حدود المكاتب — وهي تُظهر مكاتب وساطة أخرى غير مكتبك. ولا تحتوي أي بيانات عملاء أو وثائق أو أقساط أو عمولات، ولا أي بيانات تخصّ شخصاً بعينه؛ وتاريخ آخر استخدام هو للمكتب لا لأي مستخدم.',
+    providerOfficesLoading: 'جارٍ التحميل…',
+    providerOfficesLoadError: 'تعذّر تحميل مكاتب المنصّة — حاول مرة أخرى.',
+    providerOfficesEmpty:
+      'لا تُرجِع المنصّة أي مكتب، وهذه ليست نتيجة طبيعية — راجع الاتصال بقاعدة البيانات قبل الاعتماد على هذه الشاشة.',
+    providerOfficesColOffice: 'المكتب',
+    providerOfficesColStatus: 'حالة المكتب',
+    providerOfficesColLicence: 'رقم الترخيص',
+    providerOfficesColExpiry: 'تاريخ الانتهاء',
+    providerOfficesColStanding: 'الموقف',
+    providerOfficesColBranches: 'الفروع المرخَّصة',
+    providerOfficesColUsers: 'المستخدمون',
+    providerOfficesColLastUsed: 'آخر استخدام للمكتب',
+    providerOfficesNoLicence: 'لا ترخيص مسجَّل',
+    providerOfficesNoTermOnRecord:
+      'لا مدة ترخيص مسجَّلة — يُمنع العمل الجديد (م. 21/أ/9)',
+    providerOfficesLapsed: 'منتهٍ — يُمنع العمل الجديد',
+    providerOfficesInGoodStanding: 'ساري',
+    providerOfficesBranchesValue: '{total} ({dormant} بلا أي عمل)',
+    providerOfficesUsersValue: '{active} نشط من {total}',
+    providerOfficesNeverUsed: 'لم يُستخدم بعد',
+    rcStaffingHeading: 'الحد الأدنى للكوادر المعتمدة',
+    rcStaffingRequired: 'العدد المطلوب:',
+    rcStaffingCurrent: 'المسجَّل حالياً:',
+    rcStaffingMetNote:
+      'يستوفي هذا المكتب الحد الأدنى للكوادر المعتمدة لنطاق ترخيصه.',
+    rcStaffingShortNote:
+      'عدد الأشخاص الحاملين لموافقة سارية من البنك المركزي أقل من العدد الذي يتطلّبه نطاق الترخيص: شخص واحد لنوع تأمين واحد، وشخصان للنوعين. تُسجَّل الموافقة على سجل كل شخص. وإضافة النوع الثاني ستُرفَض حتى يُسجَّل شخصان.',
+    rcScopeTypes: 'أنواع التأمين',
+    rcScopeBranches: 'الفروع المرخّصة',
+    rcScopeNoBranches:
+      'لم تُسجّل أي فروع بعد. لا يُحدّد نوع التأمين إلا من فروعه.',
+    rcScopeAddBranch: 'إضافة فرع',
+    rcScopeBranchLabel: 'الفرع',
+    rcScopeRemove: 'إزالة',
+    rcScopeColBranch: 'الفرع',
+    rcScopeColType: 'النوع',
+    rcScopeSoleEstablishmentNote:
+      'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',
+    rcCapitalHeading: 'رأس المال (المادة 4/أ)',
+    rcCapitalRequired: 'رأس المال المطلوب',
+    rcCapitalPaidUp: 'رأس المال المدفوع',
+    rcCapitalUnrecordedWarning:
+      'لم يُسجّل رأس مال لهذا المكتب، لذلك لا يمكن التحقّق من متطلّب المادة 4/أ. هذه ملاحظة للتحقّق ولا تمنع أي إجراء.',
+    rcCapitalShortfallWarning:
+      'رأس المال المدفوع أقل من متطلّب المادة 4/أ لعدد الفروع المرخّصة. هذه ملاحظة للتحقّق ولا تمنع أي إجراء — المرجع هو وثائق تسجيل المكتب.',
+    rcCapitalMeets: 'رأس المال المدفوع يستوفي متطلّب المادة 4/أ لهذا النطاق.',
+    rcRenewalDueBy: 'آخر موعد لتقديم طلب التجديد',
+    rcExpiryNotEndOfYearWarning:
+      'تاريخ الانتهاء المُدخل ليس 31 كانون الأول/ديسمبر. مدة الترخيص تنتهي في 31 كانون الأول (المادة 10/ب) — تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
+    rcValidByOperationOfLaw:
+      'انتهى تاريخ هذه المدة المطبوع، والترخيص ما زال ساريًا بحكم القانون لأن طلب التجديد قُدّم في موعده (المادة 11). يبقى ساريًا حتى صدور قرار البنك المركزي.',
+    rcRenewalFiledLate:
+      'قُدّم طلب التجديد بعد الموعد المحدّد (المادة 11) — لن يستمر سريان الترخيص بعد تاريخ الانتهاء.',
+    rcExpectedThreeYearExpiry: 'نهاية مدة الثلاث سنوات المتوقّعة',
+    rcColRenewalFiled: 'تاريخ تقديم طلب التجديد',
+    rcNotFiled: 'لم يُقدَّم',
+    rcCurrentTerm: 'المدة الحالية',
+    rcCertificateFileName: 'اسم ملف الشهادة',
+    rcCertificateFileNameLabel: 'اسم ملف الشهادة',
+    rcCertificateStorageRef: 'مرجع تخزين الشهادة',
+    rcCertificateStorageRefLabel: 'مرجع تخزين الشهادة',
+    rcRecordRenewalButton: 'تسجيل تقديم طلب التجديد',
+    rcRenewalAlreadyFiled:
+      'سُجِّل طلب التجديد لهذه المدة، ولا يمكن تغيير تاريخه.',
     rcRenewButton: 'تجديد الترخيص',
     rcCreateButton: 'إنشاء ترخيص',
     rcAddObligationButton: 'إضافة التزام',
@@ -156,7 +231,8 @@ export const COMPLIANCE_RISK = {
     opColClaimsHistory: 'سجل المطالبات',
     opSaveButton: 'حفظ',
     opEventsHeading: 'أحداث مخاطر المسؤولية المهنية',
-    opEventPolicyIdLabel: 'معرّف وثيقة المسؤولية المهنية (اختياري — الافتراضي هو الحالية)',
+    opEventPolicyIdLabel:
+      'معرّف وثيقة المسؤولية المهنية (اختياري — الافتراضي هو الحالية)',
     opEventDescriptionLabel: 'وصف حدث مخاطر المسؤولية المهنية',
     opColSource: 'المصدر',
     opSourcePolicyCheckingDiscrepancy: 'اختلاف في تدقيق الوثيقة',
@@ -170,7 +246,8 @@ export const COMPLIANCE_RISK = {
     opNoEvents: 'لا توجد أحداث مخاطر مسجّلة بعد.',
     opRegisterLoadError: 'تعذّر تحميل سجل المخاطر — حاول مرة أخرى.',
     opPiLoadError: 'تعذّر تحميل سجل وثيقة المسؤولية المهنية — حاول مرة أخرى.',
-    opEventsLoadError: 'تعذّر تحميل أحداث مخاطر المسؤولية المهنية — حاول مرة أخرى.',
+    opEventsLoadError:
+      'تعذّر تحميل أحداث مخاطر المسؤولية المهنية — حاول مرة أخرى.',
     opActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     opRefusalAct: 'عرض سجل المخاطر',
     opPiRefusalAct: 'عرض وثيقة المسؤولية المهنية',
@@ -240,7 +317,8 @@ export const COMPLIANCE_RISK = {
     icNone: 'لم يُجرَ أي تدقيق بعد — شغّله لفحص كل ثنائية.',
     // Zero violations is the EXPECTED result, not an absence of data: every
     // pair is backed by a DB constraint. The copy has to read as a pass.
-    icClean: 'لم يُعثر على أي مخالفة موافقة ذاتية. جميع الثنائيات المفحوصة سليمة.',
+    icClean:
+      'لم يُعثر على أي مخالفة موافقة ذاتية. جميع الثنائيات المفحوصة سليمة.',
     icRunButton: 'تشغيل التدقيق الآن',
     icRunningButton: 'جارٍ التشغيل…',
     icPairsScanned: 'الثنائيات المفحوصة',
@@ -253,7 +331,8 @@ export const COMPLIANCE_RISK = {
     icDeclaredIntro:
       'الحالات التي نفّذ فيها شخص واحد طرفي عملية تتطلب شخصين، في مكتب أعلن السماح بذلك. كل حالة مسجّلة بسببها وبالأدوار التي كان يحملها. أي مراجعة لصلاحيات الشخص نفسه تظهر في الأعلى ومُعلَّمة.',
     icDeclaredOfficeSegregated: 'هذا المكتب يفصل بين المهام.',
-    icDeclaredOfficeCombined: 'هذا المكتب أعلن السماح بتنفيذ الشخص نفسه لطرفي العملية.',
+    icDeclaredOfficeCombined:
+      'هذا المكتب أعلن السماح بتنفيذ الشخص نفسه لطرفي العملية.',
     icDeclaredOfficeDeclaredBy: 'أعلنه {who}.',
     icDeclaredOfficeNeverDeclared: 'لم يُعلَن هذا صراحةً — هو الوضع الافتراضي.',
     icDeclaredEmpty: 'لا توجد اعتمادات ذاتية معلنة.',
@@ -265,7 +344,8 @@ export const COMPLIANCE_RISK = {
     icDeclaredAccessFlag: 'مراجعة صلاحيات نفسه —',
     icDeclaredHatAmbiguous: 'أكثر من دور يمنح الاعتماد',
     icDeclaredTruncated: 'تُعرض أحدث الحالات فقط.',
-    icDeclaredLoadError: 'تعذّر تحميل الاعتمادات الذاتية المعلنة. حاول مرة أخرى.',
+    icDeclaredLoadError:
+      'تعذّر تحميل الاعتمادات الذاتية المعلنة. حاول مرة أخرى.',
     icRefusalAct: 'عرض تقرير الضوابط الداخلية',
 
     // ---- Internal audit findings (#57) ---------------------------------------
@@ -354,15 +434,18 @@ export const COMPLIANCE_RISK = {
     tmLoading: 'Loading…',
     tmNone: 'No transaction-monitoring alerts.',
     tmLoadError: 'Could not load transaction-monitoring alerts — try again.',
-    tmSweepSummary: 'Scanned {scanned} candidate(s) — created {created} alert(s), {skipped} already flagged, {failed} failed.',
+    tmSweepSummary:
+      'Scanned {scanned} candidate(s) — created {created} alert(s), {skipped} already flagged, {failed} failed.',
     tmActionError: 'That action failed — try again.',
     tmRefusalAct: 'view the transaction monitoring alerts',
 
     wsHeading: 'Sanctions watchlist sync',
-    shMissingConfig: 'Missing configuration: {missing}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.',
+    shMissingConfig:
+      'Missing configuration: {missing}. Automated screening provider is not configured. Compliance review is required before the applicable workflow can proceed.',
     shScreeningAttempts: 'Screening attempts (last {days} days)',
     shHoldsReleased: 'Holds released (last {days} days)',
-    wsRescreenSummary: 'Re-screened {screened} active customer(s) — {hits} produced a HIT, {failed} failed.',
+    wsRescreenSummary:
+      'Re-screened {screened} active customer(s) — {hits} produced a HIT, {failed} failed.',
     wsIntro:
       "Two free public sanctions lists (OFAC SDN, UN Consolidated) are synced locally every 12 hours — the lists' own real-world refresh cadence — and every ACTIVE customer is re-screened against them every 4 hours. Both can also be run on demand here.",
     wsSyncButton: 'Sync watchlists now',
@@ -422,6 +505,81 @@ export const COMPLIANCE_RISK = {
     rcEvidenceRefLabel: 'Evidence ref',
     rcNoCalendarItems: 'No compliance calendar items.',
     rcNoLicense: 'No broker license record exists yet.',
+    rcNoLicenseBlocksBusiness:
+      'This office holds no licence term on record — and new business issuance is blocked. Practising without a current licence is a ground for administrative sanction (CBJ Instructions No. 9 of 2026, art. 21/a/9). Record the licence and its certificate below.',
+    rcTermsHeading: 'Licence terms',
+    rcScopeHeading: 'Licence scope',
+    providerOfficesHeading: 'Brokerage offices on the platform',
+    providerOfficesRefusalAct:
+      'read the state of brokerage offices on the platform',
+    providerOfficesCrossOfficeNote:
+      'This screen crosses office boundaries — it shows other brokerage offices, not only yours. It contains no customer, policy, premium or commission data and nothing about any individual person; the last-used date is the office’s, not any user’s.',
+    providerOfficesLoading: 'Loading…',
+    providerOfficesLoadError:
+      'Could not load the platform offices — try again.',
+    providerOfficesEmpty:
+      'The platform returned no offices at all, which is not a normal result — check the database connection before relying on this screen.',
+    providerOfficesColOffice: 'Office',
+    providerOfficesColStatus: 'Office status',
+    providerOfficesColLicence: 'Licence number',
+    providerOfficesColExpiry: 'Expires',
+    providerOfficesColStanding: 'Standing',
+    providerOfficesColBranches: 'Licensed branches',
+    providerOfficesColUsers: 'Users',
+    providerOfficesColLastUsed: 'Office last used',
+    providerOfficesNoLicence: 'no licence recorded',
+    providerOfficesNoTermOnRecord:
+      'no licence term on record — new business blocked (art. 21/a/9)',
+    providerOfficesLapsed: 'lapsed — new business blocked',
+    providerOfficesInGoodStanding: 'in force',
+    providerOfficesBranchesValue: '{total} ({dormant} with no business)',
+    providerOfficesUsersValue: '{active} active of {total}',
+    providerOfficesNeverUsed: 'never used',
+    rcStaffingHeading: 'Minimum approved staff',
+    rcStaffingRequired: 'Required:',
+    rcStaffingCurrent: 'Currently recorded:',
+    rcStaffingMetNote:
+      'This office meets the minimum approved staff for its licence scope.',
+    rcStaffingShortNote:
+      'Fewer people hold a current CBJ approval than this licence scope requires: one approved person for one insurance type, two for both. The approval is recorded on each person’s own employee record. Adding the second type will be refused until two are on record.',
+    rcScopeTypes: 'Insurance types',
+    rcScopeBranches: 'Licensed branches',
+    rcScopeNoBranches:
+      'No branches recorded yet. An insurance type is only ever determined by its branches.',
+    rcScopeAddBranch: 'Add branch',
+    rcScopeBranchLabel: 'Branch',
+    rcScopeRemove: 'Remove',
+    rcScopeColBranch: 'Branch',
+    rcScopeColType: 'Type',
+    rcScopeSoleEstablishmentNote:
+      'This office is registered as a sole establishment (natural person), which may be licensed for ONE insurance type only (art. 3/a). Adding a branch of the other type will be refused.',
+    rcCapitalHeading: 'Capital (art. 4/a)',
+    rcCapitalRequired: 'Required capital',
+    rcCapitalPaidUp: 'Paid-up capital',
+    rcCapitalUnrecordedWarning:
+      'No paid-up capital is recorded for this office, so the art. 4/a requirement cannot be checked. This is a note to verify and blocks nothing.',
+    rcCapitalShortfallWarning:
+      'The recorded paid-up capital is below what art. 4/a requires for this number of licensed branches. This is a note to verify and blocks nothing — the authority is the office’s registration documents.',
+    rcCapitalMeets:
+      'The recorded paid-up capital meets the art. 4/a requirement for this scope.',
+    rcRenewalDueBy: 'Renewal application due by',
+    rcExpiryNotEndOfYearWarning:
+      'The expiry you entered is not a 31 December. A licence term ends on 31 December (art. 10/b) — check it against the date printed on the certificate. The entry was not refused.',
+    rcValidByOperationOfLaw:
+      "This term's printed expiry has passed, and the licence remains valid by operation of law because the renewal application was filed on time (art. 11). It stays valid until the CBJ's decision issues.",
+    rcRenewalFiledLate:
+      'The renewal application was filed after the deadline (art. 11) — the licence will not remain valid past its expiry.',
+    rcExpectedThreeYearExpiry: 'Expected end of a three-year term',
+    rcColRenewalFiled: 'Renewal filed',
+    rcNotFiled: 'Not filed',
+    rcCurrentTerm: 'Current term',
+    rcCertificateFileName: 'Certificate file name',
+    rcCertificateFileNameLabel: 'Certificate file name',
+    rcCertificateStorageRef: 'Certificate storage reference',
+    rcCertificateStorageRefLabel: 'Certificate storage reference',
+    rcRecordRenewalButton: 'Record renewal application',
+    rcRenewalAlreadyFiled:
+      'A renewal application is already recorded for this term; its filing date cannot be changed.',
     rcRenewButton: 'Renew license',
     rcCreateButton: 'Create license',
     rcAddObligationButton: 'Add obligation',
@@ -468,7 +626,8 @@ export const COMPLIANCE_RISK = {
     opColClaimsHistory: 'Claims history',
     opSaveButton: 'Save',
     opEventsHeading: 'PI risk events',
-    opEventPolicyIdLabel: 'PI policy id (optional — defaults to the current one)',
+    opEventPolicyIdLabel:
+      'PI policy id (optional — defaults to the current one)',
     opEventDescriptionLabel: 'PI risk event description',
     opColSource: 'Source',
     opSourcePolicyCheckingDiscrepancy: 'Policy Checking discrepancy',

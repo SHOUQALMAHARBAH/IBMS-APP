@@ -1,29 +1,15 @@
-import { IsOptional, IsString, Length } from 'class-validator';
-import { Transform } from 'class-transformer';
-import { emptyStringToUndefined } from '../../../common/dto.util';
+import { BrokerLicenseTermDto } from './broker-license-term.dto';
 
 /**
- * Process 51 — `POST /broker-license/renew` (`license.manage` / Compliance).
- * Updates the existing singleton record's particulars and resets `status`
- * to `'active'` — a fresh license period supersedes any prior manual lapse.
- * 404 if no record exists yet (`create` first).
+ * Module 0 item (c) — `POST /broker-license/renew` (`license.manage` / Compliance). APPENDS the
+ * next term; 404 if the office holds none yet (`create` first).
+ *
+ * IT NO LONGER OVERWRITES. Renewal used to be an `updateMany` over the single global row, so the
+ * term being replaced was erased and the office could not show a regulator what it had been
+ * licensed for last year. A renewal is a new term; the old one stays, with its own certificate,
+ * its own dates and its own status.
+ *
+ * Every field is declared on `BrokerLicenseTermDto` — this class adds nothing, because the two
+ * routes differ in what they require of the office's existing terms, not in what a term looks like.
  */
-export class RenewBrokerLicenseDto {
-  @IsString()
-  @Length(1, 200)
-  licenseNumber!: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  @Length(1, 500)
-  scopeOfAuthorization?: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  issuedAt?: string;
-
-  @IsString()
-  expiresAt!: string;
-}
+export class RenewBrokerLicenseDto extends BrokerLicenseTermDto {}

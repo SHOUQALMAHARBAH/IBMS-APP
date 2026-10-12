@@ -19,6 +19,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
+import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return withDerivedPermissions({
@@ -84,9 +85,23 @@ interface Opts {
   transitionRejects?: boolean;
   artifactsReject?: boolean;
   customerOwner?: string;
-  // undefined -> no BrokerLicense record configured (not blocked); pass an
-  // explicit object to exercise the gate.
-  brokerLicense?: { licenseNumber: string; status: string; expiresAt: Date };
+  // Module 0 item (c) INVERTED THIS DEFAULT, and the inversion is the point.
+  //
+  // It used to be: undefined -> no BrokerLicense configured -> NOT BLOCKED. That is what let every
+  // other `place` test here run without thinking about the licence, and it is exactly the hole the
+  // item closes — practising with no licence on record is a ground for administrative sanction
+  // (CBJ Instructions No. 9 of 2026, art. 21/a/9).
+  //
+  // Now: undefined -> a VALID current term, so these tests still exercise what they are about;
+  // `null` -> the office holds NO term, which the gate refuses; an object -> that term.
+  brokerLicense?: {
+    licenseNumber: string;
+    status: string;
+    expiresAt: Date;
+    // Module 0 item (d) — art. 11. Needed here because the gate's answer for an EXPIRED term now
+    // depends on whether a renewal application was filed on time.
+    renewalRequestedAt?: Date | null;
+  } | null;
   // Insurer management — `false` exercises the deactivated-insurer refusal, `null`
   // an insurer that does not exist. Defaults to active.
   insurerActive?: boolean | null;
@@ -267,11 +282,23 @@ function makeDeps(opts: Opts = {}) {
     findById: findCustomerById,
   } as unknown as CustomerRepository;
 
-  const findCurrentLicense = vi
-    .fn()
-    .mockResolvedValue(opts.brokerLicense ?? null);
+  // A VALID term unless the test says otherwise. `null` is the explicit "this office holds no
+  // licence" case; `undefined` gets this.
+  const defaultTerm = {
+    id: 'term-default',
+    licenseNumber: 'CBJ-TEST-001',
+    status: 'active',
+    expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+    certificateDocumentId: 'doc-certificate-1',
+    renewalRequestedAt: null,
+  };
+  const licenseTerms =
+    opts.brokerLicense === null
+      ? []
+      : [{ ...defaultTerm, ...(opts.brokerLicense ?? {}) }];
+  const findLicenseTerms = vi.fn().mockResolvedValue(licenseTerms);
   const brokerLicenses = {
-    findCurrent: findCurrentLicense,
+    findTerms: findLicenseTerms,
   } as unknown as BrokerLicenseRepository;
 
   const record = vi
@@ -320,6 +347,13 @@ function makeDeps(opts: Opts = {}) {
       brokerLicenses,
       audit,
       workflow,
+      // Module 0 item (h). Resolves GENERAL for every line, so these tests stay about PLACEMENT:
+      // the actors here carry no role scope, which `withinRoleScope` reads as unrestricted whatever
+      // the category — and a mock returning `undefined` would make the scope check throw rather
+      // than pass, which is how a missing mock method reads as a broken feature.
+      {
+        findCategory: vi.fn().mockResolvedValue('GENERAL'),
+      } as unknown as InsuranceLineRepository,
     ),
     state,
     mocks: {
@@ -335,7 +369,7 @@ function makeDeps(opts: Opts = {}) {
       findRecommendationByOpportunityId,
       findClientDecisionByOpportunityId,
       findCustomerById,
-      findCurrentLicense,
+      findLicenseTerms,
       record,
       transition,
     },
@@ -369,10 +403,39 @@ describe('PolicyService', () => {
     });
 
     // Process 51 (backlog Part C #51's first checkbox) — the license gate.
-    it('proceeds when no BrokerLicense record is configured (not an oversight — see assertLicenseNotLapsed)', async () => {
+    //
+    // REPOINTED by Module 0 item (c). This test used to be named "proceeds when no BrokerLicense
+    // record is configured (not an oversight — see assertLicenseNotLapsed)" and asserted that a
+    // Policy WAS created. It encoded the old behaviour as intended, and the behaviour reversed:
+    // absence now BLOCKS. Renamed rather than edited in place so the reversal is legible to a
+    // reader who remembers the old assertion.
+    it('REFUSES placement when the office holds no licence term — this used to proceed', async () => {
+      const { service, mocks } = makeDeps({ brokerLicense: null });
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(mocks.findLicenseTerms).toHaveBeenCalled();
+    });
+
+    it('never creates a Policy when the office holds no licence term, and cites the regulation', async () => {
+      // A SEPARATE behaviour from the refusal above, and the one that matters on the record: the
+      // gate could 422 and still have written a row, and a refusal that does not say WHY sends
+      // Compliance looking for a system fault instead of a missing licence. Mirrors the two
+      // lapsed-licence tests below, which assert the same pair.
+      const { service, mocks } = makeDeps({ brokerLicense: null });
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        /holds no CBJ broker license term on record/,
+      );
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        /art\. 21\/a\/9/,
+      );
+      expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    it('proceeds when the office holds a valid term', async () => {
       const { service, mocks } = makeDeps();
       await service.place(PLACE_DTO, placement());
-      expect(mocks.findCurrentLicense).toHaveBeenCalled();
+      expect(mocks.findLicenseTerms).toHaveBeenCalled();
       expect(mocks.create).toHaveBeenCalled();
     });
 
@@ -408,6 +471,64 @@ describe('PolicyService', () => {
           licenseNumber: 'CBJ-1',
           status: 'lapsed',
           expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        },
+      });
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    // Module 0 item (d) — CBJ Instructions No. 9 of 2026, art. 11.
+    it('PROCEEDS past expiry when the renewal application was filed on time (by operation of law)', async () => {
+      // After 31 December an office that applied on time stays valid until the decision issues.
+      // Blocking it would refuse business the regulation permits — an error running against the
+      // brokerage, the same direction as the empty holiday calendar.
+      const { service, mocks } = makeDeps({
+        brokerLicense: {
+          licenseNumber: 'CBJ-TEST-001',
+          status: 'active',
+          expiresAt: new Date('2020-12-31T00:00:00.000Z'),
+          // 45 calendar days before that expiry, i.e. exactly on art. 11's deadline.
+          renewalRequestedAt: new Date('2020-11-16T00:00:00.000Z'),
+        },
+      });
+      await service.place(PLACE_DTO, placement());
+      expect(mocks.create).toHaveBeenCalled();
+    });
+
+    it('still BLOCKS past expiry when the application was filed LATE', async () => {
+      // The other half. Without it the test above would pass against an implementation that
+      // treated ANY recorded application as an extension, which is not what art. 11 says.
+      const { service, mocks } = makeDeps({
+        brokerLicense: {
+          licenseNumber: 'CBJ-TEST-001',
+          status: 'active',
+          expiresAt: new Date('2020-12-31T00:00:00.000Z'),
+          renewalRequestedAt: new Date('2020-12-20T00:00:00.000Z'),
+        },
+      });
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    it('still BLOCKS a MANUALLY lapsed term even with a timely application', async () => {
+      // A CBJ suspension is not cured by having applied for renewal.
+      //
+      // The expiry is in the PAST deliberately. The first version of this test used 2099 and was
+      // INSENSITIVE to the thing it claims to be about: with the term still inside its period the
+      // ordering of the manual-lapse check against art. 11's extension never matters, so planting
+      // the inversion left this test green while its sibling in broker-license.config.spec.ts
+      // died. Expired + manually lapsed + filed on time is the only combination where the
+      // ordering decides the answer.
+      const { service, mocks } = makeDeps({
+        brokerLicense: {
+          licenseNumber: 'CBJ-TEST-001',
+          status: 'lapsed',
+          expiresAt: new Date('2020-12-31T00:00:00.000Z'),
+          renewalRequestedAt: new Date('2020-11-16T00:00:00.000Z'),
         },
       });
       await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(

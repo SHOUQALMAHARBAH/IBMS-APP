@@ -1,6 +1,12 @@
 'use client';
 
-import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import {
+  type CSSProperties,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -24,9 +30,13 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { CorrectEmployeeRecord } from '../../../../components/supporting-operations/CorrectEmployeeRecord';
 import { hasPermission } from '../../../../lib/auth/permissions';
-import { errorStyle, successStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  errorStyle,
+  successStyle,
+} from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { CbjApprovalPanel } from '../../../../components/supporting-operations/CbjApprovalPanel';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
@@ -34,10 +44,23 @@ const cell: CSSProperties = {
   borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: '2px solid var(--border-default)',
+};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = {
+  margin: '1rem 0',
+  display: 'grid',
+  gap: '0.4rem',
+  maxWidth: '26rem',
+};
+const labelStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.2rem',
+};
 
 export default function EmployeeDetailPage() {
   const { t } = useLanguage();
@@ -56,7 +79,10 @@ export default function EmployeeDetailPage() {
   // you read an employee record: it is `employee.national-id.reveal`, held by
   // Compliance alone. Rendering the form to every reader would offer a control
   // that 403s on submit.
-  const canRevealNationalId = hasPermission(user, 'employee.national-id.reveal');
+  const canRevealNationalId = hasPermission(
+    user,
+    'employee.national-id.reveal',
+  );
 
   const [trainingName, setTrainingName] = useState('');
   const [trainingDueAt, setTrainingDueAt] = useState('');
@@ -160,7 +186,9 @@ export default function EmployeeDetailPage() {
       setRoleIds([]);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('empdLoginError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('empdLoginError'),
+      );
     } finally {
       setBusy(false);
     }
@@ -173,7 +201,9 @@ export default function EmployeeDetailPage() {
       const result = await revealEmployeeField(employeeId, revealReason);
       setRevealedValue(result.value);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('empdRevealError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('empdRevealError'),
+      );
     }
   }
 
@@ -189,7 +219,9 @@ export default function EmployeeDetailPage() {
       setTrainingDueAt('');
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('empdRecordTrainingError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('empdRecordTrainingError'),
+      );
     }
   }
 
@@ -199,7 +231,9 @@ export default function EmployeeDetailPage() {
       await completeTraining(employeeId, trainingId);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('empdCompleteTrainingError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('empdCompleteTrainingError'),
+      );
     }
   }
 
@@ -209,7 +243,9 @@ export default function EmployeeDetailPage() {
       await terminateEmployee(employeeId);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('empdTerminateError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('empdTerminateError'),
+      );
     }
   }
 
@@ -225,7 +261,9 @@ export default function EmployeeDetailPage() {
       await updateDeprovisioningChecklist(employeeId, { [field]: true });
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('empdChecklistUpdateError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('empdChecklistUpdateError'),
+      );
     }
   }
 
@@ -235,7 +273,9 @@ export default function EmployeeDetailPage() {
       await completeDeprovisioningChecklist(employeeId);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('empdChecklistCompleteError'));
+      setActionError(
+        err instanceof ApiError ? err.message : t('empdChecklistCompleteError'),
+      );
     }
   }
 
@@ -269,21 +309,31 @@ export default function EmployeeDetailPage() {
                 {employee.grandfatherName ? (
                   <>
                     {' '}
-                    — {t('empdGrandfatherName')} <bdi>{employee.grandfatherName}</bdi>
+                    — {t('empdGrandfatherName')}{' '}
+                    <bdi>{employee.grandfatherName}</bdi>
                   </>
-                ) : null}
-                {' '}
+                ) : null}{' '}
                 — {t('empdFamilyName')} <bdi>{employee.familyName}</bdi>
               </p>
             ) : null}
-            <p>{t('empdNationalIdLabel')} {employee.nationalId}</p>
-            <p>{t('empdPositionLabel')} {employee.position ?? '—'}</p>
-            <p>{t('empdLicensedRoleLabel')} {employee.licensedRole ?? '—'}</p>
-            <p>{t('empdHireDateLabel')} {employee.hireDate?.slice(0, 10) ?? '—'}</p>
+            <p>
+              {t('empdNationalIdLabel')} {employee.nationalId}
+            </p>
+            <p>
+              {t('empdPositionLabel')} {employee.position ?? '—'}
+            </p>
+            <p>
+              {t('empdLicensedRoleLabel')} {employee.licensedRole ?? '—'}
+            </p>
+            <p>
+              {t('empdHireDateLabel')} {employee.hireDate?.slice(0, 10) ?? '—'}
+            </p>
             <p>
               {t('empdStatusLabel')}{' '}
               {employee.terminationDate
-                ? t('empdTerminatedOn', { date: employee.terminationDate.slice(0, 10) })
+                ? t('empdTerminatedOn', {
+                    date: employee.terminationDate.slice(0, 10),
+                  })
                 : t('empdActive')}
             </p>
 
@@ -292,7 +342,19 @@ export default function EmployeeDetailPage() {
               a reader without it sees the record and no control, which is what this page already
               does with the reveal and the de-provisioning checklist.
             */}
-            <CorrectEmployeeRecord employee={employee} onCorrected={() => void load()} />
+            <CorrectEmployeeRecord
+              employee={employee}
+              onCorrected={() => void load()}
+            />
+
+            {/* Module 0 item (g). Beside the record it describes, and gated internally on
+                `employee.update` the same way the correction form is: a reader without it sees the
+                approval and no controls. */}
+            <CbjApprovalPanel
+              employeeId={employee.id}
+              approval={employee.cbjApproval}
+              onChanged={() => void load()}
+            />
 
             {canRevealNationalId ? (
               <form onSubmit={onReveal} style={formStyle}>
@@ -306,7 +368,11 @@ export default function EmployeeDetailPage() {
                   />
                 </label>
                 <button type="submit">{t('empdReveal')}</button>
-                {revealedValue ? <p>{t('empdFullValue')} {revealedValue}</p> : null}
+                {revealedValue ? (
+                  <p>
+                    {t('empdFullValue')} {revealedValue}
+                  </p>
+                ) : null}
               </form>
             ) : null}
 
@@ -329,16 +395,26 @@ export default function EmployeeDetailPage() {
               // Names the account rather than offering another. User.employeeId is unique, so a
               // second login for the same person is not a thing to attempt and then be refused.
               <p data-existing-account={employee.account.id}>
-                {t('empdLoginExists')} <bdi dir="ltr">{employee.account.email}</bdi>
+                {t('empdLoginExists')}{' '}
+                <bdi dir="ltr">{employee.account.email}</bdi>
               </p>
             ) : !canIssueLogin ? (
-              <p style={{ color: 'var(--ink-secondary)' }} data-login-not-permitted>
+              <p
+                style={{ color: 'var(--ink-secondary)' }}
+                data-login-not-permitted
+              >
                 {permissionRefusal(t, 'empdLoginRefusalAct', 'user.manage')}
               </p>
             ) : !showLoginForm ? (
               <>
-                <p style={{ color: 'var(--ink-secondary)' }}>{t('empdLoginNone')}</p>
-                <button type="button" onClick={() => setShowLoginForm(true)} data-open-login-form>
+                <p style={{ color: 'var(--ink-secondary)' }}>
+                  {t('empdLoginNone')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginForm(true)}
+                  data-open-login-form
+                >
                   {t('empdLoginButton')}
                 </button>
               </>
@@ -398,15 +474,26 @@ export default function EmployeeDetailPage() {
                     ))}
                   </select>
                 </label>
-                <fieldset style={{ border: '1px solid var(--border-subtle)', padding: '0.5rem' }}>
+                <fieldset
+                  style={{
+                    border: '1px solid var(--border-subtle)',
+                    padding: '0.5rem',
+                  }}
+                >
                   <legend>{t('empRolesHeading')}</legend>
                   {roles.length === 0 ? (
-                    <p style={{ color: 'var(--ink-secondary)', margin: 0 }}>{t('empRolesNone')}</p>
+                    <p style={{ color: 'var(--ink-secondary)', margin: 0 }}>
+                      {t('empRolesNone')}
+                    </p>
                   ) : (
                     roles.map((r) => (
                       <label
                         key={r.id}
-                        style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}
+                        style={{
+                          display: 'flex',
+                          gap: '0.4rem',
+                          alignItems: 'center',
+                        }}
                       >
                         <input
                           type="checkbox"
@@ -461,7 +548,9 @@ export default function EmployeeDetailPage() {
             </form>
 
             {employee.trainings.length === 0 ? (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('empdNoTraining')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>
+                {t('empdNoTraining')}
+              </p>
             ) : (
               <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
                 <thead>
@@ -476,11 +565,18 @@ export default function EmployeeDetailPage() {
                   {employee.trainings.map((training) => (
                     <tr key={training.id}>
                       <td style={cell}>{training.trainingName}</td>
-                      <td style={cell}>{training.dueAt?.slice(0, 10) ?? '—'}</td>
-                      <td style={cell}>{training.completedAt?.slice(0, 10) ?? '—'}</td>
+                      <td style={cell}>
+                        {training.dueAt?.slice(0, 10) ?? '—'}
+                      </td>
+                      <td style={cell}>
+                        {training.completedAt?.slice(0, 10) ?? '—'}
+                      </td>
                       <td style={cell}>
                         {!training.completedAt ? (
-                          <button type="button" onClick={() => onCompleteTraining(training.id)}>
+                          <button
+                            type="button"
+                            onClick={() => onCompleteTraining(training.id)}
+                          >
                             {t('empdMarkComplete')}
                           </button>
                         ) : null}
@@ -490,7 +586,6 @@ export default function EmployeeDetailPage() {
                 </tbody>
               </table>
             )}
-
           </section>
 
           {employee.deprovisioningChecklist ? (
@@ -509,7 +604,10 @@ export default function EmployeeDetailPage() {
                   {employee.deprovisioningChecklist.systemAccessRevokedAt ? (
                     t('empdYes')
                   ) : (
-                    <button type="button" onClick={() => onTickChecklistItem('systemAccessRevoked')}>
+                    <button
+                      type="button"
+                      onClick={() => onTickChecklistItem('systemAccessRevoked')}
+                    >
                       {t('empdMarkDone')}
                     </button>
                   )}
@@ -519,7 +617,12 @@ export default function EmployeeDetailPage() {
                   {employee.deprovisioningChecklist.physicalAccessRevokedAt ? (
                     t('empdYes')
                   ) : (
-                    <button type="button" onClick={() => onTickChecklistItem('physicalAccessRevoked')}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onTickChecklistItem('physicalAccessRevoked')
+                      }
+                    >
                       {t('empdMarkDone')}
                     </button>
                   )}
@@ -529,7 +632,10 @@ export default function EmployeeDetailPage() {
                   {employee.deprovisioningChecklist.deviceReturnedAt ? (
                     t('empdYes')
                   ) : (
-                    <button type="button" onClick={() => onTickChecklistItem('deviceReturned')}>
+                    <button
+                      type="button"
+                      onClick={() => onTickChecklistItem('deviceReturned')}
+                    >
                       {t('empdMarkDone')}
                     </button>
                   )}
@@ -539,14 +645,25 @@ export default function EmployeeDetailPage() {
                   {employee.deprovisioningChecklist.knowledgeTransferDoneAt ? (
                     t('empdYes')
                   ) : (
-                    <button type="button" onClick={() => onTickChecklistItem('knowledgeTransferDone')}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onTickChecklistItem('knowledgeTransferDone')
+                      }
+                    >
                       {t('empdMarkDone')}
                     </button>
                   )}
                 </li>
               </ul>
               {employee.deprovisioningChecklist.completedAt ? (
-                <p>Completed {employee.deprovisioningChecklist.completedAt.replace('T', ' ').slice(0, 16)}.</p>
+                <p>
+                  Completed{' '}
+                  {employee.deprovisioningChecklist.completedAt
+                    .replace('T', ' ')
+                    .slice(0, 16)}
+                  .
+                </p>
               ) : (
                 <button type="button" onClick={onCompleteChecklist}>
                   {t('empdCompleteChecklist')}

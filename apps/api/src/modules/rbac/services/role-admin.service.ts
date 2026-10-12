@@ -18,6 +18,10 @@ import type {
   RoleSecurityAttributesDto,
   UpdateRoleDto,
 } from '../dto/role-crud.dto';
+import type { SetRoleScopeDto } from '../dto/role-scope.dto';
+import { InsuranceLineRepository } from '../../../repositories/insurance-line.repository';
+import type { InsuranceLineCategory } from '@ibms/db';
+import { OrganizationRepository } from '../../../repositories/organization.repository';
 
 /** What the Role screen renders for one row. */
 export interface RoleAdminView {
@@ -34,6 +38,23 @@ export interface RoleAdminView {
    *  history, not access, and are excluded. */
   holderCount: number;
   permissionCount: number;
+  /**
+   * MODULE 0 ITEM (h) — the insurance-line scope, on the LIST view as well as the detail one.
+   *
+   * On the list because a scope an administrator cannot see while comparing roles is a scope
+   * they will not notice is missing — § 5 of `docs/decision-role-scope.md` names an unscoped
+   * role that somebody MEANT to scope as the cost of NULL-means-everything, and this is the
+   * half that makes it visible.
+   */
+  insuranceLineCategory: InsuranceLineCategory | null;
+  scopeBranchCount: number;
+}
+
+/** One role with everything the matrix screen renders — the grants AND the scope's branch ids. */
+export interface RoleDetailView extends RoleAdminView {
+  permissionCodes: string[];
+  scopeLineIds: string[];
+  scopeOfficeLineIds: string[];
 }
 
 /**
@@ -98,6 +119,14 @@ export class RoleAdminService {
     private readonly orgContext: OrgContextService,
     private readonly audit: AuditService,
     private readonly permissions: PermissionsService,
+    // Module 0 item (h): the branch-within-the-type rule reads the catalogue's own
+    // `category`. A shared REPOSITORY across the module boundary, never a service.
+    private readonly lines: InsuranceLineRepository,
+    // Module 0 item (j)'s gap closure: the PLATFORM refusal needs the granting office's TYPE. A
+    // shared repository across the module boundary — the established shape — and provided in the
+    // SAME commit as the dependency, because a missing provider is a runtime DI failure `tsc`
+    // cannot see and item (e) shipped exactly that.
+    private readonly organizations: OrganizationRepository,
   ) {}
 
   /** Every role the office has, retired ones included — a screen that hid them
@@ -116,18 +145,19 @@ export class RoleAdminService {
       requiresHardwareToken: role.requiresHardwareToken,
       holderCount: role.holderCount,
       permissionCount: role.permissionCount,
+      insuranceLineCategory: role.insuranceLineCategory,
+      scopeBranchCount: role.scopeBranchCount,
     }));
   }
 
   /** One role plus the codes it grants — what the matrix loads to render a row's
    *  checkboxes. Another office's id reads as absent, not forbidden. */
-  async get(
-    roleId: string,
-  ): Promise<RoleAdminView & { permissionCodes: string[] }> {
+  async get(roleId: string): Promise<RoleDetailView> {
     const role = await this.roles.findByIdWithPermissionCodes(roleId);
     if (!role) throw new NotFoundException(`Role ${roleId} not found.`);
     const counts = await this.roles.findAllForAdmin();
     const withCounts = counts.find((r) => r.id === role.id);
+    const scope = await this.roles.findScope(roleId);
     return {
       id: role.id,
       name: role.name,
@@ -140,6 +170,16 @@ export class RoleAdminService {
       requiresHardwareToken: role.requiresHardwareToken,
       holderCount: withCounts?.holderCount ?? 0,
       permissionCount: role.permissionCodes.length,
+      // Module 0 item (h). From the role row itself, not from `withCounts`: the count is only
+      // needed when the branches are not being listed, and this view is what the matrix screen
+      // loads to render one role's scope controls.
+      insuranceLineCategory: role.insuranceLineCategory,
+      scopeBranchCount: withCounts?.scopeBranchCount ?? 0,
+      // Module 0 item (h). The IDS, not just the count: the matrix screen has to pre-tick
+      // the branches already in scope, and a count cannot do that. On the DETAIL read
+      // only — the list renders every role and would be N+1 for ids nothing shows.
+      scopeLineIds: scope?.insuranceLineIds ?? [],
+      scopeOfficeLineIds: scope?.officeInsuranceLineIds ?? [],
       permissionCodes: role.permissionCodes,
     };
   }
@@ -286,6 +326,35 @@ export class RoleAdminService {
 
     const requested = [...new Set(permissionCodes)];
     const permissionIds = await this.resolveCodes(requested);
+
+    /*
+     * MODULE 0 ITEM (j)'s GAP CLOSURE — A PLATFORM CODE IS REFUSED FOR A NON-PROVIDER OFFICE.
+     *
+     * `permissions.ts`'s header states the invariant this enforces ("no code in this grid may have
+     * an effect outside the granting office") and records this exact design as the deferred cure:
+     * "a `Permission.scope` column with a server-side refusal and a matrix filter... if a genuinely
+     * platform-wide capability is ever needed, the column is the same work then, with a real case to
+     * test against."
+     *
+     * THE MATRIX ALSO HIDES THESE CODES, AND THAT IS NOT THE BOUNDARY. A hidden control the API
+     * still honours is not a boundary — `PATCH /rbac/roles/:id/permissions` takes a list of codes
+     * from the client, so hiding one on screen stops nobody who can write a request. The screen
+     * spares an administrator a refusal they cannot act on; this is what makes it true.
+     */
+    const platformCodes =
+      await this.catalogue.findPlatformScopedCodes(requested);
+    if (platformCodes.length > 0) {
+      const org = await this.organizations.findById(organizationId);
+      if (org?.type !== 'PROVIDER') {
+        throw new UnprocessableEntityException(
+          `${platformCodes.join(', ')} ${platformCodes.length === 1 ? 'is a PLATFORM-scoped permission' : 'are PLATFORM-scoped permissions'}: ` +
+            'the effect reaches across offices, so it may only be granted to a role of the platform ' +
+            'operator organization. This office cannot grant it to itself, and no permission grant ' +
+            'will change that — it is a property of the code, not of your role. ' +
+            'See the header of packages/db/prisma/seed-data/permissions.ts.',
+        );
+      }
+    }
     const before = new Set(role.permissionCodes);
     const after = new Set(requested);
 
@@ -481,6 +550,119 @@ export class RoleAdminService {
    * respect. Losing every permission is recoverable by an administrator; losing every administrator
    * is not.
    */
+  /**
+   * MODULE 0 ITEM (h) — set a role's insurance-line scope.
+   *
+   * ## The rule the database cannot hold
+   *
+   * A branch must lie WITHIN the role's own type. Deciding that needs `Role.insuranceLineCategory`
+   * plus the branch's catalogue row — two tables — and a Postgres CHECK compares columns of one row
+   * of one table. So it lives here, is recorded as service-grain rather than left for a reader to
+   * assume a database guarantee, and is proven over real HTTP because this service is the only
+   * thing holding it.
+   *
+   * ## Refusing branches with NO type is the sharper half
+   *
+   * A role with no `insuranceLineCategory` is unrestricted, so a branch list on it would describe a
+   * narrowing that nothing enforces — the screen would show four branches and the decision would
+   * permit every line. Refused by name rather than silently ignored, because a scope that is
+   * displayed and not applied is worse than no scope at all.
+   *
+   * ## An `isSystem` role may still be scoped
+   *
+   * `isSystem` refuses rename/retire/re-grant, and scope is none of those: an office that defines
+   * its own Manager role beside the seeded one must be able to scope the seeded one too, or the flag
+   * becomes a reason it cannot configure its own access. Stated because the three neighbouring
+   * methods all refuse an `isSystem` role and a reader would reasonably expect this one to as well.
+   */
+  async setScope(
+    roleId: string,
+    dto: SetRoleScopeDto,
+    actorUserId: string,
+  ): Promise<RoleDetailView> {
+    const role = await this.roles.findByIdWithPermissionCodes(roleId);
+    if (!role) throw new NotFoundException('Role not found');
+
+    const existing = await this.roles.findScope(roleId);
+    const category =
+      dto.insuranceLineCategory === undefined
+        ? (existing?.insuranceLineCategory ?? null)
+        : dto.insuranceLineCategory;
+    const insuranceLineIds =
+      dto.insuranceLineIds ?? existing?.insuranceLineIds ?? [];
+    const officeInsuranceLineIds =
+      dto.officeInsuranceLineIds ?? existing?.officeInsuranceLineIds ?? [];
+
+    if (
+      category === null &&
+      insuranceLineIds.length + officeInsuranceLineIds.length > 0
+    ) {
+      throw new UnprocessableEntityException(
+        'A role with no insurance type is unrestricted, so a branch list on it would describe a ' +
+          'narrowing that nothing enforces. Give the role an insurance type, or clear its branches.',
+      );
+    }
+
+    // Every branch must be in the role's own type. Checked BEFORE the write, against the catalogue
+    // rather than against anything the caller sent, so a branch cannot assert its own category.
+    for (const id of insuranceLineIds) {
+      const actual = await this.lines.findCategory(id, null);
+      if (actual === null) {
+        throw new NotFoundException(`Insurance line ${id} was not found.`);
+      }
+      if (actual !== category) {
+        throw new UnprocessableEntityException(
+          `Insurance line ${id} is ${actual}, but this role is scoped to ${category}. A branch ` +
+            'outside the role’s own insurance type would be a scope that contradicts itself.',
+        );
+      }
+    }
+    for (const id of officeInsuranceLineIds) {
+      const actual = await this.lines.findCategory(null, id);
+      if (actual === null) {
+        throw new NotFoundException(
+          `Insurance line ${id} was not found in this office.`,
+        );
+      }
+      if (actual !== category) {
+        throw new UnprocessableEntityException(
+          `Insurance line ${id} is ${actual}, but this role is scoped to ${category}. A branch ` +
+            'outside the role’s own insurance type would be a scope that contradicts itself.',
+        );
+      }
+    }
+
+    await this.roles.replaceScope(roleId, role.organizationId, {
+      insuranceLineCategory: category,
+      insuranceLineIds,
+      officeInsuranceLineIds,
+    });
+
+    // The scope decides what the role's grants reach, so a stale cache would leave a widened role
+    // refused — or worse, a narrowed one still permitted — for up to the TTL.
+    this.permissions.invalidateCache();
+
+    await this.audit.record({
+      userId: actorUserId,
+      action: 'UPDATE',
+      entityType: 'Role',
+      entityId: roleId,
+      beforeValue: {
+        insuranceLineCategory: existing?.insuranceLineCategory ?? null,
+        branchCount:
+          (existing?.insuranceLineIds.length ?? 0) +
+          (existing?.officeInsuranceLineIds.length ?? 0),
+      },
+      afterValue: {
+        insuranceLineCategory: category,
+        branchCount: insuranceLineIds.length + officeInsuranceLineIds.length,
+      },
+    });
+
+    const refreshed = await this.get(roleId);
+    return refreshed;
+  }
+
   async remove(roleId: string, actorUserId: string): Promise<void> {
     const role = await this.users.findRoleById(roleId);
     if (!role) throw new NotFoundException(`Role ${roleId} not found.`);

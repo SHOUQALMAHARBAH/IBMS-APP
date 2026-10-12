@@ -3,6 +3,7 @@ import type {
   Employee,
   SecurityAwarenessTraining,
 } from '@ibms/db';
+import type { CbjApprovalView } from './employee-cbj-approval.config';
 
 /**
  * Process 66 (backlog Part C #66, Domain H) — Human Resources. `Employee`,
@@ -79,6 +80,12 @@ export interface EmployeeDetail extends MaskedEmployee {
    * where access is read and changed, behind `user.manage`).
    */
   account: { id: string; email: string } | null;
+  /**
+   * Module 0 item (g) — this person's CBJ approval, on the detail read rather than behind a second
+   * request. A person's regulatory standing is part of who they are on this screen, and a separate
+   * fetch is one more thing a screen can forget to make — which item (e) proved by forgetting one.
+   */
+  cbjApproval: CbjApprovalView;
 }
 
 export function toEmployeeListRow(employee: Employee): EmployeeListRow {

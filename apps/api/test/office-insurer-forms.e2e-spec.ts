@@ -404,6 +404,13 @@ describe('the office boundary', () => {
         legalName: 'Q9 Office B',
         legalNameAr: 'مكتب ب',
         subdomain: `q9-office-b-${tag}`,
+        // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+        // neither kind is a safe fallback for the other, so every creator states which it is.
+        type: 'BROKERAGE_OFFICE',
+        // Required for a brokerage office by the `Organization_broker_kind_matches_type`
+        // CHECK. The compiler cannot ask for it — a nullable column is optional in
+        // Prisma's CreateInput — so the database is what refuses its absence.
+        brokerKind: 'CORPORATE',
       },
     });
     const otherOfficeInsurer = await rawPrisma.insurer.create({

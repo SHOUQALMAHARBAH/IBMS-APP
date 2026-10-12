@@ -1,6 +1,6 @@
-import { expect, test, type Page, type Request } from "@playwright/test";
-import { permissionsForRoles } from "./fixtures/role-permissions";
-import { expectNone } from "./support/anchored";
+import { expect, test, type Page, type Request } from '@playwright/test';
+import { permissionsForRoles } from './fixtures/role-permissions';
+import { expectNone } from './support/anchored';
 
 /**
  * ONE PERSON, ONE SCREEN, ONE SAVE.
@@ -20,10 +20,10 @@ import { expectNone } from "./support/anchored";
  *      none, the screen says where to create them instead of failing on submit.
  */
 const ME_BASE = {
-  id: "user-1",
-  email: "admin@ibms.test",
-  fullName: "Office Administrator",
-  languagePreference: "EN",
+  id: 'user-1',
+  email: 'admin@ibms.test',
+  fullName: 'Office Administrator',
+  languagePreference: 'EN',
   mfaEnabled: true,
   mfaPolicySatisfied: true,
   accessValidUntil: null,
@@ -33,39 +33,39 @@ const ME_BASE = {
 };
 
 const SALES_ROLE = {
-  id: "11111111-1111-4111-8111-111111111111",
-  name: "SALES_RELATIONSHIP_OFFICER",
-  nameEn: "Sales / Relationship Officer",
-  nameAr: "موظف المبيعات وعلاقات العملاء",
+  id: '11111111-1111-4111-8111-111111111111',
+  name: 'SALES_RELATIONSHIP_OFFICER',
+  nameEn: 'Sales / Relationship Officer',
+  nameAr: 'موظف المبيعات وعلاقات العملاء',
   description: null,
-  status: "ACTIVE",
+  status: 'ACTIVE',
 };
 const RETIRED_ROLE = {
-  id: "33333333-3333-4333-8333-333333333333",
-  name: "OLD_DESK",
-  nameEn: "Old desk",
-  nameAr: "مكتب قديم",
+  id: '33333333-3333-4333-8333-333333333333',
+  name: 'OLD_DESK',
+  nameEn: 'Old desk',
+  nameAr: 'مكتب قديم',
   description: null,
-  status: "INACTIVE",
+  status: 'INACTIVE',
 };
 
-const CLAIMS_DEPT = { id: "dept-1", name: "Claims", nameAr: "المطالبات" };
-const IRBID_BRANCH = { id: "branch-1", name: "Irbid", nameAr: "إربد" };
+const CLAIMS_DEPT = { id: 'dept-1', name: 'Claims', nameAr: 'المطالبات' };
+const IRBID_BRANCH = { id: 'branch-1', name: 'Irbid', nameAr: 'إربد' };
 
 const EMPLOYEE_ROW = {
-  id: "emp-1",
-  fullName: "سلمى خالد المحاربة",
-  position: "Placement Officer",
-  hireDate: "2020-06-01T00:00:00.000Z",
+  id: 'emp-1',
+  fullName: 'سلمى خالد المحاربة',
+  position: 'Placement Officer',
+  hireDate: '2020-06-01T00:00:00.000Z',
   terminationDate: null,
   licensedRole: null,
 };
 
 async function mockAuth(page: Page, roles: string[]) {
-  await page.route("**/auth/refresh", (route) =>
-    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+  await page.route('**/auth/refresh', (route) =>
+    route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
-  await page.route("**/auth/me", (route) =>
+  await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
       json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
@@ -81,63 +81,80 @@ async function mockScreen(
   const posts: Request[] = [];
   const units = opts.orgUnits ?? true;
 
-  await page.route("http://localhost:4000/employees", (route) => {
-    if (route.request().method() === "POST") {
-      posts.push(route.request());
-      return route.fulfill({ status: 201, json: { ...EMPLOYEE_ROW, id: "emp-new" } });
-    }
-    return route.fulfill({ status: 200, json: [EMPLOYEE_ROW] });
-  });
-  await page.route("http://localhost:4000/admin/users", (route) => {
-    if (route.request().method() === "POST") {
+  await page.route('http://localhost:4000/employees', (route) => {
+    if (route.request().method() === 'POST') {
       posts.push(route.request());
       return route.fulfill({
         status: 201,
-        json: { id: "user-new", email: "salma@ibms.test", fullName: EMPLOYEE_ROW.fullName },
+        json: { ...EMPLOYEE_ROW, id: 'emp-new' },
+      });
+    }
+    return route.fulfill({ status: 200, json: [EMPLOYEE_ROW] });
+  });
+  await page.route('http://localhost:4000/admin/users', (route) => {
+    if (route.request().method() === 'POST') {
+      posts.push(route.request());
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: 'user-new',
+          email: 'salma@ibms.test',
+          fullName: EMPLOYEE_ROW.fullName,
+        },
       });
     }
     return route.fulfill({ status: 200, json: { users: [], total: 0 } });
   });
-  await page.route("http://localhost:4000/admin/departments", (route) =>
+  await page.route('http://localhost:4000/admin/departments', (route) =>
     route.fulfill({ status: 200, json: units ? [CLAIMS_DEPT] : [] }),
   );
-  await page.route("http://localhost:4000/admin/branches", (route) =>
+  await page.route('http://localhost:4000/admin/branches', (route) =>
     route.fulfill({ status: 200, json: units ? [IRBID_BRANCH] : [] }),
   );
-  await page.route("http://localhost:4000/rbac/roles", (route) =>
+  await page.route('http://localhost:4000/rbac/roles', (route) =>
     route.fulfill({ status: 200, json: [SALES_ROLE, RETIRED_ROLE] }),
   );
   return { posts };
 }
 
 async function fillPerson(page: Page) {
-  await page.locator('[data-person-field="givenName"]').fill("سلمى");
-  await page.locator('[data-person-field="familyName"]').fill("المحاربة");
-  await page.locator('[data-person-field="nationalId"]').fill("9881234567");
-  await page.locator('[data-person-field="hireDate"]').fill("2026-02-01");
+  await page.locator('[data-person-field="givenName"]').fill('سلمى');
+  await page.locator('[data-person-field="familyName"]').fill('المحاربة');
+  await page.locator('[data-person-field="nationalId"]').fill('9881234567');
+  await page.locator('[data-person-field="hireDate"]').fill('2026-02-01');
 }
 
-test("ONE request creates the person and the login together", async ({ page }) => {
-  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+test('ONE request creates the person and the login together', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR']);
   const { posts } = await mockScreen(page);
-  await page.goto("/employees");
+  await page.goto('/employees');
 
   await fillPerson(page);
-  await page.locator('[data-person-field="givenNameEn"]').fill("Salma");
-  await page.locator('[data-person-field="familyNameEn"]').fill("Almaharbah");
-  await page.locator('[data-person-field="departmentId"]').selectOption(CLAIMS_DEPT.id);
-  await page.locator('[data-person-field="branchId"]').selectOption(IRBID_BRANCH.id);
+  await page.locator('[data-person-field="givenNameEn"]').fill('Salma');
+  await page.locator('[data-person-field="familyNameEn"]').fill('Almaharbah');
+  await page
+    .locator('[data-person-field="departmentId"]')
+    .selectOption(CLAIMS_DEPT.id);
+  await page
+    .locator('[data-person-field="branchId"]')
+    .selectOption(IRBID_BRANCH.id);
 
-  await page.locator("[data-give-login]").check();
-  await page.locator('[data-account-field="email"]').fill("salma@ibms.test");
-  await page.locator('[data-account-field="password"]').fill("Another-Correct-Horse-7!");
+  await page.locator('[data-give-login]').check();
+  await page.locator('[data-account-field="email"]').fill('salma@ibms.test');
+  await page
+    .locator('[data-account-field="password"]')
+    .fill('Another-Correct-Horse-7!');
   await page.locator(`[data-account-role="${SALES_ROLE.id}"]`).check();
-  await page.getByRole("button", { name: "Record the person and create the login" }).click();
+  await page
+    .getByRole('button', { name: 'Record the person and create the login' })
+    .click();
 
   await expect.poll(() => posts.length).toBe(1);
   // ONE request, to the route that writes both rows in one transaction.
   const [sent] = posts;
-  expect(sent.url()).toContain("/admin/users");
+  expect(sent.url()).toContain('/admin/users');
   const body = sent.postDataJSON() as {
     email: string;
     departmentId: string;
@@ -146,10 +163,10 @@ test("ONE request creates the person and the login together", async ({ page }) =
     fullName?: string;
     employee?: Record<string, string>;
   };
-  expect(body.employee?.givenName).toBe("سلمى");
-  expect(body.employee?.nationalId).toBe("9881234567");
+  expect(body.employee?.givenName).toBe('سلمى');
+  expect(body.employee?.nationalId).toBe('9881234567');
   // Composed from what was typed; the father's English name was not given and is not invented.
-  expect(body.employee?.givenNameEn).toBe("Salma");
+  expect(body.employee?.givenNameEn).toBe('Salma');
   expect(body.employee?.fatherNameEn).toBeUndefined();
   // One pair of org-unit fields, used for both rows — nothing for them to disagree about.
   expect(body.departmentId).toBe(CLAIMS_DEPT.id);
@@ -160,95 +177,120 @@ test("ONE request creates the person and the login together", async ({ page }) =
   expect(body.fullName).toBeUndefined();
 });
 
-test("the same form records a person with NO login", async ({ page }) => {
-  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+test('the same form records a person with NO login', async ({ page }) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR']);
   const { posts } = await mockScreen(page);
-  await page.goto("/employees");
+  await page.goto('/employees');
 
   await fillPerson(page);
-  await page.locator('[data-person-field="departmentId"]').selectOption(CLAIMS_DEPT.id);
-  await page.getByRole("button", { name: "Record employee" }).click();
+  await page
+    .locator('[data-person-field="departmentId"]')
+    .selectOption(CLAIMS_DEPT.id);
+  await page.getByRole('button', { name: 'Record employee' }).click();
 
   await expect.poll(() => posts.length).toBe(1);
   const [sent] = posts;
   // The person-only route. Which endpoint is called is invisible to whoever pressed Save; that it is
   // ONE call either way is the property.
   expect(sent.url()).toMatch(/\/employees$/);
-  const body = sent.postDataJSON() as { givenName: string; departmentId?: string };
-  expect(body.givenName).toBe("سلمى");
+  const body = sent.postDataJSON() as {
+    givenName: string;
+    departmentId?: string;
+  };
+  expect(body.givenName).toBe('سلمى');
   expect(body.departmentId).toBe(CLAIMS_DEPT.id);
 });
 
-test("a Manager can record people and is told plainly that logins are not theirs to give", async ({
+test('a Manager can record people and is told plainly that logins are not theirs to give', async ({
   page,
 }) => {
   // Measured against the seeded grid, not assumed: BRANCH_DEPARTMENT_MANAGER holds employee.create,
   // department.read and branch.read — and NOT user.manage.
-  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
+  await mockAuth(page, ['BRANCH_DEPARTMENT_MANAGER']);
   await mockScreen(page);
-  await page.goto("/employees");
+  await page.goto('/employees');
 
   // Positive anchor first, so the absence below means something.
-  await expect(page.getByRole("heading", { name: "Record a new employee" })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Record a new employee' }),
+  ).toBeVisible();
   await expect(page.locator('[data-person-field="givenName"]')).toBeVisible();
   // The placement fields are there — they hold both read codes.
-  await expect(page.locator('[data-person-field="departmentId"]')).toBeVisible();
+  await expect(
+    page.locator('[data-person-field="departmentId"]'),
+  ).toBeVisible();
 
   await expectNone(
-    page.locator("[data-give-login]"),
+    page.locator('[data-give-login]'),
     page.locator('[data-person-field="givenName"]'),
   );
   // Absent AND explained. A missing control with no sentence reads as a missing feature.
-  await expect(page.locator("[data-no-login-permission]")).toContainText("user.manage");
+  await expect(page.locator('[data-no-login-permission]')).toContainText(
+    'user.manage',
+  );
 });
 
-test("an office with no departments is told where to create them, not refused on submit", async ({
+test('an office with no departments is told where to create them, not refused on submit', async ({
   page,
 }) => {
-  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR']);
   const { posts } = await mockScreen(page, { orgUnits: false });
-  await page.goto("/employees");
+  await page.goto('/employees');
 
   await fillPerson(page);
-  await page.locator("[data-give-login]").check();
+  await page.locator('[data-give-login]').check();
 
-  const blocked = page.locator("[data-account-blocked]");
+  const blocked = page.locator('[data-account-blocked]');
   await expect(blocked).toBeVisible();
-  await expect(blocked.getByRole("link", { name: "Departments & branches" })).toBeVisible();
+  await expect(
+    blocked.getByRole('link', { name: 'Departments & branches' }),
+  ).toBeVisible();
   // And the button cannot be pressed into a 422 that says the same thing later.
   await expect(
-    page.getByRole("button", { name: "Record the person and create the login" }),
+    page.getByRole('button', {
+      name: 'Record the person and create the login',
+    }),
   ).toBeDisabled();
   expect(posts).toEqual([]);
 });
 
-test("does not offer a RETIRED role, and refuses to submit with no role at all", async ({
+test('does not offer a RETIRED role, and refuses to submit with no role at all', async ({
   page,
 }) => {
-  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR']);
   const { posts } = await mockScreen(page);
-  await page.goto("/employees");
+  await page.goto('/employees');
 
   await fillPerson(page);
-  await page.locator('[data-person-field="departmentId"]').selectOption(CLAIMS_DEPT.id);
-  await page.locator('[data-person-field="branchId"]').selectOption(IRBID_BRANCH.id);
-  await page.locator("[data-give-login]").check();
-  await page.locator('[data-account-field="email"]').fill("salma@ibms.test");
-  await page.locator('[data-account-field="password"]').fill("Another-Correct-Horse-7!");
+  await page
+    .locator('[data-person-field="departmentId"]')
+    .selectOption(CLAIMS_DEPT.id);
+  await page
+    .locator('[data-person-field="branchId"]')
+    .selectOption(IRBID_BRANCH.id);
+  await page.locator('[data-give-login]').check();
+  await page.locator('[data-account-field="email"]').fill('salma@ibms.test');
+  await page
+    .locator('[data-account-field="password"]')
+    .fill('Another-Correct-Horse-7!');
 
   // A retired role grants nothing, so offering one would hand a new account a row that reads as
   // access and confers none.
-  await expect(page.locator(`[data-account-role="${SALES_ROLE.id}"]`)).toBeVisible();
+  await expect(
+    page.locator(`[data-account-role="${SALES_ROLE.id}"]`),
+  ).toBeVisible();
   await expectNone(
     page.locator(`[data-account-role="${RETIRED_ROLE.id}"]`),
     page.locator(`[data-account-role="${SALES_ROLE.id}"]`),
   );
 
-  await page.getByRole("button", { name: "Record the person and create the login" }).click();
+  await page
+    .getByRole('button', { name: 'Record the person and create the login' })
+    .click();
   // Scoped to main: Next renders its own route announcer with role="alert", so a page-wide
   // getByRole("alert") is a strict-mode violation rather than a reading of this screen.
-  await expect(page.locator("main").getByRole("alert")).toContainText(
-    "at least one role",
+  await expect(page.locator('main').getByRole('alert')).toContainText(
+    'at least one role',
   );
   // Refused HERE, so the account is never created without the access that makes it usable.
   expect(posts).toEqual([]);
@@ -264,17 +306,33 @@ test("does not offer a RETIRED role, and refuses to submit with no role at all",
  */
 const DETAIL_BASE = {
   ...EMPLOYEE_ROW,
-  givenName: "سلمى",
-  fatherName: "خالد",
+  givenName: 'سلمى',
+  fatherName: 'خالد',
   grandfatherName: null,
-  familyName: "المحاربة",
-  nationalId: "***4567",
+  familyName: 'المحاربة',
+  nationalId: '***4567',
   confidentialityAgreementSignedAt: null,
   backgroundCheckCompletedAt: null,
-  createdAt: "2020-06-01T09:00:00.000Z",
-  updatedAt: "2020-06-01T09:00:00.000Z",
+  createdAt: '2020-06-01T09:00:00.000Z',
+  updatedAt: '2020-06-01T09:00:00.000Z',
   trainings: [],
   deprovisioningChecklist: null,
+  /*
+   * MODULE 0 ITEM (g). Added because CI caught its absence and this local run did not: the detail
+   * page renders the CBJ approval panel, which reads this field, and a mock without it made
+   * `approval.status` throw during render — taking the whole page down, not just the panel.
+   *
+   * The drift class item (g) is itself about: `EmployeeDetail` is HAND-COPIED over an HTTP response
+   * and TypeScript cannot check it. Two specs failed; `employees.spec.ts` passed only because its
+   * fixture had been updated in the same change. A mock must match the endpoint.
+   */
+  cbjApproval: {
+    status: null,
+    approvalDate: null,
+    types: [],
+    branches: [],
+    countsTowardMinimumStaff: false,
+  },
 };
 
 async function mockDetail(
@@ -282,43 +340,55 @@ async function mockDetail(
   account: { id: string; email: string } | null,
 ): Promise<{ posts: Request[] }> {
   const posts: Request[] = [];
-  await page.route("http://localhost:4000/employees/emp-1", (route) =>
+  await page.route('http://localhost:4000/employees/emp-1', (route) =>
     route.fulfill({ status: 200, json: { ...DETAIL_BASE, account } }),
   );
-  await page.route("http://localhost:4000/admin/users", (route) => {
-    if (route.request().method() === "POST") {
+  await page.route('http://localhost:4000/admin/users', (route) => {
+    if (route.request().method() === 'POST') {
       posts.push(route.request());
       return route.fulfill({
         status: 201,
-        json: { id: "user-new", email: "salma@ibms.test", fullName: DETAIL_BASE.fullName },
+        json: {
+          id: 'user-new',
+          email: 'salma@ibms.test',
+          fullName: DETAIL_BASE.fullName,
+        },
       });
     }
     return route.fulfill({ status: 200, json: { users: [], total: 0 } });
   });
-  await page.route("http://localhost:4000/admin/departments", (route) =>
+  await page.route('http://localhost:4000/admin/departments', (route) =>
     route.fulfill({ status: 200, json: [CLAIMS_DEPT] }),
   );
-  await page.route("http://localhost:4000/admin/branches", (route) =>
+  await page.route('http://localhost:4000/admin/branches', (route) =>
     route.fulfill({ status: 200, json: [IRBID_BRANCH] }),
   );
-  await page.route("http://localhost:4000/rbac/roles", (route) =>
+  await page.route('http://localhost:4000/rbac/roles', (route) =>
     route.fulfill({ status: 200, json: [SALES_ROLE, RETIRED_ROLE] }),
   );
   return { posts };
 }
 
-test("a person recorded earlier can be given a login from their own page", async ({ page }) => {
-  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+test('a person recorded earlier can be given a login from their own page', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR']);
   const { posts } = await mockDetail(page, null);
-  await page.goto("/employees/emp-1");
+  await page.goto('/employees/emp-1');
 
-  await page.locator("[data-open-login-form]").click();
-  await page.locator('[data-account-field="email"]').fill("salma@ibms.test");
-  await page.locator('[data-account-field="password"]').fill("Another-Correct-Horse-7!");
-  await page.locator('[data-account-field="departmentId"]').selectOption(CLAIMS_DEPT.id);
-  await page.locator('[data-account-field="branchId"]').selectOption(IRBID_BRANCH.id);
+  await page.locator('[data-open-login-form]').click();
+  await page.locator('[data-account-field="email"]').fill('salma@ibms.test');
+  await page
+    .locator('[data-account-field="password"]')
+    .fill('Another-Correct-Horse-7!');
+  await page
+    .locator('[data-account-field="departmentId"]')
+    .selectOption(CLAIMS_DEPT.id);
+  await page
+    .locator('[data-account-field="branchId"]')
+    .selectOption(IRBID_BRANCH.id);
   await page.locator(`[data-account-role="${SALES_ROLE.id}"]`).check();
-  await page.locator("[data-submit-login]").click();
+  await page.locator('[data-submit-login]').click();
 
   await expect.poll(() => posts.length).toBe(1);
   const body = posts[0].postDataJSON() as {
@@ -327,24 +397,26 @@ test("a person recorded earlier can be given a login from their own page", async
     fullName?: string;
   };
   // Links THIS person by id — no person block, because the person already exists.
-  expect(body.employeeId).toBe("emp-1");
+  expect(body.employeeId).toBe('emp-1');
   expect(body.employee).toBeUndefined();
   // And no name: it comes from the record, and the API refuses one that disagrees with it.
   expect(body.fullName).toBeUndefined();
 });
 
-test("names the login a person already holds instead of offering a second", async ({ page }) => {
-  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
-  await mockDetail(page, { id: "user-7", email: "salma@ibms.test" });
-  await page.goto("/employees/emp-1");
+test('names the login a person already holds instead of offering a second', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR']);
+  await mockDetail(page, { id: 'user-7', email: 'salma@ibms.test' });
+  await page.goto('/employees/emp-1');
 
   // `User.employeeId` is unique, so a second login is not a thing to attempt and then be refused.
   // The screen knows because the detail response says so.
   await expect(page.locator('[data-existing-account="user-7"]')).toContainText(
-    "salma@ibms.test",
+    'salma@ibms.test',
   );
   await expectNone(
-    page.locator("[data-open-login-form]"),
-    page.locator("[data-login-section]"),
+    page.locator('[data-open-login-form]'),
+    page.locator('[data-login-section]'),
   );
 });

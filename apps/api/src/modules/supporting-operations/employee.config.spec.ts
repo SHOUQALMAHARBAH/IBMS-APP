@@ -28,12 +28,19 @@ function employee(over: Partial<Employee> = {}): Employee {
     position: 'Placement Officer',
     hireDate: new Date('2024-01-15T00:00:00.000Z'),
     terminationDate: null,
-    licensedRole: 'CBJ-licensed Broker Representative',
+    licensedRole: 'Chartered Insurance Institute, Dip CII',
     confidentialityAgreementSignedAt: new Date('2024-01-15T00:00:00.000Z'),
     backgroundCheckCompletedAt: new Date('2024-01-10T00:00:00.000Z'),
     createdAt: new Date('2024-01-15T09:00:00.000Z'),
     updatedAt: new Date('2024-01-15T09:00:00.000Z'),
     departmentId: null,
+    /*
+     * MODULE 0 ITEM (g). This fixture uses the FULL `Employee` model type precisely so a new
+     * column cannot be added without a decision being made here — its own header says so, and it
+     * fired as designed. NULL is "not a CBJ-approved person", the ordinary case for most staff.
+     */
+    cbjApprovalStatus: null,
+    cbjApprovalDate: null,
     ...over,
   };
 }
@@ -68,7 +75,7 @@ describe('toEmployeeListRow', () => {
       position: 'Placement Officer',
       hireDate: '2024-01-15T00:00:00.000Z',
       terminationDate: null,
-      licensedRole: 'CBJ-licensed Broker Representative',
+      licensedRole: 'Chartered Insurance Institute, Dip CII',
     });
     expect(row).not.toHaveProperty('nationalIdEnc');
   });

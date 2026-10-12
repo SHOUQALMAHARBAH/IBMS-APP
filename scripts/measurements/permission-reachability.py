@@ -50,10 +50,37 @@ def roles_and_codes():
     out = {}
     for m in re.finditer(r'"([A-Z_]+)"\s*:\s*\[(.*?)\n  \]', src, re.S):
         out[m.group(1)] = set(re.findall(r"'([a-z0-9.\-]+)'", m.group(2)))
-    # Pinned against the fixture's own header, so a parser that matches nothing cannot report that
-    # every permission is unreachable.
-    assert len(out) == 12, 'expected 12 seeded roles, parsed %d' % len(out)
-    assert sum(len(v) for v in out.values()) == 491, 'expected 491 grants'
+    # Cross-checked against the fixture's OWN HEADER, so a parser that matches nothing cannot report
+    # that every permission is unreachable.
+    #
+    # READ from the header rather than pinned as a literal, and that is the fix Module 0 item (i)
+    # asked for. The literal said 491 against a real 502: the grid grew by eleven grants across
+    # four-action Phase 4, the `customer.read` split, `diagnostics.view` and Module 0's own codes,
+    # and every one of those commits left this number behind. A hand-written count of a GENERATED
+    # file is a second home for one fact — the copy is the one that drifts, and this copy drifted
+    # until the whole measurement refused to run.
+    #
+    # The non-vacuity property survives intact, which is the point: if the parser stops matching,
+    # its count disagrees with the header and this still fails. What it no longer does is fail
+    # because somebody added a permission.
+    src_head = src[:4000]
+    header = re.search(r'(\d+)\s+seeded[^.]*?,\s*(\d+)\s+grants', src_head)
+    assert header, (
+        'the fixture header no longer states its role and grant counts, so there is nothing to '
+        'cross-check the parser against. Restore the "<N> seeded ... <M> grants" line in '
+        'apps/web/e2e/fixtures/role-permissions.ts, or this measurement is unguarded.'
+    )
+    want_roles, want_grants = int(header.group(1)), int(header.group(2))
+    got_roles, got_grants = len(out), sum(len(v) for v in out.values())
+    assert got_roles == want_roles, (
+        'the fixture header says %d seeded roles and the parser found %d'
+        % (want_roles, got_roles)
+    )
+    assert got_grants == want_grants, (
+        'the fixture header says %d grants and the parser found %d — regenerate with '
+        '`npm run db:fixture:permissions` if the grid changed, or fix the parser'
+        % (want_grants, got_grants)
+    )
     return out
 
 

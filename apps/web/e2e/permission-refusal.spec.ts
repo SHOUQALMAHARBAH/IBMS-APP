@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expect, test, type Page } from '@playwright/test';
+import { permissionsForRoles } from './fixtures/role-permissions';
 
 /*
  * THE REFUSAL SENTENCE, PROVEN AGAINST THE REAL SCREENS.
@@ -35,10 +35,10 @@ import { permissionsForRoles } from "./fixtures/role-permissions";
  */
 
 const ME_BASE = {
-  id: "user-1",
-  email: "officer@ibms.test",
-  fullName: "An Officer",
-  languagePreference: "EN",
+  id: 'user-1',
+  email: 'officer@ibms.test',
+  fullName: 'An Officer',
+  languagePreference: 'EN',
   mfaEnabled: false,
   mfaPolicySatisfied: true,
   accessValidUntil: null,
@@ -47,11 +47,11 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[], language = "EN") {
-  await page.route("**/auth/refresh", (route) =>
-    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+async function mockAuth(page: Page, roles: string[], language = 'EN') {
+  await page.route('**/auth/refresh', (route) =>
+    route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
-  await page.route("**/auth/me", (route) =>
+  await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
       json: {
@@ -66,49 +66,49 @@ async function mockAuth(page: Page, roles: string[], language = "EN") {
 
 /** Every role name a seeded office uses, in both languages, as the forbidden vocabulary. */
 const ROLE_WORDS = [
-  "Office Administrator",
-  "System",
-  "Administrator",
-  "Compliance",
-  "Manager",
-  "Executive",
-  "مسؤول المكتب",
-  "مدير",
-  "الالتزام",
+  'Office Administrator',
+  'System',
+  'Administrator',
+  'Compliance',
+  'Manager',
+  'Executive',
+  'مسؤول المكتب',
+  'مدير',
+  'الالتزام',
 ];
 
-test("the refusal names the act, names who grants it, and names them by function", async ({
+test('the refusal names the act, names who grants it, and names them by function', async ({
   page,
 }) => {
-  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
-  await page.route("http://localhost:4000/payment-channels**", (route) =>
+  await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER']);
+  await page.route('http://localhost:4000/payment-channels**', (route) =>
     route.fulfill({
       status: 403,
       json: {
-        message: "You do not hold a permission required to perform this action",
+        message: 'You do not hold a permission required to perform this action',
       },
     }),
   );
 
-  await page.goto("/payment-channels");
+  await page.goto('/payment-channels');
 
   // 1 — THE ACT, in the language of the work rather than of the permission.
   const refusal = page.getByText(
-    "view the payment channels an office sends money through",
+    'view the payment channels an office sends money through',
     { exact: false },
   );
   await expect(refusal).toBeVisible();
 
   // 2 — THE GRANTOR.
   await expect(
-    page.getByText("ask whoever manages permissions in your office", {
+    page.getByText('ask whoever manages permissions in your office', {
       exact: false,
     }),
   ).toBeVisible();
 
   // 3 — the code ALONGSIDE, in a parenthetical, never as the sentence.
   await expect(
-    page.getByText("(payment-channel.read)", { exact: false }),
+    page.getByText('(payment-channel.read)', { exact: false }),
   ).toBeVisible();
 
   // 4 — NO ROLE NAME. Anchored on the act above already being visible, so this cannot pass on a page that
@@ -120,112 +120,118 @@ test("the refusal names the act, names who grants it, and names them by function
     ).toHaveCount(0);
   }
   await expect(
-    page.getByText("You do not hold a permission required", { exact: false }),
+    page.getByText('You do not hold a permission required', { exact: false }),
   ).toHaveCount(0);
 });
 
-test("the Arabic refusal is the Arabic sentence, not a translated English one", async ({
+test('the Arabic refusal is the Arabic sentence, not a translated English one', async ({
   page,
 }) => {
-  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
-  await page.route("http://localhost:4000/payment-channels**", (route) =>
+  await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER'], 'AR');
+  await page.route('http://localhost:4000/payment-channels**', (route) =>
     route.fulfill({
       status: 403,
       json: {
-        message: "You do not hold a permission required to perform this action",
+        message: 'You do not hold a permission required to perform this action',
       },
     }),
   );
 
-  await page.goto("/payment-channels");
+  await page.goto('/payment-channels');
 
   // The act, recovered verbatim from what the Arabic already said — the half the Arabic held all along.
-  await expect(page.getByText("عرض قنوات الدفع", { exact: false })).toBeVisible();
+  await expect(
+    page.getByText('عرض قنوات الدفع', { exact: false }),
+  ).toBeVisible();
   // The grantor, by function. «ممن يدير الصلاحيات في مكتبك» names a job, not a role.
   await expect(
-    page.getByText("اطلبها ممن يدير الصلاحيات في مكتبك", { exact: false }),
+    page.getByText('اطلبها ممن يدير الصلاحيات في مكتبك', { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByText("(payment-channel.read)", { exact: false }),
+    page.getByText('(payment-channel.read)', { exact: false }),
   ).toBeVisible();
   // And no English leaked into the Arabic rendering — anchored on the Arabic act above.
   await expect(
-    page.getByText("ask whoever manages", { exact: false }),
+    page.getByText('ask whoever manages', { exact: false }),
   ).toHaveCount(0);
 });
 
-test("ANY ONE of several codes — a route guard, which ORs them", async ({
+test('ANY ONE of several codes — a route guard, which ORs them', async ({
   page,
 }) => {
   // `GET /customers/kyc-records` declares ('kyc.capture', 'kyc.approve') and `PermissionsGuard` is
   // `required.some`, so holding EITHER is enough. The sentence has to say so: a reader told they need both
   // asks for a grant they do not need.
-  await mockAuth(page, ["FINANCE_COLLECTIONS_OFFICER"]);
+  await mockAuth(page, ['FINANCE_COLLECTIONS_OFFICER']);
   // The exact URL, with no `**`: `kyc-queue-duty.spec.ts` records why — a wildcard here also catches
   // `/kyc-records/:id/submit` and every other action route. The controller carries no prefix, so the path
   // is `/kyc-records` and not `/customers/kyc-records` as the route's own file layout suggests.
-  await page.route("http://localhost:4000/kyc-records", (route) =>
+  await page.route('http://localhost:4000/kyc-records', (route) =>
     route.fulfill({
       status: 403,
       json: {
-        message: "You do not hold a permission required to perform this action",
+        message: 'You do not hold a permission required to perform this action',
       },
     }),
   );
 
-  await page.goto("/customers/kyc-queue");
+  await page.goto('/customers/kyc-queue');
 
-  await expect(
-    page.getByText("work the KYC queue", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("any one of these permissions grants it", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("(kyc.capture, kyc.approve)", { exact: false }),
-  ).toBeVisible();
+  /*
+   * SCOPED TO THE LOAD-ERROR ELEMENT, because TWO alerts on this screen contain "work the KYC
+   * queue": this refusal and the reduced-capability note above it, which names the same act by
+   * design. A page-wide `getByText` matched both and resolved by RENDER RACE — it passed until an
+   * unrelated change shifted the timing, then failed roughly two runs in three.
+   *
+   * Scoping is the fix; loosening the text would have let it pass against the wrong element, which
+   * is the same mistake IMPROVEMENTS § 1.85 records on `/settings/roles`.
+   */
+  const refusal = page.locator('[data-kyc-load-error]');
+  await expect(refusal).toContainText('work the KYC queue');
+  await expect(refusal).toContainText('any one of these permissions grants it');
+  await expect(refusal).toContainText('(kyc.capture, kyc.approve)');
   // The opposite claim must NOT be on the page — anchored on the act being visible above.
   await expect(
-    page.getByText("needs all of these permissions", { exact: false }),
+    page.getByText('needs all of these permissions', { exact: false }),
   ).toHaveCount(0);
 });
 
-test("ALL of several codes — a screen that loads them together", async ({
+test('ALL of several codes — a screen that loads them together', async ({
   page,
 }) => {
   // The opposite case, and the one that makes the two functions worth having. This screen loads two
   // dashboards with `Promise.all` and closes entirely if EITHER refuses, so its reader needs BOTH. Phrasing
   // it "any one of these" — the rule that is true at the route guard — would tell somebody holding
   // `employee-performance.view` that they already qualify, when the screen will refuse them again.
-  await mockAuth(page, ["FINANCE_COLLECTIONS_OFFICER"]);
-  await page.route("http://localhost:4000/insurer-performance**", (route) =>
+  await mockAuth(page, ['FINANCE_COLLECTIONS_OFFICER']);
+  await page.route('http://localhost:4000/insurer-performance**', (route) =>
     route.fulfill({
       status: 403,
       json: {
-        message: "You do not hold a permission required to perform this action",
+        message: 'You do not hold a permission required to perform this action',
       },
     }),
   );
-  await page.route("http://localhost:4000/employee-performance**", (route) =>
+  await page.route('http://localhost:4000/employee-performance**', (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
 
-  await page.goto("/dashboards/insurer-employee-performance");
+  await page.goto('/dashboards/insurer-employee-performance');
 
   await expect(
-    page.getByText("view the insurer and employee performance dashboard", {
+    page.getByText('view the insurer and employee performance dashboard', {
       exact: false,
     }),
   ).toBeVisible();
   await expect(
-    page.getByText("needs all of these permissions", { exact: false }),
+    page.getByText('needs all of these permissions', { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByText("(insurer-performance.view, employee-performance.view)", {
+    page.getByText('(insurer-performance.view, employee-performance.view)', {
       exact: false,
     }),
   ).toBeVisible();
   await expect(
-    page.getByText("any one of these permissions grants it", { exact: false }),
+    page.getByText('any one of these permissions grants it', { exact: false }),
   ).toHaveCount(0);
 });

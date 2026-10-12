@@ -139,6 +139,42 @@ export class InsuranceLineRepository {
   /** How many insurers already say they offer this office-added line. Read before a
    *  rename only to report it; a rename is allowed either way, since the line is the
    *  same line under a corrected name. */
+  /**
+   * MODULE 0 ITEM (h) — the CATEGORY of one branch, whichever catalogue it came from.
+   *
+   * Here rather than on a consuming module's repository because this is the catalogue's own
+   * question, and item (h)'s role-scope decision needs it at four write surfaces that would
+   * otherwise each resolve it their own way.
+   *
+   * Tenant-scoped by the extension on the office half, so another office's bespoke line reads as
+   * ABSENT rather than as a line this office may write business in.
+   *
+   * NOTE — `BrokerLicenseScopeRepository.findCandidateCategory` asks the same question from the
+   * licence module and is deliberately left alone. Two READERS of a catalogue column are not the
+   * drift class this repo guards against; what must have one home is the role-scope DECISION, and
+   * `role-scope.inventory.spec.ts` is what holds that.
+   */
+  async findCategory(
+    insuranceLineId: string | null,
+    officeInsuranceLineId: string | null,
+  ): Promise<InsuranceLineCategory | null> {
+    if (insuranceLineId) {
+      const line = await this.prisma.client.insuranceLine.findUnique({
+        where: { id: insuranceLineId },
+        select: { category: true },
+      });
+      return line?.category ?? null;
+    }
+    if (officeInsuranceLineId) {
+      const line = await this.prisma.client.officeInsuranceLine.findUnique({
+        where: { id: officeInsuranceLineId },
+        select: { category: true },
+      });
+      return line?.category ?? null;
+    }
+    return null;
+  }
+
   countInsurersOffering(officeInsuranceLineId: string): Promise<number> {
     return this.prisma.client.insurerOfferedLine.count({
       where: { officeInsuranceLineId },

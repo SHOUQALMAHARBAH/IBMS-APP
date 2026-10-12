@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -18,6 +19,9 @@ import { CreateTrainingDto } from './dto/create-training.dto';
 import { SearchEmployeesDto } from './dto/search-employees.dto';
 import { UpdateDeprovisioningChecklistDto } from './dto/update-deprovisioning-checklist.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
+import { EmployeeCbjApprovalService } from './employee-cbj-approval.service';
+import { SetCbjApprovalDto } from './dto/set-cbj-approval.dto';
+import { AddCbjApprovalBranchDto } from './dto/add-cbj-approval-branch.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { EMPLOYEE_SEARCH_CODES } from '../../common/picker-search.config';
@@ -35,7 +39,10 @@ import { EMPLOYEE_SEARCH_CODES } from '../../common/picker-search.config';
 @ApiTags('supporting-operations')
 @Controller('employees')
 export class EmployeeController {
-  constructor(private readonly employees: EmployeeService) {}
+  constructor(
+    private readonly employees: EmployeeService,
+    private readonly cbjApprovals: EmployeeCbjApprovalService,
+  ) {}
 
   @RequirePermissions('employee.create')
   @Post()
@@ -129,6 +136,52 @@ export class EmployeeController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.employees.update(id, dto, user.id);
+  }
+
+  /**
+   * Module 0 item (g) — this person's CBJ approval.
+   *
+   * On `employee.update` rather than a new permission code: recording a CBJ approval is a
+   * correction to the person's record, which is what that code already governs, and the holders are
+   * already the right ones. A new code would have meant five regenerations for a capability nobody
+   * asked to separate.
+   *
+   * The READ is on `employee.read`, beside the detail page it renders in.
+   */
+  @RequirePermissions('employee.read')
+  @Get(':id/cbj-approval')
+  getCbjApproval(@Param('id') id: string) {
+    return this.cbjApprovals.get(id);
+  }
+
+  @RequirePermissions('employee.update')
+  @Patch(':id/cbj-approval')
+  setCbjApproval(
+    @Param('id') id: string,
+    @Body() dto: SetCbjApprovalDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cbjApprovals.set(id, dto, user.id);
+  }
+
+  @RequirePermissions('employee.update')
+  @Post(':id/cbj-approval/branches')
+  addCbjApprovalBranch(
+    @Param('id') id: string,
+    @Body() dto: AddCbjApprovalBranchDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cbjApprovals.addBranch(id, dto, user.id);
+  }
+
+  @RequirePermissions('employee.update')
+  @Delete(':id/cbj-approval/branches/:branchId')
+  removeCbjApprovalBranch(
+    @Param('id') id: string,
+    @Param('branchId') branchId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cbjApprovals.removeBranch(id, branchId, user.id);
   }
 
   @RequirePermissions('training.record')

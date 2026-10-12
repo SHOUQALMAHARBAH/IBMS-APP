@@ -35,6 +35,22 @@ interface BrokerLicenseBody {
   licenseNumber: string;
   status: string;
   isCurrentlyLapsed: boolean;
+  certificateDocumentId: string;
+  renewalRequestedAt: string | null;
+  expiresAt: string;
+}
+/** Module 0 item (d) — the derived term/renewal facts the SCREEN reads. */
+interface BrokerLicenseDerivedBody {
+  renewalDueBy: string;
+  renewalFiledOnTime: boolean;
+  validByOperationOfLaw: boolean;
+  expiryIsEndOfCalendarYear: boolean;
+  expectedExpiryForThreeYearTerm: string | null;
+}
+/** Module 0 item (c): `GET /broker-license` answers the current term AND the series. */
+interface BrokerLicenseSeriesBody {
+  current: BrokerLicenseBody | null;
+  terms: BrokerLicenseBody[];
 }
 interface ComplianceCalendarItemBody {
   id: string;
@@ -111,7 +127,7 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
     sharedApp = undefined;
   });
 
-  it('gates and manages the broker license singleton (create/renew/mark-lapsed/get), restoring a safe state before finishing', async () => {
+  it('manages the office licence as a SERIES OF TERMS (renewal appends, certificate mandatory, filing date write-once), leaving an active term behind', async () => {
     const app = await boot();
     const compliance = await makeUser(
       app,
@@ -124,7 +140,7 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
       'SALES_RELATIONSHIP_OFFICER',
     );
 
-    // non-Compliance is forbidden on every route
+    // non-Compliance is forbidden on every route, including the new one
     await request(app.getHttpServer())
       .post('/broker-license')
       .set(bearer(other.accessToken))
@@ -134,60 +150,138 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
       .get('/broker-license')
       .set(bearer(other.accessToken))
       .expect(403);
+    await request(app.getHttpServer())
+      .post('/broker-license/renewal-requested')
+      .set(bearer(other.accessToken))
+      .send({})
+      .expect(403);
 
-    // db-test is cumulative (project memory) — a prior run may already have
-    // created the singleton, so setup tolerates a 409 rather than assuming
-    // a clean slate.
-    const created = await request(app.getHttpServer())
+    const RUN = Date.now().toString(36);
+    const certificate = {
+      certificateFileName: 'cbj-licence-' + RUN + '.pdf',
+      certificateStorageRef: 'licences/cbj-licence-' + RUN + '.pdf',
+    };
+
+    /*
+     * EXPIRIES ARE DERIVED FROM WHAT ALREADY EXISTS, not pinned.
+     *
+     * db-test is cumulative and every run of this spec appends terms, so a fixed `expiresAt` is
+     * wrong twice over: `@@unique([organizationId, licenseNumber, expiresAt])` would collide on a
+     * re-run, and -- worse -- several terms sharing one expiry makes "the current term" the
+     * arbitrary winner of an id tie-break, so the restore at the end could not guarantee it had
+     * left an ACTIVE term current. Going past the existing maximum makes each appended term
+     * unambiguously the latest.
+     */
+    const before = await request(app.getHttpServer())
+      .get('/broker-license')
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const beforeBody = before.body as BrokerLicenseSeriesBody;
+    const highestYear = beforeBody.terms.reduce(
+      (max, t) => Math.max(max, new Date(t.expiresAt).getUTCFullYear()),
+      2030,
+    );
+    const expiryIn = (offset: number) => highestYear + offset + '-12-31';
+
+    // The office already holds a term (the migration kept the pre-existing one; the seed gives a
+    // fresh database one), so `create` is a 409 -- per OFFICE now, where the old 409 was
+    // effectively per platform because the row was keyed by a global constant.
+    await request(app.getHttpServer())
       .post('/broker-license')
       .set(bearer(compliance.accessToken))
       .send({
-        licenseNumber: 'CBJ-RC-E2E-1',
-        scopeOfAuthorization: 'General insurance brokerage',
-        issuedAt: '2026-01-01',
-        expiresAt: FAR_FUTURE,
-      });
-    expect([201, 409]).toContain(created.status);
-    if (created.status === 409) {
-      // a second create attempt is a 409 regardless — proves the guard
-      // itself, not just that setup happened to collide with a prior run
-      const secondAttempt = await request(app.getHttpServer())
-        .post('/broker-license')
-        .set(bearer(compliance.accessToken))
-        .send({ licenseNumber: 'X', expiresAt: FAR_FUTURE })
-        .expect(409);
-      expect(secondAttempt.status).toBe(409);
-    }
+        licenseNumber: 'CBJ-' + RUN + '-X',
+        expiresAt: expiryIn(1),
+        ...certificate,
+      })
+      .expect(409);
 
-    // No `finally` here (ESLint's `no-unsafe-finally` — a `throw` inside
-    // `finally` would silently swallow a genuine assertion failure from the
-    // `try` block below it). Instead the restore runs unconditionally right
-    // after the try/catch, and whichever failed — the test body, the
-    // restore, or both — is what actually throws.
+    // THE CERTIFICATE IS MANDATORY. Asserted here as well as by the NOT NULL column, because this
+    // is the refusal a caller actually sees -- a 400 naming the field rather than a 500 from a
+    // constraint violation.
+    await request(app.getHttpServer())
+      .post('/broker-license/renew')
+      .set(bearer(compliance.accessToken))
+      .send({ licenseNumber: 'CBJ-' + RUN + '-NOCERT', expiresAt: expiryIn(1) })
+      .expect(400);
+
     let testError: unknown = null;
     try {
+      // RENEWAL APPENDS. The old implementation was an `updateMany` over one global row, so the
+      // term being replaced was erased.
       const renewed = await request(app.getHttpServer())
         .post('/broker-license/renew')
         .set(bearer(compliance.accessToken))
         .send({
-          licenseNumber: 'CBJ-RC-E2E-2',
+          licenseNumber: 'CBJ-' + RUN + '-A',
           scopeOfAuthorization: 'General insurance brokerage',
           issuedAt: '2026-01-01',
-          expiresAt: FAR_FUTURE,
+          expiresAt: expiryIn(1),
+          ...certificate,
         })
         .expect(201);
       const renewedBody = renewed.body as BrokerLicenseBody;
-      expect(renewedBody.licenseNumber).toBe('CBJ-RC-E2E-2');
+      expect(renewedBody.licenseNumber).toBe('CBJ-' + RUN + '-A');
       expect(renewedBody.status).toBe('active');
       expect(renewedBody.isCurrentlyLapsed).toBe(false);
+      // The certificate was filed and is pointed at -- not merely requested by the DTO.
+      expect(renewedBody.certificateDocumentId).toBeTruthy();
 
       const got = await request(app.getHttpServer())
         .get('/broker-license')
         .set(bearer(compliance.accessToken))
         .expect(200);
-      expect((got.body as BrokerLicenseBody).licenseNumber).toBe(
-        'CBJ-RC-E2E-2',
+      const series = got.body as BrokerLicenseSeriesBody;
+      expect(series.current?.licenseNumber).toBe('CBJ-' + RUN + '-A');
+      // THE PREVIOUS TERM SURVIVED. This is the claim the old overwrite could not satisfy, and the
+      // reason an office can show a regulator what it held in an earlier period.
+      expect(series.terms.length).toBeGreaterThan(beforeBody.terms.length);
+
+      // THE FILING DATE IS WRITE-ONCE. Art. 11 measures lateness from it, so a second call must be
+      // refused rather than allowed to move it.
+      const filed = await request(app.getHttpServer())
+        .post('/broker-license/renewal-requested')
+        .set(bearer(compliance.accessToken))
+        .send({ requestedAt: highestYear + 1 + '-11-01' })
+        .expect(201);
+      expect((filed.body as BrokerLicenseBody).renewalRequestedAt).toBe(
+        highestYear + 1 + '-11-01T00:00:00.000Z',
       );
+      await request(app.getHttpServer())
+        .post('/broker-license/renewal-requested')
+        .set(bearer(compliance.accessToken))
+        .send({ requestedAt: highestYear + 1 + '-12-20' })
+        .expect(409);
+
+      /*
+       * MODULE 0 ITEM (d) — THE DERIVED FACTS ARE ON THE WIRE.
+       *
+       * Asserted over real HTTP rather than trusted from the unit tests, because the screen reads
+       * these five fields through a HAND-COPIED interface that TypeScript cannot check against an
+       * HTTP response. If the api stopped sending one, nothing would fail at compile time and the
+       * screen would render `undefined` — which is how the customer-import result panel broke.
+       * The same reasoning as the duty-segregation wire-shape spec.
+       */
+      const derived = (
+        await request(app.getHttpServer())
+          .get('/broker-license')
+          .set(bearer(compliance.accessToken))
+          .expect(200)
+      ).body as BrokerLicenseSeriesBody;
+      const d = derived.current as unknown as BrokerLicenseDerivedBody;
+
+      // Art. 11: 45 CALENDAR days before this term's expiry. The term expires 31 December of
+      // highestYear+1, so the deadline is 16 November of that year.
+      expect(d.renewalDueBy).toBe(highestYear + 1 + '-11-16T00:00:00.000Z');
+      // Filed on 1 November, which is before that deadline.
+      expect(d.renewalFiledOnTime).toBe(true);
+      // Still inside the term, so nothing is being extended yet — the two are different states
+      // and a screen needs to tell them apart.
+      expect(d.validByOperationOfLaw).toBe(false);
+      // Art. 10/b: this spec's terms all expire on 31 December.
+      expect(d.expiryIsEndOfCalendarYear).toBe(true);
+      // Informational. Issued 2026-01-01, so a three-calendar-year term would end 2028-12-31.
+      expect(d.expectedExpiryForThreeYearTerm).toBe('2028-12-31T00:00:00.000Z');
 
       const lapsed = await request(app.getHttpServer())
         .post('/broker-license/mark-lapsed')
@@ -206,30 +300,45 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
       testError = err;
     }
 
-    // ALWAYS restore — a leftover lapsed singleton would 422 every Policy
-    // `place()` call in every e2e file that runs afterward
-    // (vitest-e2e.config.ts's fileParallelism: false makes this sufficient,
-    // not just best-effort). A @code-reviewer MAJOR on the first pass: only
-    // checking isCurrentlyLapsed when restored.status === 201 misses the
-    // more likely failure mode (renew itself returning a non-201) — both
-    // are asserted unconditionally now.
+    /*
+     * ALWAYS RESTORE -- and it matters MORE than it did before. A leftover lapsed current term used
+     * to 422 every Policy `place()` in every later e2e file; since Module 0 item (c) an office with
+     * NO usable term is refused too, so this is the only thing standing between this test and every
+     * subsequent placement failing.
+     *
+     * Restores by APPENDING a later term rather than by editing the lapsed one, because that is
+     * what a renewal now is. Its expiry is past everything above, so it is unambiguously current.
+     *
+     * No `finally` (ESLint `no-unsafe-finally`): a throw there would swallow a genuine assertion
+     * failure from the try block.
+     */
     const restored = await request(app.getHttpServer())
       .post('/broker-license/renew')
       .set(bearer(compliance.accessToken))
-      .send({ licenseNumber: 'CBJ-RC-E2E-1', expiresAt: FAR_FUTURE });
+      .send({
+        licenseNumber: 'CBJ-' + RUN + '-RESTORE',
+        expiresAt: expiryIn(3),
+        ...certificate,
+      });
     if (restored.status !== 201) {
       throw new Error(
-        `Broker license restore failed (status ${restored.status}: ${JSON.stringify(restored.body)}) — every subsequent e2e file placing a Policy would now be blocked.` +
+        'Broker license restore failed (status ' +
+          restored.status +
+          ': ' +
+          JSON.stringify(restored.body) +
+          ') -- every subsequent e2e file placing a Policy would now be blocked.' +
           (testError
-            ? ` Also, the test body itself failed: ${(testError as Error).message}`
+            ? ' Also, the test body itself failed: ' +
+              (testError as Error).message
             : ''),
       );
     }
     if ((restored.body as BrokerLicenseBody).isCurrentlyLapsed) {
       throw new Error(
-        'Broker license restore did not clear isCurrentlyLapsed — every subsequent e2e file placing a Policy would now be blocked.' +
+        'Broker license restore did not clear isCurrentlyLapsed -- every subsequent e2e file placing a Policy would now be blocked.' +
           (testError
-            ? ` Also, the test body itself failed: ${(testError as Error).message}`
+            ? ' Also, the test body itself failed: ' +
+              (testError as Error).message
             : ''),
       );
     }

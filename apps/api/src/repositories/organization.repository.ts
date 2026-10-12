@@ -73,19 +73,35 @@ export class OrganizationRepository {
    * view and unrelated files reported `expected 201, got 500` with nothing saying why.
    */
   async soleOrganizationIdOrThrow(): Promise<string> {
+    /*
+     * BROKERAGE OFFICES ONLY, since Module 0 item (j)'s gap closure.
+     *
+     * Signup files a new account under an OFFICE. The PROVIDER organization is not one — nobody
+     * signs up into the platform operator; its single user is created by the seed — so counting it
+     * here would make the platform's one office ambiguous the moment a provider existed, and every
+     * signup would refuse with a message about a second office that does not exist.
+     *
+     * Found by the e2e harness rather than by reasoning: `assertOneOrganization` refused the whole
+     * api e2e suite the moment the provider was seeded, naming the leftover row. The invariant was
+     * never "one Organization" — it was "one office signup can resolve", and the two were the same
+     * thing until today.
+     *
+     * An INSURANCE_COMPANY row would have had the same effect and is excluded for the same reason.
+     */
     const organizations = await this.prisma.client.organization.findMany({
       take: 2,
+      where: { type: 'BROKERAGE_OFFICE' },
       select: { id: true },
       orderBy: { createdAt: 'asc' },
     });
     if (organizations.length === 0) {
       throw new Error(
-        'No Organization exists — run `npm run db:seed` before anyone can sign up.',
+        'No brokerage office exists — run `npm run db:seed` before anyone can sign up. (A PROVIDER organization is not an office: nobody signs up into the platform operator.)',
       );
     }
     if (organizations.length > 1) {
       throw new Error(
-        'More than one Organization exists, so anonymous signup can no longer tell which office an account belongs to. ' +
+        'More than one brokerage office exists, so anonymous signup can no longer tell which office an account belongs to. ' +
           'A second office cannot currently be onboarded through the application at all: nothing in it creates an ' +
           'Organization, and no request can create the first user inside one. Phase 4 (§4.10) is where that lands — ' +
           'the Organization resolved from the request subdomain before the sign-in form is shown. ' +

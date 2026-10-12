@@ -271,52 +271,165 @@ async function postAs<T = Record<string, unknown>>(
   return res.body as T;
 }
 
+/** The PATCH sibling of `postAs`. Added for Module 0 item (g)'s approval route, which is a PATCH. */
+async function patchAs<T = Record<string, unknown>>(
+  app: INestApplication<App>,
+  token: string,
+  urlPath: string,
+  body: unknown,
+): Promise<T> {
+  const res = await request(app.getHttpServer())
+    .patch(urlPath)
+    .set(bearer(token))
+    .send(body as object);
+  if (res.status < 200 || res.status >= 300) {
+    throw new Error(
+      `PATCH ${urlPath} -> ${res.status}: ${JSON.stringify(res.body)}`,
+    );
+  }
+  return res.body as T;
+}
+
 // ---------------------------------------------------------------------------
 // Name / content pools (Arabic-first — this system's primary language)
 // ---------------------------------------------------------------------------
 
 const GIVEN_NAMES_M = [
-  'محمد', 'أحمد', 'عمر', 'خالد', 'يوسف', 'إبراهيم', 'عبدالله', 'سامي',
-  'فادي', 'مراد', 'زيد', 'قصي', 'باسل', 'هاني', 'رامي', 'طارق', 'ماجد',
-  'نضال', 'وليد', 'سعد',
+  'محمد',
+  'أحمد',
+  'عمر',
+  'خالد',
+  'يوسف',
+  'إبراهيم',
+  'عبدالله',
+  'سامي',
+  'فادي',
+  'مراد',
+  'زيد',
+  'قصي',
+  'باسل',
+  'هاني',
+  'رامي',
+  'طارق',
+  'ماجد',
+  'نضال',
+  'وليد',
+  'سعد',
 ];
 const GIVEN_NAMES_F = [
-  'فاطمة', 'مريم', 'سارة', 'رنا', 'هبة', 'لينا', 'ريم', 'دانة', 'نور',
-  'رهف', 'ياسمين', 'دعاء', 'سلمى', 'آية', 'لبنى', 'هالة', 'منى', 'غادة',
-  'إيمان', 'شذى',
+  'فاطمة',
+  'مريم',
+  'سارة',
+  'رنا',
+  'هبة',
+  'لينا',
+  'ريم',
+  'دانة',
+  'نور',
+  'رهف',
+  'ياسمين',
+  'دعاء',
+  'سلمى',
+  'آية',
+  'لبنى',
+  'هالة',
+  'منى',
+  'غادة',
+  'إيمان',
+  'شذى',
 ];
 const MIDDLE_NAMES = [
-  'محمود', 'حسين', 'سالم', 'فهد', 'رشيد', 'منصور', 'جميل', 'كريم', 'عادل', 'ناصر',
+  'محمود',
+  'حسين',
+  'سالم',
+  'فهد',
+  'رشيد',
+  'منصور',
+  'جميل',
+  'كريم',
+  'عادل',
+  'ناصر',
 ];
 const FAMILY_NAMES = [
-  'الخطيب', 'العبدالله', 'النابلسي', 'القاسم', 'الحوراني', 'السعدي',
-  'المصري', 'الزعبي', 'الشوابكة', 'التميمي', 'العدوان', 'الرفاعي',
-  'الخوالدة', 'الحياري', 'البدور', 'العمري', 'السرحان', 'القرالة',
-  'الطراونة', 'الزيود',
+  'الخطيب',
+  'العبدالله',
+  'النابلسي',
+  'القاسم',
+  'الحوراني',
+  'السعدي',
+  'المصري',
+  'الزعبي',
+  'الشوابكة',
+  'التميمي',
+  'العدوان',
+  'الرفاعي',
+  'الخوالدة',
+  'الحياري',
+  'البدور',
+  'العمري',
+  'السرحان',
+  'القرالة',
+  'الطراونة',
+  'الزيود',
 ];
 
 const COMPANY_PREFIXES = [
-  'شركة الأمل', 'شركة النخبة', 'شركة الرواد', 'مجموعة الأفق', 'شركة الوفاء',
-  'شركة المستقبل', 'شركة الاتحاد', 'شركة النور', 'شركة الرياض',
-  'مجموعة السلام', 'شركة الفا', 'شركة الياسمين',
+  'شركة الأمل',
+  'شركة النخبة',
+  'شركة الرواد',
+  'مجموعة الأفق',
+  'شركة الوفاء',
+  'شركة المستقبل',
+  'شركة الاتحاد',
+  'شركة النور',
+  'شركة الرياض',
+  'مجموعة السلام',
+  'شركة الفا',
+  'شركة الياسمين',
 ];
 const COMPANY_SUFFIXES = [
-  'للتجارة العامة', 'للمقاولات', 'للصناعات الغذائية', 'للاستشارات',
-  'لتكنولوجيا المعلومات', 'للنقل والشحن', 'للتوزيع', 'للخدمات اللوجستية',
-  'للتصنيع', 'للاستثمار العقاري',
+  'للتجارة العامة',
+  'للمقاولات',
+  'للصناعات الغذائية',
+  'للاستشارات',
+  'لتكنولوجيا المعلومات',
+  'للنقل والشحن',
+  'للتوزيع',
+  'للخدمات اللوجستية',
+  'للتصنيع',
+  'للاستثمار العقاري',
 ];
 const SECTORS = [
-  'Manufacturing', 'Retail Trade', 'Construction', 'Healthcare',
-  'Logistics & Transport', 'Information Technology', 'Food & Beverage',
-  'Real Estate', 'Professional Services', 'Hospitality',
+  'Manufacturing',
+  'Retail Trade',
+  'Construction',
+  'Healthcare',
+  'Logistics & Transport',
+  'Information Technology',
+  'Food & Beverage',
+  'Real Estate',
+  'Professional Services',
+  'Hospitality',
 ];
 const CITIES = [
-  'عمّان، الأردن', 'إربد، الأردن', 'الزرقاء، الأردن', 'العقبة، الأردن',
-  'السلط، الأردن', 'مادبا، الأردن', 'الكرك، الأردن',
+  'عمّان، الأردن',
+  'إربد، الأردن',
+  'الزرقاء، الأردن',
+  'العقبة، الأردن',
+  'السلط، الأردن',
+  'مادبا، الأردن',
+  'الكرك، الأردن',
 ];
 const LEAD_SOURCES = [
-  'referral', 'website', 'social_media', 'campaign', 'tender',
-  'bank_partner', 'strategic_partner', 'ex_customer', 'renewal',
+  'referral',
+  'website',
+  'social_media',
+  'campaign',
+  'tender',
+  'bank_partner',
+  'strategic_partner',
+  'ex_customer',
+  'renewal',
 ] as const;
 
 /**
@@ -369,16 +482,35 @@ interface InsurerSeed {
  * The Arabic names differ the way a second typist would actually differ — 'شركة' against 'شركه',
  * 'للتأمين' against 'للتامين' — so the merged directory entry visibly covers two spellings.
  */
-const LOCAL_INSURER_SEEDS: Record<'a' | 'b', { legalName: string; legalNameAr: string; lines: string[] }[]> = {
+const LOCAL_INSURER_SEEDS: Record<
+  'a' | 'b',
+  { legalName: string; legalNameAr: string; lines: string[] }[]
+> = {
   a: [
-    { legalName: 'Petra Takaful (demo)', legalNameAr: 'بترا للتكافل', lines: ['Group Medical', 'Group Life'] },
-    { legalName: 'Yarmouk Insurance (demo)', legalNameAr: 'شركة اليرموك للتأمين', lines: ['Motor Fleet', 'Property All Risks'] },
+    {
+      legalName: 'Petra Takaful (demo)',
+      legalNameAr: 'بترا للتكافل',
+      lines: ['Group Medical', 'Group Life'],
+    },
+    {
+      legalName: 'Yarmouk Insurance (demo)',
+      legalNameAr: 'شركة اليرموك للتأمين',
+      lines: ['Motor Fleet', 'Property All Risks'],
+    },
   ],
   b: [
-    { legalName: 'Zarqa Mutual (demo)', legalNameAr: 'الزرقاء التعاونية', lines: ['Public Liability'] },
+    {
+      legalName: 'Zarqa Mutual (demo)',
+      legalNameAr: 'الزرقاء التعاونية',
+      lines: ['Public Liability'],
+    },
     // The same company as office A's second entry. Same canonical key, different spelling — which
     // is what makes the cross-office directory show one company rather than two.
-    { legalName: 'YARMOUK   insurance (demo)', legalNameAr: 'شركه اليرموك للتامين', lines: ['Motor Fleet'] },
+    {
+      legalName: 'YARMOUK   insurance (demo)',
+      legalNameAr: 'شركه اليرموك للتامين',
+      lines: ['Motor Fleet'],
+    },
   ],
 };
 
@@ -413,12 +545,44 @@ const DUPLICATE_SPELLING_DEMO = {
 } as const;
 
 const INSURER_SEEDS: InsurerSeed[] = [
-  { legalName: 'Jordan Insurance Company (demo)', legalNameAr: 'الشركة الأردنية للتأمين', lines: ['Motor Fleet', 'Property All Risks', 'Marine Cargo / Goods in Transit'] },
-  { legalName: 'Middle East Insurance Company (demo)', legalNameAr: 'الشركة الشرق أوسطية للتأمين', lines: ['Motor Fleet', 'Public Liability', 'Group Medical'] },
-  { legalName: 'Arabia Insurance Jordan (demo)', legalNameAr: 'شركة العربية للتأمين - الأردن', lines: ['Property All Risks', 'Machinery Breakdown', 'Marine Cargo / Goods in Transit'] },
-  { legalName: 'Jordan French Insurance (demo)', legalNameAr: 'الأردنية الفرنسية للتأمين', lines: ['Motor Fleet', 'Group Medical', 'Group Life'] },
-  { legalName: 'National Ahlia Insurance (demo)', legalNameAr: 'الأهلية الوطنية للتأمين', lines: ['Property All Risks', 'Public Liability', 'Motor Fleet'] },
-  { legalName: 'Al-Manara Insurance (demo)', legalNameAr: 'شركة المنارة للتأمين', lines: ['Group Medical', 'Group Life', 'Public Liability'] },
+  {
+    legalName: 'Jordan Insurance Company (demo)',
+    legalNameAr: 'الشركة الأردنية للتأمين',
+    lines: [
+      'Motor Fleet',
+      'Property All Risks',
+      'Marine Cargo / Goods in Transit',
+    ],
+  },
+  {
+    legalName: 'Middle East Insurance Company (demo)',
+    legalNameAr: 'الشركة الشرق أوسطية للتأمين',
+    lines: ['Motor Fleet', 'Public Liability', 'Group Medical'],
+  },
+  {
+    legalName: 'Arabia Insurance Jordan (demo)',
+    legalNameAr: 'شركة العربية للتأمين - الأردن',
+    lines: [
+      'Property All Risks',
+      'Machinery Breakdown',
+      'Marine Cargo / Goods in Transit',
+    ],
+  },
+  {
+    legalName: 'Jordan French Insurance (demo)',
+    legalNameAr: 'الأردنية الفرنسية للتأمين',
+    lines: ['Motor Fleet', 'Group Medical', 'Group Life'],
+  },
+  {
+    legalName: 'National Ahlia Insurance (demo)',
+    legalNameAr: 'الأهلية الوطنية للتأمين',
+    lines: ['Property All Risks', 'Public Liability', 'Motor Fleet'],
+  },
+  {
+    legalName: 'Al-Manara Insurance (demo)',
+    legalNameAr: 'شركة المنارة للتأمين',
+    lines: ['Group Medical', 'Group Life', 'Public Liability'],
+  },
 ];
 
 /**
@@ -443,7 +607,13 @@ const INSURER_SEEDS: InsurerSeed[] = [
  */
 const USED_PERSON_NAMES = new Set<string>();
 
-function personName(): { given: string; father: string; grandfather: string; family: string; gender: 'M' | 'F' } {
+function personName(): {
+  given: string;
+  father: string;
+  grandfather: string;
+  family: string;
+  gender: 'M' | 'F';
+} {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const gender: 'M' | 'F' = Math.random() < 0.6 ? 'M' : 'F';
     const given = gender === 'M' ? pick(GIVEN_NAMES_M) : pick(GIVEN_NAMES_F);
@@ -506,8 +676,14 @@ interface ActorRoleDef {
   label: string;
 }
 type ActorKey =
-  | 'sales' | 'placement' | 'policyCheck' | 'claims'
-  | 'finance' | 'compliance' | 'manager' | 'admin';
+  | 'sales'
+  | 'placement'
+  | 'policyCheck'
+  | 'claims'
+  | 'finance'
+  | 'compliance'
+  | 'manager'
+  | 'admin';
 
 /** The ONE definition of a demo actor's address. `ensureActor` creates the
  * account under it and `releaseActorsForHumanLogin` finds it again by it, so a
@@ -518,14 +694,42 @@ function actorEmail(orgSlug: string, key: ActorKey): string {
 }
 
 const ACTOR_ROLE_DEFS: ActorRoleDef[] = [
-  { key: 'sales', role: RoleName.SALES_RELATIONSHIP_OFFICER, label: 'Sales Relationship Officer' },
-  { key: 'placement', role: RoleName.PLACEMENT_TECHNICAL_OFFICER, label: 'Placement Technical Officer' },
-  { key: 'policyCheck', role: RoleName.POLICY_CHECKING_OFFICER, label: 'Policy Checking Officer' },
+  {
+    key: 'sales',
+    role: RoleName.SALES_RELATIONSHIP_OFFICER,
+    label: 'Sales Relationship Officer',
+  },
+  {
+    key: 'placement',
+    role: RoleName.PLACEMENT_TECHNICAL_OFFICER,
+    label: 'Placement Technical Officer',
+  },
+  {
+    key: 'policyCheck',
+    role: RoleName.POLICY_CHECKING_OFFICER,
+    label: 'Policy Checking Officer',
+  },
   { key: 'claims', role: RoleName.CLAIMS_OFFICER, label: 'Claims Officer' },
-  { key: 'finance', role: RoleName.FINANCE_COLLECTIONS_OFFICER, label: 'Finance & Collections Officer' },
-  { key: 'compliance', role: RoleName.COMPLIANCE_OFFICER, label: 'Compliance Officer' },
-  { key: 'manager', role: RoleName.BRANCH_DEPARTMENT_MANAGER, label: 'Branch / Department Manager' },
-  { key: 'admin', role: RoleName.SYSTEM_SECURITY_ADMINISTRATOR, label: 'System Security Administrator' },
+  {
+    key: 'finance',
+    role: RoleName.FINANCE_COLLECTIONS_OFFICER,
+    label: 'Finance & Collections Officer',
+  },
+  {
+    key: 'compliance',
+    role: RoleName.COMPLIANCE_OFFICER,
+    label: 'Compliance Officer',
+  },
+  {
+    key: 'manager',
+    role: RoleName.BRANCH_DEPARTMENT_MANAGER,
+    label: 'Branch / Department Manager',
+  },
+  {
+    key: 'admin',
+    role: RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+    label: 'System Security Administrator',
+  },
 ];
 
 interface Actor {
@@ -572,7 +776,9 @@ async function ensureRoleMirroringDefaultOffice(
   roleName: string,
 ): Promise<{ id: string }> {
   const template = await rawPrisma.role.findUnique({
-    where: { organizationId_name: { organizationId: ORG_A_ID, name: roleName } },
+    where: {
+      organizationId_name: { organizationId: ORG_A_ID, name: roleName },
+    },
     include: { permissions: { select: { permissionId: true } } },
   });
   if (!template) {
@@ -674,7 +880,9 @@ async function ensureActor(
   def: ActorRoleDef,
 ): Promise<{ id: string; email: string; label: string }> {
   const email = actorEmail(orgSlug, def.key);
-  let user = await rawPrisma.user.findFirst({ where: { organizationId: orgId, email } });
+  let user = await rawPrisma.user.findFirst({
+    where: { organizationId: orgId, email },
+  });
   if (!user) {
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
     const actorName = personName();
@@ -728,7 +936,10 @@ async function ensureActor(
   return { id: user.id, email, label: def.label };
 }
 
-async function loginActor(app: INestApplication<App>, email: string): Promise<string> {
+async function loginActor(
+  app: INestApplication<App>,
+  email: string,
+): Promise<string> {
   const res = await request(app.getHttpServer())
     .post('/auth/login')
     .send({ email, password: DEMO_PASSWORD });
@@ -737,7 +948,11 @@ async function loginActor(app: INestApplication<App>, email: string): Promise<st
       `Login failed for ${email} -> ${res.status}: ${JSON.stringify(res.body)}`,
     );
   }
-  const body = res.body as { accessToken?: string; mfaRequired?: boolean; outcome?: string };
+  const body = res.body as {
+    accessToken?: string;
+    mfaRequired?: boolean;
+    outcome?: string;
+  };
   if (!body.accessToken) {
     throw new Error(
       `Login for ${email} returned no session (${JSON.stringify(body)}) — ` +
@@ -753,12 +968,17 @@ async function loginActor(app: INestApplication<App>, email: string): Promise<st
  * they are the only two routes reachable by an enrolled-but-not-yet-verified
  * account. The session token issued BEFORE enrolment stays valid afterwards
  * (same as every e2e spec), so nothing needs to log in twice. */
-async function enrolMfa(app: INestApplication<App>, token: string): Promise<void> {
+async function enrolMfa(
+  app: INestApplication<App>,
+  token: string,
+): Promise<void> {
   const enroll = await request(app.getHttpServer())
     .post('/auth/mfa/totp/enroll')
     .set(bearer(token));
   if (enroll.status < 200 || enroll.status >= 300) {
-    throw new Error(`MFA enrol failed -> ${enroll.status}: ${JSON.stringify(enroll.body)}`);
+    throw new Error(
+      `MFA enrol failed -> ${enroll.status}: ${JSON.stringify(enroll.body)}`,
+    );
   }
   const { credentialId, otpAuthUri } = enroll.body as {
     credentialId: string;
@@ -767,9 +987,14 @@ async function enrolMfa(app: INestApplication<App>, token: string): Promise<void
   const verify = await request(app.getHttpServer())
     .post('/auth/mfa/totp/enroll/verify')
     .set(bearer(token))
-    .send({ credentialId, code: authenticator.generate(secretFromOtpAuthUri(otpAuthUri)) });
+    .send({
+      credentialId,
+      code: authenticator.generate(secretFromOtpAuthUri(otpAuthUri)),
+    });
   if (verify.status < 200 || verify.status >= 300) {
-    throw new Error(`MFA verify failed -> ${verify.status}: ${JSON.stringify(verify.body)}`);
+    throw new Error(
+      `MFA verify failed -> ${verify.status}: ${JSON.stringify(verify.body)}`,
+    );
   }
 }
 
@@ -879,7 +1104,12 @@ async function ensureActors(
       const token = await loginActor(app, created.email);
       // Without this every later call from this actor 403s MFA_REQUIRED.
       await enrolMfa(app, token);
-      return { id: created.id, email: created.email, token, label: created.label };
+      return {
+        id: created.id,
+        email: created.email,
+        token,
+        label: created.label,
+      };
     });
     if (actor) actors[def.key] = actor;
   }
@@ -929,7 +1159,9 @@ async function attachCompanyFactsAndLines(
     .map((l) => ({ line: l, code: lineCodeForProgrammeLine(l) }))
     .filter((x) => {
       if (x.code === null) {
-        tally.errors.push(`insurer line "${x.line}" has no catalogue code — skipped`);
+        tally.errors.push(
+          `insurer line "${x.line}" has no catalogue code — skipped`,
+        );
         return false;
       }
       return true;
@@ -950,7 +1182,11 @@ async function attachCompanyFactsAndLines(
       companyPhone: `+962 6 5${String(100000 + Math.floor(Math.random() * 899999)).slice(0, 6)}`,
       companyEmail: `info@${insurerId.slice(0, 8)}.demo.test`,
       companyWebsite: `${insurerId.slice(0, 8)}.demo.test`,
-      companyCorrespondenceAddress: pick(['عمان - شارع الملكة رانيا', 'عمان - العبدلي', 'إربد - شارع الجامعة']),
+      companyCorrespondenceAddress: pick([
+        'عمان - شارع الملكة رانيا',
+        'عمان - العبدلي',
+        'إربد - شارع الجامعة',
+      ]),
     },
   });
 
@@ -1034,7 +1270,9 @@ async function proveDuplicateSpellingIsRefused(
   // properties are pinned independently by `insurer-crud.e2e-spec.ts`, so this stays a check on the
   // demo rather than a second copy of that test.
   const message = String((res.body as { message?: unknown }).message ?? '');
-  const namesTheAttempt = message.toLowerCase().includes(DUPLICATE_SPELLING_DEMO.attempt.toLowerCase());
+  const namesTheAttempt = message
+    .toLowerCase()
+    .includes(DUPLICATE_SPELLING_DEMO.attempt.toLowerCase());
   if (!namesTheAttempt || !message.includes('reactivate')) {
     recordBrokenPromise(
       [
@@ -1065,7 +1303,9 @@ async function deactivateOneInsurerWithCommitments(
   });
   const insurerId = withPolicies[0]?.insurerId;
   if (!insurerId) {
-    tally.errors.push('no insurer in this office holds a policy — nothing deactivated, so the impact counts would all read zero');
+    tally.errors.push(
+      'no insurer in this office holds a policy — nothing deactivated, so the impact counts would all read zero',
+    );
     return null;
   }
   const already = await rawPrisma.insurer.findUnique({
@@ -1081,12 +1321,17 @@ async function deactivateOneInsurerWithCommitments(
     bump(tally, 'created', 'insurerDeactivation');
     return insurerId;
   } catch (err) {
-    tally.errors.push(`could not deactivate insurer ${insurerId}: ${(err as Error).message}`);
+    tally.errors.push(
+      `could not deactivate insurer ${insurerId}: ${(err as Error).message}`,
+    );
     return null;
   }
 }
 
-async function ensureInsurersForOrg(orgId: string, tally: Tally): Promise<OrgInsurer[]> {
+async function ensureInsurersForOrg(
+  orgId: string,
+  tally: Tally,
+): Promise<OrgInsurer[]> {
   const out: OrgInsurer[] = [];
   for (const seed of INSURER_SEEDS) {
     const master = await rawPrisma.insurerMaster.upsert({
@@ -1115,7 +1360,12 @@ async function ensureInsurersForOrg(orgId: string, tally: Tally): Promise<OrgIns
       });
     }
     await attachCompanyFactsAndLines(relationship.id, orgId, seed.lines, tally);
-    out.push({ id: relationship.id, insurerMasterId: master.id, name: seed.legalName, lines: seed.lines });
+    out.push({
+      id: relationship.id,
+      insurerMasterId: master.id,
+      name: seed.legalName,
+      lines: seed.lines,
+    });
   }
 
   // Companies this office registered ITSELF — no catalogue row. The case the feature exists for,
@@ -1141,7 +1391,12 @@ async function ensureInsurersForOrg(orgId: string, tally: Tally): Promise<OrgIns
       bump(tally, 'created', 'insurerLocal');
     }
     await attachCompanyFactsAndLines(local.id, orgId, seed.lines, tally);
-    out.push({ id: local.id, insurerMasterId: null, name: seed.legalName, lines: seed.lines });
+    out.push({
+      id: local.id,
+      insurerMasterId: null,
+      name: seed.legalName,
+      lines: seed.lines,
+    });
   }
 
   /**
@@ -1159,7 +1414,11 @@ async function ensureInsurersForOrg(orgId: string, tally: Tally): Promise<OrgIns
   const activeIds = new Set(
     (
       await rawPrisma.insurer.findMany({
-        where: { organizationId: orgId, id: { in: out.map((i) => i.id) }, isActive: true },
+        where: {
+          organizationId: orgId,
+          id: { in: out.map((i) => i.id) },
+          isActive: true,
+        },
         select: { id: true },
       })
     ).map((i) => i.id),
@@ -1202,7 +1461,10 @@ async function ensureCommissionAgreements(
         // backfilled, and this writer was never changed.
         const code = lineCodeForProgrammeLine(line);
         const managed = code
-          ? await rawPrisma.insuranceLine.findUnique({ where: { code }, select: { id: true } })
+          ? await rawPrisma.insuranceLine.findUnique({
+              where: { code },
+              select: { id: true },
+            })
           : null;
 
         if (managed && claimedLineIds.has(managed.id)) {
@@ -1283,27 +1545,116 @@ async function seedEmployees(
   const alreadyLinked = new Set(
     (
       await rawPrisma.user.findMany({
-        where: { id: { in: Object.values(actors).map((a) => a.id) }, employeeId: { not: null } },
+        where: {
+          id: { in: Object.values(actors).map((a) => a.id) },
+          employeeId: { not: null },
+        },
         select: { id: true },
       })
     ).map((u) => u.id),
   );
-  const linkableActors = Object.values(actors).filter((a) => !alreadyLinked.has(a.id));
+  const linkableActors = Object.values(actors).filter(
+    (a) => !alreadyLinked.has(a.id),
+  );
   for (let i = 0; i < count; i += 1) {
     await attempt(tally, 'employee', async () => {
       const name = personName();
-      const linkUser = i < linkableActors.length ? linkableActors[i] : undefined;
+      const linkUser =
+        i < linkableActors.length ? linkableActors[i] : undefined;
       return postAs(app, actors.admin.token, '/employees', {
         givenName: name.given,
         fatherName: name.father,
         grandfatherName: name.grandfather,
         familyName: name.family,
         nationalId: jordanianNationalId(),
-        position: pick(['Account Executive', 'Underwriting Assistant', 'Claims Handler', 'Compliance Analyst', 'Office Administrator', 'Branch Manager']),
+        position: pick([
+          'Account Executive',
+          'Underwriting Assistant',
+          'Claims Handler',
+          'Compliance Analyst',
+          'Office Administrator',
+          'Branch Manager',
+        ]),
         hireDate: isoDateDaysAgo(randomInt(60, 2000)),
-        licensedRole: Math.random() < 0.4 ? 'CBJ Licensed Insurance Broker' : undefined,
+        /*
+         * MODULE 0 ITEM (g). This used to read 'CBJ Licensed Insurance Broker', and the api now
+         * REFUSES CBJ-ish text here with a 400 — so ~40% of seeded employees would have failed.
+         * The CBJ approval is a STRUCTURED marker now; `licensedRole` is for other certifications,
+         * which is what this line seeds.
+         */
+        licensedRole:
+          Math.random() < 0.4
+            ? pick([
+                'Chartered Insurance Institute, Dip CII',
+                'ACII',
+                'Jordan Insurance Federation certificate',
+              ])
+            : undefined,
         userId: linkUser?.id,
       });
+    });
+  }
+
+  await seedCbjApprovals(app, actors, tally);
+}
+
+/**
+ * MODULE 0 ITEMS (g) AND (f) — give the demo office enough CBJ-approved people to be licensed for
+ * both insurance types.
+ *
+ * Not decoration: item (f) refuses the second insurance type unless at least two people hold a
+ * CURRENT approval, so a demo office with none cannot exercise the licence-scope screen at all. Two
+ * is the minimum that makes the feature reachable; seeding every employee would make the refusal
+ * unreachable instead, and a demo where no rule ever fires teaches nothing.
+ *
+ * Through the real routes, like everything else in this script — the refusals and the audit rows are
+ * part of what is being demonstrated.
+ */
+async function seedCbjApprovals(
+  app: INestApplication<App>,
+  actors: Actors,
+  tally: Tally,
+): Promise<void> {
+  if (!actors.admin) return;
+  const candidates = await rawPrisma.employee.findMany({
+    where: { terminationDate: null, cbjApprovalStatus: null },
+    select: { id: true },
+    orderBy: { createdAt: 'desc' },
+    take: 3,
+  });
+  const lines = await rawPrisma.insuranceLine.findMany({
+    where: { category: { in: ['GENERAL', 'LIFE'] } },
+    select: { id: true, category: true },
+    orderBy: { displayOrder: 'asc' },
+  });
+  const general = lines.find((l) => l.category === 'GENERAL');
+  const life = lines.find((l) => l.category === 'LIFE');
+
+  for (const [index, employee] of candidates.entries()) {
+    await attempt(tally, 'cbjApproval', async () => {
+      await patchAs(
+        app,
+        actors.admin.token,
+        `/employees/${employee.id}/cbj-approval`,
+        {
+          status: 'CURRENT',
+          approvalDate: isoDateDaysAgo(randomInt(200, 1500)),
+        },
+      );
+      // One general branch each, and a life branch for the second person — so the office is staffed
+      // for both types and the derived-type display has something to show.
+      const line = index === 1 ? (life ?? general) : general;
+      if (line) {
+        await postAs(
+          app,
+          actors.admin.token,
+          `/employees/${employee.id}/cbj-approval/branches`,
+          {
+            insuranceLineId: line.id,
+          },
+        );
+      }
+      return { id: employee.id };
     });
   }
 }
@@ -1317,7 +1668,10 @@ interface SeededCustomer {
   legalName: string;
 }
 
-async function createLead(app: INestApplication<App>, actors: Actors): Promise<{ id: string }> {
+async function createLead(
+  app: INestApplication<App>,
+  actors: Actors,
+): Promise<{ id: string }> {
   const name = personName();
   return postAs(app, actors.sales.token, '/leads', {
     fullName: `${name.given} ${name.father} ${name.family}`,
@@ -1329,7 +1683,11 @@ async function createLead(app: INestApplication<App>, actors: Actors): Promise<{
   });
 }
 
-async function createCorporateCustomer(app: INestApplication<App>, actors: Actors, prospectId?: string): Promise<SeededCustomer> {
+async function createCorporateCustomer(
+  app: INestApplication<App>,
+  actors: Actors,
+  prospectId?: string,
+): Promise<SeededCustomer> {
   const legalName = companyName();
   const body: Record<string, unknown> = {
     customerType: 'CORPORATE' as CustomerType,
@@ -1342,11 +1700,20 @@ async function createCorporateCustomer(app: INestApplication<App>, actors: Actor
     languagePreference: pick(['AR', 'EN']) as LanguagePreference,
   };
   if (prospectId) body.prospectId = prospectId;
-  const created = await postAs<{ id: string }>(app, actors.sales.token, '/customers', body);
+  const created = await postAs<{ id: string }>(
+    app,
+    actors.sales.token,
+    '/customers',
+    body,
+  );
   return { id: created.id, legalName };
 }
 
-async function createIndividualCustomer(app: INestApplication<App>, actors: Actors, prospectId?: string): Promise<SeededCustomer> {
+async function createIndividualCustomer(
+  app: INestApplication<App>,
+  actors: Actors,
+  prospectId?: string,
+): Promise<SeededCustomer> {
   const name = personName();
   const fullName = `${name.given} ${name.father} ${name.grandfather} ${name.family}`;
   const body: Record<string, unknown> = {
@@ -1365,7 +1732,12 @@ async function createIndividualCustomer(app: INestApplication<App>, actors: Acto
     languagePreference: pick(['AR', 'EN']) as LanguagePreference,
   };
   if (prospectId) body.prospectId = prospectId;
-  const created = await postAs<{ id: string }>(app, actors.sales.token, '/customers', body);
+  const created = await postAs<{ id: string }>(
+    app,
+    actors.sales.token,
+    '/customers',
+    body,
+  );
   return { id: created.id, legalName: fullName };
 }
 
@@ -1384,12 +1756,16 @@ async function seedLeadFunnel(
   if (stage === 'NEW') return undefined;
 
   await attempt(tally, 'leadTransition', () =>
-    postAs(app, actors.sales.token, `/leads/${lead.id}/transition`, { toStatus: 'CONTACTED' }),
+    postAs(app, actors.sales.token, `/leads/${lead.id}/transition`, {
+      toStatus: 'CONTACTED',
+    }),
   );
   if (stage === 'CONTACTED') return undefined;
 
   await attempt(tally, 'leadTransition', () =>
-    postAs(app, actors.sales.token, `/leads/${lead.id}/transition`, { toStatus: 'QUALIFIED' }),
+    postAs(app, actors.sales.token, `/leads/${lead.id}/transition`, {
+      toStatus: 'QUALIFIED',
+    }),
   );
   if (stage === 'QUALIFIED') return undefined;
 
@@ -1403,7 +1779,10 @@ async function seedLeadFunnel(
       businessSize: pick(['Small', 'Medium', 'Large']),
       location: pick(CITIES),
       contactPerson: `${pick(GIVEN_NAMES_M)} ${pick(FAMILY_NAMES)}`,
-      productsOfInterest: pickN(['Property', 'Motor Fleet', 'Group Medical', 'Marine', 'Liability'], 2),
+      productsOfInterest: pickN(
+        ['Property', 'Motor Fleet', 'Group Medical', 'Marine', 'Liability'],
+        2,
+      ),
       expectedPremium: money(randomInt(5_000, 80_000)),
     }),
   );
@@ -1434,7 +1813,10 @@ interface PipelineResult {
  * coverage, so they match exactly (a mismatch drives the policy into
  * DISCREPANCY, which is a realistic state to show but not the default one
  * this script aims for). */
-function buildCoverageFigures(): { limits: Record<string, string>; sumsInsured: Record<string, string> } {
+function buildCoverageFigures(): {
+  limits: Record<string, string>;
+  sumsInsured: Record<string, string>;
+} {
   const total = randomInt(50_000, 750_000);
   return {
     limits: { perOccurrence: money(total), aggregate: money(total * 2) },
@@ -1454,7 +1836,8 @@ async function runFullPipeline(
     postAs<{ id: string }>(app, actors.sales.token, '/risk-profiles', {
       customerId,
       siteLabel: 'Head Office',
-      priorClaimsHistorySummary: 'No prior claims reported in the past 3 years.',
+      priorClaimsHistorySummary:
+        'No prior claims reported in the past 3 years.',
     }),
   );
   if (!riskProfile) return undefined;
@@ -1468,9 +1851,24 @@ async function runFullPipeline(
   if (!needsAssessment) return undefined;
 
   const naOk = await attempt(tally, 'needsAssessmentApproval', async () => {
-    await postAs(app, actors.sales.token, `/needs-assessments/${needsAssessment.id}/submit`, {});
-    await postAs(app, actors.manager.token, `/needs-assessments/${needsAssessment.id}/review`, {});
-    await postAs(app, actors.manager.token, `/needs-assessments/${needsAssessment.id}/approve`, {});
+    await postAs(
+      app,
+      actors.sales.token,
+      `/needs-assessments/${needsAssessment.id}/submit`,
+      {},
+    );
+    await postAs(
+      app,
+      actors.manager.token,
+      `/needs-assessments/${needsAssessment.id}/review`,
+      {},
+    );
+    await postAs(
+      app,
+      actors.manager.token,
+      `/needs-assessments/${needsAssessment.id}/approve`,
+      {},
+    );
     return true;
   });
   if (!naOk) return undefined;
@@ -1488,10 +1886,20 @@ async function runFullPipeline(
   // Which lines this programme actually designed. Derived from the needs
   // assessment's answers, which are randomised per customer, so this differs
   // run to run and customer to customer.
-  const designedLines = new Set((program.lines ?? []).map((l) => l.insuranceLine));
+  const designedLines = new Set(
+    (program.lines ?? []).map((l) => l.insuranceLine),
+  );
 
-  const programFinalized = await attempt(tally, 'insuranceProgramFinalize', () =>
-    postAs(app, actors.placement.token, `/insurance-programs/${program.id}/finalize`, {}),
+  const programFinalized = await attempt(
+    tally,
+    'insuranceProgramFinalize',
+    () =>
+      postAs(
+        app,
+        actors.placement.token,
+        `/insurance-programs/${program.id}/finalize`,
+        {},
+      ),
   );
   if (!programFinalized) return undefined;
 
@@ -1507,7 +1915,10 @@ async function runFullPipeline(
   // lines (the obvious order) 422s whenever that line is not on the
   // programme — which was ~1 pipeline in 3 before this.
   const eligible = insurers
-    .map((i) => ({ insurer: i, lines: i.lines.filter((l) => designedLines.has(l)) }))
+    .map((i) => ({
+      insurer: i,
+      lines: i.lines.filter((l) => designedLines.has(l)),
+    }))
     .filter((e) => e.lines.length > 0);
   if (eligible.length === 0) {
     // Possible in principle (a questionnaire designing only lines no demo
@@ -1532,14 +1943,19 @@ async function runFullPipeline(
 
   const premium = randomInt(500, 45_000);
   const quotation = await attempt(tally, 'quotation', () =>
-    postAs<{ current?: { id: string }; id?: string }>(app, actors.placement.token, '/quotations', {
-      rfqId: rfq.id,
-      insurerId: insurer.id,
-      premium: money(premium),
-      currency: 'JOD',
-      deductible: money(Math.max(50, Math.round(premium * 0.05))),
-      commissionRatePercent: '12.50',
-    }),
+    postAs<{ current?: { id: string }; id?: string }>(
+      app,
+      actors.placement.token,
+      '/quotations',
+      {
+        rfqId: rfq.id,
+        insurerId: insurer.id,
+        premium: money(premium),
+        currency: 'JOD',
+        deductible: money(Math.max(50, Math.round(premium * 0.05))),
+        commissionRatePercent: '12.50',
+      },
+    ),
   );
   if (!quotation) return undefined;
   const quotationId = quotation.current?.id ?? quotation.id;
@@ -1549,7 +1965,9 @@ async function runFullPipeline(
   }
 
   const comparisonOk = await attempt(tally, 'comparison', () =>
-    postAs(app, actors.placement.token, '/comparison-matrices', { rfqId: rfq.id }),
+    postAs(app, actors.placement.token, '/comparison-matrices', {
+      rfqId: rfq.id,
+    }),
   );
   if (!comparisonOk) return undefined;
 
@@ -1557,13 +1975,18 @@ async function runFullPipeline(
     postAs<{ id: string }>(app, actors.placement.token, '/recommendations', {
       opportunityId: opportunity.id,
       recommendedQuotationId: quotationId,
-      rationale: 'Best overall balance of coverage breadth, competitive pricing and insurer standing for this risk profile.',
+      rationale:
+        'Best overall balance of coverage breadth, competitive pricing and insurer standing for this risk profile.',
       rationaleFactors: {
-        coverage: 'Coverage matches every line the needs assessment recommended.',
+        coverage:
+          'Coverage matches every line the needs assessment recommended.',
         price: 'Most competitive premium among the insurers approached.',
-        financialStrength: 'The insurer carries a strong regional financial-strength rating.',
-        claimsService: 'Established, responsive local claims-handling track record.',
-        deductible: 'Deductible level is appropriate for the client size and risk appetite.',
+        financialStrength:
+          'The insurer carries a strong regional financial-strength rating.',
+        claimsService:
+          'Established, responsive local claims-handling track record.',
+        deductible:
+          'Deductible level is appropriate for the client size and risk appetite.',
         policyConditions: 'Standard market wording with no unusual exclusions.',
       },
     }),
@@ -1571,7 +1994,12 @@ async function runFullPipeline(
   if (!recommendation) return undefined;
 
   const sent = await attempt(tally, 'recommendationSend', () =>
-    postAs(app, actors.placement.token, `/recommendations/${recommendation.id}/send`, {}),
+    postAs(
+      app,
+      actors.placement.token,
+      `/recommendations/${recommendation.id}/send`,
+      {},
+    ),
   );
   if (!sent) return undefined;
 
@@ -1615,7 +2043,10 @@ async function runFullPipeline(
   // the cover (Placement) — see policy.controller.ts's own comment.
   const checked = await attempt(tally, 'policyChecking', () =>
     postAs(app, actors.policyCheck.token, `/policies/${policy.id}/checking`, {
-      requestedCoverage: { limits: coverage.limits, sumsInsured: coverage.sumsInsured },
+      requestedCoverage: {
+        limits: coverage.limits,
+        sumsInsured: coverage.sumsInsured,
+      },
     }),
   );
   if (!checked) return undefined;
@@ -1629,10 +2060,21 @@ async function runFullPipeline(
   if (!delivered) return undefined;
 
   await attempt(tally, 'policyAcknowledgeReceipt', () =>
-    postAs(app, actors.sales.token, `/policies/${policy.id}/delivery/acknowledge-receipt`, {}),
+    postAs(
+      app,
+      actors.sales.token,
+      `/policies/${policy.id}/delivery/acknowledge-receipt`,
+      {},
+    ),
   );
 
-  return { customerId, policyId: policy.id, policyNumber, premium, inceptionDaysAgo };
+  return {
+    customerId,
+    policyId: policy.id,
+    policyNumber,
+    premium,
+    inceptionDaysAgo,
+  };
 }
 
 async function maybeInvoicePolicy(
@@ -1683,7 +2125,10 @@ async function maybeClaimPolicy(
   await attempt(tally, 'claimRegistration', () =>
     postAs(app, actors.claims.token, `/claims/${claim.id}/registration`, {
       insurerClaimReference: `INS-REF-${Date.now()}-${nextSeq()}`,
-      adjuster: { name: `${pick(GIVEN_NAMES_M)} ${pick(FAMILY_NAMES)}`, firm: 'Regional Loss Adjusters LLC' },
+      adjuster: {
+        name: `${pick(GIVEN_NAMES_M)} ${pick(FAMILY_NAMES)}`,
+        firm: 'Regional Loss Adjusters LLC',
+      },
     }),
   );
 }
@@ -1699,7 +2144,13 @@ async function seedComplaints(
   count: number,
   tally: Tally,
 ): Promise<void> {
-  const categories = ['denied_claim', 'delayed_issuance', 'premium_dispute', 'unanswered_claim', 'other'];
+  const categories = [
+    'denied_claim',
+    'delayed_issuance',
+    'premium_dispute',
+    'unanswered_claim',
+    'other',
+  ];
   for (let i = 0; i < count && customerIds.length > 0; i += 1) {
     await attempt(tally, 'complaint', () =>
       postAs(app, actors.compliance.token, '/complaints', {
@@ -1724,11 +2175,31 @@ async function seedIncidents(
 ): Promise<void> {
   const severities = ['low', 'medium', 'high', 'critical'];
   const samples = [
-    { title: 'Phishing email targeting a claims workstation', description: 'A claims officer reported a suspicious email requesting login credentials; the link was not clicked.' },
-    { title: 'Laptop left unattended in a client meeting room', description: 'A placement officer\'s laptop was briefly unattended; the screen was locked and no data was accessed.' },
-    { title: 'Misdirected email containing a customer document', description: 'A policy schedule was emailed to an incorrect recipient inside the same office and was recalled promptly.' },
-    { title: 'Unusual login pattern flagged for a Finance account', description: 'Multiple failed login attempts were recorded outside normal business hours.' },
-    { title: 'Vendor access review overdue', description: 'A third-party vendor\'s access review was flagged as overdue during a routine compliance check.' },
+    {
+      title: 'Phishing email targeting a claims workstation',
+      description:
+        'A claims officer reported a suspicious email requesting login credentials; the link was not clicked.',
+    },
+    {
+      title: 'Laptop left unattended in a client meeting room',
+      description:
+        "A placement officer's laptop was briefly unattended; the screen was locked and no data was accessed.",
+    },
+    {
+      title: 'Misdirected email containing a customer document',
+      description:
+        'A policy schedule was emailed to an incorrect recipient inside the same office and was recalled promptly.',
+    },
+    {
+      title: 'Unusual login pattern flagged for a Finance account',
+      description:
+        'Multiple failed login attempts were recorded outside normal business hours.',
+    },
+    {
+      title: 'Vendor access review overdue',
+      description:
+        "A third-party vendor's access review was flagged as overdue during a routine compliance check.",
+    },
   ];
   for (let i = 0; i < count; i += 1) {
     const s = samples[i % samples.length];
@@ -1748,10 +2219,21 @@ async function seedVendors(
   count: number,
   tally: Tally,
 ): Promise<void> {
-  const types = ['reinsurer', 'loss_adjuster', 'it_cloud', 'printing_archiving', 'marketing_call_centre', 'other'];
+  const types = [
+    'reinsurer',
+    'loss_adjuster',
+    'it_cloud',
+    'printing_archiving',
+    'marketing_call_centre',
+    'other',
+  ];
   const names = [
-    'Regional Loss Adjusters LLC', 'CloudSecure Hosting Services', 'Al-Nokhba Printing & Archiving',
-    'Horizon Marketing & Call Centre', 'Jordan Reinsurance Facility', 'Apex Office Supplies',
+    'Regional Loss Adjusters LLC',
+    'CloudSecure Hosting Services',
+    'Al-Nokhba Printing & Archiving',
+    'Horizon Marketing & Call Centre',
+    'Jordan Reinsurance Facility',
+    'Apex Office Supplies',
   ];
   for (let i = 0; i < count; i += 1) {
     await attempt(tally, 'vendor', () =>
@@ -1768,7 +2250,9 @@ async function seedVendors(
 // ---------------------------------------------------------------------------
 
 async function preflight(): Promise<void> {
-  const orgA = await rawPrisma.organization.findUnique({ where: { id: ORG_A_ID } });
+  const orgA = await rawPrisma.organization.findUnique({
+    where: { id: ORG_A_ID },
+  });
   if (!orgA) {
     throw new Error(
       'Default organization not found in this database. Run `npm run db:seed` (against the DEV .env) first — ' +
@@ -1811,7 +2295,9 @@ async function seedOrganization(
 
   console.log('- actors...');
   const actors = await ensureActors(app, orgId, orgSlug, tally);
-  const missing = ACTOR_ROLE_DEFS.map((d) => d.key).filter((key) => !actors[key]);
+  const missing = ACTOR_ROLE_DEFS.map((d) => d.key).filter(
+    (key) => !actors[key],
+  );
   if (missing.length > 0) {
     throw new Error(
       `Could not provision these actor accounts for ${orgLabel}: ${missing.join(', ')} — see errors above. ` +
@@ -1833,9 +2319,13 @@ async function seedOrganization(
   const leadFunnelCustomers: SeededCustomer[] = [];
   for (let i = 0; i < NUM.leadsPerOrg; i += 1) {
     const stage =
-      i < Math.round(NUM.leadsPerOrg * 0.3) ? 'CONVERTED' :
-      i < Math.round(NUM.leadsPerOrg * 0.5) ? 'QUALIFIED' :
-      i < Math.round(NUM.leadsPerOrg * 0.75) ? 'CONTACTED' : 'NEW';
+      i < Math.round(NUM.leadsPerOrg * 0.3)
+        ? 'CONVERTED'
+        : i < Math.round(NUM.leadsPerOrg * 0.5)
+          ? 'QUALIFIED'
+          : i < Math.round(NUM.leadsPerOrg * 0.75)
+            ? 'CONTACTED'
+            : 'NEW';
     const customer = await seedLeadFunnel(app, actors, stage, tally);
     if (customer) leadFunnelCustomers.push(customer);
   }
@@ -1844,7 +2334,9 @@ async function seedOrganization(
   const standaloneCustomers: SeededCustomer[] = [];
   for (let i = 0; i < NUM.customersPerOrg; i += 1) {
     const customer = await attempt(tally, 'customer', () =>
-      Math.random() < 0.55 ? createIndividualCustomer(app, actors) : createCorporateCustomer(app, actors),
+      Math.random() < 0.55
+        ? createIndividualCustomer(app, actors)
+        : createCorporateCustomer(app, actors),
     );
     if (customer) standaloneCustomers.push(customer);
     if ((i + 1) % 50 === 0) console.log(`  ...${i + 1}/${NUM.customersPerOrg}`);
@@ -1856,9 +2348,18 @@ async function seedOrganization(
   const pipelineTargets = standaloneCustomers.slice(0, NUM.fullPipelinePerOrg);
   const policies: PipelineResult[] = [];
   for (let i = 0; i < pipelineTargets.length; i += 1) {
-    const result = await runFullPipeline(app, actors, orgSlug, insurers, pipelineTargets[i].id, tally);
+    const result = await runFullPipeline(
+      app,
+      actors,
+      orgSlug,
+      insurers,
+      pipelineTargets[i].id,
+      tally,
+    );
     if (result) policies.push(result);
-    console.log(`  ...pipeline ${i + 1}/${pipelineTargets.length}${result ? ' -> ' + result.policyNumber : ' (stopped early, see errors)'}`);
+    console.log(
+      `  ...pipeline ${i + 1}/${pipelineTargets.length}${result ? ' -> ' + result.policyNumber : ' (stopped early, see errors)'}`,
+    );
   }
 
   console.log(`- invoices/claims on ${policies.length} issued policies...`);
@@ -1866,17 +2367,37 @@ async function seedOrganization(
   let claimsCreated = 0;
   for (let i = 0; i < policies.length; i += 1) {
     if (Math.random() < 0.75) {
-      await maybeInvoicePolicy(app, actors, policies[i].policyId, policies[i].premium, tally);
+      await maybeInvoicePolicy(
+        app,
+        actors,
+        policies[i].policyId,
+        policies[i].premium,
+        tally,
+      );
       invoicesCreated += 1;
     }
     if (Math.random() < 0.4) {
-      await maybeClaimPolicy(app, actors, policies[i].policyId, policies[i].inceptionDaysAgo, tally);
+      await maybeClaimPolicy(
+        app,
+        actors,
+        policies[i].policyId,
+        policies[i].inceptionDaysAgo,
+        tally,
+      );
       claimsCreated += 1;
     }
   }
 
-  console.log(`- ${NUM.complaintsPerOrg} complaints, ${NUM.incidentsPerOrg} incidents, ${NUM.vendorsPerOrg} vendors...`);
-  await seedComplaints(app, actors, allCustomers.map((c) => c.id), NUM.complaintsPerOrg, tally);
+  console.log(
+    `- ${NUM.complaintsPerOrg} complaints, ${NUM.incidentsPerOrg} incidents, ${NUM.vendorsPerOrg} vendors...`,
+  );
+  await seedComplaints(
+    app,
+    actors,
+    allCustomers.map((c) => c.id),
+    NUM.complaintsPerOrg,
+    tally,
+  );
   await seedIncidents(app, actors, NUM.incidentsPerOrg, tally);
   await seedVendors(app, actors, NUM.vendorsPerOrg, tally);
 
@@ -1884,7 +2405,12 @@ async function seedOrganization(
   // is only worth looking at when its five impact counts are not all zero.
   if (actors.admin) {
     console.log('- deactivating one insurer that has live commitments...');
-    await deactivateOneInsurerWithCommitments(app, orgId, actors.admin.token, tally);
+    await deactivateOneInsurerWithCommitments(
+      app,
+      orgId,
+      actors.admin.token,
+      tally,
+    );
   }
 
   return {
@@ -1904,155 +2430,194 @@ async function seedOrganization(
 // Main
 // ---------------------------------------------------------------------------
 
-it('seeds demo data for two Organizations through the real API', async () => {
-  const tally = newTally();
-  // Two offices are the POINT of this script, so the one-Organization guard in
-  // `createTestApp` does not apply to it — see `CreateTestAppOptions`. Passing this is what
-  // makes the run repeatable: before it, the first run created Office B and every later run
-  // was refused before reaching a single line of seeding logic.
-  const app = await createTestApp({ multipleOrganizationsAreExpected: true });
-  // Captured rather than allowed to propagate, so the release below still runs
-  // and can never replace the error that actually caused it.
-  let fatal: Error | undefined;
-  try {
-    console.log('Running preflight checks...');
-    await preflight();
+it(
+  'seeds demo data for two Organizations through the real API',
+  async () => {
+    const tally = newTally();
+    // Two offices are the POINT of this script, so the one-Organization guard in
+    // `createTestApp` does not apply to it — see `CreateTestAppOptions`. Passing this is what
+    // makes the run repeatable: before it, the first run created Office B and every later run
+    // was refused before reaching a single line of seeding logic.
+    const app = await createTestApp({ multipleOrganizationsAreExpected: true });
+    // Captured rather than allowed to propagate, so the release below still runs
+    // and can never replace the error that actually caused it.
+    let fatal: Error | undefined;
+    try {
+      console.log('Running preflight checks...');
+      await preflight();
 
-    console.log('Ensuring Office B exists...');
-    const existingOrgB = await rawPrisma.organization.findUnique({ where: { id: ORG_B_ID } });
-    if (!existingOrgB) {
-      await rawPrisma.organization.create({
-        data: {
-          id: ORG_B_ID,
-          legalName: ORG_B_LEGAL_NAME,
-          legalNameAr: ORG_B_LEGAL_NAME_AR,
-          subdomain: ORG_B_SUBDOMAIN,
-        },
+      console.log('Ensuring Office B exists...');
+      const existingOrgB = await rawPrisma.organization.findUnique({
+        where: { id: ORG_B_ID },
       });
-    }
-    // The new-office rule. Runs on every pass, not just on creation, so an
-    // Office B created by an earlier version of this script also ends up with
-    // one — the same reason every other step here is idempotent.
-    for (const orgId of [ORG_A_ID, ORG_B_ID]) {
-      await ensureOfficeAdministrator(orgId);
-    }
-
-    const orgAName =
-      (await rawPrisma.organization.findUnique({ where: { id: ORG_A_ID } }))?.legalName ?? ORG_A_LABEL;
-
-    // Each Organization is seeded independently — a hard failure in Office A
-    // (e.g. its actor accounts could not be provisioned) must not prevent
-    // Office B from being attempted, and vice versa.
-    const summaries: OrgSeedSummary[] = [];
-    for (const [orgId, orgSlug, orgLabel] of [
-      [ORG_A_ID, ORG_A_SLUG, orgAName],
-      [ORG_B_ID, ORG_B_SLUG, ORG_B_LEGAL_NAME],
-    ] as const) {
-      try {
-        summaries.push(await seedOrganization(app, orgId, orgSlug, orgLabel, tally));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`\n!!! ${orgLabel} FAILED entirely: ${message}\n`);
-        tally.errors.push(`[org:${orgSlug}] ${message}`);
+      if (!existingOrgB) {
+        await rawPrisma.organization.create({
+          data: {
+            id: ORG_B_ID,
+            legalName: ORG_B_LEGAL_NAME,
+            legalNameAr: ORG_B_LEGAL_NAME_AR,
+            subdomain: ORG_B_SUBDOMAIN,
+            // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+            // neither kind is a safe fallback for the other, so every creator states which it is.
+            type: 'BROKERAGE_OFFICE',
+            // Required for a brokerage office by the `Organization_broker_kind_matches_type`
+            // CHECK. The compiler cannot ask for it — a nullable column is optional in
+            // Prisma's CreateInput — so the database is what refuses its absence.
+            brokerKind: 'CORPORATE',
+          },
+        });
       }
-    }
-
-    // ------------------------------------------------------------------
-    // Report
-    // ------------------------------------------------------------------
-    const totalCreated = Object.values(tally.created).reduce((a, b) => a + b, 0);
-    const totalFailed = Object.values(tally.failed).reduce((a, b) => a + b, 0);
-
-    console.log('\n================ DEMO SEED SUMMARY ================');
-    for (const summary of summaries) {
-      console.log(`\n${summary.orgLabel}:`);
-      console.log(`  customers: ${summary.customersCreated} (of which ${summary.leadFunnelCustomers} came through the lead funnel)`);
-      console.log(`  full pipelines completed (ACTIVE-track policies): ${summary.fullPipelinesCompleted}`);
-      console.log(`  invoices: ${summary.invoicesCreated}, claims: ${summary.claimsCreated}`);
-      console.log(`  demo login (password for all: ${DEMO_PASSWORD}):`);
-      for (const actor of Object.values(summary.actors)) {
-        console.log(`    ${actor.label.padEnd(32)} ${actor.email}`);
+      // The new-office rule. Runs on every pass, not just on creation, so an
+      // Office B created by an earlier version of this script also ends up with
+      // one — the same reason every other step here is idempotent.
+      for (const orgId of [ORG_A_ID, ORG_B_ID]) {
+        await ensureOfficeAdministrator(orgId);
       }
+
+      const orgAName =
+        (await rawPrisma.organization.findUnique({ where: { id: ORG_A_ID } }))
+          ?.legalName ?? ORG_A_LABEL;
+
+      // Each Organization is seeded independently — a hard failure in Office A
+      // (e.g. its actor accounts could not be provisioned) must not prevent
+      // Office B from being attempted, and vice versa.
+      const summaries: OrgSeedSummary[] = [];
+      for (const [orgId, orgSlug, orgLabel] of [
+        [ORG_A_ID, ORG_A_SLUG, orgAName],
+        [ORG_B_ID, ORG_B_SLUG, ORG_B_LEGAL_NAME],
+      ] as const) {
+        try {
+          summaries.push(
+            await seedOrganization(app, orgId, orgSlug, orgLabel, tally),
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`\n!!! ${orgLabel} FAILED entirely: ${message}\n`);
+          tally.errors.push(`[org:${orgSlug}] ${message}`);
+        }
+      }
+
+      // ------------------------------------------------------------------
+      // Report
+      // ------------------------------------------------------------------
+      const totalCreated = Object.values(tally.created).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      const totalFailed = Object.values(tally.failed).reduce(
+        (a, b) => a + b,
+        0,
+      );
+
+      console.log('\n================ DEMO SEED SUMMARY ================');
+      for (const summary of summaries) {
+        console.log(`\n${summary.orgLabel}:`);
+        console.log(
+          `  customers: ${summary.customersCreated} (of which ${summary.leadFunnelCustomers} came through the lead funnel)`,
+        );
+        console.log(
+          `  full pipelines completed (ACTIVE-track policies): ${summary.fullPipelinesCompleted}`,
+        );
+        console.log(
+          `  invoices: ${summary.invoicesCreated}, claims: ${summary.claimsCreated}`,
+        );
+        console.log(`  demo login (password for all: ${DEMO_PASSWORD}):`);
+        for (const actor of Object.values(summary.actors)) {
+          console.log(`    ${actor.label.padEnd(32)} ${actor.email}`);
+        }
+      }
+      console.log(
+        `\nRows created: ${totalCreated}  |  Failed attempts: ${totalFailed}`,
+      );
+      if (totalFailed > 0) {
+        console.log(
+          '\nFirst 20 failures (non-fatal — everything else above still got created):',
+        );
+        for (const line of tally.errors.slice(0, 20))
+          console.log(`  - ${line}`);
+        if (tally.errors.length > 20)
+          console.log(
+            `  ... and ${tally.errors.length - 20} more (see the full report file).`,
+          );
+      }
+      console.log('=====================================================\n');
+
+      const reportPath = path.join(__dirname, 'seed-demo-report.json');
+      fs.writeFileSync(
+        reportPath,
+        JSON.stringify(
+          {
+            generatedAt: new Date().toISOString(),
+            config: NUM,
+            // The password is deliberately NOT written here. This file is gitignored, but "not
+            // committed" is not the same as "not on disk": the whole point of taking the password
+            // from the environment is that it stops existing in a file anybody can open, and a
+            // report that helpfully records it puts it straight back. Whoever set DEMO_PASSWORD for
+            // the run is the one who knows it.
+            passwordRecorded: false,
+            totals: { created: tally.created, failed: tally.failed },
+            errors: tally.errors,
+            organizations: summaries.map((s) => ({
+              orgId: s.orgId,
+              orgLabel: s.orgLabel,
+              customersCreated: s.customersCreated,
+              leadFunnelCustomers: s.leadFunnelCustomers,
+              fullPipelinesCompleted: s.fullPipelinesCompleted,
+              invoicesCreated: s.invoicesCreated,
+              claimsCreated: s.claimsCreated,
+              actors: Object.fromEntries(
+                Object.entries(s.actors).map(([key, actor]) => [
+                  key,
+                  { email: actor.email, label: actor.label },
+                ]),
+              ),
+            })),
+          },
+          null,
+          2,
+        ),
+      );
+      console.log(`Full report written to ${reportPath}`);
+    } catch (err) {
+      fatal = err instanceof Error ? err : new Error(String(err));
     }
-    console.log(`\nRows created: ${totalCreated}  |  Failed attempts: ${totalFailed}`);
-    if (totalFailed > 0) {
-      console.log('\nFirst 20 failures (non-fatal — everything else above still got created):');
-      for (const line of tally.errors.slice(0, 20)) console.log(`  - ${line}`);
-      if (tally.errors.length > 20) console.log(`  ... and ${tally.errors.length - 20} more (see the full report file).`);
+
+    // Reached on every path — the catch above swallows anything the body threw.
+    // Deliberately not a `finally`: throwing out of one is `no-unsafe-finally`,
+    // and it would swallow the real error on its way past.
+    console.log('');
+    console.log('Releasing actor logins for human sign-in (MFA reset)...');
+    await releaseActorsForHumanLogin();
+    const stillLocked = await findLockedDemoActors();
+    const totalActors = DEMO_ORGS.length * ACTOR_ROLE_DEFS.length;
+    console.log(
+      stillLocked.length === 0
+        ? `All ${totalActors} demo accounts released — password-only sign-in, ` +
+            'MFA enrolment on first login.'
+        : `!!! ${stillLocked.length} demo account(s) STILL LOCKED.`,
+    );
+
+    await app.close();
+    await rawPrisma.$disconnect();
+
+    if (fatal) throw fatal;
+    if (brokenPromises.length > 0) {
+      throw new Error(
+        `Seeding finished and the data is in place, but ${brokenPromises.length} promise(s) that ` +
+          `docs/first-run.md makes to its reader could NOT be confirmed against this run:\n  - ` +
+          `${brokenPromises.join('\n  - ')}\n` +
+          'The environment is usable; the DOCUMENT is wrong until that is fixed.',
+      );
     }
-    console.log('=====================================================\n');
-
-    const reportPath = path.join(__dirname, 'seed-demo-report.json');
-    fs.writeFileSync(
-      reportPath,
-      JSON.stringify(
-        {
-          generatedAt: new Date().toISOString(),
-          config: NUM,
-          // The password is deliberately NOT written here. This file is gitignored, but "not
-          // committed" is not the same as "not on disk": the whole point of taking the password
-          // from the environment is that it stops existing in a file anybody can open, and a
-          // report that helpfully records it puts it straight back. Whoever set DEMO_PASSWORD for
-          // the run is the one who knows it.
-          passwordRecorded: false,
-          totals: { created: tally.created, failed: tally.failed },
-          errors: tally.errors,
-          organizations: summaries.map((s) => ({
-            orgId: s.orgId,
-            orgLabel: s.orgLabel,
-            customersCreated: s.customersCreated,
-            leadFunnelCustomers: s.leadFunnelCustomers,
-            fullPipelinesCompleted: s.fullPipelinesCompleted,
-            invoicesCreated: s.invoicesCreated,
-            claimsCreated: s.claimsCreated,
-            actors: Object.fromEntries(
-              Object.entries(s.actors).map(([key, actor]) => [key, { email: actor.email, label: actor.label }]),
-            ),
-          })),
-        },
-        null,
-        2,
-      ),
-    );
-    console.log(`Full report written to ${reportPath}`);
-  } catch (err) {
-    fatal = err instanceof Error ? err : new Error(String(err));
-  }
-
-  // Reached on every path — the catch above swallows anything the body threw.
-  // Deliberately not a `finally`: throwing out of one is `no-unsafe-finally`,
-  // and it would swallow the real error on its way past.
-  console.log('');
-  console.log('Releasing actor logins for human sign-in (MFA reset)...');
-  await releaseActorsForHumanLogin();
-  const stillLocked = await findLockedDemoActors();
-  const totalActors = DEMO_ORGS.length * ACTOR_ROLE_DEFS.length;
-  console.log(
-    stillLocked.length === 0
-      ? `All ${totalActors} demo accounts released — password-only sign-in, ` +
-          'MFA enrolment on first login.'
-      : `!!! ${stillLocked.length} demo account(s) STILL LOCKED.`,
-  );
-
-  await app.close();
-  await rawPrisma.$disconnect();
-
-  if (fatal) throw fatal;
-  if (brokenPromises.length > 0) {
-    throw new Error(
-      `Seeding finished and the data is in place, but ${brokenPromises.length} promise(s) that ` +
-        `docs/first-run.md makes to its reader could NOT be confirmed against this run:\n  - ` +
-        `${brokenPromises.join('\n  - ')}\n` +
-        'The environment is usable; the DOCUMENT is wrong until that is fixed.',
-    );
-  }
-  if (stillLocked.length > 0) {
-    throw new Error(
-      `Seeding finished, but ${stillLocked.length} demo account(s) are still ` +
-        `behind a six-digit prompt nobody can answer: ` +
-        `${stillLocked.join(', ')}. Their TOTP secret was generated in this ` +
-        `process and never shown to anyone. Clear MfaCredential and set ` +
-        `mfaEnabled = false for them before demoing.`,
-    );
-  }
-}, 30 * 60_000);
+    if (stillLocked.length > 0) {
+      throw new Error(
+        `Seeding finished, but ${stillLocked.length} demo account(s) are still ` +
+          `behind a six-digit prompt nobody can answer: ` +
+          `${stillLocked.join(', ')}. Their TOTP secret was generated in this ` +
+          `process and never shown to anyone. Clear MfaCredential and set ` +
+          `mfaEnabled = false for them before demoing.`,
+      );
+    }
+  },
+  30 * 60_000,
+);

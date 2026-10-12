@@ -82,9 +82,117 @@ async function ensureDefaultOrganization(): Promise<void> {
       // page the moment the UI switches.
       legalNameAr: "مكتب الوساطة الافتراضي",
       subdomain: "default",
+      // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
+      // neither kind is a safe fallback for the other, so every creator states which it is.
+      type: 'BROKERAGE_OFFICE',
+      // Required for a brokerage office by the `Organization_broker_kind_matches_type`
+      // CHECK. The compiler cannot ask for it — a nullable column is optional in
+      // Prisma's CreateInput — so the database is what refuses its absence.
+      brokerKind: 'CORPORATE',
     },
   });
   console.log("Seeded the default organization.");
+}
+
+/**
+ * MODULE 0 ITEM (j)'s GAP CLOSURE — the PROVIDER organization.
+ *
+ * ## In the SEED, never in a migration
+ *
+ * A migration that invents an organization is a migration that invents a tenant: it would arrive in
+ * production with no decision behind it. This sits inside `SEED_SAMPLE_DATA` (`NODE_ENV !==
+ * "production"`), the same gate the placeholder broker licence uses and for the same reason — a
+ * provider organization appearing in production would hand somebody the cross-office dashboard
+ * nobody asked to create.
+ *
+ * ## What it is allowed to hold, stated rather than implied
+ *
+ * ONE role, holding exactly ONE code: `provider.office-state.read`. No business permission, so every
+ * business route answers 403 for this organization — a GRANT-level closure, not a schema-level one,
+ * and the report says so. There is no structural refusal that stops a provider administrator
+ * granting itself `customer.create`; what there is, is a provider organization that starts with
+ * nothing but the dashboard.
+ *
+ * `brokerKind` is NULL, which `Organization_broker_kind_matches_type` requires for any type that is
+ * not BROKERAGE_OFFICE — item (b) wrote that CHECK as the negation, so it covers PROVIDER unchanged.
+ *
+ * Idempotent: keyed on the fixed id, and the role on `(organizationId, name)`.
+ */
+export const PROVIDER_ORGANIZATION_ID = "00000000-0000-0000-0000-0000000000f0";
+
+async function ensureProviderOrganization(): Promise<void> {
+  const existing = await prisma.organization.findUnique({
+    where: { id: PROVIDER_ORGANIZATION_ID },
+  });
+  if (!existing) {
+    // A second PROVIDER row is refused by the partial unique `Organization_one_provider`, so this
+    // also guards against a hand-created provider elsewhere: the create would fail loudly rather
+    // than produce two.
+    await prisma.organization.create({
+      data: {
+        id: PROVIDER_ORGANIZATION_ID,
+        legalName: "IBMS Platform Operator",
+        legalNameAr: "مُشغّل منصّة IBMS",
+        subdomain: "provider",
+        type: "PROVIDER",
+        // NULL, required by the item (b) CHECK for every type that is not a brokerage office.
+        brokerKind: null,
+      },
+    });
+  }
+
+  const code = "provider.office-state.read";
+  const permission = await prisma.permission.findUnique({ where: { code } });
+  if (!permission) {
+    throw new Error(
+      `${code} is not in the permission catalogue, so the provider organization cannot be given the one capability it exists for. Seed the catalogue first.`,
+    );
+  }
+
+  const role = await prisma.role.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: PROVIDER_ORGANIZATION_ID,
+        name: "PLATFORM_OPERATOR",
+      },
+    },
+    update: {},
+    create: {
+      organizationId: PROVIDER_ORGANIZATION_ID,
+      name: "PLATFORM_OPERATOR",
+      nameEn: "Platform operator",
+      nameAr: "مُشغّل المنصّة",
+      description:
+        "Reads the cross-office provider dashboard. Holds no brokerage capability at all.",
+      isSystem: true,
+    },
+  });
+
+  const alreadyGranted = await prisma.rolePermission.findFirst({
+    where: { roleId: role.id, permissionId: permission.id },
+  });
+  if (!alreadyGranted) {
+    await prisma.rolePermission.create({
+      data: {
+        organizationId: PROVIDER_ORGANIZATION_ID,
+        roleId: role.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+
+  // MEASURED, not assumed: this role holds exactly one code. If a later change grants it anything
+  // else, the seed says so rather than leaving the "holds no brokerage capability" claim false.
+  const granted = await prisma.rolePermission.count({ where: { roleId: role.id } });
+  if (granted !== 1) {
+    throw new Error(
+      `PLATFORM_OPERATOR holds ${granted} permission(s); it must hold exactly 1 (${code}). The provider organization exists to read the dashboard and nothing else — if that is changing, change this check deliberately.`,
+    );
+  }
+
+  console.log(
+    `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (1 permission: ${code}).`,
+  );
 }
 
 async function ensureSystemAccount(): Promise<void> {
@@ -592,11 +700,16 @@ async function main() {
       update: {
         module: permission.module,
         description: permission.description,
+        // Module 0 item (j). On the UPDATE branch too, deliberately: a code whose scope is widened
+        // or narrowed in the catalogue must take effect on a re-seed, and a field only written on
+        // CREATE is a field that silently keeps its first value forever.
+        scope: permission.scope ?? "OFFICE",
       },
       create: {
         code: permission.code,
         module: permission.module,
         description: permission.description,
+        scope: permission.scope ?? "OFFICE",
       },
     });
 
@@ -657,10 +770,18 @@ async function main() {
   console.log(`Seeded ${INSURANCE_LINES.length} standard insurance lines.`);
 
   if (SEED_SAMPLE_DATA) {
+    // Module 0 item (j)'s gap closure. BEFORE the sample users, so a future provider user has an
+    // organization and a role to be attached to.
+    await ensureProviderOrganization();
     await ensureSampleInsurers();
     await ensureSampleUsers(roleIdByName);
+    // AFTER the sample users: the certificate is attributed to a real user of the office, and in a
+    // fresh dev database the sample users are the only ones that exist.
+    await ensureBrokerLicenseTerms();
   } else {
-    console.log("NODE_ENV=production — skipping sample insurers/users.");
+    console.log(
+      "NODE_ENV=production — skipping sample insurers/users and the placeholder broker licence.",
+    );
   }
 
   // Every office, every environment: a business-day deadline counted against an
@@ -748,3 +869,105 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+/**
+ * A CURRENT LICENCE TERM for every brokerage office that holds none — Module 0 item (c).
+ *
+ * ## Why the seed has to do this at all
+ *
+ * Item (c) made the absence of a licence BLOCK new business: practising with none on record is a
+ * ground for administrative sanction (CBJ Instructions No. 9 of 2026, art. 21/a/9). Before that,
+ * absence passed, which is what let dozens of policy/endorsement/claim/finance specs place a Policy
+ * without ever thinking about a licence. Those specs are not wrong — the gate was — so the data
+ * they run against now provides what the gate requires.
+ *
+ * ## DEV AND TEST ONLY, and this gate is load-bearing rather than tidy
+ *
+ * It sits inside `SEED_SAMPLE_DATA` (`NODE_ENV !== "production"`). A placeholder licence in a
+ * production database would hand an office the one thing the new gate exists to withhold, and the
+ * gate would then report every unlicensed office as licensed. That is a worse failure than the one
+ * item (c) fixed, because it would look like compliance.
+ *
+ * ## EVERY brokerage office, not the first one
+ *
+ * Seeding only the default office would reproduce exactly the defect item (c) removed — one licence
+ * for the platform — and would hide it from every walkthrough, because the second office would fail
+ * to place business for a reason nobody would connect to the seed.
+ *
+ * The licence number says SEED in it on purpose. Nobody should be able to mistake this for a real
+ * CBJ number, and the certificate document says the same in its own filename.
+ *
+ * Idempotent: an office that already holds a term is skipped, so a re-run never appends a second.
+ */
+async function ensureBrokerLicenseTerms(): Promise<void> {
+  const offices = await prisma.organization.findMany({
+    where: { type: "BROKERAGE_OFFICE" },
+    select: { id: true, subdomain: true },
+    orderBy: { subdomain: "asc" },
+  });
+
+  // Three calendar years ending 31 December (art. 10/b), issued at the start of this year. Derived
+  // from the current year rather than pinned, so a seed run in 2030 does not produce an expired
+  // licence — which would block new business just as thoroughly as no licence at all.
+  const year = new Date().getUTCFullYear();
+  const issuedAt = new Date(Date.UTC(year, 0, 1));
+  const expiresAt = new Date(Date.UTC(year + 2, 11, 31));
+
+  let created = 0;
+  let skipped = 0;
+  for (const office of offices) {
+    const existing = await prisma.brokerLicense.count({
+      where: { organizationId: office.id },
+    });
+    if (existing > 0) {
+      skipped += 1;
+      continue;
+    }
+
+    // `Document.uploadedByUserId` is NOT NULL and no real uploader exists for seeded data. The
+    // office's earliest user is a real row rather than an invented id; it is not a claim that this
+    // person filed anything, which is why the filename says the document is a placeholder.
+    const uploader = await prisma.user.findFirst({
+      where: { organizationId: office.id },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: { id: true },
+    });
+    if (!uploader) {
+      console.log(
+        `  ${office.subdomain}: no user to attribute a certificate to — skipping its licence.`,
+      );
+      continue;
+    }
+
+    // Both rows or neither: a Document with no term pointing at it is an orphaned certificate in
+    // the office's records, which is the same reasoning as the repository's createTerm.
+    await prisma.$transaction(async (tx) => {
+      const certificate = await tx.document.create({
+        data: {
+          organizationId: office.id,
+          category: "BROKER_LICENSE_CERTIFICATE",
+          classification: "INTERNAL",
+          fileName: "seeded-placeholder-licence-certificate--not-a-real-cbj-document.pdf",
+          storageRef: `seed:placeholder-licence-certificate:${office.subdomain}`,
+          uploadedByUserId: uploader.id,
+        },
+      });
+      await tx.brokerLicense.create({
+        data: {
+          organizationId: office.id,
+          licenseNumber: `CBJ-SEED-${office.subdomain.toUpperCase()}`,
+          scopeOfAuthorization: "Seeded placeholder — general insurance brokerage",
+          issuedAt,
+          expiresAt,
+          status: "active",
+          certificateDocumentId: certificate.id,
+        },
+      });
+    });
+    created += 1;
+  }
+
+  console.log(
+    `Seeded ${created} placeholder broker licence term(s) across ${offices.length} brokerage office(s) (${skipped} already held one), each expiring ${expiresAt.toISOString().slice(0, 10)}.`,
+  );
+}

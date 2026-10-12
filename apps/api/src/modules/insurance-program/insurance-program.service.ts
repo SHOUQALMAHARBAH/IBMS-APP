@@ -34,6 +34,7 @@ import {
 } from './insurance-program.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { AssembleInsuranceProgramDto } from './dto/assemble-insurance-program.dto';
+import { assertWithinRoleScope } from '../../common/role-scope';
 
 /** The derivation inputs echoed back on `GET /insurance-programs/:id` so the
  * Placement Officer can see *why* each line's Sum Insured basis is what it
@@ -307,6 +308,40 @@ export class InsuranceProgramService {
     }
   }
 
+  /**
+   * MODULE 0 ITEM (h) — the role scope, on every line this programme would carry.
+   *
+   * A programme line is the first point at which business is attached to an insurance line, so it
+   * is the first place a scoped role can be outside its scope.
+   *
+   * Here and NOT inside `toLineInputs`, which is where the first version put it: that method takes
+   * the lines alone, has no actor, and maps them SYNCHRONOUSLY — three reasons the check could not
+   * live there, and `tsc` named all three. Resolving the ids is a different job from deciding who
+   * may write them, and keeping them apart is what let this become one loop with one message.
+   *
+   * Every line is checked, not the first: a programme refused on its third line must say so, and
+   * stopping at the first in-scope line would pass a mixed programme a scoped officer may not write.
+   */
+  private async assertLinesWithinScope(
+    inputs: readonly InsuranceProgramLineInput[],
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    for (const input of inputs) {
+      const lineId = input.insuranceLineId ?? null;
+      // A line whose code resolved to nothing carries a NULL FK and its string (see
+      // `toLineInputs`). There is no catalogue row to be outside the scope of, so it is not
+      // refused — the warning that line already logs is the right response to an unmapped line.
+      if (lineId === null) continue;
+      const category = await this.lines.findCategory(lineId, null);
+      if (!category) continue;
+      assertWithinRoleScope(
+        actor,
+        { category, lineId },
+        'design a programme line',
+      );
+    }
+  }
+
   async assemble(
     dto: AssembleInsuranceProgramDto,
     actor: AuthenticatedUser,
@@ -371,7 +406,9 @@ export class InsuranceProgramService {
       },
     });
 
-    await this.programs.createLines(program.id, await this.toLineInputs(lines));
+    const lineInputs = await this.toLineInputs(lines);
+    await this.assertLinesWithinScope(lineInputs, actor);
+    await this.programs.createLines(program.id, lineInputs);
 
     return this.toView(await this.mustFind(program.id));
   }
@@ -415,10 +452,15 @@ export class InsuranceProgramService {
     // warns about open: a finalize() landing between the read and the
     // rewrite would have a FINALIZED program's lines silently replaced. A
     // `null` result means this call lost that race.
+    // Item (h): the same check on the RE-ASSEMBLE path. A scope enforced on create and not on
+    // replace is a scope one request can walk around.
+    const lineInputs = await this.toLineInputs(lines);
+    await this.assertLinesWithinScope(lineInputs, actor);
+
     const result = await this.programs.reassembleLines(
       program.id,
       actor.id,
-      await this.toLineInputs(lines),
+      lineInputs,
     );
     if (!result) {
       throw new ConflictException(

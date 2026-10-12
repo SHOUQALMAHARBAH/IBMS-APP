@@ -1,4 +1,10 @@
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '../auth/api-client';
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiPut,
+} from '../auth/api-client';
 
 /**
  * Office-scoped custom RBAC, PHASE 3 — the Role screen's client.
@@ -36,10 +42,24 @@ export interface RoleAdminEntry {
    *  than a guess. */
   holderCount: number;
   permissionCount: number;
+  /**
+   * MODULE 0 ITEM (h) — the insurance-line scope. `null` is UNRESTRICTED, never "scoped to
+   * nothing": every role that existed before item (h) carries none.
+   *
+   * ⚠️ HAND-COPIED OVER AN HTTP RESPONSE, AND TYPESCRIPT CANNOT CHECK IT — the drift class that
+   * broke the customer-import result panel. When `RoleAdminView` changes in apps/api, this changes
+   * in the same commit, and `role-scope.e2e-spec.ts` asserts the fields on the response body.
+   */
+  insuranceLineCategory: 'GENERAL' | 'LIFE' | null;
+  scopeBranchCount: number;
 }
 
 export interface RoleWithGrants extends RoleAdminEntry {
   permissionCodes: string[];
+  /** Module 0 item (h) — the branch ids already in scope, so the matrix can pre-tick them.
+   *  On the DETAIL read only; the list carries `scopeBranchCount`. */
+  scopeLineIds: string[];
+  scopeOfficeLineIds: string[];
 }
 
 /** One code from the global catalogue. The catalogue describes the software, not
@@ -49,6 +69,14 @@ export interface PermissionCatalogueEntry {
   code: string;
   module: string;
   description: string;
+  /**
+   * MODULE 0 ITEM (j)'s GAP CLOSURE — how far this code's effect reaches.
+   *
+   * Optional because ~80 spec files build a catalogue entry and a required field would fail every
+   * one of them over a value none of them are about. Absent is read as OFFICE, which is the
+   * non-widening reading: a caller that does not know must not treat a code as platform-wide.
+   */
+  scope?: 'OFFICE' | 'PLATFORM';
 }
 
 export function listRolesForAdmin(): Promise<RoleAdminEntry[]> {
@@ -126,6 +154,24 @@ export function setRoleSecurityAttributes(
 /** A POST, not a DELETE — there is no delete. `Role.status` is the only removal
  *  there is, because the grant rows pointing at a role ARE the record of who held
  *  what and when. */
+/**
+ * Module 0 item (h). `insuranceLineCategory: null` makes the role UNRESTRICTED; omitting it leaves
+ * the scope alone — so the screen's "every insurance type" option must send an explicit null.
+ *
+ * The branch lists are REPLACED wholesale, not patched: a role's scope is a setting an
+ * administrator tunes on a matrix, so "these four, not those two" is one act with one audit row.
+ */
+export function setRoleScope(
+  roleId: string,
+  body: {
+    insuranceLineCategory?: 'GENERAL' | 'LIFE' | null;
+    insuranceLineIds?: string[];
+    officeInsuranceLineIds?: string[];
+  },
+): Promise<RoleWithGrants> {
+  return apiPatch<RoleWithGrants>(`/rbac/roles/${roleId}/scope`, body);
+}
+
 export function setRoleStatus(
   roleId: string,
   status: 'ACTIVE' | 'INACTIVE',
@@ -178,6 +224,8 @@ export interface DutySegregationReadiness {
   status: 'NOBODY' | 'SINGLE_HOLDER' | 'READY';
 }
 
-export function listDutySegregationReadiness(): Promise<DutySegregationReadiness[]> {
+export function listDutySegregationReadiness(): Promise<
+  DutySegregationReadiness[]
+> {
   return apiGet<DutySegregationReadiness[]>('/rbac/duty-segregation-readiness');
 }

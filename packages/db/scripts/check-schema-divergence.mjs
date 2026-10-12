@@ -107,6 +107,28 @@ const EXPECTED = {
   'ALTER TABLE "OfficeInsurerFormField" DROP CONSTRAINT "OfficeInsurerFormField_template_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
 
+  // Module 0 item (e)'s licence scope. Same shape, same reason: without the composite, office A's
+  // licence could list office B's private line as one of its licensed branches and the reference
+  // would be structurally valid — which on a REGULATORY record is worse than on a programme line.
+  'ALTER TABLE "BrokerLicenseScopeLine" DROP CONSTRAINT "BrokerLicenseScopeLine_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
+  // Module 0 item (g)'s per-person CBJ approval branches. Same shape, same reason — and the record
+  // of what a person was approved for is read by the staff-minimum rule, so a branch pointing at
+  // another office's private line would make one office's headcount depend on another's catalogue.
+  'ALTER TABLE "EmployeeCbjApprovalBranch" DROP CONSTRAINT "EmployeeCbjApprovalBranch_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
+  // Module 0 item (h)'s role scope. TWO composite FKs, which is one more than the siblings: the
+  // office-line one for the same reason as every other, and the ROLE one because a scope row
+  // claiming a role from another office would make one office's AUTHORIZATION depend on another
+  // office's roles. Prisma models the single-column relation in both cases and cannot express
+  // either composite.
+  'ALTER TABLE "RoleScopeBranch" DROP CONSTRAINT "RoleScopeBranch_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+  'ALTER TABLE "RoleScopeBranch" DROP CONSTRAINT "RoleScopeBranch_role_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // ---- GIN indexes on `Unsupported("tsvector")` ----
   // Prisma cannot index a field whose type it does not model. `canonicalTokens` is a plain
   // `String[]`, which it CAN index — so that one was declared rather than listed here.

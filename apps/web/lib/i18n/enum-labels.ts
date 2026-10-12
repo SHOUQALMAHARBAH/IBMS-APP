@@ -9,6 +9,19 @@ import type { TranslationKey } from './translations';
 type Labels<T extends string> = Record<T, TranslationKey>;
 
 export const ENUM_LABEL = {
+  /** Module 0 item (e) — the two insurance TYPES a broker licence covers (art. 3/a). Added here
+   *  rather than labelled per screen: the licence scope, the insurance-lines admin screen and the
+   *  insurer directory all render this enum. */
+  InsuranceLineCategory: {
+    GENERAL: 'insuranceLineCategoryGeneral',
+    LIFE: 'insuranceLineCategoryLife',
+  } satisfies Labels<'GENERAL' | 'LIFE'>,
+  /** Module 0 item (g) — a person's CBJ approval standing. */
+  CbjApprovalStatus: {
+    CURRENT: 'cbjApprovalStatusCurrent',
+    SUSPENDED: 'cbjApprovalStatusSuspended',
+    CANCELLED: 'cbjApprovalStatusCancelled',
+  } satisfies Labels<'CURRENT' | 'SUSPENDED' | 'CANCELLED'>,
   AuditAction: {
     CREATE: 'auditActionCreate',
     READ: 'auditActionRead',
@@ -344,7 +357,8 @@ export const ENUM_LABEL = {
     explicit_consent: 'cbtBasisExplicitConsent',
   } satisfies Labels<string>,
   DisposalMethod: {
-    certified_secure_wipe_nist_800_88: 'disposalMethodCertifiedSecureWipeNist80088',
+    certified_secure_wipe_nist_800_88:
+      'disposalMethodCertifiedSecureWipeNist80088',
     physical_destruction: 'disposalMethodPhysicalDestruction',
     certified_shredding: 'disposalMethodCertifiedShredding',
   } satisfies Labels<string>,

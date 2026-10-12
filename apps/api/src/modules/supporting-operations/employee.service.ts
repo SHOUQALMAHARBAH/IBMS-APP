@@ -48,6 +48,7 @@ import {
   type EmployeeListRow,
   type MaskedEmployee,
 } from './employee.config';
+import { EmployeeCbjApprovalService } from './employee-cbj-approval.service';
 
 const TERMINATION_SLA_WORKFLOW = 'termination_access_revocation';
 
@@ -97,6 +98,9 @@ export class EmployeeService {
     private readonly reveal: SensitiveFieldRevealService,
     private readonly slaTimers: SlaTimerService,
     private readonly sessions: SessionService,
+    // Module 0 item (g). A SERVICE injected across no module boundary — both live in this
+    // module — so the house rule that services are not shared between modules is intact.
+    private readonly cbjApprovals: EmployeeCbjApprovalService,
   ) {}
 
   /**
@@ -290,6 +294,7 @@ export class EmployeeService {
       trainings: employee.trainings,
       deprovisioningChecklist: employee.deprovisioningChecklist,
       account: account ? { id: account.id, email: account.email } : null,
+      cbjApproval: await this.cbjApprovals.get(id),
     };
   }
 
