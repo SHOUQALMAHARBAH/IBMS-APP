@@ -62,8 +62,20 @@ const LEGACY_ROLE_NAMES = [
 
 /** Every role the PLATFORM defines, which is exactly the set `isSystem` marks.
  *  The legacy eleven plus `OFFICE_ADMINISTRATOR`, which Phase 3 installs in every
- *  office — a twelfth platform role, not an office's own. */
-const PLATFORM_ROLE_NAMES = [...LEGACY_ROLE_NAMES, 'OFFICE_ADMINISTRATOR'];
+ *  office — a twelfth platform role, not an office's own.
+ *
+ *  `PLATFORM_OPERATOR` is the thirteenth, added by item (j)'s gap closure, and it is
+ *  the first that is NOT per-office: it exists in the single `PROVIDER` organization
+ *  and nowhere else. It belongs here for the same reason as the other twelve — the
+ *  seed defines it, so the office Role screen must not be able to rename, retire or
+ *  re-grant it — and `RoleAdminService.setPermissions` calls `assertNotSystem`, which
+ *  is what makes that flag the thing stopping a provider administrator re-granting
+ *  their own role through the screen. */
+const PLATFORM_ROLE_NAMES = [
+  ...LEGACY_ROLE_NAMES,
+  'OFFICE_ADMINISTRATOR',
+  'PLATFORM_OPERATOR',
+];
 
 const createdRoleIds: string[] = [];
 
@@ -198,11 +210,37 @@ describe('Role lifecycle attributes — status and isSystem', () => {
         `${role.name} in org ${role.organizationId} isSystem`,
       ).toBe(shouldBeSystem);
     }
-    // Guard against the loop passing on an empty set.
-    expect(
-      all.filter((r) => r.isSystem).length,
-      'every office must have protected platform roles',
-    ).toBeGreaterThanOrEqual(PLATFORM_ROLE_NAMES.length);
+    /*
+     * Guard against the loop passing on an empty set — and keyed on the PER-OFFICE twelve, not on
+     * `PLATFORM_ROLE_NAMES.length`.
+     *
+     * That distinction appeared with the thirteenth name. `PLATFORM_OPERATOR` lives in the single
+     * PROVIDER organization, so a floor of 13 is satisfied by one office's twelve plus the
+     * provider's one — which means it would ALSO be satisfied by an office that had lost one of its
+     * own twelve, as long as the provider existed. The floor has to be the set every office is
+     * supposed to carry, which is the twelve.
+     */
+    const perOfficeRoleNames = PLATFORM_ROLE_NAMES.filter(
+      (n) => n !== 'PLATFORM_OPERATOR',
+    );
+    const officeIds = new Set(
+      (
+        await rawPrisma.organization.findMany({
+          where: { type: 'BROKERAGE_OFFICE' },
+          select: { id: true },
+        })
+      ).map((o) => o.id),
+    );
+    expect(officeIds.size, 'at least one brokerage office').toBeGreaterThan(0);
+    for (const officeId of officeIds) {
+      const protectedHere = all.filter(
+        (r) => r.organizationId === officeId && r.isSystem,
+      );
+      expect(
+        protectedHere.length,
+        `office ${officeId} must carry all ${perOfficeRoleNames.length} protected platform roles`,
+      ).toBeGreaterThanOrEqual(perOfficeRoleNames.length);
+    }
   });
 
   it('starts every legacy role ACTIVE — the migration retires nothing', async () => {

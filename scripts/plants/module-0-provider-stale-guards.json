@@ -1,0 +1,22 @@
+{
+  "the-platform-operator-is-not-in-the-protected-role-set": {
+    "file": "apps/api/test/role-security-attributes.e2e-spec.ts",
+    "from": "  'OFFICE_ADMINISTRATOR',\n  'PLATFORM_OPERATOR',\n];",
+    "to": "  'OFFICE_ADMINISTRATOR',\n];"
+  },
+  "the-per-office-floor-counts-the-provider-only-role": {
+    "file": "apps/api/test/role-security-attributes.e2e-spec.ts",
+    "from": "    const perOfficeRoleNames = PLATFORM_ROLE_NAMES.filter(\n      (n) => n !== 'PLATFORM_OPERATOR',\n    );",
+    "to": "    const perOfficeRoleNames = PLATFORM_ROLE_NAMES;"
+  },
+  "the-providers-grant-is-read-through-the-tenant-scoped-client": {
+    "file": "apps/api/test/office-administrator.e2e-spec.ts",
+    "from": "    const codes = await rawPrisma.rolePermission.findMany({",
+    "to": "    const codes = await prisma.rolePermission.findMany({"
+  },
+  "the-unexpected-kind-query-is-pointed-at-a-row-that-exists": {
+    "file": "apps/api/test/organization-type.e2e-spec.ts",
+    "from": "WHERE \"type\" NOT IN ('BROKERAGE_OFFICE', 'PROVIDER')`,",
+    "to": "WHERE \"type\" NOT IN ('BROKERAGE_OFFICE')`,"
+  }
+}

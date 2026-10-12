@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import {
   TEST_ORGANIZATION_ID as DEFAULT_ORGANIZATION_ID,
   prisma,
+  rawPrisma,
 } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
@@ -242,7 +243,29 @@ describe('every office has a route to user administration', () => {
     // Asked as a CAPABILITY, not by role name. An office whose administration
     // sits on a role it named itself satisfies this, which is the whole point of
     // the phase.
+    //
+    // ## THE DENOMINATOR IS BROKERAGE OFFICES, AND THAT IS A CORRECTION, NOT A WEAKENING
+    //
+    // This read was `findMany()` over every Organization, which was the same set
+    // as "every office" until item (j)'s gap closure seeded a PROVIDER row. The
+    // rule is about an OFFICE being able to administer itself: the failure it
+    // prevents is an office that cannot be set up, or that loses its last
+    // administrator and cannot repair itself from inside the system. The platform
+    // operator is not an office — it holds no brokerage data and is created
+    // deliberately by the seed rather than by signup.
+    //
+    // The third place the same denominator correction was needed, and the
+    // reason is one fact: `soleOrganizationIdOrThrow` (signup's office resolver)
+    // and `assertOneOrganization` (the e2e harness) both counted Organizations
+    // when they meant brokerage offices. Two things were the same thing until
+    // today.
+    //
+    // WHAT THIS STILL CATCHES, which is why it is not the thing the message below
+    // warns against: a leaked e2e fixture office is a BROKERAGE_OFFICE, so it is
+    // still in this set and still fails here. Nothing about a real office's
+    // administrability is excused.
     const organizations = await prisma.organization.findMany({
+      where: { type: 'BROKERAGE_OFFICE' },
       select: { id: true, subdomain: true },
     });
     expect(
@@ -250,9 +273,32 @@ describe('every office has a route to user administration', () => {
       'the test database must hold at least the default Organization',
     ).toBeGreaterThan(0);
 
+    /*
+     * `rawPrisma`, AND THAT IS A FIX RATHER THAN A STYLE CHOICE.
+     *
+     * This read was the exported tenant-scoped `prisma`, which is permanently inside the seeded
+     * office's context. `Organization` carries no `organizationId` so it is not in
+     * `TENANT_SCOPED_MODELS` and the read above sees every row — but `Role` and `RolePermission`
+     * both carry one and are scoped, so this set could only ever contain the DEFAULT office.
+     *
+     * The consequence: a SECOND brokerage office would have been reported orphaned even with a
+     * perfectly good administrator role, because its role was invisible to the query. The test
+     * claims "in every Organization" and could answer for exactly one.
+     *
+     * MEASURED, not reasoned — a throwaway probe against db-test comparing the two clients:
+     *
+     *   scopedRoles=30  rawRoles=31
+     *   scopedGrants=517 rawGrants=518
+     *   scopedOrgs=2    rawOrgs=2
+     *
+     * The one role and one grant missing from the scoped view are the platform operator's. This is
+     * one of the few specs entitled to cross organizations, for the same reason
+     * `role-security-attributes.e2e-spec.ts` says so in its own header: the property under test is
+     * "every office's copy agrees", which a tenant-scoped read cannot see.
+     */
     const grantingOrgIds = new Set(
       (
-        await prisma.role.findMany({
+        await rawPrisma.role.findMany({
           where: {
             status: 'ACTIVE',
             permissions: { some: { permission: { code: 'user.manage' } } },
@@ -271,6 +317,65 @@ describe('every office has a route to user administration', () => {
         'If one is named after an e2e fixture, a killed run leaked it — clean it up rather than weakening this check, ' +
         'because the same failure on a real office means that office cannot be administered at all.',
     ).toEqual([]);
+  }, 120_000);
+
+  it('and the PROVIDER organization deliberately has NO route to user administration', async () => {
+    /*
+     * THE CONSEQUENCE OF THE NARROWING ABOVE, PINNED SO IT STAYS A DECISION.
+     *
+     * The test above now excludes the platform operator, which means the platform operator cannot
+     * provision a user into itself from inside the application: nobody in it holds `user.manage`,
+     * so every route into user administration is refused for it. Measured rather than inferred —
+     * the provider's only role holds exactly one code, `provider.office-state.read`.
+     *
+     * That is the intended state and the migration says so in its own words: the dashboard is
+     * unreachable until somebody deliberately creates the operator. But an UNSTATED consequence of
+     * a narrowed denominator is how a real gap gets excused, so it is asserted here instead. If a
+     * later change grants the provider `user.manage` — which would let it provision its own staff,
+     * tenant-scoped exactly as an office does — this test fails and that becomes a recorded
+     * decision rather than a side effect.
+     *
+     * WHAT IT COSTS TODAY, said plainly so the next reader does not have to measure it: the
+     * provider dashboard has no hand-walkable path on the dev database, because the seed creates
+     * the organization and its role but no user. The api e2e creates its own provider user with the
+     * owner connection, which is the only way in.
+     */
+    // `rawPrisma` throughout: `Role` and `RolePermission` are tenant-scoped, so reading another
+    // organization's rows through the scoped client returns EMPTY whatever the state is — this
+    // whole test would have asserted an absence it could not have observed. The non-vacuity floor
+    // at the bottom is what caught it, which is the only reason it is not still written that way.
+    const provider = await rawPrisma.organization.findFirst({
+      where: { type: 'PROVIDER' },
+      select: { id: true },
+    });
+    if (!provider) {
+      // Correct on a database seeded without sample data, and not a failure: `SEED_SAMPLE_DATA` is
+      // what keeps a placeholder platform operator out of production.
+      return;
+    }
+
+    const administering = await rawPrisma.role.findMany({
+      where: {
+        organizationId: provider.id,
+        status: 'ACTIVE',
+        permissions: { some: { permission: { code: 'user.manage' } } },
+      },
+      select: { name: true },
+    });
+    expect(
+      administering.map((r) => r.name),
+      'the platform operator holds user administration — intended or not, that is a decision to record',
+    ).toEqual([]);
+
+    const codes = await rawPrisma.rolePermission.findMany({
+      where: { organizationId: provider.id },
+      select: { permission: { select: { code: true } } },
+    });
+    // Non-vacuity: the assertion above is also satisfied by a provider organization holding no
+    // grants at all, which would mean the dashboard was withdrawn rather than scoped.
+    expect(codes.map((c) => c.permission.code).sort()).toEqual([
+      'provider.office-state.read',
+    ]);
   }, 120_000);
 
   it('gives every Organization an isSystem OFFICE_ADMINISTRATOR with all 25 codes', async () => {

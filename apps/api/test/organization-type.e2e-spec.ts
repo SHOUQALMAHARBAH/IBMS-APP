@@ -41,9 +41,19 @@ describe('Organization.type — the database guarantees', () => {
          FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
         WHERE t.typname = 'OrganizationType'`,
     );
-    // A third kind appearing here is a new kind of organization nobody decided on — the same
-    // reason the migration asserts the set rather than merely asserting the type exists.
-    expect(rows[0]?.labels).toBe('BROKERAGE_OFFICE,INSURANCE_COMPANY');
+    // A kind appearing here that is not in this list is a new kind of organization nobody decided
+    // on — the same reason the migration asserts the set rather than merely asserting the type
+    // exists. It fired as designed when item (j)'s gap closure added the third.
+    //
+    // `PROVIDER` was that decision (migration `20261117100000`): the platform operator, which item
+    // (j) shipped as inexpressible and the closure made expressible. A FOURTH label is still an
+    // undecided kind and still fails here.
+    //
+    // THE ORDER IS LOAD-BEARING AND NOT MERELY COSMETIC. `enumsortorder` is the order the labels
+    // were added, and `PROVIDER` had to be added in its own migration precisely because the next
+    // one's partial unique index names the label in its WHERE clause — so a reordering here would
+    // mean the enum was rebuilt rather than appended to.
+    expect(rows[0]?.labels).toBe('BROKERAGE_OFFICE,INSURANCE_COMPANY,PROVIDER');
   });
 
   it('is NOT NULL and carries NO default — which is the decision, not an oversight', async () => {
@@ -142,6 +152,47 @@ describe('Organization.type — the database guarantees', () => {
     const brokerages = await rawPrisma.organization.count({
       where: { type: 'BROKERAGE_OFFICE' },
     });
-    expect(brokerages).toBe(total);
+    expect(
+      brokerages,
+      'the backfill must have reached at least one office',
+    ).toBeGreaterThan(0);
+
+    /*
+     * THE DENOMINATOR MOVED, AND THAT IS WHY THIS IS NOT `brokerages === total` ANY MORE.
+     *
+     * Item (a)'s claim is about its own BACKFILL: every row that existed when the migration ran
+     * came out of it a brokerage office. That claim is unchanged. What changed is that the seed now
+     * creates a PROVIDER organization AFTER the backfill (item (j)'s gap closure), so "every
+     * organization is a brokerage office" is no longer the same sentence as "the backfill reached
+     * every row" — and asserting the first would be asserting something item (a) never claimed.
+     *
+     * Written as "nothing is of a type nobody decided to create" rather than as a count, so it
+     * still fails for the cases this test exists for: a row left INSURANCE_COMPANY by a bad
+     * backfill, and a SECOND provider slipping past the partial unique. A plain `total - 1` would
+     * pass against either.
+     */
+    const unexpected = await rawPrisma.$queryRawUnsafe<
+      { kind: string; subdomain: string }[]
+    >(
+      `SELECT "type"::text AS kind, "subdomain" FROM "Organization" WHERE "type" NOT IN ('BROKERAGE_OFFICE', 'PROVIDER')`,
+    );
+    expect(
+      unexpected,
+      'an organization of a kind item (a) did not backfill and item (j) did not seed',
+    ).toEqual([]);
+
+    const providers = await rawPrisma.organization.count({
+      where: { type: 'PROVIDER' },
+    });
+    // At most one, which the partial unique `Organization_one_provider` already refuses — asserted
+    // here too because this is the test that reads the whole table, and `db:divergence` is blind to
+    // a partial index.
+    expect(providers, 'at most one platform operator').toBeLessThanOrEqual(1);
+    // DEFENSIVE, and named as such rather than counted as proven: no plant on this file can
+    // make the arithmetic disagree, because nothing here WRITES an organization. The query
+    // above is the detector — pointed at `NOT IN ('BROKERAGE_OFFICE')` it names the provider
+    // and the test dies, which is what proves it reads rows rather than passing on an empty
+    // set. This line is the second way the same wrong state would surface.
+    expect(brokerages + providers).toBe(total);
   });
 });
