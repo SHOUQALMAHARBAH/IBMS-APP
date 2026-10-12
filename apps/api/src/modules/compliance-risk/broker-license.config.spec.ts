@@ -3,6 +3,7 @@ import {
   brokerLicenseAuditSnapshot,
   deriveBrokerLicenseView,
   expectedExpiryForThreeYearTerm,
+  expiryMatchesThreeYearTerm,
   expiryIsEndOfCalendarYear,
   isBrokerLicenseCurrentlyLapsed,
   isValidPendingRenewalDecision,
@@ -202,7 +203,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
     });
   });
 
-  describe('expectedExpiryForThreeYearTerm — informational, nothing refuses on it', () => {
+  describe('expectedExpiryForThreeYearTerm (art. 10/b) — it WARNS now, and still refuses nothing', () => {
     it('is 31 December of the issue year + 2, counting the year of issue', () => {
       expect(
         expectedExpiryForThreeYearTerm(new Date('2026-01-01T00:00:00.000Z'))
@@ -213,6 +214,66 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
 
     it('is null when no issue date was recorded', () => {
       expect(expectedExpiryForThreeYearTerm(null)).toBeNull();
+    });
+
+    it('counts a PART year as a whole year — the case item (d) called unanswerable', () => {
+      /*
+       * Art. 10/b: "ويعتبر جزء السنة الميلادية لهذه الغاية سنة" — part of a calendar year is
+       * considered, for this purpose, a year. So a licence granted on 15 June 2026 ends on
+       * 31 December 2028, NOT 2029: the six remaining months of 2026 are the first year.
+       *
+       * This is the exact example the old comment named as "a question for the regulator". It is
+       * answered in the article's own sentence, and asserting the mid-year case is what tells a
+       * correct implementation apart from one that counts three FULL years from the issue date.
+       */
+      expect(
+        expectedExpiryForThreeYearTerm(new Date('2026-06-15T00:00:00.000Z'))
+          ?.toISOString()
+          .slice(0, 10),
+      ).toBe('2028-12-31');
+
+      // The last possible day of the issue year still makes that year the first one.
+      expect(
+        expectedExpiryForThreeYearTerm(new Date('2026-12-31T00:00:00.000Z'))
+          ?.toISOString()
+          .slice(0, 10),
+      ).toBe('2028-12-31');
+    });
+  });
+
+  describe('expiryMatchesThreeYearTerm (art. 10/b) — THREE states, and a warning never a block', () => {
+    it('is true when the entered expiry is what art. 10/b requires', () => {
+      expect(
+        expiryMatchesThreeYearTerm({
+          issuedAt: new Date('2026-06-15T00:00:00.000Z'),
+          expiresAt: new Date('2028-12-31T00:00:00.000Z'),
+        }),
+      ).toBe(true);
+    });
+
+    it('is false for the reading art. 10/b rules out — three FULL years from issue', () => {
+      // 2029-12-31 is what you get by NOT counting the part year. The article says to count it.
+      expect(
+        expiryMatchesThreeYearTerm({
+          issuedAt: new Date('2026-06-15T00:00:00.000Z'),
+          expiresAt: new Date('2029-12-31T00:00:00.000Z'),
+        }),
+      ).toBe(false);
+    });
+
+    it('is NULL with no issue date — a missing field is not a discrepancy', () => {
+      /*
+       * The state that matters most. Collapsing this into `false` would put a regulatory-discrepancy
+       * warning on the screen of every office that simply never recorded an issue date — accusing
+       * them of a mismatch with the regulation on the strength of a blank field. Same three-state
+       * treatment as `isCurrentlyLapsed`, and the screen checks `=== false` for exactly this reason.
+       */
+      expect(
+        expiryMatchesThreeYearTerm({
+          issuedAt: null,
+          expiresAt: new Date('2028-12-31T00:00:00.000Z'),
+        }),
+      ).toBeNull();
     });
   });
 

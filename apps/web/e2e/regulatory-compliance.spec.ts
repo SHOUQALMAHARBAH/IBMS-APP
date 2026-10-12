@@ -46,6 +46,9 @@ const LICENSE = {
   validPendingRenewalDecision: false,
   expiryIsEndOfCalendarYear: false,
   expectedExpiryForThreeYearTerm: '2028-12-31T00:00:00.000Z',
+  // FALSE, and accurate rather than convenient: this fixture's term runs 2026-01-01 to
+  // 2027-01-01, which is neither a 31 December nor the three-year term art. 10/b requires.
+  expiryMatchesThreeYearTerm: false,
 };
 
 /*
@@ -313,6 +316,60 @@ test('an expiry that is not a 31 December WARNS and does not block (art. 10/b)',
   // Not refused: the entry stands and the licence still reads active.
   await expect(warning).toContainText('was not refused');
   await expect(page.locator('main')).toContainText('CBJ-2026-001');
+});
+
+test('an expiry that is not the three-year term WARNS, and names the part-year rule (art. 10/b)', async ({
+  page,
+}) => {
+  /*
+   * Correction 0.3. Module 0 item (d) surfaced the expected expiry and deliberately warned about
+   * NOTHING, on the stated ground that "three calendar years" was ambiguous for a term issued
+   * mid-year. Art. 10/b answers it in its own sentence — part of a calendar year counts as a year —
+   * so the ambiguity was never there and the screen now says when the dates disagree.
+   *
+   * Same pair as the sibling above: the warning appears AND nothing is refused.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page);
+  await page.goto('/regulatory-compliance');
+
+  const warning = page.locator('[data-expiry-not-three-year-term]');
+  await expect(warning).toContainText('art. 10/b');
+  // The RULE, not just the article number — an officer reading "does not match art. 10/b" with no
+  // explanation cannot tell whether the entry or the regulation is being described.
+  await expect(warning).toContainText('part of a calendar year counts as a year');
+  await expect(warning).toContainText('was not refused');
+  await expect(page.locator('main')).toContainText('CBJ-2026-001');
+});
+
+test('NO three-year warning when the issue date was never recorded — a blank field is not a discrepancy', async ({
+  page,
+}) => {
+  /*
+   * THE THREE-STATE HALF, and the one that would rot silently. `expiryMatchesThreeYearTerm` is
+   * null when no issue date is on record, and collapsing that into `false` would accuse every
+   * office that left the field blank of disagreeing with the regulation.
+   *
+   * The absence is anchored on a positive read from the SAME render — without it an unhydrated
+   * page satisfies the absence and the test passes proving nothing.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      current: {
+        ...LICENSE,
+        issuedAt: null,
+        expectedExpiryForThreeYearTerm: null,
+        expiryMatchesThreeYearTerm: null,
+      },
+      terms: [LICENSE],
+    },
+  });
+  await page.goto('/regulatory-compliance');
+
+  // Anchor: the page rendered and the term is on it.
+  await expect(page.locator('main')).toContainText('CBJ-2026-001');
+  await expect(page.locator('[data-expiry-not-three-year-term]')).toHaveCount(0);
 });
 
 test('an expired term with a timely application says it is still valid, and does NOT cite art. 11', async ({

@@ -46,6 +46,9 @@ export interface BrokerLicense {
   /** Informational only. Nothing refuses on it — see the api config for why three-calendar-years
    *  is not a second warning condition. */
   expectedExpiryForThreeYearTerm: string | null;
+  /** Art. 10/b — whether the entered expiry matches the three-year term. NULL means no issue
+   *  date on record, which is NOT a mismatch. A warning on screen; nothing is blocked. */
+  expiryMatchesThreeYearTerm: boolean | null;
 }
 
 /**

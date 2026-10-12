@@ -46,6 +46,7 @@ interface BrokerLicenseDerivedBody {
   validPendingRenewalDecision: boolean;
   expiryIsEndOfCalendarYear: boolean;
   expectedExpiryForThreeYearTerm: string | null;
+  expiryMatchesThreeYearTerm: boolean | null;
 }
 /** Module 0 item (c): `GET /broker-license` answers the current term AND the series. */
 interface BrokerLicenseSeriesBody {
@@ -280,8 +281,25 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
       expect(d.validPendingRenewalDecision).toBe(false);
       // Art. 10/b: this spec's terms all expire on 31 December.
       expect(d.expiryIsEndOfCalendarYear).toBe(true);
-      // Informational. Issued 2026-01-01, so a three-calendar-year term would end 2028-12-31.
+      // Art. 10/b. Issued 2026-01-01, so a three-calendar-year term ends 2028-12-31.
       expect(d.expectedExpiryForThreeYearTerm).toBe('2028-12-31T00:00:00.000Z');
+      /*
+       * ASSERTED ON THE WIRE, and that is the whole reason this line exists. The screen reads
+       * this field through a hand-copied interface in `apps/web/lib/compliance-risk/`, which
+       * TypeScript cannot check against an HTTP response — dropping the field from the view is
+       * invisible to `tsc` and to every unit test, and shows up only here.
+       *
+       * `toBeDefined` before the value: a dropped field is `undefined`, and `undefined` is not
+       * `true`, so the equality alone would fail with a message about the wrong thing.
+       */
+      expect(d.expiryMatchesThreeYearTerm).toBeDefined();
+      // This spec's terms expire 31 December of highestYear+1, derived from the existing maximum
+      // rather than pinned, so whether they match art. 10/b's 2028-12-31 depends on the run.
+      // Compared against the term's OWN expiry rather than asserted as a constant.
+      expect(d.expiryMatchesThreeYearTerm).toBe(
+        d.expectedExpiryForThreeYearTerm ===
+          (derived.current as BrokerLicenseBody).expiresAt,
+      );
 
       const lapsed = await request(app.getHttpServer())
         .post('/broker-license/mark-lapsed')

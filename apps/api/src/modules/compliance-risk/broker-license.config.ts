@@ -116,20 +116,54 @@ export function expiryIsEndOfCalendarYear(expiresAt: Date): boolean {
 }
 
 /**
- * The expiry art. 10/b implies for a term issued on this date: 31 December of the issue year + 2,
- * i.e. three calendar years counting the year of issue. Null when no issue date was recorded.
+ * The expiry art. 10/b requires for a term issued on this date: 31 December of the issue year + 2.
+ * Null when no issue date was recorded.
  *
- * INFORMATIONAL ONLY — it is deliberately NOT a second warning condition. The brief names exactly
- * one thing to warn about (an expiry that is not a 31 December), and "three calendar years" is
- * genuinely ambiguous for a term issued mid-year: whether 2026-06-15 should end 2028-12-31 or
- * 2029-12-31 is a question for the regulator, not something to infer and then warn on. Surfaced so
- * a screen can show it beside the entered date; nothing refuses on it.
+ * ## IT IS NOT AMBIGUOUS. ITEM (d) SAID IT WAS, AND THE TEXT SAYS OTHERWISE — corrected 2026-10-13.
+ *
+ * This function used to carry the note: *"'three calendar years' is genuinely ambiguous for a term
+ * issued mid-year: whether 2026-06-15 should end 2028-12-31 or 2029-12-31 is a question for the
+ * regulator"*, and on that basis it was INFORMATIONAL ONLY and warned about nothing.
+ *
+ * Art. 10/b answers it in its own sentence:
+ *
+ *   يُمنح الترخيص لمدة ثلاث سنوات ميلادية تنتهي في الحادي والثلاثين من شهر كانون الأول
+ *   ويعتبر جزء السنة الميلادية لهذه الغاية سنة
+ *
+ *   "The licence is granted for three calendar years ending on 31 December, AND PART OF A CALENDAR
+ *   YEAR IS CONSIDERED, FOR THIS PURPOSE, A YEAR."
+ *
+ * So the year of issue counts as the first year however late in it the licence was granted, and a
+ * term issued 2026-06-15 ends 2028-12-31. The arithmetic here was already right; what was wrong was
+ * the claim that nobody could know, which is why this is a comment-and-consequence change rather
+ * than a formula change.
+ *
+ * The CONSEQUENCE is `expiryMatchesThreeYearTerm` below: the screen now says when the entered
+ * expiry disagrees with art. 10/b. It WARNS and never blocks, for the reason item (d) gave and
+ * which still holds — the certificate is the authority, and a date entered as printed on it stands.
  */
 export function expectedExpiryForThreeYearTerm(
   issuedAt: Date | null,
 ): Date | null {
   if (!issuedAt) return null;
   return new Date(Date.UTC(issuedAt.getUTCFullYear() + 2, 11, 31));
+}
+
+/**
+ * Does the entered expiry match what art. 10/b requires for this issue date?
+ *
+ * `null` when no issue date was recorded — which is NOT `false`. "The office did not record when
+ * the licence was issued" and "the expiry disagrees with the regulation" are different facts, and
+ * reporting the first as the second would accuse an office of a regulatory discrepancy on the
+ * strength of a missing field. The same three-state treatment as `isCurrentlyLapsed`.
+ */
+export function expiryMatchesThreeYearTerm(term: {
+  issuedAt: Date | null;
+  expiresAt: Date;
+}): boolean | null {
+  const expected = expectedExpiryForThreeYearTerm(term.issuedAt);
+  if (!expected) return null;
+  return expected.getTime() === term.expiresAt.getTime();
 }
 
 /**
@@ -267,8 +301,11 @@ export interface BrokerLicenseView {
   /** Art. 10/b — false means the entered expiry is not a 31 December. A WARNING, never a block:
    *  the date is entered as printed on the certificate and the certificate is the authority. */
   expiryIsEndOfCalendarYear: boolean;
-  /** Informational only — see `expectedExpiryForThreeYearTerm`. Nothing refuses on it. */
+  /** The expiry art. 10/b requires for this issue date. Null when no issue date was recorded. */
   expectedExpiryForThreeYearTerm: string | null;
+  /** Whether the entered expiry matches it. NULL means no issue date on record, which is not the
+   *  same as a mismatch — see `expiryMatchesThreeYearTerm`. A WARNING on screen, never a block. */
+  expiryMatchesThreeYearTerm: boolean | null;
 }
 
 export function deriveBrokerLicenseView(
@@ -293,6 +330,7 @@ export function deriveBrokerLicenseView(
     expiryIsEndOfCalendarYear: expiryIsEndOfCalendarYear(row.expiresAt),
     expectedExpiryForThreeYearTerm:
       expectedExpiryForThreeYearTerm(row.issuedAt)?.toISOString() ?? null,
+    expiryMatchesThreeYearTerm: expiryMatchesThreeYearTerm(row),
   };
 }
 

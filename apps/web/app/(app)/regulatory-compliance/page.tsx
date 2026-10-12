@@ -343,6 +343,19 @@ export default function RegulatoryCompliancePage() {
             </p>
           ) : null}
 
+          {/* Art. 10/b's PART-YEAR rule. `=== false` and not `!matches`: null means no issue date
+              on record, which is a missing field and not a discrepancy, and would otherwise warn
+              every office that never recorded one. Also a warning only — same reason as above. */}
+          {license.expiryMatchesThreeYearTerm === false ? (
+            <p
+              style={warningStyle}
+              role="status"
+              data-expiry-not-three-year-term=""
+            >
+              {t('rcExpiryNotThreeYearTermWarning')}
+            </p>
+          ) : null}
+
           {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
               system is content with, and explain neither. */}
           {license.validPendingRenewalDecision ? (
