@@ -94,6 +94,107 @@ async function ensureDefaultOrganization(): Promise<void> {
   console.log("Seeded the default organization.");
 }
 
+/**
+ * MODULE 0 ITEM (j)'s GAP CLOSURE — the PROVIDER organization.
+ *
+ * ## In the SEED, never in a migration
+ *
+ * A migration that invents an organization is a migration that invents a tenant: it would arrive in
+ * production with no decision behind it. This sits inside `SEED_SAMPLE_DATA` (`NODE_ENV !==
+ * "production"`), the same gate the placeholder broker licence uses and for the same reason — a
+ * provider organization appearing in production would hand somebody the cross-office dashboard
+ * nobody asked to create.
+ *
+ * ## What it is allowed to hold, stated rather than implied
+ *
+ * ONE role, holding exactly ONE code: `provider.office-state.read`. No business permission, so every
+ * business route answers 403 for this organization — a GRANT-level closure, not a schema-level one,
+ * and the report says so. There is no structural refusal that stops a provider administrator
+ * granting itself `customer.create`; what there is, is a provider organization that starts with
+ * nothing but the dashboard.
+ *
+ * `brokerKind` is NULL, which `Organization_broker_kind_matches_type` requires for any type that is
+ * not BROKERAGE_OFFICE — item (b) wrote that CHECK as the negation, so it covers PROVIDER unchanged.
+ *
+ * Idempotent: keyed on the fixed id, and the role on `(organizationId, name)`.
+ */
+export const PROVIDER_ORGANIZATION_ID = "00000000-0000-0000-0000-0000000000f0";
+
+async function ensureProviderOrganization(): Promise<void> {
+  const existing = await prisma.organization.findUnique({
+    where: { id: PROVIDER_ORGANIZATION_ID },
+  });
+  if (!existing) {
+    // A second PROVIDER row is refused by the partial unique `Organization_one_provider`, so this
+    // also guards against a hand-created provider elsewhere: the create would fail loudly rather
+    // than produce two.
+    await prisma.organization.create({
+      data: {
+        id: PROVIDER_ORGANIZATION_ID,
+        legalName: "IBMS Platform Operator",
+        legalNameAr: "مُشغّل منصّة IBMS",
+        subdomain: "provider",
+        type: "PROVIDER",
+        // NULL, required by the item (b) CHECK for every type that is not a brokerage office.
+        brokerKind: null,
+      },
+    });
+  }
+
+  const code = "provider.office-state.read";
+  const permission = await prisma.permission.findUnique({ where: { code } });
+  if (!permission) {
+    throw new Error(
+      `${code} is not in the permission catalogue, so the provider organization cannot be given the one capability it exists for. Seed the catalogue first.`,
+    );
+  }
+
+  const role = await prisma.role.upsert({
+    where: {
+      organizationId_name: {
+        organizationId: PROVIDER_ORGANIZATION_ID,
+        name: "PLATFORM_OPERATOR",
+      },
+    },
+    update: {},
+    create: {
+      organizationId: PROVIDER_ORGANIZATION_ID,
+      name: "PLATFORM_OPERATOR",
+      nameEn: "Platform operator",
+      nameAr: "مُشغّل المنصّة",
+      description:
+        "Reads the cross-office provider dashboard. Holds no brokerage capability at all.",
+      isSystem: true,
+    },
+  });
+
+  const alreadyGranted = await prisma.rolePermission.findFirst({
+    where: { roleId: role.id, permissionId: permission.id },
+  });
+  if (!alreadyGranted) {
+    await prisma.rolePermission.create({
+      data: {
+        organizationId: PROVIDER_ORGANIZATION_ID,
+        roleId: role.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+
+  // MEASURED, not assumed: this role holds exactly one code. If a later change grants it anything
+  // else, the seed says so rather than leaving the "holds no brokerage capability" claim false.
+  const granted = await prisma.rolePermission.count({ where: { roleId: role.id } });
+  if (granted !== 1) {
+    throw new Error(
+      `PLATFORM_OPERATOR holds ${granted} permission(s); it must hold exactly 1 (${code}). The provider organization exists to read the dashboard and nothing else — if that is changing, change this check deliberately.`,
+    );
+  }
+
+  console.log(
+    `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (1 permission: ${code}).`,
+  );
+}
+
 async function ensureSystemAccount(): Promise<void> {
   // `User.email` is unique per organization now, not globally (spec §3.2), so
   // the upsert keys on the compound constraint rather than on email alone.
@@ -599,11 +700,16 @@ async function main() {
       update: {
         module: permission.module,
         description: permission.description,
+        // Module 0 item (j). On the UPDATE branch too, deliberately: a code whose scope is widened
+        // or narrowed in the catalogue must take effect on a re-seed, and a field only written on
+        // CREATE is a field that silently keeps its first value forever.
+        scope: permission.scope ?? "OFFICE",
       },
       create: {
         code: permission.code,
         module: permission.module,
         description: permission.description,
+        scope: permission.scope ?? "OFFICE",
       },
     });
 
@@ -664,6 +770,9 @@ async function main() {
   console.log(`Seeded ${INSURANCE_LINES.length} standard insurance lines.`);
 
   if (SEED_SAMPLE_DATA) {
+    // Module 0 item (j)'s gap closure. BEFORE the sample users, so a future provider user has an
+    // organization and a role to be attached to.
+    await ensureProviderOrganization();
     await ensureSampleInsurers();
     await ensureSampleUsers(roleIdByName);
     // AFTER the sample users: the certificate is attributed to a real user of the office, and in a

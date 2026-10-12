@@ -79,9 +79,30 @@ export interface MatrixModule {
  * dense rows and belong at the top of a module), then by family/code. Nothing here depends on a
  * hand-maintained list, so a new permission appears in the right place without an edit.
  */
-export function buildMatrix(catalogue: readonly PermissionCatalogueEntry[]): MatrixModule[] {
+export function buildMatrix(
+  catalogue: readonly PermissionCatalogueEntry[],
+): MatrixModule[] {
   const byModule = new Map<string, PermissionCatalogueEntry[]>();
   for (const entry of catalogue) {
+    /*
+     * MODULE 0 ITEM (j)'s GAP CLOSURE — A PLATFORM CODE IS NEVER OFFERED HERE.
+     *
+     * This screen is the OFFICE role builder: every code on it is granted by an office to its own
+     * roles. A PLATFORM code reaches across offices, so offering it would invite an administrator to
+     * tick a box the server then refuses — teaching the limit by failure.
+     *
+     * THIS IS NOT THE BOUNDARY, and the distinction matters. `PATCH /rbac/roles/:id/permissions`
+     * takes a list of codes from the client, so hiding one on screen stops nobody who can write a
+     * request: `RoleAdminService.setPermissions` is what refuses it. The flag hides it; the server
+     * refuses it.
+     *
+     * Absent `scope` is read as OFFICE — the non-widening reading for a caller that does not know.
+     *
+     * The provider's own role is `isSystem` and seeded, and `assertNotSystem` already refuses
+     * re-granting one here, so nothing is made unreachable by this: the platform grant is made by
+     * the seed, deliberately, and not by a screen.
+     */
+    if (entry.scope === 'PLATFORM') continue;
     const list = byModule.get(entry.module) ?? [];
     list.push(entry);
     byModule.set(entry.module, list);
@@ -90,7 +111,9 @@ export function buildMatrix(catalogue: readonly PermissionCatalogueEntry[]): Mat
   const modules: MatrixModule[] = [];
   // `moduleName`, not `module`: Next forbids assigning to `module` (it shadows the CommonJS global)
   // and the rule is an error, not a warning.
-  for (const [moduleName, entries] of [...byModule.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const [moduleName, entries] of [...byModule.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  )) {
     const families = new Map<string, PermissionCatalogueEntry[]>();
     for (const entry of entries) {
       const family = familyOf(entry.code);
@@ -107,16 +130,28 @@ export function buildMatrix(catalogue: readonly PermissionCatalogueEntry[]): Mat
         crud.push({
           kind: 'crud',
           family,
-          codes: Object.fromEntries(crudMembers.map((m) => [verbOf(m.code), m.code])),
+          codes: Object.fromEntries(
+            crudMembers.map((m) => [verbOf(m.code), m.code]),
+          ),
         });
         // A family can qualify AND still hold non-CRUD codes (`incident.classify` beside
         // `incident.read`/`.create`). Those stay toggles — they are not sub-states of anything.
-        for (const m of members.filter((m) => !CRUD_VERBS.has(verbOf(m.code)))) {
-          toggles.push({ kind: 'toggle', code: m.code, description: m.description });
+        for (const m of members.filter(
+          (m) => !CRUD_VERBS.has(verbOf(m.code)),
+        )) {
+          toggles.push({
+            kind: 'toggle',
+            code: m.code,
+            description: m.description,
+          });
         }
       } else {
         for (const m of members) {
-          toggles.push({ kind: 'toggle', code: m.code, description: m.description });
+          toggles.push({
+            kind: 'toggle',
+            code: m.code,
+            description: m.description,
+          });
         }
       }
     }
@@ -133,7 +168,10 @@ export function buildMatrix(catalogue: readonly PermissionCatalogueEntry[]): Mat
 }
 
 /** How many of a module's codes this role holds — what the collapsed view shows per module. */
-export function grantedInModule(module: MatrixModule, granted: ReadonlySet<string>): number {
+export function grantedInModule(
+  module: MatrixModule,
+  granted: ReadonlySet<string>,
+): number {
   return module.codes.reduce((n, code) => (granted.has(code) ? n + 1 : n), 0);
 }
 

@@ -18,12 +18,19 @@ import type { PrismaService } from '../prisma/prisma.service';
 function repositoryWith(
   organizations: { id: string }[],
 ): OrganizationRepository {
+  return built(organizations).repository;
+}
+
+/** The repository AND the `findMany` double, so a test can read the query it was handed. */
+function built(organizations: { id: string }[]): {
+  repository: OrganizationRepository;
+  findMany: ReturnType<typeof vi.fn>;
+} {
+  const findMany = vi.fn().mockResolvedValue(organizations);
   const prisma = {
-    client: {
-      organization: { findMany: vi.fn().mockResolvedValue(organizations) },
-    },
+    client: { organization: { findMany } },
   } as unknown as PrismaService;
-  return new OrganizationRepository(prisma);
+  return { repository: new OrganizationRepository(prisma), findMany };
 }
 
 describe('soleOrganizationIdOrThrow', () => {
@@ -77,5 +84,25 @@ describe('soleOrganizationIdOrThrow', () => {
       expect(text).toContain('packages/db/prisma/seed.ts');
       expect(text).toContain('apps/api/scripts/seed-demo.script.ts');
     });
+  });
+
+  it('ASKS ONLY FOR BROKERAGE OFFICES — the provider is not a signup candidate', async () => {
+    /*
+     * MODULE 0 ITEM (j)'s GAP CLOSURE, and this assertion exists because the other tests here CANNOT
+     * see it: they stub `findMany`, so the `where` clause makes no difference to what they get back
+     * and a plant removing it would leave all four green.
+     *
+     * The consequence of losing it is not subtle. With a PROVIDER organization seeded, an unfiltered
+     * query returns two rows and EVERY SIGNUP refuses — with a message about a second office that
+     * does not exist. That is how the api e2e suite failed the moment the provider was first seeded.
+     */
+    const { repository, findMany } = built([{ id: 'org-1' }]);
+    await repository.soleOrganizationIdOrThrow();
+    expect(findMany).toHaveBeenCalledTimes(1);
+    const args = findMany.mock.calls[0][0] as { where?: { type?: string } };
+    expect(
+      args.where?.type,
+      'signup resolves the sole organization WITHOUT filtering to BROKERAGE_OFFICE. A PROVIDER (or INSURANCE_COMPANY) row then makes the platform look like it has two offices, and every signup refuses.',
+    ).toBe('BROKERAGE_OFFICE');
   });
 });

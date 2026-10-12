@@ -68,6 +68,8 @@ export interface PermissionSeed {
   code: string;
   module: string;
   description: string;
+  /** Module 0 item (j). Omitted = OFFICE, which is the non-widening default — see the header. */
+  scope?: "OFFICE" | "PLATFORM";
   /** Role machine names. Typed as `string`, not `RoleName`, because
    *  `OFFICE_ADMINISTRATOR` is a seeded role deliberately outside the legacy
    *  enum — see `roles.ts`. `permissions.spec.ts` still checks every entry
@@ -1749,9 +1751,35 @@ const admin: PermissionSeed[] = [
      */
     code: "provider.office-state.read",
     module: "admin",
+    // MODULE 0 ITEM (j)'s GAP CLOSURE — THE FIRST AND ONLY PLATFORM-SCOPED CODE.
+    //
+    // This file's own header states the invariant ("no code in this grid may have an effect outside
+    // the granting office") and records the deferred cure: "a `Permission.scope` column with a
+    // server-side refusal and a matrix filter... if a genuinely platform-wide capability is ever
+    // needed, the column is the same work then, WITH A REAL CASE TO TEST AGAINST." This is that case
+    // and that column.
+    //
+    // Unlike `insurer.form.map`, where the cure belonged at the TABLE, there is nothing to re-scope:
+    // the dashboard's whole purpose is to span tenants, which is why it reads a SECURITY DEFINER
+    // view. `RoleAdminService.setPermissions` refuses this code for any non-PROVIDER organization,
+    // and the office role matrix never offers it.
+    scope: "PLATFORM",
     description:
       "Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform",
-    roles: [ADMIN],
+    /*
+     * NO SEEDED ROLE IN A BROKERAGE OFFICE, since item (j)'s gap closure. It shipped as
+     * `roles: [ADMIN]` before the PROVIDER organization type existed to hold it — which left a
+     * brokerage office's own administrator role holding a code whose effect reaches every other
+     * office, the exact state this file's header forbids.
+     *
+     * The PROVIDER organization's `PLATFORM_OPERATOR` role holds it, granted by
+     * `ensureProviderOrganization()` in the seed. An empty list here is not an oversight: this grid
+     * is "granted BY an office TO its own roles", and no office may hold this.
+     *
+     * `20261117120000_withdraw_platform_grant_from_offices` removes the grants that already exist,
+     * because the seed upserts and never revokes.
+     */
+    roles: [],
   },
   {
     code: "access-recertification.cycle.start",

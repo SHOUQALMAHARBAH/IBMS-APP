@@ -23,6 +23,8 @@ export class ProviderOfficeStateController {
   @RequirePermissions('provider.office-state.read')
   @Get()
   list(@CurrentUser() user: AuthenticatedUser) {
-    return this.offices.list(user.id);
+    // The ORGANIZATION as well as the actor: item (j)'s gap closure serves this only to the
+    // platform operator, and the service is where that is decided.
+    return this.offices.list(user.id, user.organizationId);
   }
 }

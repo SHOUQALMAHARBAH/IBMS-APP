@@ -422,6 +422,30 @@ enum OrganizationType {
   /// An insurance company. Its own registration field list and its own agreement with the
   /// broker; it is NOT a brokerage office with a flag flipped.
   INSURANCE_COMPANY
+  /// MODULE 0 ITEM (j)'s GAP CLOSURE — the platform operator itself.
+  ///
+  /// EXACTLY ONE may exist, held by the partial unique `Organization_one_provider` rather than by
+  /// service code: this is a rule one row of one table can answer, unlike art. 3/a and the role
+  /// scope, which need three and are therefore service-grain.
+  ///
+  /// It exists so "only the provider may read the cross-office dashboard" is EXPRESSIBLE. A
+  /// `isProvider` boolean beside this column would be a second home for one fact, free to disagree
+  /// with it.
+  PROVIDER
+}
+
+/// MODULE 0 ITEM (j)'s GAP CLOSURE — how far a permission's effect may reach.
+///
+/// `permissions.ts`'s own header states the invariant and records this column as the deferred cure,
+/// to be built "if a genuinely platform-wide capability is ever needed... with a real case to test
+/// against". `provider.office-state.read` is that case.
+enum PermissionScope {
+  /// Granted BY an office TO its own roles, and its effect stops there. Every code but one.
+  OFFICE
+  /// Reaches across offices. May only be granted to a role of the PROVIDER organization, refused by
+  /// `RoleAdminService.setPermissions` and hidden by the matrix — the flag hides it, the server
+  /// refuses it.
+  PLATFORM
 }
 
 /// ONE LICENSED BRANCH on one licence term — Module 0 item (e).
@@ -1004,10 +1028,20 @@ model RoleScopeBranch {
 /// grid illustrated per role in Part 5.1 (e.g. Sales Officer can create
 /// Lead/Customer/RFQ but cannot approve refunds or delete claims).
 model Permission {
-  id          String  @id @default(uuid())
-  code        String  @unique // e.g. "policy.check", "refund.approve", "claim.delete"
+  id          String          @id @default(uuid())
+  code        String          @unique // e.g. "policy.check", "refund.approve", "claim.delete"
   module      String // maps to a Part 2 domain / PCMS module, e.g. "claims", "finance", "m04_dsr"
   description String?
+  /// MODULE 0 ITEM (j)'s GAP CLOSURE — how far this code's effect may reach.
+  ///
+  /// DEFAULTS TO `OFFICE`, and that default is honest where `Organization.type`'s absence of one
+  /// was: OFFICE is the NON-WIDENING value, so a code added later without a decision cannot become
+  /// platform-wide by omission. The same call as `dutySegregationMode` defaulting to SEGREGATED.
+  ///
+  /// A `PLATFORM` code may only be granted to a role of the PROVIDER organization. That is enforced
+  /// in `RoleAdminService.setPermissions` — the office role matrix also hides it, but the flag hides
+  /// it and the SERVER refuses it, because a hidden control the API still honours is not a boundary.
+  scope       PermissionScope @default(OFFICE)
 
   roles RolePermission[]
 }

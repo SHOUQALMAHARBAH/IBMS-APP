@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildMatrix, codesOfRow, familyOf, grantedInModule, verbOf } from './permission-matrix';
+import {
+  buildMatrix,
+  codesOfRow,
+  familyOf,
+  grantedInModule,
+  verbOf,
+} from './permission-matrix';
 import { machineNameProblem, toMachineName } from './role-name';
 import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 
@@ -15,10 +21,34 @@ import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 describe('the permission matrix is derived from the catalogue, not hard-coded', () => {
   const matrix = buildMatrix(PERMISSION_CATALOGUE);
 
-  it('covers every code exactly once', () => {
+  it('covers every OFFICE-SCOPED code exactly once, and no PLATFORM code at all', () => {
     const covered = matrix.flatMap((m) => m.rows.flatMap(codesOfRow)).sort();
-    const all = PERMISSION_CATALOGUE.map((p) => p.code).sort();
-    expect(covered).toEqual(all);
+    /*
+     * MODULE 0 ITEM (j)'s GAP CLOSURE narrowed this from "every code" to "every OFFICE-scoped
+     * code". This screen is the OFFICE role builder, and a PLATFORM code reaches across offices, so
+     * offering one would invite an administrator to tick a box the server then refuses.
+     *
+     * Both halves are asserted. The first alone would pass against a matrix that dropped a code for
+     * any reason; the second names the property — the platform codes are ABSENT, not merely
+     * uncounted.
+     */
+    const officeScoped = PERMISSION_CATALOGUE.filter(
+      (p) => p.scope !== 'PLATFORM',
+    ).map((p) => p.code);
+    const platform = PERMISSION_CATALOGUE.filter(
+      (p) => p.scope === 'PLATFORM',
+    ).map((p) => p.code);
+    expect(covered).toEqual([...officeScoped].sort());
+    expect(
+      platform.length,
+      'no code in the catalogue is PLATFORM-scoped, so this check is vacuous — item (j) made `provider.office-state.read` the first one.',
+    ).toBeGreaterThan(0);
+    for (const code of platform) {
+      expect(
+        covered,
+        `${code} is PLATFORM-scoped and appears in the OFFICE role matrix. It reaches across offices and the server refuses granting it to a brokerage office, so the screen must not offer it.`,
+      ).not.toContain(code);
+    }
     // No code may appear in two rows: a permission granted from two controls is a permission whose
     // state the screen cannot show honestly.
     expect(new Set(covered).size).toBe(covered.length);
@@ -26,12 +56,16 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
 
   it('groups into the 12 modules the catalogue declares', () => {
     expect(matrix.length).toBe(12);
-    expect(matrix.map((m) => m.module)).toEqual([...matrix.map((m) => m.module)].sort());
+    expect(matrix.map((m) => m.module)).toEqual(
+      [...matrix.map((m) => m.module)].sort(),
+    );
   });
 
   it('applies five states to exactly the CRUD-shaped families, and a toggle to the rest', () => {
     const crud = matrix.flatMap((m) => m.rows.filter((r) => r.kind === 'crud'));
-    const toggles = matrix.flatMap((m) => m.rows.filter((r) => r.kind === 'toggle'));
+    const toggles = matrix.flatMap((m) =>
+      m.rows.filter((r) => r.kind === 'toggle'),
+    );
 
     // THE MEASURED SHAPE. If a permission is added, one of these numbers changes and this test
     // fails — which is the alarm, not an inconvenience. Re-measure and update deliberately.
@@ -95,16 +129,32 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     expect(PERMISSION_CATALOGUE.length).toBe(220);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
-    expect(toggles.length).toBe(161);
-    expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
+    // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
+    // and the matrix no longer offers it — so the toggle list loses exactly the one code it added.
+    expect(toggles.length).toBe(160);
+    // Against the OFFICE-SCOPED count, which is what the matrix covers.
+    expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
+      PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,
+    );
   });
 
   it('every five-state row really has two or more CRUD verbs — the rule, not the count', () => {
-    const VERBS = ['read', 'create', 'update', 'delete', 'deactivate', 'view', 'manage'];
+    const VERBS = [
+      'read',
+      'create',
+      'update',
+      'delete',
+      'deactivate',
+      'view',
+      'manage',
+    ];
     for (const row of matrix.flatMap((m) => m.rows)) {
       if (row.kind !== 'crud') continue;
       const verbs = Object.keys(row.codes);
-      expect(verbs.length, `${row.family} qualified with ${verbs.length} verb(s)`).toBeGreaterThanOrEqual(2);
+      expect(
+        verbs.length,
+        `${row.family} qualified with ${verbs.length} verb(s)`,
+      ).toBeGreaterThanOrEqual(2);
       for (const verb of verbs) expect(VERBS).toContain(verb);
     }
   });
@@ -126,7 +176,9 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     const granted = new Set(picked.codes.slice(0, 3));
     expect(grantedInModule(picked, granted)).toBe(3);
     expect(grantedInModule(picked, new Set())).toBe(0);
-    expect(grantedInModule(picked, new Set(picked.codes))).toBe(picked.codes.length);
+    expect(grantedInModule(picked, new Set(picked.codes))).toBe(
+      picked.codes.length,
+    );
   });
 
   it('splits a code into family and verb', () => {
@@ -140,7 +192,9 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
 describe('the machine name is generated, and refused when it would be unreadable', () => {
   it('reads back to the role it names', () => {
     expect(toMachineName('Claims Triage Desk')).toBe('CLAIMS_TRIAGE_DESK');
-    expect(toMachineName('  Senior   Underwriter  ')).toBe('SENIOR_UNDERWRITER');
+    expect(toMachineName('  Senior   Underwriter  ')).toBe(
+      'SENIOR_UNDERWRITER',
+    );
     expect(toMachineName('Finance / Collections')).toBe('FINANCE_COLLECTIONS');
     expect(toMachineName('Café Manager')).toBe('CAFE_MANAGER');
     expect(toMachineName('HR')).toBe('HR');

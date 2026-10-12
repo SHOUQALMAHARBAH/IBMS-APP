@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import {
   ProviderOfficeStateRepository,
@@ -9,6 +9,7 @@ import {
   renewalApplicationDueBy,
   renewalFiledOnTime,
 } from './broker-license.config';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 
 /**
  * MODULE 0 ITEM (j) — THE PROVIDER DASHBOARD.
@@ -151,9 +152,42 @@ export class ProviderOfficeStateService {
   constructor(
     private readonly offices: ProviderOfficeStateRepository,
     private readonly audit: AuditService,
+    // The caller's own organization TYPE. A shared repository across the module boundary, and the
+    // compliance-risk module already provides it (item (e) needed it for `brokerKind`), so this
+    // adds a dependency rather than a provider — verified rather than assumed, because item (e)'s
+    // first wiring claimed a provider it did not have.
+    private readonly organizations: OrganizationRepository,
   ) {}
 
-  async list(actorUserId: string): Promise<ProviderOfficeStateView[]> {
+  async list(
+    actorUserId: string,
+    organizationId: string,
+  ): Promise<ProviderOfficeStateView[]> {
+    /*
+     * MODULE 0 ITEM (j)'s GAP CLOSURE — THE CALLER'S ORGANIZATION MUST BE THE PROVIDER.
+     *
+     * The permission alone is no longer the whole gate. `provider.office-state.read` is
+     * PLATFORM-scoped, so `RoleAdminService.setPermissions` refuses granting it to a non-provider
+     * office and the matrix never offers it — but a grant that predates this rule, or a row written
+     * directly, would still carry the code. This is the layer that makes the boundary true rather
+     * than merely tidy.
+     *
+     * A REFUSAL, NEVER AN EMPTY LIST. Returning `[]` would read as "no offices exist" — the silent
+     * failure this project keeps removing (the empty holiday calendar, the screening result that
+     * found nobody). It names the reason and the remedy, and says plainly that a permission grant is
+     * not the remedy.
+     */
+    const org = await this.organizations.findById(organizationId);
+    if (org?.type !== 'PROVIDER') {
+      throw new ForbiddenException(
+        'The provider dashboard reads every brokerage office on the platform, so it is served only ' +
+          'to the platform operator organization. Your organization is ' +
+          `${org?.type ?? 'of an unknown type'}, so this is refused — and NOT because the list is ` +
+          'empty. A permission grant will not change it: `provider.office-state.read` is a ' +
+          'PLATFORM-scoped code and cannot be granted to a brokerage office at all.',
+      );
+    }
+
     const rows = await this.offices.findAll();
 
     await this.audit.record({

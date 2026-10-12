@@ -21,6 +21,7 @@ import type {
 import type { SetRoleScopeDto } from '../dto/role-scope.dto';
 import { InsuranceLineRepository } from '../../../repositories/insurance-line.repository';
 import type { InsuranceLineCategory } from '@ibms/db';
+import { OrganizationRepository } from '../../../repositories/organization.repository';
 
 /** What the Role screen renders for one row. */
 export interface RoleAdminView {
@@ -121,6 +122,11 @@ export class RoleAdminService {
     // Module 0 item (h): the branch-within-the-type rule reads the catalogue's own
     // `category`. A shared REPOSITORY across the module boundary, never a service.
     private readonly lines: InsuranceLineRepository,
+    // Module 0 item (j)'s gap closure: the PLATFORM refusal needs the granting office's TYPE. A
+    // shared repository across the module boundary — the established shape — and provided in the
+    // SAME commit as the dependency, because a missing provider is a runtime DI failure `tsc`
+    // cannot see and item (e) shipped exactly that.
+    private readonly organizations: OrganizationRepository,
   ) {}
 
   /** Every role the office has, retired ones included — a screen that hid them
@@ -320,6 +326,35 @@ export class RoleAdminService {
 
     const requested = [...new Set(permissionCodes)];
     const permissionIds = await this.resolveCodes(requested);
+
+    /*
+     * MODULE 0 ITEM (j)'s GAP CLOSURE — A PLATFORM CODE IS REFUSED FOR A NON-PROVIDER OFFICE.
+     *
+     * `permissions.ts`'s header states the invariant this enforces ("no code in this grid may have
+     * an effect outside the granting office") and records this exact design as the deferred cure:
+     * "a `Permission.scope` column with a server-side refusal and a matrix filter... if a genuinely
+     * platform-wide capability is ever needed, the column is the same work then, with a real case to
+     * test against."
+     *
+     * THE MATRIX ALSO HIDES THESE CODES, AND THAT IS NOT THE BOUNDARY. A hidden control the API
+     * still honours is not a boundary — `PATCH /rbac/roles/:id/permissions` takes a list of codes
+     * from the client, so hiding one on screen stops nobody who can write a request. The screen
+     * spares an administrator a refusal they cannot act on; this is what makes it true.
+     */
+    const platformCodes =
+      await this.catalogue.findPlatformScopedCodes(requested);
+    if (platformCodes.length > 0) {
+      const org = await this.organizations.findById(organizationId);
+      if (org?.type !== 'PROVIDER') {
+        throw new UnprocessableEntityException(
+          `${platformCodes.join(', ')} ${platformCodes.length === 1 ? 'is a PLATFORM-scoped permission' : 'are PLATFORM-scoped permissions'}: ` +
+            'the effect reaches across offices, so it may only be granted to a role of the platform ' +
+            'operator organization. This office cannot grant it to itself, and no permission grant ' +
+            'will change that — it is a property of the code, not of your role. ' +
+            'See the header of packages/db/prisma/seed-data/permissions.ts.',
+        );
+      }
+    }
     const before = new Set(role.permissionCodes);
     const after = new Set(requested);
 

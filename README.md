@@ -1542,7 +1542,7 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
-### OPEN — the provider dashboard discloses office state to any office granted its code
+### CLOSED 2026-10-12 — the provider dashboard discloses office state to any office granted its code
 
 Module 0 item (j)'s `/provider-offices` is a CROSS-OFFICE read, gated on
 `provider.office-state.read` and granted to one seeded role (the systems administrator). It shows
@@ -1552,11 +1552,36 @@ they were last used — all of which is commercially meaningful between competit
 **This product has no platform-operator concept**: every user belongs to an `Organization`, so
 "only the provider may hold this code" is not expressible. An office granted it sees every office.
 
-What bounds the disclosure today is the view's column list — no customer, policy, premium,
+What bounded the disclosure at the time was the view's column list — no customer, policy, premium,
 commission or personal data, enforced by the migration's own assertions, the repository's runtime
-column check and an api e2e over the response body — and the narrowness of the grant. Closing this
-properly needs a platform-operator identity that sits outside the tenant model, which is a decision
-about the product rather than a patch to the screen.
+column check and an api e2e over the response body — and the narrowness of the grant.
+
+**CLOSED on 2026-10-12** by making the platform operator expressible rather than hiding the control,
+on the owner's decision. Three layers, each with its own refusal:
+
+1. **A third `OrganizationType`: `PROVIDER`** (migration `20261117100000`), with **exactly one**
+   permitted, held by the partial unique `Organization_one_provider` — a database rule, because this
+   is a question one row of one table can answer, unlike art. 3/a. The migration PROVES it refuses a
+   second in a rolled-back probe rather than asserting the index exists.
+2. **A `PermissionScope` of `OFFICE` or `PLATFORM` on the permission itself** (migration
+   `20261117110000`) — the design `packages/db/prisma/seed-data/permissions.ts` had already named and
+   deferred until "a genuinely platform-wide capability is ever needed, with a real case to test
+   against". `provider.office-state.read` is the first and only `PLATFORM` code. The office role
+   matrix never offers it AND `RoleAdminService.setPermissions` refuses it for a non-provider
+   organization: the flag hides it, the server refuses it.
+3. **The route requires the caller's organization to be `PROVIDER`**, and refuses with a sentence
+   naming why — never an empty list, which would read as "no offices exist".
+
+Migration `20261117120000` withdraws the grants that already existed in brokerage offices, because
+the seed upserts grants and never revokes one.
+
+**What is closed and what is not, measured rather than claimed.** The provider organization holds
+exactly ONE permission code and zero rows in `Customer`, `Policy`, `Claim`, `Invoice`, `Employee`,
+`Insurer`, `BrokerLicense`, `Lead` and `Prospect` on both databases. That closure is at the GRANT
+level, not the schema level: no structural rule stops a provider administrator granting their own
+role `customer.create` and then writing a customer. What exists is a provider organization that
+starts with nothing but the dashboard, and a seed check that fails if its role ever holds more than
+that one code.
 
 ### OPEN — the bulk import's screen is broken, and its report has no screen at all
 

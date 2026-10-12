@@ -109,6 +109,26 @@ export class PermissionRepository {
     }));
   }
 
+  /**
+   * MODULE 0 ITEM (j)'s GAP CLOSURE — which of these codes are PLATFORM-scoped.
+   *
+   * Asked of the DATABASE rather than of the seed file: the catalogue in `permissions.ts` is the
+   * seed's INPUT, and a code's scope as stored is what the running system acts on. Reading the file
+   * would answer a different question and would be wrong the moment the two disagreed — the same
+   * reason `db:fixture:permissions` reads the seeded database rather than `permissions.ts`.
+   *
+   * Returns the codes, not a boolean, so the refusal can NAME them.
+   */
+  async findPlatformScopedCodes(codes: string[]): Promise<string[]> {
+    if (codes.length === 0) return [];
+    const rows = await this.prisma.client.permission.findMany({
+      where: { code: { in: codes }, scope: 'PLATFORM' },
+      select: { code: true },
+      orderBy: { code: 'asc' },
+    });
+    return rows.map((r) => r.code);
+  }
+
   async findCodesForRoles(roleIds: string[]): Promise<string[]> {
     if (roleIds.length === 0) return [];
     const links = await this.prisma.client.rolePermission.findMany({

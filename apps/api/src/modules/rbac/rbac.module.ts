@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 import { APP_GUARD } from '@nestjs/core';
 import { RbacController } from './controllers/rbac.controller';
 import { AccessRecertificationController } from './controllers/access-recertification.controller';
@@ -44,6 +45,8 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
     OrgStructureController,
   ],
   providers: [
+    // Module 0 item (j)'s gap closure — the PLATFORM-scope refusal reads the office's type.
+    OrganizationRepository,
     // Module 0 item (h). A missing provider is a RUNTIME DI failure `tsc` cannot see —
     // item (e) shipped exactly that — so it lands in the SAME commit as the dependency.
     InsuranceLineRepository,

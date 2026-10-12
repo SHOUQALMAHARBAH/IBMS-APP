@@ -108,7 +108,9 @@ async function main() {
   // has to run against the real 186 rather than the union of what happens to be granted. Emitting it
   // here keeps one generated source of truth and makes `--check` fail when a permission is added.
   const catalogue = await prisma.permission.findMany({
-    select: { code: true, module: true, description: true },
+    // `scope` since Module 0 item (j)'s gap closure: the matrix must not offer a PLATFORM code
+    // in the OFFICE role builder, and it decides that from the entry rather than from a list.
+    select: { code: true, module: true, description: true, scope: true },
     orderBy: [{ module: 'asc' }, { code: 'asc' }],
   });
   if (catalogue.length === 0) {
@@ -119,7 +121,7 @@ async function main() {
   const catalogueBody = catalogue
     .map(
       (perm) =>
-        `  { code: '${perm.code}', module: '${perm.module}', description: ${JSON.stringify(perm.description ?? '')} },`,
+        `  { code: '${perm.code}', module: '${perm.module}', description: ${JSON.stringify(perm.description ?? '')}, scope: '${perm.scope}' },`,
     )
     .join('\n');
 
@@ -186,6 +188,8 @@ export const PERMISSION_CATALOGUE: readonly {
   code: string;
   module: string;
   description: string;
+  /** Module 0 item (j). PLATFORM codes reach across offices and the matrix never offers them. */
+  scope: 'OFFICE' | 'PLATFORM';
 }[] = [
 ${catalogueBody}
 ];

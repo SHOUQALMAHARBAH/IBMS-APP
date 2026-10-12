@@ -8,6 +8,7 @@ import type { OrgContextService } from '../../../common/org-context/org-context.
 import type { AuditService } from '../../audit/audit.service';
 import type { PermissionsService } from './permissions.service';
 import type { InsuranceLineRepository } from '../../../repositories/insurance-line.repository';
+import type { OrganizationRepository } from '../../../repositories/organization.repository';
 
 /**
  * THE THREE STATES, CONSTRUCTED — because the seeded office cannot produce one of them.
@@ -44,6 +45,9 @@ function makeService(holdersByCode: Record<string, number>) {
     // Module 0 item (h). Readiness never touches the line catalogue, so an empty double is honest
     // here — unlike the policy spec, where the scope check actually runs.
     {} as unknown as InsuranceLineRepository,
+    // Module 0 item (j)'s gap closure: the PLATFORM-scope refusal reads the office's TYPE.
+    // Readiness never reaches it, so an empty double is honest here.
+    {} as unknown as OrganizationRepository,
   );
   return { service, users };
 }
@@ -108,6 +112,9 @@ describe('duty-segregation readiness', () => {
       {} as unknown as PermissionsService,
       // Item (h), same as the helper above — readiness never touches the catalogue.
       {} as unknown as InsuranceLineRepository,
+      // Module 0 item (j)'s gap closure: the PLATFORM-scope refusal reads the office's TYPE.
+      // Readiness never reaches it, so an empty double is honest here.
+      {} as unknown as OrganizationRepository,
     );
     const rows = await service.dutySegregationReadiness();
     // One person holding it through two roles is ONE person, and the office is not ready.

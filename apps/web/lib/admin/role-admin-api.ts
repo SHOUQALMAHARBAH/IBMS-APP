@@ -69,6 +69,14 @@ export interface PermissionCatalogueEntry {
   code: string;
   module: string;
   description: string;
+  /**
+   * MODULE 0 ITEM (j)'s GAP CLOSURE — how far this code's effect reaches.
+   *
+   * Optional because ~80 spec files build a catalogue entry and a required field would fail every
+   * one of them over a value none of them are about. Absent is read as OFFICE, which is the
+   * non-widening reading: a caller that does not know must not treat a code as platform-wide.
+   */
+  scope?: 'OFFICE' | 'PLATFORM';
 }
 
 export function listRolesForAdmin(): Promise<RoleAdminEntry[]> {

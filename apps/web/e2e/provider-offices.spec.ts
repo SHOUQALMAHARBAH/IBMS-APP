@@ -1,6 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { permissionsForRoles } from './fixtures/role-permissions';
 
 /**
  * MODULE 0 ITEM (j) — the provider dashboard screen.
@@ -26,18 +25,27 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+/**
+ * AUTH BY EXPLICIT CODES, not by a role name — and that changed with item (j)'s gap closure.
+ *
+ * This spec used to call `permissionsForRoles(['SYSTEM_SECURITY_ADMINISTRATOR'])`, which worked only
+ * while a brokerage office's admin role held `provider.office-state.read`. The closure withdrew that
+ * grant (migration `20261117120000`), so six tests here began rendering the refusal instead of the
+ * table — the closure working, and this spec's premise being wrong.
+ *
+ * NO ROLE NAME CAN EXPRESS "platform operator" in this fixture: `permissionsForRoles` is built from
+ * the twelve seeded OFFICE roles, and the provider's `PLATFORM_OPERATOR` lives in a different
+ * organization entirely. So the codes are given directly, which is the same reason
+ * `mockAuthWithCodes` exists in `roles.spec.ts`.
+ */
+async function mockAuth(page: Page, permissions: string[]) {
   await page.route('**/auth/refresh', (route) =>
     route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
   await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
-      json: {
-        ...ME_BASE,
-        roles,
-        permissions: permissionsForRoles(roles),
-      },
+      json: { ...ME_BASE, roles: ['PLATFORM_OPERATOR'], permissions },
     }),
   );
 }
@@ -135,7 +143,7 @@ test('says it crosses office boundaries BEFORE the first row', async ({
    * is, so the screen states what it is first — and states what it does NOT contain, because
    * "office state" is not obvious from a table of offices.
    */
-  await mockAuth(page, ['SYSTEM_SECURITY_ADMINISTRATOR']);
+  await mockAuth(page, ['provider.office-state.read']);
   await mockOffices(page);
   await page.goto('/provider-offices');
 
@@ -152,7 +160,7 @@ test('renders the THREE licence states as three states', async ({ page }) => {
    * the two would tell a provider a licence expired when none was ever recorded, and would hide the
    * worse state behind the milder one.
    */
-  await mockAuth(page, ['SYSTEM_SECURITY_ADMINISTRATOR']);
+  await mockAuth(page, ['provider.office-state.read']);
   await mockOffices(page);
   await page.goto('/provider-offices');
 
@@ -173,7 +181,7 @@ test('shows the dormant count BESIDE the total, never instead of it', async ({
   page,
 }) => {
   // "2 dormant" means nothing without knowing of how many. Asserted on both numbers.
-  await mockAuth(page, ['SYSTEM_SECURITY_ADMINISTRATOR']);
+  await mockAuth(page, ['provider.office-state.read']);
   await mockOffices(page);
   await page.goto('/provider-offices');
 
@@ -188,7 +196,7 @@ test('an office never used says so rather than showing a dash', async ({
 }) => {
   // "never used" and "no date" are different facts, and on a provider dashboard the first is the
   // actionable one.
-  await mockAuth(page, ['SYSTEM_SECURITY_ADMINISTRATOR']);
+  await mockAuth(page, ['provider.office-state.read']);
   await mockOffices(page);
   await page.goto('/provider-offices');
 
@@ -199,7 +207,9 @@ test('an office never used says so rather than showing a dash', async ({
 test('a reader without the code gets the shared refusal, not an empty page', async ({
   page,
 }) => {
-  await mockAuth(page, ['SALES_RELATIONSHIP_OFFICER']);
+  // A reader holding NO codes — which is now every brokerage user, since the closure withdrew
+  // the grant from every office role.
+  await mockAuth(page, []);
   await mockOffices(page);
   await page.goto('/provider-offices');
 
@@ -215,7 +225,7 @@ test('an empty platform is a stated state, not an empty table', async ({
 }) => {
   // "No offices" on a platform dashboard is a wrong-answer state rather than a quiet nothing — an
   // empty table would read as "nothing to see" for a condition that means something is broken.
-  await mockAuth(page, ['SYSTEM_SECURITY_ADMINISTRATOR']);
+  await mockAuth(page, ['provider.office-state.read']);
   await mockOffices(page, []);
   await page.goto('/provider-offices');
 
@@ -226,7 +236,7 @@ test('an empty platform is a stated state, not an empty table', async ({
 });
 
 test('@a11y the provider dashboard has no violations', async ({ page }) => {
-  await mockAuth(page, ['SYSTEM_SECURITY_ADMINISTRATOR']);
+  await mockAuth(page, ['provider.office-state.read']);
   await mockOffices(page);
   await page.goto('/provider-offices');
   await expect(page.locator('[data-provider-offices]')).toBeVisible();

@@ -3,14 +3,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
-import { listKycRecords, type KycQueueRecord, type KycRecord } from '../../../../lib/kyc/kyc-api';
+import {
+  listKycRecords,
+  type KycQueueRecord,
+  type KycRecord,
+} from '../../../../lib/kyc/kyc-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { KycQueue } from '../../../../components/customer/KycQueue';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
-import { permissionRefusalAnyOf, reducedCapability } from '../../../../lib/i18n/permission-refusal';
+import {
+  permissionRefusalAnyOf,
+  reducedCapability,
+} from '../../../../lib/i18n/permission-refusal';
 
 // Roles the seeded permission grid grants `kyc.approve` to — the queue is
 // COMPLIANCE_OFFICER-only; the backend independently enforces this
@@ -32,7 +39,10 @@ export default function KycQueuePage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? permissionRefusalAnyOf(t, 'kycQueueRefusalAct', ['kyc.capture', 'kyc.approve'])
+          ? permissionRefusalAnyOf(t, 'kycQueueRefusalAct', [
+              'kyc.capture',
+              'kyc.approve',
+            ])
           : err instanceof ApiError
             ? err.message
             : t('commonTryAgain'),
@@ -61,7 +71,11 @@ export default function KycQueuePage() {
     // (same lesson as leads/page.tsx's handleLeadTransitioned) rather than
     // replacing it and losing customer.legalName/customerType.
     setItems((prev) =>
-      prev ? prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)) : prev,
+      prev
+        ? prev.map((item) =>
+            item.id === updated.id ? { ...item, ...updated } : item,
+          )
+        : prev,
     );
   }
 
@@ -69,18 +83,29 @@ export default function KycQueuePage() {
     <main style={pageStyle}>
       <h1>{t('kycQueuePageHeading')}</h1>
       <p style={{ opacity: 0.8 }}>{t('kycQueuePageIntro')}</p>
+      {/* TWO alerts on this screen contain the phrase "work the KYC queue" — this
+          reduced-capability note and the load refusal below — because the act is named in both by
+          design. Each carries its own hook so a test can address the one it means: scoping the
+          assertion is the fix, never loosening it to whichever happens to render first. */}
       {!canApprove ? (
-        <p role="alert" style={errorStyle}>
-          {reducedCapability(t, 'kycQueueApproveCanAct', 'kycQueueApproveCannotAct', 'kyc.approve')}
+        <p role="alert" style={errorStyle} data-kyc-reduced-capability="">
+          {reducedCapability(
+            t,
+            'kycQueueApproveCanAct',
+            'kycQueueApproveCannotAct',
+            'kyc.approve',
+          )}
         </p>
       ) : null}
       {items === null && !loadError ? <p>{t('commonLoading')}</p> : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
+        <p role="alert" style={errorStyle} data-kyc-load-error="">
           {loadError}
         </p>
       ) : null}
-      {items !== null && !loadError ? <KycQueue items={items} onItemChanged={handleItemChanged} /> : null}
+      {items !== null && !loadError ? (
+        <KycQueue items={items} onItemChanged={handleItemChanged} />
+      ) : null}
     </main>
   );
 }
