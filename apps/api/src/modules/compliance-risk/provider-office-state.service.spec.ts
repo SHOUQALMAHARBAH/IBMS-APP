@@ -10,7 +10,7 @@ import type { ProviderOfficeStateRow } from '../../repositories/provider-office-
  *
  *   * a NAIVE `expiresAt <= now` answers identically to the regulatory rule,
  *   * the `no term on record` branch is never reached,
- *   * and art. 11's by-operation-of-law extension — the case where the two readings DISAGREE —
+ *   * and the renewal-pending rule — the case where the two readings DISAGREE —
  *     cannot occur.
  *
  * An e2e over one office cannot tell those apart however it is written. So the states are proven
@@ -76,12 +76,12 @@ describe('item (j): the three licence states', () => {
     expect(view.isCurrentlyLapsed).toBe(true);
   });
 
-  it('A TERM PAST ITS EXPIRY WITH A TIMELY RENEWAL IS NOT LAPSED — art. 11', () => {
+  it('A TERM PAST ITS EXPIRY WITH A TIMELY RENEWAL IS NOT LAPSED — the renewal-pending rule', () => {
     /*
      * THE CASE THAT DISTINGUISHES THE RULE FROM A COMPARISON, and the reason a naive
      * `expiresAt <= now` plant survived the e2e.
      *
-     * After expiry, an office that applied for renewal on time stays valid by operation of law
+     * After expiry, an office that applied for renewal on time stays valid pending the decision
      * until the CBJ's decision issues (item (d)). A comparison answers "lapsed"; the rule answers
      * "not lapsed". One of those tells a provider to chase an office that is compliant.
      */
@@ -98,7 +98,7 @@ describe('item (j): the three licence states', () => {
   });
 
   it('a term past its expiry with a LATE renewal IS lapsed', () => {
-    // The other side of the same edge: art. 11's extension is earned by filing ON TIME, so a late
+    // The other side of the same edge: the extension is earned by filing ON TIME, so a late
     // filing does not buy it. Both sides are asserted, because a rule tested on one side is a rule
     // that passes against an implementation that always says yes.
     const view = toProviderOfficeStateView(

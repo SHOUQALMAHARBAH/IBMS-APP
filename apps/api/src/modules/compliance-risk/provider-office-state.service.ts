@@ -33,7 +33,7 @@ import { OrganizationRepository } from '../../repositories/organization.reposito
  * ## The lapse rule is APPLIED here, not copied into SQL
  *
  * The view returns `status`, `expiresAt` and `renewalRequestedAt` raw. The regulatory answer —
- * manual lapse first, then inside the term, then art. 11's by-operation-of-law extension — comes
+ * manual lapse first, then inside the term, then the renewal-pending rule — comes
  * from `isBrokerLicenseCurrentlyLapsed`, the same function `PolicyService.place()` uses. A copy of
  * that rule in SQL would be a second home for a rule whose CHECK ORDER is load-bearing, and the
  * copy is the one that drifts. A provider dashboard calling an office lapsed when the application
@@ -94,7 +94,7 @@ function iso(value: Date | null): string | null {
  * `expiresAt <= now` answers identically to the regulatory rule, and the `term === null` branch is
  * never reached at all. An e2e over one office simply cannot tell those apart.
  *
- * So the three licence states and the art. 11 extension are proven HERE, where the input can be
+ * So the three licence states and the renewal-pending rule are proven HERE, where the input can be
  * chosen, and the e2e proves what only it can: that the view crosses offices, that the column list
  * holds, and that the route is gated.
  */
@@ -126,7 +126,7 @@ export function toProviderOfficeStateView(
     licenseStatus: row.licenseStatus,
     renewalRequestedAt: iso(row.renewalRequestedAt),
     // THE SHARED REGULATORY RULE, never a comparison written here. Its check ORDER is load-bearing
-    // — manual lapse, then inside the term, then art. 11's by-operation-of-law extension — and a
+    // — manual lapse, then inside the term, then the renewal-pending rule — and a
     // copy would drift from the one `PolicyService.place()` enforces.
     isCurrentlyLapsed:
       term === null ? null : isBrokerLicenseCurrentlyLapsed(term, now),

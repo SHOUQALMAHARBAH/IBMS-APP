@@ -98,8 +98,9 @@ interface Opts {
     licenseNumber: string;
     status: string;
     expiresAt: Date;
-    // Module 0 item (d) — art. 11. Needed here because the gate's answer for an EXPIRED term now
-    // depends on whether a renewal application was filed on time.
+    // Module 0 item (d) — the renewal-pending rule (the owner's decision, not art. 11). Needed
+    // here because the gate's answer for an EXPIRED term now depends on whether a renewal
+    // application was filed on time.
     renewalRequestedAt?: Date | null;
   } | null;
   // Insurer management — `false` exercises the deactivated-insurer refusal, `null`
@@ -479,8 +480,10 @@ describe('PolicyService', () => {
       expect(mocks.create).not.toHaveBeenCalled();
     });
 
-    // Module 0 item (d) — CBJ Instructions No. 9 of 2026, art. 11.
-    it('PROCEEDS past expiry when the renewal application was filed on time (by operation of law)', async () => {
+    // Module 0 item (d) — the renewal-pending rule. The OWNER'S DECISION, not art. 11: that
+    // article is one sentence about a 45-day filing deadline and contains no extension.
+    // See `RENEWAL_PENDING_RULE_BASIS` in broker-license.config.ts.
+    it('PROCEEDS past expiry when the renewal application was filed on time (pending the decision)', async () => {
       // After 31 December an office that applied on time stays valid until the decision issues.
       // Blocking it would refuse business the regulation permits — an error running against the
       // brokerage, the same direction as the empty holiday calendar.
@@ -499,7 +502,7 @@ describe('PolicyService', () => {
 
     it('still BLOCKS past expiry when the application was filed LATE', async () => {
       // The other half. Without it the test above would pass against an implementation that
-      // treated ANY recorded application as an extension, which is not what art. 11 says.
+      // treated ANY recorded application as an extension, which is not what the rule says.
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-TEST-001',
@@ -519,7 +522,7 @@ describe('PolicyService', () => {
       //
       // The expiry is in the PAST deliberately. The first version of this test used 2099 and was
       // INSENSITIVE to the thing it claims to be about: with the term still inside its period the
-      // ordering of the manual-lapse check against art. 11's extension never matters, so planting
+      // ordering of the manual-lapse check against the renewal-pending rule never matters, so planting
       // the inversion left this test green while its sibling in broker-license.config.spec.ts
       // died. Expired + manually lapsed + filed on time is the only combination where the
       // ordering decides the answer.

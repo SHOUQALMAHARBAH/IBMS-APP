@@ -43,7 +43,7 @@ const LICENSE = {
   // expiry, and 2027-01-01 minus 45 days is 2026-11-17.
   renewalDueBy: '2026-11-17T00:00:00.000Z',
   renewalFiledOnTime: false,
-  validByOperationOfLaw: false,
+  validPendingRenewalDecision: false,
   expiryIsEndOfCalendarYear: false,
   expectedExpiryForThreeYearTerm: '2028-12-31T00:00:00.000Z',
 };
@@ -315,7 +315,7 @@ test('an expiry that is not a 31 December WARNS and does not block (art. 10/b)',
   await expect(page.locator('main')).toContainText('CBJ-2026-001');
 });
 
-test('an expired term with a timely application says it is still valid by operation of law (art. 11)', async ({
+test('an expired term with a timely application says it is still valid, and does NOT cite art. 11', async ({
   page,
 }) => {
   // Without this the screen would show an expiry in the past beside a licence the system is
@@ -327,7 +327,7 @@ test('an expired term with a timely application says it is still valid by operat
     expiryIsEndOfCalendarYear: true,
     renewalRequestedAt: '2026-11-16T00:00:00.000Z',
     renewalFiledOnTime: true,
-    validByOperationOfLaw: true,
+    validPendingRenewalDecision: true,
     isCurrentlyLapsed: false,
   };
   await mockRegulatoryCompliance(page, {
@@ -335,9 +335,16 @@ test('an expired term with a timely application says it is still valid by operat
   });
   await page.goto('/regulatory-compliance');
 
-  const notice = page.locator('[data-valid-by-operation-of-law]');
-  await expect(notice).toContainText('by operation of law');
-  await expect(notice).toContainText('art. 11');
+  const notice = page.locator('[data-valid-pending-renewal-decision]');
+  // The rule still holds and the notice still explains it.
+  await expect(notice).toContainText('treated as still valid');
+  await expect(notice).toContainText('filed on time');
+  // AND IT NO LONGER CLAIMS A LEGAL AUTHORITY IT DOES NOT HAVE. This is the half that would
+  // rot silently: the behaviour is unchanged, so only an assertion on the ABSENCE of the
+  // citation can catch somebody putting it back.
+  await expect(notice).not.toContainText('art. 11');
+  await expect(notice).not.toContainText('by operation of law');
+  await expect(notice).toContainText('no provision of Instructions No. 9 of 2026');
   // And the two warnings are distinct states, not one: a 31-December expiry raises no art. 10/b
   // warning even while this one is showing.
   await expect(page.locator('[data-expiry-not-end-of-year]')).toHaveCount(0);
@@ -353,7 +360,7 @@ test('an application filed AFTER the deadline is called out while there is still
     expiryIsEndOfCalendarYear: true,
     renewalRequestedAt: '2026-12-20T00:00:00.000Z',
     renewalFiledOnTime: false,
-    validByOperationOfLaw: false,
+    validPendingRenewalDecision: false,
   };
   await mockRegulatoryCompliance(page, {
     licenseSeries: { current: late, terms: [late] },

@@ -345,13 +345,13 @@ export default function RegulatoryCompliancePage() {
 
           {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
               system is content with, and explain neither. */}
-          {license.validByOperationOfLaw ? (
+          {license.validPendingRenewalDecision ? (
             <p
               style={warningStyle}
               role="status"
-              data-valid-by-operation-of-law=""
+              data-valid-pending-renewal-decision=""
             >
-              {t('rcValidByOperationOfLaw')}
+              {t('rcValidPendingRenewalDecision')}
             </p>
           ) : null}
 

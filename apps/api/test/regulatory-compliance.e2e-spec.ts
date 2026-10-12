@@ -43,7 +43,7 @@ interface BrokerLicenseBody {
 interface BrokerLicenseDerivedBody {
   renewalDueBy: string;
   renewalFiledOnTime: boolean;
-  validByOperationOfLaw: boolean;
+  validPendingRenewalDecision: boolean;
   expiryIsEndOfCalendarYear: boolean;
   expectedExpiryForThreeYearTerm: string | null;
 }
@@ -277,7 +277,7 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
       expect(d.renewalFiledOnTime).toBe(true);
       // Still inside the term, so nothing is being extended yet — the two are different states
       // and a screen needs to tell them apart.
-      expect(d.validByOperationOfLaw).toBe(false);
+      expect(d.validPendingRenewalDecision).toBe(false);
       // Art. 10/b: this spec's terms all expire on 31 December.
       expect(d.expiryIsEndOfCalendarYear).toBe(true);
       // Informational. Issued 2026-01-01, so a three-calendar-year term would end 2028-12-31.

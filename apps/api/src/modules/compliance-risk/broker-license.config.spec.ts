@@ -5,7 +5,7 @@ import {
   expectedExpiryForThreeYearTerm,
   expiryIsEndOfCalendarYear,
   isBrokerLicenseCurrentlyLapsed,
-  isValidByOperationOfLaw,
+  isValidPendingRenewalDecision,
   pickCurrentTerm,
   renewalApplicationDueBy,
   renewalFiledOnTime,
@@ -216,7 +216,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
     });
   });
 
-  describe('isBrokerLicenseCurrentlyLapsed — art. 11 by operation of law', () => {
+  describe("isBrokerLicenseCurrentlyLapsed — the renewal-pending rule (owner's decision, not art. 11)", () => {
     const past = new Date('2029-02-01T00:00:00.000Z');
 
     it('lapses after expiry when NOTHING was filed', () => {
@@ -273,13 +273,13 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
     });
   });
 
-  describe('isValidByOperationOfLaw — its own flag, not folded into isCurrentlyLapsed', () => {
+  describe('isValidPendingRenewalDecision — its own flag, not folded into isCurrentlyLapsed', () => {
     const past = new Date('2029-02-01T00:00:00.000Z');
     const inside = new Date('2028-06-01T00:00:00.000Z');
 
     it('is true only once past expiry with a timely application pending', () => {
       expect(
-        isValidByOperationOfLaw(
+        isValidPendingRenewalDecision(
           {
             status: 'active',
             expiresAt: EXPIRES,
@@ -292,7 +292,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
 
     it('is false INSIDE the term even with a timely application — nothing is being extended yet', () => {
       expect(
-        isValidByOperationOfLaw(
+        isValidPendingRenewalDecision(
           {
             status: 'active',
             expiresAt: EXPIRES,
@@ -305,7 +305,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
 
     it('is false when the term was manually lapsed', () => {
       expect(
-        isValidByOperationOfLaw(
+        isValidPendingRenewalDecision(
           {
             status: 'lapsed',
             expiresAt: EXPIRES,
@@ -318,7 +318,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
 
     it('is false when nothing was filed', () => {
       expect(
-        isValidByOperationOfLaw(
+        isValidPendingRenewalDecision(
           { status: 'active', expiresAt: EXPIRES, renewalRequestedAt: null },
           past,
         ),
@@ -338,7 +338,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       );
       expect(view.renewalDueBy).toBe(DEADLINE.toISOString());
       expect(view.renewalFiledOnTime).toBe(true);
-      expect(view.validByOperationOfLaw).toBe(true);
+      expect(view.validPendingRenewalDecision).toBe(true);
       // Expired on the calendar AND not lapsed — the pair a screen needs to explain itself.
       expect(view.isCurrentlyLapsed).toBe(false);
       expect(view.expiryIsEndOfCalendarYear).toBe(true);

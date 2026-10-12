@@ -169,8 +169,8 @@ export const COMPLIANCE_RISK = {
     rcRenewalDueBy: 'آخر موعد لتقديم طلب التجديد',
     rcExpiryNotEndOfYearWarning:
       'تاريخ الانتهاء المُدخل ليس 31 كانون الأول/ديسمبر. مدة الترخيص تنتهي في 31 كانون الأول (المادة 10/ب) — تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
-    rcValidByOperationOfLaw:
-      'انتهى تاريخ هذه المدة المطبوع، والترخيص ما زال ساريًا بحكم القانون لأن طلب التجديد قُدّم في موعده (المادة 11). يبقى ساريًا حتى صدور قرار البنك المركزي.',
+    rcValidPendingRenewalDecision:
+      'انتهى تاريخ هذه المدة المطبوع، ويُعامَل الترخيص على أنه ما زال ساريًا لأن طلب التجديد قُدّم في موعده، إلى حين صدور قرار البنك المركزي. هذا قرار داخلي للمكتب ولا يستند إلى نص في تعليمات رقم (9) لسنة 2026.',
     rcRenewalFiledLate:
       'قُدّم طلب التجديد بعد الموعد المحدّد (المادة 11) — لن يستمر سريان الترخيص بعد تاريخ الانتهاء.',
     rcExpectedThreeYearExpiry: 'نهاية مدة الثلاث سنوات المتوقّعة',
@@ -565,8 +565,8 @@ export const COMPLIANCE_RISK = {
     rcRenewalDueBy: 'Renewal application due by',
     rcExpiryNotEndOfYearWarning:
       'The expiry you entered is not a 31 December. A licence term ends on 31 December (art. 10/b) — check it against the date printed on the certificate. The entry was not refused.',
-    rcValidByOperationOfLaw:
-      "This term's printed expiry has passed, and the licence remains valid by operation of law because the renewal application was filed on time (art. 11). It stays valid until the CBJ's decision issues.",
+    rcValidPendingRenewalDecision:
+      "This term's printed expiry has passed, and the licence is treated as still valid because the renewal application was filed on time, until the CBJ's decision issues. This is an internal decision and rests on no provision of Instructions No. 9 of 2026.",
     rcRenewalFiledLate:
       'The renewal application was filed after the deadline (art. 11) — the licence will not remain valid past its expiry.',
     rcExpectedThreeYearExpiry: 'Expected end of a three-year term',

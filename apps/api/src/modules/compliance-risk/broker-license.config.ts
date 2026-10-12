@@ -41,7 +41,36 @@ export type BrokerLicenseStatus = (typeof BROKER_LICENSE_STATUSES)[number];
  *   art. 21/a/9 — practising after a licence has ended is a ground for sanction.
  */
 
-/** Art. 11. CALENDAR days, not business days, and the reading is deliberate: the deadline is
+/**
+ * THE BASIS FOR "A TIMELY RENEWAL KEEPS THE LICENCE ALIVE PAST ITS PRINTED EXPIRY".
+ *
+ * Quoted verbatim wherever that rule is explained, because it replaced a CITATION THAT WAS FALSE.
+ * Until 2026-10-12 this rule cited art. 11 — in code, in test names, and in a sentence a user could
+ * read on screen in both languages. Art. 11 is one sentence: file a renewal every three years, 45
+ * days before expiry. It contains no extension, and no other article of Instructions No. 9 of 2026
+ * does either.
+ *
+ * The rule itself STANDS — it is the owner's decision, answering the text's silence, and it is
+ * conditioned on the renewal having been filed on time. What was removed is the claim of legal
+ * authority behind it:
+ *
+ *   Owner's decision. No provision in Instructions No. 9 of 2026. Supported by analogy only with
+ *   art. 8/d of Law No. 12 of 2021 (deemed approval for insurance companies), which does not
+ *   extend to brokers by its terms. Pending arts. 82 and 109 of that law and the CBJ renewal
+ *   application form.
+ *
+ * Against the analogy stands art. 5/a of the same law: no person may practise insurance business
+ * without the required licence. That is why the rule is conditioned on a TIMELY filing and is not
+ * a general grace period.
+ */
+export const RENEWAL_PENDING_RULE_BASIS =
+  "Owner's decision. No provision in Instructions No. 9 of 2026. Supported by analogy only with " +
+  'art. 8/d of Law No. 12 of 2021 (deemed approval for insurance companies), which does not ' +
+  'extend to brokers by its terms. Pending arts. 82 and 109 of that law and the CBJ renewal ' +
+  'application form.';
+
+/** Art. 11 — and this one IS art. 11: the filing deadline is the article's whole content.
+ *  CALENDAR days, not business days, and the reading is deliberate: the deadline is
  *  stated as a span before a fixed calendar date, and counting it in business days would move it
  *  EARLIER — making the office late for a filing the regulation would call timely. This project has
  *  already been bitten by a date rule whose error ran against the brokerage (the empty holiday
@@ -138,7 +167,8 @@ export function isBrokerLicenseCurrentlyLapsed(
   if (license.expiresAt.getTime() > now.getTime()) return false;
 
   /*
-   * PAST EXPIRY — art. 11's by-operation-of-law extension, item (d).
+   * PAST EXPIRY — THE RENEWAL-PENDING RULE. See `RENEWAL_PENDING_RULE_BASIS` above: this is the
+   * OWNER'S DECISION, not art. 11, and the citation that stood here was false.
    *
    * After 31 December an office whose renewal application was filed ON TIME stays valid until the
    * regulator's decision issues; an office that filed nothing, or filed late, expires.
@@ -153,14 +183,17 @@ export function isBrokerLicenseCurrentlyLapsed(
 }
 
 /**
- * EXPIRED BUT STILL VALID, by art. 11 rather than by its own dates.
+ * EXPIRED BUT STILL VALID, because a timely renewal application is pending a decision.
+ *
+ * NOT "by operation of law" — that was the name until 2026-10-12 and it asserted in an identifier
+ * exactly the legal authority that does not exist. See `RENEWAL_PENDING_RULE_BASIS`.
  *
  * Its own flag rather than being folded into `isCurrentlyLapsed`, because the two answer different
  * questions and a screen needs both: "may this office place business" (it may) and "is this term
  * past its printed expiry" (it is). Collapsing them would leave an officer looking at an expiry in
  * the past with nothing explaining why the system is content.
  */
-export function isValidByOperationOfLaw(
+export function isValidPendingRenewalDecision(
   license: {
     status: string;
     expiresAt: Date;
@@ -228,8 +261,9 @@ export interface BrokerLicenseView {
   renewalDueBy: string;
   /** Whether the application was filed by that deadline. False when none was filed. */
   renewalFiledOnTime: boolean;
-  /** Past its printed expiry yet still valid, because a timely application is pending (art. 11). */
-  validByOperationOfLaw: boolean;
+  /** Past its printed expiry yet still valid, because a timely application is pending a decision.
+   *  The owner's decision, NOT art. 11 — see `RENEWAL_PENDING_RULE_BASIS`. */
+  validPendingRenewalDecision: boolean;
   /** Art. 10/b — false means the entered expiry is not a 31 December. A WARNING, never a block:
    *  the date is entered as printed on the certificate and the certificate is the authority. */
   expiryIsEndOfCalendarYear: boolean;
@@ -255,7 +289,7 @@ export function deriveBrokerLicenseView(
       : null,
     renewalDueBy: renewalApplicationDueBy(row.expiresAt).toISOString(),
     renewalFiledOnTime: renewalFiledOnTime(row),
-    validByOperationOfLaw: isValidByOperationOfLaw(row, now),
+    validPendingRenewalDecision: isValidPendingRenewalDecision(row, now),
     expiryIsEndOfCalendarYear: expiryIsEndOfCalendarYear(row.expiresAt),
     expectedExpiryForThreeYearTerm:
       expectedExpiryForThreeYearTerm(row.issuedAt)?.toISOString() ?? null,
