@@ -7,6 +7,34 @@ import {
 } from "./seed-data/roles";
 import { PERMISSIONS } from "./seed-data/permissions";
 import { INSURANCE_LINES } from "./seed-data/insurance-lines";
+import {
+  BANKS,
+  BUSINESS_MODELS,
+  CITIES,
+  COUNTRIES,
+  CURRENCIES,
+  LEGAL_FORMS,
+  LICENSING_AUTHORITIES,
+  RATING_AGENCIES,
+  type ReferenceSeed,
+} from "./seed-data/reference-tables";
+
+/** The eight, paired with the Prisma delegate each one seeds. A tuple list rather than eight
+ *  copies of the same loop: the shape is identical by design, and eight near-identical blocks is
+ *  eight places for one of them to drift. */
+const REFERENCE_TABLES: [
+  "country" | "city" | "bank" | "currency" | "licensingAuthority" | "ratingAgency" | "legalForm" | "businessModel",
+  ReferenceSeed[],
+][] = [
+  ["country", COUNTRIES],
+  ["city", CITIES],
+  ["bank", BANKS],
+  ["currency", CURRENCIES],
+  ["licensingAuthority", LICENSING_AUTHORITIES],
+  ["ratingAgency", RATING_AGENCIES],
+  ["legalForm", LEGAL_FORMS],
+  ["businessModel", BUSINESS_MODELS],
+];
 import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
 import { validatePasswordPolicy } from "../src/password-policy";
@@ -768,6 +796,39 @@ async function main() {
     });
   }
   console.log(`Seeded ${INSURANCE_LINES.length} standard insurance lines.`);
+
+  // MODULE 0-ب ITEM (c) — the eight provider-maintained reference tables.
+  //
+  // Same upsert shape as the insurance lines above and for the same reasons: keyed on `code`
+  // because each database generates its own uuids, and `displayOrder` taken from the array index
+  // so reordering a seed list reorders every picker and nothing else.
+  //
+  // PLATFORM-SCOPED and therefore seeded OUTSIDE `SEED_SAMPLE_DATA`: an office picks its city and
+  // its bank from these on a production database too, and a catalogue that only existed in
+  // development would make the registration form unusable where it matters.
+  for (const [table, rows] of REFERENCE_TABLES) {
+    for (const [index, ref] of rows.entries()) {
+      await (
+        prisma[table] as {
+          upsert: (args: unknown) => Promise<unknown>;
+        }
+      ).upsert({
+        where: { code: ref.code },
+        update: {
+          nameEn: ref.nameEn,
+          nameAr: ref.nameAr,
+          displayOrder: index,
+        },
+        create: {
+          code: ref.code,
+          nameEn: ref.nameEn,
+          nameAr: ref.nameAr,
+          displayOrder: index,
+        },
+      });
+    }
+    console.log(`Seeded ${rows.length} ${table} reference row(s).`);
+  }
 
   if (SEED_SAMPLE_DATA) {
     // Module 0 item (j)'s gap closure. BEFORE the sample users, so a future provider user has an

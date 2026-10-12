@@ -9,6 +9,20 @@ import type { TranslationKey } from './translations';
 type Labels<T extends string> = Record<T, TranslationKey>;
 
 export const ENUM_LABEL = {
+  /** Module 0-ب item (c) — the brokerage licence type. NOT the life/general split, which module 0
+   *  derives from the licence's branches and never stores; merging the two axes would destroy that
+   *  derivation. */
+  BrokerageKind: {
+    DIRECT: 'brokerageKindDirect',
+    REINSURANCE: 'brokerageKindReinsurance',
+  } satisfies Labels<'DIRECT' | 'REINSURANCE'>,
+  /** Module 0-ب item (c) — how the system exchanges data with an insurance company. */
+  IntegrationMethod: {
+    API: 'integrationMethodApi',
+    PORTAL: 'integrationMethodPortal',
+    EMAIL: 'integrationMethodEmail',
+    MANUAL: 'integrationMethodManual',
+  } satisfies Labels<'API' | 'PORTAL' | 'EMAIL' | 'MANUAL'>,
   /** Module 0 item (e) — the two insurance TYPES a broker licence covers (art. 3/a). Added here
    *  rather than labelled per screen: the licence scope, the insurance-lines admin screen and the
    *  insurer directory all render this enum. */

@@ -10,6 +10,16 @@
 // that let eight of them drift out of sync before this existed.
 export const ENUMS = {
   AR: {
+    // Module 0-ب item (c) — نوع ترخيص الوساطة (المادة 3/ب). محور مستقل تمامًا عن نوعي التأمين
+    // (عام/حياة) اللذين يُشتقّان من فروع الترخيص ولا يُخزَّنان.
+    brokerageKindDirect: 'وساطة تأمين مباشر',
+    brokerageKindReinsurance: 'وساطة إعادة تأمين',
+    // Module 0-ب item (c) — طريقة تبادل البيانات مع شركة التأمين. بيانات الدخول والمفاتيح
+    // لا تُحفظ في هذه الجداول إطلاقًا.
+    integrationMethodApi: 'ربط برمجي (API)',
+    integrationMethodPortal: 'بوابة إلكترونية',
+    integrationMethodEmail: 'بريد إلكتروني',
+    integrationMethodManual: 'يدوي',
     // AuditAction
     auditActionCreate: 'إنشاء',
     auditActionRead: 'اطّلاع',
@@ -308,6 +318,16 @@ export const ENUMS = {
     infoAssetTypeOther: 'أخرى',
   },
   EN: {
+    // Module 0-ب item (c) — the brokerage licence type (art. 3/b). A DIFFERENT AXIS from the
+    // life/general types, which are derived from the licence's branches and never stored.
+    brokerageKindDirect: 'Direct insurance brokerage',
+    brokerageKindReinsurance: 'Reinsurance brokerage',
+    // Module 0-ب item (c) — how the system exchanges data with an insurance company.
+    // Credentials and keys never enter these tables.
+    integrationMethodApi: 'API integration',
+    integrationMethodPortal: 'Web portal',
+    integrationMethodEmail: 'Email',
+    integrationMethodManual: 'Manual',
     // AuditAction
     auditActionCreate: 'Create',
     auditActionRead: 'Read',

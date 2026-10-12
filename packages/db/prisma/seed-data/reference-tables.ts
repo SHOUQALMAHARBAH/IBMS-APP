@@ -1,0 +1,278 @@
+/**
+ * Module 0-ب item (c) — the eight PROVIDER-MAINTAINED reference tables.
+ *
+ * ## Why these eight are tables and the other four are enums
+ *
+ * The owner's test, and it is NOT "closed set versus open set":
+ *
+ *   > Does any code path branch on the value? If the code branches on it, it stays an enum,
+ *   > because a new row would create a state no code path handles — and that failure is silent.
+ *   > If the code only displays, stores and filters it, it becomes a seeded table, because it
+ *   > will grow without us and every growth must not require a release.
+ *
+ * Nothing branches on a bank, a city, a country, a currency, a licensing authority, a rating
+ * agency, a legal form or a business model. They are stored, displayed and filtered. A new bank
+ * opens in Jordan and nobody should wait for a deploy.
+ *
+ * And the referential-integrity half of the field dictionary's note R17 is satisfied either way —
+ * the owner's words: *"an FK to a seeded row is a stronger guarantee than a string compared
+ * against an enum, not a weaker one."*
+ *
+ * ## PLATFORM-scoped, every one
+ *
+ * An office adds no bank and no city. That is the whole difference from `OfficeInsuranceLine`,
+ * where an office's own vocabulary IS genuinely its own. These are maintained by the provider, so
+ * they carry no `organizationId` and are not in `TENANT_SCOPED_MODELS`.
+ *
+ * ## The shape is `InsuranceLine`'s, deliberately
+ *
+ * `code @unique`, `nameEn`, `nameAr`, `displayOrder` — so module 1's legal-values table becomes the
+ * ninth of the same family rather than a second pattern. Upserted on `code`, never on the uuid:
+ * each database generates its own ids, so a re-seed recognises a row by the one value stable
+ * across all of them. `displayOrder` comes from the array index, so reordering a list here
+ * reorders every picker and nothing else.
+ *
+ * ## "A seed row that is a placeholder is worse than a short list"
+ *
+ * The owner's instruction, and it is why there is no `OTHER`, no `TBD` and no padding below. Every
+ * row names a real thing. Where a list is genuinely incomplete it says so in its own comment
+ * rather than inventing a filler row — and because these are tables, the cure is a row rather than
+ * a release.
+ */
+
+export interface ReferenceSeed {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+}
+
+/**
+ * Countries. Jordan alone, and that is "minimal and real" rather than an oversight.
+ *
+ * A foreign country IS representable — art. 10/a/1/b contemplates a branch of a foreign company,
+ * and an insurer may be foreign — but seeding a world list would be padding, and the provider adds
+ * the one it needs as a row. That is precisely what makes this a table.
+ */
+export const COUNTRIES: ReferenceSeed[] = [
+  { code: "JO", nameEn: "Jordan", nameAr: "الأردن" },
+];
+
+/**
+ * Jordan's twelve governorates, by their capitals — the administrative division an address is
+ * actually recorded against. Ordered as the Department of Statistics orders them: the three
+ * northern, then central, then southern.
+ */
+export const CITIES: ReferenceSeed[] = [
+  { code: "AMMAN", nameEn: "Amman", nameAr: "عمّان" },
+  { code: "IRBID", nameEn: "Irbid", nameAr: "إربد" },
+  { code: "ZARQA", nameEn: "Zarqa", nameAr: "الزرقاء" },
+  { code: "BALQA", nameEn: "Balqa (Salt)", nameAr: "البلقاء (السلط)" },
+  { code: "MAFRAQ", nameEn: "Mafraq", nameAr: "المفرق" },
+  { code: "JERASH", nameEn: "Jerash", nameAr: "جرش" },
+  { code: "AJLOUN", nameEn: "Ajloun", nameAr: "عجلون" },
+  { code: "MADABA", nameEn: "Madaba", nameAr: "مادبا" },
+  { code: "KARAK", nameEn: "Karak", nameAr: "الكرك" },
+  { code: "TAFILAH", nameEn: "Tafilah", nameAr: "الطفيلة" },
+  { code: "MAAN", nameEn: "Ma'an", nameAr: "معان" },
+  { code: "AQABA", nameEn: "Aqaba", nameAr: "العقبة" },
+];
+
+/**
+ * Jordanian licensed banks.
+ *
+ * ## THE LIMIT OF THIS LIST, STATED RATHER THAN IMPLIED
+ *
+ * These are the Jordanian banks operating in the Kingdom as known at the time of writing. It is
+ * NOT transcribed from a CBJ register that this repository holds — no such file is in the repo —
+ * so treat it as a working list to be checked against the Central Bank's published register, not
+ * as an authority.
+ *
+ * That is survivable precisely because this is a table: a bank missing here is a row the provider
+ * adds, and a bank that merges or closes is a row the provider edits. Had this been an enum, every
+ * one of those would be a release, which is the whole argument for the shape.
+ *
+ * Branches of foreign banks operating in Jordan are deliberately omitted rather than half-listed.
+ */
+export const BANKS: ReferenceSeed[] = [
+  { code: "ARAB_BANK", nameEn: "Arab Bank", nameAr: "البنك العربي" },
+  {
+    code: "HOUSING_BANK",
+    nameEn: "Housing Bank for Trade and Finance",
+    nameAr: "بنك الإسكان للتجارة والتمويل",
+  },
+  { code: "BANK_OF_JORDAN", nameEn: "Bank of Jordan", nameAr: "بنك الأردن" },
+  {
+    code: "JORDAN_AHLI_BANK",
+    nameEn: "Jordan Ahli Bank",
+    nameAr: "البنك الأهلي الأردني",
+  },
+  {
+    code: "CAIRO_AMMAN_BANK",
+    nameEn: "Cairo Amman Bank",
+    nameAr: "بنك القاهرة عمّان",
+  },
+  {
+    code: "JORDAN_KUWAIT_BANK",
+    nameEn: "Jordan Kuwait Bank",
+    nameAr: "البنك الأردني الكويتي",
+  },
+  { code: "BANK_AL_ETIHAD", nameEn: "Bank al Etihad", nameAr: "بنك الاتحاد" },
+  {
+    code: "CAPITAL_BANK",
+    nameEn: "Capital Bank of Jordan",
+    nameAr: "كابيتال بنك",
+  },
+  {
+    code: "ARAB_JORDAN_INVESTMENT_BANK",
+    nameEn: "Arab Jordan Investment Bank",
+    nameAr: "بنك الاستثمار العربي الأردني",
+  },
+  {
+    code: "INVEST_BANK",
+    nameEn: "InvestBank",
+    nameAr: "بنك الاستثمار",
+  },
+  {
+    code: "ABC_BANK_JORDAN",
+    nameEn: "Arab Banking Corporation (Jordan)",
+    nameAr: "بنك المؤسسة العربية المصرفية (الأردن)",
+  },
+  // Islamic banks — a separate licence category at the CBJ, and the distinction matters to a
+  // takaful-writing office, so they are named rather than folded in.
+  {
+    code: "JORDAN_ISLAMIC_BANK",
+    nameEn: "Jordan Islamic Bank",
+    nameAr: "البنك الإسلامي الأردني",
+  },
+  {
+    code: "ISLAMIC_INTERNATIONAL_ARAB_BANK",
+    nameEn: "Islamic International Arab Bank",
+    nameAr: "البنك العربي الإسلامي الدولي",
+  },
+  {
+    code: "SAFWA_ISLAMIC_BANK",
+    nameEn: "Safwa Islamic Bank",
+    nameAr: "بنك صفوة الإسلامي",
+  },
+];
+
+/**
+ * Currencies.
+ *
+ * JOD is the base — `money-decimal-jod` and every `Decimal(18,3)` in this schema exist because the
+ * dinar divides into 1000 fils. USD and EUR are seeded beside it because reinsurance placements and
+ * some marine and aviation covers are denominated in them, so an office that cannot name them
+ * cannot record the business it actually writes.
+ *
+ * Nothing in this module converts between them, and no rate table exists. The currency is RECORDED,
+ * not arithmetic — stated here so nobody reads three rows as a multi-currency capability.
+ */
+export const CURRENCIES: ReferenceSeed[] = [
+  { code: "JOD", nameEn: "Jordanian Dinar", nameAr: "دينار أردني" },
+  { code: "USD", nameEn: "US Dollar", nameAr: "دولار أمريكي" },
+  { code: "EUR", nameEn: "Euro", nameAr: "يورو" },
+];
+
+/**
+ * Licensing authorities. One row, because for insurance brokerage in Jordan there is one.
+ *
+ * The Central Bank of Jordan took over insurance supervision; the field dictionary's own example
+ * names it, and Instructions No. 9 of 2026 are issued by it under arts. 82/a and 109/b of Law No.
+ * 12 of 2021. A foreign regulator would be a row, added when a foreign-licensed entity is first
+ * registered.
+ */
+export const LICENSING_AUTHORITIES: ReferenceSeed[] = [
+  {
+    code: "CBJ",
+    nameEn: "Central Bank of Jordan",
+    nameAr: "البنك المركزي الأردني",
+  },
+];
+
+/**
+ * Credit rating agencies — the four whose ratings an insurer actually quotes. The field
+ * dictionary's example is AM Best.
+ *
+ * Only ever read beside `Insurer.financialStrengthRating`, which stays OFFICE-SCOPED: what it holds
+ * is the rating THIS office recorded in discharging its duty of care when selecting an insurer, not
+ * a fact about the company. See `docs/decision-insurer-field-split.md`.
+ */
+export const RATING_AGENCIES: ReferenceSeed[] = [
+  { code: "AM_BEST", nameEn: "AM Best", nameAr: "إيه إم بست" },
+  {
+    code: "SP_GLOBAL",
+    nameEn: "S&P Global Ratings",
+    nameAr: "إس آند بي جلوبال للتصنيف",
+  },
+  { code: "MOODYS", nameEn: "Moody's", nameAr: "موديز" },
+  { code: "FITCH", nameEn: "Fitch Ratings", nameAr: "فيتش للتصنيف" },
+];
+
+/**
+ * Legal forms, from the field dictionary's reference tab — PLUS ONE THE SHEET DOES NOT HAVE.
+ *
+ * ## `SOLE_ESTABLISHMENT` is added, with its citation, and that is a finding
+ *
+ * The sheet lists five: public shareholding, private shareholding, limited liability, general
+ * partnership, limited partnership. All five are companies.
+ *
+ * But art. 10/a/1/a of Instructions No. 9 of 2026 requires an applicant licensed as a NATURAL
+ * PERSON broker to be registered as a sole establishment (مؤسسة فردية), and `BrokerKind` already
+ * has `NATURAL_PERSON` as one of its two values. Seeding the sheet's five alone would make a
+ * natural-person broker — half of the kinds this system models — unregisterable, which is the
+ * unreachable-precondition shape this project has shipped once already.
+ *
+ * So it is seeded with the article named. Flagged here rather than slipped in, because it is the
+ * one row below that the owner's source document does not contain.
+ */
+export const LEGAL_FORMS: ReferenceSeed[] = [
+  {
+    code: "SOLE_ESTABLISHMENT",
+    nameEn: "Sole establishment",
+    nameAr: "مؤسسة فردية",
+  },
+  {
+    code: "PUBLIC_SHAREHOLDING",
+    nameEn: "Public shareholding company",
+    nameAr: "شركة مساهمة عامة",
+  },
+  {
+    code: "PRIVATE_SHAREHOLDING",
+    nameEn: "Private shareholding company",
+    nameAr: "شركة مساهمة خاصة",
+  },
+  {
+    code: "LIMITED_LIABILITY",
+    nameEn: "Limited liability company",
+    nameAr: "شركة ذات مسؤولية محدودة",
+  },
+  {
+    code: "GENERAL_PARTNERSHIP",
+    nameEn: "General partnership",
+    nameAr: "شركة تضامن",
+  },
+  {
+    code: "LIMITED_PARTNERSHIP",
+    nameEn: "Limited partnership",
+    nameAr: "شركة توصية بسيطة",
+  },
+];
+
+/**
+ * Business models — conventional and takaful.
+ *
+ * ## NOTHING MAY BRANCH ON THIS VALUE. That is the design, not an accident.
+ *
+ * The field dictionary says the business model "affects the wording of quotations and policies and
+ * their terminology", which sounds like a branch and by the owner's own rule would make it an enum.
+ * The rule is satisfied differently and deliberately here: where terminology differs, the
+ * difference lives in TEMPLATE ROWS keyed to the model row — data, not an `if`. A third business
+ * model is then a row plus its templates, not a release.
+ *
+ * If you find yourself writing `if (model === 'TAKAFUL')`, stop: that is the signal the design was
+ * lost.
+ */
+export const BUSINESS_MODELS: ReferenceSeed[] = [
+  { code: "CONVENTIONAL", nameEn: "Conventional insurance", nameAr: "تأمين تقليدي" },
+  { code: "TAKAFUL", nameEn: "Takaful insurance", nameAr: "تأمين تكافلي" },
+];

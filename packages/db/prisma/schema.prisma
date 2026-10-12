@@ -5496,6 +5496,125 @@ model InsuranceLine {
 /// create two rows, and the directory aggregates them by canonical name the same
 /// way it aggregates companies. An addition never reaches another office's picker
 /// directly, which is the same boundary every other tenant-scoped table keeps.
+/// MODULE 0-ب ITEM (c) — THE EIGHT PROVIDER-MAINTAINED REFERENCE TABLES.
+///
+/// Shaped on `InsuranceLine` above, deliberately, so module 1's legal-values table becomes the
+/// ninth of the same family rather than a second pattern: `code @unique`, both scripts, a
+/// `displayOrder` taken from the seed array's index.
+///
+/// PLATFORM-SCOPED, every one. They carry no `organizationId`, are not in `TENANT_SCOPED_MODELS`
+/// and have no RLS policy — an office adds no bank and no city. That is the whole difference from
+/// `OfficeInsuranceLine`, where the office's own vocabulary genuinely is its own.
+///
+/// WHY TABLES AND NOT ENUMS: nothing branches on any of these values. The test is the owner's —
+/// does a code path BRANCH on it? A value the code decides from is an enum, because a new row
+/// would create a state nothing handles and that failure is silent. A value only stored, shown and
+/// filtered is a table, because it grows without us and a new bank must not need a release.
+///
+/// See `packages/db/prisma/seed-data/reference-tables.ts` for each list and its limits.
+model Country {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+model City {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+model Bank {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+model Currency {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+model LicensingAuthority {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+model RatingAgency {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+model LegalForm {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+/// Conventional or takaful. NOTHING MAY BRANCH ON THIS VALUE — where terminology differs the
+/// difference belongs in template rows keyed to the model row, so a third business model is a row
+/// plus its templates rather than a release. `if (model === 'TAKAFUL')` is the signal the design
+/// was lost.
+model BusinessModel {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  nameEn       String
+  nameAr       String
+  displayOrder Int
+  createdAt    DateTime @default(now())
+}
+
+/// MODULE 0-ب — the field dictionary's `license_type_id`, and A DIFFERENT AXIS from the licence
+/// TYPES module 0 derives.
+///
+/// Direct insurance brokerage or reinsurance brokerage. The life/general split stays DERIVED from
+/// the licence's branches and is never stored (module 0 item (e)); merging the two axes would
+/// destroy that derivation.
+///
+/// An enum because the code branches on it: Instructions No. 9 of 2026 govern INSURANCE brokerage,
+/// so where this reads REINSURANCE the art. 4/a capital slabs, the art. 3/a type rules and the
+/// art. 4/z staffing minimums must not fire, and the office is marked as outside their scope.
+enum BrokerageKind {
+  DIRECT
+  REINSURANCE
+}
+
+/// How the system exchanges data with an insurance company. An enum because these are four
+/// genuinely different code paths, and `api_endpoint` is required only for API.
+///
+/// CREDENTIALS NEVER ENTER THESE TABLES — keys and tokens belong in a secret store. The field
+/// dictionary says so and so does this repository.
+enum IntegrationMethod {
+  API
+  PORTAL
+  EMAIL
+  MANUAL
+}
+
 model OfficeInsuranceLine {
   id             String                @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
