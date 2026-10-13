@@ -184,6 +184,25 @@ export const BANKS: ReferenceSeed[] = [
  *
  * Nothing in this module converts between them, and no rate table exists. The currency is RECORDED,
  * not arithmetic — stated here so nobody reads three rows as a multi-currency capability.
+ *
+ * ## A NON-JOD VALUE HAS NO CONVERSION PATH, AND NO AMOUNT IN ONE MAY BE COMPARED TO A THRESHOLD
+ *
+ * Read this before writing any comparison between a stored amount and a legal threshold.
+ *
+ * EVERY threshold in Instructions No. 9 of 2026 is denominated in Jordanian dinars — the art. 4/a
+ * capital slabs (5,000 / 7,500 / 10,000 per type), the 50,000 in art. 13/b/2, and the 2,000 in
+ * art. 15/d that exempts a placement from the three-insurer minimum.
+ *
+ * So an amount recorded in USD or EUR CANNOT be tested against any of them. Comparing 3,000 dollars
+ * to 2,000 dinars as bare numbers would have the system reach a REGULATORY CONCLUSION from an
+ * invalid comparison — granting the art. 15/d exemption where it does not apply, or refusing it
+ * where it does. That is the same class as the provider being reported an unlicensed office: a
+ * true-sounding statement produced by comparing the wrong things.
+ *
+ * Conversion needs two things this system does not hold: a RATE, and the DATE the rate was taken.
+ * A rate without its date is useless to an audit two years later.
+ *
+ * NOT BUILT — module 14. See `docs/deferred-register.md`.
  */
 export const CURRENCIES: ReferenceSeed[] = [
   { code: "JOD", nameEn: "Jordanian Dinar", nameAr: "دينار أردني" },

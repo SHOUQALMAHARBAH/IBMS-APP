@@ -52,6 +52,7 @@ These are the owner's items whose declaration site does not exist yet. Each land
 | Item | Article / decision | Lands with |
 |---|---|---|
 | Per-branch last-activity tracking | art. 21/a/10 | a later module |
+| **Foreign-currency amounts have no conversion path** — every threshold in Instructions No. 9 of 2026 is in JOD (art. 4/a slabs, art. 13/b/2's 50,000, art. 15/d's 2,000), so an amount in USD or EUR cannot be tested against any of them. Comparing bare numbers would reach a regulatory conclusion from an invalid comparison. Conversion needs a RATE **and the DATE it was taken** — a rate without its date is useless to an audit. Declared on the `CURRENCIES` list in `reference-tables.ts` | arts. 4/a, 13/b/2, 15/d | **module 14** |
 | The warned-act mechanism, and the issuance gate that depends on it | arts. 15/d, 19/a/3, 16/y/8 | module 1 (specified in the module 0-ب brief's appendix; **must not be half-built earlier**) |
 | The legal-values table | decision; م١٥/ي reads from it | module 1 |
 | Art. 15/i and 15/k against the IBAN field | arts. 15/i, 15/k | **item (d)** — the IBAN column does not exist yet |
@@ -80,10 +81,27 @@ Recorded here because both came out of guards that were green while describing s
    never merely that one occurred. Two instances in one week: a typeless-organization test whose
    `23502` silently moved to a different column, and four `broker-kind` tests that kept expecting a
    refusal and got one from the wrong column.
-2. **Wherever a seed or a test asserts a QUANTITY of permissions, roles or grants, it asserts the
-   wrong thing.** A count cannot see a substitution. Demonstrated: with a count check, a swapped-in
-   `customer.create` was accepted *and really granted*. Nine found, two converted, one live
-   compliance-reporting gap discovered (`needs-assessment.approve`).
+2. **Wherever an assertion fixes the QUANTITY of a set of NAMED VALUES, it asserts the wrong
+   thing.** Not only permissions, roles and grants — the original scoping was too narrow, and the
+   third instance fell outside it entirely. Reasons, enum members, migration counts, route counts,
+   seeded rows, scope values, registry entries: wherever a number stands in for a named set, the
+   substitution passes.
+
+   A count cannot see a substitution. Demonstrated: with a count check a swapped-in
+   `customer.create` was accepted *and really granted*.
+
+   **Four instances found and converted**, in order: the provider grant set; `CHECKER_PERMISSIONS`
+   pinned at 13 (which was hiding a live compliance-reporting gap — `needs-assessment.approve`);
+   `UnscopedReason` pinned at one value; and `MAKER_CHECKER_REGISTRY` pinned at 15 entries — the
+   last mattering most, because `CHECKER_PERMISSIONS` now derives from it and
+   `duty-segregation-schema.e2e-spec.ts` compares it against `pg_constraint`, so a silently wrong
+   entry would propagate into both.
+
+   **Classified and deliberately NOT converted**, because the number IS the thing under test: a
+   function's return value (`requiredApprovedStaff`), tallies of fixture data, dashboard
+   aggregations, per-test result counts — and `ALL_STATUSES).toHaveLength(9)`, which sits directly
+   beneath named-set assertions and exists to catch a TENTH status arriving, with that reasoning
+   written out beside it.
 3. **A guard that runs after the write it guards is a report, not a guard.** The check belongs
    inside the transaction that writes. Applies directly to item (d), where the organization, the
    licence term with its certificate and the scope lines are written together.
