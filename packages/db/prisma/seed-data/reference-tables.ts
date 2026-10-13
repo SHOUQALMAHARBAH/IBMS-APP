@@ -202,7 +202,10 @@ export const BANKS: ReferenceSeed[] = [
  * Conversion needs two things this system does not hold: a RATE, and the DATE the rate was taken.
  * A rate without its date is useless to an audit two years later.
  *
- * NOT BUILT — module 14. See `docs/deferred-register.md`.
+ * NOT BUILT — module 14. See `docs/deferred-register.md`, which also carries the question that
+ * SIZES that work and must be asked at module 14's OPENING rather than during it: whether
+ * offices write policies in foreign currency at all. If they do not, this shrinks to a
+ * reinsurance reference; either way the answer shapes the build instead of correcting it.
  */
 export const CURRENCIES: ReferenceSeed[] = [
   { code: "JOD", nameEn: "Jordanian Dinar", nameAr: "دينار أردني" },
