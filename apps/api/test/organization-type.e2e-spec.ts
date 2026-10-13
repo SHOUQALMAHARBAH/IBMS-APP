@@ -30,9 +30,9 @@ const ROLLBACK = 'rollback: the organization in this test must not outlive it';
  *  (Prisma's `@updatedAt` is applied client-side), while `status`, `createdAt` and
  *  `dutySegregationMode` all carry one. Measured off `pg_attrdef`, not guessed. */
 const INSERT_WITHOUT_TYPE =
-  'INSERT INTO "Organization" (id, "legalName", subdomain, "updatedAt") VALUES ($1, $2, $3, now())';
+  'INSERT INTO "Organization" (id, "legalName", "legalNameAr", subdomain, "updatedAt") VALUES ($1, $2, $2, $3, now())';
 const INSERT_WITH_TYPE =
-  'INSERT INTO "Organization" (id, "legalName", subdomain, "updatedAt", "type") VALUES ($1, $2, $3, now(), $4::"OrganizationType")';
+  'INSERT INTO "Organization" (id, "legalName", "legalNameAr", subdomain, "updatedAt", "type") VALUES ($1, $2, $2, $3, now(), $4::"OrganizationType")';
 
 describe('Organization.type — the database guarantees', () => {
   it('carries exactly the two intended kinds, in order', async () => {
@@ -102,9 +102,14 @@ describe('Organization.type — the database guarantees', () => {
       //
       // WHY THE CODE ALONE PINS `type`: of this table's NOT NULL columns, `status`, `createdAt`
       // and `dutySegregationMode` carry database defaults, and the INSERT above supplies `id`,
-      // `legalName`, `subdomain` and `updatedAt` — every other one. `type` is therefore the only
-      // column that can be null here, which is what makes a bare code assertion sufficient rather
-      // than merely passing.
+      // `legalName`, `legalNameAr`, `subdomain` and `updatedAt` — every other one. `type` is
+      // therefore the only column that can be null here, which is what makes a bare code
+      // assertion sufficient rather than merely passing.
+      //
+      // `legalNameAr` IS IN THAT LIST DELIBERATELY, and it is the reason this comment moved.
+      // Module 0-ب made it NOT NULL, which would otherwise have made THIS test pass for the wrong
+      // reason: the INSERT would raise 23502 about the Arabic name while the assertion claimed it
+      // was about `type`, and a later change making `type` nullable would not have been caught.
     ).rejects.toThrow(/23502/);
 
     const survivors = await rawPrisma.organization.count({ where: { id } });

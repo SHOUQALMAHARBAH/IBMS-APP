@@ -13,7 +13,9 @@ function org(id: string, legalName = `Office ${id}`): Organization {
   return {
     id,
     legalName,
-    legalNameAr: null,
+    // NOT NULL since module 0-ب Part E measurement 3: ZERO rows lacked an Arabic legal
+    // database, so the column tightened). The compiler asked for this the moment it did.
+    legalNameAr: `مكتب ${id}`,
     brokerLicenseNumber: null,
     subdomain: id,
     // Module 0 item (a). The compiler asked for this the moment the column landed, which is the

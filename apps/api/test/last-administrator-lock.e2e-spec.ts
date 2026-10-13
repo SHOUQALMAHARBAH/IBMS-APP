@@ -196,6 +196,9 @@ beforeAll(async () => {
     data: {
       id: ORG_ID,
       legalName: 'Last Administrator Lock Office',
+      // NOT NULL since module 0-ب: an Arabic-first system must not hold an organization
+      // whose name can only be printed in Latin script.
+      legalNameAr: 'مكتب قفل آخر مدير',
       subdomain: SUBDOMAIN,
       // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
       // neither kind is a safe fallback for the other, so every creator states which it is.

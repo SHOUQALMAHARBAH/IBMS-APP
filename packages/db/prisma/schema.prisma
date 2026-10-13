@@ -208,9 +208,15 @@ enum MfaCredentialType {
 model Organization {
   id                         String           @id @default(uuid())
   legalName                  String
-  /// Arabic legal name — see the model comment. Optional only because an
-  /// office may be onboarded before its registered Arabic name is confirmed.
-  legalNameAr                String?
+  /// Arabic legal name. NOT NULL since module 0-ب: the field dictionary marks it mandatory on
+  /// both sheets, and this system's base language is Arabic — a name that exists only in Latin
+  /// script prints untranslated mid-sentence on every Arabic screen.
+  ///
+  /// It was nullable "because an office may be onboarded before its registered Arabic name is
+  /// confirmed", which was true while NOTHING COULD ONBOARD AN OFFICE AT ALL. The provider
+  /// registration form changes that, and the measurement that decided it found ZERO rows without
+  /// one on either database. Empty string is NOT caught here — the DTO refuses it.
+  legalNameAr                String
   /// Brokerage office or insurance company — see `OrganizationType`. NOT NULL with no default:
   /// the kind is stated at creation, never inferred. Tenant isolation is UNCHANGED by this column;
   /// `Organization` carries no `organizationId` and so was never in `TENANT_SCOPED_MODELS`.
