@@ -1,5 +1,6 @@
 import { PrismaClient, RoleName } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import {
   OFFICE_ADMINISTRATOR_ROLE,
   ROLES,
@@ -220,6 +221,131 @@ async function ensureProviderOrganization(): Promise<void> {
 
   console.log(
     `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (1 permission: ${code}).`,
+  );
+}
+
+/**
+ * MODULE 0-ب ITEM (a) — the provider's own sign-in, with NO PASSWORD ANYWHERE.
+ *
+ * Item (j) created the provider organization and its role and stopped there, so the dashboard had
+ * no hand-walkable path at all: nobody could sign in as the operator, and nobody in that
+ * organization holds `user.manage`, so no account could be provisioned from inside the application
+ * either. This closes that.
+ *
+ * ## THE PASSWORD DOES NOT EXIST — it is not withheld, it is never created
+ *
+ * `User.passwordHash` is NOT NULL, so the row needs *something*. It gets the hash of 32 random
+ * bytes that are discarded in the same expression: nothing can present the plaintext because
+ * nothing ever held it. Not in this file, not in the environment, not in the seed's output.
+ *
+ * That is stronger than a generated-and-printed password, and it is the owner's instruction: the
+ * provider is never handed a password, and sets their own.
+ *
+ * ## HOW THE PROVIDER ACTUALLY GETS IN, through the EXISTING flow
+ *
+ * `POST /auth/forgot-password` -> the emailed link -> `POST /auth/reset-password` -> sign in ->
+ * enrol TOTP at /settings/security.
+ *
+ * Measured rather than assumed, because the brief asked for the measurement if the existing path
+ * could NOT be reused:
+ *
+ *   * `forgotPassword` resolves the account with `findByEmailAcrossOrganizations` inside
+ *     `runUnscoped("auth-bootstrap")` and then adopts the user's own organization, so a PROVIDER
+ *     user is found exactly like any office user — tenancy is no obstacle.
+ *   * `resetPassword` looks the token up unscoped too.
+ *   * MFA is already FORCED, by nothing more than the schema: `Role.requiresMfaAlways` defaults to
+ *     `true` (Phase 2 made both MFA attributes default to the STRICT value), and the
+ *     PLATFORM_OPERATOR role carries it.
+ *   * `requiresHardwareToken` also defaults true and does NOT block: `mfaPolicySatisfied` returns
+ *     `user.mfaEnabled && !requiresHardwareToken`, and its own comment says the flag is surfaced
+ *     as a banner because WebAuthn is not implemented. So TOTP enrolment is reachable.
+ *
+ * So no second enrolment path is built, and none is needed.
+ *
+ * ## WHY NO RESET LINK IS PRINTED HERE
+ *
+ * Generating one in the seed would put a live credential-equivalent in script output and in every
+ * terminal scrollback that ever ran it, to save one click. The account exists; the owner uses the
+ * ordinary "forgot password" path, which is also the path they will use the next time they need it.
+ *
+ * ## THE ADDRESS IS CONFIGURABLE AND DEFAULTS TO A NON-PERSONAL ONE
+ *
+ * `PROVIDER_ADMIN_EMAIL` overrides it. The default is deliberately not a real person's address: a
+ * personal email committed to a seed file is in git history for good, and this file is public.
+ *
+ * ## INSIDE `SEED_SAMPLE_DATA`, like the organization it belongs to
+ *
+ * A seeded operator account on a production database is a credential nobody asked for. The
+ * migration that created the type says the same thing in its own words: the dashboard is
+ * unreachable until somebody deliberately creates the operator.
+ */
+async function ensureProviderAdminUser(): Promise<void> {
+  const email = process.env.PROVIDER_ADMIN_EMAIL ?? "operator@ibms.local";
+
+  const existing = await prisma.user.findUnique({
+    where: {
+      organizationId_email: {
+        organizationId: PROVIDER_ORGANIZATION_ID,
+        email,
+      },
+    },
+  });
+
+  // IDEMPOTENT, and the branch matters: re-running the seed must never reset a password the owner
+  // has already chosen. An upsert with a fresh random hash in its `update` would silently lock
+  // them out on every re-seed.
+  if (existing) {
+    console.log(`Provider operator ${email} already exists — password untouched.`);
+    return;
+  }
+
+  // 32 random bytes, hashed, and the plaintext is discarded in the same expression. There is no
+  // variable holding it and no way to recover it: the account is unusable until the owner sets
+  // their own password through the reset flow.
+  const unusablePassword = randomBytes(32).toString("hex");
+  const passwordHash = await bcrypt.hash(unusablePassword, 12);
+
+  const role = await prisma.role.findUnique({
+    where: {
+      organizationId_name: {
+        organizationId: PROVIDER_ORGANIZATION_ID,
+        name: "PLATFORM_OPERATOR",
+      },
+    },
+  });
+  if (!role) {
+    throw new Error(
+      "PLATFORM_OPERATOR does not exist, so the provider operator cannot be given the one role it needs. ensureProviderOrganization() must run first.",
+    );
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      organizationId: PROVIDER_ORGANIZATION_ID,
+      email,
+      fullName: "Platform Operator",
+      passwordHash,
+      // FALSE on purpose. `mustChangePassword` is for an administrator who HANDED somebody a
+      // password and wants it changed on first use. Nobody was handed anything here — the account
+      // has no usable password at all, so the forced-change prompt would be a second gate in front
+      // of a door that is already locked.
+      mustChangePassword: false,
+      languagePreference: "AR",
+    },
+  });
+
+  await prisma.userRoleAssignment.create({
+    data: {
+      organizationId: PROVIDER_ORGANIZATION_ID,
+      userId: user.id,
+      roleId: role.id,
+    },
+  });
+
+  console.log(
+    `Seeded the provider operator ${email} with NO usable password. ` +
+      `Sign in by requesting a password reset for that address — nothing here knows a password, ` +
+      `and MFA is forced by the PLATFORM_OPERATOR role.`,
   );
 }
 
@@ -834,6 +960,8 @@ async function main() {
     // Module 0 item (j)'s gap closure. BEFORE the sample users, so a future provider user has an
     // organization and a role to be attached to.
     await ensureProviderOrganization();
+    // Item (a) — immediately after, because it needs that organization and its role.
+    await ensureProviderAdminUser();
     await ensureSampleInsurers();
     await ensureSampleUsers(roleIdByName);
     // AFTER the sample users: the certificate is attributed to a real user of the office, and in a
