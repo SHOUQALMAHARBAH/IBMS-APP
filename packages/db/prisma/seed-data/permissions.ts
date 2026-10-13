@@ -1782,6 +1782,32 @@ const admin: PermissionSeed[] = [
     roles: [],
   },
   {
+    /*
+     * MODULE 0-ب ITEM (d) — REGISTER A BROKERAGE OFFICE ON THE PLATFORM.
+     *
+     * PLATFORM-scoped and the SECOND such code. Its effect is the creation of a TENANT, which is as
+     * far outside the granting office as an effect can reach, so item (j)'s three layers all apply:
+     * the office matrix never offers it, `setPermissions` refuses it for a non-PROVIDER
+     * organization, and the route checks the caller's organization type.
+     *
+     * Nothing in this product could create a second office before it. Measured and recorded against
+     * `soleOrganizationIdOrThrow`: the only two writers of `Organization` were the seed and the demo
+     * script, neither reachable over HTTP, and the signup refusal says in its own message that a
+     * second office cannot be onboarded through the application. This is the route that changes it.
+     */
+    code: "provider.office.register",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its own roles", and no office may register another office. The PROVIDER organization's
+     * `PLATFORM_OPERATOR` role holds it, granted by `ensureProviderOrganization()` in the seed.
+     */
+    roles: [],
+  },
+  {
     code: "access-recertification.cycle.start",
     module: "admin",
     description: "Start an access-recertification cycle",

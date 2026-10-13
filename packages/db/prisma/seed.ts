@@ -196,8 +196,10 @@ async function ensureProviderOrganization(): Promise<void> {
    * here and in README § Known gaps rather than left for a reader to assume otherwise.
    */
   const PROVIDER_CODES = [
-    // The capability the organization exists for.
+    // The capabilities the organization exists for.
     "provider.office-state.read",
+    // Item (d) — registering a brokerage office. The only route in this product that creates a tenant.
+    "provider.office.register",
     // Item (b) — self-administration. Its own users, its own roles, bounded by tenancy.
     "user.manage",
     "role.read",

@@ -6794,21 +6794,42 @@ model DuplicateNameWarning {
 /// cancellation by operation of law. Storing that conclusion would let it disagree with the dates
 /// it is computed from.
 model RegulatoryAction {
-  id               String               @id @default(uuid())
+  id               String                @id @default(uuid())
   organizationId   String
-  organization     Organization         @relation(fields: [organizationId], references: [id])
+  organization     Organization          @relation(fields: [organizationId], references: [id])
   kind             RegulatoryActionKind
+  /// WHICH PROVISION THE ACT WAS TAKEN UNDER, because the two suspensions in these Instructions are
+  /// not the same act and only one of them carries art. 14/c.
+  ///
+  /// `BROKER_REQUEST` is art. 14/a — suspension AT THE BROKER'S OWN REQUEST with the CBJ's prior
+  /// approval, open-ended, and art. 14/c deems it a CANCELLATION once it passes two years.
+  /// `SANCTION` is art. 21/b/5-6 — imposed by the CBJ «وللمدة التي يراها مناسبة», for a period it
+  /// sets, which is what `suspendedUntil` carries.
+  ///
+  /// Conflating them is not cosmetic: applying art. 14/c to a sanction would report a brokerage
+  /// serving a long CBJ penalty as CANCELLED, by operation of a rule written for a voluntary
+  /// withdrawal. See the migration header for the verified text of both articles, and for why
+  /// whether 14/c also reaches a 21/b suspension is left to the regulator rather than inferred.
+  basis            RegulatoryActionBasis
   /// When the act TAKES EFFECT, which is not when it was recorded — a suspension dated last month
   /// entered today was in force for that month, and art. 14/c counts from this date.
-  effectiveFrom    DateTime             @db.Date
+  effectiveFrom    DateTime              @db.Date
   /// The CBJ decision that ordered it. Required: an act with no decision behind it is an assertion
   /// about the regulator that nobody can check.
   decisionRef      String
   /// The decision document. `onDelete: Restrict` — the document IS the evidence.
   documentId       String?
-  document         Document?            @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  document         Document?             @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  /// The period the CBJ set under art. 21/b, where it set one. NULL on an art. 14/a suspension,
+  /// which is open-ended by nature. A CHECK restricts it to a SUSPENSION — on a cancellation it is
+  /// meaningless and on a reinstatement it would read as "reinstated until".
+  ///
+  /// DERIVED FROM, never stored as, a status: a sanction whose period has run out stops suspending
+  /// the office the moment the date passes, so there is nothing to sweep and nothing to go stale —
+  /// the same reasoning that keeps `BrokerLicense` off a `BrokerLicenseSweepScheduler`.
+  suspendedUntil   DateTime?             @db.Date
   recordedByUserId String
-  recordedAt       DateTime             @default(now())
+  recordedAt       DateTime              @default(now())
 
   @@index([organizationId, effectiveFrom])
 }
@@ -6816,6 +6837,14 @@ model RegulatoryAction {
 /// Suspension or cancellation — the two acts a regulator takes against a licence. A LIFTING is not
 /// here: it is the ABSENCE of a standing act, recorded as its own kind so the series tells the
 /// whole story rather than a row being deleted, which append-only forbids.
+/// MODULE 0-ب ITEM (d) — which provision a regulatory act was taken under. See `RegulatoryAction.basis`.
+enum RegulatoryActionBasis {
+  /// Art. 14/a — at the broker's own request, with the CBJ's prior approval. Art. 14/c applies.
+  BROKER_REQUEST
+  /// Art. 21/b/5-6 — imposed by the CBJ as an administrative sanction, for a period it sets.
+  SANCTION
+}
+
 enum RegulatoryActionKind {
   SUSPENSION
   CANCELLATION

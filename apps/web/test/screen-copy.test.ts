@@ -63,6 +63,21 @@ function sources(): Array<[string, string]> {
 }
 
 describe('every screen speaks both languages (rule 6)', () => {
+  /*
+   * AN EXPLICIT TIMEOUT, AND IT RETIRES A RECORDED FLAKE RATHER THAN HIDING ONE.
+   *
+   * This test SHELLS OUT to `scripts/measurements/hardcoded-ui-english.py`, which takes ~0.8s alone
+   * and has been measured at 20,980ms under a full four-workspace parallel run — against vitest's
+   * 5000ms default, which `apps/web` does not override. It was recorded as a known fragility with
+   * the note that CI cannot reach it because the frontend job runs `--filter=web` alone; it was then
+   * hit again locally at 5556ms in an ordinary `vitest run` of this workspace, which is well inside
+   * what CI does.
+   *
+   * Raising a timeout is normally the wrong move and this repository has the lesson written down.
+   * The distinction is the same one `role-scope.inventory.spec.ts` makes: nothing is being hidden.
+   * The assertion is correct, the work is a Python subprocess over the whole screen tree, and 5s is
+   * simply the wrong budget for it. Leaving it means a red build nobody believes.
+   */
   it('has no user-facing English written into it', () => {
     // The MEASUREMENT is the guard. Re-implementing the scan in TypeScript would give two detectors that
     // can disagree, and the one behind the build would be the one nobody re-runs by hand.
@@ -96,7 +111,7 @@ describe('every screen speaks both languages (rule 6)', () => {
         `read by nobody in the primary language. Add the key to a dictionary in ` +
         `lib/i18n/translations/ and render it through t(). Full output:\n${output}`,
     ).toBe(0);
-  });
+  }, 60_000);
 });
 
 /*

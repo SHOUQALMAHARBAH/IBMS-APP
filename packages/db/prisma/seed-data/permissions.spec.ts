@@ -58,9 +58,24 @@ describe("permission grid — every code is independent and traceable", () => {
   it("has at least one PLATFORM code, so the branch above is not vacuous", () => {
     // Without this, deleting the scope field from every entry would make the narrowing above
     // unreachable and the test would still pass.
+    //
+    // THE SET, NOT A COUNT, AND IT IS THE RIGHT SHAPE FOR THIS ONE. A PLATFORM code is a code whose
+    // effect leaves the granting office, so which codes are on this list is the boundary itself —
+    // `toHaveLength(2)` would be satisfied by any two, including one swapped for a code nobody
+    // decided should cross offices. Adding to it is a deliberate edit here, with a reason.
     expect(
-      PERMISSIONS.filter((p) => p.scope === "PLATFORM").map((p) => p.code),
-    ).toEqual(["provider.office-state.read"]);
+      PERMISSIONS.filter((p) => p.scope === "PLATFORM")
+        .map((p) => p.code)
+        .sort(),
+    ).toEqual(
+      [
+        // Module 0 item (j) — reads the cross-office dashboard.
+        "provider.office-state.read",
+        // Module 0-ب item (d) — CREATES A TENANT, which is as far outside the granting office as an
+        // effect can reach.
+        "provider.office.register",
+      ].sort(),
+    );
   });
 
   it("only references roles the seed actually installs", () => {

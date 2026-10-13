@@ -126,7 +126,13 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // exactly two of the four: it is the only member of a `provider` family, and one CRUD verb is
     // not a family, so it lands in the TOGGLE list. Families and the codes they cover do not move —
     // the same arithmetic `diagnostics.view` produced, for the same reason.
-    expect(PERMISSION_CATALOGUE.length).toBe(220);
+    // `provider.office.register` (Module 0-ب item (d), the route that creates a tenant) moves exactly
+    // ONE of the four. It is PLATFORM-scoped like its sibling, so the matrix never offers it: the
+    // catalogue grows and the toggle list does not. `provider` now holds TWO codes — but
+    // `office-state.read` and `office.register` are two different FAMILIES by the matrix's own
+    // reading (`provider.office-state` and `provider.office`), so no five-state row appears either,
+    // which is the right answer for a pair an office may never hold.
+    expect(PERMISSION_CATALOGUE.length).toBe(221);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure

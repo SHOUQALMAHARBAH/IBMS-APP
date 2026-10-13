@@ -1,6 +1,6 @@
 # Permission catalogue — دليل الصلاحيات
 
-> **220 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
+> **221 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
 >
 > **The English text is the stored description.** It is developer-facing and often terse: a hint at what the code gates, not something to translate word for word.
 >
@@ -8,7 +8,7 @@
 >
 > **A code held by NO role is not a mistake.** It means the seeded grid grants it to nobody yet; an office can still grant it from the Role screen.
 
-## admin — الإدارة والأمن  (22)
+## admin — الإدارة والأمن  (23)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -25,15 +25,16 @@
 | `department.update` | Rename a department | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `diagnostics.view` | See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence | SYSTEM_SECURITY_ADMINISTRATOR |
 | `encryption-key.read` | View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `permission.read` | View the global permission catalogue (the codes a role can be granted) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `provider.office-state.read` | Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform | SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.create` | Define a new role in this office's catalogue | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.deactivate` | Retire a role, reactivate a retired one, and delete one that was never used | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.read` | View the office's role catalogue | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.update` | Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `permission.read` | View the global permission catalogue (the codes a role can be granted) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `provider.office-state.read` | Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
+| `provider.office.register` | Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
+| `role.create` | Define a new role in this office's catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.deactivate` | Retire a role, reactivate a retired one, and delete one that was never used | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.read` | View the office's role catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.update` | Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `security-config.manage` | Update the security configuration | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `security-config.read` | Read the security configuration (idle timeout, lockout policy, ...) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `user.manage` | Provision/deprovision user accounts and role assignments | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `user.manage` | Provision/deprovision user accounts and role assignments | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 
 ## claims — المطالبات  (13)
 
@@ -145,7 +146,7 @@
 | `client-accounting.read` | View the client accounts-receivable/ageing report | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR, FINANCE_COLLECTIONS_OFFICER |
 | `commission-override.approve` | Approve a manual commission override (separately logged from the raiser) | BRANCH_DEPARTMENT_MANAGER |
 | `commission-override.raise` | Raise a manual commission override with a mandatory reason | FINANCE_COLLECTIONS_OFFICER |
-| `commission-rate.manage` | Alter a commission rate agreement/table (Finance may never do this without approval) | BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER, E2E_SCOPED_1791747386117, E2E_SCOPED_1791747449534, E2E_SCOPED_1791747478636, E2E_SCOPED_1791747511183, E2E_SCOPED_1791747548194, E2E_SCOPED_1791747577626, E2E_SCOPED_1791747598466, E2E_SCOPED_1791747619161, E2E_SCOPED_1791747649698, E2E_SCOPED_1791747743120, E2E_SCOPED_1791747764660, E2E_SCOPED_1791747785377, E2E_SCOPED_1791750200179 |
+| `commission-rate.manage` | Alter a commission rate agreement/table (Finance may never do this without approval) | BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER, E2E_SCOPED_1791747386117, E2E_SCOPED_1791747449534, E2E_SCOPED_1791747478636, E2E_SCOPED_1791747511183, E2E_SCOPED_1791747548194, E2E_SCOPED_1791747577626, E2E_SCOPED_1791747598466, E2E_SCOPED_1791747619161, E2E_SCOPED_1791747649698, E2E_SCOPED_1791747743120, E2E_SCOPED_1791747764660, E2E_SCOPED_1791747785377, E2E_SCOPED_1791750200179, E2E_SCOPED_1791755811235, E2E_SCOPED_1791803778496, E2E_SCOPED_1791808688265 |
 | `commission.calculate` | Apply the governed commission rate from the agreement table | FINANCE_COLLECTIONS_OFFICER |
 | `commission.reconcile` | Reconcile a commission ledger entry against the insurer statement and mark it paid | FINANCE_COLLECTIONS_OFFICER |
 | `financial-report.view` | View financial reporting/dashboards | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR, FINANCE_COLLECTIONS_OFFICER |
@@ -292,8 +293,8 @@
 
 ## Measured, so the numbers are checkable
 
-- **220** codes, **12** modules.
-- **0** held by no seeded role; **87** held by exactly one.
+- **221** codes, **12** modules.
+- **0** held by no seeded role; **88** held by exactly one.
 - **0** have no stored English description.
 
 Regenerate after any permission change. The sibling file `docs/permission-catalogue-for-descriptions.txt` is the one to TYPE INTO — it carries an `ar:` line per code and is regenerated without destroying what is already written there.

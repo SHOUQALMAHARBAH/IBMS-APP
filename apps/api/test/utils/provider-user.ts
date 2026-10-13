@@ -54,23 +54,47 @@ export async function createProviderUser(
   app: INestApplication<App>,
   label: string,
 ): Promise<{ accessToken: string; userId: string; organizationId: string }> {
-  const email = `${label}-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}@ibms.test`;
-
   const org = await rawPrisma.organization.findFirstOrThrow({
     where: { type: 'PROVIDER' },
   });
   const role = await rawPrisma.role.findFirstOrThrow({
     where: { organizationId: org.id, name: 'PLATFORM_OPERATOR' },
   });
+  return createUserInOrganization(app, {
+    organizationId: org.id,
+    roleId: role.id,
+    label,
+  });
+}
+
+/**
+ * THE SAME THREE DETAILS, FOR ANY ORGANIZATION.
+ *
+ * Generalised when module 0-ب item (d) needed a signed-in user inside a BROKERAGE OFFICE holding a
+ * PLATFORM-scoped grant — the one caller that can prove the registration route's organization check
+ * is a real boundary rather than a flag.
+ *
+ * Generalised rather than copied, for exactly the reason the header above gives: the three details
+ * that bite (`mustChangePassword`, the bcrypt cost, forced MFA) cost a failing run EACH to learn,
+ * and a second copy is where one of them is quietly dropped.
+ */
+export async function createUserInOrganization(
+  app: INestApplication<App>,
+  options: { organizationId: string; roleId: string; label: string },
+): Promise<{ accessToken: string; userId: string; organizationId: string }> {
+  const { organizationId, roleId, label } = options;
+  const email = `${label}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}@ibms.test`;
+  const org = { id: organizationId };
+  const role = { id: roleId };
 
   const bcrypt = await import('bcryptjs');
   const created = await rawPrisma.user.create({
     data: {
       organizationId: org.id,
       email,
-      fullName: 'Platform Operator E2E',
+      fullName: 'E2E fixture user',
       passwordHash: await bcrypt.hash(PROVIDER_E2E_PASSWORD, 12),
       isActive: true,
       mustChangePassword: false,

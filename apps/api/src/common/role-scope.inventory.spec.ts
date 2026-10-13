@@ -50,7 +50,7 @@ const SCOPED_WRITERS = [
 /**
  * Write surfaces that carry a line and are deliberately NOT scoped, each with its reason.
  *
- * These are not exemptions of convenience. All five record what the OFFICE or one of its PEOPLE is
+ * These are not exemptions of convenience. All six record what the OFFICE or one of its PEOPLE is
  * LICENSED for — which is the INPUT to scope, not a thing scope governs. Scoping them would mean a
  * GENERAL-scoped administrator could not record the office's own life licence, which inverts the
  * relationship: the licence is what makes a scope possible, so a scope cannot gate the licence.
@@ -66,6 +66,15 @@ const UNSCOPED_WRITERS: Record<string, string> = {
     "an office's own mapping of an insurer form — a configuration row, not business",
   'modules/rbac/services/role-admin.service.ts':
     'writes the SCOPE itself; scoping that would make a scope unchangeable once set',
+  /*
+   * MODULE 0-ب ITEM (d). The same argument as `broker-license-scope.service.ts` one step earlier in
+   * the office's life, and a second argument that only applies here: the writer is the PROVIDER, and
+   * the provider holds no role in the office being created — there is no scope to be within. The
+   * office does not exist until this transaction commits, so a scope check would be asking a
+   * question about a tenant that has no roles, no users and no grants yet.
+   */
+  'modules/provider/office-registration.service.ts':
+    "the office's FIRST licensed branches, written by the provider at registration — the input to scope, before any role exists to be scoped",
 };
 
 function read(relative: string): string | null {

@@ -221,6 +221,7 @@ export const PERMISSIONS = {
     'perm:privacy-notice.publish': 'ينشر إشعار خصوصية بنسخة مُرقَّمة بلغتين. نشرٌ للعموم بأثر قانوني',
     'perm:privacy-notice.read': 'يقرأ إشعار الخصوصية المنطبق على نقطة تواصل. قراءة فقط؛ النشر صلاحية أخرى',
     'perm:provider.office-state.read': 'يقرأ قائمة مكاتب الوساطة على المنصّة وحالتها: رقم الترخيص وتاريخ انتهائه، وعدد الفروع المرخَّصة التي لا يُكتب فيها أي عمل، وأعداد المستخدمين، وآخر استخدام لكل مكتب. القراءة تعبُر المكاتب — فهي تُظهر مكاتب أخرى لا مكتبك وحده — ولا تحتوي عن قصد أي بيانات عملاء أو وثائق أو أقساط أو عمولات، ولا أي بيانات شخصية. امنحها لمن يُشغّل المنصّة فقط',
+    'perm:provider.office.register': 'يُسجّل مكتب وساطة جديداً على المنصّة: هُويّته القانونية، ومدّة ترخيصه وشهادته، والفروع التأمينية المرخَّصة له، وتأمين مسؤوليته المهنية، وبياناته البنكية، ودوره الإداري الأول. هذا الإجراء يُنشئ مستأجراً جديداً — فكلّ مكتب يُسجَّل بهذه الطريقة هو مجموعة سجلّات منفصلة ومعزولة تماماً — وهو الطريق الوحيد في هذا النظام القادر على ذلك. امنحها لمن يُشغّل المنصّة فقط',
     'perm:profitability-analysis.view': 'يرى ما يربح المكتب فعلاً: إيراد العمولة مقابل تكلفة الخدمة وصافي الربحية لكل نوع تأمين وكل فئة عملاء. أكشف شاشة بعد تقرير المالية',
     'perm:program.assemble': 'يبني البرنامج التأميني للعميل: عدة أنواع تأمين مجموعة بناءً على نتائج تقييم الخطر. عمل فني لا بيعي',
     'perm:program.read': 'يقرأ البرامج التأمينية للعملاء',
@@ -444,6 +445,8 @@ export const PERMISSIONS = {
     'perm:privacy-notice.read': 'Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)',
     'perm:provider.office-state.read':
       'Opens the platform-wide view of every brokerage office: its licence number and expiry, whether that licence still lets it place business, how many of its licensed branches carry no business at all, how many people it has, and when it was last used. This crosses office boundaries — the holder sees other offices, not only their own — so grant it only to whoever operates the platform. It shows no customers, no policies, no premiums or commission, and nothing about any individual person',
+    'perm:provider.office.register':
+      'Registers a new brokerage office on the platform: its legal identity, its licence term and certificate, the branches it is licensed for, its professional indemnity cover, its banking details and its first administrator role. This CREATES A TENANT — every office registered this way is a separate, isolated set of records that no other office can reach — and it is the only route in this product that can do it. Grant it only to whoever operates the platform',
     'perm:profitability-analysis.view': 'View profitability analysis (commission income vs. cost-to-serve)',
     'perm:program.assemble': 'Assemble a multi-line Insurance Program from risk-assessment results',
     'perm:program.read': 'List/read Insurance Programs',
