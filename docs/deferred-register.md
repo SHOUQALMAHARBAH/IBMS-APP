@@ -11,6 +11,12 @@
 must say the same thing. If they diverge, THE CODE IS RIGHT AND THIS FILE IS STALE** — and that
 divergence is itself worth checking for.
 
+**A deferral with a specific point of first contact in the code is recorded in BOTH places.** The
+register serves whoever is PLANNING; a note at the point of contact serves whoever is about to
+write the thing the deferral makes invalid, and needs the warning before the code exists rather
+than after. The foreign-currency item is the worked example: it is here, and on the `CURRENCIES`
+list that whoever writes `amount > THRESHOLD` will be reading.
+
 ---
 
 ## How to re-measure this, rather than trusting it
@@ -52,6 +58,7 @@ These are the owner's items whose declaration site does not exist yet. Each land
 | Item | Article / decision | Lands with |
 |---|---|---|
 | Per-branch last-activity tracking | art. 21/a/10 | a later module |
+| **`RegulatoryAction` cannot express that one act's document SUPERSEDED another's.** `documentId` carries `onDelete: Restrict`, which is right — the document is the evidence and must not vanish from under the record — but it means a corrected or replaced scan can only be ADDED, and a new row reads as a SECOND regulatory act rather than a correction of the first. Measured: the model has no `supersededBy`, `replaces` or equivalent field. **No field is invented now.** When it is needed it is a link between two acts, not a mutable column, because append-only is the whole point | decision 71 (append-only) | a later module |
 | **Foreign-currency amounts have no conversion path** — every threshold in Instructions No. 9 of 2026 is in JOD (art. 4/a slabs, art. 13/b/2's 50,000, art. 15/d's 2,000), so an amount in USD or EUR cannot be tested against any of them. Comparing bare numbers would reach a regulatory conclusion from an invalid comparison. Conversion needs a RATE **and the DATE it was taken** — a rate without its date is useless to an audit. Declared on the `CURRENCIES` list in `reference-tables.ts`. **ASK AT MODULE 14's OPENING, NOT DURING IT:** whether offices actually write policies in foreign currency. The owner has deliberately left open whether this is a central part of that module or a footnote, and the answer SIZES the build rather than correcting it afterwards. If they do not, it shrinks to a reinsurance reference and stays small either way. | arts. 4/a, 13/b/2, 15/d | **module 14** |
 | The warned-act mechanism, and the issuance gate that depends on it | arts. 15/d, 19/a/3, 16/y/8 | module 1 (specified in the module 0-ب brief's appendix; **must not be half-built earlier**) |
 | The legal-values table | decision; م١٥/ي reads from it | module 1 |
@@ -97,11 +104,15 @@ Recorded here because both came out of guards that were green while describing s
    `duty-segregation-schema.e2e-spec.ts` compares it against `pg_constraint`, so a silently wrong
    entry would propagate into both.
 
-   **Classified and deliberately NOT converted**, because the number IS the thing under test: a
-   function's return value (`requiredApprovedStaff`), tallies of fixture data, dashboard
-   aggregations, per-test result counts — and `ALL_STATUSES).toHaveLength(9)`, which sits directly
-   beneath named-set assertions and exists to catch a TENTH status arriving, with that reasoning
-   written out beside it.
+   **THE BOUNDARY OF THIS RULE, recorded so it is not later applied into noise.** Convert where a
+   count STANDS IN FOR a set of named values. KEEP the number where the quantity IS the thing under
+   test, and say which beside it.
+
+   Deliberately not converted, each because the number is the claim: a function's return value
+   (`requiredApprovedStaff`), tallies of fixture data, dashboard aggregations, per-test result
+   counts — and `ALL_STATUSES).toHaveLength(9)`, the clearest case, which sits directly beneath
+   named-set assertions and exists to catch a TENTH status arriving, with that reasoning already
+   written beside it. A named set there would say LESS, not more.
 3. **A guard that runs after the write it guards is a report, not a guard.** The check belongs
    inside the transaction that writes. Applies directly to item (d), where the organization, the
    licence term with its certificate and the scope lines are written together.

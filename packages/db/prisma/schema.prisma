@@ -206,8 +206,8 @@ enum MfaCredentialType {
 /// reasoning as `Customer.legalNameAr` / `Insurer.nameAr` elsewhere in this
 /// schema.
 model Organization {
-  id                         String           @id @default(uuid())
-  legalName                  String
+  id                  String           @id @default(uuid())
+  legalName           String
   /// Arabic legal name. NOT NULL since module 0-ب: the field dictionary marks it mandatory on
   /// both sheets, and this system's base language is Arabic — a name that exists only in Latin
   /// script prints untranslated mid-sentence on every Arabic screen.
@@ -216,11 +216,11 @@ model Organization {
   /// confirmed", which was true while NOTHING COULD ONBOARD AN OFFICE AT ALL. The provider
   /// registration form changes that, and the measurement that decided it found ZERO rows without
   /// one on either database. Empty string is NOT caught here — the DTO refuses it.
-  legalNameAr                String
+  legalNameAr         String
   /// Brokerage office or insurance company — see `OrganizationType`. NOT NULL with no default:
   /// the kind is stated at creation, never inferred. Tenant isolation is UNCHANGED by this column;
   /// `Organization` carries no `organizationId` and so was never in `TENANT_SCOPED_MODELS`.
-  type                       OrganizationType
+  type                OrganizationType
   /// PAID-UP CAPITAL in JOD — CBJ Instructions No. 9 of 2026, art. 4/a, which scales the
   /// requirement by how many branches the office is licensed for. Module 0 item (e) compares the
   /// two and WARNS; it never refuses, because the authority on an office's capital is its
@@ -230,19 +230,19 @@ model Organization {
   /// zero would be a false statement rather than a missing one. `money-fields.inventory.ts`
   /// classifies it as a real JOD amount, so every arithmetic touching it goes through
   /// `money.util.ts`.
-  paidUpCapital              Decimal?         @db.Decimal(18, 3)
+  paidUpCapital       Decimal?         @db.Decimal(18, 3)
   /// Natural person (sole establishment) or corporate — CBJ Instructions No. 9 of 2026, art. 3/a.
   /// NULL exactly when this is an insurance company; the CHECK constraint
   /// `Organization_broker_kind_matches_type` is what makes that structural rather than a habit.
-  brokerKind                 BrokerKind?
+  brokerKind          BrokerKind?
   /// This office's own CBJ broker license number. Distinct from the
   /// `BrokerLicense` model, which tracks a license's lifecycle per office.
-  brokerLicenseNumber        String?
+  brokerLicenseNumber String?
   /// Tenant resolution key (spec §4.10) — e.g. "alsalam" resolves
   /// alsalam.ibms-app.example to this row BEFORE any login step runs.
   /// Nothing consumes it yet; `GET /orgs/resolve` arrives in Phase 4.
-  subdomain                  String           @unique
-  status                     OrgStatus        @default(ACTIVE)
+  subdomain           String           @unique
+  status              OrgStatus        @default(ACTIVE)
   /// SUPERSEDED by the per-office duty-segregation MODE — see
   /// `docs/duty-segregation-mode.md`. Kept until the deferred cleanup track removes it, and
   /// deliberately NOT given a consumer in the meantime: two live mechanisms for one problem is how the
@@ -257,9 +257,110 @@ model Organization {
   /// Deliberately a plain id, NOT a User relation — a second
   /// Organization<->User relation would force every other relation in this
   /// file to be explicitly named.
+  /// MODULE 0-ب ITEM (d) — THE REGISTRATION FIELDS, from the owner's field dictionary v2.
+  ///
+  /// Broker sheet 47 fields, insurer sheet 38. Where a field already had a home it kept it —
+  /// `legalName`, `legalNameAr`, `type`, `brokerKind`, `status`, `createdAt`, `updatedAt`, and the
+  /// whole licence block on `BrokerLicense` — so what follows is only what was genuinely absent.
+  /// `docs/module-0b-field-map.md` places all 85 field by field.
+
+  /// Short code the provider assigns. UNIQUE PLATFORM-WIDE and across organization types: the
+  /// sheet carries `broker_code` and `insurer_code` separately because it models two tables, and
+  /// both now live here. One column, so an insurer cannot carry a broker's code.
+  code                       String?   @unique
+  /// Trade name, where it differs from the legal name. Optional on the sheet.
+  tradeName                  String?
+  /// NATIONAL IDENTIFIER, and THE DUPLICATE-REGISTRATION DEFENCE. Unique platform-wide and across
+  /// types — a per-tenant constraint would let the same office be registered twice, which is the
+  /// one thing this field exists to stop.
+  nationalEstablishmentNo    String?   @unique
+  commercialRegistrationNo   String?
+  commercialRegistrationDate DateTime? @db.Date
+  taxNumber                  String?
+
+  /// Direct insurance brokerage or reinsurance brokerage — the sheet's `license_type_id`, and a
+  /// DIFFERENT AXIS from the life/general types module 0 derives from the licence's branches.
+  /// Where this reads REINSURANCE, Instructions No. 9 of 2026 do not govern the office and their
+  /// guards must not fire.
+  brokerageKind BrokerageKind?
+
+  /// Address and contact. `address`, `phone` and `email` are mandatory on both sheets; the website
+  /// is optional.
+  countryId String?
+  country   Country? @relation(fields: [countryId], references: [id])
+  cityId    String?
+  city      City?    @relation(fields: [cityId], references: [id])
+  address   String?
+  phone     String?
+  email     String?
+  website   String?
+
+  /// THE KEY PEOPLE ARE TEXT, NOT FOREIGN KEYS. At registration the office has no employee records
+  /// at all, so an FK here would make registration impossible — the unreachable-precondition shape
+  /// this project has shipped once. The office links them to real employees later.
+  ///
+  /// They are PERSONAL DATA under PDPL No. 24/2023 and their read is permission-gated from the
+  /// start, not later.
+  generalManagerName     String?
+  complianceOfficerName  String?
+  complianceOfficerEmail String?
+  complianceOfficerPhone String?
+
+  /// THE BANK GUARANTEE HAS NO BASIS IN INSTRUCTIONS NO. 9 OF 2026 — verified by reading arts. 3,
+  /// 4, 10, 11, 13, 15 and 18. The field dictionary marked these "conditionally mandatory"; its v2
+  /// corrections tab reclassifies all four as OPTIONAL for exactly this reason.
+  ///
+  /// So: collected if the office has one, NEVER required, never a reason to refuse registration,
+  /// and never labelled a regulatory requirement. The financial requirements that DO exist are
+  /// paid-up capital per type (art. 4/a) and 50,000 JOD for more than five PHYSICAL branches
+  /// (art. 13/b/2) — the latter unimplemented, see `broker-license-scope.config.ts`.
+  bankGuaranteeNo     String?
+  bankGuaranteeBankId String?
+  bankGuaranteeBank   Bank?     @relation("OrganizationGuaranteeBank", fields: [bankGuaranteeBankId], references: [id])
+  bankGuaranteeAmount Decimal?  @db.Decimal(18, 3)
+  bankGuaranteeExpiry DateTime? @db.Date
+
+  /// Banking. The IBAN is ENCRYPTED — see `security/encrypted-fields.ts`.
+  ///
+  /// ART. 15/i AND 15/k ARE NOT BUILT AND BELONG TO MODULE 14, recorded here so they are not
+  /// rediscovered: 15/i requires a DEDICATED client-funds account, and 15/k forbids pledging it or
+  /// letting it bear interest. This column records an account; it enforces neither rule.
+  bankId     String?
+  bank       Bank?     @relation("OrganizationBank", fields: [bankId], references: [id])
+  ibanEnc    String? // -- ENCRYPT
+  currencyId String?
+  currency   Currency? @relation(fields: [currencyId], references: [id])
+
+  legalFormId          String?
+  legalForm            LegalForm?          @relation(fields: [legalFormId], references: [id])
+  licensingAuthorityId String?
+  licensingAuthority   LicensingAuthority? @relation(fields: [licensingAuthorityId], references: [id])
+
+  /// INSURER-ONLY FIELDS. Present on this model because an insurance company IS an Organization
+  /// (decision 63); null for a brokerage office.
+  shortName            String?
+  insurerLicenseNumber String?
+  businessModelId      String?
+  businessModel        BusinessModel?     @relation(fields: [businessModelId], references: [id])
+  integrationMethod    IntegrationMethod?
+  apiEndpoint          String?
+  /// The company's PUBLISHED channels — company facts, resolved through the insurer resolver when
+  /// an office's `Insurer` row is linked. The office's own named contact inside the company stays
+  /// on `Insurer`, because each broker deals with a different person.
+  quotationEmail       String?
+  claimsEmail          String?
+
+  /// Who registered and last amended this organization. PLAIN IDS, NOT FOREIGN KEYS: `User` is
+  /// tenant-scoped and the registrar is the PROVIDER's user, in a different organization, so an FK
+  /// would be a cross-tenant reference. Same treatment as `dpoAlternateApproverUserId` below.
+  createdByUserId String?
+  updatedByUserId String?
+
+  regulatoryActions RegulatoryAction[]
+
   dpoAlternateApproverUserId String?
-  createdAt                  DateTime         @default(now())
-  updatedAt                  DateTime         @updatedAt
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   accessAnomalyAlerts                 AccessAnomalyAlert[]
   accessDeprovisioningChecklists      AccessDeprovisioningChecklist[]
@@ -3976,6 +4077,18 @@ model ProfessionalIndemnityPolicy {
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
   organizationId       String       @default(dbgenerated())
   organization         Organization @relation(fields: [organizationId], references: [id])
+  /// MODULE 0-ب ITEM (d) — the field dictionary's `pi_policy_no`, which had NOWHERE TO GO: this
+  /// model carried the limit and the expiry but no policy number at all. One column on the model
+  /// that already exists, rather than three loose fields on the organization.
+  ///
+  /// PROFESSIONAL INDEMNITY IS MANDATORY FOR EVERY BROKER, not conditional — art. 10/a/4 requires
+  /// it before final licence approval and art. 18/a/3 lists it among the periodic data. The sheet's
+  /// "conditionally mandatory" was corrected in v2.
+  ///
+  /// NO MINIMUM LIMIT IS ENFORCEABLE AND NONE IS INVENTED: art. 10/a/4 leaves the contract's terms
+  /// and amounts to a CBJ decision issued for that purpose, which we do not have. `coverageLimit`
+  /// is collected; nothing refuses on its size.
+  policyNumber         String?
   insurerName          String
   coverageLimit        Decimal      @db.Decimal(18, 3)
   expiresAt            DateTime
@@ -5519,8 +5632,8 @@ model InsuranceLine {
 ///
 /// See `packages/db/prisma/seed-data/reference-tables.ts` for each list and its limits.
 model Country {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String         @id @default(uuid())
+  code          String         @unique
   nameEn        String
   nameAr        String
   /// Arabic explanation of what this value MEANS, required only where the value carries a
@@ -5530,12 +5643,13 @@ model Country {
   /// reading descriptions at exactly the point where one matters.
   descriptionAr String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
+  organizations Organization[]
 }
 
 model City {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String         @id @default(uuid())
+  code          String         @unique
   nameEn        String
   nameAr        String
   /// Arabic explanation of what this value MEANS, required only where the value carries a
@@ -5545,12 +5659,13 @@ model City {
   /// reading descriptions at exactly the point where one matters.
   descriptionAr String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
+  organizations Organization[]
 }
 
 model Bank {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String         @id @default(uuid())
+  code          String         @unique
   nameEn        String
   nameAr        String
   /// Arabic explanation of what this value MEANS, required only where the value carries a
@@ -5560,12 +5675,14 @@ model Bank {
   /// reading descriptions at exactly the point where one matters.
   descriptionAr String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
+  organizations Organization[] @relation("OrganizationBank")
+  guaranteeFor  Organization[] @relation("OrganizationGuaranteeBank")
 }
 
 model Currency {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String         @id @default(uuid())
+  code          String         @unique
   nameEn        String
   nameAr        String
   /// Arabic explanation of what this value MEANS, required only where the value carries a
@@ -5575,12 +5692,13 @@ model Currency {
   /// reading descriptions at exactly the point where one matters.
   descriptionAr String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
+  organizations Organization[]
 }
 
 model LicensingAuthority {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String         @id @default(uuid())
+  code          String         @unique
   nameEn        String
   nameAr        String
   /// Arabic explanation of what this value MEANS, required only where the value carries a
@@ -5590,7 +5708,8 @@ model LicensingAuthority {
   /// reading descriptions at exactly the point where one matters.
   descriptionAr String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
+  organizations Organization[]
 }
 
 model RatingAgency {
@@ -5609,8 +5728,8 @@ model RatingAgency {
 }
 
 model LegalForm {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String         @id @default(uuid())
+  code          String         @unique
   nameEn        String
   nameAr        String
   /// Arabic explanation of what this value MEANS, required only where the value carries a
@@ -5620,7 +5739,8 @@ model LegalForm {
   /// reading descriptions at exactly the point where one matters.
   descriptionAr String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
+  organizations Organization[]
 }
 
 /// Conventional or takaful. NOTHING MAY BRANCH ON THIS VALUE — where terminology differs the
@@ -5628,8 +5748,8 @@ model LegalForm {
 /// plus its templates rather than a release. `if (model === 'TAKAFUL')` is the signal the design
 /// was lost.
 model BusinessModel {
-  id            String   @id @default(uuid())
-  code          String   @unique
+  id            String         @id @default(uuid())
+  code          String         @unique
   nameEn        String
   nameAr        String
   /// Arabic explanation of what this value MEANS, required only where the value carries a
@@ -5639,7 +5759,8 @@ model BusinessModel {
   /// reading descriptions at exactly the point where one matters.
   descriptionAr String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime       @default(now())
+  organizations Organization[]
 }
 
 /// MODULE 0-ب — the field dictionary's `license_type_id`, and A DIFFERENT AXIS from the licence
@@ -6019,9 +6140,10 @@ model Document {
   deletionOverrideByUserId String? // privileged, logged override only
   createdAt                DateTime           @default(now())
 
-  claimDocuments ClaimDocument[]
+  claimDocuments    ClaimDocument[]
   /// Module 0 item (c) — the terms whose certificate this document is.
-  brokerLicenses BrokerLicense[]
+  brokerLicenses    BrokerLicense[]
+  regulatoryActions RegulatoryAction[]
 
   @@index([policyId])
   @@index([customerId])
@@ -6652,4 +6774,50 @@ model DuplicateNameWarning {
   @@index([organizationId, warnedAt(sort: Desc)])
   @@index([canonicalKey])
   @@index([samePerson])
+}
+
+/// MODULE 0-ب ITEM (d) — THE REGULATOR'S ACT, APPEND-ONLY. Decision 71.
+///
+/// LICENCE STATUS IS NOT STORED. It is DERIVED from the licence term's dates, whether a renewal was
+/// filed and when, and whether any regulatory act is standing — the same principle as licence types
+/// derived from branches. The field dictionary's v2 corrections tab reclassifies `license_status_id`
+/// on BOTH sheets from a stored FK to "محسوب — لا عمود".
+///
+/// "قيد التجديد" in particular is already derivable from `renewalRequestedAt` and art. 11's 45-day
+/// deadline, so storing it would be a second home for a fact the system already computes.
+///
+/// WHAT IS STORED IS THE ACT: its kind, the date it takes effect, the CBJ decision that ordered it,
+/// and the document. APPEND-ONLY — no permission edits, voids or deletes a row here, because this
+/// is the evidence of what the regulator did, not a status field somebody maintains.
+///
+/// ART. 14/c IS DERIVED FROM IT, NEVER STORED: a suspension running beyond two years is deemed a
+/// cancellation by operation of law. Storing that conclusion would let it disagree with the dates
+/// it is computed from.
+model RegulatoryAction {
+  id               String               @id @default(uuid())
+  organizationId   String
+  organization     Organization         @relation(fields: [organizationId], references: [id])
+  kind             RegulatoryActionKind
+  /// When the act TAKES EFFECT, which is not when it was recorded — a suspension dated last month
+  /// entered today was in force for that month, and art. 14/c counts from this date.
+  effectiveFrom    DateTime             @db.Date
+  /// The CBJ decision that ordered it. Required: an act with no decision behind it is an assertion
+  /// about the regulator that nobody can check.
+  decisionRef      String
+  /// The decision document. `onDelete: Restrict` — the document IS the evidence.
+  documentId       String?
+  document         Document?            @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  recordedByUserId String
+  recordedAt       DateTime             @default(now())
+
+  @@index([organizationId, effectiveFrom])
+}
+
+/// Suspension or cancellation — the two acts a regulator takes against a licence. A LIFTING is not
+/// here: it is the ABSENCE of a standing act, recorded as its own kind so the series tells the
+/// whole story rather than a row being deleted, which append-only forbids.
+enum RegulatoryActionKind {
+  SUSPENSION
+  CANCELLATION
+  REINSTATEMENT
 }
