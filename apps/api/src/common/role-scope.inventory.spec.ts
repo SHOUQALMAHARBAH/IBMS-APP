@@ -120,7 +120,7 @@ describe('item (h): every line-writing service decides the role scope', () => {
         `${relative} is named in UNSCOPED_WRITERS and does not exist — re-point the row rather than deleting it.`,
       ).not.toBeNull();
     }
-  });
+  }, 30_000);
 
   it('each one calls assertWithinRoleScope', () => {
     for (const relative of SCOPED_WRITERS) {
@@ -134,8 +134,25 @@ describe('item (h): every line-writing service decides the role scope', () => {
           'known, or add a row to UNSCOPED_WRITERS with a reason that survives review.',
       ).toBe(true);
     }
-  });
+  }, 30_000);
 
+  /*
+   * AN EXPLICIT TIMEOUT, AND IT IS NOT A MITIGATION FOR A FLAKE.
+   *
+   * Every test in this file READS THE WHOLE API SOURCE TREE from disk. Measured under a parallel
+   * `vitest run src/common`: 6915ms, against vitest's 5000ms default — so it passes alone every
+   * time and fails under load, which looks exactly like flakiness and is not. It is I/O cost.
+   *
+   * Raising a timeout is normally the wrong move — this repository has a recorded lesson about
+   * mitigations that buy time and hide the next crossing. The distinction here is that nothing is
+   * being hidden: the assertion is correct, the work is genuinely file I/O over hundreds of files,
+   * and 5s is simply the wrong budget for it. The alternative — leaving it — means CI goes red on
+   * load and somebody learns to re-run the suite until it is green, which is how a real failure
+   * gets dismissed later.
+   *
+   * `screen-copy.test.ts` has the same shape for the same reason and is recorded as a known flake;
+   * this one is fixed rather than recorded, because CI does run `src/common`.
+   */
   it('NO OTHER service writes a line without deciding scope', () => {
     /*
      * The half that makes this a guard rather than a checklist: a NEW write surface is found by
@@ -161,7 +178,7 @@ describe('item (h): every line-writing service decides the role scope', () => {
         'UNSCOPED_WRITERS in this spec with a reason. An over-selected file is a one-line row with ' +
         'an argument; an unchecked one is a scope a request walks around.',
     ).toEqual([]);
-  });
+  }, 30_000);
 
   it('the matcher really does find line-writing files — not vacuous', () => {
     // If `writesALine` ever stops recognising the shape, every assertion above passes over an
@@ -174,7 +191,7 @@ describe('item (h): every line-writing service decides the role scope', () => {
       found.length,
       'the line-writing matcher found nothing at all — its shape has drifted and every check in this file is now vacuous.',
     ).toBeGreaterThanOrEqual(4);
-  });
+  }, 30_000);
 });
 
 describe('item (h): the scope decision has exactly one home', () => {
@@ -228,14 +245,14 @@ describe('item (h): the scope decision has exactly one home', () => {
         'ONE home: call `withinRoleScope` or `assertWithinRoleScope`. A second copy of the ' +
         'comparison is how one of the two comes back looser than it went in.',
     ).toEqual([]);
-  });
+  }, 30_000);
 
   it('and the one home really contains the comparison — not vacuous', () => {
     const decision = read(DECISION_FILE);
     expect(decision).not.toBeNull();
     expect(decision).toContain('scope.category');
     expect(decision).toContain('lineIds');
-  });
+  }, 30_000);
 });
 
 /**
@@ -273,13 +290,13 @@ describe('item (h): permission codes are not duplicated per insurance type', () 
         "scope, not to the code — otherwise the catalogue doubles and an office's grid becomes two " +
         'grids that can disagree.',
     ).toEqual([]);
-  });
+  }, 30_000);
 
   it('the catalogue is really being read — not vacuous', () => {
     // 219 codes at the time of writing. The floor is lower so an unrelated catalogue change does
     // not fail this, and far above zero so a drifted regex cannot pass over an empty set.
     expect(permissionCodes().length).toBeGreaterThan(200);
-  });
+  }, 30_000);
 });
 
 describe('item (h): the decision itself', () => {
@@ -295,7 +312,7 @@ describe('item (h): the decision itself', () => {
     const unscoped = { roleId: 'r1', category: null, lineIds: [] };
     expect(scopeCovers(unscoped, GENERAL)).toBe(true);
     expect(scopeCovers(unscoped, LIFE)).toBe(true);
-  });
+  }, 30_000);
 
   it('an EMPTY branch list covers every branch within the type', () => {
     const general = { roleId: 'r1', category: 'GENERAL' as const, lineIds: [] };
@@ -304,7 +321,7 @@ describe('item (h): the decision itself', () => {
       true,
     );
     expect(scopeCovers(general, LIFE)).toBe(false);
-  });
+  }, 30_000);
 
   it('a named branch list covers only those branches', () => {
     const narrow = {
@@ -316,7 +333,7 @@ describe('item (h): the decision itself', () => {
     expect(scopeCovers(narrow, { category: 'GENERAL', lineId: 'line-x' })).toBe(
       false,
     );
-  });
+  }, 30_000);
 
   it('several roles UNION, never intersect', () => {
     /*
@@ -337,7 +354,7 @@ describe('item (h): the decision itself', () => {
       roleScopes: [{ roleId: 'r1', category: 'GENERAL' as const, lineIds: [] }],
     };
     expect(withinRoleScope(onlyGeneral, LIFE)).toBe(false);
-  });
+  }, 30_000);
 
   it('NO scopes at all is unrestricted, and so is an absent field', () => {
     // The ordinary case for every office that has not configured a scope, and the reason this
@@ -345,5 +362,5 @@ describe('item (h): the decision itself', () => {
     // outage on the deploy that added the column.
     expect(withinRoleScope({ roleScopes: [] }, GENERAL)).toBe(true);
     expect(withinRoleScope({ roleScopes: undefined }, LIFE)).toBe(true);
-  });
+  }, 30_000);
 });

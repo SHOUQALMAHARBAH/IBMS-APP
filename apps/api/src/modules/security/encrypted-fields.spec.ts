@@ -41,6 +41,12 @@ describe('ENCRYPTED_FIELDS — the exact Part 10.2 field map', () => {
       Customer: ['nationalIdEnc', 'contactPhoneEnc', 'contactEmailEnc'],
       CustomerIdentifierCorrection: ['beforeValueEnc', 'afterValueEnc'],
       UltimateBeneficialOwner: ['nationalIdEnc'],
+      // Module 0-ب item (d). The office's own IBAN, encrypted for the same reason a national
+      // ID is: an account identifier in the clear is directly actionable by anyone who reads
+      // the row or a backup of it. This spec pins the map by EXACT EQUALITY on purpose, so a
+      // new encrypted field is a REVIEWED change rather than one that silently starts — or
+      // silently fails to start — encrypting.
+      Organization: ['ibanEnc'],
       InsuredPerson: ['nationalIdEnc'],
       Employee: ['nationalIdEnc'],
       ThirdPartyClaimant: ['contactDetailsEnc'],

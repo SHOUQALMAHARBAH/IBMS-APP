@@ -117,7 +117,14 @@ Recorded here because both came out of guards that were green while describing s
    inside the transaction that writes. Applies directly to item (d), where the organization, the
    licence term with its certificate and the scope lines are written together.
 
-4. **A guard that is correct only because today's inputs happen to suit it is not a guard.**
+4. **A verification that routes a gate's result through another process reports THAT PROCESS, not
+   the gate.** `node check.mjs | tail -2; echo $?` prints `tail`'s exit status. This has cost
+   something twice: once reading a turbo task's output through a grep that matched nothing, and
+   once reading `db:divergence` through `tail` — where the first reading said the gate PASSED when
+   it had failed, on the one check that protects tenant isolation. Capture the gate's own exit code
+   directly, or run it without a pipe.
+
+5. **A guard that is correct only because today's inputs happen to suit it is not a guard.**
    `replace('$', …)` substituted one occurrence and worked solely because the token it guards
    contains one `$` — the same shape as the `|`-escaping defect this repository shipped once. Prove
    a guard against the GENERAL input, not the present one.

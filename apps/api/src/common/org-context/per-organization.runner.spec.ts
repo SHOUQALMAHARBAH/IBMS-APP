@@ -29,6 +29,49 @@ function org(id: string, legalName = `Office ${id}`): Organization {
     // low" are deliberately different states, and this runner is about neither.
     paidUpCapital: null,
     status: 'ACTIVE',
+    /*
+     * MODULE 0-ب ITEM (d) — the 35 registration columns, all null.
+     *
+     * NULL is the honest value and not a shortcut: this runner is about per-organization iteration,
+     * and these three offices were never registered through the form that collects any of this.
+     * They are listed rather than spread from a partial, because the comment below is right — the
+     * TYPE is what forces a decision here, and `...({} as Organization)` would take that away.
+     */
+    code: null,
+    tradeName: null,
+    nationalEstablishmentNo: null,
+    commercialRegistrationNo: null,
+    commercialRegistrationDate: null,
+    taxNumber: null,
+    brokerageKind: null,
+    countryId: null,
+    cityId: null,
+    address: null,
+    phone: null,
+    email: null,
+    website: null,
+    generalManagerName: null,
+    complianceOfficerName: null,
+    complianceOfficerEmail: null,
+    complianceOfficerPhone: null,
+    bankGuaranteeNo: null,
+    bankGuaranteeBankId: null,
+    bankGuaranteeAmount: null,
+    bankGuaranteeExpiry: null,
+    bankId: null,
+    ibanEnc: null,
+    currencyId: null,
+    legalFormId: null,
+    licensingAuthorityId: null,
+    shortName: null,
+    insurerLicenseNumber: null,
+    businessModelId: null,
+    integrationMethod: null,
+    apiEndpoint: null,
+    quotationEmail: null,
+    claimsEmail: null,
+    createdByUserId: null,
+    updatedByUserId: null,
     dpoAlternateApproverUserId: null,
     // Part 4 — every office reads SEGREGATED unless it has declared otherwise, which is what the migration
     // left every existing one at. A fixture that omitted these would not compile, deliberately: the type is

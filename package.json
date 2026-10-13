@@ -55,7 +55,8 @@
     "test:e2e": "turbo run test:e2e",
     "test:security": "node scripts/audit-check.mjs",
     "test:smoke": "bash scripts/smoke.sh api",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "db:migrate:diff": "npm run migrate:diff --workspace=@ibms/db"
   },
   "devDependencies": {
     "turbo": "2.10.11"
