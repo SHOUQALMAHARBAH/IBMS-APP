@@ -4,16 +4,36 @@
 lands: an existing column, a new column, or a field you cannot place. A field you cannot
 place is a finding, not a silent omission."*
 
-Source: `WASEET360_Broker_Insurer_Data_Fields.xlsx` — broker **42** (31 mandatory / 7
-conditional / 4 optional), insurer **36** (31/2/3), and a broker–insurer agreement sheet of
-13 which is **not in this module**. The workbook's own summary tab states those counts and
-they match the brief exactly.
+> ## ⚠️ THIS DOCUMENT WAS WRITTEN FROM v1 AND THE OWNER SENT A CORRECTED v2
+>
+> **Re-measured 2026-10-13 against `WASEET360_Broker_Insurer_Data_Fields_v2_corrected.xlsx`:
+> the broker sheet is 47 fields and the insurer sheet is 38.** The brief said 47 and 38; this
+> document said 42 and 36, and the brief was right. Sections A and B below are the v1 reading
+> and are kept rather than rewritten, because they are what items (a)–(c) were built against —
+> what is added is § A.1, the five v2 additions, and § B.1, the two.
+>
+> **All seven additions ALREADY HAVE HOMES in the schema.** They are corrections aligning the
+> sheet to what module 0 had already built, not new columns — which is why nothing in item (d)
+> needed a migration for them.
+>
+> The v2 workbook also carries a corrections sheet («تصحيحات ١٣ تشرين الأول») with six
+> corrections, each of which is recorded against the thing it corrects: the bank guarantee is
+> OPTIONAL with no basis in Instructions No. 9 of 2026 (correction 1), professional indemnity is
+> mandatory WITHOUT condition (2), licence status is DERIVED and not stored (3), licence types are
+> derived from the branch categories (4), the financial-strength rating is OFFICE-scoped and carries
+> its as-of date (5), and the broker–insurer remittance period is a SEVEN-WORKING-DAY legal cap
+> under art. 15/i and the sheet's `30` example must never be seeded (6).
+
+Source: `WASEET360_Broker_Insurer_Data_Fields.xlsx` (**v1** — see the box above) — broker **42**
+(31 mandatory / 7 conditional / 4 optional), insurer **36** (31/2/3), and a broker–insurer
+agreement sheet of 13 which is **not in this module**. The workbook's own summary tab states
+those counts and they match the brief exactly.
 
 Legend: **EXISTS** · **NEW** · **CANNOT PLACE** (a finding).
 
 ---
 
-## A. The broker sheet — 42 fields
+## A. The broker sheet — 42 fields (v1)
 
 ### Basic identity (10)
 
@@ -109,9 +129,29 @@ not rediscover them.
 
 **Broker total: 42 placed. 0 cannot place.** 13 existing, 29 new.
 
+### A.1 The five v2 additions (#43–#47) — all already present
+
+| # | Sheet field | Lands on | State |
+|---|---|---|---|
+| 43 | `broker_kind` | `Organization.brokerKind` | **EXISTS** — module 0 item (b). Art. 3/a's axis, and a DIFFERENT one from `brokerageKind` (#11). |
+| 44 | *(computed)* Licensed Insurance Types | — | **DERIVED, never stored** — decision 67, restated by correction 4. The distinct categories of #17's branches, in catalogue order. |
+| 45 | `paid_up_capital_per_type` | `Organization.paidUpCapital` | **EXISTS** — module 0 item (e). ONE stored figure; the "per type" half is the REQUIREMENT, computed per type from the branch counts and summed (art. 4/a). |
+| 46 | `license_certificate_document_id` | `BrokerLicense.certificateDocumentId` | **EXISTS, NOT NULL** — module 0 item (c). A term with no certificate is unrepresentable. |
+| 47 | `renewal_requested_at` | `BrokerLicense.renewalRequestedAt` | **EXISTS, write-once** — module 0 item (c); item (d) reads it for art. 11's deadline. |
+
+### A.2 Two fields the registration REQUIRES that the sheet does not name
+
+Recorded as additions rather than folded in with the 47, because the dictionary describes a
+brokerage and these describe this platform and this schema.
+
+| Field | Why it is required | Where |
+|---|---|---|
+| `subdomain` | `NOT NULL UNIQUE` on `Organization` since multi-tenancy Phase 1 — it is how the platform addresses a tenant. No registration can omit it. | `RegisterBrokerageOfficeDto.subdomain` |
+| `piInsurerName` | `ProfessionalIndemnityPolicy.insurerName` is NOT NULL and predates this module by a year. Taken as TEXT rather than an `Insurer` FK: the office's PI insurer is a company on the broker's own books, and at registration the office has no books. | `RegisterBrokerageOfficeDto.piInsurerName` |
+
 ---
 
-## B. The insurer sheet — 36 fields
+## B. The insurer sheet — 36 fields (v1; v2 adds the two in § B.1)
 
 Placed per the owner's two rulings: the company as a party that signs in is an
 `Organization`; `Insurer` stays as one office's counterparty relationship and gains a
@@ -159,6 +199,13 @@ nullable pointer; the split is a **resolver, not a move** (`docs/decision-insure
 
 **Insurer total: 36 placed. 0 cannot place.** 12 existing, 24 new (plus the owner's
 `ratingAsOf`, which the sheet does not have).
+
+### B.1 The two v2 additions (#37–#38)
+
+| # | Sheet field | Lands on | State |
+|---|---|---|---|
+| 37 | `fs_rating_as_of` | `Insurer.financialStrengthRatingAsOf` | **ALREADY DECIDED** — decision 64 named it before v2 did, and the v1 reading above already recorded it as "the owner's `ratingAsOf`, which the sheet does not have". v2 adds it to the sheet, so it is no longer an addition of ours. Correction 5 states why it is required beside the rating: *«تصنيفاً بلا تاريخٍ دعوى لا سجلّ عناية»* — a rating with no date is a claim, not a due-diligence record. |
+| 38 | `license_certificate_document_id` | *(item (e))* | **NEW for the insurer**. The broker side has `BrokerLicense.certificateDocumentId` NOT NULL; an insurance company's licence is **not** a `BrokerLicense` (§ C.8), so where its certificate hangs is item (e)'s decision. |
 
 ---
 
