@@ -540,6 +540,18 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         labelKey: 'navProviderOffices',
         permissions: ['provider.office-state.read'],
       },
+      // MODULE 0-ب ITEM (d) — registering an office. Beside the provider dashboard because both
+      // are the platform operator's, and in ADMINISTRATION for the same measured reason: this code
+      // is PLATFORM-scoped and held only by the provider, which already sees this group.
+      //
+      // Its own destination rather than a control on `/provider-offices`: that screen reads every
+      // office's state and this one creates a tenant, and a create button on a cross-office report
+      // is a control whose blast radius does not match what the reader is looking at.
+      {
+        href: '/provider-register-office',
+        labelKey: 'navProviderRegisterOffice',
+        permissions: ['provider.office.register'],
+      },
       {
         href: '/settings/email',
         labelKey: 'navEmailIntegration',
