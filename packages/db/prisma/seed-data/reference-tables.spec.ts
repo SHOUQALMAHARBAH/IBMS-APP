@@ -107,6 +107,86 @@ describe("the eight provider-maintained reference lists", () => {
     expect(LEGAL_FORMS.map((f) => f.code)).toContain("SOLE_ESTABLISHMENT");
   });
 
+  describe("the Arabic description belongs where a value carries a RULE", () => {
+    /*
+     * The owner's reasoning, and it is why this is not a description on all eight:
+     *
+     *   > A city, a bank and a country are satisfied by their Arabic name — the name IS the Arabic,
+     *   > and a description there would only restate it, which trains people to stop reading
+     *   > descriptions at exactly the point where one matters.
+     *
+     * So the split is asserted in BOTH directions. Requiring one on the two rule-bearing tables is
+     * the obvious half; asserting their ABSENCE on the other six is the half that keeps the
+     * decision alive, because nothing else would notice a well-meant restating paragraph appearing
+     * on `City`.
+     */
+    const RULE_BEARING: [string, ReferenceSeed[]][] = [
+      ["LEGAL_FORMS", LEGAL_FORMS],
+      ["BUSINESS_MODELS", BUSINESS_MODELS],
+    ];
+    const PROPER_NOUN = LISTS.filter(
+      ([name]) => !RULE_BEARING.some(([r]) => r === name),
+    );
+
+    it("is TWO lists and SIX, not four and four", () => {
+      /*
+       * MEASURED, and it corrects the brief. The owner named four rule-bearing vocabularies —
+       * legal form, business model, brokerage kind, integration method — but the last two are
+       * ENUMS with no row to hang a description on. Their Arabic lives in
+       * `apps/web/lib/i18n/translations/enums.ts`, reached through `ENUM_LABEL`.
+       *
+       * Pinned so that moving a table across is a deliberate edit here rather than a quiet one.
+       */
+      expect(RULE_BEARING).toHaveLength(2);
+      expect(PROPER_NOUN).toHaveLength(6);
+    });
+
+    describe.each(RULE_BEARING)("%s carries one on every row", (name, rows) => {
+      it("present, non-empty and in ARABIC script", () => {
+        for (const row of rows) {
+          expect(
+            row.descriptionAr?.trim(),
+            `${name}.${row.code} carries no Arabic description, and its value carries a rule the name does not convey`,
+          ).toBeTruthy();
+          // The half a presence check cannot see: a description written in Latin script is
+          // present, non-empty and useless on an Arabic-first screen.
+          expect(
+            ARABIC.test(row.descriptionAr ?? ""),
+            `${name}.${row.code} description is not Arabic script`,
+          ).toBe(true);
+        }
+      });
+
+      it("cites the article or the consequence, rather than restating the name", () => {
+        /*
+         * The point of requiring it at all. `SOLE_ESTABLISHMENT` described as "a sole
+         * establishment" satisfies every assertion above and tells a reader nothing — the owner's
+         * example of the failure, in her own words: "a label nobody can act on".
+         *
+         * Checked by LENGTH relative to the name rather than by matching an article number, because
+         * `BusinessModel`'s consequence is a terminology rule with no article behind it.
+         */
+        for (const row of rows) {
+          expect(
+            (row.descriptionAr ?? "").length,
+            `${name}.${row.code} description is no longer than its own name — it restates rather than explains`,
+          ).toBeGreaterThan(row.nameAr.length * 3);
+        }
+      });
+    });
+
+    it("the six proper-noun lists carry NONE", () => {
+      for (const [name, rows] of PROPER_NOUN) {
+        for (const row of rows) {
+          expect(
+            row.descriptionAr,
+            `${name}.${row.code} carries a description. A country, city, bank, currency, licensing authority or rating agency is satisfied by its Arabic NAME — if this value genuinely carries a rule, move the list into RULE_BEARING deliberately rather than adding prose here`,
+          ).toBeUndefined();
+        }
+      }
+    });
+  });
+
   it("keeps JOD, because every money column in this schema assumes it", () => {
     // `Decimal(18,3)` throughout exists because the dinar divides into 1000 fils. A currency list
     // without JOD would be a list that cannot express the base currency of the system.

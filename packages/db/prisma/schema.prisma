@@ -5519,66 +5519,108 @@ model InsuranceLine {
 ///
 /// See `packages/db/prisma/seed-data/reference-tables.ts` for each list and its limits.
 model Country {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 model City {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 model Bank {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 model Currency {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 model LicensingAuthority {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 model RatingAgency {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 model LegalForm {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 /// Conventional or takaful. NOTHING MAY BRANCH ON THIS VALUE — where terminology differs the
@@ -5586,12 +5628,18 @@ model LegalForm {
 /// plus its templates rather than a release. `if (model === 'TAKAFUL')` is the signal the design
 /// was lost.
 model BusinessModel {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  nameEn       String
-  nameAr       String
-  displayOrder Int
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  code          String   @unique
+  nameEn        String
+  nameAr        String
+  /// Arabic explanation of what this value MEANS, required only where the value carries a
+  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
+  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
+  /// satisfied by their Arabic name, and a description restating it trains people to stop
+  /// reading descriptions at exactly the point where one matters.
+  descriptionAr String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
 }
 
 /// MODULE 0-ب — the field dictionary's `license_type_id`, and A DIFFERENT AXIS from the licence

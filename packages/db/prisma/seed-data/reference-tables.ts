@@ -44,6 +44,24 @@ export interface ReferenceSeed {
   code: string;
   nameEn: string;
   nameAr: string;
+  /**
+   * Arabic explanation of what this value MEANS — required only where the value carries a RULE the
+   * name does not convey, and absent everywhere else.
+   *
+   * The owner's reasoning, and it is why this is optional rather than on all eight: "a city, a bank
+   * and a country are satisfied by their Arabic name — the name IS the Arabic, and a description
+   * there would only restate it, which trains people to stop reading descriptions at exactly the
+   * point where one matters."
+   *
+   * `LegalForm` and `BusinessModel` carry one on every row, enforced by a CHECK rather than by this
+   * type — a convention is satisfied by the seed and then broken by the first row added through a
+   * screen.
+   *
+   * MEASURED, because the owner named four rule-bearing vocabularies and only TWO are tables:
+   * `BrokerageKind` and `IntegrationMethod` are ENUMS with no row to hang this on, and their Arabic
+   * lives in `apps/web/lib/i18n/translations/enums.ts`.
+   */
+  descriptionAr?: string;
 }
 
 /**
@@ -230,31 +248,43 @@ export const LEGAL_FORMS: ReferenceSeed[] = [
     code: "SOLE_ESTABLISHMENT",
     nameEn: "Sole establishment",
     nameAr: "مؤسسة فردية",
+    descriptionAr:
+      "الشكل القانوني لوسيط التأمين الطبيعي. المادة 10/أ/1/أ من تعليمات رقم (9) لسنة 2026 تشترط تسجيل طالب الترخيص كوسيط تأمين طبيعي كمؤسسة فردية. ولا يجوز لهذا الشكل فتح أكثر من خمسة فروع (المادة 13/ب).",
   },
   {
     code: "PUBLIC_SHAREHOLDING",
     nameEn: "Public shareholding company",
     nameAr: "شركة مساهمة عامة",
+    descriptionAr:
+      "شركة مساهمة عامة. أحد الأشكال الثلاثة التي تجيز لها المادة 13/ب/4 فتح أكثر من خمسة فروع داخل المملكة أو فروع خارجها، بشروط أخرى مجتمعة معها.",
   },
   {
     code: "PRIVATE_SHAREHOLDING",
     nameEn: "Private shareholding company",
     nameAr: "شركة مساهمة خاصة",
+    descriptionAr:
+      "شركة مساهمة خاصة. أحد الأشكال الثلاثة التي تجيز لها المادة 13/ب/4 فتح أكثر من خمسة فروع داخل المملكة أو فروع خارجها، بشروط أخرى مجتمعة معها.",
   },
   {
     code: "LIMITED_LIABILITY",
     nameEn: "Limited liability company",
     nameAr: "شركة ذات مسؤولية محدودة",
+    descriptionAr:
+      "شركة ذات مسؤولية محدودة. أحد الأشكال الثلاثة التي تجيز لها المادة 13/ب/4 فتح أكثر من خمسة فروع داخل المملكة أو فروع خارجها، بشروط أخرى مجتمعة معها.",
   },
   {
     code: "GENERAL_PARTNERSHIP",
     nameEn: "General partnership",
     nameAr: "شركة تضامن",
+    descriptionAr:
+      "شركة تضامن. شكل اعتباري لا تذكره المادة 13/ب/4 ضمن الأشكال المؤهلة لفتح أكثر من خمسة فروع، فلا ينطبق عليه ذلك التوسّع.",
   },
   {
     code: "LIMITED_PARTNERSHIP",
     nameEn: "Limited partnership",
     nameAr: "شركة توصية بسيطة",
+    descriptionAr:
+      "شركة توصية بسيطة. شكل اعتباري لا تذكره المادة 13/ب/4 ضمن الأشكال المؤهلة لفتح أكثر من خمسة فروع، فلا ينطبق عليه ذلك التوسّع.",
   },
 ];
 
@@ -273,6 +303,12 @@ export const LEGAL_FORMS: ReferenceSeed[] = [
  * lost.
  */
 export const BUSINESS_MODELS: ReferenceSeed[] = [
-  { code: "CONVENTIONAL", nameEn: "Conventional insurance", nameAr: "تأمين تقليدي" },
-  { code: "TAKAFUL", nameEn: "Takaful insurance", nameAr: "تأمين تكافلي" },
+  { code: "CONVENTIONAL", nameEn: "Conventional insurance", nameAr: "تأمين تقليدي",
+    descriptionAr:
+      "نمط النشاط التقليدي. يحدّد صياغة العروض والوثائق ومصطلحاتها، وتُشتقّ هذه الصياغة من قوالب مرتبطة بهذا السطر — لا من شرط في الشيفرة، حتى يكون إدخال نمط ثالث سطراً وقوالبَ لا إصداراً جديداً.",
+  },
+  { code: "TAKAFUL", nameEn: "Takaful insurance", nameAr: "تأمين تكافلي",
+    descriptionAr:
+      "نمط النشاط التكافلي. يحدّد صياغة العروض والوثائق ومصطلحاتها (اشتراك بدل قسط، وفائض بدل ربح)، وتُشتقّ من قوالب مرتبطة بهذا السطر لا من شرط في الشيفرة. قوالب المصطلحات التكافلية لم تُبنَ بعد — انظر سجلّ المؤجَّل.",
+  },
 ];

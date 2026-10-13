@@ -1022,12 +1022,18 @@ async function main() {
           nameEn: ref.nameEn,
           nameAr: ref.nameAr,
           displayOrder: index,
+          // Written on BOTH paths. On `update` because a re-seed must carry a corrected description
+          // through; on `create` because `LegalForm` and `BusinessModel` carry a CHECK requiring
+          // one, so a from-empty seed that omitted it would be REFUSED by the database rather than
+          // quietly producing rows with no explanation.
+          descriptionAr: ref.descriptionAr ?? null,
         },
         create: {
           code: ref.code,
           nameEn: ref.nameEn,
           nameAr: ref.nameAr,
           displayOrder: index,
+          descriptionAr: ref.descriptionAr ?? null,
         },
       });
     }
