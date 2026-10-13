@@ -238,45 +238,64 @@ async function ensureProviderOrganization(): Promise<void> {
     },
   });
 
-  for (const permission of permissions) {
-    const alreadyGranted = await prisma.rolePermission.findFirst({
-      where: { roleId: role.id, permissionId: permission.id },
-    });
-    if (!alreadyGranted) {
-      await prisma.rolePermission.create({
-        data: {
-          organizationId: PROVIDER_ORGANIZATION_ID,
-          roleId: role.id,
-          permissionId: permission.id,
-        },
-      });
-    }
-  }
+  const expectedCodes = [...PROVIDER_CODES].sort();
 
   /*
-   * MEASURED, not assumed: this role holds EXACTLY these codes and no others.
+   * GRANT AND VERIFY IN ONE TRANSACTION, so a failing check UNDOES the grants rather than
+   * reporting them.
    *
-   * The check this replaces demanded exactly ONE and said in its own message: "if that is
-   * changing, change this check deliberately." This is that deliberate change — item (b) widened
-   * the set from the dashboard alone to the dashboard plus self-administration.
+   * ## This is a repair, and the incident that produced it is worth keeping
    *
-   * It compares the SET and not the COUNT. A count would pass against seven codes of which one was
-   * `customer.create`, which is precisely the drift the check exists to catch.
+   * The first version granted in a loop and then checked. A plant swapping `customer.create` into
+   * `PROVIDER_CODES` made the check fire exactly as designed — and the row was already written, so
+   * the provider organization really held a brokerage capability in db-test afterwards. The guard
+   * REPORTED the state it existed to prevent.
+   *
+   * That is the difference between a guard and a decoration restated at the level of a write: a
+   * check after an unconditional write can only ever describe the damage. Inside a transaction the
+   * throw rolls the grants back, so the only states that survive are "exactly the intended set" and
+   * "nothing changed".
+   *
+   * ## MEASURED, not assumed: this role holds EXACTLY these codes and no others
+   *
+   * The check this replaces demanded exactly ONE and said in its own message: "if that is changing,
+   * change this check deliberately." This is that deliberate change — item (b) widened the set from
+   * the dashboard alone to the dashboard plus self-administration.
+   *
+   * It compares the SET and not the COUNT, and that distinction was demonstrated rather than
+   * argued: with the check reduced to a count, a swapped-in `customer.create` was accepted and
+   * granted. A count of seven is satisfied by a set containing a brokerage capability.
    */
-  const grantedCodes = (
-    await prisma.rolePermission.findMany({
-      where: { roleId: role.id },
-      select: { permission: { select: { code: true } } },
-    })
-  )
-    .map((g) => g.permission.code)
-    .sort();
-  const expectedCodes = [...PROVIDER_CODES].sort();
-  if (grantedCodes.join(",") !== expectedCodes.join(",")) {
-    throw new Error(
-      `PLATFORM_OPERATOR holds [${grantedCodes.join(", ")}]; it must hold exactly [${expectedCodes.join(", ")}]. The provider administers ITSELF and reads the dashboard — it holds no brokerage capability at all. If that is changing, change this list deliberately.`,
-    );
-  }
+  await prisma.$transaction(async (tx) => {
+    for (const permission of permissions) {
+      const alreadyGranted = await tx.rolePermission.findFirst({
+        where: { roleId: role.id, permissionId: permission.id },
+      });
+      if (!alreadyGranted) {
+        await tx.rolePermission.create({
+          data: {
+            organizationId: PROVIDER_ORGANIZATION_ID,
+            roleId: role.id,
+            permissionId: permission.id,
+          },
+        });
+      }
+    }
+
+    const grantedCodes = (
+      await tx.rolePermission.findMany({
+        where: { roleId: role.id },
+        select: { permission: { select: { code: true } } },
+      })
+    )
+      .map((g) => g.permission.code)
+      .sort();
+    if (grantedCodes.join(",") !== expectedCodes.join(",")) {
+      throw new Error(
+        `PLATFORM_OPERATOR holds [${grantedCodes.join(", ")}]; it must hold exactly [${expectedCodes.join(", ")}]. The provider administers ITSELF and reads the dashboard — it holds no brokerage capability at all. If that is changing, change this list deliberately. (No grant was written: this check runs inside the same transaction.)`,
+      );
+    }
+  });
 
   console.log(
     `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (${PROVIDER_CODES.length} permissions: ${expectedCodes.join(", ")}).`,

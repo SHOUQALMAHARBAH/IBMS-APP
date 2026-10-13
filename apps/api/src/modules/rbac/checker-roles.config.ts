@@ -68,6 +68,22 @@ export const CHECKER_PERMISSIONS: readonly string[] = [
   'dsr.close',
   'incident.classification.co-sign',
   'access-recertification.review',
+  /*
+   * FOUND 2026-10-13, and the way it was found is the point.
+   *
+   * This code is the checker half of a registered maker/checker pair on `NeedsAssessment`, and it
+   * was missing here — so a role holding it ALONGSIDE the maker code was never reported by the
+   * duty-segregation readiness signal. The pair's database CHECK still refused a silent
+   * self-approval; what was absent was the DETECTION that an office had granted one role both
+   * halves, which is the whole purpose of this list.
+   *
+   * The spec's own comment had said for months: "a pair added to `maker-checker.util.ts` without a
+   * code here is a pair whose checker half can be handed out silently." It was right, and the test
+   * beneath it could not see it, because that test asserted `toHaveLength(13)` — a hardcoded count,
+   * satisfied by any thirteen strings. It now derives the expected number from
+   * `MAKER_CHECKER_REGISTRY`, and derived, it failed immediately: `expected 13 to be 14`.
+   */
+  'needs-assessment.approve',
 ];
 
 /** One role being granted, with what it actually grants. The caller resolves the
