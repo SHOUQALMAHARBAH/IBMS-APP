@@ -365,12 +365,18 @@ describe('every office has a route to user administration', () => {
       .map((c) => c.permission.code)
       .sort();
 
-    // THE SET, not a count. A count of seven is satisfied by a set containing `customer.create`,
-    // which is exactly the drift this exists to catch.
+    // THE SET, not a count. A count of eight is satisfied by a set containing `customer.create`,
+    // which is exactly the drift this exists to catch — and it is what caught item (d) adding a
+    // code, by NAME, in CI. Each entry below is a deliberate edit with a reason beside it.
     expect(codes).toEqual(
       [
         'permission.read',
+        // Item (j) — the cross-office dashboard the organization exists for.
         'provider.office-state.read',
+        // Item (d) — registering a brokerage office. PLATFORM-scoped, and the only route in this
+        // product that creates a tenant.
+        'provider.office.register',
+        // Item (b) — self-administration, bounded by tenancy rather than by anything written for it.
         'role.create',
         'role.deactivate',
         'role.read',

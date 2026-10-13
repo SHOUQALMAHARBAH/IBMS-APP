@@ -54,6 +54,7 @@ cannot exist until the code that declares them does. Completed at module close.
 | 11 | **Whether art. 14/c reaches an art. 21/b suspension is UNSETTLED, and is not inferred** | CBJ Instr. 9/2026 arts. 14/b, 14/c, 21/b | `license-standing.config.ts`, and the migration header | 14/b scopes itself to «الفقرة (أ) من هذه المادة»; 14/c carries no such phrase. The text reads either way. Today it only matters for a 21/b suspension that states no period, since one that names its own end date expires on its own. **A question for the regulator, deliberately not resolved by reading** — correction 0.1 of this module was stripping a rule asserted under an article that did not carry it, and inventing the opposite here would be the same mistake with the sign flipped. |
 | 12 | **`BrokerLicense.status = 'lapsed'` is a SECOND HOME for what `RegulatoryAction` now models** | decision 71 | `broker-license.config.ts`, `license-standing.config.ts` | The manual marker predates the act table and is IN USE — measured: 0 rows on dev, 19 on db-test, with `BrokerLicenseRepository.markLapsed` reachable from the service. The derivation reads it as SUSPENDED with a NULL decision reference (its own documentation says it means a CBJ suspension), so nothing is currently wrong — but two homes for "has the regulator stopped this office" is one too many. **The collapse order is: record acts for whatever the marker was standing in for, THEN drop the column** — never the reverse, which would lose the fact before it was recorded anywhere. |
 | 13 | **The eight reference tables cannot RETIRE a row** | item (c), item (d) | `reference-data.service.ts` | They carry `code`, both names, `descriptionAr` and `displayOrder` — and no `isActive`. Found by the compiler: the first version of the reference service carried a paragraph explaining how retired rows are handled. A column is NOT invented, because the question it raises is a decision: what happens on the screen of an office whose stored legal form has been retired — does it still render, and does it still validate? |
+| 15 | **A `Document` reference can cross offices at the DATABASE level, on four tables** | multi-tenancy Phase 2 | *(measured 2026-10-13; no single declaration site — see below)* | Measured: `Document` carries `organizationId` and has **no `(id, organizationId)` unique**, so none of its four referrers can carry the composite tenant foreign key the rest of this schema uses — `BrokerLicense.certificateDocumentId` (module 0 item (c)), `ClaimDocument.documentId`, `Document.previousVersionId` and `RegulatoryAction.documentId` (item (d)). **Bounded, not open**: `Document` is tenant-scoped and RLS-protected, so the application cannot read another office's document to obtain its id; the composite FK is the defence-in-depth for the raw-query and forgotten-`where` case, which is precisely what the other thirteen exist for. **Deliberately NOT fixed on one table alone** — adding it to `RegulatoryAction` only would make the newest table look guarded while three older ones are not, and leave the next reader believing the pattern is handled. It is ONE coherent change (one unique on `Document`, four composite FKs) belonging to whoever next touches document tenancy. |
 | 14 | **The office-administrator grant set has TWO homes, guarded rather than collapsed** | item (d), owner's instruction | `office-administrator-grants.ts`, `office-administrator-grants.parity.spec.ts` | The seed grid names the role per code; the api declares the list the registration resolves. One home is not available today: `prisma/seed-data/` sits outside `@ibms/db`'s export surface, and `packages/db/tsconfig.json`'s `rootDir: "src"` blocks the reverse import. **The collapse is available and is a real refactor**: move the list to `packages/db/src/`, export it as a package subpath, and derive the grid's membership from it — 45 entries change. Until then the parity guard fails in BOTH directions, which is this repository's established answer to a hand-written mirror. |
 
 ### Pending the item that creates them
@@ -83,6 +84,33 @@ These are the owner's items whose declaration site does not exist yet. Each land
 | 2 | Art. 4/a capital is a **warning, never a refusal** | art. 4/a | `broker-license-scope.config.ts` |
 | 3 | A non-31-December expiry **warns, never blocks** | art. 10/b | `broker-license.config.ts` |
 | 4 | The bank guarantee has **no basis in Instructions No. 9 of 2026** | — | to be declared on the field itself in **item (d)** |
+
+---
+
+## A standing rule item (d) earned in CI
+
+**A new table carrying `organizationId` ASSERTS ITS OWN ROW-LEVEL SECURITY, in its own migration.**
+
+`RegulatoryAction` was created with `organizationId` and no RLS. `tenant-isolation.e2e-spec.ts`
+caught it in CI — `expected [ 'RegulatoryAction' ] to deeply equal []` — and the migration that
+created it had asserted a great deal: the thirteen composite tenant foreign keys, the enum labels,
+the NOT NULL with no default, the duplicate-registration refusal proven by attempting it. What it did
+not assert was the one thing that is a CONVENTION rather than a property of that table.
+
+The hole was real while it lasted. The application layer filtered correctly from the first moment,
+because `tenantScopeExtension` derives its scoped set from the DMMF — but RLS is the layer that makes
+the promise true for a raw query, a forgotten `where`, or a future repository reaching past the
+extension, and ten raw-SQL call sites in this codebase are protected by it ALONE.
+
+The repair is `20261123100000_regulatory_action_rls`, which asserts BOTH flags and that exactly one
+policy reads `app.current_org_id`. `ENABLE` without `FORCE` leaves the table owner exempt, and every
+migration and the seed connect as the owner; a policy that does not read the session variable is one
+nothing can ever satisfy, which once made every permission read return empty and 403'd every user.
+
+**And the second half of the lesson is about blast radius, not RLS.** The local run was scoped to
+"which specs touch registration", and the set that mattered was "which specs assert about the SET of
+tenant-scoped tables". Before adding a table, grep for `TENANT_SCOPED_MODELS`, `relrowsecurity` and
+`pg_policies` — three files, measured — and run those.
 
 ---
 
