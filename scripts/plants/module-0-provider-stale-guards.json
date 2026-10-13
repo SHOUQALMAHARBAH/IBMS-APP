@@ -11,8 +11,8 @@
   },
   "the-providers-grant-is-read-through-the-tenant-scoped-client": {
     "file": "apps/api/test/office-administrator.e2e-spec.ts",
-    "from": "    const codes = await rawPrisma.rolePermission.findMany({",
-    "to": "    const codes = await prisma.rolePermission.findMany({"
+    "from": "      await rawPrisma.rolePermission.findMany({",
+    "to": "      await prisma.rolePermission.findMany({"
   },
   "the-unexpected-kind-query-is-pointed-at-a-row-that-exists": {
     "file": "apps/api/test/organization-type.e2e-spec.ts",

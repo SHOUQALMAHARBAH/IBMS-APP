@@ -518,8 +518,11 @@ describe('Provider dashboard — the provider-only boundary', () => {
     try {
       await rawPrisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe(
-          `INSERT INTO "Organization" ("id","legalName","type","subdomain","updatedAt")
-             VALUES ('00000000-0000-0000-0000-00000000e001','E2E Second Provider','PROVIDER','e2e-second-provider', now())`,
+          // `legalNameAr` REQUIRED since module 0-ب Part E. Without it this INSERT is refused
+          // for the wrong reason — 23502 rather than the partial unique — and the test would
+          // have gone on passing while proving nothing about `Organization_one_provider`.
+          `INSERT INTO "Organization" ("id","legalName","legalNameAr","type","subdomain","updatedAt")
+             VALUES ('00000000-0000-0000-0000-00000000e001','E2E Second Provider','مزوّد ثانٍ للاختبار','PROVIDER','e2e-second-provider', now())`,
         );
         throw new Error(SENTINEL);
       });

@@ -170,11 +170,52 @@ async function ensureProviderOrganization(): Promise<void> {
     });
   }
 
-  const code = "provider.office-state.read";
-  const permission = await prisma.permission.findUnique({ where: { code } });
-  if (!permission) {
+  /*
+   * MODULE 0-ب ITEM (b) — THE PROVIDER ADMINISTERS ITSELF, AND NOTHING ELSE.
+   *
+   * Item (j) gave this role one code. That left the provider organization unable to add a second
+   * operator, change a role, or repair itself from inside the application — the same shape as an
+   * office with no administrator, which `office-administrator.e2e-spec.ts` calls a defect in its
+   * own failure message.
+   *
+   * WHAT BOUNDS IT TO ITS OWN ORGANIZATION IS TENANCY, NOT A NEW MECHANISM. `User`, `Role`,
+   * `UserRoleAssignment` and `RolePermission` all carry `organizationId` and are therefore in the
+   * DMMF-derived `TENANT_SCOPED_MODELS`, so every read and write the provider makes through these
+   * codes is filtered to the provider organization before it reaches the database. A provider
+   * operator cannot see, let alone change, an office's users or roles — and that is a property of
+   * the extension plus RLS rather than of anything written here, which is why the e2e proves it by
+   * ASKING FOR an office's role by id and getting a 404.
+   *
+   * WHAT IS DELIBERATELY ABSENT: every brokerage code. No policy, customer, commission,
+   * collection, claim or employee capability. The count check below is what keeps that true.
+   *
+   * THE DECLARED GAP STAYS DECLARED: nothing structurally stops a provider administrator granting
+   * their own role an office-scoped code — they hold `role.update` and the catalogue is global.
+   * What bounds it is that the provider starts with exactly this set and a seed check that fails
+   * if the set changes. That is a GRANT-level closure, not a schema-level one, and it is stated
+   * here and in README § Known gaps rather than left for a reader to assume otherwise.
+   */
+  const PROVIDER_CODES = [
+    // The capability the organization exists for.
+    "provider.office-state.read",
+    // Item (b) — self-administration. Its own users, its own roles, bounded by tenancy.
+    "user.manage",
+    "role.read",
+    "role.create",
+    "role.update",
+    "role.deactivate",
+    "permission.read",
+  ] as const;
+
+  const permissions = await prisma.permission.findMany({
+    where: { code: { in: [...PROVIDER_CODES] } },
+    select: { id: true, code: true },
+  });
+  if (permissions.length !== PROVIDER_CODES.length) {
+    const found = new Set(permissions.map((x) => x.code));
+    const missing = PROVIDER_CODES.filter((c) => !found.has(c));
     throw new Error(
-      `${code} is not in the permission catalogue, so the provider organization cannot be given the one capability it exists for. Seed the catalogue first.`,
+      `${missing.join(", ")} is not in the permission catalogue, so the provider organization cannot be given the capabilities it needs. Seed the catalogue first.`,
     );
   }
 
@@ -197,30 +238,48 @@ async function ensureProviderOrganization(): Promise<void> {
     },
   });
 
-  const alreadyGranted = await prisma.rolePermission.findFirst({
-    where: { roleId: role.id, permissionId: permission.id },
-  });
-  if (!alreadyGranted) {
-    await prisma.rolePermission.create({
-      data: {
-        organizationId: PROVIDER_ORGANIZATION_ID,
-        roleId: role.id,
-        permissionId: permission.id,
-      },
+  for (const permission of permissions) {
+    const alreadyGranted = await prisma.rolePermission.findFirst({
+      where: { roleId: role.id, permissionId: permission.id },
     });
+    if (!alreadyGranted) {
+      await prisma.rolePermission.create({
+        data: {
+          organizationId: PROVIDER_ORGANIZATION_ID,
+          roleId: role.id,
+          permissionId: permission.id,
+        },
+      });
+    }
   }
 
-  // MEASURED, not assumed: this role holds exactly one code. If a later change grants it anything
-  // else, the seed says so rather than leaving the "holds no brokerage capability" claim false.
-  const granted = await prisma.rolePermission.count({ where: { roleId: role.id } });
-  if (granted !== 1) {
+  /*
+   * MEASURED, not assumed: this role holds EXACTLY these codes and no others.
+   *
+   * The check this replaces demanded exactly ONE and said in its own message: "if that is
+   * changing, change this check deliberately." This is that deliberate change — item (b) widened
+   * the set from the dashboard alone to the dashboard plus self-administration.
+   *
+   * It compares the SET and not the COUNT. A count would pass against seven codes of which one was
+   * `customer.create`, which is precisely the drift the check exists to catch.
+   */
+  const grantedCodes = (
+    await prisma.rolePermission.findMany({
+      where: { roleId: role.id },
+      select: { permission: { select: { code: true } } },
+    })
+  )
+    .map((g) => g.permission.code)
+    .sort();
+  const expectedCodes = [...PROVIDER_CODES].sort();
+  if (grantedCodes.join(",") !== expectedCodes.join(",")) {
     throw new Error(
-      `PLATFORM_OPERATOR holds ${granted} permission(s); it must hold exactly 1 (${code}). The provider organization exists to read the dashboard and nothing else — if that is changing, change this check deliberately.`,
+      `PLATFORM_OPERATOR holds [${grantedCodes.join(", ")}]; it must hold exactly [${expectedCodes.join(", ")}]. The provider administers ITSELF and reads the dashboard — it holds no brokerage capability at all. If that is changing, change this list deliberately.`,
     );
   }
 
   console.log(
-    `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (1 permission: ${code}).`,
+    `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (${PROVIDER_CODES.length} permissions: ${expectedCodes.join(", ")}).`,
   );
 }
 

@@ -319,31 +319,33 @@ describe('every office has a route to user administration', () => {
     ).toEqual([]);
   }, 120_000);
 
-  it('and the PROVIDER organization deliberately has NO route to user administration', async () => {
+  it('and the PROVIDER administers ITSELF — exactly these codes, and no brokerage capability', async () => {
     /*
-     * THE CONSEQUENCE OF THE NARROWING ABOVE, PINNED SO IT STAYS A DECISION.
+     * THE SAME PIN, REPOINTED. Module 0-ب item (b) moved its target rather than removing it.
      *
-     * The test above now excludes the platform operator, which means the platform operator cannot
-     * provision a user into itself from inside the application: nobody in it holds `user.manage`,
-     * so every route into user administration is refused for it. Measured rather than inferred —
-     * the provider's only role holds exactly one code, `provider.office-state.read`.
+     * It used to assert the opposite: that the provider held NO route to user administration. That
+     * was the honest consequence of item (j) giving its role a single code — and it was a defect,
+     * not a design. The provider organization could not add a second operator, change a role, or
+     * repair itself from inside the application, which is the same shape
+     * `every office has a route to user administration` above calls a defect in its own message.
      *
-     * That is the intended state and the migration says so in its own words: the dashboard is
-     * unreachable until somebody deliberately creates the operator. But an UNSTATED consequence of
-     * a narrowed denominator is how a real gap gets excused, so it is asserted here instead. If a
-     * later change grants the provider `user.manage` — which would let it provision its own staff,
-     * tenant-scoped exactly as an office does — this test fails and that becomes a recorded
-     * decision rather than a side effect.
+     * So the provider now administers ITSELF, and what this pins is the SET — because the risk
+     * never was that it would hold too few codes, it is that it would quietly acquire a brokerage
+     * one. A provider operator holds `role.update` and the permission catalogue is global, so
+     * nothing structurally stops them granting their own role `customer.create`. THAT is the
+     * declared gap, it stays declared in `seed.ts` and in README § Known gaps, and this assertion
+     * is what turns a silent drift into a failing build.
      *
-     * WHAT IT COSTS TODAY, said plainly so the next reader does not have to measure it: the
-     * provider dashboard has no hand-walkable path on the dev database, because the seed creates
-     * the organization and its role but no user. The api e2e creates its own provider user with the
-     * owner connection, which is the only way in.
+     * WHAT BOUNDS IT TO ITS OWN ORGANIZATION IS TENANCY, not anything written for this module:
+     * `User`, `Role`, `UserRoleAssignment` and `RolePermission` all carry `organizationId`, so
+     * every read and write through these codes is filtered before it reaches the database. That
+     * half is proven over real HTTP in `provider-self-administration.e2e-spec.ts`, by asking for an
+     * office's role BY ID and being told it does not exist.
      */
     // `rawPrisma` throughout: `Role` and `RolePermission` are tenant-scoped, so reading another
-    // organization's rows through the scoped client returns EMPTY whatever the state is — this
-    // whole test would have asserted an absence it could not have observed. The non-vacuity floor
-    // at the bottom is what caught it, which is the only reason it is not still written that way.
+    // organization's rows through the scoped client returns the DEFAULT OFFICE's — measured last
+    // module at 517 grants where one was expected. This test would not have been vacuous, it would
+    // have been confidently wrong.
     const provider = await rawPrisma.organization.findFirst({
       where: { type: 'PROVIDER' },
       select: { id: true },
@@ -354,28 +356,41 @@ describe('every office has a route to user administration', () => {
       return;
     }
 
-    const administering = await rawPrisma.role.findMany({
-      where: {
-        organizationId: provider.id,
-        status: 'ACTIVE',
-        permissions: { some: { permission: { code: 'user.manage' } } },
-      },
-      select: { name: true },
-    });
-    expect(
-      administering.map((r) => r.name),
-      'the platform operator holds user administration — intended or not, that is a decision to record',
-    ).toEqual([]);
+    const codes = (
+      await rawPrisma.rolePermission.findMany({
+        where: { organizationId: provider.id },
+        select: { permission: { select: { code: true } } },
+      })
+    )
+      .map((c) => c.permission.code)
+      .sort();
 
-    const codes = await rawPrisma.rolePermission.findMany({
-      where: { organizationId: provider.id },
-      select: { permission: { select: { code: true } } },
-    });
-    // Non-vacuity: the assertion above is also satisfied by a provider organization holding no
-    // grants at all, which would mean the dashboard was withdrawn rather than scoped.
-    expect(codes.map((c) => c.permission.code).sort()).toEqual([
-      'provider.office-state.read',
-    ]);
+    // THE SET, not a count. A count of seven is satisfied by a set containing `customer.create`,
+    // which is exactly the drift this exists to catch.
+    expect(codes).toEqual(
+      [
+        'permission.read',
+        'provider.office-state.read',
+        'role.create',
+        'role.deactivate',
+        'role.read',
+        'role.update',
+        'user.manage',
+      ].sort(),
+    );
+
+    // Said a second way, on the SHAPE rather than the list, so a brokerage code added under a name
+    // this list does not enumerate still fails. The list above would catch it too; this one says
+    // WHY in its message, which is what a reader needs at 3am.
+    const brokerage = codes.filter((c) =>
+      /^(policy|customer|claim|commission|collection|invoice|receipt|remittance|refund|endorsement|rfq|quotation|lead|prospect|employee)\./.test(
+        c,
+      ),
+    );
+    expect(
+      brokerage,
+      'the provider organization holds a BROKERAGE capability — it administers itself and reads the dashboard, nothing else',
+    ).toEqual([]);
   }, 120_000);
 
   it('gives every Organization an isSystem OFFICE_ADMINISTRATOR with all 25 codes', async () => {

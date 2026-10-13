@@ -31,9 +31,16 @@ import { rawPrisma } from './tenant-prisma';
 const ROLLBACK = 'rollback: nothing in this test may outlive it';
 const CHECK_NAME = 'Organization_broker_kind_matches_type';
 
+/* `legalNameAr` is supplied from the same parameter as `legalName`, and it is REQUIRED here
+ * since module 0-ب Part E made the column NOT NULL.
+ *
+ * Without it this INSERT raises 23502 (not-null) instead of 23514 (check), so all four tests
+ * below would fail — and worse, the two that EXPECT a refusal would still get one, from the
+ * wrong column. CI caught exactly that: raw SQL is invisible to the typecheck that found the
+ * two typed `organization.create` sites, so the compiler could not point here. */
 const INSERT =
-  'INSERT INTO "Organization" (id, "legalName", subdomain, "updatedAt", "type", "brokerKind")' +
-  ' VALUES ($1, $2, $3, now(), $4::"OrganizationType", $5::"BrokerKind")';
+  'INSERT INTO "Organization" (id, "legalName", "legalNameAr", subdomain, "updatedAt", "type", "brokerKind")' +
+  ' VALUES ($1, $2, $2, $3, now(), $4::"OrganizationType", $5::"BrokerKind")';
 
 /** One attempted Organization, always rolled back. Resolves to the error thrown, or to the
  *  sentinel when the database accepted a row it should have refused. */
