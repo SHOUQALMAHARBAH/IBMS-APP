@@ -14,7 +14,13 @@ import { describe, expect, it } from 'vitest';
  *
  * `runUnscoped()` is that hatch, and it is legitimate: resolving a session, a refresh token or a
  * login email is literally HOW the organization context gets established, so it cannot already
- * require one. `UnscopedReason` is a closed union with a single member for that reason.
+ * require one.
+ *
+ * `UnscopedReason` is a CLOSED union of TWO members — `auth-bootstrap` and `subdomain-resolution`.
+ * It carried one until 2026-10-13, which meant subdomain resolution was wearing authentication's
+ * label: a union reporting ONE reason while serving TWO. Splitting it costs nothing and restores
+ * what the closed union is for — a new reason has to be a visible type edit rather than the quiet
+ * reuse of a label that does not fit.
  *
  * ## WHY THIS IS A GUARD AND NOT A MEASUREMENT IN A REPORT
  *
@@ -59,6 +65,23 @@ const WRITE_OPS = [
   '$executeRaw',
   '$executeRawUnsafe',
 ];
+
+/**
+ * Escape EVERY regex metacharacter, not just the one that happened to appear.
+ *
+ * This read `op.replace('$', '\\$')`, and CodeQL was right to fail the build on it: a STRING
+ * pattern in `String.replace` substitutes only the FIRST occurrence, so an operation name carrying
+ * two metacharacters would be half-escaped and the regex would quietly mean something other than
+ * intended — on a guard whose whole job is to notice a write inside a bypass.
+ *
+ * It happened to work, because `$executeRaw` has exactly one `$`. "Happens to work for today's
+ * inputs" is the same shape as the `|`-escaping defect this repository has already shipped once,
+ * where escaping one metacharacter and not the backslash before it produced a live pipe in
+ * generated markdown.
+ */
+function escapeForRegex(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -163,7 +186,7 @@ describe('runUnscoped — the tenancy escape hatches, counted', () => {
     // organization at all, which `tenantScopeExtension` exists to make impossible.
     const offenders = hatches.filter((h) =>
       WRITE_OPS.some((op) =>
-        new RegExp(`\\.${op.replace('$', '\\$')}\\s*\\(`).test(h.body),
+        new RegExp(`\\.${escapeForRegex(op)}\\s*\\(`).test(h.body),
       ),
     );
     expect(

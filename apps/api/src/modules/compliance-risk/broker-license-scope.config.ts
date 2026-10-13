@@ -15,6 +15,28 @@ import {
  *              a NATURAL PERSON (sole establishment) may hold ONE type only.
  *   art. 4/a — capital: 5,000 JOD per type up to 6 branches, 7,500 up to 12, 10,000 above 12.
  *
+ * ## ART. 13/b/2 IS DECLARED UNIMPLEMENTED, AND MUST NOT BE BUILT FROM ITS CAPITAL FIGURE ALONE
+ *
+ * Art. 13/b allows a CORPORATE broker to open more than five branches INSIDE THE KINGDOM, or any
+ * branch abroad, subject to four CONJUNCTIVE conditions: three years since licensing with actual
+ * practice (13/b/1), paid-up capital of at least 50,000 JOD (13/b/2), operating profits in the two
+ * preceding years (13/b/3), and a legal form of public shareholding, private shareholding or LLC
+ * (13/b/4).
+ *
+ * NONE OF IT IS IMPLEMENTED, and the reason is that the system does not model what it counts: art.
+ * 13's فروع are PHYSICAL BRANCH OFFICES, and this product has no physical-branch concept at all.
+ * Art. 4/a's فروع above are INSURANCE BRANCHES — lines within a type — which is a different noun
+ * sharing a word.
+ *
+ * So a guard written against the branch count THIS file has would fire on insurance lines and tell
+ * every office holding six or more of them — the ordinary case — that it needs 50,000 JOD, with no
+ * basis in the text. That is the same class of false regulatory finding as the provider being
+ * reported as an unlicensed office, and it is why the article is named here and left unbuilt
+ * rather than approximated.
+ *
+ * Were physical branches modelled later, a capital-only guard would STILL be wrong: the four
+ * conditions are conjunctive, and capital is one of them.
+ *
  * ## The TYPE is derived from the branch, never stored beside it
  *
  * `InsuranceLineCategory` has exactly two values — GENERAL and LIFE — which is precisely the pair

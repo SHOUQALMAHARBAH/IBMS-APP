@@ -65,7 +65,7 @@ export class OrganizationResolutionService {
 
   /** The office a subdomain names, or null. */
   async findBySubdomain(subdomain: string): Promise<Organization | null> {
-    return this.orgContext.runUnscoped('auth-bootstrap', async () =>
+    return this.orgContext.runUnscoped('subdomain-resolution', async () =>
       // `await` inside the bypass is load-bearing: a Prisma promise handed back
       // unexecuted would run after the store closed. Same trap as every other
       // site that wraps a query in AsyncLocalStorage.
