@@ -572,9 +572,25 @@ describe('Provider dashboard — the provider-only boundary', () => {
       'the set of SECURITY DEFINER views changed. Each one reads PAST row-level security, so a new member is a new cross-office channel: declare it in `security-definer-views.e2e-spec.ts`, argue for its column list, and then change this assertion deliberately.',
     ).toEqual(['InsurerDirectory', 'ProviderOfficeState']);
 
-    // And the application-layer complement: the only sanctioned way to run a query WITHOUT tenant
-    // filtering is still the single auth-bootstrap reason. A second member of that union would be a
-    // cross-office path that no view enumeration could see.
+    /*
+     * And the application-layer complement: the only sanctioned ways to run a query WITHOUT tenant
+     * filtering are the reasons named below. A member appearing here that is not in that list is a
+     * cross-office path no view enumeration could see.
+     *
+     * ## PINNED AS A SET, AND IT USED TO BE PINNED AS ONE VALUE
+     *
+     * This read `.toEqual(['auth-bootstrap'])` under a message saying "a SECOND is a cross-office
+     * channel". It fired on module 0-ب's `UnscopedReason` split and was right to — but its premise
+     * did not hold: that change RENAMED one of two existing uses rather than adding a path.
+     * Subdomain resolution had been wearing authentication's label, so the union reported one
+     * reason while serving two. The call-site count was ten before and ten after.
+     *
+     * So the set is named rather than counted. A THIRD member still fails, which is the property
+     * worth keeping; what no longer fails is correcting a label to match what it does.
+     *
+     * The third instance in this module of the same class — a quantity asserted where a set was
+     * meant. See `docs/deferred-register.md` § standing rules.
+     */
     const orgContext = readFileSync(
       join(
         __dirname,
@@ -590,9 +606,9 @@ describe('Provider dashboard — the provider-only boundary', () => {
       ...orgContext.matchAll(/^\s*\|?\s*'([a-z-]+)'(?:;|$)/gm),
     ].map((m) => m[1]);
     expect(
-      reasons,
-      '`UnscopedReason` gained a member. Each one is a path that runs tenant-scoped queries with filtering OFF, so a second is a cross-office channel that the view enumeration above cannot see.',
-    ).toEqual(['auth-bootstrap']);
+      [...reasons].sort(),
+      '`UnscopedReason` names a reason this guard does not know. Each one is a path that runs tenant-scoped queries with filtering OFF, so an unrecognised member is a cross-office channel the view enumeration above cannot see. Adding one is a deliberate decision: argue for it, then name it here.',
+    ).toEqual(['auth-bootstrap', 'subdomain-resolution']);
   }, 300_000);
 
   it('THE ROLE-SAVE PATH REFUSES A PLATFORM CODE FOR A BROKERAGE OFFICE — the flag hides it, the server refuses it', async () => {

@@ -87,3 +87,18 @@ Recorded here because both came out of guards that were green while describing s
 3. **A guard that runs after the write it guards is a report, not a guard.** The check belongs
    inside the transaction that writes. Applies directly to item (d), where the organization, the
    licence term with its certificate and the scope lines are written together.
+
+4. **A guard that is correct only because today's inputs happen to suit it is not a guard.**
+   `replace('$', …)` substituted one occurrence and worked solely because the token it guards
+   contains one `$` — the same shape as the `|`-escaping defect this repository shipped once. Prove
+   a guard against the GENERAL input, not the present one.
+
+---
+
+## Owed to module 1 — recorded here so it is not rediscovered
+
+| Item | Why it is owed | Not to be started before |
+|---|---|---|
+| **`MAKER_CHECKER_REGISTRY` records no MAKER code** | It holds the checker permission and the database constraint, so half the pair is not recorded anywhere and the system **cannot answer the real segregation question** — does one role hold both halves of the same pair. This surfaced only because a scan of mine rested on five maker codes that do not exist, and the retraction was worth more than the answer. The durable fix is to record the maker code beside the checker code, so a pair is a pair in data. | module 1 |
+| **The readiness signal splits in two** | One name currently covers two different measurements. They must be named for what they measure: **checker concentration** (a control observation) and **both halves of one pair** (the hard rule). **Nothing may call concentration a segregation breach** — a screen reporting a violation it did not measure is a false claim to the user. | module 1, with the warned-act machine |
+| **Do not change the seeded role's permissions** | `BRANCH_DEPARTMENT_MANAGER` holds seven checker permissions. Whether that is a breach cannot be judged until the question above can be asked correctly. | — |

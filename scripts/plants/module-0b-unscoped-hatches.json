@@ -13,5 +13,10 @@
     "file": "apps/api/src/modules/auth/services/session.service.ts",
     "from": "      this.sessions.findById(sessionId),",
     "to": "      this.prisma.client.$executeRawUnsafe('SELECT 1') as unknown as never,"
+  },
+  "a-third-unscoped-reason-appears": {
+    "file": "apps/api/src/common/org-context/org-context.service.ts",
+    "from": "  | 'subdomain-resolution';",
+    "to": "  | 'subdomain-resolution'\n  | 'reporting-across-offices';"
   }
 }
