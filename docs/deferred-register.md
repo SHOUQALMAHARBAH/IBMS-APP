@@ -34,8 +34,23 @@ register entry is the gap this file exists to close.
 
 ## Module 0-ب — provider registration
 
-**Status: INCOMPLETE. Items (d), (e), (f) and (g) are not built**, and several deferrals below
-cannot exist until the code that declares them does. Completed at module close.
+**Status at the module's close, 2026-10-14 — and this line was itself stale until now**, which is
+the reason it carries a date: it said "items (d), (e), (f) and (g) are not built" long after three of
+those four were.
+
+| Item | State |
+|---|---|
+| (a) a provider user signs in | **built** |
+| (b) the provider administers itself | **built** — six self-administration codes |
+| (c) the eight reference tables | **built** — with a nullable Arabic description on the rule-bearing ones |
+| (d) register a brokerage office | **built** — `POST /provider/brokerage-offices`, plus decision 88's reopen |
+| (e) register an insurance company | **built** — service, screen and resolver |
+| (f) invite the first administrator | **NOT BUILT, and raised as a stop condition** — entry 26: selecting from the catalogue yields only the six self-administration codes, because nothing in this product is reachable by a company user |
+| (g) PLATFORM scope on this module's codes | **built, and it was already satisfied** — the two provider codes carry it, the two office codes correctly do not, and the literal over-reading is refused by the permission grid guard by name |
+
+Two things are open and both are the owner's: whether item (f) ships the honest six now, and whether
+the close's demonstration offices are written to **dev** (which makes the login page's signup link
+refuse, and is effectively irreversible once a user exists inside one).
 
 ### Declared and verifiable now
 
@@ -86,6 +101,51 @@ These are the owner's items whose declaration site does not exist yet. Each land
 | Takaful terminology templates | decision (business model is a table; nothing may branch on it) | **item (e)** |
 | The real mail sender | owner's decision B2 | **item (f)** — a temporary on-demand script stands in |
 | `INSURANCE_COMPANY_ADMINISTRATOR` | owner's decision | **item (f)** |
+
+---
+
+## The named short pass — between this module's close and module 1's opening
+
+The owner named three debts and placed them in a **short pass of their own**, after this module's close
+and before module 1 opens. They are recorded here because of this register's own standing rule: a
+deferral belongs in **a file in the repository rather than a line in a report** — and these three
+lived only in a report, which is already a failure of that rule rather than a risk of one.
+
+**Stated as the owner named them, not as I reconstructed them:**
+
+| # | The debt, in the owner's words |
+|---|---|
+| S1 | a **grants counter** exiting before measuring |
+| S2 | a **screening comment** denying two columns that exist |
+| S3 | a **segregation comment** citing a lifted refusal |
+
+### THE LOCATIONS ARE NOT RECORDED, AND I COULD NOT RE-DERIVE THEM — read this before starting
+
+All three were found by reading, during this module, and reported in conversation. Their file and line
+were never written down. Searching the repository for each one by SHAPE did not find it:
+
+- **S1** — `scripts/measurements/permission-reachability.py` runs clean (exit 0, 507 grants, every
+  figure printed), which was the obvious candidate because it HAD this defect once: a `== 491` pin
+  against a real 502 made it exit before measuring anything, and that was fixed by reading the count
+  from the fixture's own header. No hard-pinned grant count remains anywhere under `scripts/`.
+- **S2** — every "has no field / does not exist" comment in the screening module reads correctly today,
+  including the one most likely to be it (`MatchThresholds` lacking an index signature, which is a
+  true statement about a TypeScript interface).
+- **S3** — `SELF_APPROVAL_REPORT_EXISTS`, the COMBINED-mode shipping gate that WAS lifted, appears
+  nowhere in the tree, so a comment citing it by name would have surfaced.
+
+**So the first task of that pass is to re-identify all three, and the honest reason is recorded rather
+than papered over: guessing at a location and writing it here would put a false entry in the register,
+which is the defect class this module spent its close correcting in three other places.** The owner
+saw each one when it was reported and will recognise them; what is preserved here is that there are
+exactly THREE and what each is about.
+
+**The shape they share is worth keeping even if the locations change.** All three are a statement in
+code that is false or self-defeating: a counter that cannot reach its own measurement, a comment
+denying something that exists, and a comment citing a control that no longer does. None changes
+behaviour. Every one misleads the next reader — which is the same class as the signup refusal that told
+a reader an office could not be onboarded, and the dictionary header that credited the owner with four
+lines she had never seen.
 
 ---
 
