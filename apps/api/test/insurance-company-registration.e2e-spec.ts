@@ -399,6 +399,63 @@ describe('decision 90 — every refusal is a sentence, never a constraint', () =
   }, 180_000);
 });
 
+describe('TWO COMPANIES COEXIST — the acceptance witness', () => {
+  /*
+   * The companion to the office witness, and it carries one thing that one cannot: a company's
+   * licensed lines live on `InsurerLicensedLine` keyed by `insuranceCompanyId` with NO
+   * `organizationId`, so two companies' line sets are kept apart by that key alone. If the key were
+   * ever wrong — which it was, in the first version of that migration — two companies would either
+   * share a line set or one would be invisible. Asserting both sets separately is what catches it.
+   */
+  it('registers two distinct companies that both exist at once, with separate licensed-line sets', async () => {
+    const first = await register(
+      validCompany({
+        legalName: 'First Insurance Company',
+        licensedLineIds: generalLineIds.slice(0, 2),
+      }),
+    );
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+    const second = await register(
+      validCompany({
+        legalName: 'Second Insurance Company',
+        licensedLineIds: generalLineIds.slice(2, 5),
+      }),
+    );
+    expect(second.status, JSON.stringify(second.body)).toBe(201);
+
+    const firstId = (first.body as { id: string }).id;
+    const secondId = (second.body as { id: string }).id;
+    expect(firstId).not.toBe(secondId);
+
+    const present = await rawPrisma.organization.findMany({
+      where: { id: { in: [firstId, secondId] } },
+      select: { id: true, type: true },
+    });
+    expect(present).toHaveLength(2);
+    for (const org of present) expect(org.type).toBe('INSURANCE_COMPANY');
+
+    // THE LINE SETS ARE SEPARATE AND BOTH VISIBLE — two and three, not five on one or zero on the
+    // other, which is what a wrongly-keyed row would produce.
+    const firstLines = await rawPrisma.insurerLicensedLine.count({
+      where: { insuranceCompanyId: firstId },
+    });
+    const secondLines = await rawPrisma.insurerLicensedLine.count({
+      where: { insuranceCompanyId: secondId },
+    });
+    expect(firstLines).toBe(2);
+    expect(secondLines).toBe(3);
+
+    // Both carry their own certificate pointer — the third statement of each transaction ran.
+    const orgs = await rawPrisma.organization.findMany({
+      where: { id: { in: [firstId, secondId] } },
+      select: { insurerLicenseCertificateDocumentId: true },
+    });
+    for (const org of orgs) {
+      expect(org.insurerLicenseCertificateDocumentId).toBeTruthy();
+    }
+  }, 180_000);
+});
+
 describe('the boundary — who may register a company', () => {
   it('refuses an office user who HOLDS the permission, and says why', async () => {
     const office = await rawPrisma.organization.findFirstOrThrow({

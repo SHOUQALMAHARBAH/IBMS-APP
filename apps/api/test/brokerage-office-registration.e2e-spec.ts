@@ -643,6 +643,119 @@ describe('the boundary — who may register an office', () => {
  * together in each case — the office EXISTS and the derived pack names what is missing — because a
  * test asserting only the marker would pass against an implementation that also refused the save.
  */
+describe('THREE OFFICES COEXIST — the acceptance witness for a multi-office platform', () => {
+  /*
+   * The close asks for three offices registered, and the question behind that is not "does the route
+   * work" — eight tests above already register one each. It is whether three can exist AT THE SAME
+   * TIME, which no single-registration test can answer and which several things could quietly
+   * forbid: `Organization_one_provider` is a partial unique and a wrongly-written one would have
+   * constrained offices too; the administrator role is created per office and a globally-unique role
+   * name would collide on the second; and the platform-wide identifier uniques must bind ACROSS
+   * offices while letting three distinct offices through.
+   *
+   * It also asserts each office gets its OWN administrator role, because one shared role would mean
+   * office A's administrator could administer office B — the failure this registration route exists
+   * to make impossible.
+   *
+   * ## WHAT A SOURCE PLANT CANNOT DO TO THIS TEST, stated rather than left implied
+   *
+   * `createAdministratorRole` has NO per-office branch — every office goes through identical code,
+   * and the office id arrives from the tenant context rather than from an argument. So there is no
+   * one-line substitution that makes the THIRD office behave differently from the first, and the
+   * regressions this test is really aimed at are at CONSTRAINT level: a `Role.name` unique written
+   * globally instead of per office, or a partial unique like `Organization_one_provider` written so
+   * that it constrains offices too. Neither is expressible as a source plant.
+   *
+   * The attempt is recorded because it taught something: resolving the grants against one hard-coded
+   * code made the service's own count guard throw, which killed six tests at their `expect(201)`
+   * rather than at anything they assert — a plant that breaks the structure cannot tell you which
+   * test observes what. What IS plantable here is the `isSystem` assertion below, which is why it was
+   * added.
+   */
+  it('registers three distinct offices that all exist at once, each with its own administrator', async () => {
+    const bodies = [
+      validOffice({ legalName: 'First Brokerage Office' }),
+      validOffice({ legalName: 'Second Brokerage Office' }),
+      validOffice({ legalName: 'Third Brokerage Office' }),
+    ];
+
+    const ids: string[] = [];
+    for (const body of bodies) {
+      const response = await register(body);
+      expect(
+        response.status,
+        `registering office ${ids.length + 1} of 3 failed: ${JSON.stringify(response.body)}`,
+      ).toBe(201);
+      ids.push((response.body as RegistrationBody).id);
+    }
+
+    // DISTINCT ROWS, not one row written three times.
+    expect(new Set(ids).size).toBe(3);
+
+    // ALL THREE PRESENT SIMULTANEOUSLY — read back from the database rather than from the three
+    // responses that reported them.
+    const present = await rawPrisma.organization.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, legalName: true, type: true, subdomain: true },
+    });
+    expect(present).toHaveLength(3);
+    for (const org of present) expect(org.type).toBe('BROKERAGE_OFFICE');
+    expect(new Set(present.map((o) => o.subdomain)).size).toBe(3);
+
+    // AND EACH HAS ITS OWN ADMINISTRATOR ROLE. Three rows, three distinct ids, same name — which is
+    // the point: the name is unique PER OFFICE, so a globally-unique name would have failed above.
+    const roles = await rawPrisma.role.findMany({
+      where: { organizationId: { in: ids }, name: 'OFFICE_ADMINISTRATOR' },
+      select: {
+        id: true,
+        organizationId: true,
+        isSystem: true,
+        requiresMfaAlways: true,
+      },
+    });
+    expect(roles).toHaveLength(3);
+    expect(new Set(roles.map((r) => r.id)).size).toBe(3);
+    expect(new Set(roles.map((r) => r.organizationId)).size).toBe(3);
+
+    /*
+     * AND EVERY ONE IS `isSystem`, FOR EVERY OFFICE — not just the first.
+     *
+     * This is the property that makes the witness plantable at all, and it is a real one: `isSystem`
+     * is what stops the Role screen renaming, retiring or re-granting this row. An office whose
+     * administrator role could be retired can lock itself out of its own user administration, and
+     * nothing inside the system can repair that — which is the whole argument the last-administrator
+     * lockout guard rests on. `isSystem` grants nothing by itself; it only withholds those three
+     * controls.
+     *
+     * The strict MFA attribute is asserted beside it for the same reason the service states both
+     * explicitly rather than inheriting the column defaults: a future change to a default must not
+     * silently relax the first administrator of every office registered afterwards.
+     */
+    for (const role of roles) {
+      expect(
+        role.isSystem,
+        'an office administrator role is not isSystem, so that office can retire its own administrator and lock itself out of user administration with no route back',
+      ).toBe(true);
+      expect(role.requiresMfaAlways).toBe(true);
+    }
+
+    // Each role carries the full declared grant set — not a copy of another office's.
+    for (const role of roles) {
+      const grants = await rawPrisma.rolePermission.count({
+        where: { roleId: role.id },
+      });
+      expect(grants).toBe(OFFICE_ADMINISTRATOR_GRANTS.length);
+    }
+
+    // AND THE PROVIDER IS STILL THE ONLY PROVIDER — the partial unique constrains its own type and
+    // nothing else, which is exactly what three coexisting offices prove.
+    const providers = await rawPrisma.organization.count({
+      where: { type: 'PROVIDER' },
+    });
+    expect(providers).toBe(1);
+  }, 180_000);
+});
+
 describe('decision 88 — the two art. 10/a documents do NOT block a save', () => {
   it('registers with NEITHER, and the derived pack NAMES both', async () => {
     const response = await register(validOffice());
