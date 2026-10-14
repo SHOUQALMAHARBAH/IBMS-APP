@@ -1,0 +1,26 @@
+{
+  "the-registered-company-does-not-outrank-the-catalogue": {
+    "_": "Decision 63's whole point, removed: a linked record falls back to the catalogue name and the office's phone. Must kill 'THE REGISTERED COMPANY OUTRANKS BOTH'.",
+    "file": "apps/api/src/repositories/insurer-identity.ts",
+    "from": "  if (insurer.insuranceCompany) {",
+    "to": "  if (false && insurer.insuranceCompany) {"
+  },
+  "per-field-coalesce-instead-of-one-source": {
+    "_": "The bug a unit test caught on insurerIdentity, re-armed: a registered company with no Arabic name falls through to the OFFICE'S Arabic name, rendering the company's Latin name beside a name the office typed. Must kill the two source-chosen-once tests.",
+    "file": "apps/api/src/repositories/insurer-identity.ts",
+    "from": "      nameAr: company.legalNameAr,\n      phone: company.phone,",
+    "to": "      nameAr: company.legalNameAr || insurer.legalNameAr,\n      phone: company.phone ?? insurer.companyPhone,"
+  },
+  "the-view-reads-the-row-instead-of-the-resolver": {
+    "_": "The single-read-path condition, broken: deriveInsurerView goes back to the local columns, so a linked record shows what the office typed. Must kill the resolver-sourced assertions in the view spec.",
+    "file": "apps/api/src/modules/insurer/insurer.config.ts",
+    "from": "    companyPhone: company.phone,",
+    "to": "    companyPhone: row.companyPhone,"
+  },
+  "a-linked-record-is-still-editable": {
+    "_": "The read-only condition, removed: an office may keep typing over facts the company publishes, which is the second source of truth the link exists to remove. Must kill the 'may NOT once linked' test.",
+    "file": "apps/api/src/repositories/insurer-identity.ts",
+    "from": "  return insurer.insuranceCompanyId === null;",
+    "to": "  return true;"
+  }
+}

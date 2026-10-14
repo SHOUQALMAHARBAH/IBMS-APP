@@ -29,6 +29,12 @@ const LINKED: InsurerRecord = {
   id: 'ins-linked',
   insurerMasterId: 'master-1',
   insurerMaster: { legalName: 'AIG Jordan', legalNameAr: 'إي آي جي الأردن' },
+  // DECISION 63 — NOT linked to a registered company, which is this fixture's point: it is the
+  // catalogue-linked case, and the resolver must answer GLOBAL_CATALOGUE for it. The fields are
+  // listed rather than omitted because `InsurerRecord` is the full select type, and that is what
+  // forces a decision here when a source is added rather than letting one default in silently.
+  insuranceCompanyId: null,
+  insuranceCompany: null,
   legalName: null,
   legalNameAr: null,
   isActive: true,
@@ -273,6 +279,61 @@ describe('the view keeps company-level and relationship data distinguishable', (
     expect(view.companyEmail).toBeNull();
   });
 
+  it('reads the COMPANY FACTS from the resolver, not from the row — and labels the source', () => {
+    /*
+     * CONDITION 2 OF THE RESOLVER — "it is the only read path" — and nothing observed it until a
+     * plant said so. Pointing `deriveInsurerView` back at `row.companyPhone` killed NO test, because
+     * every fixture here is UNLINKED and the resolver then returns the office's own values anyway:
+     * the two paths answer identically, so neither assertion could tell them apart.
+     *
+     * The straddling-boundary failure, for the second time in this module. A fixture that cannot
+     * distinguish the thing it is about is indistinguishable from one that can.
+     *
+     * This one is linked, and the company's values DIFFER from the office's in every field.
+     */
+    const linkedToCompany: InsurerRecord = {
+      ...LINKED,
+      insuranceCompanyId: 'org-company-1',
+      insuranceCompany: {
+        legalName: 'Registered Insurance Company',
+        legalNameAr: 'شركة التأمين المسجّلة',
+        phone: '+962-6-999-9999',
+        email: 'info@registered.test',
+        website: 'https://registered.test',
+        address: 'The address the company published',
+      },
+      companyPhone: '+962-6-111-1111',
+      companyEmail: 'office-typed@example.test',
+      companyWebsite: 'https://office-typed.test',
+      companyCorrespondenceAddress: 'An address the office typed',
+    };
+    const view = deriveInsurerView(linkedToCompany);
+
+    expect(view.companyPhone).toBe('+962-6-999-9999');
+    expect(view.companyEmail).toBe('info@registered.test');
+    expect(view.companyWebsite).toBe('https://registered.test');
+    expect(view.companyCorrespondenceAddress).toBe(
+      'The address the company published',
+    );
+    // The NAME too: `insurerIdentity` only knows master-over-local, so a view still reading it for
+    // the name would show the catalogue's name beside the company's own address.
+    expect(view.name).toBe('Registered Insurance Company');
+    expect(view.companyFactSource).toBe('REGISTERED_COMPANY');
+
+    // CONDITION 3 — the office's own values are not lost, they are read-only and labelled.
+    expect(view.officeMayEditCompanyFacts).toBe(false);
+    expect(view.officeRecorded?.companyPhone).toBe('+962-6-111-1111');
+  });
+
+  it('shows no separate "what the office recorded" block while UNLINKED', () => {
+    // The other half, so the block is not simply always rendered: unlinked, the local columns ARE the
+    // resolved values, and showing them twice would invite a reader to think they are two facts.
+    const view = deriveInsurerView(LINKED);
+    expect(view.officeMayEditCompanyFacts).toBe(true);
+    expect(view.officeRecorded).toBeNull();
+    expect(view.companyFactSource).toBe('GLOBAL_CATALOGUE');
+  });
+
   /**
    * The key set, asserted whole — the precursor to the directory's allow-list test.
    *
@@ -304,6 +365,30 @@ describe('the view keeps company-level and relationship data distinguishable', (
       'createdAt',
     ];
     const RELATIONSHIP_HALF = [
+      /*
+       * MODULE 0-ب ITEM (e), DECISION 63 — ALL FOUR OF THE RESOLVER'S FIELDS ARE RELATIONSHIP, and
+       * this guard is what forced the decision rather than letting them be appended.
+       *
+       * They look like company fields because they sit beside the company half and describe where its
+       * values came from. They are not. Every one is a fact about THIS OFFICE'S OWN RECORD:
+       *
+       *   `companyFactSource`          — whether this office typed the details or the company
+       *                                  published them. That is a statement about the office's
+       *                                  record-keeping, and "this competitor types its counterparty
+       *                                  details by hand" is exactly what the boundary exists to keep
+       *                                  in.
+       *   `insuranceCompanyId`         — the link THIS office made. Another office may not have made
+       *                                  it, so it is not a property of the company.
+       *   `officeMayEditCompanyFacts`  — about this office's own rights over its own row.
+       *   `officeRecorded`             — says so in its name.
+       *
+       * The directory reads the COMPANY half by name, so putting any of these there would have made
+       * them eligible to cross an office boundary.
+       */
+      'companyFactSource',
+      'insuranceCompanyId',
+      'officeMayEditCompanyFacts',
+      'officeRecorded',
       'financialStrengthRating',
       'creditTermsDays',
       'rfqContactName',

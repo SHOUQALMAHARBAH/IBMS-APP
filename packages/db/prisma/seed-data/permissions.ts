@@ -537,6 +537,41 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
   },
   {
+    /*
+     * MODULE 0-ب ITEM (e), DECISION 63 — LINKING THIS OFFICE'S COUNTERPARTY RECORD TO A REGISTERED
+     * INSURANCE COMPANY.
+     *
+     * Its own code, and SEPARATE from `insurer.update`, because the act is not an edit: it changes
+     * which SOURCE answers for the company's name, phone, email, website and address, and it makes
+     * this office's own columns read-only. An officer who may correct a phone number has not thereby
+     * been given the authority to decide that the record in front of them IS a particular licensed
+     * company.
+     *
+     * OFFICE-scoped, not PLATFORM: the office is asserting something about ITS OWN record. Nothing is
+     * written on the company's row — tenant scoping would not permit it, and nothing should be built
+     * that needs it.
+     */
+    code: "insurer.company.link",
+    module: "insurance-operations",
+    description:
+      "Link this office's insurer record to an insurance company registered on the platform. Changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's own copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record.",
+    roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
+  },
+  {
+    /*
+     * UNLINKING IS ITS OWN CODE, not the same one read twice. The owner's condition is that each act
+     * needs a permission, and the two are not symmetrical in consequence: linking narrows what this
+     * office may edit, while unlinking RETURNS a company's published details to being whatever the
+     * office last typed — which is the direction that can quietly make a screen show a stale phone
+     * number as though it were current.
+     */
+    code: "insurer.company.unlink",
+    module: "insurance-operations",
+    description:
+      "Remove the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note.",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
     code: "rfq.insurer.update",
     module: "insurance-operations",
     description: "Update an insurer's RFQ response status",

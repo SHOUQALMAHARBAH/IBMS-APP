@@ -1,4 +1,8 @@
-import { insurerIdentity } from '../../repositories/insurer-identity';
+import {
+  insurerIdentity,
+  officeMayEditCompanyFacts,
+  resolveInsurerCompanyFacts,
+} from '../../repositories/insurer-identity';
 import type { InsurerRecord } from '../../repositories/insurer.repository';
 import {
   officeLineView,
@@ -49,6 +53,30 @@ export interface InsurerView {
   companyEmail: string | null;
   companyWebsite: string | null;
   companyCorrespondenceAddress: string | null;
+  /** MODULE 0-ب ITEM (e), DECISION 63 — WHERE THE FOUR FIELDS ABOVE CAME FROM.
+   *
+   *  `REGISTERED_COMPANY` means the company registered itself on this platform and its own record
+   *  answered. `GLOBAL_CATALOGUE` means the platform catalogue named it and the office's row supplied
+   *  the contact facts. `OFFICE_LOCAL` means this office typed all of it.
+   *
+   *  The screen LABELS this. An office looking at a phone number has to be able to tell what it typed
+   *  itself from what the company published, or the two become one undifferentiated claim. */
+  companyFactSource: 'REGISTERED_COMPANY' | 'GLOBAL_CATALOGUE' | 'OFFICE_LOCAL';
+  /** The registered company this record is linked to, or null. */
+  insuranceCompanyId: string | null;
+  /** Whether this office may still EDIT the local company columns. FALSE once linked — the company's
+   *  own record answers, and letting an office type over it would recreate the second source of truth
+   *  the link removes. The values are not cleared: the screen shows them as what the office recorded. */
+  officeMayEditCompanyFacts: boolean;
+  /** What THIS OFFICE recorded, kept visible beside the resolved values when the two differ. Null
+   *  when the record is not linked, because then they ARE the resolved values and showing them twice
+   *  would invite a reader to think they are two facts. */
+  officeRecorded: {
+    companyPhone: string | null;
+    companyEmail: string | null;
+    companyWebsite: string | null;
+    companyCorrespondenceAddress: string | null;
+  } | null;
   /** RELATIONSHIP-level from here down — this office's own commercial terms and the
    *  named people who answer it. None of this may cross an office boundary. */
   financialStrengthRating: string | null;
@@ -96,10 +124,15 @@ function offeredLineViews(row: InsurerRecord): InsuranceLineView[] {
 
 export function deriveInsurerView(row: InsurerRecord): InsurerView {
   const identity = insurerIdentity(row);
+  const company = resolveInsurerCompanyFacts(row);
+  const mayEdit = officeMayEditCompanyFacts(row);
   return {
     id: identity.id,
-    name: identity.name,
-    nameAr: identity.nameAr,
+    // THE NAME ALSO COMES FROM THE RESOLVER, because a registered company outranks the catalogue and
+    // `insurerIdentity` only knows the catalogue. Two precedences for one fact is what decision 63
+    // exists to remove.
+    name: company.name,
+    nameAr: company.nameAr,
     // Derived from the LINK, not from whether a name happens to be present: a row
     // may carry both (the database does not stop it), and which one is
     // authoritative is decided by the link in exactly one place.
@@ -108,10 +141,23 @@ export function deriveInsurerView(row: InsurerRecord): InsurerView {
     isActive: identity.isActive,
     linesOffered: offeredLineViews(row),
     structure: row.structure,
-    companyPhone: row.companyPhone,
-    companyEmail: row.companyEmail,
-    companyWebsite: row.companyWebsite,
-    companyCorrespondenceAddress: row.companyCorrespondenceAddress,
+    // DECISION 63 — the four company facts come from the RESOLVER, never from the row directly. This
+    // is the only read path for them; `resolveInsurerCompanyFacts` owns the precedence.
+    companyPhone: company.phone,
+    companyEmail: company.email,
+    companyWebsite: company.website,
+    companyCorrespondenceAddress: company.correspondenceAddress,
+    companyFactSource: company.source,
+    insuranceCompanyId: row.insuranceCompanyId,
+    officeMayEditCompanyFacts: mayEdit,
+    officeRecorded: mayEdit
+      ? null
+      : {
+          companyPhone: row.companyPhone,
+          companyEmail: row.companyEmail,
+          companyWebsite: row.companyWebsite,
+          companyCorrespondenceAddress: row.companyCorrespondenceAddress,
+        },
     financialStrengthRating: identity.financialStrengthRating,
     creditTermsDays: row.creditTermsDays,
     rfqContactName: row.rfqContactName,

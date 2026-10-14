@@ -178,6 +178,8 @@ export const PERMISSIONS = {
     'perm:insurer.form.map': 'يربط نموذج شركة التأمين الرسمي لنوع تأمين واحد. أثره على المنصة كلها: النموذج يصير النموذج الذي تقدّم عليه كل المكاتب — ولهذا لا تُمنح لمن يستعمل النموذج فقط',
     'perm:insurer.master.read': 'يقرأ السجل العام لشركات التأمين وربط النماذج المشترك بين كل المؤسسات. ولا يحمل شروط أي مكتب التجارية — تلك على سجل المكتب نفسه',
     'perm:insurer.office-form.map': 'يربط نسخة هذا المكتب وحده من نموذج شركة يتعامل معها مباشرة. أثره داخل المكتب فقط: لا يقرأه غيره، ويتقدّم على النموذج المشترك في تقديمات هذا المكتب، ولا يعدّل المشترك أبداً. وبخلاف السابقة يجوز أن يشير إلى نوع تأمين أضافه المكتب بنفسه',
+    'perm:insurer.company.link': 'يربط سجلّ شركة التأمين لدى هذا المكتب بشركةِ تأمينٍ مسجَّلةٍ على المنصّة. يغيّر هذا الربطُ المصدرَ الذي يُجيب عن اسم الشركة وبيانات اتصالها المنشورة — فيصير سجلُّ الشركة نفسها هو المرجع — ويجعل نسخَ المكتب من تلك الحقول للقراءة فقط. وتبقى قيمُ المكتب محفوظةً ومعروضةً بوصفها ما سجّله المكتب. ولا يُكتب شيءٌ على سجلّ الشركة.',
+    'perm:insurer.company.unlink': 'يفكّ الربطَ بين سجلّ شركة التأمين لدى هذا المكتب وشركةٍ مسجَّلة. فتعود قيمُ المكتب المخزَّنة هي الجواب وتصير قابلةً للتعديل. ولا يتغيّر شيءٌ على سجلّ الشركة. ويُسجَّل الفعلُ في سجلّ التدقيق، لأنه يُعيد حقيقةً منشورةً إلى كونها ملاحظةَ مكتب.',
     'perm:insurer.read': 'يقرأ علاقة هذا المكتب بشركات التأمين: جهات الاتصال وشروط الائتمان والقوة المالية وأنواع التأمين التي تكتبها',
     'perm:insurer.update': 'يحدّث سجل المكتب لشركة تأمين وشروط التعامل معها',
     'perm:interaction.log': 'يسجّل تواصلاً مع عميل: اجتماع، اتصال، بريد. ويلزم معها customer.read وإلا فلن يجد الموظف العميل ليسجّل عليه',
@@ -404,6 +406,10 @@ export const PERMISSIONS = {
     'perm:insurer.read': "Read this office's own insurer relationships — contacts, credit terms, financial strength and the lines they offer",
     'perm:insurer.update': "Maintain this office's own record of an insurer and its relationship terms",
     'perm:interaction.log': 'Log a customer interaction (meeting/call/email/...)',
+    'perm:insurer.company.link':
+      "Links this office's insurer record to an insurance company registered on the platform. It changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record.",
+    'perm:insurer.company.unlink':
+      "Removes the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note.",
     'perm:internal-audit.close': 'Close an internal audit finding after remediation',
     'perm:internal-audit.record': 'Record an internal audit finding',
     'perm:internal-controls.view': 'View the periodic self-approval (maker/checker) audit report',

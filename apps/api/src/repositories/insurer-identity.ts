@@ -138,3 +138,143 @@ export function insurerName(insurer: InsurerNameSources): string {
     ? insurer.insurerMaster.legalName
     : (insurer.legalName ?? '');
 }
+
+/* ==============================================================================================
+ * MODULE 0-ب ITEM (e), DECISION 63 — THE COMPANY-FACT RESOLVER.
+ *
+ * ## THE PRECEDENCE, STATED ONCE IN PROSE AND ONCE IN CODE
+ *
+ *    1. THE REGISTERED COMPANY  — `Insurer.insuranceCompany`, an `Organization` of type
+ *                                 `INSURANCE_COMPANY` that registered itself on this platform.
+ *                                 Most authoritative: it is the company's own record of itself,
+ *                                 entered against its own licence.
+ *    2. THE GLOBAL CATALOGUE    — `InsurerMaster`. NAMES ONLY; it carries no contact facts.
+ *    3. THE OFFICE'S OWN ROW    — the local `Insurer` columns. What this office typed, and the only
+ *                                 answer for a company that has not registered — which is the
+ *                                 MAJORITY case, measured: 4 of dev's 19 rows and 6 of db-test's 534
+ *                                 were local-only when decision 63 was written.
+ *
+ * ## WHY THIS LIVES IN THIS FILE AND NOT A NEW ONE
+ *
+ * This file already owns the master-over-local precedence for the NAME. A second file owning the
+ * registered-over-master precedence would be two homes for one question — "where does an insurer's
+ * name come from" — and the two would answer differently the first time one of them learned about a
+ * source the other had not. One file, one precedence, three levels.
+ *
+ * ## THE SOURCE IS CHOSEN ONCE, THEN EVERY FIELD IS READ FROM IT
+ *
+ * The same rule `insurerIdentity` already follows, and for the same reason a unit test caught there:
+ * per-field `??` looks equivalent and is not. A registered company with no Arabic name would fall
+ * through to the OFFICE'S Arabic name, rendering the company's own Latin name beside a name the
+ * office typed — the two-sources-of-truth drift the precedence exists to prevent.
+ *
+ * So a null here means "this source does not publish that fact", never "ask the next source". The
+ * office's own values are not lost: they stay in the local columns, the screen shows them as what
+ * THIS OFFICE RECORDED, and `source` below is what lets it say so.
+ * ============================================================================================== */
+
+/** Which of the three sources answered. The screen LABELS this — an office looking at a company fact
+ *  has to be able to tell what it typed itself from what the company published. */
+export type InsurerCompanyFactSource =
+  'REGISTERED_COMPANY' | 'GLOBAL_CATALOGUE' | 'OFFICE_LOCAL';
+
+/** What the resolver needs. A superset of `InsurerIdentity`, because the name precedence gains a
+ *  third level and the contact facts gain a second. */
+export interface InsurerCompanyFactSources {
+  insurerMaster: { legalName: string; legalNameAr: string | null } | null;
+  insuranceCompany: {
+    legalName: string;
+    legalNameAr: string;
+    phone: string | null;
+    email: string | null;
+    website: string | null;
+    address: string | null;
+  } | null;
+  legalName: string | null;
+  legalNameAr: string | null;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  companyWebsite: string | null;
+  companyCorrespondenceAddress: string | null;
+}
+
+export interface ResolvedInsurerCompanyFacts {
+  source: InsurerCompanyFactSource;
+  name: string;
+  nameAr: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  correspondenceAddress: string | null;
+}
+
+/**
+ * THE ONLY PLACE A COMPANY FACT IS RESOLVED. `deriveInsurerView` calls this and nothing else reads
+ * the local `company*` columns to decide what to show.
+ *
+ * `name` stays NON-nullable, the property every consumer was already written against, and it is safe
+ * for the same reason `insurerIdentity`'s is: `Insurer_has_identity` refuses a row with neither a
+ * master link nor a local name. The `?? ''` is unreachable and exists only because TypeScript cannot
+ * see a CHECK.
+ */
+export function resolveInsurerCompanyFacts(
+  insurer: InsurerCompanyFactSources,
+): ResolvedInsurerCompanyFacts {
+  if (insurer.insuranceCompany) {
+    const company = insurer.insuranceCompany;
+    return {
+      source: 'REGISTERED_COMPANY',
+      name: company.legalName,
+      nameAr: company.legalNameAr,
+      phone: company.phone,
+      email: company.email,
+      website: company.website,
+      correspondenceAddress: company.address,
+    };
+  }
+
+  if (insurer.insurerMaster) {
+    /*
+     * THE CATALOGUE ANSWERS FOR THE NAME AND FOR NOTHING ELSE, and the contact fields below fall to
+     * the office's own row rather than to null. That is NOT a per-field coalesce in disguise: the
+     * catalogue has no phone, email, website or address columns at all, so there is no second
+     * SOURCE for those facts to drift from — the office's row is the only one that has ever held
+     * them for a master-linked insurer, and it has held them since long before this item.
+     *
+     * The source label reports GLOBAL_CATALOGUE because that is where the NAME came from, which is
+     * the fact an office can be misled about. Reporting OFFICE_LOCAL here would tell a reader the
+     * office named the company, which it did not.
+     */
+    return {
+      source: 'GLOBAL_CATALOGUE',
+      name: insurer.insurerMaster.legalName,
+      nameAr: insurer.insurerMaster.legalNameAr,
+      phone: insurer.companyPhone,
+      email: insurer.companyEmail,
+      website: insurer.companyWebsite,
+      correspondenceAddress: insurer.companyCorrespondenceAddress,
+    };
+  }
+
+  return {
+    source: 'OFFICE_LOCAL',
+    name: insurer.legalName ?? '',
+    nameAr: insurer.legalNameAr,
+    phone: insurer.companyPhone,
+    email: insurer.companyEmail,
+    website: insurer.companyWebsite,
+    correspondenceAddress: insurer.companyCorrespondenceAddress,
+  };
+}
+
+/** Whether this office may still EDIT the local company columns.
+ *
+ *  FALSE once the record is linked: the registered company answers for those facts, and letting an
+ *  office keep typing over them would recreate the second source of truth the link exists to remove.
+ *  The columns are not cleared and not dropped — they stay as what the office recorded before the
+ *  link, which is why the screen can still show them, labelled. */
+export function officeMayEditCompanyFacts(insurer: {
+  insuranceCompanyId: string | null;
+}): boolean {
+  return insurer.insuranceCompanyId === null;
+}

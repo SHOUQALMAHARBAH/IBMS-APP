@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -11,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { InsurerService } from './insurer.service';
+import { InsurerCompanyLinkService } from './insurer-company-link.service';
+import { LinkInsurerCompanyDto } from './dto/link-insurer-company.dto';
 import {
   DeactivateInsurerDto,
   ListInsurersQueryDto,
@@ -48,7 +51,36 @@ import { SearchInsurersDto } from '../../common/picker-search.dto';
 @ApiTags('insurer')
 @Controller('insurers')
 export class InsurerController {
-  constructor(private readonly insurers: InsurerService) {}
+  constructor(
+    private readonly insurers: InsurerService,
+    private readonly companyLink: InsurerCompanyLinkService,
+  ) {}
+
+  /**
+   * MODULE 0-ب ITEM (e), DECISION 63 — link this office's record to a registered insurance company.
+   *
+   * TWO CODES, NOT ONE, because the owner's condition is that each act needs a permission and the two
+   * are not symmetrical in consequence: linking narrows what this office may edit, while unlinking
+   * returns a company's published details to being whatever the office last typed.
+   */
+  @RequirePermissions('insurer.company.link')
+  @Post(':id/company-link')
+  linkToCompany(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LinkInsurerCompanyDto,
+  ) {
+    return this.companyLink.link(user.id, id, dto.insuranceCompanyId);
+  }
+
+  @RequirePermissions('insurer.company.unlink')
+  @Delete(':id/company-link')
+  unlinkFromCompany(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.companyLink.unlink(user.id, id);
+  }
 
   /** The office's insurers, ACTIVE and inactive. `?isActive=` narrows it; absent
    *  means both, because an office that cannot see what it deactivated cannot

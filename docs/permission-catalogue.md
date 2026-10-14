@@ -1,6 +1,6 @@
 # Permission catalogue — دليل الصلاحيات
 
-> **221 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
+> **223 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
 >
 > **The English text is the stored description.** It is developer-facing and often terse: a hint at what the code gates, not something to translate word for word.
 >
@@ -27,7 +27,7 @@
 | `encryption-key.read` | View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `permission.read` | View the global permission catalogue (the codes a role can be granted) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `provider.office-state.read` | Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
-| `provider.office.register` | Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
+| `provider.office.register` | Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform | E2E_PLATFORM_GRANT_179190811423235, PLATFORM_OPERATOR |
 | `role.create` | Define a new role in this office's catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `role.deactivate` | Retire a role, reactivate a retired one, and delete one that was never used | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `role.read` | View the office's role catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
@@ -160,7 +160,7 @@
 | `reconciliation-exception.resolve` | Close a reconciliation exception | BRANCH_DEPARTMENT_MANAGER, FINANCE_COLLECTIONS_OFFICER |
 | `remittance.record` | Record a remittance to an insurer | FINANCE_COLLECTIONS_OFFICER |
 
-## insurance-operations — العمليات التأمينية  (51)
+## insurance-operations — العمليات التأمينية  (53)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -180,6 +180,8 @@
 | `endorsement.read` | List/read endorsements, their premium adjustment, the tied commission reversal, the refund approval state and the versioned coverage schedule | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, FINANCE_COLLECTIONS_OFFICER, PLACEMENT_TECHNICAL_OFFICER, SALES_RELATIONSHIP_OFFICER |
 | `insurance-line.create` | Add a line of business to this office's vocabulary | OFFICE_ADMINISTRATOR |
 | `insurance-line.update` | Correct a line of business this office added | OFFICE_ADMINISTRATOR |
+| `insurer.company.link` | Link this office's insurer record to an insurance company registered on the platform. Changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's own copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record. | OFFICE_ADMINISTRATOR, PLACEMENT_TECHNICAL_OFFICER, SYSTEM_SECURITY_ADMINISTRATOR |
+| `insurer.company.unlink` | Remove the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note. | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `insurer.create` | Register an insurer for this office, whether it is in the global catalogue or in none | OFFICE_ADMINISTRATOR |
 | `insurer.deactivate` | Stop and resume dealing with an insurer, and read the live impact of doing so | OFFICE_ADMINISTRATOR |
 | `insurer.directory.read` | Search the cross-office insurer directory — companies any office has registered, with their public contact details and the lines they offer. Never shows which offices deal with a company, or any office's commercial terms. | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, OFFICE_ADMINISTRATOR, PLACEMENT_TECHNICAL_OFFICER, SALES_RELATIONSHIP_OFFICER |
@@ -293,8 +295,8 @@
 
 ## Measured, so the numbers are checkable
 
-- **221** codes, **12** modules.
-- **0** held by no seeded role; **88** held by exactly one.
+- **223** codes, **12** modules.
+- **0** held by no seeded role; **87** held by exactly one.
 - **0** have no stored English description.
 
 Regenerate after any permission change. The sibling file `docs/permission-catalogue-for-descriptions.txt` is the one to TYPE INTO — it carries an `ar:` line per code and is regenerated without destroying what is already written there.

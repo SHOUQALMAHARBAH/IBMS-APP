@@ -132,12 +132,18 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // `office-state.read` and `office.register` are two different FAMILIES by the matrix's own
     // reading (`provider.office-state` and `provider.office`), so no five-state row appears either,
     // which is the right answer for a pair an office may never hold.
-    expect(PERMISSION_CATALOGUE.length).toBe(221);
+    // `insurer.company.link` and `insurer.company.unlink` (module 0-ب item (e), decision 63) move
+    // THREE of the four. They are OFFICE-scoped, so the matrix does offer them — and `insurer.company`
+    // is a new family with exactly two members, but neither `link` nor `unlink` is one of the seven
+    // CRUD verbs a five-state row is built from, so they land in the TOGGLE list and the family count
+    // does not move. The same arithmetic `discard` produced, for the same reason: a five-state control
+    // offers none / read / read+write / +delete / full, and "link" is not a point on that scale.
+    expect(PERMISSION_CATALOGUE.length).toBe(223);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
     // and the matrix no longer offers it — so the toggle list loses exactly the one code it added.
-    expect(toggles.length).toBe(160);
+    expect(toggles.length).toBe(162);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

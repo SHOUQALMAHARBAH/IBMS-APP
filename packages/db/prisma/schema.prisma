@@ -519,6 +519,10 @@ model Organization {
   employeeCbjApprovalBranches         EmployeeCbjApprovalBranch[]
   roleScopeBranches                   RoleScopeBranch[]
   insurerLicensedLines                InsurerLicensedLine[]
+  /// MODULE 0-ب ITEM (e) — the office-side counterparty records LINKED to this registered insurance
+  /// company. A NAMED relation, because `Organization` is already `Insurer`'s tenant through a
+  /// different field and Prisma cannot tell two relations between one pair apart without a name.
+  linkedInsurerRecords                Insurer[]                        @relation("InsurerRegisteredCompany")
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -6015,6 +6019,27 @@ model Insurer {
   /// violation it is rather than as a confusing CHECK violation on an unrelated column.
   insurerMaster   InsurerMaster? @relation(fields: [insurerMasterId], references: [id], onDelete: Restrict)
 
+  /// MODULE 0-ب ITEM (e), DECISION 63 — the registered INSURANCE COMPANY this counterparty record is,
+  /// when there is one. The whole of the field split, which is a RESOLVER and not a move.
+  ///
+  /// An office may carry an `Insurer` row for a company with no platform organization, and that is
+  /// the majority case — so the local company columns below cannot move anywhere. They stay, they
+  /// answer when this is NULL, and when it is set the organization's value wins. The precedence lives
+  /// in exactly one place: `resolveInsurerCompanyFacts` in `repositories/insurer-identity.ts`.
+  ///
+  /// NOT `registeredOrganizationId` or anything containing `organizationId`. That name means THE
+  /// TENANT in this codebase — `Insurer.organizationId` above is the office that owns this record —
+  /// and `tenantScopeExtension` derives its scoped set from it. Naming this one similarly would
+  /// invite the confusion that made `InsurerLicensedLine` tenant-scoped by accident earlier in this
+  /// item.
+  ///
+  /// NO UNIQUE, deliberately: several offices each keep their own `Insurer` row for the same company
+  /// and all of them may link to it. A unique here would let the first office to link block the rest.
+  /// That it points only at an `INSURANCE_COMPANY` is enforced in `InsurerCompanyLinkService` — a
+  /// CHECK compares columns of one row of one table, and the type lives across the foreign key.
+  insuranceCompanyId String?
+  insuranceCompany   Organization? @relation("InsurerRegisteredCompany", fields: [insuranceCompanyId], references: [id], onDelete: Restrict)
+
   /// Office-local identity, populated ONLY when `insurerMasterId` is NULL.
   ///
   /// Both scripts are required for a local row, for the same reason Phase 1 made
@@ -6154,6 +6179,7 @@ model Insurer {
   @@unique([id, organizationId])
   @@index([organizationId])
   @@index([insurerMasterId])
+  @@index([insuranceCompanyId])
   /// Declared, not added — the database has had this index since `20261013100000_one_canonical_name_key`, and no migration
   /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
   /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.

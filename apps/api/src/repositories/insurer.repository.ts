@@ -59,10 +59,28 @@ export const INSURER_RECORD_SELECT = {
   },
   // COMPANY-level — the switchboard, the general mailbox, the site, the address
   // formal paperwork goes to. Safe to show across offices; see the schema.
+  //
+  // STILL SELECTED AFTER DECISION 63, and that is the point rather than an oversight: they answer for
+  // every insurer that has NOT registered on this platform, which is the majority. The resolver
+  // decides which source wins; it cannot decide from a field it was not given.
   companyPhone: true,
   companyEmail: true,
   companyWebsite: true,
   companyCorrespondenceAddress: true,
+  // MODULE 0-ب ITEM (e), DECISION 63 — the registered company, when this record is linked to one.
+  // Only the facts the resolver resolves: this is a read of ANOTHER organization's row, so the
+  // select IS the disclosure boundary, exactly as the insurer directory's column list is.
+  insuranceCompanyId: true,
+  insuranceCompany: {
+    select: {
+      legalName: true,
+      legalNameAr: true,
+      phone: true,
+      email: true,
+      website: true,
+      address: true,
+    },
+  },
   // RELATIONSHIP-level — the named people who answer THIS office. Never leaves it.
   rfqContactName: true,
   rfqContactEmail: true,
