@@ -80,6 +80,11 @@ export interface InsurerView {
   /** RELATIONSHIP-level from here down — this office's own commercial terms and the
    *  named people who answer it. None of this may cross an office boundary. */
   financialStrengthRating: string | null;
+  /** MODULE 0-ب ITEM (e) — the date the rating was as at, and the agency that published it. Shown,
+   *  not merely stored: a rating with no date is a claim rather than a record of the care taken in
+   *  choosing this insurer, which is why `Insurer_rating_carries_its_date` refuses either half alone. */
+  financialStrengthRatingAsOf: string | null;
+  ratingAgencyId: string | null;
   creditTermsDays: number | null;
   rfqContactName: string | null;
   rfqContactEmail: string | null;
@@ -159,6 +164,9 @@ export function deriveInsurerView(row: InsurerRecord): InsurerView {
           companyCorrespondenceAddress: row.companyCorrespondenceAddress,
         },
     financialStrengthRating: identity.financialStrengthRating,
+    financialStrengthRatingAsOf:
+      row.financialStrengthRatingAsOf?.toISOString() ?? null,
+    ratingAgencyId: row.ratingAgencyId,
     creditTermsDays: row.creditTermsDays,
     rfqContactName: row.rfqContactName,
     rfqContactEmail: row.rfqContactEmail,

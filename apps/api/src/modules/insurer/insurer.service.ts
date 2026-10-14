@@ -1,3 +1,4 @@
+import { parseCalendarDate } from '../../common/calendar-date.util';
 import {
   ConflictException,
   Injectable,
@@ -167,6 +168,8 @@ export class InsurerService {
 
     const company = this.companyFrom(dto);
     const relationship = this.relationshipFrom(dto);
+    // DECISION 90, on the create path: `current` is null because there is no row yet.
+    this.assertRatingCarriesItsDate(relationship, null);
     // Resolved BEFORE the insurer is written: an unknown line id is a 422 about the
     // body, and discovering it after the insert would leave a registered company with
     // a half-applied product list and no way for the caller to tell.
@@ -260,6 +263,13 @@ export class InsurerService {
         ? {}
         : { legalNameAr: dto.legalNameAr }),
     };
+
+    /*
+     * DECISION 90, on the UPDATE path, and this is the case a DTO could never get right: the rule is
+     * about the row AFTER the patch. `row` is the current state, `patch` is what this body changes,
+     * and the check reads the merge of the two.
+     */
+    this.assertRatingCarriesItsDate(patch, row);
 
     const resolvedLines = await this.resolveLineIds(dto.lineIds);
     const delta = auditDelta(row, patch);
@@ -512,7 +522,66 @@ export class InsurerService {
       fields.creditTermsDays = dto.creditTermsDays;
     if (dto.financialStrengthRating !== undefined)
       fields.financialStrengthRating = dto.financialStrengthRating;
+    if (dto.financialStrengthRatingAsOf !== undefined)
+      fields.financialStrengthRatingAsOf = parseCalendarDate(
+        dto.financialStrengthRatingAsOf,
+        'financialStrengthRatingAsOf',
+      );
+    if (dto.ratingAgencyId !== undefined)
+      fields.ratingAgencyId = dto.ratingAgencyId;
     return fields;
+  }
+
+  /**
+   * DECISION 90 — A DATABASE CONSTRAINT MUST NEVER BE THE ERROR MESSAGE.
+   *
+   * `Insurer_rating_carries_its_date` refuses a rating without its as-of date and a date without its
+   * rating, in both directions, from `20261125110000` onward. The CHECK is the backstop and stays
+   * exactly as it is; this is the form-level equivalent, and its whole job is that nobody ever meets
+   * the backstop.
+   *
+   * Without it, an office typing a rating into `/insurers/new` — a screen that has existed since
+   * long before this module — would get a raw constraint violation surfaced as a 500. That is not a
+   * hypothetical: the field is on the form, the DTO accepted it, and the service wrote it.
+   *
+   * ## IT READS THE MERGED STATE, NOT THE BODY, AND THAT IS WHY IT IS NOT A DECORATOR
+   *
+   * A PATCH carrying only the rating is CORRECT on a record that already has a date and WRONG on one
+   * that does not; a PATCH clearing the date is wrong on a record that has a rating. A DTO cannot see
+   * the row, so a class-level `@Validate` would be right about the body and wrong about the outcome —
+   * item (e)'s own lesson, which bit when `@IsOptional()` turned out to skip every validator on an
+   * absent field.
+   *
+   * `current` is null on the create path, where the merged state is just the body.
+   */
+  private assertRatingCarriesItsDate(
+    fields: InsurerRelationshipFields,
+    current: {
+      financialStrengthRating: string | null;
+      financialStrengthRatingAsOf: Date | null;
+    } | null,
+  ): void {
+    const rating =
+      fields.financialStrengthRating !== undefined
+        ? fields.financialStrengthRating
+        : (current?.financialStrengthRating ?? null);
+    const asOf =
+      fields.financialStrengthRatingAsOf !== undefined
+        ? fields.financialStrengthRatingAsOf
+        : (current?.financialStrengthRatingAsOf ?? null);
+
+    const hasRating = rating !== null && rating !== '';
+    const hasAsOf = asOf !== null;
+    if (hasRating === hasAsOf) return;
+
+    if (hasRating) {
+      throw new UnprocessableEntityException(
+        'A financial strength rating must carry the date it was as at. Enter the as-of date beside the rating, or clear the rating. A rating with no date is a claim rather than a record of the care taken in choosing this insurer.',
+      );
+    }
+    throw new UnprocessableEntityException(
+      'An as-of date was given with no financial strength rating. Enter the rating beside it, or clear the date.',
+    );
   }
 
   /**

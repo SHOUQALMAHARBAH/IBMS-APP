@@ -54,6 +54,7 @@ cannot exist until the code that declares them does. Completed at module close.
 | 11 | **Whether art. 14/c reaches an art. 21/b suspension is UNSETTLED, and is not inferred** | CBJ Instr. 9/2026 arts. 14/b, 14/c, 21/b | `license-standing.config.ts`, and the migration header | 14/b scopes itself to «الفقرة (أ) من هذه المادة»; 14/c carries no such phrase. The text reads either way. Today it only matters for a 21/b suspension that states no period, since one that names its own end date expires on its own. **A question for the regulator, deliberately not resolved by reading** — correction 0.1 of this module was stripping a rule asserted under an article that did not carry it, and inventing the opposite here would be the same mistake with the sign flipped. |
 | 12 | **`BrokerLicense.status = 'lapsed'` is a SECOND HOME for what `RegulatoryAction` now models** | decision 71 | `broker-license.config.ts`, `license-standing.config.ts` | The manual marker predates the act table and is IN USE — measured: 0 rows on dev, 19 on db-test, with `BrokerLicenseRepository.markLapsed` reachable from the service. The derivation reads it as SUSPENDED with a NULL decision reference (its own documentation says it means a CBJ suspension), so nothing is currently wrong — but two homes for "has the regulator stopped this office" is one too many. **The collapse order is: record acts for whatever the marker was standing in for, THEN drop the column** — never the reverse, which would lose the fact before it was recorded anywhere. |
 | 13 | **The eight reference tables cannot RETIRE a row** | item (c), item (d) | `reference-data.service.ts` | They carry `code`, both names, `descriptionAr` and `displayOrder` — and no `isActive`. Found by the compiler: the first version of the reference service carried a paragraph explaining how retired rows are handled. A column is NOT invented, because the question it raises is a decision: what happens on the screen of an office whose stored legal form has been retired — does it still render, and does it still validate? |
+| 16 | **A financial-strength rating and its date cannot be CLEARED through the API** | — | `insurer-crud.dto.ts`, `insurer-crud.e2e-spec.ts` | Found while writing decision 90's merged-state test, which first tried to clear a date and got a **400, not a 422**: an empty string is refused by the DTO's length rule before any service rule runs, and `emptyStringToUndefined` turns an empty date into "no change" rather than into a clear. So a rating entered in error stays forever, and so does its date. **Pre-existing, not introduced by item (e)** — the rating column has behaved this way since Process 31 — and NOT patched here, because "clear" needs a convention this API does not have (an explicit `null`, a `DELETE` sub-route, or a sentinel), and inventing one for a single field would be a third way of saying "remove a value" in a codebase that already has two. |
 | 15 | **A `Document` reference can cross offices at the DATABASE level, on four tables** | multi-tenancy Phase 2 | *(measured 2026-10-13; no single declaration site — see below)* | Measured: `Document` carries `organizationId` and has **no `(id, organizationId)` unique**, so none of its four referrers can carry the composite tenant foreign key the rest of this schema uses — `BrokerLicense.certificateDocumentId` (module 0 item (c)), `ClaimDocument.documentId`, `Document.previousVersionId` and `RegulatoryAction.documentId` (item (d)). **Bounded, not open**: `Document` is tenant-scoped and RLS-protected, so the application cannot read another office's document to obtain its id; the composite FK is the defence-in-depth for the raw-query and forgotten-`where` case, which is precisely what the other thirteen exist for. **Deliberately NOT fixed on one table alone** — adding it to `RegulatoryAction` only would make the newest table look guarded while three older ones are not, and leave the next reader believing the pattern is handled. It is ONE coherent change (one unique on `Document`, four composite FKs) belonging to whoever next touches document tenancy. |
 | 14 | **The office-administrator grant set has TWO homes, guarded rather than collapsed** | item (d), owner's instruction | `office-administrator-grants.ts`, `office-administrator-grants.parity.spec.ts` | The seed grid names the role per code; the api declares the list the registration resolves. One home is not available today: `prisma/seed-data/` sits outside `@ibms/db`'s export surface, and `packages/db/tsconfig.json`'s `rootDir: "src"` blocks the reverse import. **The collapse is available and is a real refactor**: move the list to `packages/db/src/`, export it as a package subpath, and derive the grid's membership from it — 45 entries change. Until then the parity guard fails in BOTH directions, which is this repository's established answer to a hand-written mirror. |
 
@@ -88,6 +89,30 @@ These are the owner's items whose declaration site does not exist yet. Each land
 
 ---
 
+## A standing rule the plants earned — a boundary needs a fixture on EACH side
+
+**A boundary — linked/unlinked, locked/open, inside the office/outside — needs a fixture on EACH
+side of it, and on the distinguishing side the values must DIFFER IN EVERY FIELD UNDER ASSERTION.
+Otherwise it is the similarity that passes the test, not the correctness of the code.**
+
+The owner's words, from the resolver's own plant. It is the SIBLING of the vacuity rule, not the same
+rule: there the set is empty, here it is full but entirely on one side — which is more dangerous,
+because a suite rich in fixtures looks thorough.
+
+**Three instances in this module, all found by planting and none by reading:**
+
+* `deriveInsurerView` pointed back at `row.companyPhone` killed NOTHING, because every fixture in
+  that spec was UNLINKED and the resolver returns the office's own values for those — the two paths
+  answer identically.
+* The art. 14/c leap-day test asserted 2026-02-28 and 2026-03-02, one either side of BOTH thresholds,
+  so it answered the same under calendar and 730-day arithmetic. 2026-03-01 is the only day they
+  disagree.
+* Decision 90's merged-state test: the ACCEPTED half carried the rating IN THE BODY, so the
+  `current` fallback was never reached and a plant that ignored the current row left it green. The
+  observing case patches only the DATE, so the rating can come from nowhere else.
+
+---
+
 ## A standing rule item (e)'s measurement earned
 
 **WHERE TWO SOURCES COULD PRODUCE THE SAME-LOOKING LIST, EACH SCREEN NAMES WHICH ONE IT IS SHOWING,
@@ -114,6 +139,29 @@ The general rule is wider than insurer lines and is why it is recorded here rath
 on one column. An observed set and a declared set are different claims; a screen that shows one while
 the reader believes the other is the confidently-wrong-figure failure this repository has shipped
 three times.
+
+---
+
+## A standing rule the naming correction earned — ask BEFORE naming a column
+
+**Before naming a column on any new table, answer one question: do these rows belong to a TENANT (an
+office), or are they a GENERAL FACT? Only the first carries `organizationId`. The second is forbidden
+from carrying it, even when the thing it points at happens to be an `Organization` row — because that
+name creates the isolation, and naming a general column that way hides a fact from the people who own
+it.**
+
+The owner's words, generalised from `InsurerLicensedLine`. The name is the mechanism:
+`tenantScopeExtension` derives its scoped set from the DMMF as "every model carrying an
+`organizationId`", matching the field name EXACTLY.
+
+**AND THE DANGEROUS DIRECTION, recorded and deliberately NOT measured yet**: a table that DOES belong
+to a tenant but whose column is named something else leaves the scoped set SILENTLY, and neither
+`tenant-isolation.e2e-spec.ts` nor `db:divergence` can see it — both start from that same set. Do not
+sweep for it. **Ask it at the first new office-owned table, not before.**
+
+A fact about HOW a record came to exist — who typed it, where it came from, when — belongs to the
+OWNER OF THE RECORD, not to the thing the record describes. It classifies on the office's side even
+when its subject is a company. (`companyFactSource`, `insuranceCompanyId`, `officeRecorded`.)
 
 ---
 

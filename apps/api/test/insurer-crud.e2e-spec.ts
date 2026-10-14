@@ -221,6 +221,9 @@ describe('registering an insurer — both paths through one endpoint', () => {
       rfqContactPhone: '+962 6 500 1000',
       creditTermsDays: 45,
       financialStrengthRating: 'BBB+',
+      // MODULE 0-ب ITEM (e) — the pair. Submitting the rating alone is now a 422 naming both fields,
+      // which is asserted in its own test below rather than discovered here.
+      financialStrengthRatingAsOf: '2026-01-15',
     }).expect(201);
 
     const view = response.body as InsurerView;
@@ -807,4 +810,167 @@ describe('the permission split, and what absence looks like', () => {
       .set(bearer(admin.accessToken))
       .expect(400);
   }, 120_000);
+});
+
+/**
+ * DECISION 90 — A DATABASE CONSTRAINT MUST NEVER BE THE ERROR MESSAGE.
+ *
+ * The owner's governing decision in its sharpest local form. `Insurer_rating_carries_its_date` became
+ * enforceable in `20261125110000`, and `/insurers/new` has carried a financial-strength-rating input
+ * since long before this module — so without a form-level equivalent an office typing a rating would
+ * have met a raw constraint violation surfaced as a 500.
+ *
+ * Every assertion below is on the SENTENCE, not on the status alone and never on the SQLSTATE. A 422
+ * that could be any of several refusals tells a person nothing; the point of the decision is that the
+ * message names what to do.
+ */
+describe('decision 90 — the rating and its date, in words rather than a constraint', () => {
+  it('refuses a rating with no as-of date, and NAMES the date', async () => {
+    const response = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Undated Rating Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة تصنيف بلا تاريخ`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2000',
+        companyEmail: 'undated@example.test',
+        financialStrengthRating: 'A-',
+      })
+      .expect(422);
+
+    const message = String((response.body as { message: string }).message);
+    // THE SENTENCE, and the three things it has to contain: what is wrong, what to do, and why the
+    // rule exists. A message that said only "invalid" would satisfy a status assertion and fail a
+    // person.
+    expect(message).toMatch(/as.?at|as-of/i);
+    expect(message).toMatch(/clear the rating/i);
+    // And NOT the constraint. If this ever fails, somebody removed the service check and the database
+    // is answering the user directly — which is the whole of what decision 90 forbids.
+    expect(message).not.toContain('Insurer_rating_carries_its_date');
+    expect(message).not.toContain('23514');
+    expect(message).not.toMatch(/violates check constraint/i);
+  }, 120_000);
+
+  it('refuses an as-of date with no rating, and NAMES the rating', async () => {
+    // The other direction. Without it, an implementation that only checked one way would pass the
+    // test above while leaving the database to answer for the other.
+    const response = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Dateless Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة بلا تصنيف`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2001',
+        companyEmail: 'dateless@example.test',
+        financialStrengthRatingAsOf: '2026-01-15',
+      })
+      .expect(422);
+
+    const message = String((response.body as { message: string }).message);
+    expect(message).toMatch(/no financial strength rating/i);
+    expect(message).not.toMatch(/violates check constraint/i);
+  }, 120_000);
+
+  it('accepts the PAIR — so the refusals are about the rule and not about the field', async () => {
+    // The non-empty positive case. Without it, an implementation that refused every rating would pass
+    // both tests above.
+    const response = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Dated Rating Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة تصنيف مؤرَّخ`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2002',
+        companyEmail: 'dated@example.test',
+        financialStrengthRating: 'A+',
+        financialStrengthRatingAsOf: '2026-02-20',
+      })
+      .expect(201);
+
+    const view = response.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(view.financialStrengthRating).toBe('A+');
+    expect(view.financialStrengthRatingAsOf).toContain('2026-02-20');
+  }, 120_000);
+
+  it('reads the MERGED state on a PATCH, which is why the rule is not a decorator', async () => {
+    /*
+     * THE CASE A DTO COULD NEVER GET RIGHT. A PATCH carrying only the rating is CORRECT on a record
+     * that already has a date, and WRONG on one that does not. A class-level validator sees the body
+     * and not the row, so it would have to refuse both or accept both.
+     */
+    const dated = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Merged State Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة الحالة المدمجة`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2003',
+        companyEmail: 'merged@example.test',
+        financialStrengthRating: 'A',
+        financialStrengthRatingAsOf: '2026-03-01',
+      })
+      .expect(201);
+    const id = (dated.body as InsurerView).id;
+
+    /*
+     * ACCEPTED, AND THIS IS THE HALF THAT OBSERVES THE MERGE — found by planting, not by reading.
+     *
+     * The patch carries ONLY the as-of date, so the RATING can only come from the current row. Make
+     * the rule ignore `current` and this becomes "a date with no rating" and a 422. The rating-only
+     * patch below does NOT observe it: its body carries the rating, so the fallback is never reached
+     * and the plant left it green.
+     *
+     * Third time in this module that a plant has found a test which could not fail.
+     */
+    await request(app!.getHttpServer())
+      .patch(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .send({ financialStrengthRatingAsOf: '2026-04-01' })
+      .expect(200);
+
+    // ACCEPTED: the row already carries a date, so a rating-only patch is complete after the merge.
+    await request(app!.getHttpServer())
+      .patch(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .send({ financialStrengthRating: 'AA-' })
+      .expect(200);
+
+    /*
+     * REFUSED: the IDENTICAL body, on a record that has no date. Same patch, opposite answer — which
+     * is the whole claim, and no decorator could make it.
+     *
+     * The first version of this test tried to clear the DATE instead and got a 400, not a 422: an
+     * empty string is refused by the DTO's length rule before any service rule runs, and
+     * `emptyStringToUndefined` turns an empty date into "no change" rather than into a clear. So
+     * CLEARING a rating or its date is not expressible through this API at all — a pre-existing gap,
+     * not introduced here, and recorded in `docs/deferred-register.md` rather than worked around with
+     * a test that asserts something unreachable.
+     */
+    const undated = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Unrated Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة بلا تصنيف بعد`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2004',
+        companyEmail: 'unrated@example.test',
+      })
+      .expect(201);
+
+    const refused = await request(app!.getHttpServer())
+      .patch(`/insurers/${(undated.body as InsurerView).id}`)
+      .set(bearer(admin.accessToken))
+      .send({ financialStrengthRating: 'AA-' })
+      .expect(422);
+    const message = String((refused.body as { message: string }).message);
+    expect(message).toMatch(/as.?at|as-of/i);
+    expect(message).not.toMatch(/violates check constraint/i);
+  }, 180_000);
 });

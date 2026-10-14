@@ -35,6 +35,10 @@ const LINKED: InsurerRecord = {
   // forces a decision here when a source is added rather than letting one default in silently.
   insuranceCompanyId: null,
   insuranceCompany: null,
+  // MODULE 0-ب ITEM (e). Both null, which is the state every pre-existing row is in and the only
+  // state `Insurer_rating_carries_its_date` accepts alongside a null rating.
+  ratingAgencyId: null,
+  financialStrengthRatingAsOf: null,
   legalName: null,
   legalNameAr: null,
   isActive: true,
@@ -390,6 +394,12 @@ describe('the view keeps company-level and relationship data distinguishable', (
       'officeMayEditCompanyFacts',
       'officeRecorded',
       'financialStrengthRating',
+      // MODULE 0-ب ITEM (e) — with the rating, and for decision 64's reason: the rating is what THIS
+      // OFFICE recorded in performing its duty of care when choosing an insurer, not a public fact
+      // about the company. Its date and its agency are properties of that record, so they classify
+      // with it. The directory must never show any of the three.
+      'financialStrengthRatingAsOf',
+      'ratingAgencyId',
       'creditTermsDays',
       'rfqContactName',
       'rfqContactEmail',

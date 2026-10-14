@@ -81,6 +81,12 @@ export const INSURER_RECORD_SELECT = {
       address: true,
     },
   },
+  // MODULE 0-ب ITEM (e) — the rating's own date and agency. SELECTED, not merely writable: the
+  // service's merged-state check for `Insurer_rating_carries_its_date` has to read the CURRENT date
+  // to decide whether a PATCH that carries only a rating is correct, and the compiler is what said
+  // so — it refused the check until this was here.
+  financialStrengthRatingAsOf: true,
+  ratingAgencyId: true,
   // RELATIONSHIP-level — the named people who answer THIS office. Never leaves it.
   rfqContactName: true,
   rfqContactEmail: true,
@@ -134,6 +140,10 @@ export interface InsurerRelationshipFields {
   underwriterContact?: string | null;
   creditTermsDays?: number | null;
   financialStrengthRating?: string | null;
+  /** MODULE 0-ب ITEM (e) — the pair `Insurer_rating_carries_its_date` refuses apart. The service
+   *  checks the MERGED state before either reaches here; this signature is what lets it. */
+  financialStrengthRatingAsOf?: Date | null;
+  ratingAgencyId?: string | null;
 }
 
 /**
