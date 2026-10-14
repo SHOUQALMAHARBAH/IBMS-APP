@@ -1575,13 +1575,24 @@ on the owner's decision. Three layers, each with its own refusal:
 Migration `20261117120000` withdraws the grants that already existed in brokerage offices, because
 the seed upserts grants and never revokes one.
 
-**What is closed and what is not, measured rather than claimed.** The provider organization holds
-exactly ONE permission code and zero rows in `Customer`, `Policy`, `Claim`, `Invoice`, `Employee`,
-`Insurer`, `BrokerLicense`, `Lead` and `Prospect` on both databases. That closure is at the GRANT
-level, not the schema level: no structural rule stops a provider administrator granting their own
-role `customer.create` and then writing a customer. What exists is a provider organization that
-starts with nothing but the dashboard, and a seed check that fails if its role ever holds more than
-that one code.
+**What is closed and what is not, measured rather than claimed — RE-MEASURED 2026-10-14.** The
+provider organization holds **NINE** permission codes and **zero** rows in `Customer`, `Policy`,
+`Claim`, `Invoice`, `Employee`, `Insurer`, `BrokerLicense`, `Lead` and `Prospect` on both databases.
+
+**This paragraph said ONE code, which was true at item (j) and is no longer.** The nine are the
+dashboard (`provider.office-state.read`), the two tenant-creating registration routes that module 0-ب
+added (`provider.office.register`, `provider.insurer.register`), and **six self-administration codes**
+(`user.manage`, `role.read`, `role.create`, `role.update`, `role.deactivate`, `permission.read`) so
+the provider can administer its own users and roles. The set is DECLARED as `PROVIDER_CODES` in
+`packages/db/prisma/seed.ts` and the seed check fails if it changes — so the number moves only as a
+recorded decision, which is how it moved from one to nine.
+
+**The zero-rows half is unchanged and is the part that matters.** Every brokerage code is still
+deliberately absent: no policy, customer, commission, collection, claim or employee capability. The
+closure is at the GRANT level, not the schema level — no structural rule stops a provider
+administrator granting their own role `customer.create` and then writing a customer. What exists is a
+provider organization that starts with nothing but the dashboard, its two registration routes and its
+own administration.
 
 ### OPEN — the bulk import's screen is broken, and its report has no screen at all
 
@@ -1924,18 +1935,28 @@ section that describe the following as open are **superseded**:
   SYSTEM_SECURITY_ADMINISTRATOR), plus an opt-in bootstrap administrator in
   the seed (`BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`). Before
   this, a production-seeded database had the full role catalogue, all permissions
-  (157 then, 186 today), and no way to give anyone a role — sample users are
+  (157 then, 224 today), and no way to give anyone a role — sample users are
   seeded only when `NODE_ENV !== 'production'` and signup grants none. Web:
   `/settings/users`. **Within ONE office only:** `ProvisionUserDto` has no
   `organizationId` and the tenant context supplies it, so this provisions into the
-  CALLER's office and cannot reach another. **A second office cannot currently be
-  onboarded through the application at all** — `Organization` has exactly two
-  writers in the repository, `packages/db/prisma/seed.ts` and
-  `apps/api/scripts/seed-demo.script.ts`, neither reachable over HTTP, and
-  anonymous signup refuses once a second office exists because it cannot tell which
-  one an account belongs to. That is RBAC Phase 4 (subdomain resolution); the
-  refusal message says so, having previously advised `POST /admin/users`, which
-  could never have helped.
+  CALLER's office and cannot reach another. **CORRECTED 2026-10-14 — this
+  paragraph said "a second office cannot currently be onboarded through the
+  application at all", naming `packages/db/prisma/seed.ts` and
+  `apps/api/scripts/seed-demo.script.ts` as `Organization`'s only two writers,
+  "neither reachable over HTTP". Module 0-ب items (d) and (e) made all of that
+  false and nothing here noticed.** Measured: there are now **four** non-spec
+  `organization.create` call sites and **two are reachable over HTTP** —
+  `POST /provider/brokerage-offices` and `POST /provider/insurance-companies`,
+  both held by the platform provider, both naming the organization explicitly.
+  **An office IS onboarded through the application; it is onboarded by the
+  provider, not by signup.** The half of the old claim that survives is the narrow
+  one this is really about: **anonymous signup still cannot resolve WHICH office an
+  account belongs to**, so it refuses once a second office exists — that is RBAC
+  Phase 4 (the Organization resolved from the request subdomain before the sign-in
+  form is shown). The refusal message carried the same false claim and is corrected
+  with it, and its spec now pairs every claim with a `not.toContain` of what it
+  replaced, because the previous version asserted that a phrase was PRESENT and so
+  stayed green while the phrase became wrong.
 - **Part 3.9 — the renewal module now exists.** `apps/api/src/modules/renewal/`
   — a nightly lead-time sweep opens a `RenewalCase` per expiring ACTIVE policy
   and walks it through `RenewalStatus`. This gives three already-shipped
