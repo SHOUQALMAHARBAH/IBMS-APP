@@ -17,10 +17,14 @@
 #
 # ## What it does NOT do
 #
-# It does not touch dev or db-test. It creates a throwaway database on the db-test CONTAINER, uses
-# it, and drops it — in a trap, so an interrupted run does not leave it behind to confuse the next
-# one. It never runs `prisma migrate reset`, which refuses to run unattended and needs the user's
-# explicit consent for that run.
+# It does not touch the dev or db-test DATABASES. It creates a throwaway database on the db-test
+# CONTAINER, uses it, and drops it — in a trap, so an interrupted run does not leave it behind to
+# confuse the next one. It never runs `prisma migrate reset`, which refuses to run unattended and
+# needs the user's explicit consent for that run.
+#
+# The one thing that outlives the run is the `ibms_app` ROLE, and only on a cluster where it does not
+# already exist — see the note at the CREATE ROLE below. "Does not touch db-test" is therefore a claim
+# about its DATABASE, not about its cluster, and is worded that way on purpose.
 #
 # Usage:  bash scripts/from-empty.sh
 set -uo pipefail
@@ -59,7 +63,14 @@ docker exec -i "$CONTAINER" psql -U ibms -d ibms_test -c "CREATE DATABASE \"${SC
   || { echo "FROM-EMPTY: could not create the throwaway database"; exit 1; }
 
 # `ibms_app` is the runtime role the privileges gate checks; the migrations grant to it by name, so
-# it has to exist here too or the GRANT statements fail on a database built from nothing.
+# it has to exist or the GRANT statements fail on a database built from nothing.
+#
+# THE ONE CLUSTER-LEVEL EFFECT, STATED BECAUSE THE TRAP CANNOT UNDO IT. `CREATE ROLE` is cluster-wide,
+# not per-database, so this is the only thing here that outlives the throwaway database. Measured on
+# this machine: the role already exists on the db-test cluster (`rolcanlogin = t`), so the guard is a
+# no-op and nothing is created. On a cluster where it is genuinely absent it IS created and is left in
+# place deliberately — dropping a role every migration grants to would break the next run, and a
+# cleanup that breaks what it cleans up after is worse than the residue.
 docker exec -i "$CONTAINER" psql -U ibms -d "$SCRATCH" -c \
   "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='ibms_app') THEN CREATE ROLE ibms_app LOGIN PASSWORD 'ibms_app'; END IF; END \$\$;" >/dev/null
 
