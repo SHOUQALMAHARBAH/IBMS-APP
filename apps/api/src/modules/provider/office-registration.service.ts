@@ -27,6 +27,7 @@ import {
   OFFICE_ADMINISTRATOR_GRANTS,
   OFFICE_ADMINISTRATOR_ROLE_NAME,
 } from './office-administrator-grants';
+import { deriveRegistrationPackState } from './registration-pack.config';
 import type { RegisterBrokerageOfficeDto } from './dto/register-brokerage-office.dto';
 
 /**
@@ -328,10 +329,38 @@ export class OfficeRegistrationService {
           },
         });
 
+        /*
+         * DECISION 88 — THE TWO ART. 10/a DOCUMENTS, EACH WRITTEN ONLY IF GIVEN.
+         *
+         * Written AFTER the organization, because `Document.organizationId` references it — the same
+         * ordering the insurer registration had to learn the hard way, where the pointer sits on the
+         * parent and the first draft produced a 500 on every call.
+         *
+         * A pair that is half-supplied is treated as ABSENT rather than refused: the DTO already
+         * refuses a malformed value, and refusing a half-filled optional upload would make an
+         * optional document behave like a required one on the path where somebody started typing and
+         * stopped. The marker then names it, which is what the marker is for.
+         */
+        const registrationPack = await this.fileRegistrationPackDocuments(
+          tx,
+          actor.id,
+          dto,
+        );
+        if (
+          registrationPack.premisesTenureDocumentId !== null ||
+          registrationPack.associationMembershipDocumentId !== null
+        ) {
+          await tx.organization.update({
+            where: { id: organizationId },
+            data: registrationPack,
+          });
+        }
+
         const roleId = await this.createAdministratorRole(tx);
 
         return {
           organization,
+          registrationPack: deriveRegistrationPackState(registrationPack),
           licenseId: license.id,
           administratorRoleId: roleId.id,
           administratorGrantCount: roleId.grantCount,
@@ -386,6 +415,9 @@ export class OfficeRegistrationService {
       legalNameAr: result.organization.legalNameAr,
       administratorRoleId: result.administratorRoleId,
       administratorGrantCount: result.administratorGrantCount,
+      /** DECISION 88 — DERIVED, never stored, and it NAMES what is missing rather than counting it.
+       *  The screen's wording states what this system holds and never a finding about the office. */
+      registrationPack: result.registrationPack,
       licensedTypes: result.licensedTypes,
       /** Art. 4/a, as INFORMATION. `meetsRequirement: false` with `capitalIsUnrecorded: true` means
        *  nobody typed a figure — a different fact from a figure that is short, and the screen renders
@@ -399,6 +431,67 @@ export class OfficeRegistrationService {
       },
       expiryIsEndOfCalendarYear: result.expiryIsEndOfCalendarYear,
       expiryMatchesThreeYearTerm: result.expiryMatchesThreeYearTerm,
+    };
+  }
+
+  /**
+   * DECISION 88 — files whichever of the two art. 10/a documents the caller supplied.
+   *
+   * Each is independent: one may be given and the other not, and that is the ordinary state of an
+   * office whose paperwork arrives in two envelopes. A document is written only when BOTH of its
+   * fields are present, because a file name with no location — or the reverse — is half a record,
+   * and half a record would make the marker report a document we cannot actually produce.
+   */
+  private async fileRegistrationPackDocuments(
+    tx: TenantTransactionClient,
+    actorUserId: string,
+    dto: RegisterBrokerageOfficeDto,
+  ): Promise<{
+    premisesTenureDocumentId: string | null;
+    associationMembershipDocumentId: string | null;
+  }> {
+    const file = async (
+      fileName: string | undefined,
+      storageRef: string | undefined,
+      /*
+       * NO `which` ARGUMENT, and it was removed rather than silenced. The first version took one, to
+       * label which art. 10/a document this is — and `Document` has no description column, so nothing
+       * could read it. `no-unused-vars` refused it, correctly: a parameter passed at both call sites
+       * and read at neither looks like it distinguishes two things, and the distinction is carried
+       * elsewhere entirely. The POINTER on `Organization` is what identifies which document this is,
+       * and it identifies it exactly; the call sites below name it in the clearest form there is.
+       */
+    ): Promise<string | null> => {
+      if (fileName === undefined || storageRef === undefined) return null;
+      const document = await tx.document.create({
+        data: {
+          fileName,
+          storageRef,
+          // OTHER, deliberately, and this is the one place in this module where it is right. A new
+          // `DocumentCategory` value needs its own migration (`ALTER TYPE ... ADD VALUE` cannot be
+          // used in the transaction that adds it) and would be a decision about how an inspection
+          // query partitions documents — which decision 88 did not take. The POINTER on
+          // `Organization` is what identifies these two, and it identifies them exactly, which a
+          // category never could: a category says "this is a lease", the pointer says "this is THIS
+          // OFFICE'S art. 10/a/2 document".
+          category: 'OTHER',
+          classification: 'CONFIDENTIAL',
+          uploadedByUserId: actorUserId,
+        },
+        select: { id: true },
+      });
+      return document.id;
+    };
+
+    return {
+      premisesTenureDocumentId: await file(
+        dto.premisesTenureFileName,
+        dto.premisesTenureStorageRef,
+      ),
+      associationMembershipDocumentId: await file(
+        dto.associationMembershipFileName,
+        dto.associationMembershipStorageRef,
+      ),
     };
   }
 

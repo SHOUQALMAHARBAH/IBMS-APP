@@ -53,6 +53,22 @@ export const PROVIDER = {
     regInsSuccessLines: 'عدد الفروع المرخَّص بها: {count}',
     regInsSuccessCategories: 'أنواع التأمين المرخَّص بها: {types}',
     regInsRegisterAnother: 'تسجيل شركة أخرى',
+    regOfficeSectionPack: 'وثائق التسجيل (المادة ١٠/أ)',
+    regOfficePremisesTenureFileName: 'اسم ملف عقد الإيجار أو سند الملكية',
+    regOfficePremisesTenureStorageRef: 'موضع حفظ عقد الإيجار أو سند الملكية',
+    regOfficeAssociationFileName: 'اسم ملف إثبات الانتساب إلى الجمعية',
+    regOfficeAssociationStorageRef: 'موضع حفظ إثبات الانتساب',
+    regOfficePackNote:
+      'المادة (١٠/أ/٢) تُوجب نسخةً عن عقد الإيجار أو سند الملكية للمقر، والمادة (١٠/أ/٣) تُوجب ما يُثبت الانتساب إلى الجمعية الأردنية لوسطاء التأمين، وتُكرّرها المادة (١٨/أ) في البيانات الدورية. وبالقرار ٨٨: غيابُهما لا يمنع الحفظ، ويُحسَب السجلُّ ناقصاً. وإثباتُ الانتساب يُحفَظ ضمن حزمة تسجيل المكتب بلا ربطٍ بشخصٍ بعد، لأنّ الأشخاص الذين تذكرهم المادة لا وجود لهم في النظام لحظةَ التسجيل.',
+    regOfficePackHeading: 'اكتمال حزمة التسجيل',
+    regOfficePackComplete:
+      'حزمة التسجيل مكتملة: الوثيقتان مُسجَّلتان في النظام — اسمُ الملف وموضعُ حفظه ومَن سجّله.',
+    regOfficePackMissingIntro: 'الناقص:',
+    regOfficePackNotHeld: 'لا سجلَّ لهذه الوثيقة في النظام',
+    regOfficePackPremisesTenure: 'عقد الإيجار أو سند الملكية',
+    regOfficePackAssociation: 'إثبات الانتساب إلى الجمعية الأردنية لوسطاء التأمين',
+    regOfficePackScope:
+      'هذا بيانٌ عمّا يُسجّله النظام، لا حُكمٌ على المكتب. والمكتبُ المرخَّص من البنك المركزي قد قدّم هذه الوثائق إلى الجهة الرقابية بالفعل، فغيابُ سجلٍّ عندنا نقصٌ في سجلّنا نحن. والنظامُ لا يحفظ الملفات نفسها؛ ما يُحفَظ سجلٌّ بالوثيقة — اسمُها وموضعُ حفظها ومَن سجّلها — فـ«مُسجَّلة» تعني مُثبَتةً ومنسوبةً إلى مَن سجّلها، لا أنّ الملفَّ قابلٌ للاسترجاع من هنا.',
     regOfficeRefusalAct: 'تسجيل مكتب وساطة على المنصّة',
     regOfficeHeading: 'تسجيل مكتب وساطة',
     regOfficeIntro:
@@ -188,6 +204,23 @@ export const PROVIDER = {
     regInsSuccessLines: 'Licensed lines: {count}',
     regInsSuccessCategories: 'Licensed insurance types: {types}',
     regInsRegisterAnother: 'Register another company',
+    regOfficeSectionPack: 'Registration documents (art. 10/a)',
+    regOfficePremisesTenureFileName: 'Lease or title deed file name',
+    regOfficePremisesTenureStorageRef: 'Where the lease or title deed is filed',
+    regOfficeAssociationFileName: 'Association membership proof file name',
+    regOfficeAssociationStorageRef: 'Where the membership proof is filed',
+    regOfficePackNote:
+      'Art. 10/a/2 requires a copy of the lease contract or the title deed for the premises, and art. 10/a/3 requires proof of membership of the Jordanian Insurance Brokers Association, which art. 18/a repeats in the periodic returns. Under decision 88 their absence does not block the save; the record is counted as incomplete. The membership proof is held in the office’s registration pack with no link to a person yet, because the people the article names do not exist in the system when an office is registered.',
+    regOfficePackHeading: 'Registration pack',
+    regOfficePackComplete:
+      'The registration pack is complete: both documents are recorded in the system — the file name, where it is filed, and who filed it.',
+    regOfficePackMissingIntro: 'Missing:',
+    regOfficePackNotHeld: 'there is no record of this document in the system',
+    regOfficePackPremisesTenure: 'lease contract or title deed',
+    regOfficePackAssociation:
+      'proof of membership of the Jordanian Insurance Brokers Association',
+    regOfficePackScope:
+      'This states what the system records, not a judgement about the office. An office licensed by the Central Bank has already submitted these documents to the regulator, so our holding no record is a gap in our own record. The system does not store the files themselves; what is stored is a record of each document — its name, where it is filed, and who filed it — so “recorded” means filed and attributed, not that the file can be fetched from here.',
     regOfficeRefusalAct: 'register a brokerage office on the platform',
     regOfficeHeading: 'Register a brokerage office',
     regOfficeIntro:

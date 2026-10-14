@@ -145,6 +145,7 @@ function registeredBody(over: Record<string, unknown> = {}) {
     administratorRoleId: 'role-new',
     administratorGrantCount: 45,
     licensedTypes: ['GENERAL'],
+    registrationPack: { missing: [], complete: true },
     capital: {
       requiredCapital: '5000.000',
       paidUpCapital: null,
@@ -412,5 +413,186 @@ test.describe('registering a brokerage office', () => {
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
     expect(results.violations).toEqual([]);
+  });
+});
+
+/**
+ * DECISION 88 — THE MARKER, AND ITS ASSERTIONS ARE VISIBILITY ASSERTIONS.
+ *
+ * The owner's canonical form of the rule, and this is the first case where the hidden thing would be
+ * THE DELIVERABLE ITSELF: a marker present in the DOM and invisible satisfies decision 88 on paper and
+ * fails it entirely in practice — the office would be none the wiser that we are missing a document,
+ * which is the one thing the marker exists to say.
+ *
+ * So both assertions below are `toBeVisible()` first: that it is VISIBLE and names what is missing,
+ * and that the VISIBLE text carries no word of breach.
+ */
+const FORBIDDEN = [
+  'breach',
+  'non-compliant',
+  'noncompliant',
+  'non-compliance',
+  'violation',
+  'violates',
+  'fails art',
+  'in default',
+  'مخالف',
+  'إخلال',
+  'عدم التزام',
+  'انتهاك',
+];
+
+test.describe('decision 88 — the registration pack marker', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page, ['provider.office.register']);
+    await mockReads(page);
+  });
+
+  test('neither document: the save SUCCEEDS and the marker names BOTH', async ({
+    page,
+  }) => {
+    /*
+     * THE NON-REFUSAL, which is the inverse shape of every other test in this file and therefore
+     * needs its own witness: absence must NOT block. Both halves in one test — the office exists AND
+     * the marker names what is missing — because a test asserting only the marker would pass against
+     * an implementation that also refused the save.
+     */
+    await page.route(
+      'http://localhost:4000/provider/brokerage-offices',
+      (route) =>
+        route.fulfill({
+          status: 201,
+          json: registeredBody({
+            registrationPack: {
+              missing: ['premisesTenure', 'associationMembership'],
+              complete: false,
+            },
+          }),
+        }),
+    );
+    await page.goto('/provider-register-office');
+    await fillValidForm(page);
+    await page.getByRole('button', { name: 'Register office' }).click();
+
+    // THE SAVE SUCCEEDED.
+    await expect(page.getByTestId('registered-office')).toBeVisible();
+    await expect(page.getByTestId('registered-office')).toContainText('OFF-1');
+
+    // AND THE MARKER IS VISIBLE AND NAMES BOTH, by name and never by count.
+    const marker = page.getByTestId('registration-pack-missing');
+    await expect(marker).toBeVisible();
+    await expect(marker).toContainText('lease contract or title deed');
+    await expect(marker).toContainText(
+      'proof of membership of the Jordanian Insurance Brokers Association',
+    );
+    await expect(marker).toContainText('no record of this document');
+    // NEVER A COUNT.
+    await expect(marker).not.toContainText('2 documents');
+  });
+
+  test('one uploaded: the marker names the REMAINING one alone', async ({
+    page,
+  }) => {
+    await page.route(
+      'http://localhost:4000/provider/brokerage-offices',
+      (route) =>
+        route.fulfill({
+          status: 201,
+          json: registeredBody({
+            registrationPack: {
+              missing: ['associationMembership'],
+              complete: false,
+            },
+          }),
+        }),
+    );
+    await page.goto('/provider-register-office');
+    await fillValidForm(page);
+    await page.getByRole('button', { name: 'Register office' }).click();
+
+    const marker = page.getByTestId('registration-pack-missing');
+    await expect(marker).toBeVisible();
+    await expect(marker).toContainText(
+      'proof of membership of the Jordanian Insurance Brokers Association',
+    );
+    // ALONE — the one we now hold is not named. Without this the test would pass on a marker that
+    // always lists both.
+    await expect(marker).not.toContainText('lease contract or title deed');
+  });
+
+  test('both uploaded: NO marker at all — the non-empty negative case', async ({
+    page,
+  }) => {
+    await page.route(
+      'http://localhost:4000/provider/brokerage-offices',
+      (route) => route.fulfill({ status: 201, json: registeredBody() }),
+    );
+    await page.goto('/provider-register-office');
+    await fillValidForm(page);
+    await page.getByRole('button', { name: 'Register office' }).click();
+
+    // Anchored on something that IS visible from the same render, so an unmounted page cannot satisfy
+    // the absence.
+    const complete = page.getByTestId('registration-pack-complete');
+    await expect(complete).toBeVisible();
+    await expect(page.getByTestId('registration-pack-missing')).toHaveCount(0);
+
+    /*
+     * AND IT DOES NOT OVERCLAIM. Decision 88 rule 4 forbids the marker making a finding about the
+     * OFFICE; this is its mirror, and it is the owner's standing rule that what the system SAYS
+     * stays accurate. This product has NO OBJECT STORAGE anywhere, so `storageRef` names a location
+     * nothing can fetch — the same limitation `broker-license-term.dto.ts` already states about the
+     * licence certificate. "Both documents are held in the system" was therefore a claim this
+     * system cannot support, about itself. It says RECORDED, and the scope note says what that
+     * means.
+     */
+    await expect(complete).toContainText('recorded in the system');
+    await expect(complete).not.toContainText('held in the system');
+  });
+
+  test('the VISIBLE text carries no word of breach or non-compliance', async ({
+    page,
+  }) => {
+    /*
+     * THE CLAUSE THAT MATTERS MOST, and it is asserted on what a person can SEE rather than on what
+     * the document contains. An office licensed by the Central Bank has already submitted these to
+     * the regulator; our not holding a copy is OUR gap, not its violation. A marker worded the other
+     * way is the system making a false regulatory finding against a compliant office.
+     *
+     * Not cosmetic, and not skipped for looking so.
+     */
+    await page.route(
+      'http://localhost:4000/provider/brokerage-offices',
+      (route) =>
+        route.fulfill({
+          status: 201,
+          json: registeredBody({
+            registrationPack: {
+              missing: ['premisesTenure', 'associationMembership'],
+              complete: false,
+            },
+          }),
+        }),
+    );
+    await page.goto('/provider-register-office');
+    await fillValidForm(page);
+    await page.getByRole('button', { name: 'Register office' }).click();
+
+    const section = page.getByTestId('registration-pack');
+    await expect(section).toBeVisible();
+    // `innerText` is what a reader sees — it excludes hidden subtrees, where `textContent` would not.
+    const visible = (await section.innerText()).toLowerCase();
+    expect(visible.length).toBeGreaterThan(40);
+    for (const word of FORBIDDEN) {
+      expect(
+        visible,
+        `the registration-pack marker says "${word}". It states what WE hold and never a finding about the office — an office licensed by the Central Bank has already submitted these documents to the regulator`,
+      ).not.toContain(word.toLowerCase());
+    }
+    // AND it says whose gap it is, which is the positive half of the same clause.
+    await expect(page.getByTestId('registration-pack-scope')).toBeVisible();
+    await expect(page.getByTestId('registration-pack-scope')).toContainText(
+      'gap in our own record',
+    );
   });
 });

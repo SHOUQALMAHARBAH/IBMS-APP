@@ -106,21 +106,27 @@ async function deleteCompany(organizationId: string) {
   await rawPrisma.insurerLicensedLine.deleteMany({
     where: { insuranceCompanyId: organizationId },
   });
-  // The certificate is referenced BY the organization, so the pointer must be cleared before the
-  // document can go — `onDelete: Restrict`, deliberately, because the document is the evidence.
-  const org = await rawPrisma.organization.findUnique({
-    where: { id: organizationId },
-    select: { insurerLicenseCertificateDocumentId: true },
-  });
+  /*
+   * The certificate is referenced BY the organization, so the pointer must be cleared before the
+   * document can go — `onDelete: Restrict`, deliberately, because the document is the evidence.
+   *
+   * IT CLEARS THE STATE, NOT THE POINTER IT REMEMBERS, and the difference is what broke this sweep.
+   * The first version read the pointer, nulled it, and deleted THAT id. Correct on a fresh row and
+   * incapable of repairing the only state it exists for: a run killed between the null and the
+   * delete leaves the pointer NULL with its document still present, so the next sweep's `if` is
+   * skipped, the document survives, and `organization.deleteMany` throws on
+   * `Document_organizationId_fkey`. Measured, not reasoned — FIVE leftover companies sat in db-test
+   * in exactly that shape, all from one run, and every later run's entry sweep failed on the first
+   * of them. A self-healing sweep that only heals rows that never needed healing is not one.
+   *
+   * So: null the pointer, then delete every document in the organization. Idempotent in both
+   * directions, and it cannot be defeated by a partial previous teardown.
+   */
   await rawPrisma.organization.updateMany({
     where: { id: organizationId },
     data: { insurerLicenseCertificateDocumentId: null },
   });
-  if (org?.insurerLicenseCertificateDocumentId) {
-    await rawPrisma.document.deleteMany({
-      where: { id: org.insurerLicenseCertificateDocumentId },
-    });
-  }
+  await rawPrisma.document.deleteMany({ where: { organizationId } });
   await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
 }
 

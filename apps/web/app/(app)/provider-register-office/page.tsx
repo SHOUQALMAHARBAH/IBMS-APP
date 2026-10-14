@@ -85,6 +85,10 @@ const EMPTY: Form = {
   licenseExpiresAt: '',
   certificateFileName: '',
   certificateStorageRef: '',
+  premisesTenureFileName: '',
+  premisesTenureStorageRef: '',
+  associationMembershipFileName: '',
+  associationMembershipStorageRef: '',
   countryId: '',
   cityId: '',
   address: '',
@@ -233,6 +237,12 @@ export default function RegisterBrokerageOfficePage() {
         certificateFileName: form.certificateFileName.trim(),
         certificateStorageRef: form.certificateStorageRef.trim(),
         licensedLineIds: selectedLines,
+        premisesTenureFileName: optional('premisesTenureFileName'),
+        premisesTenureStorageRef: optional('premisesTenureStorageRef'),
+        associationMembershipFileName: optional('associationMembershipFileName'),
+        associationMembershipStorageRef: optional(
+          'associationMembershipStorageRef',
+        ),
         countryId: form.countryId,
         cityId: form.cityId,
         address: form.address.trim(),
@@ -286,6 +296,41 @@ export default function RegisterBrokerageOfficePage() {
         <p data-testid="licensed-types">
           {t('regOfficeSuccessTypes', { types: result.licensedTypes.join(', ') })}
         </p>
+
+        {/*
+          * DECISION 88 — THE MARKER. It NAMES what is missing and never counts it, and every word of
+          * it states what THIS SYSTEM holds. It is forbidden to say or imply that the office fails
+          * art. 10/a: an office licensed by the Central Bank has already submitted these documents to
+          * the regulator, so our not holding a copy is OUR gap. A marker worded the other way would be
+          * the system making a false regulatory finding against a compliant office.
+          *
+          * It GATES NOTHING — not sign-in, not role creation, not anything. A marker and a report.
+          */}
+        <section style={sectionStyle} data-testid="registration-pack">
+          <h2>{t('regOfficePackHeading')}</h2>
+          {result.registrationPack.complete ? (
+            <p role="status" data-testid="registration-pack-complete">
+              {t('regOfficePackComplete')}
+            </p>
+          ) : (
+            <>
+              <p role="status" data-testid="registration-pack-missing">
+                {t('regOfficePackMissingIntro')}{' '}
+                {result.registrationPack.missing
+                  .map((key) =>
+                    key === 'premisesTenure'
+                      ? t('regOfficePackPremisesTenure')
+                      : t('regOfficePackAssociation'),
+                  )
+                  .join(' · ')}{' '}
+                — {t('regOfficePackNotHeld')}
+              </p>
+              <p style={noteStyle} data-testid="registration-pack-scope">
+                {t('regOfficePackScope')}
+              </p>
+            </>
+          )}
+        </section>
 
         <section style={sectionStyle} data-testid="capital-assessment">
           <h2>{t('regOfficePaidUpCapital')}</h2>
@@ -567,6 +612,34 @@ export default function RegisterBrokerageOfficePage() {
             )}
           </div>
           <p style={noteStyle}>{t('regOfficeIbanNote')}</p>
+        </fieldset>
+
+        <fieldset style={sectionStyle}>
+          <legend style={legendStyle}>{t('regOfficeSectionPack')}</legend>
+          {/* DECISION 88 — BOTH OPTIONAL. Absence does not block the save; it makes the derived
+              registration pack incomplete, and the marker on the result panel names what is missing
+              in words that state what WE hold. */}
+          <p style={noteStyle} data-testid="registration-pack-note">
+            {t('regOfficePackNote')}
+          </p>
+          <div style={fieldRow}>
+            {text(
+              'premisesTenureFileName',
+              t('regOfficePremisesTenureFileName'),
+            )}
+            {text(
+              'premisesTenureStorageRef',
+              t('regOfficePremisesTenureStorageRef'),
+            )}
+            {text(
+              'associationMembershipFileName',
+              t('regOfficeAssociationFileName'),
+            )}
+            {text(
+              'associationMembershipStorageRef',
+              t('regOfficeAssociationStorageRef'),
+            )}
+          </div>
         </fieldset>
 
         <fieldset style={sectionStyle}>

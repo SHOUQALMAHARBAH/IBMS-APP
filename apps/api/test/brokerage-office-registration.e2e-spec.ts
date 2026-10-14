@@ -139,6 +139,30 @@ async function deleteOffice(organizationId: string) {
   await rawPrisma.document.deleteMany({
     where: { id: { in: licenses.map((l) => l.certificateDocumentId) } },
   });
+  /*
+   * THE REGISTRATION PACK'S POINTERS SIT ON THE PARENT, so they have to be released before their
+   * documents can go. `Document_organizationId_fkey` is RESTRICT, so a document left behind makes the
+   * office undeletable and every later spec in this run refuses with a fault that is not its own —
+   * which is exactly what happened on this witness's first run.
+   *
+   * Nulling the columns and THEN deleting is the order; deleting first hits
+   * `Organization_premisesTenureDocumentId_fkey`, also RESTRICT.
+   */
+  await rawPrisma.organization.updateMany({
+    where: { id: organizationId },
+    data: {
+      premisesTenureDocumentId: null,
+      associationMembershipDocumentId: null,
+    },
+  });
+  /*
+   * THIS LINE IS WHAT GUARANTEES IT, not the by-id delete above — do not tidy it away as redundant.
+   * The by-id delete remembers a pointer; this one clears the state, which is the only form that can
+   * repair a run killed between nulling a pointer and deleting its document. The sibling company
+   * spec had exactly the pointer-remembering shape and left five undeletable organizations in
+   * db-test, after which every later run's entry sweep failed on the first of them.
+   */
+  await rawPrisma.document.deleteMany({ where: { organizationId } });
   await rawPrisma.professionalIndemnityPolicy.deleteMany({
     where: { organizationId },
   });
@@ -609,4 +633,111 @@ describe('the boundary — who may register an office', () => {
       registered,
     );
   });
+});
+
+/**
+ * DECISION 88 — THE TWO NON-REFUSALS, over real HTTP.
+ *
+ * This is the INVERSE SHAPE of every refusal test above and therefore needs its own witness: the
+ * claim is that absence does NOT block, which no refusal test can establish. Both halves are asserted
+ * together in each case — the office EXISTS and the derived pack names what is missing — because a
+ * test asserting only the marker would pass against an implementation that also refused the save.
+ */
+describe('decision 88 — the two art. 10/a documents do NOT block a save', () => {
+  it('registers with NEITHER, and the derived pack NAMES both', async () => {
+    const response = await register(validOffice());
+    expect(response.status).toBe(201);
+
+    const body = response.body as RegistrationBody & {
+      registrationPack: { missing: string[]; complete: boolean };
+    };
+    // THE SAVE SUCCEEDED — read back from the database, not from the response that reported it.
+    const organization = await rawPrisma.organization.findUnique({
+      where: { id: body.id },
+    });
+    expect(
+      organization,
+      'the office was NOT registered. Decision 88: absence of an art. 10/a document must not block the save — an office licensed by the Central Bank has already submitted these to the regulator',
+    ).toBeTruthy();
+    expect(organization?.premisesTenureDocumentId).toBeNull();
+    expect(organization?.associationMembershipDocumentId).toBeNull();
+
+    // AND THE PACK NAMES BOTH, by name and never by count.
+    expect(body.registrationPack.complete).toBe(false);
+    expect(body.registrationPack.missing).toEqual([
+      'premisesTenure',
+      'associationMembership',
+    ]);
+  }, 180_000);
+
+  it('registers with ONE, and the pack names the REMAINING one alone', async () => {
+    const response = await register(
+      validOffice({
+        premisesTenureFileName: 'lease.pdf',
+        premisesTenureStorageRef: 'not-a-real-store/lease.pdf',
+      }),
+    );
+    expect(response.status).toBe(201);
+
+    const body = response.body as RegistrationBody & {
+      registrationPack: { missing: string[]; complete: boolean };
+    };
+    expect(body.registrationPack.missing).toEqual(['associationMembership']);
+
+    const organization = await rawPrisma.organization.findUniqueOrThrow({
+      where: { id: body.id },
+    });
+    expect(organization.premisesTenureDocumentId).toBeTruthy();
+    expect(organization.associationMembershipDocumentId).toBeNull();
+  }, 180_000);
+
+  it('registers with BOTH, and the pack is complete — the non-empty negative case', async () => {
+    const response = await register(
+      validOffice({
+        premisesTenureFileName: 'lease.pdf',
+        premisesTenureStorageRef: 'not-a-real-store/lease.pdf',
+        associationMembershipFileName: 'association.pdf',
+        associationMembershipStorageRef: 'not-a-real-store/association.pdf',
+      }),
+    );
+    expect(response.status).toBe(201);
+
+    const body = response.body as RegistrationBody & {
+      registrationPack: { missing: string[]; complete: boolean };
+    };
+    expect(body.registrationPack.missing).toEqual([]);
+    expect(body.registrationPack.complete).toBe(true);
+
+    const organization = await rawPrisma.organization.findUniqueOrThrow({
+      where: { id: body.id },
+    });
+    expect(organization.premisesTenureDocumentId).toBeTruthy();
+    expect(organization.associationMembershipDocumentId).toBeTruthy();
+  }, 180_000);
+
+  it('GATES NOTHING — the office registered with neither still gets its administrator role', async () => {
+    /*
+     * Decision 88 rule 5, asserted rather than assumed. The marker is a marker and a report: it does
+     * not block sign-in, role creation, or anything else. The administrator role is the nearest thing
+     * this route produces that an office cannot work without, so it is what the assertion reads.
+     */
+    const response = await register(validOffice());
+    expect(response.status).toBe(201);
+    const body = response.body as RegistrationBody & {
+      registrationPack: { missing: string[] };
+      administratorGrantCount: number;
+    };
+    expect(body.registrationPack.missing.length).toBe(2);
+    expect(body.administratorGrantCount).toBe(
+      OFFICE_ADMINISTRATOR_GRANTS.length,
+    );
+
+    const role = await rawPrisma.role.findFirst({
+      where: { organizationId: body.id, name: 'OFFICE_ADMINISTRATOR' },
+    });
+    expect(
+      role,
+      'an incomplete pack withheld the administrator role',
+    ).toBeTruthy();
+  }, 180_000);
 });

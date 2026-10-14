@@ -204,6 +204,47 @@ export class RegisterBrokerageOfficeDto {
   @Length(1, 150)
   website?: string;
 
+  // ------------------------------------------------------- the art. 10/a registration pack (#48-#49)
+
+  /**
+   * DECISION 88 — ART. 10/a/2 and ART. 10/a/3, BOTH OPTIONAL, AND THE OPTIONALITY IS THE DECISION.
+   *
+   * «نسخة عن عقد الإيجار أو سند الملكية للمقر الخاص به» and «ما يثبت انتساب ... إلى الجمعية الأردنية
+   * لوسطاء التأمين». Mandatory in the article, and ABSENCE DOES NOT BLOCK THE SAVE here.
+   *
+   * That is not a relaxation of the regulation. An office licensed by the Central Bank DID submit
+   * these to the regulator — that is what being licensed means — so refusing to record a licensed
+   * office until WE hold our own copy would be refusing a fact in favour of our filing. What happens
+   * instead is that the registration pack is derived as INCOMPLETE and the marker names what is
+   * missing, in words that state what we hold and never a finding about the office.
+   *
+   * Do not reason from `certificateFileName` above, which IS required: that one is required because
+   * `BrokerLicense.certificateDocumentId` is NOT NULL, which was discovered rather than chosen.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 400)
+  premisesTenureFileName?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 500)
+  premisesTenureStorageRef?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 400)
+  associationMembershipFileName?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 500)
+  associationMembershipStorageRef?: string;
+
   // ------------------------------------------------------------------- key people (#24-#27)
 
   /**

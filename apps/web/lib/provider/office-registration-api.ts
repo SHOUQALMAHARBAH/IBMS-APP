@@ -70,6 +70,12 @@ export interface RegisterBrokerageOfficeInput {
   certificateStorageRef: string;
   renewalRequestedAt?: string;
   licensedLineIds: string[];
+  /** DECISION 88 — art. 10/a/2 and art. 10/a/3. OPTIONAL: absence does not block the save, it makes
+   *  the derived registration pack incomplete. */
+  premisesTenureFileName?: string;
+  premisesTenureStorageRef?: string;
+  associationMembershipFileName?: string;
+  associationMembershipStorageRef?: string;
   countryId: string;
   cityId: string;
   address: string;
@@ -101,6 +107,17 @@ export interface RegisteredOffice {
   legalNameAr: string;
   administratorRoleId: string;
   administratorGrantCount: number;
+  /**
+   * DECISION 88 — DERIVED, never stored, and it NAMES what is missing rather than counting it.
+   *
+   * `missing` lists the documents THIS SYSTEM does not hold. It is never a finding about the office:
+   * an office licensed by the Central Bank has already submitted them to the regulator, so our not
+   * holding a copy is a gap in our record.
+   */
+  registrationPack: {
+    missing: ('premisesTenure' | 'associationMembership')[];
+    complete: boolean;
+  };
   /** DERIVED from the branch categories, never entered — decision 67. */
   licensedTypes: ('GENERAL' | 'LIFE')[];
   /**

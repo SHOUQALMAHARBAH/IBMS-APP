@@ -65,6 +65,10 @@ function org(id: string, legalName = `Office ${id}`): Organization {
     licensingAuthorityId: null,
     shortName: null,
     insurerLicenseNumber: null,
+    // MODULE 0-ب, DECISION 88. Both null, which is the state every existing office is in and exactly
+    // what the derived marker is for — absence is the ordinary case, not an error.
+    premisesTenureDocumentId: null,
+    associationMembershipDocumentId: null,
     // MODULE 0-ب ITEM (e). Listed rather than spread, for the reason this fixture's own comment gives:
     // the TYPE is the reminder that a new office-level column has to be DECIDED here, not defaulted.
     insurerLicenseCertificateDocumentId: null,

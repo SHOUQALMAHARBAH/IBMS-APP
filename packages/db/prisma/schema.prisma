@@ -338,8 +338,8 @@ model Organization {
 
   /// INSURER-ONLY FIELDS. Present on this model because an insurance company IS an Organization
   /// (decision 63); null for a brokerage office.
-  shortName                           String?
-  insurerLicenseNumber                String?
+  shortName                String?
+  insurerLicenseNumber     String?
   /// MODULE 0-ب ITEM (e) — the INSURANCE COMPANY's licence certificate.
   ///
   /// On the organization rather than on a term, because the v2 insurer sheet carries a licence
@@ -353,6 +353,30 @@ model Organization {
   /// indistinguishable in the one query a CBJ inspection asks.
   ///
   /// NULLABLE because three organizations predate it; the REQUIREMENT lives at the write path.
+  /// MODULE 0-ب, DECISION 88 — ART. 10/a/2: the lease contract or the title deed for the premises.
+  ///
+  /// NULLABLE, AND THAT IS THE DECISION RATHER THAN AN OVERSIGHT. Absence does not block a save. An
+  /// office licensed by the Central Bank DID submit this to the regulator — that is what being
+  /// licensed means — so our not holding a copy is OUR gap, not its violation. Completeness is
+  /// DERIVED from these two columns and NEVER stored; there is no flag and there must not be one.
+  ///
+  /// Do not reason from `BrokerLicense.certificateDocumentId`, which is NOT NULL: that was discovered
+  /// rather than chosen, and tightening these would both break decision 88 and reinstate the circular
+  /// foreign key, since the pointer sits on the PARENT here.
+  premisesTenureDocumentId String?
+  premisesTenureDocument   Document? @relation("OrganizationPremisesTenure", fields: [premisesTenureDocumentId], references: [id], onDelete: Restrict)
+
+  /// MODULE 0-ب, DECISION 88 — ART. 10/a/3: proof of membership of the Jordanian Insurance Brokers
+  /// Association, and art. 18/a repeats it in the periodic returns, so it recurs annually.
+  ///
+  /// NO PERSON KEY, deliberately. The article attaches this to PERSONS — the natural broker, the
+  /// insurance-business manager, the practitioner — and none of them exists when an office is
+  /// registered. A column pointing at an `Employee` would be a relation whose other side cannot
+  /// exist, which is a precondition nothing can satisfy. The per-person link belongs to the employees
+  /// module.
+  associationMembershipDocumentId String?
+  associationMembershipDocument   Document? @relation("OrganizationAssociationMembership", fields: [associationMembershipDocumentId], references: [id], onDelete: Restrict)
+
   insurerLicenseCertificateDocumentId String?
   insurerLicenseCertificate           Document?          @relation("OrganizationInsurerLicenseCertificate", fields: [insurerLicenseCertificateDocumentId], references: [id], onDelete: Restrict)
   /// MODULE 0-ب ITEM (e) — the lines this INSURANCE COMPANY is licensed to underwrite.
@@ -6294,6 +6318,11 @@ model Document {
   /// A NAMED relation, because `Document` already relates to `Organization` as its tenant and Prisma
   /// cannot tell two relations between the same pair apart without one.
   insurerLicenseCertificateFor Organization[]     @relation("OrganizationInsurerLicenseCertificate")
+  /// MODULE 0-ب, DECISION 88 — the offices whose art. 10/a registration documents these are. NAMED
+  /// relations, because `Document` already relates to `Organization` as its tenant and Prisma cannot
+  /// tell several relations between one pair apart without names.
+  premisesTenureFor            Organization[]     @relation("OrganizationPremisesTenure")
+  associationMembershipFor     Organization[]     @relation("OrganizationAssociationMembership")
 
   @@index([policyId])
   @@index([customerId])
