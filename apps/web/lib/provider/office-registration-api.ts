@@ -129,3 +129,57 @@ export function registerBrokerageOffice(
 ): Promise<RegisteredOffice> {
   return apiPost('/provider/brokerage-offices', input);
 }
+
+/**
+ * MODULE 0-ب ITEM (e) — registering an INSURANCE COMPANY.
+ *
+ * ⚠️ HAND-COPIED OVER HTTP, like everything else in this file. When the api view shape changes, this
+ * interface, the screen and every Playwright mock change in the SAME commit.
+ */
+export interface RegisterInsuranceCompanyInput {
+  code: string;
+  legalNameAr: string;
+  legalName: string;
+  shortName: string;
+  legalFormId: string;
+  nationalEstablishmentNo: string;
+  commercialRegistrationNo: string;
+  taxNumber: string;
+  insurerLicenseNumber: string;
+  licensingAuthorityId: string;
+  businessModelId: string;
+  licensedLineIds: string[];
+  certificateFileName: string;
+  certificateStorageRef: string;
+  countryId: string;
+  cityId: string;
+  address: string;
+  phone: string;
+  email: string;
+  website?: string;
+  quotationEmail: string;
+  claimsEmail: string;
+  integrationMethod: 'API' | 'PORTAL' | 'EMAIL' | 'MANUAL';
+  apiEndpoint?: string;
+  bankId: string;
+  iban: string;
+  subdomain: string;
+}
+
+export interface RegisteredInsuranceCompany {
+  id: string;
+  code: string | null;
+  legalName: string;
+  legalNameAr: string;
+  shortName: string | null;
+  certificateDocumentId: string;
+  licensedLineCount: number;
+  /** DERIVED from the catalogue categories, never entered — decision 67. */
+  licensedCategories: ('GENERAL' | 'LIFE')[];
+}
+
+export function registerInsuranceCompany(
+  input: RegisterInsuranceCompanyInput,
+): Promise<RegisteredInsuranceCompany> {
+  return apiPost('/provider/insurance-companies', input);
+}

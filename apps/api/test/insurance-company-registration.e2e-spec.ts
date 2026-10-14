@@ -200,6 +200,19 @@ describe('the provider registers an insurance company', () => {
     // `Organization_broker_kind_matches_type` requires this to be NULL for a company, and the route
     // satisfies it by never setting it rather than by clearing it afterwards.
     expect(organization.brokerKind).toBeNull();
+    /*
+     * THE ONLY THING ENFORCING THIS COMPANY'S CERTIFICATE IS THE SERVICE, so this assertion is the
+     * whole of the guarantee and is deliberately read from the STORED RECORD rather than from the
+     * 201 the write returned — a mapper can report a field it did not persist (§ 1.80).
+     *
+     * The asymmetry with the brokerage side is PERMANENT and must not be "fixed":
+     * `BrokerLicense.certificateDocumentId` is NOT NULL, while this column is nullable and the mirror
+     * CHECK permits NULL — which is exactly what makes the three-statement transaction legal.
+     * Tightening it to NOT NULL would reinstate the circular foreign key that made every registration
+     * a 500.
+     *
+     * Proven by planting: removing the third statement kills this test alone.
+     */
     expect(organization.insurerLicenseCertificateDocumentId).toBe(
       view.certificateDocumentId,
     );

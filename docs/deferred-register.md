@@ -90,6 +90,31 @@ These are the owner's items whose declaration site does not exist yet. Each land
 
 ---
 
+## A permanent asymmetry, recorded so neither side is reasoned about by analogy
+
+**THE TWO LICENCE CERTIFICATES HAVE DIFFERENT STRENGTHS OF ENFORCEMENT, AND THAT IS NOT A DEFECT.**
+
+* `BrokerLicense.certificateDocumentId` is **NOT NULL** — the database refuses a term with no
+  certificate, however it is written.
+* `Organization.insurerLicenseCertificateDocumentId` is **nullable**, and
+  `Organization_insurer_certificate_only_on_a_company` permits NULL. The company's certificate is
+  enforced by the SERVICE alone.
+
+**DO NOT "FIX" THE SECOND TO NOT NULL.** It would reinstate a CIRCULAR FOREIGN KEY:
+`Organization.insurerLicenseCertificateDocumentId` references `Document`, and `Document
+.organizationId` references `Organization` — so with the pointer on the PARENT, neither row can be
+written first. The brokerage path never meets this because its certificate hangs off `BrokerLicense`,
+a CHILD of the organization. **The same column shape creates a cycle in one path and not the other,
+and the brokerage side is safer BY ACCIDENT rather than by design** — which is why neither is ever
+reasoned about by analogy with the other.
+
+What the asymmetry needs instead is an ASSERTION THAT THE SERVICE'S THIRD STATEMENT RAN, read from
+the stored record rather than inferred from a 201. It exists in
+`insurance-company-registration.e2e-spec.ts`, and removing the statement kills that test alone —
+proven by planting, not claimed.
+
+---
+
 ## A standing rule the live-screen finding earned
 
 **EVERY NEW CONSTRAINT IS ASKED ABOUT ITS EXISTING WRITERS, NOT ONLY ITS NEW ONE.**
@@ -131,6 +156,10 @@ because a suite rich in fixtures looks thorough.
 * Decision 90's merged-state test: the ACCEPTED half carried the rating IN THE BODY, so the
   `current` fallback was never reached and a plant that ignored the current row left it green. The
   observing case patches only the DATE, so the rating can come from nowhere else.
+* The insurer screen's two notes: `getByTestId(...).toContainText(...)` passes on a HIDDEN element,
+  because text content is readable from one. For a sentence whose entire purpose is to be READ,
+  "it is in the DOM" is not the claim — `toBeVisible()` is. Both plants hid the note and left every
+  text assertion green.
 * Decision 93's no-op test, which shows the rule has a SECOND HALF: a fixture on each side is not
   enough when the two sides look the same under every assertion made. Removing the nothing-to-clear
   branch killed nothing, because writing null over null produces an identical record — what actually

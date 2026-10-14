@@ -18,6 +18,41 @@
 //   الكفالة البنكية      the bank guarantee
 export const PROVIDER = {
   AR: {
+    regInsRefusalAct: 'تسجيل شركة تأمين على المنصّة',
+    regInsHeading: 'تسجيل شركة تأمين',
+    regInsIntro:
+      'يُنشئ هذا النموذج شركةَ تأمينٍ على المنصّة. تُدخَل البيانات كما وردت في ترخيص الشركة وسجلّ المنشأة.',
+    regInsTenantWarning:
+      'التسجيل يُنشئ مستأجراً جديداً. لا يوجد في هذا النظام طريق لحذف شركة بعد تسجيلها، لأن سجلّ التدقيق لا يُحذف — فتحقّق من رقم المنشأة الوطني قبل الحفظ.',
+    regInsSectionIdentity: 'التعريف الأساسي',
+    regInsSectionLicence: 'الترخيص والنشاط',
+    regInsSectionAddress: 'العنوان ووسائل الاتصال',
+    regInsSectionIntegration: 'طريقة الربط',
+    regInsSectionBanking: 'البيانات البنكية',
+    regInsSectionPlatform: 'بيانات المنصّة',
+    regInsCode: 'رمز الشركة',
+    regInsShortName: 'الاسم المختصر',
+    regInsLicenseNo: 'رقم الترخيص',
+    regInsBusinessModel: 'نمط النشاط',
+    regInsLicensedLines: 'فروع التأمين المرخَّص بها',
+    regInsLicensedLinesHint:
+      'هذه فروعُ الاكتتاب التي يُجيزها ترخيصُ الشركة. وهي ليست ما سجّله المكاتبُ من تعاملٍ معها — وهما حقيقتان مختلفتان ولا تُدمجان.',
+    regInsQuotationEmail: 'بريد طلبات التسعير',
+    regInsClaimsEmail: 'بريد المطالبات',
+    regInsPublishedChannelsNote:
+      'هذه قنواتٌ منشورةٌ للشركة. أمّا مسؤولُ علاقات الوسطاء وتصنيفُ الملاءة فيُسجّلهما كلُّ مكتبٍ عنده، لأنّ لكلِّ مكتبٍ جهةَ اتصالٍ مختلفةً داخل الشركة نفسها.',
+    regInsIntegrationMethod: 'طريقة الربط',
+    regInsApiEndpoint: 'عنوان الواجهة البرمجية',
+    regInsApiEndpointHint:
+      'مطلوبٌ إذا كانت طريقةُ الربط API، ولا يُدخَل مع غيرها.',
+    regInsCertificateFileName: 'اسم ملف شهادة الترخيص',
+    regInsCertificateStorageRef: 'موضع حفظ الشهادة',
+    regInsSubmit: 'تسجيل الشركة',
+    regInsSubmitting: 'جارٍ التسجيل…',
+    regInsSuccessHeading: 'تمّ تسجيل الشركة',
+    regInsSuccessLines: 'عدد الفروع المرخَّص بها: {count}',
+    regInsSuccessCategories: 'أنواع التأمين المرخَّص بها: {types}',
+    regInsRegisterAnother: 'تسجيل شركة أخرى',
     regOfficeRefusalAct: 'تسجيل مكتب وساطة على المنصّة',
     regOfficeHeading: 'تسجيل مكتب وساطة',
     regOfficeIntro:
@@ -118,6 +153,41 @@ export const PROVIDER = {
     regOfficeRegisterAnother: 'تسجيل مكتب آخر',
   },
   EN: {
+    regInsRefusalAct: 'register an insurance company on the platform',
+    regInsHeading: 'Register an insurance company',
+    regInsIntro:
+      "This form creates an insurance company on the platform. Enter the details as they appear on the company's licence and the establishment register.",
+    regInsTenantWarning:
+      'Registering creates a tenant. There is no route in this product to delete a company once registered, because the audit trail cannot be deleted — check the national establishment number before saving.',
+    regInsSectionIdentity: 'Basic identity',
+    regInsSectionLicence: 'Licensing and activity',
+    regInsSectionAddress: 'Address and contact',
+    regInsSectionIntegration: 'Integration',
+    regInsSectionBanking: 'Banking',
+    regInsSectionPlatform: 'Platform data',
+    regInsCode: 'Company code',
+    regInsShortName: 'Short name',
+    regInsLicenseNo: 'Licence number',
+    regInsBusinessModel: 'Business model',
+    regInsLicensedLines: 'Licensed lines of business',
+    regInsLicensedLinesHint:
+      "These are the lines the company's licence permits it to underwrite. They are NOT what offices have recorded buying from it — two different facts, never merged.",
+    regInsQuotationEmail: 'Quotation email',
+    regInsClaimsEmail: 'Claims email',
+    regInsPublishedChannelsNote:
+      "These are the company's published channels. The broker-relations contact and the financial strength rating are recorded by each office on its own record, because every office deals with a different named person inside the same company.",
+    regInsIntegrationMethod: 'Integration method',
+    regInsApiEndpoint: 'API endpoint',
+    regInsApiEndpointHint:
+      'Required when the integration method is API, and not entered with any other.',
+    regInsCertificateFileName: 'Licence certificate file name',
+    regInsCertificateStorageRef: 'Where the certificate is filed',
+    regInsSubmit: 'Register company',
+    regInsSubmitting: 'Registering…',
+    regInsSuccessHeading: 'Company registered',
+    regInsSuccessLines: 'Licensed lines: {count}',
+    regInsSuccessCategories: 'Licensed insurance types: {types}',
+    regInsRegisterAnother: 'Register another company',
     regOfficeRefusalAct: 'register a brokerage office on the platform',
     regOfficeHeading: 'Register a brokerage office',
     regOfficeIntro:

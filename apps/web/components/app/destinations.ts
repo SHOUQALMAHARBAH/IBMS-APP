@@ -552,6 +552,14 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         labelKey: 'navProviderRegisterOffice',
         permissions: ['provider.office.register'],
       },
+      // MODULE 0-ب ITEM (e) — the other kind of tenant. Its own destination rather than a tab on the
+      // office one: the two forms share perhaps half their fields, and a reader who has mistaken which
+      // they are filling in has already made the only mistake this screen can make.
+      {
+        href: '/provider-register-insurer',
+        labelKey: 'navProviderRegisterInsurer',
+        permissions: ['provider.insurer.register'],
+      },
       {
         href: '/settings/email',
         labelKey: 'navEmailIntegration',
