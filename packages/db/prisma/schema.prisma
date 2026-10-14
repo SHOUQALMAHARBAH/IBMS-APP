@@ -354,11 +354,10 @@ model Organization {
   ///
   /// NULLABLE because three organizations predate it; the REQUIREMENT lives at the write path.
   insurerLicenseCertificateDocumentId String?
-  insurerLicenseCertificate           Document?             @relation("OrganizationInsurerLicenseCertificate", fields: [insurerLicenseCertificateDocumentId], references: [id], onDelete: Restrict)
+  insurerLicenseCertificate           Document?          @relation("OrganizationInsurerLicenseCertificate", fields: [insurerLicenseCertificateDocumentId], references: [id], onDelete: Restrict)
   /// MODULE 0-ب ITEM (e) — the lines this INSURANCE COMPANY is licensed to underwrite.
-  insurerLicensedLines                InsurerLicensedLine[]
   businessModelId                     String?
-  businessModel                       BusinessModel?        @relation(fields: [businessModelId], references: [id])
+  businessModel                       BusinessModel?     @relation(fields: [businessModelId], references: [id])
   integrationMethod                   IntegrationMethod?
   apiEndpoint                         String?
   /// The company's PUBLISHED channels — company facts, resolved through the insurer resolver when
@@ -519,6 +518,7 @@ model Organization {
   brokerLicenseScopeLines             BrokerLicenseScopeLine[]
   employeeCbjApprovalBranches         EmployeeCbjApprovalBranch[]
   roleScopeBranches                   RoleScopeBranch[]
+  insurerLicensedLines                InsurerLicensedLine[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -5868,41 +5868,57 @@ model OfficeInsuranceLine {
 /// never both and never neither, enforced by a CHECK rather than by convention.
 /// MODULE 0-ب ITEM (e) — THE LINES AN INSURANCE COMPANY IS LICENSED TO UNDERWRITE.
 ///
+/// ## A GLOBAL COMPANY FACT. NOT TENANT-SCOPED — and the column NAME is the mechanism
+///
+/// `insuranceCompanyId`, deliberately not `organizationId`. In this codebase that name does not mean
+/// "an organization", it means THE TENANT THAT OWNS THIS ROW: `tenantScopeExtension` derives its
+/// scoped set from the DMMF as "every model carrying an organizationId", so the name alone decides
+/// whether rows are filtered.
+///
+/// The first version carried `organizationId` and was filtered to the INSURANCE COMPANY ITSELF, which
+/// broke three things at once — a brokerage office could not read the one fact this table exists to
+/// answer; the PROVIDER, which writes these rows at registration, could not read them back; and three
+/// offices dealing with one company would each have needed their own copy of a fact the Central Bank
+/// granted once.
+///
+/// So it is global: readable by every office, writable only through the provider's registration path
+/// behind a PLATFORM-scoped code no office can hold. One step weaker than `InsuranceLine`, which no
+/// application code can write at all, and the difference is stated rather than glossed.
+///
 /// ## ITS OWN LINK, AND NOT `BrokerLicenseScopeLine` — measured before deciding
 ///
 /// `BrokerLicenseScopeLine.brokerLicenseId` is NOT NULL and references `BrokerLicense`, so attaching
 /// a company's lines there would require inventing a BROKER LICENCE ROW for a company that holds
-/// none. The implication is structural rather than an accident of derivation — and it compounds:
-/// `typesInScope` derives life/general LICENCE TYPES from those rows (decision 67), so the system
-/// would report an insurance company as licensed as a life-and-general BROKER; and
-/// `BrokerLicenseScopeService` enforces art. 3/a against `Organization.brokerKind`, which item (b)'s
-/// CHECK requires to be NULL for an `INSURANCE_COMPANY`.
-///
-/// Art. 82 of Law No. 12 of 2021 lists brokers and insurance companies as different kinds of service
-/// provider; their licences are different instruments. The broker derivation reads only broker
-/// licence scope, and this is where a company's lines live.
+/// none. Structural, not an accident of derivation — and it compounds: `typesInScope` derives
+/// life/general LICENCE TYPES from those rows (decision 67), so the system would report an insurance
+/// company as licensed as a life-and-general BROKER; and `BrokerLicenseScopeService` enforces art. 3/a
+/// against `Organization.brokerKind`, which item (b)'s CHECK requires to be NULL for an
+/// `INSURANCE_COMPANY`. Art. 82 of Law No. 12 of 2021 lists brokers and insurance companies as
+/// different kinds of service provider; their licences are different instruments. The broker
+/// derivation reads only broker licence scope, and the migration ASSERTS no foreign key to
+/// `BrokerLicense` ever appears here.
 ///
 /// ## STANDARD CATALOGUE LINES ONLY
 ///
 /// No office-line column, unlike the two-nullable-FK shape the four MUST models carry. That shape
-/// exists because an OFFICE may add a line of its own; an insurance company's licence is granted by
-/// the Central Bank against the Bank's own classification, and a line one brokerage office invented
-/// is not something a regulator licensed anybody for. One required FK makes the other
-/// unrepresentable rather than merely disallowed.
+/// exists because an OFFICE may add a line of its own; a company's licence is granted against the
+/// Central Bank's classification, and a line one brokerage office invented is not something a
+/// regulator licensed anybody for.
 ///
-/// ## WHAT A BROKERAGE OFFICE CANNOT SEE, AND WHY THAT IS NOT THE SAME AS `InsurerDirectory.lines`
+/// ## NOT THE SAME FACT AS `InsurerDirectory.lines`, AND THE TWO ARE NEVER RECONCILED
 ///
-/// `organizationId` here is the COMPANY's own — an insurance company registered on this platform is
-/// a tenant — so these rows are unreadable outside it. `InsurerDirectory.lines` is NOT a substitute
-/// and must never be reconciled with this: that is OBSERVED BEHAVIOUR (lines at least one office
-/// recorded buying) while this is a REGULATORY FACT (lines the licence permits). They diverge in both
-/// directions and the observed set grows as offices trade. The cross-office read is recorded in
-/// `docs/deferred-register.md`, not improvised.
+/// That is OBSERVED BEHAVIOUR — lines at least one office recorded buying. This is a REGULATORY FACT —
+/// lines the licence permits. They diverge in both directions and the observed set grows as offices
+/// trade, so the licence would appear to change with no regulatory act behind it. The rule is recorded
+/// in `docs/deferred-register.md`: each screen names which it is showing, and neither is derived from
+/// the other.
 model InsurerLicensedLine {
-  id             String       @id @default(uuid())
-  /// The INSURANCE COMPANY's own Organization. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId String       @default(dbgenerated())
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  id String @id @default(uuid())
+
+  /// The INSURANCE COMPANY this licence fact is about. Supplied EXPLICITLY by the registration path —
+  /// there is no `@default(dbgenerated())` here, because nothing scopes this table and nothing should.
+  insuranceCompanyId String
+  insuranceCompany   Organization @relation(fields: [insuranceCompanyId], references: [id], onDelete: Restrict)
 
   insuranceLineId String
   insuranceLine   InsuranceLine @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
@@ -5912,8 +5928,8 @@ model InsurerLicensedLine {
   /// An ordinary compound unique, NOT the two-partial-index shape its broker sibling needs: both
   /// columns are NOT NULL, so there is nothing nullable for Postgres to treat as distinct and the
   /// § 1.25 trap cannot apply.
-  @@unique([organizationId, insuranceLineId], map: "InsurerLicensedLine_one_line_per_company")
-  @@index([organizationId])
+  @@unique([insuranceCompanyId, insuranceLineId], map: "InsurerLicensedLine_one_line_per_company")
+  @@index([insuranceCompanyId])
 }
 
 model InsurerOfferedLine {

@@ -24,7 +24,16 @@ import {
  *  copies of the same loop: the shape is identical by design, and eight near-identical blocks is
  *  eight places for one of them to drift. */
 const REFERENCE_TABLES: [
-  "country" | "city" | "bank" | "currency" | "licensingAuthority" | "ratingAgency" | "legalForm" | "businessModel",
+  (
+    | "country"
+    | "city"
+    | "bank"
+    | "currency"
+    | "licensingAuthority"
+    | "ratingAgency"
+    | "legalForm"
+    | "businessModel"
+  ),
   ReferenceSeed[],
 ][] = [
   ["country", COUNTRIES],
@@ -113,11 +122,11 @@ async function ensureDefaultOrganization(): Promise<void> {
       subdomain: "default",
       // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
       // neither kind is a safe fallback for the other, so every creator states which it is.
-      type: 'BROKERAGE_OFFICE',
+      type: "BROKERAGE_OFFICE",
       // Required for a brokerage office by the `Organization_broker_kind_matches_type`
       // CHECK. The compiler cannot ask for it — a nullable column is optional in
       // Prisma's CreateInput — so the database is what refuses its absence.
-      brokerKind: 'CORPORATE',
+      brokerKind: "CORPORATE",
     },
   });
   console.log("Seeded the default organization.");
@@ -375,7 +384,9 @@ async function ensureProviderAdminUser(): Promise<void> {
   // has already chosen. An upsert with a fresh random hash in its `update` would silently lock
   // them out on every re-seed.
   if (existing) {
-    console.log(`Provider operator ${email} already exists — password untouched.`);
+    console.log(
+      `Provider operator ${email} already exists — password untouched.`,
+    );
     return;
   }
 
@@ -663,7 +674,34 @@ async function ensureSampleInsurers(): Promise<void> {
         insurerMasterId: master.id,
       },
     });
-    if (existing) continue;
+    if (existing) {
+      /*
+       * MODULE 0-ب ITEM (e) — THE ONE FIELD THIS SEED UPDATES ON AN EXISTING ROW, and why.
+       *
+       * `Insurer_rating_carries_its_date` is `NOT VALID` because the three sample insurers already
+       * carried a rating when the date column was added. Leaving them that way ships a declared rule
+       * with three standing exceptions; a migration backfilling a date would invent an unsourceable
+       * fact. Giving a SAMPLE row a sample date invents nothing — its rating says "(sample rating)" in
+       * its own value — so the repair belongs here, and the `VALIDATE CONSTRAINT` migration that
+       * follows can then hold for every row.
+       *
+       * Scoped to the one field deliberately: this branch must not become a general "refresh the
+       * sample insurers" path, which would overwrite whatever an office has since recorded about a
+       * counterparty it genuinely uses.
+       */
+      if (existing.financialStrengthRatingAsOf === null) {
+        await prisma.insurer.update({
+          where: { id: existing.id },
+          data: {
+            financialStrengthRating: insurer.financialStrengthRating,
+            financialStrengthRatingAsOf: new Date(
+              `${insurer.financialStrengthRatingAsOf}T00:00:00.000Z`,
+            ),
+          },
+        });
+      }
+      continue;
+    }
     await prisma.insurer.create({
       data: {
         organizationId: DEFAULT_ORGANIZATION_ID,
@@ -676,6 +714,13 @@ async function ensureSampleInsurers(): Promise<void> {
         underwriterContact: insurer.underwriterContact,
         creditTermsDays: insurer.creditTermsDays,
         financialStrengthRating: insurer.financialStrengthRating,
+        // THE PAIR, because `Insurer_rating_carries_its_date` refuses either half alone. Writing the
+        // rating without it here would make a fresh seed fail on its own constraint — and the field
+        // is OPTIONAL in Prisma's input type, so the compiler cannot ask for it. Caught by reading
+        // the create path after patching the update path, not by a failing typecheck.
+        financialStrengthRatingAsOf: new Date(
+          `${insurer.financialStrengthRatingAsOf}T00:00:00.000Z`,
+        ),
         // InsurerProduct and InsurerSlaAgreement are tenant-scoped in their
         // own right (spec §3.2 — so RLS can enforce them independently in
         // Phase 2, not only transitively through the parent Insurer).
@@ -1106,7 +1151,9 @@ async function ensureJordanFixedHolidays(): Promise<void> {
     { month: 12, day: 25, name: "Christmas" },
   ];
 
-  const organizations = await prisma.organization.findMany({ select: { id: true } });
+  const organizations = await prisma.organization.findMany({
+    select: { id: true },
+  });
   const thisYear = new Date().getUTCFullYear();
   let created = 0;
 
@@ -1123,7 +1170,12 @@ async function ensureJordanFixedHolidays(): Promise<void> {
         });
         if (existing) continue;
         await prisma.slaHoliday.create({
-          data: { organizationId: org.id, observedOn, name: h.name, calendarType: null },
+          data: {
+            organizationId: org.id,
+            observedOn,
+            name: h.name,
+            calendarType: null,
+          },
         });
         created += 1;
       }
@@ -1222,7 +1274,8 @@ async function ensureBrokerLicenseTerms(): Promise<void> {
           organizationId: office.id,
           category: "BROKER_LICENSE_CERTIFICATE",
           classification: "INTERNAL",
-          fileName: "seeded-placeholder-licence-certificate--not-a-real-cbj-document.pdf",
+          fileName:
+            "seeded-placeholder-licence-certificate--not-a-real-cbj-document.pdf",
           storageRef: `seed:placeholder-licence-certificate:${office.subdomain}`,
           uploadedByUserId: uploader.id,
         },
@@ -1231,7 +1284,8 @@ async function ensureBrokerLicenseTerms(): Promise<void> {
         data: {
           organizationId: office.id,
           licenseNumber: `CBJ-SEED-${office.subdomain.toUpperCase()}`,
-          scopeOfAuthorization: "Seeded placeholder — general insurance brokerage",
+          scopeOfAuthorization:
+            "Seeded placeholder — general insurance brokerage",
           issuedAt,
           expiresAt,
           status: "active",

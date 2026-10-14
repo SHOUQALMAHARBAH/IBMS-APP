@@ -274,6 +274,28 @@ export const LEGAL_FORMS: ReferenceSeed[] = [
       "الشكل القانوني لوسيط التأمين الطبيعي. المادة 10/أ/1/أ من تعليمات رقم (9) لسنة 2026 تشترط تسجيل طالب الترخيص كوسيط تأمين طبيعي كمؤسسة فردية. ولا يجوز لهذا الشكل فتح أكثر من خمسة فروع (المادة 13/ب).",
   },
   {
+    /*
+     * MODULE 0-ب ITEM (e) — art. 10/a/1/b's SECOND corporate shape, and the dictionary's own list
+     * does not carry it.
+     *
+     * The article accepts a corporate broker registered «كشركةٍ أو فرعٍ لشركةٍ أجنبيةٍ عاملةٍ حسب
+     * مقتضى الحال» — as a company OR as a branch of a foreign company operating in the Kingdom. The
+     * six forms the dictionary lists are all the first kind, so a foreign company's branch was
+     * unregisterable: a precondition nothing could satisfy, which is the § 1.62 shape this project
+     * has shipped once already.
+     *
+     * A SEEDED ROW AND NOT A MIGRATION, which was measured before being instructed: `legalForm` is a
+     * reference TABLE (`Organization.legalFormId` -> `LegalForm`), there is no `enum LegalForm`
+     * anywhere, and zero `Organization` rows named a legal form at the time. So this reaches both
+     * databases through the seed, with no schema change and no `ALTER TYPE`.
+     */
+    code: "FOREIGN_COMPANY_BRANCH",
+    nameEn: "Branch of a foreign company operating in the Kingdom",
+    nameAr: "فرع لشركة أجنبية عاملة",
+    descriptionAr:
+      "شكلٌ قانونيٌّ للوسيط الاعتباري: فرعٌ لشركةٍ أجنبيةٍ عاملةٍ في المملكة. وسندُه المادة (١٠/أ/١/ب) من تعليمات ترخيص وسيط التأمين رقم (٩) لسنة ٢٠٢٦، التي تُوجب أن يكون مقدّمُ طلبِ الترخيص كوسيطٍ اعتباريٍّ مسجَّلاً «كشركةٍ أو فرعٍ لشركةٍ أجنبيةٍ عاملةٍ حسب مقتضى الحال». ولا يُختار هذا الشكلُ لوسيطٍ طبيعيٍّ، لأنّ المادة (١٠/أ/١/أ) تُوجب تسجيلَه مؤسسةً فردية.",
+  },
+  {
     code: "PUBLIC_SHAREHOLDING",
     nameEn: "Public shareholding company",
     nameAr: "شركة مساهمة عامة",
@@ -325,11 +347,17 @@ export const LEGAL_FORMS: ReferenceSeed[] = [
  * lost.
  */
 export const BUSINESS_MODELS: ReferenceSeed[] = [
-  { code: "CONVENTIONAL", nameEn: "Conventional insurance", nameAr: "تأمين تقليدي",
+  {
+    code: "CONVENTIONAL",
+    nameEn: "Conventional insurance",
+    nameAr: "تأمين تقليدي",
     descriptionAr:
       "نمط النشاط التقليدي. يحدّد صياغة العروض والوثائق ومصطلحاتها، وتُشتقّ هذه الصياغة من قوالب مرتبطة بهذا السطر — لا من شرط في الشيفرة، حتى يكون إدخال نمط ثالث سطراً وقوالبَ لا إصداراً جديداً.",
   },
-  { code: "TAKAFUL", nameEn: "Takaful insurance", nameAr: "تأمين تكافلي",
+  {
+    code: "TAKAFUL",
+    nameEn: "Takaful insurance",
+    nameAr: "تأمين تكافلي",
     descriptionAr:
       "نمط النشاط التكافلي. يحدّد صياغة العروض والوثائق ومصطلحاتها (اشتراك بدل قسط، وفائض بدل ربح)، وتُشتقّ من قوالب مرتبطة بهذا السطر لا من شرط في الشيفرة. قوالب المصطلحات التكافلية لم تُبنَ بعد — انظر سجلّ المؤجَّل.",
   },
