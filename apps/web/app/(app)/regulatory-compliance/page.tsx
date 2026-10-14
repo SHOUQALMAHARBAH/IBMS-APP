@@ -591,6 +591,15 @@ export default function RegulatoryCompliancePage() {
           )}
 
           <h3>{t('rcCapitalHeading')}</h3>
+          {/* THE COUNTING UNIT IS NOT SETTLED, AND THE SCREEN SAYS SO RATHER THAN IMPLYING IT IS.
+              Art. 4/a's slabs count branches within a type, so the unit decides the money figure —
+              and this figure counts OUR 32-line catalogue, which an unattributed reply from the
+              Central Bank suggests is a commercial product list rather than the Bank's own shorter
+              regulatory classification. Nothing is built on that reply; what it does is stop this
+              screen stating a settled answer. See `requiredCapitalForScope`. */}
+          <p role="status" data-testid="capital-counting-unit-unverified">
+            {t('rcCapitalCountingUnitUnverified')}
+          </p>
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
               <tr>

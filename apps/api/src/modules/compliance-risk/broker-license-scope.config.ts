@@ -117,6 +117,37 @@ export function typesInScope(
 }
 
 /**
+ * THE UNIT THE BRANCHES ARE COUNTED IN IS UNDER VERIFICATION WITH THE CENTRAL BANK.
+ *
+ * Art. 4/a's slabs count BRANCHES within a type — up to 6, up to 12, more than 12 — so the counting
+ * unit decides how much capital an office must hold. This function counts rows of OUR catalogue,
+ * which is 32 lines.
+ *
+ * An unattributed reply to a question put to the Central Bank states that those 32 are a COMMERCIAL
+ * PRODUCT catalogue while the Bank licenses against a shorter REGULATORY classification — its
+ * example being that our several liability lines fall under one regulatory branch, "general
+ * liability". That is consistent with the 18-general-and-8-life list in the Bank's own published
+ * broker re-registration form, which reads like a licensing classification rather than a product
+ * list.
+ *
+ * ## WHY NOTHING IS CHANGED HERE, AND WHY THE NOTE EXISTS ANYWAY
+ *
+ * The reply is NOT AUTHORITATIVE and is recorded as unattributed: no reference number, no signature,
+ * it does not contain the form or the list that was asked for, and its own closing line directs us to
+ * submit a formal written request to obtain the annexes. Nothing is built on it.
+ *
+ * So the catalogue is untouched — merging or renaming a line would change what every existing licence
+ * MEANS — and no mapping column is added, because an empty column with no reader is the
+ * `dpoAlternateApproverUserId` precedent: it existed for exactly this kind of problem, acquired no
+ * reader, and is now marked superseded. The column arrives with the official list that populates it.
+ *
+ * What IS done is to stop the screens stating a settled answer. The figure below is still computed
+ * and still shown; what changes is that both surfaces displaying it now say the counting unit is
+ * under verification. The owner's rule is that the system does not state as settled what is not, and
+ * a capital requirement is a money figure an office acts on.
+ */
+
+/**
  * The capital art. 4/a requires for the WHOLE scope.
  *
  * ## "PER TYPE" IS READ AS SUMMED, AND THAT IS A READING

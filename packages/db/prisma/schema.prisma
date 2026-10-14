@@ -338,17 +338,34 @@ model Organization {
 
   /// INSURER-ONLY FIELDS. Present on this model because an insurance company IS an Organization
   /// (decision 63); null for a brokerage office.
-  shortName            String?
-  insurerLicenseNumber String?
-  businessModelId      String?
-  businessModel        BusinessModel?     @relation(fields: [businessModelId], references: [id])
-  integrationMethod    IntegrationMethod?
-  apiEndpoint          String?
+  shortName                           String?
+  insurerLicenseNumber                String?
+  /// MODULE 0-ب ITEM (e) — the INSURANCE COMPANY's licence certificate.
+  ///
+  /// On the organization rather than on a term, because the v2 insurer sheet carries a licence
+  /// number and a licensing authority and NO issue or expiry date — unlike the broker sheet, whose
+  /// licence item (c) made a series of terms. Inventing a term series would be building a structure
+  /// for dates the form never collects.
+  ///
+  /// Its own `DocumentCategory` value (`INSURER_LICENSE_CERTIFICATE`), never the broker's: art. 82 of
+  /// Law No. 12 of 2021 lists brokers and insurance companies as different kinds of service provider
+  /// and their licences are different instruments, so a shared category would make the two
+  /// indistinguishable in the one query a CBJ inspection asks.
+  ///
+  /// NULLABLE because three organizations predate it; the REQUIREMENT lives at the write path.
+  insurerLicenseCertificateDocumentId String?
+  insurerLicenseCertificate           Document?             @relation("OrganizationInsurerLicenseCertificate", fields: [insurerLicenseCertificateDocumentId], references: [id], onDelete: Restrict)
+  /// MODULE 0-ب ITEM (e) — the lines this INSURANCE COMPANY is licensed to underwrite.
+  insurerLicensedLines                InsurerLicensedLine[]
+  businessModelId                     String?
+  businessModel                       BusinessModel?        @relation(fields: [businessModelId], references: [id])
+  integrationMethod                   IntegrationMethod?
+  apiEndpoint                         String?
   /// The company's PUBLISHED channels — company facts, resolved through the insurer resolver when
   /// an office's `Insurer` row is linked. The office's own named contact inside the company stays
   /// on `Insurer`, because each broker deals with a different person.
-  quotationEmail       String?
-  claimsEmail          String?
+  quotationEmail                      String?
+  claimsEmail                         String?
 
   /// Who registered and last amended this organization. PLAIN IDS, NOT FOREIGN KEYS: `User` is
   /// tenant-scoped and the registrar is the PROVIDER's user, in a different organization, so an FK
@@ -5605,6 +5622,7 @@ model InsuranceLine {
   rfqs                  RFQ[]
   policies              Policy[]
   commissionAgreements  CommissionAgreement[]
+  insurerLicensedLines  InsurerLicensedLine[]
 
   @@index([category, displayOrder])
 }
@@ -5725,6 +5743,8 @@ model RatingAgency {
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime @default(now())
+
+  insurers Insurer[]
 }
 
 model LegalForm {
@@ -5846,6 +5866,56 @@ model OfficeInsuranceLine {
 ///
 /// A row points at EITHER a standard line or one of the office's own additions,
 /// never both and never neither, enforced by a CHECK rather than by convention.
+/// MODULE 0-ب ITEM (e) — THE LINES AN INSURANCE COMPANY IS LICENSED TO UNDERWRITE.
+///
+/// ## ITS OWN LINK, AND NOT `BrokerLicenseScopeLine` — measured before deciding
+///
+/// `BrokerLicenseScopeLine.brokerLicenseId` is NOT NULL and references `BrokerLicense`, so attaching
+/// a company's lines there would require inventing a BROKER LICENCE ROW for a company that holds
+/// none. The implication is structural rather than an accident of derivation — and it compounds:
+/// `typesInScope` derives life/general LICENCE TYPES from those rows (decision 67), so the system
+/// would report an insurance company as licensed as a life-and-general BROKER; and
+/// `BrokerLicenseScopeService` enforces art. 3/a against `Organization.brokerKind`, which item (b)'s
+/// CHECK requires to be NULL for an `INSURANCE_COMPANY`.
+///
+/// Art. 82 of Law No. 12 of 2021 lists brokers and insurance companies as different kinds of service
+/// provider; their licences are different instruments. The broker derivation reads only broker
+/// licence scope, and this is where a company's lines live.
+///
+/// ## STANDARD CATALOGUE LINES ONLY
+///
+/// No office-line column, unlike the two-nullable-FK shape the four MUST models carry. That shape
+/// exists because an OFFICE may add a line of its own; an insurance company's licence is granted by
+/// the Central Bank against the Bank's own classification, and a line one brokerage office invented
+/// is not something a regulator licensed anybody for. One required FK makes the other
+/// unrepresentable rather than merely disallowed.
+///
+/// ## WHAT A BROKERAGE OFFICE CANNOT SEE, AND WHY THAT IS NOT THE SAME AS `InsurerDirectory.lines`
+///
+/// `organizationId` here is the COMPANY's own — an insurance company registered on this platform is
+/// a tenant — so these rows are unreadable outside it. `InsurerDirectory.lines` is NOT a substitute
+/// and must never be reconciled with this: that is OBSERVED BEHAVIOUR (lines at least one office
+/// recorded buying) while this is a REGULATORY FACT (lines the licence permits). They diverge in both
+/// directions and the observed set grows as offices trade. The cross-office read is recorded in
+/// `docs/deferred-register.md`, not improvised.
+model InsurerLicensedLine {
+  id             String       @id @default(uuid())
+  /// The INSURANCE COMPANY's own Organization. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  insuranceLineId String
+  insuranceLine   InsuranceLine @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  /// An ordinary compound unique, NOT the two-partial-index shape its broker sibling needs: both
+  /// columns are NOT NULL, so there is nothing nullable for Postgres to treat as distinct and the
+  /// § 1.25 trap cannot apply.
+  @@unique([organizationId, insuranceLineId], map: "InsurerLicensedLine_one_line_per_company")
+  @@index([organizationId])
+}
+
 model InsurerOfferedLine {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization this row belongs to.
@@ -5995,19 +6065,49 @@ model Insurer {
 
   /// Part I §10.2 — three DIFFERENT people, not one generic contact: pricing
   /// and RFQ, claims, and underwriting.
-  rfqContactName          String?
-  rfqContactEmail         String?
+  rfqContactName              String?
+  rfqContactEmail             String?
   /// Not in §5's model. Kept so the migration does not silently drop the
   /// existing `Insurer.contactPhone` column's data — §10.2's list is a
   /// minimum, and step 10 is explicitly a column-by-column migration.
-  rfqContactPhone         String?
-  claimsContactName       String?
-  claimsContactEmail      String?
-  underwriterContact      String? // Part 4.1 "underwriters"
-  creditTermsDays         Int? // narrative process 31 "Credit Terms"
-  financialStrengthRating String? // narrative process 31 "Financial Strength"
-  isActive                Boolean  @default(true)
-  createdAt               DateTime @default(now())
+  rfqContactPhone             String?
+  claimsContactName           String?
+  claimsContactEmail          String?
+  underwriterContact          String? // Part 4.1 "underwriters"
+  /// MODULE 0-ب ITEM (e) — the named human this OFFICE deals with for broker relations inside that
+  /// insurance company, and how to reach them.
+  ///
+  /// HERE AND NOT ON `Organization`, which is the owner's decision and the one the existing shape of
+  /// this model already draws: `rfqContact*`, `claimsContact*` and `underwriterContact` are
+  /// office-scoped named humans, while `companyPhone`/`companyEmail`/`companyWebsite` are company
+  /// facts. Each brokerage office deals with a DIFFERENT named contact inside the same company, so a
+  /// single column on the organization would hold one office's contact and show it to every other.
+  /// The published channels — `quotationEmail`, `claimsEmail` — stay on the organization behind the
+  /// resolver, because those are the company's own published addresses.
+  brokerRelationsName         String?
+  brokerRelationsEmail        String?
+  brokerRelationsPhone        String?
+  creditTermsDays             Int? // narrative process 31 "Credit Terms"
+  financialStrengthRating     String? // narrative process 31 "Financial Strength"
+  /// MODULE 0-ب ITEM (e) — which agency published the rating, and AS AT WHICH DAY.
+  ///
+  /// Decision 64 keeps the rating office-scoped: it is what THIS office recorded in performing its
+  /// duty of care when choosing an insurer, not a public fact about the company. The dictionary's
+  /// correction 5 says why the date is required beside it — «تصنيفاً بلا تاريخٍ دعوى لا سجلّ عناية»,
+  /// a rating with no date is a claim rather than a due-diligence record.
+  ///
+  /// `Insurer_rating_carries_its_date` refuses either half alone, in both directions. It is
+  /// `NOT VALID`: three seeded SAMPLE insurers predate the date column and carry a rating without
+  /// one, and neither backfilling a date (inventing an unsourceable fact) nor clearing their ratings
+  /// (modifying rows in an item whose evidence is that it modifies none) was acceptable. The rule is
+  /// enforced on every INSERT and UPDATE from that migration onwards — see its header.
+  ratingAgencyId              String?
+  ratingAgency                RatingAgency? @relation(fields: [ratingAgencyId], references: [id])
+  /// A DATE, not a timestamp: "as at" a day is what a rating carries, and a time would invite a
+  /// reader to believe a precision the agency never published.
+  financialStrengthRatingAsOf DateTime?     @db.Date
+  isActive                    Boolean       @default(true)
+  createdAt                   DateTime      @default(now())
 
   /// What the COMPANY offers — directory-visible. Replaced `linesOffered String[]`,
   /// which was free text with no referent and which nothing had ever written.
@@ -6095,6 +6195,10 @@ enum DocumentCategory {
   /// Module 0 item (c) — the CBJ licence certificate for one `BrokerLicense` TERM. Its own
   /// category rather than OTHER: a term cannot exist without one, so it has to be findable.
   BROKER_LICENSE_CERTIFICATE
+  /// MODULE 0-ب ITEM (e) — an INSURANCE COMPANY's licence certificate. Its own value and not the
+  /// broker's: the two licences are different instruments (Law No. 12 of 2021 art. 82), and a shared
+  /// category would make them indistinguishable in the query a CBJ inspection asks.
+  INSURER_LICENSE_CERTIFICATE
   APPLICATION_PROPOSAL
   RISK_SURVEY
   QUOTATION
@@ -6140,10 +6244,14 @@ model Document {
   deletionOverrideByUserId String? // privileged, logged override only
   createdAt                DateTime           @default(now())
 
-  claimDocuments    ClaimDocument[]
+  claimDocuments               ClaimDocument[]
   /// Module 0 item (c) — the terms whose certificate this document is.
-  brokerLicenses    BrokerLicense[]
-  regulatoryActions RegulatoryAction[]
+  brokerLicenses               BrokerLicense[]
+  regulatoryActions            RegulatoryAction[]
+  /// MODULE 0-ب ITEM (e) — the organizations whose INSURER licence certificate this document is.
+  /// A NAMED relation, because `Document` already relates to `Organization` as its tenant and Prisma
+  /// cannot tell two relations between the same pair apart without one.
+  insurerLicenseCertificateFor Organization[]     @relation("OrganizationInsurerLicenseCertificate")
 
   @@index([policyId])
   @@index([customerId])

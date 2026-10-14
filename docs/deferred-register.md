@@ -70,6 +70,7 @@ These are the owner's items whose declaration site does not exist yet. Each land
 | The legal-values table | decision; م١٥/ي reads from it | module 1 |
 | **Art. 15/i and 15/k against the IBAN field.** 15/i is the dedicated client-funds account with a SEVEN-WORKING-DAY cap on remitting premiums to the insurer and THREE for paying claims to the client (verified from the scan, printed page 18). 15/k forbids using that account for anything else and specifically forbids pledging it or taking interest through it. `Organization.ibanEnc` now exists and carries NEITHER rule: nothing marks an account as the client-funds account, and nothing counts days against either cap | arts. 15/i, 15/k | **module 14** — the column exists since item (d); the rules need the money module |
 | **The broker–insurer agreement's remittance period must be READ from the legal-values table, never seeded at 30 days.** The dictionary's own correction 6 says the sheet's `30` example contradicts art. 15/i and must not be seeded | art. 15/i | module 1 (the legal-values table) / module 14 |
+| **THE UNIT THE art. 4/a SLABS COUNT BRANCHES IN IS UNVERIFIED, and the figure is a money requirement.** The slabs count branches within a type (≤6, ≤12, >12), so the counting unit decides how much capital an office must hold — and `requiredCapitalForScope` counts rows of OUR 32-line catalogue. An **unattributed** reply to a question put to the Central Bank states those 32 are a COMMERCIAL PRODUCT catalogue while the Bank licenses against a shorter REGULATORY classification (its example: our several liability lines falling under one branch, "general liability"), which is consistent with the 18-general-and-8-life list in the Bank's own published broker re-registration form. **NOTHING IS BUILT ON IT**: no reference number, no signature, it does not contain the form or list asked for, and its closing line directs us to submit a formal written request for the annexes. **The catalogue is NOT touched** — merging or renaming a line changes what every existing licence means. **No mapping column is added either** — an empty column with no reader is the `dpoAlternateApproverUserId` precedent, which existed for exactly this kind of problem, acquired no reader, and is now marked superseded. What IS done now is the declared note on BOTH surfaces that display the figure (`/regulatory-compliance` and `/provider-register-office`, one shared i18n key so a reader moving between them does not meet two accounts of how settled it is), because the owner's rule is that the system does not state as settled what is not. **The mapping column arrives with the official list that populates it.** | CBJ Instr. 9/2026 art. 4/a | **whichever module receives the official annex** — likely alongside module 1's legal-values table, which is the provider-owned home for regulator-set values, but that is where it would FIT rather than where it is promised |
 | Takaful terminology templates | decision (business model is a table; nothing may branch on it) | **item (e)** |
 | The real mail sender | owner's decision B2 | **item (f)** — a temporary on-demand script stands in |
 | `INSURANCE_COMPANY_ADMINISTRATOR` | owner's decision | **item (f)** |
@@ -87,15 +88,63 @@ These are the owner's items whose declaration site does not exist yet. Each land
 
 ---
 
+## A standing rule item (e)'s measurement earned
+
+**WHERE TWO SOURCES COULD PRODUCE THE SAME-LOOKING LIST, EACH SCREEN NAMES WHICH ONE IT IS SHOWING,
+AND NEITHER IS DERIVED FROM THE OTHER.**
+
+Found while placing the insurance company's licensed lines. Two sets of "which lines does this insurer
+write" now exist and they are different facts:
+
+* `InsurerDirectory.lines`, aggregated from `InsurerOfferedLine` — **observed behaviour**: lines at
+  least one office has recorded buying from this insurer.
+* The company's registered licensed lines (item (e)) — a **regulatory fact**: lines the company's
+  licence permits it to underwrite.
+
+**They render identically and diverge in BOTH directions.** A company licensed for a line nobody has
+bought is shown as not offering it, which denies a broker a lawful option. A line whose licence was
+withdrawn keeps appearing because somebody bought it last year. And the observed set GROWS as offices
+trade, so the licence would appear to change with no regulatory act behind it.
+
+So neither is computed from the other, and each screen says which it is showing. The temptation to
+"reconcile" them is the defect: they are not two readings of one fact, they are two facts, and an
+office needs both — what the company may lawfully write, and what the market has actually placed.
+
+The general rule is wider than insurer lines and is why it is recorded here rather than as a comment
+on one column. An observed set and a declared set are different claims; a screen that shows one while
+the reader believes the other is the confidently-wrong-figure failure this repository has shipped
+three times.
+
+---
+
 ## A standing rule item (d) earned in CI
 
 **A new table carrying `organizationId` ASSERTS ITS OWN ROW-LEVEL SECURITY, in its own migration.**
+
+**WHICH TABLE, AND HOW MANY — measured, because a named defect that does not say its own extent is
+half a record.** Item (d) created exactly ONE table: `RegulatoryAction`
+(`20261121100000_provider_registration_fields`). Everything else it added was COLUMNS, on
+`Organization` and `ProfessionalIndemnityPolicy`, both of which already had their RLS. So the gap was
+one table of one, and it is closed.
+
+For contrast, item (c) created EIGHT tables and none of them was exposed: the eight reference lists
+deliberately carry no `organizationId` at all, and that migration ASSERTS it — *"reference tables: %
+carries organizationId — it must be platform-scoped"*. A table that is global by construction cannot
+have this defect, which is the constructive form of the rule and the better one where it is available.
 
 `RegulatoryAction` was created with `organizationId` and no RLS. `tenant-isolation.e2e-spec.ts`
 caught it in CI — `expected [ 'RegulatoryAction' ] to deeply equal []` — and the migration that
 created it had asserted a great deal: the thirteen composite tenant foreign keys, the enum labels,
 the NOT NULL with no default, the duplicate-registration refusal proven by attempting it. What it did
 not assert was the one thing that is a CONVENTION rather than a property of that table.
+
+**WHAT THE HOLE WAS, PRECISELY.** `RegulatoryAction` holds the regulator's acts against an office —
+suspensions and cancellations, with the CBJ decision reference behind each. Without a policy, a query
+that reached the table OUTSIDE `tenantScopeExtension` — raw SQL, or a repository method written
+without a `where` — would have returned every office's regulatory acts to whoever asked. On a table
+whose rows say "the Central Bank suspended this brokerage", that is a disclosure about a competitor's
+standing with its regulator. The table held ZERO rows throughout, on both databases, and no reader
+existed yet; what was missing was the layer that has to be right before a reader is written.
 
 The hole was real while it lasted. The application layer filtered correctly from the first moment,
 because `tenantScopeExtension` derives its scoped set from the DMMF — but RLS is the layer that makes
@@ -106,6 +155,14 @@ The repair is `20261123100000_regulatory_action_rls`, which asserts BOTH flags a
 policy reads `app.current_org_id`. `ENABLE` without `FORCE` leaves the table owner exempt, and every
 migration and the seed connect as the owner; a policy that does not read the session variable is one
 nothing can ever satisfy, which once made every permission read return empty and 403'd every user.
+
+**THE COUNT-VERSUS-SET CONVERSION EARNED ITS KEEP TWICE IN TWO DAYS, and the second time it caught a
+code I had added myself.** `office-administrator.e2e-spec.ts` pins the provider's grants by NAME. Item
+(d) added `provider.office.register` to the provider role and did not declare it there; the guard
+failed in CI and PRINTED THE CODE. A count of eight would have passed — and would have passed equally
+on eight that included `customer.create`, which is the drift that assertion exists to catch. The
+conversion is recorded further down as a standing rule; this is its second live instance, and the
+first where the author of the drift was the author of the guard.
 
 **And the second half of the lesson is about blast radius, not RLS.** The local run was scoped to
 "which specs touch registration", and the set that mattered was "which specs assert about the SET of

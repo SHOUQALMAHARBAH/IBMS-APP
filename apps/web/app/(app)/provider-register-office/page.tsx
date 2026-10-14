@@ -289,6 +289,12 @@ export default function RegisterBrokerageOfficePage() {
 
         <section style={sectionStyle} data-testid="capital-assessment">
           <h2>{t('regOfficePaidUpCapital')}</h2>
+          {/* On the RESULT panel too, where the figure is a statement about an office that now
+              exists. A caveat shown only on the form would vanish at exactly the point the number
+              starts being quoted. */}
+          <p role="status" data-testid="capital-counting-unit-unverified">
+            {t('rcCapitalCountingUnitUnverified')}
+          </p>
           <p>
             {t('regOfficeCapitalRequired')}: {result.capital.requiredCapital}
           </p>
@@ -537,6 +543,12 @@ export default function RegisterBrokerageOfficePage() {
           </div>
           <p style={noteStyle} data-testid="capital-note">
             {t('regOfficeCapitalNote')}
+          </p>
+          {/* The SAME key as `/regulatory-compliance`, not a second sentence: one unsettled fact, one
+              wording. Both screens display a figure computed from the same function, so a reader
+              moving between them must not meet two different accounts of how settled it is. */}
+          <p style={noteStyle} data-testid="capital-counting-unit-unverified">
+            {t('rcCapitalCountingUnitUnverified')}
           </p>
           <div style={fieldRow}>
             {text('paidUpCapital', t('regOfficePaidUpCapital'))}

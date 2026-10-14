@@ -159,6 +159,8 @@ export const COMPLIANCE_RISK = {
     rcScopeSoleEstablishmentNote:
       'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',
     rcCapitalHeading: 'رأس المال (المادة 4/أ)',
+    rcCapitalCountingUnitUnverified:
+      'وحدةُ عدِّ الفروع التي تُحدَّد بها شريحةُ المادة ٤/أ قيدُ التحقّق مع البنك المركزي. يُحسَب الرقم أدناه بعدِّ فروع كتالوجنا البالغة ٣٢ فرعاً، وقد يكون التصنيفُ الرقابيُّ المعتمَد أقصرَ من ذلك — فيتغيّر العدد وتتغيّر معه الشريحة. الرقمُ للاطّلاع ولا يُعتمَد عليه التزاماً مالياً حتى يصل التصنيفُ الرسمي.',
     rcCapitalRequired: 'رأس المال المطلوب',
     rcCapitalPaidUp: 'رأس المال المدفوع',
     rcCapitalUnrecordedWarning:
@@ -556,6 +558,8 @@ export const COMPLIANCE_RISK = {
     rcScopeSoleEstablishmentNote:
       'This office is registered as a sole establishment (natural person), which may be licensed for ONE insurance type only (art. 3/a). Adding a branch of the other type will be refused.',
     rcCapitalHeading: 'Capital (art. 4/a)',
+    rcCapitalCountingUnitUnverified:
+      'The unit used to count branches for the art. 4/a slab is under verification with the Central Bank. The figure below counts the 32 lines of our own catalogue; the Bank may license against a shorter regulatory classification, which would change the count and with it the slab. Shown for information — do not rely on it as a financial obligation until the official classification arrives.',
     rcCapitalRequired: 'Required capital',
     rcCapitalPaidUp: 'Paid-up capital',
     rcCapitalUnrecordedWarning:
