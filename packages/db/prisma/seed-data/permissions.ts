@@ -1843,6 +1843,23 @@ const admin: PermissionSeed[] = [
     roles: [],
   },
   {
+    /*
+     * MODULE 0-ب ITEM (e) — REGISTER AN INSURANCE COMPANY ON THE PLATFORM.
+     *
+     * PLATFORM-scoped and the THIRD such code, for the same reason as the second: its effect is the
+     * creation of a TENANT. Separate from `provider.office.register` because the two create different
+     * kinds of entity under different articles — a brokerage office is licensed under art. 10, an
+     * insurance company is not — and an operator trusted to register one has not thereby been trusted
+     * to register the other.
+     */
+    code: "provider.insurer.register",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform",
+    roles: [],
+  },
+  {
     code: "access-recertification.cycle.start",
     module: "admin",
     description: "Start an access-recertification cycle",

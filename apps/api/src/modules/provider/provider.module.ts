@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
-import { ProviderOfficeRegistrationController } from './provider.controller';
+import {
+  ProviderOfficeRegistrationController,
+  ProviderInsurerRegistrationController,
+} from './provider.controller';
 import { OfficeRegistrationService } from './office-registration.service';
+import { InsuranceCompanyRegistrationService } from './insurance-company-registration.service';
 import { ReferenceDataController } from './reference-data.controller';
 import { ReferenceDataService } from './reference-data.service';
 import { AuditModule } from '../audit/audit.module';
@@ -16,7 +20,15 @@ import { SecurityModule } from '../security/security.module';
  */
 @Module({
   imports: [AuditModule, SecurityModule],
-  controllers: [ProviderOfficeRegistrationController, ReferenceDataController],
-  providers: [OfficeRegistrationService, ReferenceDataService],
+  controllers: [
+    ProviderOfficeRegistrationController,
+    ProviderInsurerRegistrationController,
+    ReferenceDataController,
+  ],
+  providers: [
+    OfficeRegistrationService,
+    InsuranceCompanyRegistrationService,
+    ReferenceDataService,
+  ],
 })
 export class ProviderModule {}

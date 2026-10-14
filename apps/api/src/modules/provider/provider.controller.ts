@@ -1,7 +1,9 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { OfficeRegistrationService } from './office-registration.service';
+import { InsuranceCompanyRegistrationService } from './insurance-company-registration.service';
 import { RegisterBrokerageOfficeDto } from './dto/register-brokerage-office.dto';
+import { RegisterInsuranceCompanyDto } from './dto/register-insurance-company.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -26,6 +28,34 @@ export class ProviderOfficeRegistrationController {
     @Body() dto: RegisterBrokerageOfficeDto,
   ) {
     return this.registration.registerBrokerageOffice(
+      { id: user.id, organizationId: user.organizationId },
+      dto,
+    );
+  }
+}
+
+/**
+ * MODULE 0-ب ITEM (e) — the OTHER kind of tenant.
+ *
+ * Its own controller and its own path, not a `?type=` on the office one. A brokerage office and an
+ * insurance company are different legal entities licensed under different instruments, their forms
+ * share perhaps half their fields, and a single route taking a discriminator would have to branch on
+ * it in every refusal — which is how one branch quietly stops being checked.
+ */
+@ApiTags('provider')
+@Controller('provider/insurance-companies')
+export class ProviderInsurerRegistrationController {
+  constructor(
+    private readonly registration: InsuranceCompanyRegistrationService,
+  ) {}
+
+  @RequirePermissions('provider.insurer.register')
+  @Post()
+  register(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RegisterInsuranceCompanyDto,
+  ) {
+    return this.registration.registerInsuranceCompany(
       { id: user.id, organizationId: user.organizationId },
       dto,
     );

@@ -152,6 +152,11 @@ const OFFICE_ADMINISTRATOR_CODES = [
   // Asserted from both sides so a future edit that decided "these are the same thing really"
   // has to break one of the two.
   'insurer.office-form.map',
+  // MODULE 0-ب ITEM (e), DECISION 63 — deciding that one of the office's counterparty records IS a
+  // particular registered company, and undoing that. This list is an INDEPENDENT COPY of the seed
+  // grid's, deliberately: two lists that must be edited together are two chances to notice.
+  'insurer.company.link',
+  'insurer.company.unlink',
 ] as const;
 
 /** Withheld on purpose, each for a stated reason. A code moving from this list to
@@ -376,6 +381,8 @@ describe('every office has a route to user administration', () => {
         // Item (d) — registering a brokerage office. PLATFORM-scoped, and the only route in this
         // product that creates a tenant.
         'provider.office.register',
+        // Item (e) — the other kind of tenant.
+        'provider.insurer.register',
         // Item (b) — self-administration, bounded by tenancy rather than by anything written for it.
         'role.create',
         'role.deactivate',

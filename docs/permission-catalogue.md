@@ -1,6 +1,6 @@
 # Permission catalogue — دليل الصلاحيات
 
-> **223 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
+> **224 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
 >
 > **The English text is the stored description.** It is developer-facing and often terse: a hint at what the code gates, not something to translate word for word.
 >
@@ -8,7 +8,7 @@
 >
 > **A code held by NO role is not a mistake.** It means the seeded grid grants it to nobody yet; an office can still grant it from the Role screen.
 
-## admin — الإدارة والأمن  (23)
+## admin — الإدارة والأمن  (24)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -26,6 +26,7 @@
 | `diagnostics.view` | See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence | SYSTEM_SECURITY_ADMINISTRATOR |
 | `encryption-key.read` | View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `permission.read` | View the global permission catalogue (the codes a role can be granted) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `provider.insurer.register` | Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
 | `provider.office-state.read` | Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
 | `provider.office.register` | Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform | E2E_PLATFORM_GRANT_179190811423235, PLATFORM_OPERATOR |
 | `role.create` | Define a new role in this office's catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
@@ -295,8 +296,8 @@
 
 ## Measured, so the numbers are checkable
 
-- **223** codes, **12** modules.
-- **0** held by no seeded role; **87** held by exactly one.
+- **224** codes, **12** modules.
+- **0** held by no seeded role; **88** held by exactly one.
 - **0** have no stored English description.
 
 Regenerate after any permission change. The sibling file `docs/permission-catalogue-for-descriptions.txt` is the one to TYPE INTO — it carries an `ar:` line per code and is regenerated without destroying what is already written there.

@@ -74,6 +74,9 @@ describe("permission grid — every code is independent and traceable", () => {
         // Module 0-ب item (d) — CREATES A TENANT, which is as far outside the granting office as an
         // effect can reach.
         "provider.office.register",
+        // Module 0-ب item (e) — the other kind of tenant. Separate from the office code because the
+        // two create different legal entities under different instruments.
+        "provider.insurer.register",
       ].sort(),
     );
   });
@@ -297,7 +300,7 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 45 codes", () => {
+  it("holds exactly 47 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
@@ -310,6 +313,11 @@ describe("permission grid — the office administrator", () => {
     // written. NOT in ADDED_AFTER_THE_MIGRATION below, and the reason is worth stating: the legacy
     // administrator holds `customer.read` too (it went to every holder of the three source codes), so this
     // is not a divergence from the legacy role — it is the count pin that makes it a decision.
+    //
+    // 47 with module 0-ب item (e)'s `insurer.company.link` and `insurer.company.unlink`. An office
+    // administrator maintains the office's counterparty records, and deciding that one of them IS a
+    // particular registered company is part of that. Both also go to the legacy `ADMIN`, so the
+    // strict-subset property asserted below still holds and this is not a divergence either.
     // 44 with Part 4 step 4's `duty-segregation.mode.declare` — which DOES add a capability, deliberately,
     // and is therefore declared in ADDED_AFTER_THE_MIGRATION below.
     // 43 with four-action Phase 1 — which ADDED no capability: three umbrellas this role held
@@ -349,6 +357,11 @@ describe("permission grid — the office administrator", () => {
         "information-asset.manage",
         "insurance-line.create",
         "insurance-line.update",
+        // Module 0-ب item (e) — deciding that one of the office's counterparty records IS a
+        // particular registered company, and undoing that. Part of maintaining the register, which
+        // is what this role is for.
+        "insurer.company.link",
+        "insurer.company.unlink",
         "insurer.create",
         "insurer.deactivate",
         "insurer.directory.read",

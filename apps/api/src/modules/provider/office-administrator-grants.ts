@@ -111,6 +111,12 @@ export const OFFICE_ADMINISTRATOR_GRANT_GROUPS = {
     'insurer.deactivate',
     'insurer.directory.read',
     'insurer.office-form.map',
+    // MODULE 0-ب ITEM (e), DECISION 63 — deciding that one of the office's counterparty records IS a
+    // particular registered company, and undoing that. Two codes because the acts are not
+    // symmetrical: linking narrows what the office may edit, unlinking returns a published fact to
+    // being an office note.
+    'insurer.company.link',
+    'insurer.company.unlink',
     'insurance-line.create',
     'insurance-line.update',
     'vendor.read',

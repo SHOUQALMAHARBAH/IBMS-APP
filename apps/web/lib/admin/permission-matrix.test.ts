@@ -138,7 +138,10 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // CRUD verbs a five-state row is built from, so they land in the TOGGLE list and the family count
     // does not move. The same arithmetic `discard` produced, for the same reason: a five-state control
     // offers none / read / read+write / +delete / full, and "link" is not a point on that scale.
-    expect(PERMISSION_CATALOGUE.length).toBe(223);
+    // `provider.insurer.register` (module 0-ب item (e)) moves exactly ONE of the four: it is
+    // PLATFORM-scoped like its two siblings, so the matrix never offers it and the toggle list does
+    // not grow. The catalogue does.
+    expect(PERMISSION_CATALOGUE.length).toBe(224);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
