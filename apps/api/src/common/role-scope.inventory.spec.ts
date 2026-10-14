@@ -50,10 +50,20 @@ const SCOPED_WRITERS = [
 /**
  * Write surfaces that carry a line and are deliberately NOT scoped, each with its reason.
  *
- * These are not exemptions of convenience. All six record what the OFFICE or one of its PEOPLE is
- * LICENSED for — which is the INPUT to scope, not a thing scope governs. Scoping them would mean a
- * GENERAL-scoped administrator could not record the office's own life licence, which inverts the
- * relationship: the licence is what makes a scope possible, so a scope cannot gate the licence.
+ * These are not exemptions of convenience — but they are NOT ONE ARGUMENT EITHER, and this header
+ * used to say they were ("all six record what the OFFICE or one of its PEOPLE is LICENSED for").
+ * Three of its own entries never fitted that sentence: `role-admin.service.ts` writes the scope,
+ * and the two insurer files are catalogue and configuration. A header that over-generalises is how
+ * a seventh row gets waved through under a reason that does not apply to it, so the three kinds are
+ * named instead:
+ *
+ *   (1) THE INPUT TO SCOPE — what the office, its people, or a counterparty is LICENSED for.
+ *       Scoping these inverts the relationship: the licence is what makes a scope possible, so a
+ *       scope cannot gate the licence. A GENERAL-scoped administrator must still be able to record
+ *       the office's own life licence.
+ *   (2) CONFIGURATION THAT IS NOT BUSINESS — a catalogue row or a form mapping. Nothing is placed
+ *       in a line by writing one.
+ *   (3) THE SCOPE ITSELF — scoping that would make a scope unchangeable once set.
  */
 const UNSCOPED_WRITERS: Record<string, string> = {
   'modules/compliance-risk/broker-license-scope.service.ts':
@@ -75,6 +85,29 @@ const UNSCOPED_WRITERS: Record<string, string> = {
    */
   'modules/provider/office-registration.service.ts':
     "the office's FIRST licensed branches, written by the provider at registration — the input to scope, before any role exists to be scoped",
+  /*
+   * MODULE 0-ب ITEM (e). Kind (1), and it reaches further from an office than any other row here —
+   * three reasons, each sufficient on its own:
+   *
+   * (a) IT IS A THIRD PARTY'S LICENCE. `InsurerLicensedLine` records what an INSURANCE COMPANY is
+   *     licensed to write. Role scope narrows what an office's own staff may place in a line; a
+   *     company's licence is not business placed in a line by anybody, and the screen says so
+   *     explicitly because `InsurerDirectory.lines` renders identically and IS market behaviour.
+   *
+   * (b) IT IS NOT AN OFFICE'S DATA AT ALL. The row is keyed by `insuranceCompanyId` and carries NO
+   *     `organizationId` — deliberately, and measured: naming that column `organizationId` would
+   *     have put the table in `tenantScopeExtension`'s scoped set, which derives from the DMMF by
+   *     EXACT FIELD NAME, and a company's own licensed lines would then have been invisible to
+   *     every office but one. Role scope is a narrowing WITHIN an office's book; this row is
+   *     outside it.
+   *
+   * (c) THE WRITER IS THE PROVIDER, as in item (d) one row above. The provider holds no role in any
+   *     office, so there is no scope to be within — and if a provider role were ever given one, the
+   *     effect would be a GENERAL-scoped operator unable to record a company's LIFE licence, which
+   *     is a fact about a third party rather than anything the provider brokers.
+   */
+  'modules/provider/insurance-company-registration.service.ts':
+    "an INSURANCE COMPANY's own licensed lines, written by the provider at registration — a third party's licence, on a row that carries no organizationId at all",
 };
 
 function read(relative: string): string | null {

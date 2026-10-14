@@ -1,7 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ENCRYPTED_FIELDS, ENCRYPTED_ELSEWHERE } from './encrypted-fields';
+
+/*
+ * AN EXPLICIT PER-FILE TIMEOUT, AND IT IS NOT A MITIGATION FOR A FLAKE.
+ *
+ * This spec READS THE API SOURCE TREE from disk. The measurement is already recorded, in
+ * `common/role-scope.inventory.spec.ts`: 6915ms for one such pass under a parallel run, against
+ * vitest's 5000ms default — so these guards pass alone every time and fail under load, which looks
+ * exactly like flakiness and is I/O cost. Two DIFFERENT source-reading guards failed in two
+ * consecutive full `vitest run` passes here, which is the signature of a shared budget problem
+ * rather than of either spec.
+ *
+ * Normally raising a timeout is the wrong move and this repository has a recorded lesson saying so.
+ * What makes this the exception is that nothing is hidden: the assertion is correct and the work is
+ * genuinely file I/O over hundreds of files.
+ *
+ * FILE-SCOPED, NEVER GLOBAL. `apps/api` sets no `testTimeout`, and raising it there would also
+ * raise the budget for 3,297 ordinary unit tests, where 5s IS a real signal — a hung mock or an
+ * unawaited promise. That is precisely the "buys time and hides the next crossing" failure.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 /*
  * Part G, checklist item 4 — "every `-- ENCRYPT` field is actually encrypted

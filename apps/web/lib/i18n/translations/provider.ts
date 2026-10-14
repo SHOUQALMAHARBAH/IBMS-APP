@@ -64,7 +64,7 @@ export const PROVIDER = {
     regOfficePackComplete:
       'حزمة التسجيل مكتملة: الوثيقتان مُسجَّلتان في النظام — اسمُ الملف وموضعُ حفظه ومَن سجّله.',
     regOfficePackMissingIntro: 'الناقص:',
-    regOfficePackNotHeld: 'لا سجلَّ لهذه الوثيقة في النظام',
+    regOfficePackNotHeld: 'هذه الوثيقة غير محفوظة في النظام',
     regOfficePackPremisesTenure: 'عقد الإيجار أو سند الملكية',
     regOfficePackAssociation: 'إثبات الانتساب إلى الجمعية الأردنية لوسطاء التأمين',
     regOfficePackScope:
@@ -215,7 +215,7 @@ export const PROVIDER = {
     regOfficePackComplete:
       'The registration pack is complete: both documents are recorded in the system — the file name, where it is filed, and who filed it.',
     regOfficePackMissingIntro: 'Missing:',
-    regOfficePackNotHeld: 'there is no record of this document in the system',
+    regOfficePackNotHeld: 'this document is not stored in the system',
     regOfficePackPremisesTenure: 'lease contract or title deed',
     regOfficePackAssociation:
       'proof of membership of the Jordanian Insurance Brokers Association',

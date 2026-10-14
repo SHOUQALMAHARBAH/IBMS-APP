@@ -485,7 +485,14 @@ test.describe('decision 88 — the registration pack marker', () => {
     await expect(marker).toContainText(
       'proof of membership of the Jordanian Insurance Brokers Association',
     );
-    await expect(marker).toContainText('no record of this document');
+    /*
+     * THE DICTIONARY GIVES THIS WORDING VERBATIM (v4 broker sheet, field 48:
+     * «هذه الوثيقة غير محفوظة في النظام»), so it is asserted rather than paraphrased. I had
+     * reworded it for symmetry with the complete-side correction and put it back on reading the
+     * sheet: the overclaim was on the COMPLETE side, which the sheet does not specify, and the
+     * missing side is accurate as the owner wrote it.
+     */
+    await expect(marker).toContainText('not stored in the system');
     // NEVER A COUNT.
     await expect(marker).not.toContainText('2 documents');
   });

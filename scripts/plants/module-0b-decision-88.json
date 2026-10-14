@@ -24,7 +24,7 @@
     "to": "        if (\n          registrationPack.premisesTenureDocumentId === null ||\n          registrationPack.associationMembershipDocumentId === null\n        ) {\n          throw new UnprocessableEntityException('art. 10/a documents are required');\n        }\n        const roleId = await this.createAdministratorRole(tx);"
   },
   "the-complete-marker-overclaims": {
-    "_": "Restore the overclaim: say the documents are HELD when this product has no object storage and `storageRef` names a location nothing can fetch. Must kill 'both uploaded: NO marker at all', which is where the honest claim is pinned.",
+    "_": "Restore the overclaim: say the documents are HELD when this product has no object storage and `storageRef` names a location nothing can fetch. The MISSING side's wording is the dictionary's verbatim (v4 broker sheet field 48) and is untouched; only the complete side was mine. Must kill 'both uploaded: NO marker at all', which is where the honest claim is pinned.",
     "file": "apps/web/lib/i18n/translations/provider.ts",
     "from": "'The registration pack is complete: both documents are recorded in the system — the file name, where it is filed, and who filed it.'",
     "to": "'The registration pack is complete: both documents are held in the system.'"
