@@ -416,6 +416,81 @@ export class InsurerService {
 
   /** One of this office's insurers, or absent. See the header for why absent is a
    *  404 even when the row exists in another office. */
+  /**
+   * DECISION 93 — CLEARS THE FINANCIAL STRENGTH RATING AND ITS AS-OF DATE IN ONE WRITE.
+   *
+   * ## WHY AN ACTION AND NOT A FIELD EDIT
+   *
+   * They are a PAIR by `Insurer_rating_carries_its_date`: clearing one alone either violates the
+   * constraint or leaves a dateless rating standing. And neither can be cleared through the ordinary
+   * PATCH at all — an empty string is refused by the DTO's length rule before any service rule runs,
+   * and `emptyStringToUndefined` turns an empty date into "no change" rather than into a clear. That
+   * gap is PRE-EXISTING, recorded in `docs/deferred-register.md`, and is NOT repaired here: the
+   * general fix (an explicit null meaning clear, absent meaning no change, an empty string refused)
+   * is an API-WIDE pass, and inventing it for one field would be a third way of saying "remove a
+   * value" in a codebase that already has two.
+   *
+   * So this is the narrow exit, scoped to one pair. The DTO's length rule is untouched,
+   * `emptyStringToUndefined` is untouched, and no null-means-clear convention is introduced.
+   *
+   * ## NO CONFIRMATION STEP, DELIBERATELY
+   *
+   * Clearing an optional note is undone by retyping it. The governing decision blocks what cannot be
+   * undone and warns about what can; it does not warn about what one line of typing restores. A
+   * confirm step here is exactly the weight decision 90 exists to remove, and the audit row — the
+   * value before and the value after — is the record.
+   *
+   * ## A NO-OP WHEN THERE IS NOTHING TO CLEAR, which is the OPPOSITE of the unlink's 409
+   *
+   * The distinction is what the operator's mistake would be. Unlinking a record that is not linked
+   * suggests they targeted the wrong record, which is worth surfacing. Clearing a rating that was
+   * never there is harmless and idempotent — there is no wrong-record hypothesis to raise, and no
+   * audit row is written because nothing changed.
+   */
+  async clearFinancialStrengthRating(
+    id: string,
+    actorUserId: string,
+  ): Promise<InsurerView> {
+    const row = await this.load(id);
+    if (
+      row.financialStrengthRating === null &&
+      row.financialStrengthRatingAsOf === null
+    ) {
+      // Nothing to clear. The screen does not offer the action in this state either; this is the
+      // server saying the same thing to a caller that asked anyway.
+      return deriveInsurerView(row);
+    }
+
+    await this.insurers.update(id, {
+      financialStrengthRating: null,
+      financialStrengthRatingAsOf: null,
+    });
+
+    await this.audit.record({
+      userId: actorUserId,
+      action: 'UPDATE',
+      entityType: 'Insurer',
+      entityId: id,
+      /*
+       * BOTH HALVES OF WHAT WAS THERE. After the write both columns are NULL, so without `beforeValue`
+       * the trail would say a rating was cleared without saying what it was — and the rating is this
+       * office's record of the care it took in choosing an insurer, which is the half an auditor asks
+       * about.
+       */
+      beforeValue: {
+        financialStrengthRating: row.financialStrengthRating,
+        financialStrengthRatingAsOf:
+          row.financialStrengthRatingAsOf?.toISOString() ?? null,
+      },
+      afterValue: {
+        financialStrengthRating: null,
+        financialStrengthRatingAsOf: null,
+      },
+    });
+
+    return deriveInsurerView(await this.load(id));
+  }
+
   private async load(id: string): Promise<InsurerRecord> {
     const row = await this.insurers.findById(id);
     if (!row) throw new NotFoundException(`Insurer ${id} not found.`);

@@ -1,0 +1,14 @@
+{
+  "only-the-rating-is-cleared": {
+    "_": "Clear the rating and leave the date, which is the half of the pair the constraint refuses. Under the CHECK this is a raw violation reaching the user — decision 90's failure — so the test must die on the clear itself.",
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "      financialStrengthRating: null,\n      financialStrengthRatingAsOf: null,\n    });\n\n    await this.audit.record({",
+    "to": "      financialStrengthRating: null,\n    });\n\n    await this.audit.record({"
+  },
+  "the-no-op-is-not-a-no-op": {
+    "_": "Remove the nothing-to-clear branch, so an unrated record takes the write path and writes an audit row for a change that did not happen. Must kill the no-op test — which exists only because the boundary-fixture rule said the suite was all on one side.",
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "      row.financialStrengthRatingAsOf === null\n    ) {",
+    "to": "      row.financialStrengthRatingAsOf === null &&\n      false\n    ) {"
+  }
+}

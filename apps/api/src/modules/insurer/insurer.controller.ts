@@ -73,6 +73,23 @@ export class InsurerController {
     return this.companyLink.link(user.id, id, dto.insuranceCompanyId);
   }
 
+  /**
+   * DECISION 93 — clear the financial strength rating and its as-of date together.
+   *
+   * `insurer.update` and NOT a new code: this is a correction to the office's own relationship record,
+   * which is exactly what that permission is for. A code per action would be a checkbox on the Role
+   * screen for something nobody administers separately — and this module has already refused to
+   * declare three codes on that ground.
+   */
+  @RequirePermissions('insurer.update')
+  @Delete(':id/financial-strength-rating')
+  clearRating(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.insurers.clearFinancialStrengthRating(id, user.id);
+  }
+
   @RequirePermissions('insurer.company.unlink')
   @Delete(':id/company-link')
   unlinkFromCompany(

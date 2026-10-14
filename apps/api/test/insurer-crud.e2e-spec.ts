@@ -974,3 +974,140 @@ describe('decision 90 — the rating and its date, in words rather than a constr
     expect(message).not.toMatch(/violates check constraint/i);
   }, 180_000);
 });
+
+/**
+ * DECISION 93 — ONE ACTION CLEARS THE RATING AND ITS DATE TOGETHER.
+ *
+ * The narrow exit from a gap this item found and did not create: neither half can be cleared through
+ * the ordinary PATCH, and clearing one alone would violate `Insurer_rating_carries_its_date`. The
+ * general fix is an API-wide pass and is recorded by name.
+ *
+ * THE BOUNDARY-FIXTURE RULE IS APPLIED HERE, which is why the second test exists: a suite that only
+ * exercised records WITH a rating would be entirely on one side of the boundary, and the similarity
+ * would pass the test rather than the correctness of the code.
+ */
+describe('decision 93 — clearing a rating and its date', () => {
+  it('clears BOTH in one write, and the response carries no constraint anywhere in it', async () => {
+    const created = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Clearable Rating Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة تصنيف قابل للمسح`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 3000',
+        companyEmail: 'clearable@example.test',
+        financialStrengthRating: 'BBB',
+        financialStrengthRatingAsOf: '2026-05-05',
+      })
+      .expect(201);
+    const id = (created.body as InsurerView).id;
+
+    const cleared = await request(app!.getHttpServer())
+      .delete(`/insurers/${id}/financial-strength-rating`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+
+    const view = cleared.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(view.financialStrengthRating).toBeNull();
+    expect(view.financialStrengthRatingAsOf).toBeNull();
+
+    // DECISION 90 holds on this route too: no SQLSTATE, no constraint name, no 500. Asserted on the
+    // whole body rather than on a message field, because a constraint can surface in any of them.
+    const body = JSON.stringify(cleared.body);
+    expect(body).not.toContain('Insurer_rating_carries_its_date');
+    expect(body).not.toContain('23514');
+    expect(body).not.toMatch(/violates check constraint/i);
+
+    // AND IT HELD, on a re-read rather than on the response the write returned — the §1.80 shape:
+    // a mapper can report a field it did not persist.
+    const reread = await request(app!.getHttpServer())
+      .get(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+    const after = reread.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(after.financialStrengthRating).toBeNull();
+    expect(after.financialStrengthRatingAsOf).toBeNull();
+  }, 180_000);
+
+  it('is a NO-OP on a record that carries neither — the other side of the boundary', async () => {
+    /*
+     * The non-empty negative case. Without it the suite would be entirely on the side where a rating
+     * exists, and an implementation that cleared something — or threw — on an unrated record would
+     * pass everything above.
+     *
+     * A no-op rather than the 409 the UNLINK raises, and the difference is what the operator's
+     * mistake would be: unlinking an unlinked record suggests they targeted the wrong one, while
+     * clearing a rating that was never there is harmless and idempotent.
+     */
+    const created = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Never Rated Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة لم تُصنَّف قطّ`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 3001',
+        companyEmail: 'never-rated@example.test',
+      })
+      .expect(201);
+    const id = (created.body as InsurerView).id;
+
+    /*
+     * COUNTED BEFORE AND AFTER, not against zero. The first version asserted ZERO rows and failed on
+     * a CLEAN tree — the REGISTRATION itself writes an audit row for this insurer, so the count was
+     * never going to be nought. A test that fails for a reason other than the one it is about is a
+     * test nobody will trust the next time it fires.
+     */
+    const auditRowsBefore = await prisma.auditLogEntry.count({
+      where: { entityType: 'Insurer', entityId: id },
+    });
+
+    const response = await request(app!.getHttpServer())
+      .delete(`/insurers/${id}/financial-strength-rating`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+
+    const view = response.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(view.financialStrengthRating).toBeNull();
+    expect(view.financialStrengthRatingAsOf).toBeNull();
+    // The record is otherwise untouched — a no-op that quietly changed something else would satisfy
+    // the two assertions above.
+    expect(view.companyEmail).toBe('never-rated@example.test');
+
+    /*
+     * AND NO AUDIT ROW, WHICH IS THE ONLY OBSERVABLE DIFFERENCE — found by planting, not by reading.
+     *
+     * Removing the nothing-to-clear branch killed nothing at first: writing null over null produces
+     * an identical record, so every assertion above passed on both sides. What actually differs is
+     * that the write path LOGS A CHANGE THAT DID NOT HAPPEN — and an audit trail carrying entries for
+     * acts with no effect is worse than one carrying none, because it teaches a reader that its rows
+     * are noise.
+     *
+     * The boundary-fixture rule's second half, in practice: a fixture on each side is not enough if
+     * the two sides look the same under every assertion the test makes.
+     */
+    const auditRowsAfter = await prisma.auditLogEntry.count({
+      where: { entityType: 'Insurer', entityId: id },
+    });
+    expect(
+      auditRowsAfter,
+      'a no-op wrote an audit row — the trail now records a change that did not happen',
+    ).toBe(auditRowsBefore);
+  }, 180_000);
+
+  it('is refused to a caller without insurer.update', async () => {
+    await request(app!.getHttpServer())
+      .delete(
+        `/insurers/00000000-0000-4000-8000-000000000000/financial-strength-rating`,
+      )
+      .set(bearer(outsider.accessToken))
+      .expect(403);
+  }, 120_000);
+});
