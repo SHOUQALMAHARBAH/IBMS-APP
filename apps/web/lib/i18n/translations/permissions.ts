@@ -36,7 +36,18 @@
 //
 // ## What is wanted in a line
 //
-// THE ARABIC IS THE REVIEWED TEXT. All 219 lines were written by the owner for an office manager
+// THE ARABIC IS THE REVIEWED TEXT — FOR 220 OF 224 CODES, NOT ALL OF THEM. 219 lines were
+// written by the owner on 2026-09-30 and delivered as a FILE rather than through the chat, on
+// her reasoning that 219 hand-copied strings is 219 chances of a silent transcription error and
+// a file can be CHECKED rather than trusted. She supplied `provider.insurer.register` verbatim
+// afterwards, which makes 220. The remaining FOUR were written by an agent, because the parity
+// guard requires both languages and a code therefore cannot ship without Arabic — they are
+// PLACEHOLDERS IN HER REGISTER and are named in `AWAITING_OWNER_REVIEW` in
+// `lib/admin/permission-descriptions.test.ts`, which refuses to let the next one go undeclared.
+// This header previously said all 219 were hers, which was true at delivery and became false
+// with the first code added after it — and a header that claims every line is reviewed makes an
+// unreviewed one indistinguishable, which is the single property her file delivery provided.
+// The lines are written for an office manager
 // deciding a grant, saying what the permission OPENS and what it REVEALS rather than restating its
 // name — eighteen of her own lines failed that rule on review and were rewritten in her source
 // document before extraction. A handful name another permission code in passing (`claim.discard`,
@@ -48,7 +59,18 @@
 // an English reader sees exactly what they saw before. `permission-descriptions.test.ts` ratchets how
 // many are still the carried hint, so the English gap is measured rather than assumed done.
 //
-// THE ARABIC IS THE REVIEWED TEXT. All 219 lines were written by the owner for an office manager
+// THE ARABIC IS THE REVIEWED TEXT — FOR 220 OF 224 CODES, NOT ALL OF THEM. 219 lines were
+// written by the owner on 2026-09-30 and delivered as a FILE rather than through the chat, on
+// her reasoning that 219 hand-copied strings is 219 chances of a silent transcription error and
+// a file can be CHECKED rather than trusted. She supplied `provider.insurer.register` verbatim
+// afterwards, which makes 220. The remaining FOUR were written by an agent, because the parity
+// guard requires both languages and a code therefore cannot ship without Arabic — they are
+// PLACEHOLDERS IN HER REGISTER and are named in `AWAITING_OWNER_REVIEW` in
+// `lib/admin/permission-descriptions.test.ts`, which refuses to let the next one go undeclared.
+// This header previously said all 219 were hers, which was true at delivery and became false
+// with the first code added after it — and a header that claims every line is reviewed makes an
+// unreviewed one indistinguishable, which is the single property her file delivery provided.
+// The lines are written for an office manager
 // deciding a grant, saying what the permission OPENS and what it REVEALS rather than restating its
 // name — eighteen of her own lines failed that rule on review and were rewritten in her source
 // document before extraction. A handful name another permission code in passing (`claim.discard`,

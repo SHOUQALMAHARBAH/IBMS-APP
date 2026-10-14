@@ -1,0 +1,14 @@
+{
+  "a-code-ships-without-being-declared": {
+    "_": "The exact regression this guard exists for: a permission ships and nobody declares that its Arabic was written by an agent, so the owner is silently credited with a line she has never seen. Simulated by dropping one entry, which makes the totals disagree by one in the same direction. Must fail the BALANCES test by name.",
+    "file": "apps/web/lib/admin/permission-descriptions.test.ts",
+    "from": "  'insurer.company.unlink',\n];",
+    "to": "];"
+  },
+  "the-list-names-a-code-that-does-not-exist": {
+    "_": "A renamed or withdrawn code left in the list would keep the balance arithmetic working while naming nothing — the one way this guard could pass while describing a fiction. Must fail the real-code test by name.",
+    "file": "apps/web/lib/admin/permission-descriptions.test.ts",
+    "from": "  'provider.office-state.read',\n  'provider.office.register',",
+    "to": "  'provider.office-state.read.renamed-away',\n  'provider.office.register',"
+  }
+}
