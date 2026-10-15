@@ -86,7 +86,7 @@ const CARRIED_ENGLISH_BUDGET = 214;
  * a permission, so a must-only-shrink rule would be wrong and would teach somebody to edit it around.
  * What must only grow is `OWNER_REVIEWED_COUNT`.
  */
-const OWNER_REVIEWED_COUNT = 220;
+const OWNER_REVIEWED_COUNT = 224;
 
 /**
  * The four lines an agent wrote. Each is a placeholder in HER register, not a reviewed line.
@@ -94,11 +94,19 @@ const OWNER_REVIEWED_COUNT = 220;
  * `provider.insurer.register` is deliberately ABSENT: she supplied its Arabic verbatim after the file,
  * which is why the reviewed count is 220 and not 219.
  */
-const AWAITING_OWNER_REVIEW = [
-  'provider.office-state.read',
-  'provider.office.register',
-  'insurer.company.link',
-  'insurer.company.unlink',
+const AWAITING_OWNER_REVIEW: string[] = [
+  /*
+   * EMPTY, 2026-10-15 — the owner wrote all four, and this is the goal state rather than a
+   * disabled guard. The balance check below still holds (224 = 224 + 0) and still fails by name the
+   * moment a code ships without being declared here, which is the only thing this list was for.
+   *
+   * Two of the four were CORRECTED before being applied, which is why the count moved by four
+   * rather than by two: `provider.office-state.read` had said the code does not reach the office's
+   * own data, and the view exposes eighteen columns of it; `insurer.company.link` and `.unlink` had
+   * omitted that linking locks the office's own copy of a company's facts to read-only. Corrected in
+   * the ARABIC, never in the code — the owner's instruction, and the right direction, because the
+   * code is what the description is about.
+   */
 ];
 
 describe('whose Arabic is it — provenance, because the text cannot say', () => {
@@ -130,6 +138,11 @@ describe('whose Arabic is it — provenance, because the text cannot say', () =>
   it('and each one DOES have a line, so this is about review and not about absence', () => {
     // Not a tautology against the forward check: that one asserts the COUNT of missing lines, and a
     // code could in principle be both unlisted-missing and listed-here. These are different claims.
+    //
+    // VACUOUS WHILE THE LIST IS EMPTY, and that is stated rather than hidden: with nothing awaiting
+    // review this loop runs zero times and passes. It is kept because the list is expected to refill
+    // the next time a module ships a permission, and a guard deleted at zero is a guard nobody
+    // restores. The BALANCE check above is what is load-bearing today.
     for (const code of AWAITING_OWNER_REVIEW) {
       expect(
         hasWrittenDescription(code),

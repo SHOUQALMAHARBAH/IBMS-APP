@@ -355,11 +355,32 @@ describe('every office has a route to user administration', () => {
       where: { type: 'PROVIDER' },
       select: { id: true },
     });
-    if (!provider) {
-      // Correct on a database seeded without sample data, and not a failure: `SEED_SAMPLE_DATA` is
-      // what keeps a placeholder platform operator out of production.
-      return;
-    }
+    /*
+     * S1 OF THE NAMED SHORT PASS — THIS RETURNED BEFORE IT MEASURED.
+     *
+     * It used to `return` here, justified as "correct on a database seeded without sample data".
+     * The justification was about a database this test never runs against, and the cost was that
+     * the guard bounding the provider's capabilities PASSED SILENTLY in exactly the state where
+     * something had gone wrong: no provider organization at all.
+     *
+     * Measured rather than argued: `NODE_ENV` is assigned nowhere in `ci.yml`, `.env.example` or
+     * `.env`, so `SEED_SAMPLE_DATA` is TRUE in CI and `ensureProviderOrganization()` always runs;
+     * db-test holds exactly one PROVIDER row today. So the branch was unreachable in every
+     * environment this spec executes in — which is why nobody noticed that the one environment it
+     * WAS written for is the one where a missing provider is a finding rather than a configuration.
+     *
+     * A missing provider is now a FAILURE NAMING ITSELF. If this spec is ever pointed at a database
+     * seeded without sample data, the right answer is to skip the FILE, not to let one test report
+     * a correct grant set for an organization that does not exist.
+     */
+    expect(
+      provider,
+      'no PROVIDER organization exists, so the set of codes this test bounds could not be read at all. ' +
+        'It used to return here and pass. `ensureProviderOrganization()` runs inside SEED_SAMPLE_DATA ' +
+        '(NODE_ENV !== "production"), which is TRUE in CI — so an absent provider means the seed did not ' +
+        'run or did not complete, and a silent pass would hide it.',
+    ).not.toBeNull();
+    if (!provider) return; // unreachable past the assertion; narrows the type for the read below
 
     const codes = (
       await rawPrisma.rolePermission.findMany({

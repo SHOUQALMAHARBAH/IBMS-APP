@@ -515,8 +515,9 @@ export const OPERATIONS = {
       'العملية 5 — استبيان مخاطر منظّم يقترح قائمة تغطية، ثم بوابة مراجعة ' +
       'واعتماد. ابدأ تقييماً من ملف العميل.',
     secHardwareKeyPending:
-      'يتطلب دورك مفتاح أمان مادياً. مسار التسجيل هذا غير متاح بعد — ويفي رمز ' +
-      'تطبيق المصادقة بمتطلب المصادقة الثنائية الإلزامية في الوقت الحالي.',
+      'دورُك مُعلَّمٌ بأنّه سيتطلّب مفتاحَ أمانٍ مادياً عندما يدعمه النظام. والنظامُ ' +
+      'لا يقبل مفاتيحَ الأمان اليوم، فلا شيءَ عليك فعلُه — ورمزُ تطبيق المصادقة هو ' +
+      'ما يفي بمتطلّب المصادقة الثنائية الإلزامية. هذا بيانٌ لا إجراء.',
     iprogNoCustomerSelected:
       'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح برنامج التأمين ' +
       'الخاص به من هناك.',
@@ -1163,9 +1164,10 @@ export const OPERATIONS = {
       "list, then a review and approval gate. Start one from a customer's " +
       'profile.',
     secHardwareKeyPending:
-      "Your role requires a hardware security key. That enrollment path isn't " +
-      'available yet — an authenticator-app code satisfies the mandatory-MFA ' +
-      'requirement for now.',
+      'Your role is marked to require a hardware security key once this system ' +
+      'supports them. It cannot accept one today, so there is nothing for you to ' +
+      'do — your authenticator-app code is what satisfies the mandatory-MFA ' +
+      'requirement. This is a note, not an action.',
     iprogNoCustomerSelected:
       'No customer selected — open a customer from {link} and open its ' +
       'insurance program from there.',

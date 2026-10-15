@@ -280,8 +280,17 @@ model Organization {
 
   /// Direct insurance brokerage or reinsurance brokerage — the sheet's `license_type_id`, and a
   /// DIFFERENT AXIS from the life/general types module 0 derives from the licence's branches.
-  /// Where this reads REINSURANCE, Instructions No. 9 of 2026 do not govern the office and their
-  /// guards must not fire.
+  ///
+  /// NO GUARD DEPENDS ON THIS FIELD. It is written at registration and read by nothing — measured,
+  /// every non-spec occurrence is a write, a DTO validator or a label. This comment previously said
+  /// that where the value reads REINSURANCE the instructions' guards "must not fire", which asserted
+  /// a mechanism that does not exist: art. 3/a's refusal, art. 4/a's capital warning and art. 10/a's
+  /// registration pack are all keyed on `type = BROKERAGE_OFFICE` and fire regardless of this value.
+  ///
+  /// AND WE HOLD NO TEXT FOR REINSURANCE BROKERAGE AT ALL, which is why the claim cannot simply be
+  /// inverted either. Instructions No. 9 of 2026 are what this product implements; nothing here
+  /// states whether they reach a reinsurance broker. So the system can neither exempt such a broker
+  /// nor bind one, and this field must claim neither. It records what the office said it is.
   brokerageKind BrokerageKind?
 
   /// Address and contact. `address`, `phone` and `email` are mandatory on both sheets; the website
@@ -5818,9 +5827,21 @@ model BusinessModel {
 /// the licence's branches and is never stored (module 0 item (e)); merging the two axes would
 /// destroy that derivation.
 ///
-/// An enum because the code branches on it: Instructions No. 9 of 2026 govern INSURANCE brokerage,
-/// so where this reads REINSURANCE the art. 4/a capital slabs, the art. 3/a type rules and the
-/// art. 4/z staffing minimums must not fire, and the office is marked as outside their scope.
+/// Direct insurance brokerage or reinsurance brokerage — the field dictionary's `license_type_id`.
+///
+/// AN ENUM BECAUSE THE VALUE IS A CLOSED PAIR, NOT BECAUSE CODE BRANCHES ON IT. This comment used to
+/// say "an enum because the code branches on it" and then named three guards that "must not fire"
+/// for a reinsurance broker. Measured: NOTHING reads this field, and all three of those guards are
+/// keyed on `Organization.type` rather than on this value, so they fire either way. The
+/// justification was for a mechanism that was never built.
+///
+/// It stays an enum rather than becoming a reference table because the pair is fixed by what a
+/// brokerage licence can be, not maintained by anybody — the test item (c) established is "an enum
+/// when the value is closed and code may branch on it; a provider-maintained table when rows are
+/// added over time". Nothing is added here.
+///
+/// WE HOLD NO TEXT FOR REINSURANCE BROKERAGE, so no rule may be written against this field in
+/// either direction until we do.
 enum BrokerageKind {
   DIRECT
   REINSURANCE

@@ -30,6 +30,7 @@
     "db:migrate:dev": "npm run migrate:dev --workspace=@ibms/db",
     "db:migrate:status": "npm run migrate:status --workspace=@ibms/db",
     "db:permission-catalogue": "dotenv -e .env.test -- tsx scripts/export-permission-catalogue.ts",
+    "db:reference-values": "dotenv -e .env.test -- tsx scripts/generate-reference-values.ts",
     "db:permission-descriptions": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts",
     "db:permission-descriptions:check": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts --check",
     "db:privileges": "npm run privileges --workspace=@ibms/db",

@@ -441,6 +441,19 @@ export default function RegisterBrokerageOfficePage() {
                 <option value="DIRECT">DIRECT</option>
                 <option value="REINSURANCE">REINSURANCE</option>
               </select>
+              {/*
+                * DECLARED ON SCREEN, because the field is collected and carries no consequence.
+                * No guard reads it, and this product holds no text for reinsurance brokerage — so
+                * a reader choosing REINSURANCE must not believe the system will treat the office
+                * differently. Saying so here is the same rule as the derived-status note above: an
+                * unstated absence reads as a feature, a stated one reads as a decision.
+                */}
+              <span
+                data-testid="brokerage-kind-note"
+                style={{ display: 'block', fontSize: '0.8rem', opacity: 0.85 }}
+              >
+                {t('regOfficeBrokerageKindNote')}
+              </span>
             </label>
             <label style={{ display: 'block' }}>
               <span style={{ display: 'block', fontSize: '0.9rem' }}>

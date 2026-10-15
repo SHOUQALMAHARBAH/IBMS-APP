@@ -58,6 +58,8 @@ export const PROVIDER = {
     regOfficePremisesTenureStorageRef: 'موضع حفظ عقد الإيجار أو سند الملكية',
     regOfficeAssociationFileName: 'اسم ملف إثبات الانتساب إلى الجمعية',
     regOfficeAssociationStorageRef: 'موضع حفظ إثبات الانتساب',
+    regOfficeBrokerageKindNote:
+      'يُسجَّل هذا الحقلُ ولا يترتّب عليه أثر: لا يقرأه أيُّ ضابطٍ في النظام، ولا نملك نصّاً تنظيمياً لوساطة إعادة التأمين — فاختيارُ «إعادة التأمين» لا يُعفي المكتبَ من شيء ولا يُلزمه بشيء، والضوابطُ القائمة تُطبَّق على المكتب بصفته مكتبَ وساطة.',
     regOfficePackNote:
       'المادة (١٠/أ/٢) تُوجب نسخةً عن عقد الإيجار أو سند الملكية للمقر، والمادة (١٠/أ/٣) تُوجب ما يُثبت الانتساب إلى الجمعية الأردنية لوسطاء التأمين، وتُكرّرها المادة (١٨/أ) في البيانات الدورية. وبالقرار ٨٨: غيابُهما لا يمنع الحفظ، ويُحسَب السجلُّ ناقصاً. وإثباتُ الانتساب يُحفَظ ضمن حزمة تسجيل المكتب بلا ربطٍ بشخصٍ بعد، لأنّ الأشخاص الذين تذكرهم المادة لا وجود لهم في النظام لحظةَ التسجيل.',
     regOfficePackHeading: 'اكتمال حزمة التسجيل',
@@ -209,6 +211,8 @@ export const PROVIDER = {
     regOfficePremisesTenureStorageRef: 'Where the lease or title deed is filed',
     regOfficeAssociationFileName: 'Association membership proof file name',
     regOfficeAssociationStorageRef: 'Where the membership proof is filed',
+    regOfficeBrokerageKindNote:
+      'This field is recorded and carries no consequence: no guard in the system reads it, and this product holds no regulatory text for reinsurance brokerage — so choosing REINSURANCE neither exempts the office from anything nor binds it to anything, and the existing rules apply to it as a brokerage office.',
     regOfficePackNote:
       'Art. 10/a/2 requires a copy of the lease contract or the title deed for the premises, and art. 10/a/3 requires proof of membership of the Jordanian Insurance Brokers Association, which art. 18/a repeats in the periodic returns. Under decision 88 their absence does not block the save; the record is counted as incomplete. The membership proof is held in the office’s registration pack with no link to a person yet, because the people the article names do not exist in the system when an office is registered.',
     regOfficePackHeading: 'Registration pack',

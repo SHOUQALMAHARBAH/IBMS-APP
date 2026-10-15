@@ -1,0 +1,14 @@
+{
+  "the-provider-grant-guard-returns-before-measuring": {
+    "_": "S1. Point the provider lookup at a type db-test holds none of, so `provider` is null — exactly the state the old `return` passed silently in. The assertion must fire and NAME why a missing provider is a finding rather than a configuration. This is the only one of the three short-pass debts a plant can reach: S2 and S3 are comments, and a comment is not executable, so what proves those is the measurement beside them rather than a test.",
+    "file": "apps/api/test/office-administrator.e2e-spec.ts",
+    "from": "    const provider = await rawPrisma.organization.findFirst({\n      where: { type: 'PROVIDER' },",
+    "to": "    const provider = await rawPrisma.organization.findFirst({\n      where: { type: 'INSURANCE_COMPANY' },"
+  },
+  "s1-the-old-silent-return-restored": {
+    "_": "Restore the PRE-FIX behaviour: the bare `return` with no assertion. Applied TOGETHER with `the-provider-grant-guard-returns-before-measuring`, this proves what the debt actually cost — the test goes GREEN while the provider's grant set was never read. That is the difference between fixing something and proving what it was worth. Apply both, expect 7 passed; apply only the type plant, expect 1 failed.",
+    "file": "apps/api/test/office-administrator.e2e-spec.ts",
+    "from": "    ).not.toBeNull();\n    if (!provider) return; // unreachable past the assertion; narrows the type for the read below",
+    "to": "    );\n    if (!provider) return;"
+  }
+}

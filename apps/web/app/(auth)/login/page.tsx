@@ -145,9 +145,25 @@ export default function LoginPage() {
             <p style={helperLinkStyle}>
               <Link href="/forgot-password">{t('authForgotLink')}</Link>
             </p>
-            <p style={helperLinkStyle}>
-              {t('authNoAccount')} <Link href="/signup">{t('authSignUpLink')}</Link>
-            </p>
+            {/*
+              * THE SIGN-UP LINK IS REMOVED, MODULE 0-ب ITEM 5, and it promised a path this product
+              * does not use.
+              *
+              * Offices are onboarded by the platform provider at `POST /provider/brokerage-offices`;
+              * the first user inside one arrives by invitation. Measured before removing: signup is
+              * NOT the bootstrap — a migration creates the default organization and the seed creates
+              * the provider, its role and the sample accounts, which `scripts/from-empty.sh` proves
+              * reaches a usable system from nothing. And signup assigns NO ROLE, so every account it
+              * ever made could authenticate and reach nothing: zero permissions, and `MfaRequiredGuard`
+              * refusing every route until TOTP is paired.
+              *
+              * THE ROUTE AND PAGE STAY, deliberately and measured: `POST /auth/signup` has 120
+              * references across the api e2e suite, which creates its users through it. Removing the
+              * route would take the suite down to fix a link. What is removed is the PROMISE on the
+              * one screen every reader starts at; `/signup` remains reachable by URL with its own
+              * four tests, and its refusal text — corrected this module — now names the provider
+              * routes rather than claiming no office can be onboarded at all.
+              */}
           </form>
         )}
       </div>
