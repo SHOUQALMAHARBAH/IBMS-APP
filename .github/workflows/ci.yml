@@ -7,7 +7,26 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # `false`, DELIBERATELY — changed 2026-10-15 after the hazard was measured rather than reasoned.
+  #
+  # `true` cancels the in-flight run when a newer commit is pushed to the same ref. On this project
+  # that is not a saving, it is the deletion of evidence: the standing rule is that EVERY commit is
+  # proved, not just the branch tip, and a cancelled run leaves the previous commit with no full
+  # verification at all. It happened twice in one session — `8ce77bf` and `244fa27` each had their
+  # only run destroyed by the next push — and the retention pair therefore reached a green tip
+  # having never itself been proved.
+  #
+  # The alternative was to keep `true` and wait for `backend` before every push. That treats the
+  # EFFECT and depends on remembering, which already failed twice; this repository's own opening
+  # principle is to prefer the form that cannot express the mistake over the form that requires you
+  # to notice it.
+  #
+  # The cost is runner compute on rapid pushes. This repository is PUBLIC, so Actions minutes are
+  # free, and GitHub's free concurrency ceiling is far above a session's worth of commits. Paying
+  # compute to keep the only proof a commit ever had is the right side of that trade.
+  #
+  # Reversible in one line if the concurrency ever becomes the problem.
+  cancel-in-progress: false
 
 jobs:
   frontend:
