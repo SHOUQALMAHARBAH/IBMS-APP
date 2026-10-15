@@ -15,8 +15,19 @@ export interface ReferenceRow {
   code: string;
   nameEn: string;
   nameAr: string;
-  /** Present only where the VALUE CARRIES A RULE — legal forms and business models. Null on the six
-   *  proper-noun lists, where the Arabic NAME is the whole answer. */
+  /**
+   * Present on EVERY row of all eight lists since migration `20261130100000_value_descriptions`, each
+   * enforced by its own `*_description_required` CHECK. It used to be legal forms and business models
+   * alone, on the reasoning that a city and a bank are satisfied by their Arabic name; the owner
+   * reversed that on 2026-10-15 with a rule pointing the other way — where a value carries NO
+   * consequence the description says so, because a person who believes his choice changes the system's
+   * behaviour and later finds it does not stops trusting every list after it.
+   *
+   * Rendered by `SelectedValueDescription` under whichever select the value was chosen in. Nullable
+   * here rather than `string` deliberately: the CHECK is the authority and this interface is
+   * hand-copied over HTTP, so a type promising more than the wire carries would be a claim the
+   * compiler cannot keep (§ the api-view drift class).
+   */
   descriptionAr: string | null;
 }
 

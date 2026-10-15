@@ -132,6 +132,23 @@ check "maker/checker CHECK constraints" 16 \
 check "zero RegulatoryAction rows — no migration invents a regulator's act" 0 \
   "$(psql_scratch 'SELECT count(*) FROM "RegulatoryAction"')"
 
+# THE ELEVEN ENUM DESCRIPTIONS (module 0-ب close, the owner's decision of 2026-10-15 — a description
+# TABLE beside each enum rather than i18n keys, because "keys nothing renders is the shape the
+# enforcement inventory exists to reject"). Pinned here because the migration INSERTs them and the
+# seed upserts them: entry 33 established that data arriving only through the seed never reaches a
+# database nobody reseeds, so a from-empty run is the only place both halves are observed together.
+# A count, not a set — the SET is pinned against the GENERATED Prisma enums by
+# `enum-descriptions.spec.ts`, which is the only place that can see a member added without a line.
+check "enum member descriptions across the four new enums" 11 \
+  "$(psql_scratch 'SELECT (SELECT count(*) FROM "BrokerageKindDescription") + (SELECT count(*) FROM "RegulatoryActionKindDescription") + (SELECT count(*) FROM "RegulatoryActionBasisDescription") + (SELECT count(*) FROM "IntegrationMethodDescription")')"
+# EIGHT, not two. `descriptionAr` was required on `LegalForm` and `BusinessModel` alone until the
+# owner reversed that: where a value carries NO consequence the description must SAY so, because a
+# person who believes his choice changes the system's behaviour and later finds it does not stops
+# trusting every list after it. Each of the eight lists now carries its own CHECK, and a migration
+# that silently dropped one would leave a list able to take an undescribed row through a screen.
+check "every reference list requires an Arabic description" 8 \
+  "$(psql_scratch "SELECT count(*) FROM pg_constraint WHERE conname LIKE '%_description_required'")"
+
 if [ "$fail" != "0" ]; then
   echo
   echo "FROM-EMPTY: FAILED — the shape a database reaches from nothing is not the shape of dev."

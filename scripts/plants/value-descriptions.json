@@ -1,0 +1,22 @@
+{
+  "description-ignores-the-selection": {
+    "file": "apps/web/components/ui/SelectedValueDescription.tsx",
+    "from": "  const description = rows.find((row) => row.id === selectedId)?.descriptionAr;",
+    "to": "  const description = rows[0]?.descriptionAr;"
+  },
+  "description-renders-nothing": {
+    "file": "apps/web/components/ui/SelectedValueDescription.tsx",
+    "from": "  if (!description) return null;",
+    "to": "  if (!description || true) return null;"
+  },
+  "linked-record-editable-on-the-server": {
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "    if (!officeMayEditCompanyFacts(row)) {",
+    "to": "    if (false) {"
+  },
+  "company-record-leaks-an-office-rating": {
+    "file": "apps/api/src/modules/company/company-record.service.ts",
+    "from": "        registeredAt: company.createdAt.toISOString(),",
+    "to": "        registeredAt: company.createdAt.toISOString(),\n        financialStrengthRating: 'A-',"
+  }
+}

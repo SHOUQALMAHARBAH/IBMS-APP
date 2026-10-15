@@ -70,11 +70,20 @@ export class ReferenceDataService {
         nameEn: r.nameEn,
         nameAr: r.nameAr,
         /*
-         * The Arabic description, where the VALUE CARRIES A RULE. Present on `LegalForm` and
-         * `BusinessModel` and absent on the other six — item (c)'s decision, in the owner's words:
-         * a city, a bank and a country are satisfied by their Arabic NAME, and a description there
-         * would only restate it, which trains people to stop reading descriptions at exactly the
-         * point where one matters.
+         * The Arabic description. PRESENT ON ALL EIGHT since migration
+         * `20261130100000_value_descriptions`, which gave each list its own
+         * `*_description_required` CHECK.
+         *
+         * It was legal forms and business models alone under item (c), in the owner's words: a city,
+         * a bank and a country are satisfied by their Arabic NAME. She reversed that on 2026-10-15
+         * with a rule pointing the other way — where a value carries NO consequence the description
+         * SAYS so, because a person who believes his choice changes the system's behaviour and later
+         * finds it does not stops trusting every list after it. So three of the eight now carry a
+         * disclaiming line rather than no line, which `reference-tables.spec.ts` enforces.
+         *
+         * The `in` test stays: it is what makes this view total over eight models whose only shared
+         * shape is structural, and removing it would make a list added later fail at runtime rather
+         * than render without a description.
          */
         descriptionAr: 'descriptionAr' in r ? (r.descriptionAr ?? null) : null,
       }));

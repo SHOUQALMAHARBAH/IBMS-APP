@@ -17,6 +17,7 @@ import {
   type ReferenceRow,
   type RegisteredInsuranceCompany,
 } from '../../../lib/provider/office-registration-api';
+import { SelectedValueDescription } from '../../../components/ui/SelectedValueDescription';
 
 /**
  * MODULE 0-ب ITEM (e) — REGISTERING AN INSURANCE COMPANY, sectioned by the dictionary's own groups.
@@ -179,6 +180,8 @@ export default function RegisterInsuranceCompanyPage() {
           </option>
         ))}
       </select>
+      {/* See SelectedValueDescription: the owner's reason for these lines decides the placement. */}
+      <SelectedValueDescription rows={rows} selectedId={form[key]} field={key} />
     </label>
   );
 

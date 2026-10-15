@@ -46,6 +46,12 @@ const REFERENCE_TABLES: [
   ["businessModel", BUSINESS_MODELS],
 ];
 import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
+import {
+  BROKERAGE_KIND_DESCRIPTIONS,
+  INTEGRATION_METHOD_DESCRIPTIONS,
+  REGULATORY_ACTION_BASIS_DESCRIPTIONS,
+  REGULATORY_ACTION_KIND_DESCRIPTIONS,
+} from "./seed-data/enum-descriptions";
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
 import { validatePasswordPolicy } from "../src/password-policy";
 import { SAMPLE_INSURERS } from "./seed-data/insurers";
@@ -1096,6 +1102,40 @@ async function main() {
     }
     console.log(`Seeded ${rows.length} ${table} reference row(s).`);
   }
+
+  /*
+   * THE ELEVEN ENUM DESCRIPTIONS. Upserted rather than inserted, and that is the point of seeding
+   * them at all: migration `20261130100000` already INSERTed these rows, because register entry 33
+   * established that data arriving only through the seed never reaches a database nobody reseeds.
+   * But an applied migration cannot be edited — its checksum is stored and `db:checksums` fails on
+   * drift — so `seed-data/enum-descriptions.ts` is the home a correction is made in, and this loop
+   * is what carries that correction to a database that already has the row.
+   *
+   * `member` is the ENUM TYPE in each table, so a typo here is refused by Postgres rather than
+   * stored as a description nothing reads.
+   */
+  const ENUM_DESCRIPTIONS = [
+    ["brokerageKindDescription", BROKERAGE_KIND_DESCRIPTIONS],
+    ["regulatoryActionKindDescription", REGULATORY_ACTION_KIND_DESCRIPTIONS],
+    ["regulatoryActionBasisDescription", REGULATORY_ACTION_BASIS_DESCRIPTIONS],
+    ["integrationMethodDescription", INTEGRATION_METHOD_DESCRIPTIONS],
+  ] as const;
+
+  let enumDescriptionCount = 0;
+  for (const [model, rows] of ENUM_DESCRIPTIONS) {
+    for (const row of rows) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any)[model].upsert({
+        where: { member: row.member },
+        update: { descriptionAr: row.descriptionAr },
+        create: { member: row.member, descriptionAr: row.descriptionAr },
+      });
+      enumDescriptionCount += 1;
+    }
+  }
+  console.log(
+    `Seeded ${enumDescriptionCount} enum member description(s) across ${ENUM_DESCRIPTIONS.length} enums.`,
+  );
 
   if (SEED_SAMPLE_DATA) {
     // Module 0 item (j)'s gap closure. BEFORE the sample users, so a future provider user has an

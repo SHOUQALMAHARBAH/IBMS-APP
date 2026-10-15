@@ -45,21 +45,33 @@ export interface ReferenceSeed {
   nameEn: string;
   nameAr: string;
   /**
-   * Arabic explanation of what this value MEANS — required only where the value carries a RULE the
-   * name does not convey, and absent everywhere else.
+   * Arabic explanation of what this value MEANS. REQUIRED ON EVERY ROW OF ALL EIGHT since migration
+   * `20261130100000_value_descriptions` — each list carries its own `*_description_required` CHECK,
+   * enforced by the database rather than by this type, because a convention is satisfied by the seed
+   * and then broken by the first row added through a screen.
    *
-   * The owner's reasoning, and it is why this is optional rather than on all eight: "a city, a bank
-   * and a country are satisfied by their Arabic name — the name IS the Arabic, and a description
-   * there would only restate it, which trains people to stop reading descriptions at exactly the
-   * point where one matters."
+   * ## BOTH OF THE OWNER'S POSITIONS, BECAUSE SHE REVERSED HERSELF AND BOTH ARGUMENTS ARE GOOD
    *
-   * `LegalForm` and `BusinessModel` carry one on every row, enforced by a CHECK rather than by this
-   * type — a convention is satisfied by the seed and then broken by the first row added through a
-   * screen.
+   * Item (c), requiring it on `LegalForm` and `BusinessModel` alone: "a city, a bank and a country
+   * are satisfied by their Arabic name — the name IS the Arabic, and a description there would only
+   * restate it, which trains people to stop reading descriptions at exactly the point where one
+   * matters."
    *
-   * MEASURED, because the owner named four rule-bearing vocabularies and only TWO are tables:
-   * `BrokerageKind` and `IntegrationMethod` are ENUMS with no row to hang this on, and their Arabic
-   * lives in `apps/web/lib/i18n/translations/enums.ts`.
+   * 2026-10-15, requiring it everywhere: "where a value carries no consequence, the description says
+   * so. A person who believes his choice changes the system's behaviour, and later finds it does not,
+   * stops trusting every list after it."
+   *
+   * The second does not contradict the first so much as answer it — a restatement IS the failure she
+   * named, and a DISCLAIMER is not a restatement. `reference-tables.spec.ts` holds the split that
+   * follows: five lists explain a rule, three must contain the clause «لا يترتّب».
+   *
+   * ## THE FOUR ENUMS ARE NOT HERE, AND THE FILE THIS ONCE NAMED NEVER HELD THEM
+   *
+   * This comment used to say their Arabic "lives in `apps/web/lib/i18n/translations/enums.ts`".
+   * MEASURED FALSE — that file mentions neither `BrokerageKind` nor `IntegrationMethod`, and never
+   * did. The owner's decision of 2026-10-15 gave each of the four a `<Enum>Description` table whose
+   * `member` column IS the enum type, over i18n keys, on the ground that "keys nothing renders is the
+   * shape the enforcement inventory exists to reject". The text is in `seed-data/enum-descriptions.ts`.
    */
   descriptionAr?: string;
 }

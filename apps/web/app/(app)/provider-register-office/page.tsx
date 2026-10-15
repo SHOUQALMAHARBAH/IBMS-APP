@@ -8,6 +8,7 @@ import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { SelectedValueDescription } from '../../../components/ui/SelectedValueDescription';
 import {
   getReferenceData,
   listStandardInsuranceLines,
@@ -207,6 +208,9 @@ export default function RegisterBrokerageOfficePage() {
           </option>
         ))}
       </select>
+      {/* The chosen value's own Arabic description. See the component for why it is here and not
+          beside the label: the belief that a choice matters forms when the choice is made. */}
+      <SelectedValueDescription rows={rows} selectedId={form[key]} field={key} />
     </label>
   );
 

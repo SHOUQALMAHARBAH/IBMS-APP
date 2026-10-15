@@ -16,6 +16,7 @@ import {
   type InsurerRelationshipFields,
   type InsurerStatusImpact,
 } from '../../repositories/insurer.repository';
+import { officeMayEditCompanyFacts } from '../../repositories/insurer-identity';
 import { pageWindow, type Paginated } from '../../common/pagination';
 import { PICKER_MAX_RESULTS } from '../../common/picker-search.config';
 import type { SearchInsurersDto } from '../../common/picker-search.dto';
@@ -246,6 +247,48 @@ export class InsurerService {
       throw new UnprocessableEntityException(
         "This insurer's name comes from the shared catalogue and cannot be changed here. Only a company this office registered itself can be renamed.",
       );
+    }
+
+    /*
+     * REGISTER ENTRY 36 — THE LINK IS NOW A SERVER BOUNDARY, NOT A SCREEN ONE.
+     *
+     * `officeMayEditCompanyFacts` was projected onto the view and read by the screen, which greyed the
+     * company fields out. The server honoured a direct `PATCH` anyway, so the read-only was one layer.
+     * A hidden control the API still honours is not a boundary — the rule item (j) established with
+     * three layers for a PLATFORM permission (the matrix hides the code, `setPermissions` refuses it,
+     * the route checks the organization type), and this had one.
+     *
+     * THE SAME FUNCTION THE VIEW CALLS, deliberately. A second predicate spelling the condition again
+     * would be a second answer to "may this office type over a registered company's details", and the
+     * copy is the one that drifts — a screen saying read-only beside a server that permits it is the
+     * defect being fixed, and its mirror image is just as wrong.
+     *
+     * THE TOUCHED KEYS ARE DERIVED FROM `companyFrom`, NOT LISTED. A company fact added to the DTO
+     * later is covered the moment it appears there, where a hand-kept list here would admit it
+     * silently. The NAME is added explicitly because it is the company's own and is not a member of
+     * `InsurerCompanyFields` — it has its own column.
+     *
+     * THE RELATIONSHIP FIELDS STAY EDITABLE, which is the point of the link rather than a concession:
+     * what this office pays, which lines it places and whom it calls are facts about the OFFICE's
+     * relationship, and the registered company answers for none of them.
+     */
+    if (!officeMayEditCompanyFacts(row)) {
+      const touched = [
+        ...Object.keys(this.companyFrom(dto)),
+        ...(dto.legalName === undefined ? [] : ['legalName']),
+        ...(dto.legalNameAr === undefined ? [] : ['legalNameAr']),
+      ].sort();
+      if (touched.length > 0) {
+        /*
+         * The refusal NAMES the fields and the way out. "Forbidden" with no field list sends somebody
+         * removing one key at a time, and a 403 would be wrong twice over: the caller holds the
+         * permission, and the record is theirs — what has changed is who answers for these particular
+         * columns.
+         */
+        throw new UnprocessableEntityException(
+          `This insurer's record is linked to a registered insurance company, so the company's own details are answered by that company and cannot be edited here: ${touched.join(', ')}. The office's relationship terms are still editable. To take these details back under this office's control, unlink the record first.`,
+        );
+      }
     }
 
     const patch: InsurerCompanyFields &

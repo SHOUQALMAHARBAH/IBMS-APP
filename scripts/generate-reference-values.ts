@@ -169,7 +169,7 @@ async function main(): Promise<void> {
   out(
     'Measured against `origin/main`: 66 enums there, 70 here. The brief said two; these are the four,',
   );
-  out('and all eleven members need a description.');
+  out('and each has a description table beside it — `<Enum>Description`, keyed by the enum TYPE.');
   out();
   for (const e of ENUMS) {
     const rows = await prisma.$queryRawUnsafe<{ label: string }[]>(
@@ -184,10 +184,26 @@ async function main(): Promise<void> {
     out();
     out('| member | Arabic description |');
     out('|---|---|');
-    // Every enum member is owed: an enum has no `descriptionAr` column to read, which is the
-    // whole reason the two halves of this export are counted separately.
-    owed += rows.length;
-    for (const r of rows) out(`| \`${r.label}\` | **— OWED —** |`);
+    /*
+     * READ FROM THE DESCRIPTION TABLE BESIDE THE ENUM, not hardcoded as owed.
+     *
+     * Until 2026-10-15 every member printed `— OWED —` unconditionally, because an enum had no
+     * column to hang a description on. The owner's decision gave each of these four a description
+     * table whose `member` column IS the enum type, so a description for a member that does not
+     * exist is unrepresentable. This reads those tables, which means the owed figure below falls to
+     * zero on its own as the rows land rather than needing the script edited.
+     */
+    const described = await prisma.$queryRawUnsafe<
+      { member: string; descriptionAr: string }[]
+    >(
+      `SELECT "member"::text AS member, "descriptionAr" FROM "${e.name}Description"`,
+    );
+    const byMember = new Map(described.map((d) => [d.member, d.descriptionAr]));
+    for (const r of rows) {
+      const desc = byMember.get(r.label);
+      if (!desc) owed += 1;
+      out(`| \`${r.label}\` | ${desc ?? '**— OWED —**'} |`);
+    }
     out();
   }
 

@@ -51,7 +51,7 @@ const REFERENCE = {
       code: 'JO',
       nameEn: 'Jordan',
       nameAr: 'الأردن',
-      descriptionAr: null,
+      descriptionAr: 'الدولة التي يقع فيها المكتب. لا يترتّب على اختيارها أيُّ فحص.',
     },
   ],
   cities: [
@@ -60,7 +60,7 @@ const REFERENCE = {
       code: 'AMMAN',
       nameEn: 'Amman',
       nameAr: 'عمّان',
-      descriptionAr: null,
+      descriptionAr: 'المدينة. لا يترتّب على اختيارها أيُّ فحص، ولا تُطابَق مع الدولة.',
     },
   ],
   banks: [
@@ -106,6 +106,18 @@ const REFERENCE = {
       nameEn: 'Sole establishment',
       nameAr: 'مؤسسة فردية',
       descriptionAr: 'الشكل الذي تقتضيه م١٠/أ/١/أ للوسيط الطبيعي.',
+    },
+    /*
+     * A SECOND row, and the test below is why it exists: with one option, an implementation
+     * rendering `rows[0].descriptionAr` instead of the SELECTED row's passes every assertion. Two
+     * rows with different descriptions is the smallest fixture that can tell those apart.
+     */
+    {
+      id: 'lf-2',
+      code: 'LLC',
+      nameEn: 'Limited liability company',
+      nameAr: 'شركة ذات مسؤولية محدودة',
+      descriptionAr: 'شكلٌ اعتباري، ولا تقتضيه م١٠/أ/١/أ إلا للوسيط الاعتباري.',
     },
   ],
   businessModels: [
@@ -232,6 +244,65 @@ test.describe('registering a brokerage office', () => {
         page.getByRole('group', { name: section, exact: true }),
       ).toBeVisible();
     }
+  });
+
+  test("explains the value CHOSEN — and the explanation follows the choice", async ({
+    page,
+  }) => {
+    /*
+     * THE FORTY-FOUR DESCRIPTIONS THE OWNER WROTE REACHED NO SCREEN UNTIL THIS RENDERED THEM.
+     *
+     * Measured at module 0-ب's close: the api view sent `descriptionAr`, the web client typed it, and
+     * the only occurrences of the field anywhere in `apps/web` were this file's own fixtures and that
+     * type declaration. No screen read it. That is the shape the owner refused when she chose
+     * description TABLES over i18n keys for the eleven enum members, and it was already true of the
+     * forty-four she had just written for the reference tables.
+     *
+     * Her reason for them existing decides what this test asserts: "a person who believes his choice
+     * changes the system's behaviour, and later finds it does not, stops trusting every list after
+     * it." So the description must be about the value actually chosen — the third assertion is the
+     * load-bearing one, because an implementation rendering `rows[0].descriptionAr` satisfies the
+     * first two and is wrong for every option but the first.
+     */
+    await page.goto('/provider-register-office');
+    const legalForm = page.locator('[data-value-description="legalFormId"]');
+
+    // 1. NOTHING before a choice. A description with no selection would be describing a value the
+    //    person has not considered, which is the "stops reading descriptions" failure one step early.
+    await expect(
+      page.locator('[data-field="legalFormId"]'),
+      'anchor: the select is on the page, so the absence below is a real absence',
+    ).toBeVisible();
+    await expect(legalForm).toHaveCount(0);
+
+    /*
+     * 2 and 3. EACH NEEDLE IS UNIQUE TO ONE ROW, which took two corrections worth keeping.
+     *
+     * The first version asserted «م١٠/أ/١/أ» for lf-1 and `not.toContainText` of the same article for
+     * lf-2 — but BOTH fixture descriptions cite that article, so the negative could never hold however
+     * right the code was. And the second needle was «الوسيط الاعتباري», which does not occur: the
+     * rendered text reads «للوسيط», where the preposition assimilates the article, so the bare
+     * «الوسيط» is absent from a string that plainly says it. An Arabic assertion has to be checked
+     * against the rendered bytes, not composed from the words one expects to be there.
+     *
+     * So: «الطبيعي» occurs in lf-1's line alone and «اعتباري» in lf-2's alone.
+     */
+    await page.locator('[data-field="legalFormId"]').selectOption('lf-1');
+    await expect(legalForm).toBeVisible();
+    await expect(legalForm).toContainText('الطبيعي');
+
+    // IT FOLLOWS THE SELECTION — the new sentence is there AND the old one is gone rather than
+    // merely joined, which is what separates this from an append.
+    await page.locator('[data-field="legalFormId"]').selectOption('lf-2');
+    await expect(legalForm).toContainText('اعتباري');
+    await expect(legalForm).not.toContainText('الطبيعي');
+
+    // 4. A LIST THAT CARRIES NO CONSEQUENCE SAYS SO, and it reaches the screen too — this is the half
+    //    the owner reversed her own earlier decision to add, so it is the half most worth pinning.
+    await page.locator('[data-field="cityId"]').selectOption('city-1');
+    await expect(
+      page.locator('[data-value-description="cityId"]'),
+    ).toContainText('لا يترتّب');
   });
 
   test('STATES the three things nobody enters, rather than omitting them', async ({

@@ -5719,11 +5719,13 @@ model Country {
   code          String         @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime       @default(now())
@@ -5735,11 +5737,13 @@ model City {
   code          String         @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime       @default(now())
@@ -5751,11 +5755,13 @@ model Bank {
   code          String         @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime       @default(now())
@@ -5768,11 +5774,13 @@ model Currency {
   code          String         @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime       @default(now())
@@ -5784,11 +5792,13 @@ model LicensingAuthority {
   code          String         @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime       @default(now())
@@ -5800,11 +5810,13 @@ model RatingAgency {
   code          String   @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime @default(now())
@@ -5817,11 +5829,13 @@ model LegalForm {
   code          String         @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime       @default(now())
@@ -5837,11 +5851,13 @@ model BusinessModel {
   code          String         @unique
   nameEn        String
   nameAr        String
-  /// Arabic explanation of what this value MEANS, required only where the value carries a
-  /// rule the name does not convey. Nullable here and on all eight; the requirement lives in a
-  /// CHECK on `LegalForm` and `BusinessModel` alone — a city, a bank and a country are
-  /// satisfied by their Arabic name, and a description restating it trains people to stop
-  /// reading descriptions at exactly the point where one matters.
+  /// Arabic explanation of what this value MEANS. REQUIRED ON ALL EIGHT since migration
+  /// `20261130100000`, each by its own `*_description_required` CHECK — it used to be required on
+  /// `LegalForm` and `BusinessModel` alone, and the owner reversed that on 2026-10-15. Both of her
+  /// arguments, and the split the reversal created (five lists explain a rule; three must say
+  /// plainly that none follows), are recorded and enforced in `seed-data/reference-tables.spec.ts`.
+  /// Read that before relaxing any of the eight CHECKs. Nullable in Prisma on purpose: the
+  /// obligation is a database CHECK, not a column modifier, so a row can exist mid-correction.
   descriptionAr String?
   displayOrder  Int
   createdAt     DateTime       @default(now())
@@ -5885,6 +5901,53 @@ enum IntegrationMethod {
   PORTAL
   EMAIL
   MANUAL
+}
+
+/// MODULE 0-ب CLOSE — AN ARABIC DESCRIPTION FOR EVERY ENUM MEMBER, in a table beside the enum.
+///
+/// ## WHY A TABLE AND NOT TRANSLATION KEYS
+///
+/// The owner's decision, and the register's own reasoning for it: twenty-two i18n keys that nothing
+/// renders is the shape `permission-enforcement.inventory.spec.ts` exists to refuse, and she would
+/// rather pay once than reopen this two modules from now. The three rejected homes are recorded in
+/// deferred-register entry 39.
+///
+/// ## BESIDE THE ENUM, NEVER INSTEAD OF IT
+///
+/// The values stay CLOSED and code keeps branching on them — item (c)'s rule is "an enum when the
+/// value is closed and code may branch on it; a provider-maintained table when rows are added over
+/// time", and nothing is added to these four. So this is not the enum becoming a reference table; it
+/// is prose hung off a closed set.
+///
+/// ## `member` IS THE ENUM TYPE, WHICH IS THE WHOLE POINT
+///
+/// Not a `String`. A string column would admit `DIRECTT` — a row describing a member that does not
+/// exist, readable by nothing and findable only by a guard somebody has to write. Typing the column
+/// as the enum makes that unrepresentable, and leaves exactly ONE property for a guard to check:
+/// COMPLETENESS, that every member has a row. A database cannot express "all members present", so
+/// that half lives in `enum-descriptions.spec.ts` and in the migration's own assertion.
+///
+/// No `organizationId` and no RLS, measured against the eight reference tables which carry neither:
+/// what a value MEANS is a general fact, identical for every office, and filtering it per tenant
+/// would mean one office could be shown a different meaning for `SANCTION` than another.
+model BrokerageKindDescription {
+  member        BrokerageKind @id
+  descriptionAr String
+}
+
+model RegulatoryActionKindDescription {
+  member        RegulatoryActionKind @id
+  descriptionAr String
+}
+
+model RegulatoryActionBasisDescription {
+  member        RegulatoryActionBasis @id
+  descriptionAr String
+}
+
+model IntegrationMethodDescription {
+  member        IntegrationMethod @id
+  descriptionAr String
 }
 
 model OfficeInsuranceLine {

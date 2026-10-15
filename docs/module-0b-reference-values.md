@@ -111,7 +111,7 @@ the source can disagree with it.
 # The enums this module added — FOUR, not two
 
 Measured against `origin/main`: 66 enums there, 70 here. The brief said two; these are the four,
-and all eleven members need a description.
+and each has a description table beside it — `<Enum>Description`, keyed by the enum TYPE.
 
 ## BrokerageKind — نوع الوساطة — 2 member(s)
 
@@ -119,8 +119,8 @@ and all eleven members need a description.
 
 | member | Arabic description |
 |---|---|
-| `DIRECT` | **— OWED —** |
-| `REINSURANCE` | **— OWED —** |
+| `DIRECT` | وساطةٌ بين العميل وشركة التأمين، وهي عملُ مكاتب الوساطة في هذا النظام. بيانٌ يُسجَّل ولا يقرأه أيُّ فحصٍ أو حارس. |
+| `REINSURANCE` | وساطةٌ بين شركات التأمين وشركات إعادة التأمين. بيانٌ يُسجَّل ولا يقرأه أيُّ فحصٍ أو حارس. ولا يحمل هذا النظامُ نصّاً تنظيميّاً لوساطة إعادة التأمين، فلا يُعفي مَن يختاره من شيءٍ ولا يُلزِمه بشيء. |
 
 ## RegulatoryActionKind — نوع الفعل الرقابي — 3 member(s)
 
@@ -128,9 +128,9 @@ and all eleven members need a description.
 
 | member | Arabic description |
 |---|---|
-| `SUSPENSION` | **— OWED —** |
-| `CANCELLATION` | **— OWED —** |
-| `REINSTATEMENT` | **— OWED —** |
+| `SUSPENSION` | وقفُ الرخصة بفعلٍ من البنك المركزي. يُسجَّل بتاريخه ومستنده ولا يُعدَّل ولا يُحذَف بعد تسجيله، وحالةُ الرخصة تُستخرَج من هذه الأفعال ولا تُكتَب يداً. |
+| `CANCELLATION` | إلغاءُ الرخصة بفعلٍ من البنك المركزي. يُسجَّل بتاريخه ومستنده، ويبقى في السجل بعد أيِّ فعلٍ لاحق، لأنّ تاريخَ المكتب يُقرأ كاملاً لا آخرُه فقط. |
+| `REINSTATEMENT` | إعادةُ العمل بالرخصة بعد وقف. يُسجَّل بتاريخه ومستنده، ولا يمحو الوقفَ الذي سبقه. |
 
 ## RegulatoryActionBasis — سند الفعل — 2 member(s)
 
@@ -138,8 +138,8 @@ and all eleven members need a description.
 
 | member | Arabic description |
 |---|---|
-| `BROKER_REQUEST` | **— OWED —** |
-| `SANCTION` | **— OWED —** |
+| `BROKER_REQUEST` | الوقفُ جاء بطلبٍ من المكتب نفسِه وبموافقةٍ مسبقةٍ من البنك المركزي، وفق المادة (١٤/أ) من تعليمات رقم (٩) لسنة ٢٠٢٦. وإن امتدّ الوقفُ أكثرَ من سنتين تُعتبر الرخصةُ ملغاةً حكماً بمقتضى المادة (١٤/ج). |
+| `SANCTION` | الوقفُ جاء جزاءً من البنك المركزي، وفق المادة (٢١/ب). وسريانُ مدّة السنتين في المادة (١٤/ج) على هذه الحالة غيرُ محسومٍ في النصّ، والنظامُ لا يُقدِّره ولا يحتسبه. |
 
 ## IntegrationMethod — طريقة التكامل — 4 member(s)
 
@@ -147,10 +147,10 @@ and all eleven members need a description.
 
 | member | Arabic description |
 |---|---|
-| `API` | **— OWED —** |
-| `PORTAL` | **— OWED —** |
-| `EMAIL` | **— OWED —** |
-| `MANUAL` | **— OWED —** |
+| `API` | التبادلُ يجري آليّاً بين النظامين عبر وصلةٍ برمجية، ويلزم تسجيلُ عنوان الوصلة. ولا تُحفَظ في هذه السجلات أيُّ كلمةِ مرورٍ أو مفتاحِ دخول. |
+| `PORTAL` | العملُ يجري على بوّابة الشركة الإلكترونية، يدخل إليها موظفُ المكتب بنفسه. ولا يحفظ النظامُ بياناتِ دخولِ البوّابة. |
+| `EMAIL` | التبادلُ يجري بالبريد الإلكتروني مع الشركة، ويُسجَّل العنوانُ المعتمَد لذلك. |
+| `MANUAL` | لا ربطَ إلكترونيّاً مع الشركة: التبادلُ ورقيٌّ أو هاتفيٌّ أو تسليمٌ باليد، ويُسجَّل ما يجري كما يجري. |
 
 ---
 
@@ -161,7 +161,7 @@ and all eleven members need a description.
 | reference-table rows | **44** |
 | enum members | **11** |
 | total values in scope | **55** |
-| **of those, still OWED an Arabic description** | **11** |
+| **of those, still OWED an Arabic description** | **0** |
 
 The brief estimated "roughly forty". The measured figure is above, and it is higher because the
 module added four enums rather than two. Rows that already carry a `descriptionAr` are shown

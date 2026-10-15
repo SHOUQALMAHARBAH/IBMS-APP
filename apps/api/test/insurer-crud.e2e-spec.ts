@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { ensureRole, prisma } from './tenant-prisma';
+import { ensureRole, prisma, rawPrisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 /**
@@ -52,6 +52,21 @@ const FIXTURE_PREFIX = `CRUD Fixture ${tag}`;
 const MASTER_PREFIX = `CRUD Fixture Master ${tag}`;
 
 async function removeFixtures(): Promise<void> {
+  /*
+   * THE COMPANY FIXTURE GOES FIRST, and it is deleted rather than left because an `Organization` row
+   * is a TENANT. It is safe to delete here only because nothing in this file ever signs into it:
+   * authenticating writes append-only `AuditLogEntry` rows whose `organizationId` FK is
+   * `ON DELETE RESTRICT` behind a trigger that refuses DELETE outright, so one login would make the
+   * row permanent and this suite would accumulate a company per run. Two brokerage offices were
+   * stranded proving exactly that in item (d).
+   *
+   * `rawPrisma`, because `Organization` carries no `organizationId` and is therefore not in the
+   * tenant-scoped set at all — the exported `prisma` cannot address it.
+   */
+  await rawPrisma.organization.deleteMany({
+    where: { type: 'INSURANCE_COMPANY', subdomain: { startsWith: 'crud-co-' } },
+  });
+
   const insurers = await prisma.insurer.findMany({
     where: {
       OR: [
@@ -1110,4 +1125,114 @@ describe('decision 93 — clearing a rating and its date', () => {
       .set(bearer(outsider.accessToken))
       .expect(403);
   }, 120_000);
+});
+
+describe('register entry 36 — a linked record is read-only ON THE SERVER, not only on the screen', () => {
+  /*
+   * WHAT WAS WRONG, AND WHY NO TEST COULD SEE IT.
+   *
+   * Linking an office's `Insurer` record to a registered insurance company sets `insuranceCompanyId`,
+   * and `officeMayEditCompanyFacts` then returns false — but that value was projected onto the VIEW
+   * and consumed by the screen alone. `PATCH /insurers/:id` refused a RENAME of a catalogue insurer
+   * and applied the rating rule, and said nothing about the company columns. So the office's copy was
+   * read-only in the browser while the server still honoured a direct `PATCH`: one layer, where item
+   * (j) established three for a boundary that matters.
+   *
+   * It survived because the link route had NO api e2e of any kind — measured at the module's close,
+   * `POST /insurers/:id/company-link` and its DELETE were addressed by no test in this suite. A
+   * greyed-out field is not evidence about a server.
+   *
+   * THE THIRD TEST IS THE ONE THAT MAKES THIS A BOUNDARY RATHER THAN A LOCK. A refusal that also
+   * refused the relationship terms would be a worse defect than the one being fixed: what this office
+   * pays and which lines it places are facts about the OFFICE, the registered company answers for
+   * none of them, and an office unable to record its own commission terms because it linked a company
+   * would have to unlink to do business.
+   */
+  let company: { id: string };
+  let insurerId: string;
+
+  beforeAll(async () => {
+    company = await rawPrisma.organization.create({
+      data: {
+        legalName: `${FIXTURE_PREFIX} Company`,
+        legalNameAr: 'شركة تأمين للاختبار',
+        type: 'INSURANCE_COMPANY',
+        // NULL exactly when the organization is an insurance company —
+        // `Organization_broker_kind_matches_type` refuses a value here in both directions.
+        subdomain: `crud-co-${tag}`,
+      },
+      select: { id: true },
+    });
+
+    const registered = await register({
+      legalName: `${FIXTURE_PREFIX} Linkable`,
+      legalNameAr: 'شركة قابلة للربط',
+    }).expect(201);
+    insurerId = (registered.body as InsurerView).id;
+
+    await request(app!.getHttpServer())
+      .post(`/insurers/${insurerId}/company-link`)
+      .set(bearer(admin.accessToken))
+      .send({ insuranceCompanyId: company.id })
+      .expect(201);
+  }, 300_000);
+
+  it('REFUSES a company fact on a linked record, naming the field and the way out', async () => {
+    const refused = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ companyPhone: '+962 6 111 1111' })
+      .expect(422);
+
+    const message = JSON.stringify(refused.body);
+    // DECISION 90: the field is NAMED. "Forbidden" with no field list sends somebody removing one
+    // key at a time until the request happens to succeed.
+    expect(message).toContain('companyPhone');
+    expect(message).toContain('unlink');
+    expect(message).not.toMatch(/violates (check|unique) constraint/i);
+
+    // AND THE WRITE DID NOT HAPPEN. A 422 proves what the route answered, not what it stored — this
+    // is the half that would still pass if the refusal were thrown after the update.
+    const after = await prisma.insurer.findUniqueOrThrow({
+      where: { id: insurerId },
+      select: { companyPhone: true },
+    });
+    expect(after.companyPhone).not.toBe('+962 6 111 1111');
+  }, 300_000);
+
+  it('refuses a RENAME of a linked record too — the name is the company own', async () => {
+    const refused = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ legalNameAr: 'اسم جديد' })
+      .expect(422);
+    // `legalNameAr` is not a member of `InsurerCompanyFields` — it has its own column — so it is the
+    // one key the derived-from-`companyFrom` list cannot cover by itself.
+    expect(JSON.stringify(refused.body)).toContain('legalNameAr');
+  }, 300_000);
+
+  it('still accepts the OFFICE relationship terms, which the company does not answer for', async () => {
+    const saved = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ rfqContactEmail: `ours-${tag}@example.test` })
+      .expect(200);
+    expect((saved.body as InsurerView).rfqContactEmail).toBe(
+      `ours-${tag}@example.test`,
+    );
+  }, 300_000);
+
+  it('UNLINKING gives the columns back — the refusal is the link, not a permanent lock', async () => {
+    await request(app!.getHttpServer())
+      .delete(`/insurers/${insurerId}/company-link`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+
+    const saved = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ companyPhone: '+962 6 222 2222' })
+      .expect(200);
+    expect((saved.body as InsurerView).companyPhone).toBe('+962 6 222 2222');
+  }, 300_000);
 });
