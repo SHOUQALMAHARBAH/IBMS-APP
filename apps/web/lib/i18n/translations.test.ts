@@ -16,6 +16,7 @@ import { FINANCE } from './translations/finance';
 import { COMPLIANCE_SCREENING } from './translations/compliance-screening';
 import { COMPLIANCE_RISK } from './translations/compliance-risk';
 import { PROVIDER } from './translations/provider';
+import { COMPANY } from './translations/company';
 import { DASHBOARDS } from './translations/dashboards';
 import { OPERATIONS } from './translations/operations';
 import { DETAIL_PAGES } from './translations/detail-pages';
@@ -73,6 +74,7 @@ describe('the merged dictionary', () => {
     'compliance-screening.ts': COMPLIANCE_SCREENING,
     'compliance-risk.ts': COMPLIANCE_RISK,
     'provider.ts': PROVIDER,
+    'company.ts': COMPANY,
     'dashboards.ts': DASHBOARDS,
     'operations.ts': OPERATIONS,
     'detail-pages.ts': DETAIL_PAGES,

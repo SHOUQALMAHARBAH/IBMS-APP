@@ -90,6 +90,22 @@ describe("permission grid — every code is independent and traceable", () => {
          * a standing ability to add accounts to a live one.
          */
         "provider.office.administrator.invite",
+        /*
+         * Module 0-ب item (f), THE COMPANY HALF — the same act for a registered insurance company,
+         * and a SEPARATE code rather than a widening of the one above.
+         *
+         * Reusing the office code for a company would make the name promise "office" while the act
+         * reached a company — the defect class this module measured in `aml.monitor` (gates an alert
+         * queue, promises monitored transactions) and `sanctions-pep.screen` (promises PEP screening
+         * against two SANCTIONS lists and no PEP source). A rename touches every role that holds a
+         * code in every office, so it is the last option considered, never the first.
+         *
+         * Narrower than its name in the same two ways: the service refuses a non-company target and
+         * refuses once the company holds ANY account. And what it hands over is SIX codes — self
+         * administration only — because an insurance company has nothing else to do in this product
+         * yet, which was raised as a stop condition before it was built.
+         */
+        "provider.insurance-company.administrator.invite",
       ].sort(),
     );
   });

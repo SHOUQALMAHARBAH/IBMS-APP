@@ -70,6 +70,7 @@ const meSchema = {
     idleTimeoutMinutes: { type: 'number' as const },
     hardLogoutAfterIdleMinutes: { type: 'number' as const },
     stepUpFresh: { type: 'boolean' as const },
+    organizationType: { type: 'string' as const },
   },
   required: [
     'id',
