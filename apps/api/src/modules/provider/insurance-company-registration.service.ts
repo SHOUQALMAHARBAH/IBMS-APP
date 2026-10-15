@@ -11,6 +11,10 @@ import { OrgContextService } from '../../common/org-context/org-context.service'
 import { AuditService } from '../audit/audit.service';
 import { EncryptionService } from '../security/encryption.service';
 import type { RegisterInsuranceCompanyDto } from './dto/register-insurance-company.dto';
+import {
+  INSURANCE_COMPANY_ADMINISTRATOR_GRANTS,
+  INSURANCE_COMPANY_ADMINISTRATOR_ROLE_NAME,
+} from './insurance-company-administrator-grants';
 
 /**
  * MODULE 0-ب ITEM (e) — REGISTERING AN INSURANCE COMPANY.
@@ -200,9 +204,22 @@ export class InsuranceCompanyRegistrationService {
           })),
         });
 
+        /*
+         * ITEM (f), THE COMPANY HALF — the role is created WITH the company, exactly as the office's
+         * is, so the invite has something to grant and never has to create a role itself.
+         *
+         * Safe to add to a shipped route because ZERO companies exist on either database (measured
+         * 2026-10-15). Had one existed it would have had no role, the invite would have refused it by
+         * name, and that is register entry 33's asymmetry — a thing created by one path and absent
+         * from rows the path predates.
+         */
+        const administratorRole = await this.createAdministratorRole(tx);
+
         return {
           organization,
           certificateDocumentId: certificate.id,
+          administratorRoleId: administratorRole.id,
+          administratorGrantCount: administratorRole.grantCount,
           licensedLineCount: lines.length,
           /** DERIVED from the branch categories, never stored — decision 67, the same rule that
            *  governs a broker's licence types. */
@@ -224,6 +241,11 @@ export class InsuranceCompanyRegistrationService {
         integrationMethod: dto.integrationMethod,
         licensedLineCount: result.licensedLineCount,
         licensedCategories: result.licensedCategories,
+        // The role is part of what this act created, so it belongs in the row that records the act.
+        // The COUNT and not the codes: the grant set is a catalogue selection, and copying six code
+        // names into an append-only audit row would be a second home for a list one file owns.
+        administratorRoleId: result.administratorRoleId,
+        administratorGrantCount: result.administratorGrantCount,
       },
     });
 
@@ -234,6 +256,9 @@ export class InsuranceCompanyRegistrationService {
       legalNameAr: result.organization.legalNameAr,
       shortName: result.organization.shortName,
       certificateDocumentId: result.certificateDocumentId,
+      // Surfaced for the same reason the office's is: the provider's screen confirms the company can
+      // actually be handed over, and a role id is the only proof of that which is not a count.
+      administratorRoleId: result.administratorRoleId,
       licensedLineCount: result.licensedLineCount,
       licensedCategories: result.licensedCategories,
     };
@@ -281,6 +306,58 @@ export class InsuranceCompanyRegistrationService {
   }
 
   /** Item (j)'s third layer, on the route that creates the other kind of tenant. */
+  /**
+   * The company's own administrator role, SELECTED FROM THE CATALOGUE.
+   *
+   * Deliberately not a copy of `OFFICE_ADMINISTRATOR_GRANTS`: an office administrator's set covers
+   * branches, departments, employees, insurers and vendors, and a company has none of those here.
+   * `INSURANCE_COMPANY_ADMINISTRATOR_GRANTS` is the honest six — self-administration only — and the
+   * shortness is the finding rather than something to pad.
+   *
+   * It refuses rather than under-granting if the catalogue is short a code, the same way the office's
+   * does: an administrator missing a capability is a defect nobody finds until somebody needs it, and
+   * the registration is rolled back with the company uncreated rather than left half-right.
+   */
+  private async createAdministratorRole(tx: TenantTransactionClient) {
+    const permissions = await tx.permission.findMany({
+      where: { code: { in: [...INSURANCE_COMPANY_ADMINISTRATOR_GRANTS] } },
+      select: { id: true, code: true },
+    });
+
+    if (permissions.length !== INSURANCE_COMPANY_ADMINISTRATOR_GRANTS.length) {
+      const found = new Set(permissions.map((p) => p.code));
+      const missing = INSURANCE_COMPANY_ADMINISTRATOR_GRANTS.filter(
+        (c) => !found.has(c),
+      );
+      throw new UnprocessableEntityException(
+        `the insurance company administrator's grant set names ${missing.length} permission(s) the catalogue does not contain: ${missing.join(', ')}. The company is NOT registered.`,
+      );
+    }
+
+    const role = await tx.role.create({
+      data: {
+        name: INSURANCE_COMPANY_ADMINISTRATOR_ROLE_NAME,
+        nameEn: 'Insurance company administrator',
+        nameAr: 'مدير شركة التأمين',
+        description:
+          "Administers this insurance company: its users and its roles. Holds no capability beyond that, because an insurance company has nothing else to do in this product yet — it reads its own registry record and nothing more. Created with the company; its grants come from the permission catalogue, not from a brokerage office's copy.",
+        isSystem: true,
+        // Stated rather than inherited, for the same reason the office role states them: this is the
+        // one role every company starts with, and a later change to a column default must not
+        // silently relax the first administrator of every company registered afterwards.
+        requiresMfaAlways: true,
+        requiresHardwareToken: true,
+      },
+      select: { id: true },
+    });
+
+    await tx.rolePermission.createMany({
+      data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })),
+    });
+
+    return { id: role.id, grantCount: permissions.length };
+  }
+
   private async assertCallerIsTheProvider(organizationId: string) {
     const org = await this.prisma.client.organization.findUnique({
       where: { id: organizationId },

@@ -5,6 +5,7 @@ import {
 } from './provider.controller';
 import { OfficeRegistrationService } from './office-registration.service';
 import { OfficeAdministratorInvitationService } from './office-administrator-invitation.service';
+import { CompanyAdministratorInvitationService } from './company-administrator-invitation.service';
 import { InsuranceCompanyRegistrationService } from './insurance-company-registration.service';
 import { ReferenceDataController } from './reference-data.controller';
 import { ReferenceDataService } from './reference-data.service';
@@ -43,6 +44,7 @@ import { SecurityModule } from '../security/security.module';
     OfficeRegistrationService,
     OfficeAdministratorInvitationService,
     InsuranceCompanyRegistrationService,
+    CompanyAdministratorInvitationService,
     ReferenceDataService,
   ],
 })

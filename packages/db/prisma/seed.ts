@@ -215,6 +215,10 @@ async function ensureProviderOrganization(): Promise<void> {
     // Item (f) — giving a registered office its FIRST account. Not a tenant-creating code: this one
     // writes INSIDE a tenant somebody else will run, which is why it is separate from the two above.
     "provider.office.administrator.invite",
+    // Item (f), the company half — the same act for a registered insurance company. A SEPARATE code
+    // rather than a reuse: a code named for an office that also reached a company would promise
+    // other than it does, which is the defect class this module measured in two existing codes.
+    "provider.insurance-company.administrator.invite",
     // Item (b) — self-administration. Its own users, its own roles, bounded by tenancy.
     "user.manage",
     "role.read",

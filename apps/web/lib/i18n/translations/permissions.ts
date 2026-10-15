@@ -248,6 +248,8 @@ export const PERMISSIONS = {
     'perm:privacy-notice.read': 'يقرأ إشعار الخصوصية المنطبق على نقطة تواصل. قراءة فقط؛ النشر صلاحية أخرى',
     'perm:provider.office.administrator.invite':
       'يُنشئ حاملُها أوّلَ حسابٍ داخل مكتبِ وساطةٍ سجّله المزوّد، ويمنحه دورَ إدارةِ ذلك المكتب. وهو الكتابةُ الوحيدةُ في هذا النظام التي تتجاوز حدودَ المستأجر. ويُرفَض بعد أن يصبح للمكتب أيُّ حساب، فمن حينها يُدير المكتبُ نفسَه. ويُنشَأ المديرُ المدعوُّ بلا كلمةِ مرورٍ صالحة، ويدخل بطلبِ إعادةِ تعيينِ كلمةِ المرور لعنوانه — فلا يختار النظامُ كلمةَ مرورٍ لأحدٍ ولا يُرسلها.',
+    'perm:provider.insurance-company.administrator.invite':
+      'يُنشئ حاملُها أوّلَ حسابٍ داخل شركةِ تأمينٍ سجّلها المزوّد، ويمنحه دورَ إدارةِ تلك الشركة. يتجاوز حدودَ المستأجر كما يفعل نظيرُه الخاصُّ بمكاتب الوساطة، ويُرفَض بعد أن يصبح للشركة أيُّ حساب. ومديرُ الشركة الذي يُنشئه يحمل ستَّ صلاحياتٍ لإدارةِ نفسه فقط ولا شيء غيرها، فالشركةُ تقرأ سجلَّها لدينا ولا تملك في هذا النظام قدرةً أخرى. ويُنشَأ المديرُ المدعوُّ بلا كلمةِ مرورٍ صالحة، ويدخل بطلبِ إعادةِ تعيينِ كلمةِ المرور.',
     'perm:provider.office-state.read':
       'يرى حاملُها حالةَ مكاتب الوساطة المسجَّلة وما سُجِّل عليها من حالات وتواريخها. ويرى معها أرقاماً مجمَّعةً عن كلِّ مكتب: عددَ المستخدمين والنشطِ منهم، وعددَ أنواع التأمين المرخَّصة التي لا يكتب فيها أعمالاً، وتاريخَ آخرِ استخدامٍ للنظام. لا يُغيّر حالةَ أيِّ مكتب، ولا يصل إلى عملاءِ المكتب ولا وثائقِه ولا أقساطِه ولا عمولاتِه ولا أيِّ بياناتٍ شخصية.',
     'perm:provider.office.register':
@@ -484,6 +486,8 @@ export const PERMISSIONS = {
     'perm:privacy-notice.read': 'Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)',
     'perm:provider.office.administrator.invite':
       "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password",
+    'perm:provider.insurance-company.administrator.invite':
+      "Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset",
     'perm:provider.office-state.read':
       'Opens the platform-wide view of every brokerage office: its licence number and expiry, whether that licence still lets it place business, how many of its licensed branches carry no business at all, how many people it has, and when it was last used. This crosses office boundaries — the holder sees other offices, not only their own — so grant it only to whoever operates the platform. It shows no customers, no policies, no premiums or commission, and nothing about any individual person',
     'perm:provider.office.register':

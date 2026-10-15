@@ -5,6 +5,7 @@ import { InsuranceCompanyRegistrationService } from './insurance-company-registr
 import { RegisterBrokerageOfficeDto } from './dto/register-brokerage-office.dto';
 import { InviteOfficeAdministratorDto } from './dto/invite-office-administrator.dto';
 import { OfficeAdministratorInvitationService } from './office-administrator-invitation.service';
+import { CompanyAdministratorInvitationService } from './company-administrator-invitation.service';
 import { RegisterInsuranceCompanyDto } from './dto/register-insurance-company.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -77,6 +78,7 @@ export class ProviderOfficeRegistrationController {
 export class ProviderInsurerRegistrationController {
   constructor(
     private readonly registration: InsuranceCompanyRegistrationService,
+    private readonly invitations: CompanyAdministratorInvitationService,
   ) {}
 
   @RequirePermissions('provider.insurer.register')
@@ -87,6 +89,32 @@ export class ProviderInsurerRegistrationController {
   ) {
     return this.registration.registerInsuranceCompany(
       { id: user.id, organizationId: user.organizationId },
+      dto,
+    );
+  }
+
+  /**
+   * ITEM (f), THE COMPANY HALF — give a registered insurance company its FIRST account.
+   *
+   * A sub-path of the company, addressed by its id, for the same reason the office invite is a
+   * sub-path of the office: this is an act ON a company that already exists, one step later in its
+   * life, not a different kind of filing.
+   *
+   * ITS OWN CODE, not the office invite's. `provider.office.administrator.invite` names an office;
+   * letting it reach a company too would make the name promise other than it does, which is the
+   * defect class this close measured in `aml.monitor` and `sanctions-pep.screen`. Two acts, two
+   * codes, two refusals each naming its own organization type.
+   */
+  @RequirePermissions('provider.insurance-company.administrator.invite')
+  @Post(':companyId/administrator')
+  inviteAdministrator(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('companyId', ParseUUIDPipe) companyId: string,
+    @Body() dto: InviteOfficeAdministratorDto,
+  ) {
+    return this.invitations.invite(
+      { id: user.id, organizationId: user.organizationId },
+      companyId,
       dto,
     );
   }

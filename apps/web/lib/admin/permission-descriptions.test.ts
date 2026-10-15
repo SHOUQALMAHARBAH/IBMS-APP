@@ -64,7 +64,7 @@ const MISSING_DESCRIPTION_BUDGET = 0;
  * What must never happen is this number going up while the CODE COUNT stays the same. That would be
  * a reversion, and it is what the rule is about.
  */
-const CARRIED_ENGLISH_BUDGET = 216;
+const CARRIED_ENGLISH_BUDGET = 217;
 
 /**
  * CODES WHOSE ARABIC IS **NOT** THE OWNER'S, and the balance check that stops this list rotting.
@@ -129,6 +129,12 @@ const AWAITING_OWNER_REVIEW: string[] = [
    * the list refills itself rather than needing somebody to remember.
    */
   'provider.office.administrator.invite',
+  /*
+   * Item (f)'s COMPANY half, shipped in the same close. Its Arabic was written by an agent for
+   * the same reason the office one's was: the parity guard requires both languages, so a code
+   * cannot ship without a line, and whoever ships it writes it.
+   */
+  'provider.insurance-company.administrator.invite',
   /*
    * The two halves of the split retention code. Their Arabic was written by an agent — the withdrawn
    * umbrella's line was HERS, and a split is not a translation, so neither successor inherits it.

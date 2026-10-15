@@ -1905,6 +1905,32 @@ const admin: PermissionSeed[] = [
   },
   {
     /*
+     * ITEM (f), THE COMPANY HALF — and a SEPARATE code from the office invite rather than a reuse.
+     *
+     * Reusing `provider.office.administrator.invite` for a company would make the name promise
+     * "office" while the act reached a company, which is the exact defect class the close measured in
+     * `aml.monitor` and `sanctions-pep.screen`: a code whose name claims more, or other, than it does.
+     * A rename is the last option considered here, so the honest move is a second code.
+     *
+     * It is also a genuinely different act: an office administrator receives 47 codes and runs an
+     * office; a company administrator receives SIX and can administer users and roles only, because
+     * an insurance company has nothing else to do in this product yet.
+     */
+    code: "provider.insurance-company.administrator.invite",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its roles", and no office may hold a PLATFORM code. The provider's own grant comes from
+     * `PROVIDER_CODES` in the seed, and the grid guard REFUSES a PLATFORM code that names an office
+     * role here — by name.
+     */
+    roles: [],
+  },
+  {
+    /*
      * MODULE 0-ب ITEM (e) — REGISTER AN INSURANCE COMPANY ON THE PLATFORM.
      *
      * PLATFORM-scoped and the THIRD such code, for the same reason as the second: its effect is the

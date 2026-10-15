@@ -127,6 +127,25 @@ async function deleteCompany(organizationId: string) {
     data: { insurerLicenseCertificateDocumentId: null },
   });
   await rawPrisma.document.deleteMany({ where: { organizationId } });
+
+  /*
+   * AND THE ADMINISTRATOR ROLE, which registration started creating when item (f)'s company half
+   * shipped. This sweep did not know about it and the whole FILE failed — not a test, the file:
+   *
+   *   update or delete on table "Organization" violates RESTRICT setting of foreign key constraint
+   *   "Role_organizationId_fkey" on table "Role"
+   *
+   * Found by running this spec in the same batch as the new one rather than by reasoning about it,
+   * and it is a blast-radius shape worth naming beside the register's existing one: when a
+   * REGISTRATION route starts writing a new CHILD row, every teardown that deletes that parent has
+   * to learn about it, and the FK tells you by refusing rather than by leaking.
+   *
+   * No user is deleted here, deliberately: nothing in this file may create one (see the header), so
+   * a user inside a registered company would itself be the defect rather than something to clean up.
+   */
+  await rawPrisma.rolePermission.deleteMany({ where: { organizationId } });
+  await rawPrisma.role.deleteMany({ where: { organizationId } });
+
   await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
 }
 

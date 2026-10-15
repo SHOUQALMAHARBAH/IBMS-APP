@@ -156,11 +156,18 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * (not one — "confirm" is not a point on the none/read/write/delete/full scale, the same reason
      * `link`, `unlink` and `discard` land in the toggle list). One verb is not a family.
      */
-    expect(PERMISSION_CATALOGUE.length).toBe(226);
+    expect(PERMISSION_CATALOGUE.length).toBe(227);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
     // and the matrix no longer offers it — so the toggle list loses exactly the one code it added.
+    /*
+     * STILL 163 AFTER A 227th CODE, and that is the PLATFORM filter being observable rather than an
+     * oversight. 59 CRUD-family codes + 163 toggles = 222, not 227: the office matrix never offers a
+     * PLATFORM-scoped code (module 0 item (j)), and all FIVE of them are outside these two buckets.
+     * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
+     * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
+     */
     expect(toggles.length).toBe(163);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(

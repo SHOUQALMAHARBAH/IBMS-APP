@@ -414,6 +414,12 @@ describe('every office has a route to user administration', () => {
          * is a separate grant: registering an office is a filing, handing over its keys is not.
          */
         'provider.office.administrator.invite',
+        /*
+         * Item (f), the COMPANY half. A SEPARATE code from the office invite rather than a reuse,
+         * because a code named for an office that also reached a company would promise other than it
+         * does — the defect class this close measured in `aml.monitor` and `sanctions-pep.screen`.
+         */
+        'provider.insurance-company.administrator.invite',
         // Item (b) — self-administration, bounded by tenancy rather than by anything written for it.
         'role.create',
         'role.deactivate',

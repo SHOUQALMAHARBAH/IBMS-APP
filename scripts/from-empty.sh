@@ -98,13 +98,13 @@ check() { # name expected actual
 }
 
 say "asserting the structure"
-check "permission codes seeded" 226 \
+check "permission codes seeded" 227 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
-check "PLATFORM-scoped codes" 4 \
+check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"
 check "exactly one PROVIDER organization" 1 \
   "$(psql_scratch $'SELECT count(*) FROM "Organization" WHERE type = \'PROVIDER\'')"
-check "the provider role's grants" 10 \
+check "the provider role's grants" 11 \
   "$(psql_scratch 'SELECT count(*) FROM "RolePermission" rp JOIN "Organization" o ON o.id = rp."organizationId" WHERE o.type = '"'"'PROVIDER'"'"'')"
 check "registration-pack columns are NULLABLE" 0 \
   "$(psql_scratch 'SELECT count(*) FROM pg_attribute WHERE attrelid = '"'"'"Organization"'"'"'::regclass AND attnotnull AND attname IN ('"'"'premisesTenureDocumentId'"'"','"'"'associationMembershipDocumentId'"'"')')"
