@@ -246,6 +246,8 @@ export const PERMISSIONS = {
     'perm:portfolio-analysis.view': 'يرى أين يقع دفتر المكتب: الوثائق والقسط الصادر موزّعاً على أنواع التأمين والشركات وفئات العملاء والفروع. قسط لا عمولة',
     'perm:privacy-notice.publish': 'ينشر إشعار خصوصية بنسخة مُرقَّمة بلغتين. نشرٌ للعموم بأثر قانوني',
     'perm:privacy-notice.read': 'يقرأ إشعار الخصوصية المنطبق على نقطة تواصل. قراءة فقط؛ النشر صلاحية أخرى',
+    'perm:provider.office.administrator.invite':
+      'يُنشئ حاملُها أوّلَ حسابٍ داخل مكتبِ وساطةٍ سجّله المزوّد، ويمنحه دورَ إدارةِ ذلك المكتب. وهو الكتابةُ الوحيدةُ في هذا النظام التي تتجاوز حدودَ المستأجر. ويُرفَض بعد أن يصبح للمكتب أيُّ حساب، فمن حينها يُدير المكتبُ نفسَه. ويُنشَأ المديرُ المدعوُّ بلا كلمةِ مرورٍ صالحة، ويدخل بطلبِ إعادةِ تعيينِ كلمةِ المرور لعنوانه — فلا يختار النظامُ كلمةَ مرورٍ لأحدٍ ولا يُرسلها.',
     'perm:provider.office-state.read':
       'يرى حاملُها حالةَ مكاتب الوساطة المسجَّلة وما سُجِّل عليها من حالات وتواريخها: الهُويّة والحالة ونوع الوسيط، ومدّة الترخيص ورقمُه وانتهاؤه، وعددُ الفروع المرخَّصة والخاملِ منها، وعددُ المستخدمين والنشطِ منهم، وآخرُ استخدامٍ للنظام. لا يُغيّر حالةَ أيِّ مكتب، ولا يصل إلى عملاءِ المكتب ولا وثائقِه ولا أقساطِه ولا عمولاتِه ولا أيِّ بياناتٍ شخصية.',
     'perm:provider.office.register':
@@ -477,6 +479,8 @@ export const PERMISSIONS = {
     'perm:portfolio-analysis.view': 'View portfolio analysis by line/insurer/segment/geography',
     'perm:privacy-notice.publish': 'Publish a version-controlled bilingual privacy notice',
     'perm:privacy-notice.read': 'Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)',
+    'perm:provider.office.administrator.invite':
+      "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password",
     'perm:provider.office-state.read':
       'Opens the platform-wide view of every brokerage office: its licence number and expiry, whether that licence still lets it place business, how many of its licensed branches carry no business at all, how many people it has, and when it was last used. This crosses office boundaries — the holder sees other offices, not only their own — so grant it only to whoever operates the platform. It shows no customers, no policies, no premiums or commission, and nothing about any individual person',
     'perm:provider.office.register':

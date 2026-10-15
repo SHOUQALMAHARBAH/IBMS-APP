@@ -1,8 +1,10 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { OfficeRegistrationService } from './office-registration.service';
 import { InsuranceCompanyRegistrationService } from './insurance-company-registration.service';
 import { RegisterBrokerageOfficeDto } from './dto/register-brokerage-office.dto';
+import { InviteOfficeAdministratorDto } from './dto/invite-office-administrator.dto';
+import { OfficeAdministratorInvitationService } from './office-administrator-invitation.service';
 import { RegisterInsuranceCompanyDto } from './dto/register-insurance-company.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -19,7 +21,10 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 @ApiTags('provider')
 @Controller('provider/brokerage-offices')
 export class ProviderOfficeRegistrationController {
-  constructor(private readonly registration: OfficeRegistrationService) {}
+  constructor(
+    private readonly registration: OfficeRegistrationService,
+    private readonly invitations: OfficeAdministratorInvitationService,
+  ) {}
 
   @RequirePermissions('provider.office.register')
   @Post()
@@ -29,6 +34,31 @@ export class ProviderOfficeRegistrationController {
   ) {
     return this.registration.registerBrokerageOffice(
       { id: user.id, organizationId: user.organizationId },
+      dto,
+    );
+  }
+
+  /**
+   * MODULE 0-ب ITEM (f), BROKERAGE HALF — the office's FIRST account.
+   *
+   * A sub-path of the office rather than its own controller, which is the opposite of how item (e)
+   * was shaped and for a stated reason: registering an insurance company is a DIFFERENT KIND of act
+   * on a different entity, so it earned its own path. This is an act ON an office that already
+   * exists, addressed by that office's id — the same resource, one step later in its life.
+   *
+   * `ParseUUIDPipe` so a malformed id is a 400 naming the parameter rather than a 404 that reads as
+   * "no such office".
+   */
+  @RequirePermissions('provider.office.administrator.invite')
+  @Post(':officeId/administrator')
+  inviteAdministrator(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('officeId', ParseUUIDPipe) officeId: string,
+    @Body() dto: InviteOfficeAdministratorDto,
+  ) {
+    return this.invitations.invite(
+      { id: user.id, organizationId: user.organizationId },
+      officeId,
       dto,
     );
   }

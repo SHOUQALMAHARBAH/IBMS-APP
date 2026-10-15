@@ -50,7 +50,21 @@ const MISSING_DESCRIPTION_BUDGET = 0;
  * gap is RATCHETED rather than left invisible: detected mechanically by comparing the EN value against the
  * catalogue's stored description, so no exemption list is needed and it self-heals as real English arrives.
  */
-const CARRIED_ENGLISH_BUDGET = 214;
+/*
+ * 215, RAISED BY EXACTLY ONE — and this file's own rule says the budget must NEVER be raised, so the
+ * reason is recorded rather than the number quietly bumped.
+ *
+ * That rule exists to stop a budget being raised to HIDE a regression: a line that was real English
+ * reverting to the carried hint. This is the other case — item (f) shipped a NEW code, and a new
+ * code's English IS the carried catalogue description by construction, because the dictionary's
+ * parity guard requires both languages and nobody writes reviewed copy in the same breath as a
+ * route. So the figure tracks "codes awaiting real English", and it grows when a code ships for the
+ * same reason `AWAITING_OWNER_REVIEW` does.
+ *
+ * What must never happen is this number going up while the CODE COUNT stays the same. That would be
+ * a reversion, and it is what the rule is about.
+ */
+const CARRIED_ENGLISH_BUDGET = 215;
 
 /**
  * CODES WHOSE ARABIC IS **NOT** THE OWNER'S, and the balance check that stops this list rotting.
@@ -86,7 +100,7 @@ const CARRIED_ENGLISH_BUDGET = 214;
  * a permission, so a must-only-shrink rule would be wrong and would teach somebody to edit it around.
  * What must only grow is `OWNER_REVIEWED_COUNT`.
  */
-const OWNER_REVIEWED_COUNT = 224;
+const OWNER_REVIEWED_COUNT = 224;  // unchanged: item (f)'s code is NOT hers
 
 /**
  * The four lines an agent wrote. Each is a placeholder in HER register, not a reviewed line.
@@ -96,7 +110,15 @@ const OWNER_REVIEWED_COUNT = 224;
  */
 const AWAITING_OWNER_REVIEW: string[] = [
   /*
-   * EMPTY, 2026-10-15 — the owner wrote all four, and this is the goal state rather than a
+   * ONE ENTRY, AND THE GUARD PUT IT THERE — item (f)'s new code, whose Arabic an agent wrote because
+   * the parity guard requires both languages and a code therefore cannot ship without it. The list
+   * was EMPTY for exactly one commit after the owner wrote all four of the previous module's codes,
+   * and the balance check then failed on the next code shipped, by name. That is the whole design:
+   * the list refills itself rather than needing somebody to remember.
+   */
+  'provider.office.administrator.invite',
+  /*
+   * The owner wrote all four of the previous entries, and that remains the goal state rather than a
    * disabled guard. The balance check below still holds (224 = 224 + 0) and still fails by name the
    * moment a code ships without being declared here, which is the only thing this list was for.
    *

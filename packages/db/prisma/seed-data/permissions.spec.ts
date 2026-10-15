@@ -77,6 +77,19 @@ describe("permission grid — every code is independent and traceable", () => {
         // Module 0-ب item (e) — the other kind of tenant. Separate from the office code because the
         // two create different legal entities under different instruments.
         "provider.insurer.register",
+        /*
+         * Module 0-ب item (f) — THE ONLY CODE WHOSE EFFECT IS A WRITE *INSIDE* ANOTHER TENANT.
+         *
+         * The three above create or read across offices; this one creates an ACCOUNT in one. That is
+         * why it is separate from `provider.office.register`: registering an office is a filing, and
+         * handing somebody the keys to it is not, so an operator trusted to file is not thereby
+         * trusted to choose who runs the office.
+         *
+         * It is narrower than its name: the service refuses a non-brokerage target and refuses once
+         * the office holds ANY account, so it is the right to bootstrap an empty office once — never
+         * a standing ability to add accounts to a live one.
+         */
+        "provider.office.administrator.invite",
       ].sort(),
     );
   });

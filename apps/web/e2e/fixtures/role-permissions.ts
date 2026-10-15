@@ -566,7 +566,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 224 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 225 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -591,6 +591,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'permission.read', module: 'admin', description: "View the global permission catalogue (the codes a role can be granted)", scope: 'OFFICE' },
   { code: 'provider.insurer.register', module: 'admin', description: "Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform", scope: 'PLATFORM' },
   { code: 'provider.office-state.read', module: 'admin', description: "Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform", scope: 'PLATFORM' },
+  { code: 'provider.office.administrator.invite', module: 'admin', description: "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password", scope: 'PLATFORM' },
   { code: 'provider.office.register', module: 'admin', description: "Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform", scope: 'PLATFORM' },
   { code: 'role.create', module: 'admin', description: "Define a new role in this office's catalogue", scope: 'OFFICE' },
   { code: 'role.deactivate', module: 'admin', description: "Retire a role, reactivate a retired one, and delete one that was never used", scope: 'OFFICE' },

@@ -1844,6 +1844,34 @@ const admin: PermissionSeed[] = [
   },
   {
     /*
+     * MODULE 0-ب ITEM (f) — INVITING A REGISTERED OFFICE'S FIRST ADMINISTRATOR.
+     *
+     * PLATFORM-scoped and the FOURTH such code. Its effect is not the creation of a tenant — item
+     * (d) already did that — it is the creation of an ACCOUNT INSIDE ONE, which is the only write in
+     * this product that crosses a tenancy boundary. Separate from `provider.office.register` because
+     * registering an office and giving somebody the keys to it are different acts: the first is a
+     * filing, the second hands over control, and an operator trusted to file is not thereby trusted
+     * to choose who runs the office.
+     *
+     * It is also NARROWER than its name suggests, by three refusals in the service: the target must
+     * be a brokerage office, and it must have NO account yet. So this is the right to bootstrap an
+     * empty office once — never a standing ability to add accounts to a live one.
+     */
+    code: "provider.office.administrator.invite",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its roles", and no office may hold a PLATFORM code. The provider's own grant comes from
+     * `PROVIDER_CODES` in the seed, and the grid guard REFUSES a PLATFORM code that names an office
+     * role here — by name.
+     */
+    roles: [],
+  },
+  {
+    /*
      * MODULE 0-ب ITEM (e) — REGISTER AN INSURANCE COMPANY ON THE PLATFORM.
      *
      * PLATFORM-scoped and the THIRD such code, for the same reason as the second: its effect is the

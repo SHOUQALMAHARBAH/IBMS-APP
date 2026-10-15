@@ -122,11 +122,36 @@ async function deleteOffice(organizationId: string) {
    * Failing HERE, by name, is what stops that recurring as an FK error in a teardown three changes
    * from now.
    */
-  const users = await rawPrisma.user.count({ where: { organizationId } });
+  /*
+   * RE-POINTED FROM "no user" TO "no AUDIT ROW", and the distinction is what item (f) exposed.
+   *
+   * This guard used to refuse any user inside a registered office, on the reasoning that signing in
+   * writes append-only audit rows and the office then cannot be deleted. The CONSEQUENCE was exactly
+   * right; the KEY was a proxy. Item (f)'s invite creates a user inside a registered office BY
+   * DESIGN — that is the capability — and auditing it in the provider's log rather than the office's
+   * means the office stays deletable. So the guard now checks the thing that actually strands an
+   * office, and the users it used to forbid are deleted below.
+   *
+   * What makes an office permanent, measured: `AuditLogEntry_organizationId_fkey` is
+   * `ON DELETE RESTRICT`, and DELETE on `AuditLogEntry` is refused outright by the
+   * `audit_log_entry_no_delete` trigger. So ONE audit row is enough, forever. Two offices were
+   * stranded in db-test proving it, and clearing them needed the trigger disabled and re-enabled by
+   * hand — which is why this guard is keyed on the real cause now.
+   *
+   * SIGNING IN still strands an office (it writes audit rows into the office's own tenant), so
+   * nothing here may authenticate AS an invited administrator.
+   */
+  const auditRows = await rawPrisma.auditLogEntry.count({
+    where: { organizationId },
+  });
   expect(
-    users,
-    `a user exists inside registered office ${organizationId}. Signing in writes append-only audit rows, so that office can never be deleted and every later spec in this run will refuse. Nothing in this file may create a user inside an office it registered — use DEFAULT_OFFICE_ID`,
+    auditRows,
+    `registered office ${organizationId} carries ${auditRows} audit row(s), so it can NEVER be deleted — the FK is ON DELETE RESTRICT and the table refuses DELETE by trigger. Every later spec in this run will then refuse at createTestApp with a fault that looks like its own. Nothing in this file may SIGN IN as a user inside an office it registered, and nothing may audit into one`,
   ).toBe(0);
+
+  // The users item (f) invites. Deletable precisely because nothing audited into this office.
+  await rawPrisma.userRoleAssignment.deleteMany({ where: { organizationId } });
+  await rawPrisma.user.deleteMany({ where: { organizationId } });
 
   const licenses = await rawPrisma.brokerLicense.findMany({
     where: { organizationId },
@@ -643,6 +668,161 @@ describe('the boundary — who may register an office', () => {
  * together in each case — the office EXISTS and the derived pack names what is missing — because a
  * test asserting only the marker would pass against an implementation that also refused the save.
  */
+describe('ITEM (f) — the office gets its FIRST administrator, which is what made item (d) usable', () => {
+  /*
+   * WITHOUT THIS, ITEM (d) WAS BUILT AND UNREACHABLE. Registration creates the office and its
+   * `OFFICE_ADMINISTRATOR` role and NO USER, and both alternatives were measured to fail: signup
+   * resolves the platform's SOLE office (and assigns no role anyway), and `POST /admin/users` writes
+   * into the CALLER's office because its DTO carries no organization.
+   *
+   * THESE TESTS ARE ALSO THE ONLY PROOF THE MODULE IS WIRED. The invitation service injects
+   * `PasswordService`, which lives in `AuthModule` — a module `ProviderModule` did not import. A
+   * missing DI provider COMPILES CLEANLY and fails on the first request, which is the defect item
+   * (e) paid for with a 500 on every insurer registration. `npx tsc` passes either way; a request
+   * that boots the app is what decides.
+   */
+  async function invite(officeId: string, over: Record<string, unknown> = {}) {
+    return request(app.getHttpServer())
+      .post(`/provider/brokerage-offices/${officeId}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `admin-${unique('inv').toLowerCase()}@example.test`,
+        fullName: 'المدير المدعو للاختبار',
+        reason:
+          'First administrator for the office registered in this test run.',
+        ...over,
+      });
+  }
+
+  it('creates the account INSIDE the office, holding that office administrator role', async () => {
+    const registered = await register(validOffice());
+    expect(registered.status).toBe(201);
+    const officeId = (registered.body as RegistrationBody).id;
+
+    const response = await invite(officeId);
+    expect(
+      response.status,
+      `the invite failed: ${JSON.stringify(response.body)}. A 500 here is the DI wiring, not the logic.`,
+    ).toBe(201);
+
+    const body = response.body as {
+      officeId: string;
+      userId: string;
+      email: string;
+      roleName: string;
+      howTheySignIn: string;
+    };
+    expect(body.officeId).toBe(officeId);
+    expect(body.roleName).toBe('OFFICE_ADMINISTRATOR');
+    // STATED ON THE RESPONSE, because nothing emails anything: the operator has to be told how the
+    // person they just invited actually gets in.
+    expect(body.howTheySignIn).toBe('PASSWORD_RESET');
+
+    // THE CROSS-TENANT WRITE LANDED IN THE RIGHT TENANT — read back raw, because the point of the
+    // test is WHICH organization the row belongs to, and a scoped read could not tell.
+    const user = await rawPrisma.user.findUniqueOrThrow({
+      where: { id: body.userId },
+      select: {
+        organizationId: true,
+        email: true,
+        mustChangePassword: true,
+        isActive: true,
+        passwordHash: true,
+      },
+    });
+    expect(user.organizationId).toBe(officeId);
+    expect(user.email).toBe(body.email);
+    // NO USABLE PASSWORD, and `mustChangePassword` so even a reset lands on the change step.
+    expect(user.mustChangePassword).toBe(true);
+    expect(user.isActive).toBe(true);
+    expect(user.passwordHash.length).toBeGreaterThan(20);
+
+    const assignments = await rawPrisma.userRoleAssignment.findMany({
+      where: { userId: body.userId, revokedAt: null },
+      select: {
+        organizationId: true,
+        role: { select: { name: true, organizationId: true } },
+      },
+    });
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0].organizationId).toBe(officeId);
+    expect(assignments[0].role.name).toBe('OFFICE_ADMINISTRATOR');
+    // AND THE ROLE IS THAT OFFICE'S OWN, not another office's row with the same name — the property
+    // three-offices-coexist proves from the other direction.
+    expect(assignments[0].role.organizationId).toBe(officeId);
+
+    /*
+     * AND THE AUDIT ROW IS IN THE PROVIDER'S LOG, NOT THE OFFICE'S — the assertion that keeps this
+     * route from stranding an office forever. An audit row inside the office makes it undeletable
+     * (`ON DELETE RESTRICT` plus a trigger refusing DELETE), and its actor is a provider user the
+     * office's own tenant-scoped lookup cannot resolve. Both halves asserted, because the office
+     * half passing is what a correct-looking wrong implementation produces.
+     */
+    const provider = await rawPrisma.organization.findFirstOrThrow({
+      where: { type: 'PROVIDER' },
+      select: { id: true },
+    });
+    const inOffice = await rawPrisma.auditLogEntry.count({
+      where: { organizationId: officeId },
+    });
+    expect(
+      inOffice,
+      'the invitation audited into the OFFICE, which makes that office permanently undeletable',
+    ).toBe(0);
+    const inProvider = await rawPrisma.auditLogEntry.count({
+      where: {
+        organizationId: provider.id,
+        entityType: 'User',
+        entityId: body.userId,
+      },
+    });
+    expect(
+      inProvider,
+      "the invitation was not audited in the provider's log at all",
+    ).toBe(1);
+  }, 180_000);
+
+  it('REFUSES a second invitation — this bootstraps an empty office ONCE', async () => {
+    /*
+     * The refusal that keeps this from becoming a standing provider capability to add accounts to a
+     * live office. Asserted on the MESSAGE as well as the status, because a bare 409 would read as a
+     * duplicate email rather than "this office administers itself now".
+     */
+    const registered = await register(validOffice());
+    const officeId = (registered.body as RegistrationBody).id;
+    expect((await invite(officeId)).status).toBe(201);
+
+    const second = await invite(officeId);
+    expect(second.status).toBe(409);
+    expect(JSON.stringify(second.body)).toContain('FIRST administrator');
+    expect(JSON.stringify(second.body)).toContain('POST /admin/users');
+  }, 180_000);
+
+  it('REFUSES an organization that is not a brokerage office, naming what it is', async () => {
+    // The provider's own id: it has its own operator from the seed, and it is not an office.
+    const provider = await rawPrisma.organization.findFirstOrThrow({
+      where: { type: 'PROVIDER' },
+      select: { id: true },
+    });
+    const response = await invite(provider.id);
+    expect(response.status).toBe(403);
+    expect(JSON.stringify(response.body)).toContain('PROVIDER');
+    expect(JSON.stringify(response.body)).toContain('BROKERAGE OFFICE');
+  }, 180_000);
+
+  it('REFUSES an id that is not an organization at all — 404, not a silent 403', async () => {
+    const response = await invite('00000000-0000-0000-0000-00000000dead');
+    expect(response.status).toBe(404);
+  }, 180_000);
+
+  it('REFUSES a reason below the floor — a one-word reason is a box ticked', async () => {
+    const registered = await register(validOffice());
+    const officeId = (registered.body as RegistrationBody).id;
+    const response = await invite(officeId, { reason: 'because' });
+    expect(response.status).toBe(400);
+  }, 180_000);
+});
+
 describe('THREE OFFICES COEXIST — the acceptance witness for a multi-office platform', () => {
   /*
    * The close asks for three offices registered, and the question behind that is not "does the route

@@ -141,7 +141,13 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // `provider.insurer.register` (module 0-ب item (e)) moves exactly ONE of the four: it is
     // PLATFORM-scoped like its two siblings, so the matrix never offers it and the toggle list does
     // not grow. The catalogue does.
-    expect(PERMISSION_CATALOGUE.length).toBe(224);
+    // `provider.office.administrator.invite` (module 0-ب item (f)) moves exactly ONE of the four,
+    // for the third time and the same reason: PLATFORM-scoped, so the matrix never offers it and the
+    // toggle list does not grow. It also does NOT create a family — `provider.office.register` and
+    // `provider.office.administrator.invite` read as the families `provider.office` and
+    // `provider.office.administrator` by the matrix's own segment rule, and a one-member family is
+    // not a five-state row. So the catalogue grows and the other three figures stand.
+    expect(PERMISSION_CATALOGUE.length).toBe(225);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
