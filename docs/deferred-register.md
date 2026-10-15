@@ -109,6 +109,37 @@ These are the owner's items whose declaration site does not exist yet. Each land
 
 ---
 
+## A standing rule the third blast-radius miss earned
+
+**When a change touches a SHARED LIST, the blast radius is every spec that COUNTS it — and finding
+those is a grep for the COUNT, not for the topic.**
+
+Earned three times in one session, the same mistake each time:
+
+| # | I measured | What mattered |
+|---|---|---|
+| 1 | which specs test the provider module | which guard SCANS all api source for a shape (`role-scope.inventory.spec.ts`) |
+| 2 | what DECLARES the provider's codes | what ASSERTS them (`office-administrator.e2e-spec.ts`'s exact set) |
+| 3 | which specs touch retention | which specs COUNT the maker/checker registry (`internal-controls`, `compliance-dashboard`) |
+
+Each time the local run was green and CI was red, and each time the correct search was mechanical and
+took under a minute once asked properly. For the registry the grep is:
+
+```
+grep -rn "MAKER_CHECKER_REGISTRY\|pairsScanned\|maker_checker\|CHECKER_PERMISSIONS" apps/api --include=*.ts
+```
+
+...and then classify each hit as DERIVING (`MAKER_CHECKER_REGISTRY.length`, which needs no edit) or
+PINNING (a literal, which does). Run that way, the sixteenth pair touched **four** pins and two prose
+counts, and three further specs derived correctly — which is the shape of the answer and could not
+have been reached by thinking about retention.
+
+**The repository's workflow is targeted-locally and full-in-CI, so CI catching this is the system
+working rather than a failure on its own.** What is a failure is reaching for the topic three times
+when the question was about a shared structure.
+
+---
+
 ## The named short pass — between this module's close and module 1's opening
 
 The owner named three debts and placed them in a **short pass of their own**, after this module's close

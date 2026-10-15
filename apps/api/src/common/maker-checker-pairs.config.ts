@@ -21,7 +21,7 @@
  *
  * The complete list existed all along, in a module nobody opens when touching maker/checker. The two
  * shorter lists are the ones that drifted. Nothing verified any of them against `pg_constraint` —
- * `test/maker-checker-pairs.e2e-spec.ts` now does, so a sixteenth constraint cannot be added without this
+ * `test/maker-checker-pairs.e2e-spec.ts` now does, so a seventeenth constraint cannot be added without this
  * file moving.
  *
  * ## One pair carries a decision as well as a constraint
