@@ -160,7 +160,8 @@ and all eleven members need a description.
 |---|---|
 | reference-table rows | **44** |
 | enum members | **11** |
-| **total values needing an Arabic description** | **55** |
+| total values in scope | **55** |
+| **of those, still OWED an Arabic description** | **46** |
 
 The brief estimated "roughly forty". The measured figure is above, and it is higher because the
 module added four enums rather than two. Rows that already carry a `descriptionAr` are shown

@@ -124,6 +124,15 @@ async function main(): Promise<void> {
   out();
 
   let refRows = 0;
+  /*
+   * OWED IS COUNTED, NEVER IMPLIED. The first version of the count table said "total values
+   * needing an Arabic description" over refRows + enumMembers — which overstated the owed work
+   * by every row that already carried one (NINE of fifty-five when this was found). The owner
+   * asked for this export so she could write the descriptions; the figure she acts on is how many
+   * are still owed, so it is derived from the same test that prints the marker rather than from
+   * the total. It self-corrects as she writes, which a total can never do.
+   */
+  let owed = 0;
   for (const t of TABLES) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows: any[] = await (prisma as any)[t.model].findMany({
@@ -145,6 +154,7 @@ async function main(): Promise<void> {
     out('| code | English name | Arabic name | Arabic description |');
     out('|---|---|---|---|');
     for (const r of rows) {
+      if (!r.descriptionAr) owed += 1;
       const desc = r.descriptionAr ? r.descriptionAr : '**— OWED —**';
       out(`| \`${r.code}\` | ${r.nameEn} | ${r.nameAr} | ${desc} |`);
     }
@@ -174,6 +184,9 @@ async function main(): Promise<void> {
     out();
     out('| member | Arabic description |');
     out('|---|---|');
+    // Every enum member is owed: an enum has no `descriptionAr` column to read, which is the
+    // whole reason the two halves of this export are counted separately.
+    owed += rows.length;
     for (const r of rows) out(`| \`${r.label}\` | **— OWED —** |`);
     out();
   }
@@ -186,7 +199,8 @@ async function main(): Promise<void> {
   out('|---|---|');
   out(`| reference-table rows | **${refRows}** |`);
   out(`| enum members | **${enumMembers}** |`);
-  out(`| **total values needing an Arabic description** | **${refRows + enumMembers}** |`);
+  out(`| total values in scope | **${refRows + enumMembers}** |`);
+  out(`| **of those, still OWED an Arabic description** | **${owed}** |`);
   out();
   out(
     'The brief estimated "roughly forty". The measured figure is above, and it is higher because the',
@@ -200,7 +214,7 @@ async function main(): Promise<void> {
   const path = 'docs/module-0b-reference-values.md';
   writeFileSync(path, lines.join('\n'), 'utf8');
   console.log(
-    `${path}: ${refRows} reference rows across ${TABLES.length} tables, ${enumMembers} members across ${ENUMS.length} enums, ${refRows + enumMembers} values total.`,
+    `${path}: ${refRows} reference rows across ${TABLES.length} tables, ${enumMembers} members across ${ENUMS.length} enums, ${refRows + enumMembers} values in scope, ${owed} still OWED.`,
   );
 }
 
