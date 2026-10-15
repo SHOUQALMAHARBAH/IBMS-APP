@@ -435,6 +435,62 @@ Recorded here because both came out of guards that were green while describing s
 
 ---
 
+## A standing rule this register earned about itself
+
+**A pipe inside backticks STILL splits a markdown table cell. In a document whose entries are table
+rows, one stray pipe silently merges or drops a whole entry — so the column count is a thing to
+check, not to trust.**
+
+Earned on entry 32, which carried a literal pipe while *describing the pipe-escaping defect*. **A row
+has pipes = columns + 1**, so this table's rows carry six pipes for its five columns
+(`# | Item | Article / decision | Declared in code at | Why deferred`) — and entry 32 had **seven**,
+a spurious sixth column that pushes the "Why deferred" content into a column the header does not
+have, where most renderers drop it. The failure is quiet in the worst way: the file still renders and
+the row still looks like a row. Nothing in this repository reads these documents, so no gate can fail.
+
+The check is mechanical, and it must compare each table against **its own** majority rather than the
+file's — this register holds seven tables with three, four, five and six columns, all legitimate:
+
+```
+python - <<'PY'
+import io, re
+from collections import Counter
+for p in ("docs/deferred-register.md", "docs/module-1-preflight.md"):
+    with io.open(p, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+    hdr, tables, infence = None, {}, False
+    fence = chr(96) * 3             # spelled this way so the literal is not inside the fence below
+    for l in lines:
+        if l.startswith(fence):     # a fenced block may legitimately contain pipes
+            infence = not infence
+            continue
+        if infence:
+            continue
+        if l.startswith("#"):
+            hdr = l.strip().encode("ascii", "replace").decode("ascii")[:50]
+        if l.startswith("|") and not re.match(r"^\|[\s:-]+\|", l):
+            tables.setdefault(hdr, []).append(l.count("|"))
+    for h, rows in tables.items():
+        c = Counter(rows)
+        print(("OK    " if len(c) == 1 else "MIXED ") + f"{len(rows):3d} rows {dict(c)}  <- {h}")
+PY
+```
+
+**The fence skip is load-bearing and was added after the fact**: without it this rule's own code block
+would be read as table rows the moment somebody documents a table inside one — a checker that breaks
+on the document explaining it is worse than none.
+
+**Escape the pipe as `\|`, or reword.** Here it was reworded to "the pipe-escaping defect", because an
+escaped pipe inside backticks reads as a backslash to anyone viewing the raw file — and the raw file
+is how an agent reads this register.
+
+**And print ASCII-only when checking**: the first version of that script died on
+`UnicodeEncodeError: 'charmap' codec can't encode character 'ب'` — this host's console is cp1252
+and these headers are Arabic, which is a host quirk this repository already records and which looks
+exactly like a broken script.
+
+---
+
 ## Owed to module 1 — recorded here so it is not rediscovered
 
 | Item | Why it is owed | Not to be started before |
