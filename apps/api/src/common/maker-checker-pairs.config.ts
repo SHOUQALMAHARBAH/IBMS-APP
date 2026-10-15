@@ -109,6 +109,29 @@ export const MAKER_CHECKER_REGISTRY = [
     source: 'PRIV-SRS-01 M06',
   },
   {
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — THE SIXTEENTH PAIR, and the reason it was absent is the finding.
+     *
+     * The table already HAD a confirm step: `confirmedByLegalCounselAt`, a date with NO ACTOR. So
+     * there was nothing to compare, and a code split alone would have been separation in appearance
+     * only. Migration `20261128100000` adds the actor on both sides, the escape column and the CHECK.
+     *
+     * Registering it here is what makes it automatic rather than bespoke: the e2e derives its
+     * expected set from `pg_constraint` both ways, the duty-segregation readiness signal reads the
+     * checker permission, and a COMBINED office's declared act resolves through the same engine as
+     * the other fifteen.
+     */
+    entityType: 'RetentionScheduleItem',
+    pairLabel: 'setByUserId / confirmedByLegalCounselByUserId',
+    modelProperty: 'retentionScheduleItem',
+    makerField: 'setByUserId',
+    checkerField: 'confirmedByLegalCounselByUserId',
+    dbCheckConstraint: 'RetentionScheduleItem_maker_checker_distinct',
+    checkerPermission: 'retention-schedule.confirm',
+    dormant: false,
+    source: 'PRIV-SRS-01 M06',
+  },
+  {
     entityType: 'DataSharingApproval',
     pairLabel: 'requestedByUserId / approvedByUserId',
     modelProperty: 'dataSharingApproval',

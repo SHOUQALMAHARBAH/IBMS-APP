@@ -1,9 +1,9 @@
 {
   "a-code-ships-without-being-declared": {
-    "_": "The exact regression this guard exists for: a permission ships and nobody declares who wrote its Arabic, so the owner is silently credited with a line she has never seen. Simulated by decrementing the reviewed count, which makes the totals disagree by one in the SAME direction as an undeclared code. REPOINTED 2026-10-15: the first version removed an entry from AWAITING_OWNER_REVIEW, and expired the moment the owner wrote all four and the list emptied — an anchor on a list's CONTENTS cannot survive the list being empty, which is the state the project is trying to reach.",
+    "_": "The exact regression this guard exists for: a permission ships and nobody declares who wrote its Arabic, so the owner is silently credited with a line she has never seen. Simulated by decrementing the reviewed count, which makes the totals disagree by one in the SAME direction as an undeclared code. REPOINTED 2026-10-15: the first version removed an entry from AWAITING_OWNER_REVIEW, and expired the moment the owner wrote all four and the list emptied — an anchor on a list's CONTENTS cannot survive the list being empty, which is the state the project is trying to reach. REPOINTED AGAIN 2026-10-15: the reviewed count moved 224 -> 223 when the retention umbrella was withdrawn and took the owner's Arabic line with it, so the anchor had to follow. An anchor on a NUMBER tracks a figure that legitimately moves; that is the cost of planting an arithmetic guard, and it is cheaper than the alternative of anchoring on the list's contents, which cannot survive the list being empty.",
     "file": "apps/web/lib/admin/permission-descriptions.test.ts",
-    "from": "const OWNER_REVIEWED_COUNT = 224;",
-    "to": "const OWNER_REVIEWED_COUNT = 223;"
+    "from": "const OWNER_REVIEWED_COUNT = 223;",
+    "to": "const OWNER_REVIEWED_COUNT = 222;"
   },
   "the-list-names-a-code-that-does-not-exist": {
     "_": "A renamed or withdrawn code left in the list would keep the balance arithmetic working while naming nothing — the one way this guard could pass while describing a fiction. REPOINTED 2026-10-15 to INSERT a fake entry rather than corrupt an existing one, so it works whether the list is empty or full.",

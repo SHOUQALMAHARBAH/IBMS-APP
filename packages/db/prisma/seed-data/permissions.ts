@@ -1516,10 +1516,43 @@ const pdpl: PermissionSeed[] = [
     roles: [DPO],
   },
   {
-    code: "retention-schedule.manage",
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — THE EDIT HALF.
+     *
+     * `retention-schedule.manage` gated BOTH the edit and the Legal Counsel confirmation, which made
+     * "a retention period one person chose and confirmed alone" unrepresentable as a defect: there
+     * was one code, so there was nothing to separate.
+     *
+     * Splitting it is only half the work, and the owner was explicit that the other half is what
+     * matters: "splitting the codes alone would leave two codes with no enforcement — separated in
+     * appearance only". So migration `20261128100000` gives the table a MAKER column, a CHECKER
+     * column, an escape column and a CHECK constraint, and the pair is registered in
+     * `maker-checker-pairs.config.ts` — which is what makes the database, the readiness signal and
+     * the office's declared separated/merged state pick it up automatically.
+     *
+     * WHICH OF THE TWO A PERSON HOLDS IS THE OFFICE'S CHOICE. Both successors go to both roles that
+     * held the umbrella, because withdrawing one from one role here would be this product deciding
+     * an office's separation of duties for it. A one-person office is covered by the declared merged
+     * state, with the hat recorded per step.
+     */
+    code: "retention-schedule.update",
     module: "pdpl",
     description:
-      "Maintain the retention-period table (record categories, months, Legal Counsel confirmation)",
+      "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded",
+    roles: [COMPLIANCE, DPO],
+  },
+  {
+    /*
+     * THE CONFIRM HALF — and it is the checker, so it is registered in `checker-roles.config.ts`
+     * too. A pair added to the maker/checker registry WITHOUT a code there is a pair whose checker
+     * half can be handed out silently: the database still refuses a self-confirmation, but nothing
+     * reports that an office granted one role both halves. That was found on 2026-10-13 for
+     * `needs-assessment.approve` and is not repeated here.
+     */
+    code: "retention-schedule.confirm",
+    module: "pdpl",
+    description:
+      "Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row",
     roles: [COMPLIANCE, DPO],
   },
   {

@@ -404,6 +404,16 @@ describe('every office has a route to user administration', () => {
         'provider.office.register',
         // Item (e) — the other kind of tenant.
         'provider.insurer.register',
+        /*
+         * Item (f) — giving a registered office its FIRST account, and CI caught this omission by
+         * name. I updated `PROVIDER_CODES` in the seed and the grid spec's PLATFORM set and missed
+         * THIS pin, which is the same blast-radius mistake as before: I measured "what declares the
+         * provider's codes" and the thing that mattered was "what ASSERTS them".
+         *
+         * Not a tenant-creating code like the two above — it writes INSIDE a tenant, which is why it
+         * is a separate grant: registering an office is a filing, handing over its keys is not.
+         */
+        'provider.office.administrator.invite',
         // Item (b) — self-administration, bounded by tenancy rather than by anything written for it.
         'role.create',
         'role.deactivate',

@@ -64,7 +64,7 @@ const MISSING_DESCRIPTION_BUDGET = 0;
  * What must never happen is this number going up while the CODE COUNT stays the same. That would be
  * a reversion, and it is what the rule is about.
  */
-const CARRIED_ENGLISH_BUDGET = 215;
+const CARRIED_ENGLISH_BUDGET = 216;
 
 /**
  * CODES WHOSE ARABIC IS **NOT** THE OWNER'S, and the balance check that stops this list rotting.
@@ -100,7 +100,19 @@ const CARRIED_ENGLISH_BUDGET = 215;
  * a permission, so a must-only-shrink rule would be wrong and would teach somebody to edit it around.
  * What must only grow is `OWNER_REVIEWED_COUNT`.
  */
-const OWNER_REVIEWED_COUNT = 224;  // unchanged: item (f)'s code is NOT hers
+/*
+ * 223 — AND IT WENT DOWN, WHICH THIS GUARD'S DESIGN DID NOT ANTICIPATE.
+ *
+ * The balance was built for codes being ADDED. Module 0 close decision 3 REMOVED one:
+ * `retention-schedule.manage` was withdrawn and split into `.update` and `.confirm`, and the
+ * withdrawn code took HER Arabic line with it — it was one of the 219 she delivered. So the
+ * owner-reviewed count must come DOWN by one, or this file would still be crediting her with a line
+ * for a code that no longer exists.
+ *
+ * That is the honest accounting and it is worth stating: a reviewed count that only ever rises would
+ * drift upward every time a code is retired, and the drift would look like progress.
+ */
+const OWNER_REVIEWED_COUNT = 223;
 
 /**
  * The four lines an agent wrote. Each is a placeholder in HER register, not a reviewed line.
@@ -117,6 +129,12 @@ const AWAITING_OWNER_REVIEW: string[] = [
    * the list refills itself rather than needing somebody to remember.
    */
   'provider.office.administrator.invite',
+  /*
+   * The two halves of the split retention code. Their Arabic was written by an agent — the withdrawn
+   * umbrella's line was HERS, and a split is not a translation, so neither successor inherits it.
+   */
+  'retention-schedule.update',
+  'retention-schedule.confirm',
   /*
    * The owner wrote all four of the previous entries, and that remains the goal state rather than a
    * disabled guard. The balance check below still holds (224 = 224 + 0) and still fails by name the

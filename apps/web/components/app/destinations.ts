@@ -346,7 +346,11 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         href: '/retention-disposal',
         labelKey: 'navRetentionDisposal',
         permissions: [
-          'retention-schedule.manage',
+          // The umbrella split (module 0 close, decision 3). BOTH listed: a destination gate is
+          // satisfied by ANY of its codes, so a confirm-only holder must still be able to reach
+          // the screen — a gate nobody can satisfy makes a destination unreachable (§ 1.62).
+          'retention-schedule.update',
+          'retention-schedule.confirm',
           'legal-hold.manage',
           'retention.dispose.nominate',
           'retention.dispose.approve',

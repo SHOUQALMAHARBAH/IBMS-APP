@@ -1,6 +1,6 @@
 # Permission catalogue — دليل الصلاحيات
 
-> **225 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
+> **226 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
 >
 > **The English text is the stored description.** It is developer-facing and often terse: a hint at what the code gates, not something to translate word for word.
 >
@@ -238,7 +238,7 @@
 | `profitability-analysis.view` | View profitability analysis (commission income vs. cost-to-serve) | EXECUTIVE_MANAGEMENT, FINANCE_COLLECTIONS_OFFICER |
 | `sales-target.manage` | Set and revise sales targets per employee/team | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT |
 
-## pdpl — حماية البيانات الشخصية  (16)
+## pdpl — حماية البيانات الشخصية  (17)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -254,7 +254,8 @@
 | `legal-hold.manage` | Place/review a Legal Hold | DATA_PROTECTION_OFFICER |
 | `privacy-notice.publish` | Publish a version-controlled bilingual privacy notice | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
 | `privacy-notice.read` | Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission) | CLAIMS_OFFICER, COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER, PLACEMENT_TECHNICAL_OFFICER, SALES_RELATIONSHIP_OFFICER |
-| `retention-schedule.manage` | Maintain the retention-period table (record categories, months, Legal Counsel confirmation) | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
+| `retention-schedule.confirm` | Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
+| `retention-schedule.update` | Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
 | `retention.dispose.approve` | Give final DPO approval on a disposal batch (checker side of dual control) | DATA_PROTECTION_OFFICER |
 | `retention.dispose.nominate` | Nominate a disposal batch (maker side of dual control) | BRANCH_DEPARTMENT_MANAGER |
 | `ropa.manage` | Maintain the Records of Processing Activities register | DATA_PROTECTION_OFFICER |
@@ -297,7 +298,7 @@
 
 ## Measured, so the numbers are checkable
 
-- **225** codes, **12** modules.
+- **226** codes, **12** modules.
 - **0** held by no seeded role; **89** held by exactly one.
 - **0** have no stored English description.
 

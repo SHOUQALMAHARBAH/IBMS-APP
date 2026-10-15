@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 507 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 509 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -176,7 +176,8 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'privacy-notice.publish',
     'privacy-notice.read',
     'recommendation.all-owners.read',
-    'retention-schedule.manage',
+    'retention-schedule.confirm',
+    'retention-schedule.update',
     'risk-register.manage',
     'sanctions-pep.screen',
     'screening.run',
@@ -214,7 +215,8 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'legal-hold.manage',
     'privacy-notice.publish',
     'privacy-notice.read',
-    'retention-schedule.manage',
+    'retention-schedule.confirm',
+    'retention-schedule.update',
     'retention.dispose.approve',
     'ropa.manage',
     'sla.policy.read',
@@ -566,7 +568,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 225 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 226 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -772,7 +774,8 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'legal-hold.manage', module: 'pdpl', description: "Place/review a Legal Hold", scope: 'OFFICE' },
   { code: 'privacy-notice.publish', module: 'pdpl', description: "Publish a version-controlled bilingual privacy notice", scope: 'OFFICE' },
   { code: 'privacy-notice.read', module: 'pdpl', description: "Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)", scope: 'OFFICE' },
-  { code: 'retention-schedule.manage', module: 'pdpl', description: "Maintain the retention-period table (record categories, months, Legal Counsel confirmation)", scope: 'OFFICE' },
+  { code: 'retention-schedule.confirm', module: 'pdpl', description: "Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row", scope: 'OFFICE' },
+  { code: 'retention-schedule.update', module: 'pdpl', description: "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded", scope: 'OFFICE' },
   { code: 'retention.dispose.approve', module: 'pdpl', description: "Give final DPO approval on a disposal batch (checker side of dual control)", scope: 'OFFICE' },
   { code: 'retention.dispose.nominate', module: 'pdpl', description: "Nominate a disposal batch (maker side of dual control)", scope: 'OFFICE' },
   { code: 'ropa.manage', module: 'pdpl', description: "Maintain the Records of Processing Activities register", scope: 'OFFICE' },

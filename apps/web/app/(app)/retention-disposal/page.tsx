@@ -40,7 +40,11 @@ import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusalAllOf } from '../../../lib/i18n/permission-refusal';
 
 const SCHEDULE_ROLES = [
-  'retention-schedule.manage',
+  // MODULE 0 CLOSE, DECISION 3 — the umbrella split. The screen needs EITHER half to be useful:
+  // the maker to set a period, the checker to confirm one. Listing both is what keeps a
+  // confirm-only holder from meeting a refusal on a screen they legitimately work on.
+  'retention-schedule.update',
+  'retention-schedule.confirm',
 ];
 const LEGAL_HOLD_ROLES = [
   'legal-hold.manage',
@@ -111,7 +115,7 @@ export default function RetentionDisposalPage() {
       setBatches(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? permissionRefusalAllOf(t, 'rdRefusalAct', ['retention-schedule.manage', 'legal-hold.manage', 'retention.dispose.nominate / retention.dispose.approve'])
+          ? permissionRefusalAllOf(t, 'rdRefusalAct', ['retention-schedule.update / retention-schedule.confirm', 'legal-hold.manage', 'retention.dispose.nominate / retention.dispose.approve'])
           : err instanceof ApiError
             ? err.message
             : t('rdLoadError'),

@@ -876,6 +876,10 @@ model User {
   auditLogEntries            AuditLogEntry[]             @relation("AuditLogUser")
   accessAnomalyAlerts        AccessAnomalyAlert[]        @relation("AccessAnomalyAlertUser")
   recertifications           AccessRecertificationItem[] @relation("RecertificationReviewer")
+  /// MODULE 0 CLOSE, DECISION 3 — the sixteenth maker/checker pair. Two NAMED relations because
+  /// one person may appear as either half on different rows, and an unnamed pair would be ambiguous.
+  retentionPeriodsSet        RetentionScheduleItem[]     @relation("RetentionScheduleItemSetBy")
+  retentionPeriodsConfirmed  RetentionScheduleItem[]     @relation("RetentionScheduleItemConfirmedBy")
   mfaCredentials             MfaCredential[]
   refreshTokens              RefreshToken[]
   sessions                   UserSession[]
@@ -4807,11 +4811,35 @@ model RetentionScheduleItem {
   legalBasis                String?
   confirmedByLegalCounselAt DateTime?
 
+  /// MODULE 0 CLOSE, DECISION 3 — THE SIXTEENTH MAKER/CHECKER PAIR.
+  ///
+  /// Before this, the EDIT (`retentionPeriodMonths`, `legalBasis`) and the CONFIRM
+  /// (`confirmedByLegalCounselAt`) were both gated on one code, and the confirm recorded a DATE AND
+  /// NO ACTOR — so there was nothing to compare and no constraint a code split could have been
+  /// enforced by. Splitting the codes alone would have put "separation of duties" on a screen with
+  /// nothing behind it.
+  ///
+  /// Both nullable: four rows already existed and nobody recorded who set them, and inventing an
+  /// actor for a compliance decision is the lie these columns exist to prevent.
+  /// Who set this retention period — the MAKER.
+  setByUserId                     String?
+  setBy                           User?            @relation("RetentionScheduleItemSetBy", fields: [setByUserId], references: [id], onDelete: Restrict)
+  /// Who confirmed it as Legal Counsel — the CHECKER, and the actor the date never had.
+  confirmedByLegalCounselByUserId String?
+  confirmedByLegalCounsel         User?            @relation("RetentionScheduleItemConfirmedBy", fields: [confirmedByLegalCounselByUserId], references: [id], onDelete: Restrict)
+  /// The escape column, so a declared one-person office can do both halves WITH THE ACT RECORDED.
+  /// `onDelete: Restrict` EXPLICITLY — Prisma's default for an optional relation is `SetNull`, and a
+  /// nulled escape column would silently turn a declared combined act into an unexplained
+  /// self-approval.
+  combinedDutyActId               String?
+  combinedDutyAct                 CombinedDutyAct? @relation("RetentionScheduleItemCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
+
   disposalBatches DisposalBatch[]
   legalHolds      LegalHold[]
 
   @@unique([organizationId, recordCategory])
   @@index([organizationId])
+  @@index([combinedDutyActId])
 }
 
 /// Part 6.2 (M06) — records under active Legal Hold (releasedAt IS NULL)
@@ -6851,6 +6879,7 @@ model CombinedDutyAct {
   policyCheckings               PolicyChecking[]            @relation("PolicyCheckingCombinedDuty")
   refunds                       Refund[]                    @relation("RefundCombinedDuty")
   disposalBatches               DisposalBatch[]             @relation("DisposalBatchCombinedDuty")
+  retentionScheduleItems        RetentionScheduleItem[]     @relation("RetentionScheduleItemCombinedDuty")
   dataSharingApprovals          DataSharingApproval[]       @relation("DataSharingApprovalCombinedDuty")
   dataProcessingAgreements      DataProcessingAgreement[]   @relation("DataProcessingAgreementCombinedDuty")
   settlements                   Settlement[]                @relation("SettlementCombinedDuty")

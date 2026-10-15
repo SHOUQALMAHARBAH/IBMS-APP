@@ -98,13 +98,13 @@ check() { # name expected actual
 }
 
 say "asserting the structure"
-check "permission codes seeded" 224 \
+check "permission codes seeded" 226 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
-check "PLATFORM-scoped codes" 3 \
+check "PLATFORM-scoped codes" 4 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"
 check "exactly one PROVIDER organization" 1 \
   "$(psql_scratch $'SELECT count(*) FROM "Organization" WHERE type = \'PROVIDER\'')"
-check "the provider role's grants" 9 \
+check "the provider role's grants" 10 \
   "$(psql_scratch 'SELECT count(*) FROM "RolePermission" rp JOIN "Organization" o ON o.id = rp."organizationId" WHERE o.type = '"'"'PROVIDER'"'"'')"
 check "registration-pack columns are NULLABLE" 0 \
   "$(psql_scratch 'SELECT count(*) FROM pg_attribute WHERE attrelid = '"'"'"Organization"'"'"'::regclass AND attnotnull AND attname IN ('"'"'premisesTenureDocumentId'"'"','"'"'associationMembershipDocumentId'"'"')')"
@@ -123,6 +123,12 @@ check "the eight reference tables are seeded" 8 \
   "$(psql_scratch 'SELECT count(*) FROM (SELECT 1 FROM "LegalForm" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "LicensingAuthority" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Country" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "City" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Bank" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Currency" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "BusinessModel" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "RatingAgency" HAVING count(*) > 0) t')"
 check "insurance lines" 32 \
   "$(psql_scratch 'SELECT count(*) FROM "InsuranceLine"')"
+# THE SIXTEENTH MAKER/CHECKER PAIR (module 0 close, decision 3). Pinned here because a pair is a
+# DATABASE fact: the registry, the readiness signal and the schema guard all derive from it, and a
+# migration that silently failed to add the constraint would leave two split codes enforcing
+# nothing — separation in appearance only.
+check "maker/checker CHECK constraints" 16 \
+  "$(psql_scratch "SELECT count(*) FROM pg_constraint WHERE conname LIKE '%maker%checker%'")"
 check "zero RegulatoryAction rows — no migration invents a regulator's act" 0 \
   "$(psql_scratch 'SELECT count(*) FROM "RegulatoryAction"')"
 

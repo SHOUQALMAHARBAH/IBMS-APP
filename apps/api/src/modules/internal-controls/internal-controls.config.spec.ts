@@ -59,6 +59,19 @@ describe('MAKER_CHECKER_REGISTRY', () => {
         'PolicyChecking_maker_checker_distinct',
         'Recommendation_maker_checker_distinct',
         'Refund_maker_checker_distinct',
+        /*
+         * MODULE 0 CLOSE, DECISION 3 — THE SIXTEENTH PAIR, and this is the deliberate edit the
+         * assertion's own message asks for.
+         *
+         * `RetentionScheduleItem` already had a confirm step — `confirmedByLegalCounselAt`, a date
+         * with NO ACTOR — so one person could set a retention period and confirm it as Legal Counsel
+         * and nothing could compare them. The period decides when a customer's records are
+         * destroyed.
+         *
+         * Adding it here is what makes it visible to the duty-segregation readiness signal and to
+         * the schema guard that compares this list against `pg_constraint` both ways.
+         */
+        'RetentionScheduleItem_maker_checker_distinct',
         'Settlement_maker_checker_distinct',
       ].sort(),
     );

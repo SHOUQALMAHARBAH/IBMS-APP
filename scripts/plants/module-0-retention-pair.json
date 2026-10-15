@@ -1,0 +1,14 @@
+{
+  "the-maker-is-never-stamped": {
+    "_": "Stop stamping the maker on create. The row then has `setByUserId = null`, the engine compares the checker against an empty string, nothing ever matches, and ONE PERSON CAN SET AND CONFIRM A RETENTION PERIOD — the exact state the table was in before this pair existed, and the reason splitting the codes alone would have been separation in appearance only. Must kill the self-confirmation refusal test AND the unit test that asserts the maker is stamped.",
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "        setByUserId: actorUserId,\n      });",
+    "to": "      });"
+  },
+  "the-engine-result-is-discarded": {
+    "_": "Resolve the duty-segregation act and then drop it, passing null to the write. In a SEGREGATED office this changes nothing — which is why it is dangerous — but in a DECLARED COMBINED office the CHECK refuses a self-confirming row whose escape column is null, so a legitimate declared act becomes a 500. That is the backstop working, and it is the same mistake `no-unused-vars` caught at two call sites during item (h). Must kill the unit test that asserts the fourth argument.",
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "      actorUserId,\n      combinedDutyActId,\n    );",
+    "to": "      actorUserId,\n      null,\n    );"
+  }
+}

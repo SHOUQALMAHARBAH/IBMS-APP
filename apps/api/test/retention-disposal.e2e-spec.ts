@@ -138,7 +138,8 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
 
     const category = `E2E-Category-${Math.random().toString(36).slice(2, 8)}`;
 
-    // a role without retention-schedule.manage cannot create
+    // a role without retention-schedule.update cannot create (the umbrella split, module 0 close
+    // decision 3 — the CREATE half is the maker's code)
     await request(app.getHttpServer())
       .post('/retention-schedule')
       .set(bearer(outsider.accessToken))
@@ -231,10 +232,22 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     // Named, so the officer can see WHICH category is blocking.
     expect(JSON.stringify(unconfirmed.body)).toContain(category);
 
-    // confirm the period — the act this gate exists to require
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — CONFIRMED BY THE DPO, NOT BY THE PERSON WHO SET IT.
+     *
+     * This line used to confirm as `compliance`, the same actor that created the item above, and it
+     * now returns 403: the retention schedule is the SIXTEENTH maker/checker pair, and one person
+     * setting a retention period and confirming it as Legal Counsel is precisely what the pair
+     * exists to refuse. The test encoded the old behaviour as intended — the same situation as item
+     * (c)'s "proceeds when no BrokerLicense record is configured" — so it is RE-POINTED at a second
+     * actor rather than loosened, and the refusal it used to allow now has its own test below.
+     *
+     * The DPO holds `retention-schedule.confirm`: both halves went to both roles that held the
+     * umbrella, because which of the two a person holds is the office's choice, not this product's.
+     */
     const legallyConfirmed = await request(app.getHttpServer())
       .post(`/retention-schedule/${itemId}/confirm`)
-      .set(bearer(compliance.accessToken))
+      .set(bearer(dpo.accessToken))
       .expect(201);
     expect(
       (legallyConfirmed.body as RetentionScheduleItemBody).isConfirmed,
@@ -346,10 +359,18 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       .send({ retentionPeriodMonths: 999 })
       .expect(422);
 
-    // re-confirming is 422
+    /*
+     * Re-confirming is 422 — AS THE DPO, and the actor matters now.
+     *
+     * As `compliance` this is a 403, not a 422: that actor SET the period, so the maker/checker
+     * refusal fires BEFORE the already-confirmed check. That ordering is deliberate (module 0 close,
+     * decision 3) — refuse first on the thing the caller cannot change by editing their request, so
+     * an officer who may not confirm this row at all hears that rather than discovering it on a
+     * second attempt. Asserting 422 here therefore requires an actor who COULD confirm.
+     */
     await request(app.getHttpServer())
       .post(`/retention-schedule/${itemId}/confirm`)
-      .set(bearer(compliance.accessToken))
+      .set(bearer(dpo.accessToken))
       .expect(422);
 
     // audit: CREATE + TRANSITION rows exist for the batch
@@ -360,7 +381,7 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     expect(audit.map((a) => a.action)).toContain('TRANSITION');
   });
 
-  it('rejects an unconfirmed schedule item update from a role outside retention-schedule.manage, and records a Legal-Hold review re-basing its due date', async () => {
+  it('rejects an unconfirmed schedule item update from a role outside retention-schedule.update, and records a Legal-Hold review re-basing its due date', async () => {
     const app = await boot();
     const compliance = await makeUser(
       app,
@@ -527,6 +548,61 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
    * their own destruction batch is `assertDifferentActors` and the
    * `DisposalBatch_maker_checker_distinct` CHECK. Untested until now.
    */
+  it('MODULE 0 CLOSE, DECISION 3 — refuses the person who SET a retention period from confirming it', async () => {
+    /*
+     * THE BEHAVIOUR THREE TESTS IN THIS FILE USED TO ALLOW, now observed on its own.
+     *
+     * Before the split, `retention-schedule.manage` gated the edit AND the confirmation, and the
+     * confirm step recorded a date with NO ACTOR — so one person setting a retention period and
+     * confirming it as Legal Counsel was not merely permitted, it was unrepresentable as a defect.
+     * Three tests here did exactly that as a convenience and were re-pointed at a second actor; a
+     * re-point without this test would move a behaviour out of sight rather than into a guard.
+     *
+     * The period decides when a customer's records are destroyed. One person choosing it and
+     * confirming it alone is the shape PRIV-SRS-01 M06 exists to prevent.
+     */
+    const app = await boot();
+    const setter = await makeUser(
+      app,
+      'retention-self-confirm',
+      'COMPLIANCE_OFFICER',
+    );
+
+    const created = await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(setter.accessToken))
+      .send({
+        recordCategory: `self-confirm-${Date.now()}`,
+        retentionPeriodMonths: 36,
+        legalBasis: 'PDPL Article 5',
+      })
+      .expect(201);
+    const itemId = (created.body as { id: string }).id;
+
+    // 403, and the body NAMES the pair rather than saying "forbidden" — an officer told only that
+    // they may not do this goes looking for a missing grant they already hold.
+    const refused = await request(app.getHttpServer())
+      .post(`/retention-schedule/${itemId}/confirm`)
+      .set(bearer(setter.accessToken))
+      .expect(403);
+    expect(JSON.stringify(refused.body)).toContain('RetentionScheduleItem');
+
+    // AND NOTHING WAS WRITTEN. The refusal is worth nothing if the row came back confirmed anyway —
+    // read from the database rather than from the response that reported the refusal.
+    const row = await prisma.retentionScheduleItem.findUniqueOrThrow({
+      where: { id: itemId },
+      select: {
+        confirmedByLegalCounselAt: true,
+        confirmedByLegalCounselByUserId: true,
+        setByUserId: true,
+      },
+    });
+    expect(row.confirmedByLegalCounselAt).toBeNull();
+    expect(row.confirmedByLegalCounselByUserId).toBeNull();
+    // The MAKER was stamped on create, which is what made the comparison possible at all.
+    expect(row.setByUserId).toBe(setter.userId);
+  }, 180_000);
+
   it('refuses self-approval by one person holding BOTH the manager and DPO roles (item 5)', async () => {
     const app = await boot();
     const both = await makeUser(
@@ -548,11 +624,22 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       .expect(201);
     const itemId = (item.body as { id: string }).id;
 
-    // Confirm the period first: nomination refuses a draft, and this test is about the
-    // maker/checker refusal rather than about that gate.
+    /*
+     * Confirm the period first: nomination refuses a draft, and this test is about the DISPOSAL
+     * maker/checker refusal rather than about that gate.
+     *
+     * CONFIRMED BY A SECOND ACTOR, because the retention schedule is now a maker/checker pair too
+     * and `both` SET this period — so `both` confirming it is the sixteenth pair's refusal, not this
+     * test's subject. Using a separate confirmer keeps this test about the thing it is named for.
+     */
+    const confirmer = await makeUser(
+      app,
+      'retention-dual-confirmer',
+      'DATA_PROTECTION_OFFICER',
+    );
     await request(app.getHttpServer())
       .post(`/retention-schedule/${itemId}/confirm`)
-      .set(bearer(both.accessToken))
+      .set(bearer(confirmer.accessToken))
       .expect(201);
 
     const batch = await request(app.getHttpServer())

@@ -6,11 +6,19 @@ export interface CreateRetentionScheduleItemInput {
   recordCategory: string;
   retentionPeriodMonths: number;
   legalBasis: string | null;
+  /** MODULE 0 CLOSE, DECISION 3 — the MAKER. Required at the input boundary even though the column is
+   *  nullable: the column is nullable for FOUR PRE-EXISTING ROWS nobody recorded an actor for, and
+   *  every row written from here on has one. Optional here would make the maker half forgettable. */
+  setByUserId: string;
 }
 
 export interface UpdateRetentionScheduleItemInput {
   retentionPeriodMonths?: number;
   legalBasis?: string | null;
+  /** RE-STAMPED ON EVERY EDIT, not only on create. The maker is whoever last SET the period, because
+   *  that is the person the confirmation must differ from — carrying the original creator forward
+   *  would let A create, B edit, and B confirm their own figure. */
+  setByUserId: string;
 }
 
 /** M06 — owns `RetentionScheduleItem` writes. `recordCategory` is a real
@@ -68,10 +76,26 @@ export class RetentionScheduleRepository {
    * in the `where`, the race-safe-invariants shape, since confirmation is a
    * one-time legal act, not an editable field. 0 rows means it was already
    * confirmed. */
-  confirm(id: string, confirmedAt: Date): Promise<Prisma.BatchPayload> {
+  confirm(
+    id: string,
+    confirmedAt: Date,
+    confirmedByUserId: string,
+    combinedDutyActId: string | null,
+  ): Promise<Prisma.BatchPayload> {
     return this.prisma.client.retentionScheduleItem.updateMany({
       where: { id, confirmedByLegalCounselAt: null },
-      data: { confirmedByLegalCounselAt: confirmedAt },
+      data: {
+        confirmedByLegalCounselAt: confirmedAt,
+        /* THE ACTOR THE DATE NEVER HAD. `RetentionScheduleItem_confirmation_carries_its_actor`
+         * refuses one without the other going forward, so these two move together by construction. */
+        confirmedByLegalCounselByUserId: confirmedByUserId,
+        /* NULL for every ordinary two-person confirmation; an act id only when the office has
+         * DECLARED merged duties and the engine resolved one. Passing it is not optional — the CHECK
+         * refuses a self-confirmation whose escape column is null, so dropping this argument turns a
+         * declared combined act into a 500. That is the backstop working, and it is why the engine's
+         * return value is threaded rather than discarded. */
+        combinedDutyActId,
+      },
     });
   }
 }

@@ -147,12 +147,21 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // `provider.office.administrator.invite` read as the families `provider.office` and
     // `provider.office.administrator` by the matrix's own segment rule, and a one-member family is
     // not a five-state row. So the catalogue grows and the other three figures stand.
-    expect(PERMISSION_CATALOGUE.length).toBe(225);
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — the retention umbrella SPLIT, so the catalogue moves +1 (one code
+     * out, two in) and the TOGGLE list moves +1 for the same reason.
+     *
+     * NO NEW FAMILY, and the arithmetic is the matrix's own: a five-state row needs TWO OR MORE of
+     * the seven CRUD verbs, and `retention-schedule` now holds `.update` (a verb) and `.confirm`
+     * (not one — "confirm" is not a point on the none/read/write/delete/full scale, the same reason
+     * `link`, `unlink` and `discard` land in the toggle list). One verb is not a family.
+     */
+    expect(PERMISSION_CATALOGUE.length).toBe(226);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
     // and the matrix no longer offers it — so the toggle list loses exactly the one code it added.
-    expect(toggles.length).toBe(162);
+    expect(toggles.length).toBe(163);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

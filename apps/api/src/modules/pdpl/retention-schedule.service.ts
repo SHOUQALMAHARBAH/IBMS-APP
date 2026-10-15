@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Prisma, type RetentionScheduleItem } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import type { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { RetentionScheduleRepository } from '../../repositories/retention-schedule.repository';
 import {
@@ -42,6 +44,9 @@ export class RetentionScheduleService {
   constructor(
     private readonly repo: RetentionScheduleRepository,
     private readonly audit: AuditService,
+    /** The ONE engine every maker/checker pair resolves through — never a second copy of the
+     *  comparison. `role-scope.inventory.spec.ts`'s sibling guard refuses a second home for it. */
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   async create(
@@ -54,6 +59,9 @@ export class RetentionScheduleService {
         recordCategory: dto.recordCategory,
         retentionPeriodMonths: dto.retentionPeriodMonths,
         legalBasis: dto.legalBasis ?? null,
+        // MODULE 0 CLOSE, DECISION 3 — the MAKER, stamped on the row that will later be compared
+        // against whoever confirms it.
+        setByUserId: actorUserId,
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -99,7 +107,18 @@ export class RetentionScheduleService {
       );
     }
 
+    /*
+     * THE MAKER IS RE-STAMPED ON EVERY EDIT, not carried forward from the create.
+     *
+     * The person the confirmation must differ from is whoever LAST SET the period. Carrying the
+     * original creator forward would let A create a row, B edit the figure, and B then confirm their
+     * own figure — a self-confirmation the constraint could not see, because it would be comparing
+     * the checker against A.
+     */
+
     const row = await this.repo.update(id, {
+      // The maker, re-stamped — see the note above.
+      setByUserId: actorUserId,
       retentionPeriodMonths: dto.retentionPeriodMonths,
       legalBasis: dto.legalBasis,
     });
@@ -119,10 +138,49 @@ export class RetentionScheduleService {
   async confirm(
     id: string,
     actorUserId: string,
+    declaration: CombinedDutyDeclarationDto = {},
   ): Promise<RetentionScheduleItemView> {
-    await this.load(id);
+    const item = await this.load(id);
+
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — THE SIXTEENTH PAIR'S DECISION, THROUGH THE ONE ENGINE.
+     *
+     * `DutySegregationService.resolve` refuses a self-confirmation in a SEGREGATED office — which
+     * every office is unless it has declared otherwise — and in a declared COMBINED office returns
+     * the act id the write must carry. Threaded, never discarded: the CHECK constraint refuses a
+     * self-confirming row whose escape column is null, so dropping the return value turns a legitimate
+     * declared act into a 500. The same mistake lint caught at two call sites during item (h).
+     *
+     * PLACED BEFORE EVERY OTHER REFUSAL. An officer who may not confirm this row at all should hear
+     * that first, rather than being told about an already-confirmed row and discovering the real
+     * obstacle on their second attempt — the ordering correction item (h) made for the commission
+     * scope check, for the same reason: refuse first on the thing the caller cannot fix by editing
+     * their request.
+     *
+     * A NULL MAKER IS NOT A SELF-CONFIRMATION. The four pre-existing rows carry `setByUserId = null`
+     * because nobody recorded who set them. `assertDifferentActors` compares ids, so a null maker can
+     * never equal the checker and the engine returns null — which is the correct reading: an
+     * unattributed period confirmed by somebody is not one person doing both halves, it is a row
+     * whose first half nobody can name. Refusing it would make four seeded rows permanently
+     * unconfirmable, which is § 1.62's unreachable-precondition shape.
+     */
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'RetentionScheduleItem_maker_checker_distinct',
+      makerId: item.setByUserId ?? '',
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'RetentionScheduleItem.confirm',
+      actorUserId,
+      reason: declaration.combinedDutyReason,
+    });
+
     const confirmedAt = new Date();
-    const res = await this.repo.confirm(id, confirmedAt);
+    const res = await this.repo.confirm(
+      id,
+      confirmedAt,
+      actorUserId,
+      combinedDutyActId,
+    );
     if (res.count === 0) {
       const now = await this.load(id);
       if (now.confirmedByLegalCounselAt !== null) {

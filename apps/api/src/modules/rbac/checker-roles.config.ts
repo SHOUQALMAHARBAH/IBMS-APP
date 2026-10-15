@@ -84,6 +84,14 @@ export const CHECKER_PERMISSIONS: readonly string[] = [
    * `MAKER_CHECKER_REGISTRY`, and derived, it failed immediately: `expected 13 to be 14`.
    */
   'needs-assessment.approve',
+  /*
+   * MODULE 0 CLOSE, DECISION 3 — the checker half of the sixteenth pair, added IN THE SAME CHANGE as
+   * the pair itself. That ordering is the lesson from 2026-10-13: `needs-assessment.approve` was
+   * registered as a pair and missed here for months, so the database refused a self-confirmation
+   * while NOTHING REPORTED that an office had granted one role both halves — which is the entire
+   * purpose of this list.
+   */
+  'retention-schedule.confirm',
 ];
 
 /** One role being granted, with what it actually grants. The caller resolves the

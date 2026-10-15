@@ -278,7 +278,10 @@ export const PERMISSIONS = {
     'perm:renewal.manage': 'يشغّل مسح التجديدات القادمة، ويحرّك حالة التجديد، ويضبط متى يُعاد طرح الوثيقة على السوق',
     'perm:renewal.read': 'يقرأ حالات التجديد ومهلها ونسبة الخسارة عليها',
     'perm:retention-case.manage': 'يدير حالة محافظة على عميل فُتحت لأن وثيقته قاربت الانتهاء أو خمد تعامله',
-    'perm:retention-schedule.manage': 'يدير جدول مدد الاحتفاظ: فئات السجلات والمدد وتأكيد المستشار القانوني. ومن يملكها يحدّد متى يصير إتلاف بيانات الناس مشروعاً — لأضيق عدد',
+    'perm:retention-schedule.update':
+      'يحدّد حاملُها مدّةَ الاحتفاظ لفئةِ سجلاتٍ وسندَها القانوني. وهو النصفُ الأوّلُ من زوجِ فصلِ المهام: من يحدّد المدّة لا يستطيع تأكيدَها بوصفه المستشارَ القانوني، إلّا إذا أعلن المكتبُ دمجَ المهام فيُسجَّل الفعل. ومن يملكها يحدّد متى يصير إتلافُ بيانات الناس مشروعاً — لأضيق عدد.',
+    'perm:retention-schedule.confirm':
+      'يؤكّد حاملُها مدّةَ الاحتفاظ بوصفه المستشارَ القانوني، فيُثبَّت التاريخُ ومعه الفاعل. وهو النصفُ الثاني من الزوج: يُرفَض على من حدّد المدّة نفسَه، إلّا إذا أعلن المكتبُ دمجَ المهام فيُسجَّل الإعلانُ على السجلّ.',
     'perm:retention.dispose.approve': 'يعتمد دفعة إتلاف نهائياً. الطرف الثاني من رقابة مزدوجة، ولا يجوز أن يكون هو من رشّحها',
     'perm:retention.dispose.nominate': 'يرشّح دفعة إتلاف. الطرف الأول؛ والاعتماد لشخص آخر',
     'perm:rfq.communication.log': 'يسجّل سؤالاً وارداً من شركة تأمين أو رداً صادراً على طلب تسعير. القراءة مشمولة بـrfq.read',
@@ -511,7 +514,10 @@ export const PERMISSIONS = {
     'perm:renewal.manage': 'Run the renewal lead-time sweep, walk a renewal case through RenewalStatus, and set its re-marketing triggers',
     'perm:renewal.read': 'List/read renewal cases, their lead-time window and loss ratio',
     'perm:retention-case.manage': 'Manage a retention case opened on renewal inactivity/lapse risk',
-    'perm:retention-schedule.manage': 'Maintain the retention-period table (record categories, months, Legal Counsel confirmation)',
+    'perm:retention-schedule.update':
+      "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded",
+    'perm:retention-schedule.confirm':
+      'Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row',
     'perm:retention.dispose.approve': 'Give final DPO approval on a disposal batch (checker side of dual control)',
     'perm:retention.dispose.nominate': 'Nominate a disposal batch (maker side of dual control)',
     'perm:rfq.communication.log': 'Record an inbound insurer query or an outbound response / additional-information note on an RFQ (Process 12). Reading the correspondence is covered by rfq.read.',
