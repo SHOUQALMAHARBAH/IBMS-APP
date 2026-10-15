@@ -1576,7 +1576,9 @@ Migration `20261117120000` withdraws the grants that already existed in brokerag
 the seed upserts grants and never revokes one.
 
 **What is closed and what is not, measured rather than claimed — RE-MEASURED 2026-10-14.** The
-provider organization holds **NINE** permission codes and **zero** rows in `Customer`, `Policy`,
+provider organization holds **TEN** permission codes (**four** PLATFORM-scoped and **six**
+OFFICE-scoped self-administration codes — measured 2026-10-15, raised from NINE by item (f)'s
+`provider.office.administrator.invite`) and **zero** rows in `Customer`, `Policy`,
 `Claim`, `Invoice`, `Employee`, `Insurer`, `BrokerLicense`, `Lead` and `Prospect` on both databases.
 
 **This paragraph said ONE code, which was true at item (j) and is no longer.** The nine are the

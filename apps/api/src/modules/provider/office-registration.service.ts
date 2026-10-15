@@ -35,10 +35,16 @@ import type { RegisterBrokerageOfficeDto } from './dto/register-brokerage-office
  *
  * ## THIS IS THE ONLY ROUTE IN THIS PRODUCT THAT CREATES A TENANT
  *
- * Measured and recorded long before this item: `Organization` had exactly TWO writers in the whole
- * repository — `packages/db/prisma/seed.ts` and `apps/api/scripts/seed-demo.script.ts` — and neither
- * is reachable over HTTP. `OrganizationRepository.soleOrganizationIdOrThrow`'s refusal says so in
- * its own message: a second office cannot be onboarded through the application.
+ * Measured BEFORE this item existed: `Organization` had exactly TWO writers in the whole repository
+ * — `packages/db/prisma/seed.ts` and `apps/api/scripts/seed-demo.script.ts` — and neither was
+ * reachable over HTTP.
+ *
+ * THAT IS NO LONGER TRUE, AND THIS FILE IS WHY. There are FOUR writers now and TWO of them are
+ * reachable over HTTP: this service and `insurance-company-registration.service.ts`. An earlier
+ * version of this comment also said `soleOrganizationIdOrThrow`'s refusal "says so in its own
+ * message" — it no longer does, and the sentence was corrected there in the same pass that found
+ * this one. Left standing, a comment is a promise: the next reader would have built on a count of
+ * two in the file that made it four.
  *
  * That makes the care here disproportionate to the line count on purpose. A defect in a route that
  * edits a row damages a row; a defect here produces a tenant that is wrong from its first second,

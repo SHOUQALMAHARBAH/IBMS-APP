@@ -456,8 +456,14 @@ export class InsurerService {
       row.financialStrengthRating === null &&
       row.financialStrengthRatingAsOf === null
     ) {
-      // Nothing to clear. The screen does not offer the action in this state either; this is the
-      // server saying the same thing to a caller that asked anyway.
+      // Nothing to clear — a no-op rather than a 422, because "already clear" is the state the
+      // caller asked for.
+      //
+      // AN EARLIER VERSION OF THIS COMMENT SAID "the screen does not offer the action in this state
+      // either", which described a screen that does not exist: measured 2026-10-15, NOTHING in
+      // `apps/web` calls `DELETE /insurers/:id/financial-strength-rating`, so decision 93's single
+      // button is unbuilt and this route is unreachable from the product. Corrected rather than
+      // deleted, because the no-op behaviour is still right — what was wrong was the reason given.
       return deriveInsurerView(row);
     }
 
