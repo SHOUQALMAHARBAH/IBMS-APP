@@ -86,7 +86,15 @@ describe("the eight provider-maintained reference lists", () => {
        * who cannot find their bank picks OTHER, and the office's record then says nothing. A short
        * list produces a question instead, and these are TABLES precisely so the answer is a row.
        */
-      const FORBIDDEN = ["OTHER", "UNKNOWN", "TBD", "NA", "N_A", "MISC", "NONE"];
+      const FORBIDDEN = [
+        "OTHER",
+        "UNKNOWN",
+        "TBD",
+        "NA",
+        "N_A",
+        "MISC",
+        "NONE",
+      ];
       for (const row of rows) {
         expect(
           FORBIDDEN,
@@ -109,26 +117,59 @@ describe("the eight provider-maintained reference lists", () => {
 
   describe("the Arabic description belongs where a value carries a RULE", () => {
     /*
-     * The owner's reasoning, and it is why this is not a description on all eight:
+     * THE SPLIT WAS REDRAWN ON 2026-10-15, on the owner's own standing rule, and BOTH of her
+     * positions are recorded because they genuinely conflict and she may want the earlier one back.
+     *
+     * HER EARLIER REASONING, which this guard was built on:
      *
      *   > A city, a bank and a country are satisfied by their Arabic name — the name IS the Arabic,
      *   > and a description there would only restate it, which trains people to stop reading
      *   > descriptions at exactly the point where one matters.
      *
-     * So the split is asserted in BOTH directions. Requiring one on the two rule-bearing tables is
-     * the obvious half; asserting their ABSENCE on the other six is the half that keeps the
-     * decision alive, because nothing else would notice a well-meant restating paragraph appearing
-     * on `City`.
+     * HER NEW STANDING RULE, stated as general to every reference table after this one:
+     *
+     *   > Where a value carries no consequence, the description says so. A person who believes his
+     *   > choice changes the system's behaviour, and later finds it does not, stops trusting every
+     *   > list after it.
+     *
+     * Both are arguments about reader trust pointing in opposite directions, and they collide on
+     * exactly three lists: COUNTRIES, CITIES, BANKS. The newer rule is adopted because it is hers
+     * and she stated it as standing — and the collision is written here rather than resolved
+     * silently, so reversing it is one edit with the argument already in front of whoever makes it.
+     *
+     * AND HER OWN 46 DESCRIPTIONS SHOWED THE OLD BUCKETS WERE DRAWN IN THE WRONG PLACE, which is
+     * the part that is not a matter of taste. Three lists this guard called proper nouns carry REAL
+     * rules in her text:
+     *
+     *   LicensingAuthority  «وتعليماتُها هي التي يعمل بها هذا النظام» — WHICH regulator governs.
+     *   RatingAgency        «ولا يُقبَل تصنيفٌ بلا جهةٍ وتاريخ» — which IS the
+     *                       `Insurer_rating_carries_its_date` constraint, in words.
+     *   Currency            which amount may be compared to a legal threshold at all.
+     *
+     * So RULE_BEARING is five lists now, not two.
+     *
+     * THE GUARD STILL FAILS IN BOTH DIRECTIONS, which is the property worth keeping: a rule-bearing
+     * list missing a description fails, AND a no-consequence list whose description CLAIMS a rule
+     * fails, because it must contain the clause that disclaims one. That is a stronger check than
+     * the absence it replaces — absence could not tell a restating paragraph from a rule-claiming
+     * one, and it is the rule-claiming one that misleads.
      */
     const RULE_BEARING: [string, ReferenceSeed[]][] = [
       ["LEGAL_FORMS", LEGAL_FORMS],
       ["BUSINESS_MODELS", BUSINESS_MODELS],
+      ["LICENSING_AUTHORITIES", LICENSING_AUTHORITIES],
+      ["RATING_AGENCIES", RATING_AGENCIES],
+      ["CURRENCIES", CURRENCIES],
     ];
-    const PROPER_NOUN = LISTS.filter(
+    /** The three whose values carry NOTHING, and whose descriptions must SAY so. */
+    const NO_CONSEQUENCE = LISTS.filter(
       ([name]) => !RULE_BEARING.some(([r]) => r === name),
     );
+    /** «لا يترتّب» — "nothing follows from it". The clause that makes a no-consequence description a
+     *  disclaimer rather than a restatement of the name. */
+    const DISCLAIMS = "\u0644\u0627 \u064a\u062a\u0631\u062a\u0651\u0628";
 
-    it("is TWO lists and SIX, not four and four", () => {
+    it("is FIVE lists and THREE — redrawn 2026-10-15, was two and six", () => {
       /*
        * MEASURED, and it corrects the brief. The owner named four rule-bearing vocabularies —
        * legal form, business model, brokerage kind, integration method — but the last two are
@@ -137,8 +178,8 @@ describe("the eight provider-maintained reference lists", () => {
        *
        * Pinned so that moving a table across is a deliberate edit here rather than a quiet one.
        */
-      expect(RULE_BEARING).toHaveLength(2);
-      expect(PROPER_NOUN).toHaveLength(6);
+      expect(RULE_BEARING).toHaveLength(5);
+      expect(NO_CONSEQUENCE).toHaveLength(3);
     });
 
     describe.each(RULE_BEARING)("%s carries one on every row", (name, rows) => {
@@ -175,13 +216,23 @@ describe("the eight provider-maintained reference lists", () => {
       });
     });
 
-    it("the six proper-noun lists carry NONE", () => {
-      for (const [name, rows] of PROPER_NOUN) {
+    it("the three no-consequence lists SAY they carry no consequence", () => {
+      for (const [name, rows] of NO_CONSEQUENCE) {
         for (const row of rows) {
           expect(
-            row.descriptionAr,
-            `${name}.${row.code} carries a description. A country, city, bank, currency, licensing authority or rating agency is satisfied by its Arabic NAME — if this value genuinely carries a rule, move the list into RULE_BEARING deliberately rather than adding prose here`,
-          ).toBeUndefined();
+            row.descriptionAr?.trim(),
+            `${name}.${row.code} carries no Arabic description. A country, city or bank carries no consequence, and the owner's standing rule is that a value carrying none SAYS so — silence lets a reader believe the choice changes the system's behaviour`,
+          ).toBeTruthy();
+          /*
+           * THE CLAUSE, not merely a description. This is what replaced the old absence check and it
+           * is the stronger half: absence could not tell a harmless restatement of the name from a
+           * paragraph CLAIMING a rule this value does not carry, and the second is the one that
+           * misleads. Requiring the disclaimer catches it by name.
+           */
+          expect(
+            (row.descriptionAr ?? "").includes(DISCLAIMS),
+            `${name}.${row.code} has a description that does not disclaim a consequence. If this value genuinely carries a rule, move its list into RULE_BEARING deliberately rather than describing it as if it did`,
+          ).toBe(true);
         }
       }
     });

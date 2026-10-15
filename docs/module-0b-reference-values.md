@@ -26,7 +26,7 @@ the source can disagree with it.
 
 | code | English name | Arabic name | Arabic description |
 |---|---|---|---|
-| `CBJ` | Central Bank of Jordan | البنك المركزي الأردني | **— OWED —** |
+| `CBJ` | Central Bank of Jordan | البنك المركزي الأردني | الجهةُ التي تُصدر رخصةَ وساطة التأمين في المملكة، وتعليماتُها هي التي يعمل بها هذا النظام. ورخصةٌ صادرةٌ عن جهةٍ أخرى لا تحكمها هذه التعليمات. |
 
 ## BusinessModel — نموذج العمل — 2 row(s)
 
@@ -43,10 +43,10 @@ the source can disagree with it.
 
 | code | English name | Arabic name | Arabic description |
 |---|---|---|---|
-| `AM_BEST` | AM Best | إيه إم بست | **— OWED —** |
-| `SP_GLOBAL` | S&P Global Ratings | إس آند بي جلوبال للتصنيف | **— OWED —** |
-| `MOODYS` | Moody's | موديز | **— OWED —** |
-| `FITCH` | Fitch Ratings | فيتش للتصنيف | **— OWED —** |
+| `AM_BEST` | AM Best | إيه إم بست | وكالةُ تصنيفٍ عالميةٌ متخصّصةٌ في قطاع التأمين. تُذكَر مع تصنيف الملاءة وتاريخِه، فتصنيفٌ بلا جهةٍ أصدرته وبلا تاريخٍ لا يستطيع أحدٌ الرجوعَ إليه. |
+| `SP_GLOBAL` | S&P Global Ratings | إس آند بي جلوبال للتصنيف | وكالةُ تصنيفٍ عالميةٌ تُصنّف شركاتِ التأمين ضمن ما تُصنّفه. تُذكَر مع التصنيف وتاريخِه، ولا يُقبَل تصنيفٌ بلا جهةٍ وتاريخ. |
+| `MOODYS` | Moody's | موديز | وكالةُ تصنيفٍ عالمية. تُذكَر مع التصنيف وتاريخِه، لأنّ قراءةَ التصنيف بعد سنتين تحتاج أن تُعرَف جهتُه وزمنُه. |
+| `FITCH` | Fitch Ratings | فيتش للتصنيف | وكالةُ تصنيفٍ عالمية. تُذكَر مع التصنيف وتاريخِه، فالتصنيفُ وتاريخُه يُسجَّلان معاً ويُمحَيان معاً. |
 
 ## Currency — العملة — 3 row(s)
 
@@ -54,9 +54,9 @@ the source can disagree with it.
 
 | code | English name | Arabic name | Arabic description |
 |---|---|---|---|
-| `JOD` | Jordanian Dinar | دينار أردني | **— OWED —** |
-| `USD` | US Dollar | دولار أمريكي | **— OWED —** |
-| `EUR` | Euro | يورو | **— OWED —** |
+| `JOD` | Jordanian Dinar | دينار أردني | عملةُ الحدود القانونية كلِّها في تعليمات رقم (٩) لسنة ٢٠٢٦: رأسُ المال والضماناتُ وحدودُ الإعفاء. والمبلغُ بالدينار هو وحدَه ما يصحّ قياسُه بتلك الحدود، فغيرُه يحتاج تحويلاً لا يملكه النظام. وما يُقارِنه النظامُ اليومَ حدٌّ واحدٌ فقط: رأسُ المال المطلوب في المادة (٤/أ). أمّا مبلغُ الكفالة البنكية فيُسجَّل ولا يُفحَص، وحدّا المادتين (١٣/ب/٢) و(١٥/د) غيرُ مُدخَلَين في النظام. |
+| `USD` | US Dollar | دولار أمريكي | تُسجَّل في الاتفاقيات والمراجع بالعملة الأجنبية. ولا يحمل النظامُ سعرَ صرفٍ بتاريخه، فمبلغٌ بها لا يُقارَن بحدٍّ قانونيٍّ بالدينار ما لم يُحوَّل خارجَ النظام. |
+| `EUR` | Euro | يورو | تُسجَّل في الاتفاقيات والمراجع بالعملة الأجنبية. وكما في الدولار، لا مسارَ تحويلٍ في النظام، فلا تُقاس بها الحدودُ القانونية. |
 
 ## Country — الدولة — 1 row(s)
 
@@ -64,7 +64,7 @@ the source can disagree with it.
 
 | code | English name | Arabic name | Arabic description |
 |---|---|---|---|
-| `JO` | Jordan | الأردن | **— OWED —** |
+| `JO` | Jordan | الأردن | المملكةُ الأردنية الهاشمية. بيانُ عنوانٍ يُسجَّل كما يُدخَل، ولا يترتّب عليه حكمٌ ولا يُقابَل بالمدينة المختارة. |
 
 ## City — المدينة — 12 row(s)
 
@@ -72,18 +72,18 @@ the source can disagree with it.
 
 | code | English name | Arabic name | Arabic description |
 |---|---|---|---|
-| `AMMAN` | Amman | عمّان | **— OWED —** |
-| `IRBID` | Irbid | إربد | **— OWED —** |
-| `ZARQA` | Zarqa | الزرقاء | **— OWED —** |
-| `BALQA` | Balqa (Salt) | البلقاء (السلط) | **— OWED —** |
-| `MAFRAQ` | Mafraq | المفرق | **— OWED —** |
-| `JERASH` | Jerash | جرش | **— OWED —** |
-| `AJLOUN` | Ajloun | عجلون | **— OWED —** |
-| `MADABA` | Madaba | مادبا | **— OWED —** |
-| `KARAK` | Karak | الكرك | **— OWED —** |
-| `TAFILAH` | Tafilah | الطفيلة | **— OWED —** |
-| `MAAN` | Ma'an | معان | **— OWED —** |
-| `AQABA` | Aqaba | العقبة | **— OWED —** |
+| `AMMAN` | Amman | عمّان | العاصمة. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `IRBID` | Irbid | إربد | إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `ZARQA` | Zarqa | الزرقاء | إحدى محافظات الوسط. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `BALQA` | Balqa (Salt) | البلقاء (السلط) | محافظةُ البلقاء ومركزُها السلط. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `MAFRAQ` | Mafraq | المفرق | إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `JERASH` | Jerash | جرش | إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `AJLOUN` | Ajloun | عجلون | إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `MADABA` | Madaba | مادبا | إحدى محافظات الوسط. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `KARAK` | Karak | الكرك | إحدى محافظات الجنوب. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `TAFILAH` | Tafilah | الطفيلة | إحدى محافظات الجنوب. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `MAAN` | Ma'an | معان | إحدى محافظات الجنوب. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
+| `AQABA` | Aqaba | العقبة | محافظةُ العقبة، وهي المنفذُ البحريُّ للمملكة. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم. |
 
 ## Bank — البنك — 14 row(s)
 
@@ -91,20 +91,20 @@ the source can disagree with it.
 
 | code | English name | Arabic name | Arabic description |
 |---|---|---|---|
-| `ARAB_BANK` | Arab Bank | البنك العربي | **— OWED —** |
-| `HOUSING_BANK` | Housing Bank for Trade and Finance | بنك الإسكان للتجارة والتمويل | **— OWED —** |
-| `BANK_OF_JORDAN` | Bank of Jordan | بنك الأردن | **— OWED —** |
-| `JORDAN_AHLI_BANK` | Jordan Ahli Bank | البنك الأهلي الأردني | **— OWED —** |
-| `CAIRO_AMMAN_BANK` | Cairo Amman Bank | بنك القاهرة عمّان | **— OWED —** |
-| `JORDAN_KUWAIT_BANK` | Jordan Kuwait Bank | البنك الأردني الكويتي | **— OWED —** |
-| `BANK_AL_ETIHAD` | Bank al Etihad | بنك الاتحاد | **— OWED —** |
-| `CAPITAL_BANK` | Capital Bank of Jordan | كابيتال بنك | **— OWED —** |
-| `ARAB_JORDAN_INVESTMENT_BANK` | Arab Jordan Investment Bank | بنك الاستثمار العربي الأردني | **— OWED —** |
-| `INVEST_BANK` | InvestBank | بنك الاستثمار | **— OWED —** |
-| `ABC_BANK_JORDAN` | Arab Banking Corporation (Jordan) | بنك المؤسسة العربية المصرفية (الأردن) | **— OWED —** |
-| `JORDAN_ISLAMIC_BANK` | Jordan Islamic Bank | البنك الإسلامي الأردني | **— OWED —** |
-| `ISLAMIC_INTERNATIONAL_ARAB_BANK` | Islamic International Arab Bank | البنك العربي الإسلامي الدولي | **— OWED —** |
-| `SAFWA_ISLAMIC_BANK` | Safwa Islamic Bank | بنك صفوة الإسلامي | **— OWED —** |
+| `ARAB_BANK` | Arab Bank | البنك العربي | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `HOUSING_BANK` | Housing Bank for Trade and Finance | بنك الإسكان للتجارة والتمويل | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `BANK_OF_JORDAN` | Bank of Jordan | بنك الأردن | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `JORDAN_AHLI_BANK` | Jordan Ahli Bank | البنك الأهلي الأردني | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `CAIRO_AMMAN_BANK` | Cairo Amman Bank | بنك القاهرة عمّان | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `JORDAN_KUWAIT_BANK` | Jordan Kuwait Bank | البنك الأردني الكويتي | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `BANK_AL_ETIHAD` | Bank al Etihad | بنك الاتحاد | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `CAPITAL_BANK` | Capital Bank of Jordan | كابيتال بنك | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `ARAB_JORDAN_INVESTMENT_BANK` | Arab Jordan Investment Bank | بنك الاستثمار العربي الأردني | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `INVEST_BANK` | InvestBank | بنك الاستثمار | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `ABC_BANK_JORDAN` | Arab Banking Corporation (Jordan) | بنك المؤسسة العربية المصرفية (الأردن) | بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `JORDAN_ISLAMIC_BANK` | Jordan Islamic Bank | البنك الإسلامي الأردني | بنكٌ عاملٌ في المملكة يعمل وفق أحكام الشريعة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `ISLAMIC_INTERNATIONAL_ARAB_BANK` | Islamic International Arab Bank | البنك العربي الإسلامي الدولي | بنكٌ عاملٌ في المملكة يعمل وفق أحكام الشريعة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
+| `SAFWA_ISLAMIC_BANK` | Safwa Islamic Bank | بنك صفوة الإسلامي | بنكٌ عاملٌ في المملكة يعمل وفق أحكام الشريعة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم. |
 
 ---
 
@@ -161,7 +161,7 @@ and all eleven members need a description.
 | reference-table rows | **44** |
 | enum members | **11** |
 | total values in scope | **55** |
-| **of those, still OWED an Arabic description** | **46** |
+| **of those, still OWED an Arabic description** | **11** |
 
 The brief estimated "roughly forty". The measured figure is above, and it is higher because the
 module added four enums rather than two. Rows that already carry a `descriptionAr` are shown

@@ -72,7 +72,13 @@ export interface ReferenceSeed {
  * the one it needs as a row. That is precisely what makes this a table.
  */
 export const COUNTRIES: ReferenceSeed[] = [
-  { code: "JO", nameEn: "Jordan", nameAr: "الأردن" },
+  {
+    code: "JO",
+    nameEn: "Jordan",
+    nameAr: "الأردن",
+    descriptionAr:
+      "المملكةُ الأردنية الهاشمية. بيانُ عنوانٍ يُسجَّل كما يُدخَل، ولا يترتّب عليه حكمٌ ولا يُقابَل بالمدينة المختارة.",
+  },
 ];
 
 /**
@@ -81,18 +87,89 @@ export const COUNTRIES: ReferenceSeed[] = [
  * northern, then central, then southern.
  */
 export const CITIES: ReferenceSeed[] = [
-  { code: "AMMAN", nameEn: "Amman", nameAr: "عمّان" },
-  { code: "IRBID", nameEn: "Irbid", nameAr: "إربد" },
-  { code: "ZARQA", nameEn: "Zarqa", nameAr: "الزرقاء" },
-  { code: "BALQA", nameEn: "Balqa (Salt)", nameAr: "البلقاء (السلط)" },
-  { code: "MAFRAQ", nameEn: "Mafraq", nameAr: "المفرق" },
-  { code: "JERASH", nameEn: "Jerash", nameAr: "جرش" },
-  { code: "AJLOUN", nameEn: "Ajloun", nameAr: "عجلون" },
-  { code: "MADABA", nameEn: "Madaba", nameAr: "مادبا" },
-  { code: "KARAK", nameEn: "Karak", nameAr: "الكرك" },
-  { code: "TAFILAH", nameEn: "Tafilah", nameAr: "الطفيلة" },
-  { code: "MAAN", nameEn: "Ma'an", nameAr: "معان" },
-  { code: "AQABA", nameEn: "Aqaba", nameAr: "العقبة" },
+  {
+    code: "AMMAN",
+    nameEn: "Amman",
+    nameAr: "عمّان",
+    descriptionAr: "العاصمة. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "IRBID",
+    nameEn: "Irbid",
+    nameAr: "إربد",
+    descriptionAr:
+      "إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "ZARQA",
+    nameEn: "Zarqa",
+    nameAr: "الزرقاء",
+    descriptionAr:
+      "إحدى محافظات الوسط. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "BALQA",
+    nameEn: "Balqa (Salt)",
+    nameAr: "البلقاء (السلط)",
+    descriptionAr:
+      "محافظةُ البلقاء ومركزُها السلط. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "MAFRAQ",
+    nameEn: "Mafraq",
+    nameAr: "المفرق",
+    descriptionAr:
+      "إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "JERASH",
+    nameEn: "Jerash",
+    nameAr: "جرش",
+    descriptionAr:
+      "إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "AJLOUN",
+    nameEn: "Ajloun",
+    nameAr: "عجلون",
+    descriptionAr:
+      "إحدى محافظات الشمال. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "MADABA",
+    nameEn: "Madaba",
+    nameAr: "مادبا",
+    descriptionAr:
+      "إحدى محافظات الوسط. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "KARAK",
+    nameEn: "Karak",
+    nameAr: "الكرك",
+    descriptionAr:
+      "إحدى محافظات الجنوب. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "TAFILAH",
+    nameEn: "Tafilah",
+    nameAr: "الطفيلة",
+    descriptionAr:
+      "إحدى محافظات الجنوب. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "MAAN",
+    nameEn: "Ma'an",
+    nameAr: "معان",
+    descriptionAr:
+      "إحدى محافظات الجنوب. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
+  {
+    code: "AQABA",
+    nameEn: "Aqaba",
+    nameAr: "العقبة",
+    descriptionAr:
+      "محافظةُ العقبة، وهي المنفذُ البحريُّ للمملكة. بيانُ عنوانٍ يُسجَّل ولا يترتّب عليه حكم.",
+  },
 ];
 
 /**
@@ -112,48 +189,82 @@ export const CITIES: ReferenceSeed[] = [
  * Branches of foreign banks operating in Jordan are deliberately omitted rather than half-listed.
  */
 export const BANKS: ReferenceSeed[] = [
-  { code: "ARAB_BANK", nameEn: "Arab Bank", nameAr: "البنك العربي" },
+  {
+    code: "ARAB_BANK",
+    nameEn: "Arab Bank",
+    nameAr: "البنك العربي",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
+  },
   {
     code: "HOUSING_BANK",
     nameEn: "Housing Bank for Trade and Finance",
     nameAr: "بنك الإسكان للتجارة والتمويل",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
-  { code: "BANK_OF_JORDAN", nameEn: "Bank of Jordan", nameAr: "بنك الأردن" },
+  {
+    code: "BANK_OF_JORDAN",
+    nameEn: "Bank of Jordan",
+    nameAr: "بنك الأردن",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
+  },
   {
     code: "JORDAN_AHLI_BANK",
     nameEn: "Jordan Ahli Bank",
     nameAr: "البنك الأهلي الأردني",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   {
     code: "CAIRO_AMMAN_BANK",
     nameEn: "Cairo Amman Bank",
     nameAr: "بنك القاهرة عمّان",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   {
     code: "JORDAN_KUWAIT_BANK",
     nameEn: "Jordan Kuwait Bank",
     nameAr: "البنك الأردني الكويتي",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
-  { code: "BANK_AL_ETIHAD", nameEn: "Bank al Etihad", nameAr: "بنك الاتحاد" },
+  {
+    code: "BANK_AL_ETIHAD",
+    nameEn: "Bank al Etihad",
+    nameAr: "بنك الاتحاد",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
+  },
   {
     code: "CAPITAL_BANK",
     nameEn: "Capital Bank of Jordan",
     nameAr: "كابيتال بنك",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   {
     code: "ARAB_JORDAN_INVESTMENT_BANK",
     nameEn: "Arab Jordan Investment Bank",
     nameAr: "بنك الاستثمار العربي الأردني",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   {
     code: "INVEST_BANK",
     nameEn: "InvestBank",
     nameAr: "بنك الاستثمار",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   {
     code: "ABC_BANK_JORDAN",
     nameEn: "Arab Banking Corporation (Jordan)",
     nameAr: "بنك المؤسسة العربية المصرفية (الأردن)",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   // Islamic banks — a separate licence category at the CBJ, and the distinction matters to a
   // takaful-writing office, so they are named rather than folded in.
@@ -161,16 +272,22 @@ export const BANKS: ReferenceSeed[] = [
     code: "JORDAN_ISLAMIC_BANK",
     nameEn: "Jordan Islamic Bank",
     nameAr: "البنك الإسلامي الأردني",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة يعمل وفق أحكام الشريعة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   {
     code: "ISLAMIC_INTERNATIONAL_ARAB_BANK",
     nameEn: "Islamic International Arab Bank",
     nameAr: "البنك العربي الإسلامي الدولي",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة يعمل وفق أحكام الشريعة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
   {
     code: "SAFWA_ISLAMIC_BANK",
     nameEn: "Safwa Islamic Bank",
     nameAr: "بنك صفوة الإسلامي",
+    descriptionAr:
+      "بنكٌ عاملٌ في المملكة يعمل وفق أحكام الشريعة. يُختار في بيانات حساب المكتب أو في الكفالة البنكية، ولا يترتّب على اختياره حكم.",
   },
 ];
 
@@ -208,9 +325,27 @@ export const BANKS: ReferenceSeed[] = [
  * reinsurance reference; either way the answer shapes the build instead of correcting it.
  */
 export const CURRENCIES: ReferenceSeed[] = [
-  { code: "JOD", nameEn: "Jordanian Dinar", nameAr: "دينار أردني" },
-  { code: "USD", nameEn: "US Dollar", nameAr: "دولار أمريكي" },
-  { code: "EUR", nameEn: "Euro", nameAr: "يورو" },
+  {
+    code: "JOD",
+    nameEn: "Jordanian Dinar",
+    nameAr: "دينار أردني",
+    descriptionAr:
+      "عملةُ الحدود القانونية كلِّها في تعليمات رقم (٩) لسنة ٢٠٢٦: رأسُ المال والضماناتُ وحدودُ الإعفاء. والمبلغُ بالدينار هو وحدَه ما يصحّ قياسُه بتلك الحدود، فغيرُه يحتاج تحويلاً لا يملكه النظام. وما يُقارِنه النظامُ اليومَ حدٌّ واحدٌ فقط: رأسُ المال المطلوب في المادة (٤/أ). أمّا مبلغُ الكفالة البنكية فيُسجَّل ولا يُفحَص، وحدّا المادتين (١٣/ب/٢) و(١٥/د) غيرُ مُدخَلَين في النظام.",
+  },
+  {
+    code: "USD",
+    nameEn: "US Dollar",
+    nameAr: "دولار أمريكي",
+    descriptionAr:
+      "تُسجَّل في الاتفاقيات والمراجع بالعملة الأجنبية. ولا يحمل النظامُ سعرَ صرفٍ بتاريخه، فمبلغٌ بها لا يُقارَن بحدٍّ قانونيٍّ بالدينار ما لم يُحوَّل خارجَ النظام.",
+  },
+  {
+    code: "EUR",
+    nameEn: "Euro",
+    nameAr: "يورو",
+    descriptionAr:
+      "تُسجَّل في الاتفاقيات والمراجع بالعملة الأجنبية. وكما في الدولار، لا مسارَ تحويلٍ في النظام، فلا تُقاس بها الحدودُ القانونية.",
+  },
 ];
 
 /**
@@ -226,6 +361,8 @@ export const LICENSING_AUTHORITIES: ReferenceSeed[] = [
     code: "CBJ",
     nameEn: "Central Bank of Jordan",
     nameAr: "البنك المركزي الأردني",
+    descriptionAr:
+      "الجهةُ التي تُصدر رخصةَ وساطة التأمين في المملكة، وتعليماتُها هي التي يعمل بها هذا النظام. ورخصةٌ صادرةٌ عن جهةٍ أخرى لا تحكمها هذه التعليمات.",
   },
 ];
 
@@ -238,14 +375,34 @@ export const LICENSING_AUTHORITIES: ReferenceSeed[] = [
  * a fact about the company. See `docs/decision-insurer-field-split.md`.
  */
 export const RATING_AGENCIES: ReferenceSeed[] = [
-  { code: "AM_BEST", nameEn: "AM Best", nameAr: "إيه إم بست" },
+  {
+    code: "AM_BEST",
+    nameEn: "AM Best",
+    nameAr: "إيه إم بست",
+    descriptionAr:
+      "وكالةُ تصنيفٍ عالميةٌ متخصّصةٌ في قطاع التأمين. تُذكَر مع تصنيف الملاءة وتاريخِه، فتصنيفٌ بلا جهةٍ أصدرته وبلا تاريخٍ لا يستطيع أحدٌ الرجوعَ إليه.",
+  },
   {
     code: "SP_GLOBAL",
     nameEn: "S&P Global Ratings",
     nameAr: "إس آند بي جلوبال للتصنيف",
+    descriptionAr:
+      "وكالةُ تصنيفٍ عالميةٌ تُصنّف شركاتِ التأمين ضمن ما تُصنّفه. تُذكَر مع التصنيف وتاريخِه، ولا يُقبَل تصنيفٌ بلا جهةٍ وتاريخ.",
   },
-  { code: "MOODYS", nameEn: "Moody's", nameAr: "موديز" },
-  { code: "FITCH", nameEn: "Fitch Ratings", nameAr: "فيتش للتصنيف" },
+  {
+    code: "MOODYS",
+    nameEn: "Moody's",
+    nameAr: "موديز",
+    descriptionAr:
+      "وكالةُ تصنيفٍ عالمية. تُذكَر مع التصنيف وتاريخِه، لأنّ قراءةَ التصنيف بعد سنتين تحتاج أن تُعرَف جهتُه وزمنُه.",
+  },
+  {
+    code: "FITCH",
+    nameEn: "Fitch Ratings",
+    nameAr: "فيتش للتصنيف",
+    descriptionAr:
+      "وكالةُ تصنيفٍ عالمية. تُذكَر مع التصنيف وتاريخِه، فالتصنيفُ وتاريخُه يُسجَّلان معاً ويُمحَيان معاً.",
+  },
 ];
 
 /**
