@@ -107,7 +107,7 @@ MODULE: admin   —   الإدارة والنظام   (25 codes)
   [toggle]  provider.office-state.read
       provider.office-state.read
           en: Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform
-          ar: يرى حاملُها حالةَ مكاتب الوساطة المسجَّلة وما سُجِّل عليها من حالات وتواريخها: الهُويّة والحالة ونوع الوسيط، ومدّة الترخيص ورقمُه وانتهاؤه، وعددُ الفروع المرخَّصة والخاملِ منها، وعددُ المستخدمين والنشطِ منهم، وآخرُ استخدامٍ للنظام. لا يُغيّر حالةَ أيِّ مكتب، ولا يصل إلى عملاءِ المكتب ولا وثائقِه ولا أقساطِه ولا عمولاتِه ولا أيِّ بياناتٍ شخصية.
+          ar: يرى حاملُها حالةَ مكاتب الوساطة المسجَّلة وما سُجِّل عليها من حالات وتواريخها. ويرى معها أرقاماً مجمَّعةً عن كلِّ مكتب: عددَ المستخدمين والنشطِ منهم، وعددَ أنواع التأمين المرخَّصة التي لا يكتب فيها أعمالاً، وتاريخَ آخرِ استخدامٍ للنظام. لا يُغيّر حالةَ أيِّ مكتب، ولا يصل إلى عملاءِ المكتب ولا وثائقِه ولا أقساطِه ولا عمولاتِه ولا أيِّ بياناتٍ شخصية.
   [toggle]  provider.office.administrator.invite
       provider.office.administrator.invite
           en: Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password
@@ -620,11 +620,11 @@ MODULE: insurance-operations   —   العمليات التأمينية   (53 c
   [toggle]  insurer.company.link
       insurer.company.link
           en: Link this office's insurer record to an insurance company registered on the platform. Changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's own copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record.
-          ar: يُسجّل حاملُها أنّ المكتبَ يعمل مع شركةِ تأمينٍ مسجَّلةٍ في النظام. وبعد الربط تُعرَض بياناتُ الشركة المنشورة، وتصبح نسخةُ المكتب منها للقراءة فقط مع بقائها محفوظة. لا يُنشئ الشركةَ ولا يُعدّل بياناتها ولا رخصَها.
+          ar: يُسجّل حاملُها أنّ المكتبَ يعمل مع شركةِ تأمينٍ مسجَّلةٍ في النظام. لا يُنشئ الشركةَ ولا يُعدّل بياناتها ولا رخصَها.
   [toggle]  insurer.company.unlink
       insurer.company.unlink
           en: Remove the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note.
-          ar: يُنهي حاملُها علاقةَ العملِ المسجَّلةَ بين المكتب وشركةِ تأمين، فتعود نسخةُ المكتب من بيانات الشركة قابلةً للتعديل. لا يحذف الشركةَ، ولا يُلغي ما صدر أو سُجِّل قبل الإنهاء.
+          ar: يُنهي حاملُها علاقةَ العملِ المسجَّلةَ بين المكتب وشركةِ تأمين. لا يحذف الشركةَ، ولا يُلغي ما صدر أو سُجِّل قبل الإنهاء.
   [toggle]  insurer.directory.read
       insurer.directory.read
           en: Search the cross-office insurer directory — companies any office has registered, with their public contact details and the lines they offer. Never shows which offices deal with a company, or any office's commercial terms.
