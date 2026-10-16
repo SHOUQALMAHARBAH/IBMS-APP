@@ -180,7 +180,11 @@ npm run seed:demo -w api
   قائمة الحسابات. هذه الخطوة مهمة — اقرئي القسم ١٠ لمعرفة السبب.
 
 انتظري حتى ترى في النهاية سطرًا مثل:
-`All 16 demo accounts released — password-only sign-in, MFA enrolment on first login.`
+`All 18 demo accounts released — password-only sign-in, MFA enrolment on first login.`
+
+**الرقمُ محسوبٌ لا مثبَّت**، فهو يكبر كلّما أُضيف دورٌ إلى بيانات العرض — كان ١٦ وصار ١٨ يوم
+١٦/١٠/٢٠٢٦ بإضافة حساب «مدير المكتب». فاختلافُه ليس عيباً؛ العيبُ أن يقول السطرُ
+`STILL LOCKED`، أو ألّا يصل الأمرُ إلى هذا السطر أصلاً.
 
 **اتركيه يُكمل.** تحرير الحسابات للدخول البشري يحدث في **آخر** خطوة من الأمر. إن أوقفتِه في
 المنتصف (Ctrl+C أو إغلاق النافذة) تبقى الحسابات الستة عشر مربوطة بتطبيق مصادقة لا يملك أحد
@@ -571,10 +575,15 @@ minutes. It creates:
   authenticator registration. That step matters; see §10.
 
 Wait for the closing line:
-`All 16 demo accounts released — password-only sign-in, MFA enrolment on first login.`
+`All 18 demo accounts released — password-only sign-in, MFA enrolment on first login.`
+
+**The number is computed, not fixed** — it grows whenever a role is added to the demo data; it was
+16 and became 18 on 2026-10-16, when an Office Administrator account was added. A different number
+is not a fault. What is a fault is this line saying `STILL LOCKED`, or the command never reaching
+it at all.
 
 **Let it finish.** Releasing the logins for human sign-in is the command's **last** step. Stop it
-half-way — Ctrl+C, or closing the window — and all sixteen accounts stay paired to an
+half-way — Ctrl+C, or closing the window — and every account stays paired to an
 authenticator whose secret nobody holds, which is exactly the "correct code is rejected" state.
 One line fixes it: `npm run demo:release -w api`.
 
@@ -842,7 +851,8 @@ them in the tooling around the system rather than in the system:
    step runs last; the next run picked that company for an RFQ and `POST /rfqs` refused with a 422
    naming it. Three failures per run, recurring forever. Deactivated insurers are now held back
    from placement only — they stay registered and stay on the screens.
-5. **A killed run strands all sixteen logins.** Observed twice here, both times repaired by
+5. **A killed run strands every demo login** (eighteen as of 2026-10-16 — the count is computed
+   from the actor list, not fixed). Observed twice here, both times repaired by
    `npm run demo:release -w api` in seconds. Documented in § 4 and § 10 rather than left to be
    rediscovered.
 
