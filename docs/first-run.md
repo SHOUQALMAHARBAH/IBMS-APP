@@ -245,6 +245,29 @@ http://localhost:3000
 **حساب الإدارة `demo.admin` لا يرى العملاء ولا الوثائق ولا المطالبات.** هذه ليست مشكلة:
 قِيست صلاحياته فعليًا وهي ٢٩ صلاحية كلها إدارية. لعمل يوم عادي استخدمي حسابًا آخر.
 
+### حسابات `sample.` — تكلّف خطوتين قبل أن تُفتح أي شاشة
+
+حسابات `demo.` في الجدول أدناه تحتاج **الربط وحده**: أمر `seed:demo` يُفرغ علامةَ تغيير كلمة
+المرور ويحذف أي ربطٍ قديم في **آخر** خطوةٍ من تنفيذه ويتحقّق من ذلك بنفسه.
+
+أما حسابات `sample.` — وهي **أحد عشر**، واحدٌ لكل دور، كلمتها المشتركة `SampleUser#2026!` —
+فتكلّف **خطوتين** قبل أن تُفتح أي شاشة. اعرفي ذلك وأنتِ تخطّطين بأيِّ حساب تدخلين، لا وأنتِ عند
+الحساب الثالث:
+
+1. **تغييرُ كلمة المرور إلزاميّاً.** العلامة `mustChangePassword` مرفوعةٌ على الأحد عشر جميعاً —
+   وهي الافتراض في المخطّط، والتجهيزُ لا يُلغيها لهذه الحسابات. فالدخولُ يُجيب
+   `MUST_CHANGE_PASSWORD` **بلا جلسة**، أي أنّك تصلين إلى شاشة تغيير كلمة المرور لا إلى النظام.
+2. **ربطُ تطبيق المصادقة**، كما في القسم ٦ حرفيّاً.
+
+والخطوة الثانية تلزم الأحد عشر جميعاً، لا الأربعة الذين يشترط دورُهم المصادقة دائماً: الحارسُ
+الذي يطلب الربط لا يقرأ تلك الصفة إطلاقاً.
+
+**القياس (١٦/١٠/٢٠٢٦، قراءةٌ فقط — مقارنةُ تعميةٍ للكلمة المخزّنة، بلا دخولٍ وبلا كتابةٍ في
+السجل):** الأحد عشر كلّها `sharedPasswordMatches=true` و`mfaEnabled=false` و
+`mustChangePassword=true`، وبلا أيِّ صفِّ ربطٍ — فلا رمزَ يُطلب ولا رمزَ يكون خطأً. وحسابان منها
+(`sample.compliance` و`sample.manager`) كانا مغلقَين فعلاً حتى ١١/١٠/٢٠٢٦، وقد فُتحا بأمر
+`npm run sample:release -w api`.
+
 الجدول مقيس على المكتب الأول (يكفي تغيير `office-a` إلى `office-b` للمكتب الثاني):
 
 | الحساب | العملاء | إضافة عميل | العملاء المحتملون | الوثائق | المطالبات | شركات التأمين | تسجيل شركة | الموظفون | المستخدمون | الأدوار |
@@ -276,6 +299,14 @@ http://localhost:3000
 | **تعريف دور جديد** وتحديد صلاحياته، أو إيقافه | `الأدوار والصلاحيات` ← `/settings/roles` | العمليات |
 | **تسجيل شركة تأمين** (بالكتالوج أو محليًا)، تعديلها، **إيقافها عن التعامل** | `شركات التأمين` ← `/insurers` | الأعمال الجديدة |
 | **البحث في دليل الشركات** عبر المكاتب | `دليل شركات التأمين` ← `/insurer-directory` | الأعمال الجديدة |
+
+> **شاشةُ الأقسام والفروع تبدأ فارغة، وهذا ليس خطأً.** قِيس في ١٦/١٠/٢٠٢٦ أنّ القاعدة تحمل **صفر**
+> فرعاً و**صفر** قسماً، في كلِّ المنظّمات، وأمرُ `seed:demo` لا يُنشئ فرعاً واحداً. فإن أردتِ أن تري
+> المرشِّح بالفرع في شاشة الموظفين عاملاً، فأنشئي فرعاً واحداً هنا أولاً — واحدٌ يكفي.
+>
+> وانتبهي إلى أنّ كلمة «فرع» تعني في هذا النظام شيئين مختلفين: الفرعُ هنا **موقعٌ مكانيّ** للمكتب،
+> أما «فروع» موافقة البنك المركزي في سجلّ الموظف فهي **فروعُ تأمينٍ** — أي خطوطُ الأعمال داخل النوع،
+> وهي ما يوافق عليه المُنظِّم للشخص. لا يُنشئ أحدهما الآخر، ولا علاقة بينهما إلا اللفظ.
 
 ### عمليات لا يستطيع شخص واحد إتمامها
 
@@ -604,6 +635,31 @@ appear depends on the account's permissions — by design.
 its 29 permissions were measured and they are all administrative. For a normal day's work,
 use a different account.
 
+### The `sample.` accounts cost two steps before any screen opens
+
+The `demo.` accounts in the table below need **pairing only**: `seed:demo` clears the
+forced-password-change flag and deletes any old credential rows at the **end** of its own run, and
+checks that it did.
+
+The `sample.` accounts are different. There are **eleven**, one per role, sharing the password
+`SampleUser#2026!`, and each costs **two steps** before any screen opens. Know that while you are
+deciding which accounts to use, rather than meeting it on the third one:
+
+1. **A forced password change.** `mustChangePassword` is `true` on all eleven — it is the schema
+   default and the seed does not override it for these accounts. `login` answers
+   `MUST_CHANGE_PASSWORD` with **no session**, so you land on a change-password screen rather than
+   in the application.
+2. **Pairing an authenticator**, exactly as section 6 describes.
+
+Step 2 applies to all eleven, not only to the four whose role requires MFA always: the guard that
+demands pairing never reads that attribute.
+
+**Measured 2026-10-16, read-only** — a bcrypt comparison against each stored hash, with no sign-in
+and nothing written to the audit log: all eleven read `sharedPasswordMatches=true`,
+`mfaEnabled=false`, `mustChangePassword=true`, and carry **no credential rows at all**, so no code
+can be asked for and none can be wrong. Two of them (`sample.compliance` and `sample.manager`) were
+genuinely locked until 2026-10-11 and were released with `npm run sample:release -w api`.
+
 Measured on the first office (swap `office-a` for `office-b` for the second):
 
 | Account | Customers | Add customer | Leads | Policies | Claims | Insurers | Register insurer | Employees | Users | Roles |
@@ -636,6 +692,16 @@ customer**.
 | **Define a role**, set its permissions, retire it | `Roles & permissions` → `/settings/roles` | Operations |
 | **Register an insurer** (catalogue or local), edit it, **deactivate** it | `Insurers` → `/insurers` | New business |
 | **Search the cross-office directory** | `Insurer directory` → `/insurer-directory` | New business |
+
+> **The departments-and-branches screen starts empty, and that is not a fault.** Measured
+> 2026-10-16: the database holds **0** branches and **0** departments across every organization, and
+> `seed:demo` creates no branch at all. So if you want to see the branch filter on the employees
+> screen working, create one branch here first — one is enough.
+>
+> Note that "branch" means two different things in this system. A branch here is a **physical
+> location** of the office. The **CBJ-approval branches** on an employee's record are **insurance
+> branches** — lines of business within a type, which is what the regulator approves a person for.
+> Creating one never creates the other; they share a word and nothing else.
 
 ### Operations one person cannot complete
 
