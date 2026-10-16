@@ -1,0 +1,117 @@
+{
+  "_why": [
+    "DECLARED, NOT ACCEPTED. Each row is a (screen, role, route) triple where a holder of that",
+    "role can open that screen and a GET it needs refuses - so the page renders empty.",
+    "",
+    "This file exists so the GATE can be switched on today. Nineteen of these were found by the",
+    "first run of screen-route-permission-fit.py, and every one is a decision the OWNER has to",
+    "make: some are routes gated on the wrong permission and want widening, and some are correct",
+    "refusals that want DECLARING on screen. Neither is a thing to choose on her behalf, and a",
+    "gate that went red on all nineteen would be a permanently red build nobody reads - the",
+    "MISSING_DESCRIPTION_BUDGET lesson, applied one more time.",
+    "",
+    "IT IS A SET AND NOT A COUNT, deliberately: a count survives a substitution, so nineteen",
+    "could become nineteen different mismatches and the gate would stay quiet. The check fails on",
+    "any triple absent from this list AND on any triple here that no longer occurs, so the list",
+    "cannot rot and cannot be used as a ceiling.",
+    "",
+    "REMOVE a row when the mismatch is fixed. Never ADD one without the owner's decision."
+  ],
+  "declared": [
+    {
+      "screen": "/commission",
+      "role": "FINANCE_COLLECTIONS_OFFICER",
+      "route": "GET /insurance-lines"
+    },
+    {
+      "screen": "/employees",
+      "role": "BRANCH_DEPARTMENT_MANAGER",
+      "route": "GET /rbac/roles"
+    },
+    {
+      "screen": "/employees/[id]",
+      "role": "BRANCH_DEPARTMENT_MANAGER",
+      "route": "GET /rbac/roles"
+    },
+    {
+      "screen": "/insurers/new",
+      "role": "COMPLIANCE_OFFICER",
+      "route": "GET /insurer-masters"
+    },
+    {
+      "screen": "/insurers/new",
+      "role": "OFFICE_ADMINISTRATOR",
+      "route": "GET /insurer-masters"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "CLAIMS_OFFICER",
+      "route": "GET /rfqs/*"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "CLAIMS_OFFICER",
+      "route": "GET /rfqs/*/communications"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "CLAIMS_OFFICER",
+      "route": "GET /rfqs/selectable-insurers"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "COMPLIANCE_OFFICER",
+      "route": "GET /rfqs/*"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "COMPLIANCE_OFFICER",
+      "route": "GET /rfqs/*/communications"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "DATA_PROTECTION_OFFICER",
+      "route": "GET /rfqs/*"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "DATA_PROTECTION_OFFICER",
+      "route": "GET /rfqs/*/communications"
+    },
+    {
+      "screen": "/rfqs/[id]",
+      "role": "DATA_PROTECTION_OFFICER",
+      "route": "GET /rfqs/selectable-insurers"
+    },
+    {
+      "screen": "/settings/roles",
+      "role": "INSURANCE_COMPANY_ADMINISTRATOR",
+      "route": "GET /insurance-lines"
+    },
+    {
+      "screen": "/settings/roles",
+      "role": "SYSTEM_SECURITY_ADMINISTRATOR",
+      "route": "GET /insurance-lines"
+    },
+    {
+      "screen": "/settings/users",
+      "role": "INSURANCE_COMPANY_ADMINISTRATOR",
+      "route": "GET /admin/branches"
+    },
+    {
+      "screen": "/settings/users",
+      "role": "INSURANCE_COMPANY_ADMINISTRATOR",
+      "route": "GET /admin/departments"
+    },
+    {
+      "screen": "/settings/users",
+      "role": "PLATFORM_OPERATOR",
+      "route": "GET /admin/branches"
+    },
+    {
+      "screen": "/settings/users",
+      "role": "PLATFORM_OPERATOR",
+      "route": "GET /admin/departments"
+    }
+  ]
+}

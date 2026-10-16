@@ -57,7 +57,9 @@
     "test:security": "node scripts/audit-check.mjs",
     "test:smoke": "bash scripts/smoke.sh api",
     "typecheck": "turbo run typecheck",
-    "db:migrate:diff": "npm run migrate:diff --workspace=@ibms/db"
+    "db:migrate:diff": "npm run migrate:diff --workspace=@ibms/db",
+    "check:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py --check",
+    "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py"
   },
   "devDependencies": {
     "turbo": "2.10.11"

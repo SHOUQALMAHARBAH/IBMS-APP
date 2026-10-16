@@ -23,5 +23,10 @@
     "file": "apps/web/app/(app)/regulatory-compliance/page.tsx",
     "from": "              <p role=\"status\" data-one-type-basis=\"\">",
     "to": "              <p role=\"status\" data-one-type-basis=\"\" hidden>"
+  },
+  "insurance-lines-gate-renarrowed": {
+    "file": "apps/api/src/modules/insurer/insurance-line.controller.ts",
+    "from": "  @RequirePermissions(\n    'insurer.read',\n    'provider.office.register',\n    'provider.insurer.register',\n  )",
+    "to": "  @RequirePermissions('insurer.read')"
   }
 }

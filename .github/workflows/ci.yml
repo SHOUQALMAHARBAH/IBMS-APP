@@ -50,6 +50,23 @@ jobs:
       - name: Lint
         run: npx turbo run lint --filter=web
 
+      # THE OWNER FOUND THIS CLASS BY CLICKING, ON A THURSDAY EVENING. She opened
+      # /provider-register-office as the platform operator and got eight empty dropdowns: the page
+      # returned 200, her permission to open it was correct, and a supporting GET was gated on an
+      # OFFICE permission she does not hold and must not be given.
+      #
+      # No gate could see it. A page-load check passes (the page loads). A nav-reachability check
+      # passes (the nav entry is right). The api e2e suite passes (each route is correctly gated when
+      # asked about alone). So this step asks the only question that catches it: for every (role,
+      # screen) pair the role can OPEN, does every route that screen calls resolve for that role?
+      #
+      # It runs against a DECLARED SET rather than a count, so it fails BY NAME on a new mismatch and
+      # also on a declared one that no longer occurs - a baseline that cannot become a ceiling.
+      # Before the frontend's own tests, deliberately: it needs no install beyond the checkout and it
+      # names the defect in one line, so it should not wait behind a six-minute Playwright run.
+      - name: Screen/route permission fit
+        run: python scripts/measurements/screen-route-permission-fit.py --check
+
       - name: Unit/component tests
         run: npx turbo run test --filter=web
 

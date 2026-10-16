@@ -18,6 +18,10 @@ import {
   type RegisteredInsuranceCompany,
 } from '../../../lib/provider/office-registration-api';
 import { SelectedValueDescription } from '../../../components/ui/SelectedValueDescription';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../lib/load-independently';
 
 /**
  * MODULE 0-ب ITEM (e) — REGISTERING AN INSURANCE COMPANY, sectioned by the dictionary's own groups.
@@ -115,17 +119,43 @@ export default function RegisterInsuranceCompanyPage() {
   useEffect(() => {
     if (!canRegister) return;
     void (async () => {
-      try {
-        const [data, catalogue] = await Promise.all([
-          getReferenceData(),
-          listStandardInsuranceLines(),
-        ]);
-        setReference(data);
-        setLines(catalogue);
-        setLoadError(null);
-      } catch {
-        setLoadError(t('regOfficeLoadError'));
-      }
+      /*
+       * ONE REFUSED LIST MUST NOT DISCARD THE LISTS THAT ARRIVED.
+       *
+       * This was `Promise.all`, which rejects on the first rejection and throws away every value
+       * that resolved. `GET /insurance-lines` was gated on `insurer.read` — an OFFICE permission the
+       * platform operator does not hold — so one 403 discarded the seven reference lists that had
+       * loaded perfectly, and the form rendered with nothing selectable in legal form, licensing
+       * authority, country, city, bank, currency, business model or licensed branches, under one
+       * sentence that named none of them.
+       *
+       * The route's gate is widened now, so this particular refusal is gone. The SHAPE is what is
+       * fixed here, because the gate being right today does not make the next one right: a list
+       * added later, or a route re-gated, puts the same eight empty pickers back.
+       *
+       * `loadIndependently` keeps what resolved and NAMES what did not. The naming is the half that
+       * cost a session — a person can act on "the insurance-branches list did not load" and cannot
+       * act on "could not load".
+       */
+      const { values, failures } = await loadIndependently([
+        {
+          key: 'reference',
+          label: t('regOfficeListReference'),
+          load: getReferenceData,
+        },
+        {
+          key: 'lines',
+          label: t('regOfficeListLines'),
+          load: listStandardInsuranceLines,
+        },
+      ]);
+      if (values.reference) setReference(values.reference as ReferenceData);
+      if (values.lines) setLines(values.lines as InsuranceLineOption[]);
+      setLoadError(
+        failures.length === 0
+          ? null
+          : `${t('regOfficeListsMissing')} ${namedFailures(failures)}`,
+      );
     })();
   }, [canRegister, t]);
 

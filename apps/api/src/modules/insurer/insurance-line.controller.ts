@@ -48,8 +48,39 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 export class InsuranceLineController {
   constructor(private readonly lines: InsuranceLineService) {}
 
-  /** The standard list in market order, then this office's own additions. */
-  @RequirePermissions('insurer.read')
+  /**
+   * The standard list in market order, then this office's own additions.
+   *
+   * ## AN ANY-OF, AND THE WIDENING WAS PREDICTED IN WRITING BEFORE IT WAS NEEDED
+   *
+   * `reference-data.service.ts` wrote this down in advance: *"It WILL need widening... the gate
+   * becomes an ANY-OF, which is a one-line decision then rather than a code invented now."* The
+   * prediction was right and the widening never happened, so the owner opened
+   * `/provider-register-office` as the platform operator and found EIGHT EMPTY DROPDOWNS — the page
+   * returned 200, her permission to open it was correct, and the screen could not be used.
+   *
+   * `insurer.read` is an OFFICE permission. The platform operator does not hold it and **must not be
+   * given it**: it would hand the provider every office's own insurer records, which is a disclosure
+   * boundary and not a convenience. So the ROUTE's gate widens; the ROLE does not. That is the same
+   * reasoning that refused the security administrator `insurer.create`.
+   *
+   * `PermissionsGuard` is `required.some`, so naming three codes means ANY of the three — which is
+   * what is wanted here and is the reason this is one line rather than a new code.
+   *
+   * ## WHAT THE WIDENING DOES AND DOES NOT DISCLOSE
+   *
+   * The standard 32 lines are a GLOBAL catalogue — they describe the software, not any office — so a
+   * provider reading them learns nothing about anybody. The office-added lines ARE office data, and
+   * they stay office data: this route is tenant-scoped like every other, so a provider calling it
+   * sees the standard list and no office's additions, because the provider organization has none.
+   * The widening therefore adds no cross-office disclosure, which is why it is safe as an any-of
+   * rather than needing a separate provider-facing route.
+   */
+  @RequirePermissions(
+    'insurer.read',
+    'provider.office.register',
+    'provider.insurer.register',
+  )
   @Get()
   list() {
     return this.lines.list();
