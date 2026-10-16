@@ -531,6 +531,53 @@ test('a sole establishment is told the one-type limit BEFORE it hits the refusal
   await expect(page.locator('[data-sole-establishment]')).toHaveCount(0);
 });
 
+test('the one-type refusal DECLARES ITS BASIS — that the rule is applied however the office brokes', async ({
+  page,
+}) => {
+  /*
+   * REGISTER ENTRY 20, DECLARED RATHER THAN RESOLVED (owner's instruction, 2026-10-16).
+   *
+   * Art. 3/a's refusal is keyed on `brokerKind === 'NATURAL_PERSON'` and reads nothing about
+   * `brokerageKind`, so it fires on a reinsurance broker exactly as on a direct one — while whether
+   * Instructions No. 9 of 2026 govern a reinsurance broker at all is unresolved, and that column's
+   * own comment once claimed these guards "must not fire" for one. Entry 20 stays open; what this
+   * asserts is that the refusal is no longer SILENT about the basis on which it is being applied.
+   *
+   * THE THREE CLAUSES ARE ASSERTED SEPARATELY because each is a different promise, and a single
+   * `toContainText` of the whole sentence would pass against a reword that dropped any one of them:
+   * that it applies to EVERY office, WHY (no separate text for reinsurance brokerage), and that the
+   * question is NOT SETTLED here. The last is the one a well-meaning edit would delete as hedging.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page, {
+    scope: { ...SCOPE, brokerKind: 'NATURAL_PERSON' },
+  });
+  await page.goto('/regulatory-compliance');
+
+  const basis = page.locator('[data-one-type-basis]');
+  await expect(basis).toBeVisible();
+  await expect(basis).toContainText('every brokerage office');
+  await expect(basis).toContainText('reinsurance brokerage');
+  await expect(basis).toContainText('not settled here');
+
+  /*
+   * IT IS NOT A SECOND REFUSAL, and that is a visibility property rather than a wording one: the
+   * sole-establishment note states the limit and this states the basis of it, so both must be on the
+   * page together. A basis rendered where the limit is not would explain a rule nobody was told about.
+   */
+  await expect(page.locator('[data-sole-establishment]')).toBeVisible();
+
+  // Absent for a corporate broker, because the refusal cannot fire there and a basis with no refusal
+  // behind it is an unexplained paragraph about reinsurance on an unrelated office's screen.
+  await mockRegulatoryCompliance(page);
+  await page.reload();
+  // ANCHORED: the licence types are read from the same response, so this proves the scope section
+  // rendered before the two absences below are read as absences rather than as an unmounted page.
+  await expect(page.locator('[data-licence-types]')).toBeVisible();
+  await expect(page.locator('[data-sole-establishment]')).toHaveCount(0);
+  await expect(page.locator('[data-one-type-basis]')).toHaveCount(0);
+});
+
 test('the minimum-staff requirement is stated BEFORE the refusal, with both numbers', async ({
   page,
 }) => {

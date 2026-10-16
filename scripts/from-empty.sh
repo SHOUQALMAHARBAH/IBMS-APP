@@ -155,4 +155,22 @@ if [ "$fail" != "0" ]; then
   exit 1
 fi
 
+# ---------------------------------------------------------------------------------------------
+# REPORTED, NOT CHECKED — the two figures `docs/first-run.md` quotes to the owner.
+#
+# They are MEASUREMENTS and not `check` rows on purpose. Both grow whenever a permission or a grant
+# is added, so pinning them here would turn every ordinary catalogue change into a red gate, and
+# pinning them in a DOCUMENT is how `first-run.md` came to tell the owner to expect 219 permissions
+# and 502 grants when the real figures had moved — which, followed literally, has her re-run a seed
+# that succeeded and conclude something is broken. That is the exact defect class this module's close
+# was spent on, in the document she reads first.
+#
+# What IS pinned is the permission count, one `check` above, which is a different job: that assertion
+# is about a database built from nothing matching dev, and it is maintained by whoever changes the
+# catalogue. These two lines exist so the figures in the document can be re-measured rather than
+# remembered.
+say "MEASURED for first-run.md — permissions: $(psql_scratch 'SELECT count(*) FROM "Permission"')"
+say "MEASURED for first-run.md — role-permission grants: $(psql_scratch 'SELECT count(*) FROM "RolePermission"')"
+say "MEASURED for first-run.md — roles: $(psql_scratch 'SELECT count(*) FROM "Role"')"
+
 say "FROM-EMPTY: ${APPLIED} migrations from nothing, then the seed, every assertion green"

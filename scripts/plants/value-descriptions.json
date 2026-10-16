@@ -18,5 +18,10 @@
     "file": "apps/api/src/modules/company/company-record.service.ts",
     "from": "        registeredAt: company.createdAt.toISOString(),",
     "to": "        registeredAt: company.createdAt.toISOString(),\n        financialStrengthRating: 'A-',"
+  },
+  "one-type-refusal-is-silent-about-its-basis": {
+    "file": "apps/web/app/(app)/regulatory-compliance/page.tsx",
+    "from": "              <p role=\"status\" data-one-type-basis=\"\">",
+    "to": "              <p role=\"status\" data-one-type-basis=\"\" hidden>"
   }
 }

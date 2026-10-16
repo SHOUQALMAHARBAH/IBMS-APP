@@ -19,14 +19,25 @@
 >
 > والسبب قانوني لا تنظيمي داخلي: قانون حماية البيانات الشخصية الأردني رقم ٢٤ لسنة ٢٠٢٣، **المادة
 > ٦/ب**، لا يسمح بالاحتفاظ بالبيانات الشخصية بعد انتهاء الغرض الذي جُمعت له إلا إذا نصّ تشريع آخر على
-> خلاف ذلك. ومدد الاحتفاظ الخاصة بمكتبنا **لا تزال عند المحامي ولم تُحدَّد بعد**. أي أننا لا نستطيع
-> اليوم أن نقول كم من الوقت يحق لنا الاحتفاظ ببيانات عميل — وما لا نستطيع تحديد مدة الاحتفاظ به لا
-> نحتفظ به.
+> خلاف ذلك.
+>
+> **ما استقرّ:** الحدّ الأدنى. قانون مكافحة غسل الأموال وتمويل الإرهاب رقم ٢٠ لسنة ٢٠٢١، **المادة
+> ١٧/أ**، يوجب الاحتفاظ **خمس سنوات على الأقل** — من إتمام العملية، وفي سجلات العناية الواجبة وملفات
+> الحسابات خمس سنوات على الأقل من **انتهاء العلاقة** أو من العملية، أيّهما أطول. والمادة ١٤/أ/١ من
+> القانون نفسه تسمّي وسطاء التأمين جهةً خاضعة، فلا شكّ في أنّ الحدّ يسري على مكتبنا.
+>
+> **ما لم يستقرّ:** مدد مكتبنا نفسها لكل نوع من السجلات **لا تزال عند المحامي ولم تُحدَّد بعد**. والفرق
+> الذي يُغيّر الحكم هنا أنّ المادة ١٧/أ تحدّد حدّاً **أدنى** لما يجب الاحتفاظ به، والمادة ٦/ب تحدّ
+> **الأقصى** لما يجوز الاحتفاظ به؛ فالحدّ الأدنى لا يُجيز الاحتفاظ ولا يُسقط السؤال عن المدّة. أي أننا
+> ما زلنا لا نستطيع اليوم أن نقول كم من الوقت يحق لنا الاحتفاظ ببيانات عميل — وما لا نستطيع تحديد
+> مدة الاحتفاظ به لا نحتفظ به. (والاستشهاد أعلاه مأخوذ من `seed-data/retention-schedule.ts`، وهو
+> مُسجَّل فيه بوصفه مبدئيّاً إلى أن يُقابَل بالجريدة الرسمية.)
 >
 > ما في النظام الآن كله من صنع أداة التجهيز: العملاء، الموظفون، الوثائق، المطالبات. الأسماء تبدو
 > حقيقية وليست كذلك. استخدميها بحرية — املئي، عدّلي، احذفي، اكسري ما شئت. لا شيء منها يعود لإنسان.
 >
-> **هذا حدّ قانوني، وليس تفضيلاً.** يُرفع عندما تصل مدد الاحتفاظ من المحامي وتُدخل في النظام، لا قبل.
+> **هذا حدّ قانوني، وليس تفضيلاً.** يُرفع عندما تصل مدد مكتبنا من المحامي وتُدخل في النظام، لا قبل —
+> واستقرارُ الحدّ الأدنى في المادة ١٧/أ لا يرفعه، لأنّه ليس هو المدّة المطلوبة.
 
 ---
 
@@ -67,7 +78,7 @@ npm run db:seed
 | `Copy-Item .env.example .env` | ينسخ ملف الإعدادات. **لا يطبع شيئاً عند النجاح** — الصمت هو النجاح | لا رسالة | `already exists`: الملف موجود، تخطّي الأمر |
 | `docker compose up -d db` | يشغّل قاعدة البيانات داخل Docker | `Started` أو `Running` | `error during connect`: Docker Desktop غير مفتوح |
 | `npm run db:migrate:deploy` | **ينشئ جداول قاعدة البيانات.** بدونه القاعدة فارغة تماماً ولن يعمل أي شيء | `All migrations have been successfully applied` | `Can't reach database server`: القاعدة لم تجهز بعد — انتظري عشر ثوانٍ وأعيدي الأمر |
-| `npm run db:seed` | يضع الأدوار و**٢١٩ صلاحية**. بدونه تدخلين ولا تستطيعين فتح أي شاشة | `Seeded 219 permissions.` | إن طبع رقماً أصغر فالأمر لم يكتمل؛ أعيديه |
+| `npm run db:seed` | يضع الأدوار والصلاحيات. بدونه تدخلين ولا تستطيعين فتح أي شاشة | آخر سطر: `Seeded 16 fixed-date Jordanian public holiday(s) ...` — وقبله `Seeded 227 permissions.` (القياس في ١٦/١٠/٢٠٢٦؛ لإعادة القياس: `bash scripts/from-empty.sh` — يطبع الرقمين موسومَين باسم هذا الملف) | **لا تحكمي على النجاح بالرقم.** الرقم يكبر مع كل صلاحية تُضاف، فاختلافه عن ٢٢٧ يعني غالباً أن هذا المستند قديم لا أن التجهيز فشل. الفشل يُعلن عن نفسه: الأمر يتوقف ويطبع الخطأ، ولا يصل إلى سطره الأخير. وإن دخلتِ ورُفضت كل شاشة فالمؤشّر الوحيد هو **الإسنادات = صفر** (انظري جدول المشكلات) |
 
 > **استخدمي `db:migrate:deploy` وليس `db:migrate:dev`.** الأول يطبّق الترحيلات الموجودة ولا شيء غير ذلك.
 > الثاني يقارن بعدها ملف المخطط بقاعدة البيانات، وفي هذا المشروع الملف يحتوي أقل مما تحتويه القاعدة
@@ -341,7 +352,7 @@ yarmouk insurance (Demo)
 | **`npm run seed:demo` يتوقف فورًا ويقول `DEMO_PASSWORD is not set`** | نافذة الأوامر هذه لا تحمل كلمة المرور. كرّري سطر `$env:DEMO_PASSWORD = (Read-Host ...)` في **نفس** النافذة. |
 | **أوقفتُ أمر تجهيز البيانات في المنتصف** | الحسابات تبقى مربوطة بمصادقة لا يملك أحد سرّها، فلا يمكنك الدخول. نفّذي `npm run demo:release -w api` ثم سجّلي الدخول عادي. البيانات التي أُنشئت قبل الإيقاف تبقى، والتشغيل مرة أخرى يكمل الباقي. |
 | **`Port 3000 is in use` ثم `Another next dev server is already running`** | نسخة أخرى من النظام تعمل بالفعل. **المهم أن تعرفي أن الأمر كله يفشل، لا الواجهة وحدها**: يختار Next المنفذ 3001 ثم يرفض العمل، فيتوقف `turbo` ومعه الخدمة الخلفية — فلا تعملي على المنفذ القديم بافتراض أن كل شيء يعمل، لأن الخدمة الخلفية قد لا تكون قائمة. Next يطبع لك رقم العملية والأمر اللازم لإيقافها؛ نفّذيه ثم أعيدي `npm run dev`: `taskkill /PID <الرقم> /F` — ولإيقاف الخدمة الخلفية أيضًا إن بقيت: `netstat -ano \| findstr :4000` ثم نفس الأمر على رقمها. |
-| **أعدتُ تهيئة قاعدة بيانات الاختبار، والآن كل شيء يرفض العمل** | أمر `prisma migrate reset --force` **ينفّذ الترحيلات ولا ينفّذ تجهيز البيانات الأساسية**. فتبقى القاعدة بلا صلاحيات على الإطلاق، وكل طلب يُرفض — والمظهر يشبه خطأً في عملك، وهو ليس كذلك. **تحقّقي من الأرقام، لا من أن الأمر انتهى بنجاح**: يجب أن تكون ٢١٩ صلاحية و٥٠٢ إسنادًا. إن كان الإسناد صفرًا فنفّذي التجهيز صراحةً: من مجلد `packages/db` نفّذي `npx tsx prisma/seed.ts` بعد توجيه `DATABASE_URL` إلى قاعدة الاختبار، ثم أعيدي التحقّق. عدد الصلاحيات وحده لا يكفي — قد تُجهَّز الصلاحيات دون إسناداتها. |
+| **أعدتُ تهيئة قاعدة بيانات الاختبار، والآن كل شيء يرفض العمل** | أمر `prisma migrate reset --force` **ينفّذ الترحيلات ولا ينفّذ تجهيز البيانات الأساسية**. فتبقى القاعدة بلا صلاحيات على الإطلاق، وكل طلب يُرفض — والمظهر يشبه خطأً في عملك، وهو ليس كذلك. **المؤشّر هو الصفر، لا رقمٌ بعينه.** عدد الصلاحيات وحده لا يكفي: قد تُجهَّز الصلاحيات دون إسناداتها، والتجهيز **لا يطبع عدد الإسنادات إطلاقاً** — فلا بدّ من سؤال القاعدة: `SELECT count(*) FROM "RolePermission"`. إن كان صفراً فنفّذي التجهيز صراحةً: من مجلد `packages/db` نفّذي `npx tsx prisma/seed.ts` بعد توجيه `DATABASE_URL` إلى قاعدة الاختبار، ثم أعيدي السؤال. وإن كان رقماً آخر غير صفر فهو ليس عيباً: القياس في ١٦/١٠/٢٠٢٦ أعطى ٢٢٧ صلاحية و٥٢٠ إسناداً على قاعدة التطوير وعلى قاعدة بُنيت من الصفر — **أما قاعدة الاختبار فأعلى من ذلك** (٥٣٨ إسناداً و٤٣ دوراً يوم القياس)، لأن اختبارات الطرف الطرفي تُنشئ أدواراً تتراكم فيها. |
 | **قاعدة البيانات لا تعمل** | افتحي Docker Desktop وتأكدي أن الحاوية `ibms-app-db-1` حالتها `healthy`، أو نفّذي `docker compose up -d db`. |
 
 ## ١١. ما لا يمكن فعله بعد — بصراحة
@@ -370,16 +381,30 @@ yarmouk insurance (Demo)
 >
 > The reason is legal, not an internal preference. Jordan's Personal Data Protection Law No. 24 of
 > 2023, **Article 6(B)**, does not permit personal data to be kept beyond the purpose it was
-> collected for unless other legislation says otherwise. **Our own retention periods are still with
-> the lawyer and are not set.** So today we cannot say how long we are entitled to keep a customer's
-> data — and what we cannot state a retention period for, we do not hold.
+> collected for unless other legislation says otherwise.
+>
+> **What is settled: the floor.** The Anti-Money Laundering and Counter-Terrorism Financing Law No.
+> 20 of 2021, **article 17(A)**, requires records to be kept for **not less than five years** — from
+> completing the transaction, and for due-diligence records and account files at least five years
+> from **the end of the relationship** or from the transaction, whichever is longer. Article 14(A)(1)
+> of the same law names insurance brokers as a subject entity, so there is no question that the floor
+> reaches our office.
+>
+> **What is not settled: our own periods per record type, which are still with the lawyer.** The
+> distinction is what decides the instruction: article 17(A) sets a **minimum** we must keep, and
+> PDPL article 6(B) sets a **maximum** we may keep. A floor is not a permission, and it does not
+> answer the question article 6(B) asks. So today we still cannot say how long we are entitled to
+> keep a customer's data — and what we cannot state a retention period for, we do not hold. (The
+> citation above is the one carried in `seed-data/retention-schedule.ts`, where it is recorded as
+> provisional pending verification against the Official Gazette.)
 >
 > Everything in the system now came from the seeding tool: the customers, the employees, the
 > policies, the claims. The names look real and are not. Use them freely — fill things in, change
 > them, delete them, break whatever you like. None of it belongs to a person.
 >
-> **This is a legal boundary, not a preference.** It lifts when the retention periods come back from
-> the lawyer and are entered into the system, and not before.
+> **This is a legal boundary, not a preference.** It lifts when our own periods come back from the
+> lawyer and are entered into the system, and not before — the floor in article 17(A) being settled
+> does not lift it, because the floor is not the period we need.
 
 ---
 
@@ -420,7 +445,7 @@ What each one does, and how you know it worked:
 | `Copy-Item .env.example .env` | Copies the settings file. **Prints nothing when it works** — silence is success | No message | `already exists`: the file is there, skip this one |
 | `docker compose up -d db` | Starts the database inside Docker | `Started` or `Running` | `error during connect`: Docker Desktop is not open |
 | `npm run db:migrate:deploy` | **Creates the database tables.** Without it the database is completely empty and nothing works | `All migrations have been successfully applied` | `Can't reach database server`: the database is not ready yet — wait ten seconds and run it again |
-| `npm run db:seed` | Puts in the roles and **219 permissions**. Without it you can sign in and then open nothing | `Seeded 219 permissions.` | A smaller number means it did not finish; run it again |
+| `npm run db:seed` | Puts in the roles and the permissions. Without it you can sign in and then open nothing | A last line of `Seeded 16 fixed-date Jordanian public holiday(s) ...`, with `Seeded 227 permissions.` above it (measured 2026-10-16; re-derive with `bash scripts/from-empty.sh`, which prints both figures labelled for this file) | **Do not judge success by the number.** It grows every time a permission is added, so a figure other than 227 most likely means this document is stale, not that the seed failed. Failure announces itself: the command stops, prints the error, and never reaches its last line. If you can sign in and every screen refuses you, the one number that means something is **grants = 0** — see the troubleshooting table |
 
 > **Use `db:migrate:deploy`, not `db:migrate:dev`.** The first applies the existing migrations and nothing
 > else. The second then compares the schema file against the database, and in this project the file
@@ -693,7 +718,7 @@ for holding policies.
 | **`npm run seed:demo` stops immediately with `DEMO_PASSWORD is not set`** | That window does not carry the password. Repeat the `$env:DEMO_PASSWORD = (Read-Host ...)` line in the **same** window. |
 | **I stopped the seed half-way** | The accounts stay paired to an authenticator nobody holds a secret for, so you cannot sign in. Run `npm run demo:release -w api`, then sign in normally. Data created before the stop stays; running the seed again completes the rest. |
 | **`Port 3000 is in use`, then `Another next dev server is already running`** | Another copy is already running. **The part worth knowing is that the whole command fails, not just the website**: Next picks port 3001, then refuses, and `turbo` brings the API task down with it — so do not carry on against the old port assuming everything is up, because the API may not be. Next prints the PID and the exact command to stop it; run that, then `npm run dev` again: `taskkill /PID <pid> /F`. If an API is also left behind, find it with `netstat -ano \| findstr :4000` and stop that PID the same way. |
-| **I reset the test database and now everything refuses me** | `prisma migrate reset --force` **runs the migrations and does NOT run the seed.** The database is left with no permission grants at all, so every request is refused — and it looks exactly like something you broke, which it is not. **Check the NUMBERS, not that the command exited cleanly**: expect **219 permissions and 502 grants**. If the grant count is 0, run the seed explicitly — from `packages/db`, point `DATABASE_URL` at the test database and run `npx tsx prisma/seed.ts` — then re-check. The permission count alone is not enough: permissions can seed while grants do not. |
+| **I reset the test database and now everything refuses me** | `prisma migrate reset --force` **runs the migrations and does NOT run the seed.** The database is left with no permission grants at all, so every request is refused — and it looks exactly like something you broke, which it is not. **The signal is ZERO, not a particular number.** The permission count alone is not enough — permissions can seed while grants do not — and the seed **never prints a grant count at all**, so you have to ask the database: `SELECT count(*) FROM "RolePermission"`. If it is 0, run the seed explicitly: from `packages/db`, point `DATABASE_URL` at the test database, run `npx tsx prisma/seed.ts`, and ask again. **Any other number is not a fault.** Measured 2026-10-16: 227 permissions and 520 grants on dev and on a database built from nothing — and **the test database is higher** (538 grants across 43 roles that day), because the end-to-end tests create roles and it is cumulative. |
 | **The database is not running** | In Docker Desktop, confirm `ibms-app-db-1` is `healthy`, or run `docker compose up -d db`. |
 
 ## 11. What you cannot do yet — honestly

@@ -463,9 +463,37 @@ export default function RegulatoryCompliancePage() {
           {/* Art. 3/a. Said BEFORE the add form rather than only in the refusal, so an officer
               learns the limit before hitting it. */}
           {scope.brokerKind === 'NATURAL_PERSON' ? (
-            <p style={warningStyle} role="status" data-sole-establishment="">
-              {t('rcScopeSoleEstablishmentNote')}
-            </p>
+            <>
+              <p style={warningStyle} role="status" data-sole-establishment="">
+                {t('rcScopeSoleEstablishmentNote')}
+              </p>
+              {/*
+               * THE REFUSAL DECLARES ITS OWN BASIS (owner's instruction, 2026-10-16).
+               *
+               * Art. 3/a's one-type refusal is keyed on `brokerKind === 'NATURAL_PERSON'` and says
+               * nothing about `brokerageKind`, so it fires on a reinsurance broker exactly as it does
+               * on a direct one — while register entry 20 records that whether Instructions No. 9 of
+               * 2026 govern a reinsurance broker at all is UNRESOLVED, and that the column's own
+               * comment once claimed those guards "must not fire" for one. They do.
+               *
+               * NOTHING IS DECIDED HERE AND NO GUARD CHANGED. Entry 20 stays open. What changes is that
+               * a refusal which may rest on an article that does not govern this office stops being
+               * silent about its own basis — the reader is told the rule is applied to every brokerage
+               * office because this product holds no separate text for reinsurance brokerage.
+               *
+               * IT IS STATED FOR EVERY NATURAL-PERSON OFFICE RATHER THAN ONLY A REINSURANCE ONE, and
+               * that is deliberate twice over: the sentence is TRUE of every brokerage office, which is
+               * precisely the thing being declared; and conditioning it on `brokerageKind` would give
+               * that column its first reader, when entry 20's finding is that it is stored and read by
+               * nothing and its meaning is unsettled. A note whose visibility depends on an unresolved
+               * field is a second unresolved question.
+               *
+               * `role="status"` and not `alert`: this is the basis of a refusal, not a second refusal.
+               */}
+              <p role="status" data-one-type-basis="">
+                {t('rcScopeOneTypeBasisNote')}
+              </p>
+            </>
           ) : null}
 
           <p>

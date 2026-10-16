@@ -158,6 +158,8 @@ export const COMPLIANCE_RISK = {
     rcScopeColType: 'النوع',
     rcScopeSoleEstablishmentNote:
       'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',
+    rcScopeOneTypeBasisNote:
+      'وتُطبَّق قاعدةُ النوع الواحد على كلِّ مكتب وساطة، مباشرةً كان أو إعادةَ تأمين، لأنّ هذا النظام لا يحمل نصّاً تنظيميّاً منفصلاً لوساطة إعادة التأمين — فإن كان هذا المكتب وسيطَ إعادة تأمين فهذا هو سندُ تطبيق المادة ٣/أ عليه، ومسألةُ شمولها لوسيط إعادة التأمين غيرُ محسومةٍ هنا.',
     rcCapitalHeading: 'رأس المال (المادة 4/أ)',
     rcCapitalCountingUnitUnverified:
       'وحدةُ عدِّ الفروع التي تُحدَّد بها شريحةُ المادة ٤/أ قيدُ التحقّق مع البنك المركزي. يُحسَب الرقم أدناه بعدِّ فروع كتالوجنا البالغة ٣٢ فرعاً، وقد يكون التصنيفُ الرقابيُّ المعتمَد أقصرَ من ذلك — فيتغيّر العدد وتتغيّر معه الشريحة. الرقمُ للاطّلاع ولا يُعتمَد عليه التزاماً مالياً حتى يصل التصنيفُ الرسمي.',
@@ -557,6 +559,8 @@ export const COMPLIANCE_RISK = {
     rcScopeColType: 'Type',
     rcScopeSoleEstablishmentNote:
       'This office is registered as a sole establishment (natural person), which may be licensed for ONE insurance type only (art. 3/a). Adding a branch of the other type will be refused.',
+    rcScopeOneTypeBasisNote:
+      'The one-type rule is applied to every brokerage office, direct or reinsurance alike, because this product holds no separate regulatory text for reinsurance brokerage — so if this office is a reinsurance broker, that is the basis on which art. 3/a is being applied to it, and whether the article governs such a broker is not settled here.',
     rcCapitalHeading: 'Capital (art. 4/a)',
     rcCapitalCountingUnitUnverified:
       'The unit used to count branches for the art. 4/a slab is under verification with the Central Bank. The figure below counts the 32 lines of our own catalogue; the Bank may license against a shorter regulatory classification, which would change the count and with it the slab. Shown for information — do not rely on it as a financial obligation until the official classification arrives.',
