@@ -1,0 +1,32 @@
+{
+  "the-marker-is-hidden": {
+    "_": "The deliverable itself, invisible. Satisfies decision 88 on paper and fails it entirely in practice — the office would be none the wiser that we are missing a document, which is the one thing the marker exists to say. Must kill the names-BOTH test, and ONLY because the assertion is toBeVisible rather than toContainText.",
+    "file": "apps/web/app/(app)/provider-register-office/page.tsx",
+    "from": "              <p role=\"status\" data-testid=\"registration-pack-missing\">",
+    "to": "              <p role=\"status\" data-testid=\"registration-pack-missing\" hidden>"
+  },
+  "the-marker-makes-a-finding-about-the-office": {
+    "_": "The realistic regression: somebody adds a non-compliance finding to the marker to be helpful. Decision 88 rule 4 forbids it — an office licensed by the Central Bank already submitted these to the regulator, so our holding no record is OUR gap, not its violation. Anchored on a SHORT fragment: the first version anchored on the whole scope sentence and expired the moment that sentence was corrected for a separate reason.",
+    "file": "apps/web/lib/i18n/translations/provider.ts",
+    "from": "not a judgement about the office",
+    "to": "a finding that the office is non-compliant with art. 10/a"
+  },
+  "the-marker-always-names-both": {
+    "_": "Ignore what we actually hold and list both documents every time. The office then chases a document we already have. Anchored on a SHORT distinctive fragment rather than the whole call: the first version spanned three lines and expired the moment prettier reflowed the chain.",
+    "file": "apps/api/src/modules/provider/registration-pack.config.ts",
+    "from": "!held[d.key]",
+    "to": "Boolean(held) && true"
+  },
+  "absence-blocks-the-save": {
+    "_": "Decision 88's FIRST rule, inverted: a missing art. 10/a document refuses the registration. An office the Central Bank has already licensed then cannot be recorded until WE hold our own copy. Must kill 'the save SUCCEEDS'.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "        const roleId = await this.createAdministratorRole(tx);",
+    "to": "        if (\n          registrationPack.premisesTenureDocumentId === null ||\n          registrationPack.associationMembershipDocumentId === null\n        ) {\n          throw new UnprocessableEntityException('art. 10/a documents are required');\n        }\n        const roleId = await this.createAdministratorRole(tx);"
+  },
+  "the-complete-marker-overclaims": {
+    "_": "Restore the overclaim: say the documents are HELD when this product has no object storage and `storageRef` names a location nothing can fetch. The MISSING side's wording is the dictionary's verbatim (v4 broker sheet field 48) and is untouched; only the complete side was mine. Must kill 'both uploaded: NO marker at all', which is where the honest claim is pinned.",
+    "file": "apps/web/lib/i18n/translations/provider.ts",
+    "from": "'The registration pack is complete: both documents are recorded in the system — the file name, where it is filed, and who filed it.'",
+    "to": "'The registration pack is complete: both documents are held in the system.'"
+  }
+}

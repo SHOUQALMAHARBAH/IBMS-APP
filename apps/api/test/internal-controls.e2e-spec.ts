@@ -270,10 +270,17 @@ describe('Internal Controls — self-approval audit (e2e) — backlog Part C #56
       .expect(200);
     const body = res.body as AuditReportBody;
 
-    // 15 same-table registry pairs + the one cross-table
-    // PolicyChecking/Policy pair this process's own build discovered.
-    expect(body.pairsScanned).toBe(16);
-    expect(body.byPair).toHaveLength(16);
+    /*
+     * 16 same-table registry pairs + the one cross-table PolicyChecking/Policy pair this process's
+     * own build discovered. 16 -> 17 when module 0 close decision 3 registered the retention
+     * schedule as the sixteenth same-table pair.
+     *
+     * CI CAUGHT THIS, which is the third time this session my blast radius was wrong in the same
+     * way: I ran the specs that TOUCH retention and not the specs that COUNT the registry. The
+     * registry is a shared list, so adding to it reaches every spec that counts it.
+     */
+    expect(body.pairsScanned).toBe(17);
+    expect(body.byPair).toHaveLength(17);
     expect(typeof body.generatedAt).toBe('string');
     // DisposalBatch/DataSharingApproval/DataProcessingAgreement all gained a
     // real writer this session (M06/M07/M08) — none of the registry's pairs

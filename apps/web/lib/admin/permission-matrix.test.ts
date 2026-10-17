@@ -126,12 +126,49 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // exactly two of the four: it is the only member of a `provider` family, and one CRUD verb is
     // not a family, so it lands in the TOGGLE list. Families and the codes they cover do not move —
     // the same arithmetic `diagnostics.view` produced, for the same reason.
-    expect(PERMISSION_CATALOGUE.length).toBe(220);
+    // `provider.office.register` (Module 0-ب item (d), the route that creates a tenant) moves exactly
+    // ONE of the four. It is PLATFORM-scoped like its sibling, so the matrix never offers it: the
+    // catalogue grows and the toggle list does not. `provider` now holds TWO codes — but
+    // `office-state.read` and `office.register` are two different FAMILIES by the matrix's own
+    // reading (`provider.office-state` and `provider.office`), so no five-state row appears either,
+    // which is the right answer for a pair an office may never hold.
+    // `insurer.company.link` and `insurer.company.unlink` (module 0-ب item (e), decision 63) move
+    // THREE of the four. They are OFFICE-scoped, so the matrix does offer them — and `insurer.company`
+    // is a new family with exactly two members, but neither `link` nor `unlink` is one of the seven
+    // CRUD verbs a five-state row is built from, so they land in the TOGGLE list and the family count
+    // does not move. The same arithmetic `discard` produced, for the same reason: a five-state control
+    // offers none / read / read+write / +delete / full, and "link" is not a point on that scale.
+    // `provider.insurer.register` (module 0-ب item (e)) moves exactly ONE of the four: it is
+    // PLATFORM-scoped like its two siblings, so the matrix never offers it and the toggle list does
+    // not grow. The catalogue does.
+    // `provider.office.administrator.invite` (module 0-ب item (f)) moves exactly ONE of the four,
+    // for the third time and the same reason: PLATFORM-scoped, so the matrix never offers it and the
+    // toggle list does not grow. It also does NOT create a family — `provider.office.register` and
+    // `provider.office.administrator.invite` read as the families `provider.office` and
+    // `provider.office.administrator` by the matrix's own segment rule, and a one-member family is
+    // not a five-state row. So the catalogue grows and the other three figures stand.
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — the retention umbrella SPLIT, so the catalogue moves +1 (one code
+     * out, two in) and the TOGGLE list moves +1 for the same reason.
+     *
+     * NO NEW FAMILY, and the arithmetic is the matrix's own: a five-state row needs TWO OR MORE of
+     * the seven CRUD verbs, and `retention-schedule` now holds `.update` (a verb) and `.confirm`
+     * (not one — "confirm" is not a point on the none/read/write/delete/full scale, the same reason
+     * `link`, `unlink` and `discard` land in the toggle list). One verb is not a family.
+     */
+    expect(PERMISSION_CATALOGUE.length).toBe(227);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
     // and the matrix no longer offers it — so the toggle list loses exactly the one code it added.
-    expect(toggles.length).toBe(160);
+    /*
+     * STILL 163 AFTER A 227th CODE, and that is the PLATFORM filter being observable rather than an
+     * oversight. 59 CRUD-family codes + 163 toggles = 222, not 227: the office matrix never offers a
+     * PLATFORM-scoped code (module 0 item (j)), and all FIVE of them are outside these two buckets.
+     * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
+     * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
+     */
+    expect(toggles.length).toBe(163);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

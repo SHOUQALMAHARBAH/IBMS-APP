@@ -14,6 +14,14 @@ import type { PrismaService } from '../prisma/prisma.service';
  * can only create a user in the CALLER's office, which makes the advice circular for somebody
  * trying to create the first user in a new one. This file pins the corrected message so the
  * false claim cannot return, and so a future edit has to think about what it is promising.
+ *
+ * AND IT HAPPENED A SECOND TIME, WHICH IS WHY THE ASSERTIONS CHANGED SHAPE. The replacement text
+ * said "a second office cannot currently be onboarded through the application at all" and named two
+ * developer tools as the only writers of Organization. Module 0-ب items (d) and (e) made both
+ * false, and this file DID NOT NOTICE: it asserted that a phrase was PRESENT, so it stayed green
+ * while the phrase became a wrong claim. A `toContain` pins wording; it cannot pin a fact. Every
+ * claim here is now paired with a `not.toContain` of the thing it replaced, which is the only form
+ * that fails when somebody puts the old sentence back.
  */
 function repositoryWith(
   organizations: { id: string }[],
@@ -68,21 +76,43 @@ describe('soleOrganizationIdOrThrow', () => {
       expect(await message()).not.toContain('/admin/users');
     });
 
-    it('says plainly that a second office cannot be onboarded through the application', async () => {
+    it('NAMES THE ROUTE THAT DOES ONBOARD AN OFFICE — and no longer claims none exists', async () => {
+      /*
+       * RE-POINTED, MODULE 0-ب, AND THE RE-POINTING IS THE FINDING.
+       *
+       * This used to assert `toContain('cannot currently be onboarded')`. That phrase was true when
+       * written and items (d) and (e) made it false, and because the assertion only checked that the
+       * phrase was PRESENT, the test went on passing while the sentence became a wrong claim about
+       * the system's own capability. A test that pins a phrase pins the phrase, not the fact.
+       *
+       * So it now asserts the thing that must stay true — that the message names the route which
+       * actually onboards an office — and asserts the OLD claim is ABSENT, which is the only form
+       * that can fail if somebody restores it.
+       */
       const text = await message();
-      expect(text).toContain('cannot currently be onboarded');
-      // And it names WHERE that lands, so the statement is a status rather than a dead end.
+      expect(text).toContain('/provider/brokerage-offices');
+      expect(text).toContain('/provider/insurance-companies');
+      expect(
+        text,
+        'the refusal has gone back to claiming an office cannot be onboarded through the application. Two provider routes create an Organization over HTTP — measured.',
+      ).not.toContain('cannot currently be onboarded');
+      // The narrow half that is STILL true, kept: signup cannot resolve a tenant, and Phase 4 is
+      // where that lands — so the statement is a status rather than a dead end.
       expect(text).toContain('Phase 4');
     });
 
-    it('names the only two writers of Organization, so the operator knows what does exist', async () => {
-      // Measured, not asserted from memory: these are the only two `organization.create` call
-      // sites outside tests in the whole repository, and neither is reachable over HTTP. A
-      // message that said "nothing can do this" without saying what CAN would leave somebody
-      // searching for an endpoint that is not there.
+    it('names ALL FOUR writers of Organization, and says which are reachable over HTTP', async () => {
+      /*
+       * Measured rather than asserted from memory, which is what the previous version of this test
+       * got wrong: `organization.create` appears at FOUR non-spec call sites — the seed (twice, one
+       * file), the demo script, and the two provider registration services — and the last two ARE
+       * reachable over HTTP. The old comment here stated the opposite as a measurement.
+       */
       const text = await message();
       expect(text).toContain('packages/db/prisma/seed.ts');
       expect(text).toContain('apps/api/scripts/seed-demo.script.ts');
+      expect(text).toContain('four writers');
+      expect(text).toContain('reachable over HTTP');
     });
   });
 

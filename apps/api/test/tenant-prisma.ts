@@ -198,3 +198,32 @@ export async function ensureOfficeAdministratorFor(
   }
   return role;
 }
+
+/**
+ * Delete an organization and the rows that now BLOCK its deletion.
+ *
+ * ## WHY THIS EXISTS — a blast radius, measured the moment it bit
+ *
+ * Module 0-ب item 1 half B made registration create a default Branch and Department for every new
+ * organization, so that a freshly registered office can provision its first user. Both carry
+ * `onDelete: Restrict`, so every teardown that had been deleting a registered organization directly
+ * started failing with:
+ *
+ *   update or delete on table "Organization" violates RESTRICT setting of foreign key constraint
+ *   "Department_organizationId_fkey"
+ *
+ * The ORDER is the fact that bit, so the order gets one home. A spec that spells the order itself is
+ * a spec that will be missed the next time registration creates something.
+ *
+ * Only the children that registration creates and that RESTRICT are handled here. Everything else an
+ * organization owns either cascades or is genuinely undeletable on purpose — `AuditLogEntry` above
+ * all, which is why an organization anybody has SIGNED INTO can never be removed at all and why no
+ * test may authenticate inside a fixture organization.
+ */
+export async function deleteOrganizationCascade(
+  organizationId: string,
+): Promise<void> {
+  await rawPrisma.branch.deleteMany({ where: { organizationId } });
+  await rawPrisma.department.deleteMany({ where: { organizationId } });
+  await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
+}

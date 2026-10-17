@@ -67,6 +67,19 @@ export interface MeResponse {
   hardLogoutAfterIdleMinutes: number;
   stepUpFresh: boolean;
   /**
+   * ITEM (f), COMPANY HALF — what KIND of organization the caller belongs to.
+   *
+   * OPTIONAL, exactly like `dutySegregationMode` below and for the same measured reason: ~80
+   * spec files build this mock, and a required field would fail every one of them over a value
+   * none of them are about. An absent value means UNKNOWN, and `canReach` treats unknown as
+   * "hide anything that names a type" — failing closed, because the alternative shows a
+   * company-only destination to every brokerage user whose mock predates this field.
+   *
+   * It is NOT an authorization signal. The server re-reads the type where the record is loaded;
+   * a client-side branch is a hidden control, not a boundary.
+   */
+  organizationType?: 'BROKERAGE_OFFICE' | 'INSURANCE_COMPANY' | 'PROVIDER';
+  /**
    * Part 4 — whether this office has declared that one person may perform both halves of a maker/checker
    * pair. Optional on the type rather than required, because ~80 spec files build a `MeResponse` mock and a
    * required field would make every one of them fail to compile for a value none of them are about. Every

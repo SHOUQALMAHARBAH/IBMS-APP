@@ -21,7 +21,7 @@
  *
  * The complete list existed all along, in a module nobody opens when touching maker/checker. The two
  * shorter lists are the ones that drifted. Nothing verified any of them against `pg_constraint` —
- * `test/maker-checker-pairs.e2e-spec.ts` now does, so a sixteenth constraint cannot be added without this
+ * `test/maker-checker-pairs.e2e-spec.ts` now does, so a seventeenth constraint cannot be added without this
  * file moving.
  *
  * ## One pair carries a decision as well as a constraint
@@ -105,6 +105,29 @@ export const MAKER_CHECKER_REGISTRY = [
     checkerField: 'dpoApprovedByUserId',
     dbCheckConstraint: 'DisposalBatch_maker_checker_distinct',
     checkerPermission: 'retention.dispose.approve',
+    dormant: false,
+    source: 'PRIV-SRS-01 M06',
+  },
+  {
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — THE SIXTEENTH PAIR, and the reason it was absent is the finding.
+     *
+     * The table already HAD a confirm step: `confirmedByLegalCounselAt`, a date with NO ACTOR. So
+     * there was nothing to compare, and a code split alone would have been separation in appearance
+     * only. Migration `20261128100000` adds the actor on both sides, the escape column and the CHECK.
+     *
+     * Registering it here is what makes it automatic rather than bespoke: the e2e derives its
+     * expected set from `pg_constraint` both ways, the duty-segregation readiness signal reads the
+     * checker permission, and a COMBINED office's declared act resolves through the same engine as
+     * the other fifteen.
+     */
+    entityType: 'RetentionScheduleItem',
+    pairLabel: 'setByUserId / confirmedByLegalCounselByUserId',
+    modelProperty: 'retentionScheduleItem',
+    makerField: 'setByUserId',
+    checkerField: 'confirmedByLegalCounselByUserId',
+    dbCheckConstraint: 'RetentionScheduleItem_maker_checker_distinct',
+    checkerPermission: 'retention-schedule.confirm',
     dormant: false,
     source: 'PRIV-SRS-01 M06',
   },

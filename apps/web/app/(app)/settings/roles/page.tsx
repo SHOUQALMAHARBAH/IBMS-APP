@@ -571,63 +571,6 @@ export default function RoleAdminPage() {
           defect: the thing a person just asked for was rendered last. Create, then the open
           editor, then the table — which is also the users screen's arrangement. */}
 
-      {readinessError ? (
-        <p
-          role="alert"
-          style={errorStyle}
-          data-testid="duty-segregation-load-error"
-        >
-          {readinessError}
-        </p>
-      ) : null}
-      {readiness ? (
-        <section style={sectionStyle} data-duty-segregation>
-          <h2>{t('dutySegHeading')}</h2>
-          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>
-            {t('dutySegIntro')}
-          </p>
-          <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
-            <thead>
-              <tr>
-                <th style={head}>{t('dutySegColOperation')}</th>
-                <th style={head}>{t('dutySegColPermission')}</th>
-                <th style={head}>{t('dutySegColHolders')}</th>
-                <th style={head}>{t('dutySegColStatus')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* WORST FIRST. Sorted by how badly the office is missing a second person, not
-                  alphabetically and not by entity: a row saying "nobody can complete this" is the reason
-                  the list exists, and it must not be below fourteen rows saying "ready". */}
-              {[...readiness]
-                .sort(
-                  (a, b) =>
-                    STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
-                    a.entityType.localeCompare(b.entityType),
-                )
-                .map((row) => (
-                  <tr
-                    key={row.constraint ?? row.entityType + row.pairLabel}
-                    data-duty-row={row.status}
-                  >
-                    <td style={cell}>{row.entityType}</td>
-                    <td style={cell}>
-                      <code>{row.checkerPermission}</code>
-                    </td>
-                    <td style={cell}>{row.holderCount}</td>
-                    <td style={cell}>
-                      {row.status === 'NOBODY'
-                        ? t('dutySegStatusNobody')
-                        : row.status === 'SINGLE_HOLDER'
-                          ? t('dutySegStatusSingle')
-                          : t('dutySegStatusReady')}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
 
       {canCreate ? (
         <section style={sectionStyle}>
@@ -702,6 +645,70 @@ export default function RoleAdminPage() {
               {busy ? t('roleCreating') : t('roleCreateButton')}
             </button>
           </form>
+        </section>
+      ) : null}
+
+      {/* THE TWO-PERSON-OPERATIONS GRID SITS BELOW THE CREATE FORM, moved 2026-10-16 on the
+          owner's instruction after she walked this screen: whoever opens it opens it to create a
+          role, and the grid is reference read afterwards. The comment above this screen's first
+          section already stated that order — "the thing a person just asked for was rendered
+          last... Create, then the editor, then the table" — and this block was still above it,
+          so the rule was written down and not followed. */}
+      {readinessError ? (
+        <p
+          role="alert"
+          style={errorStyle}
+          data-testid="duty-segregation-load-error"
+        >
+          {readinessError}
+        </p>
+      ) : null}
+      {readiness ? (
+        <section style={sectionStyle} data-duty-segregation>
+          <h2>{t('dutySegHeading')}</h2>
+          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>
+            {t('dutySegIntro')}
+          </p>
+          <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
+            <thead>
+              <tr>
+                <th style={head}>{t('dutySegColOperation')}</th>
+                <th style={head}>{t('dutySegColPermission')}</th>
+                <th style={head}>{t('dutySegColHolders')}</th>
+                <th style={head}>{t('dutySegColStatus')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* WORST FIRST. Sorted by how badly the office is missing a second person, not
+                  alphabetically and not by entity: a row saying "nobody can complete this" is the reason
+                  the list exists, and it must not be below fourteen rows saying "ready". */}
+              {[...readiness]
+                .sort(
+                  (a, b) =>
+                    STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+                    a.entityType.localeCompare(b.entityType),
+                )
+                .map((row) => (
+                  <tr
+                    key={row.constraint ?? row.entityType + row.pairLabel}
+                    data-duty-row={row.status}
+                  >
+                    <td style={cell}>{row.entityType}</td>
+                    <td style={cell}>
+                      <code>{row.checkerPermission}</code>
+                    </td>
+                    <td style={cell}>{row.holderCount}</td>
+                    <td style={cell}>
+                      {row.status === 'NOBODY'
+                        ? t('dutySegStatusNobody')
+                        : row.status === 'SINGLE_HOLDER'
+                          ? t('dutySegStatusSingle')
+                          : t('dutySegStatusReady')}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </section>
       ) : null}
 

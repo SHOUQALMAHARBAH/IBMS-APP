@@ -7,7 +7,26 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # `false`, DELIBERATELY — changed 2026-10-15 after the hazard was measured rather than reasoned.
+  #
+  # `true` cancels the in-flight run when a newer commit is pushed to the same ref. On this project
+  # that is not a saving, it is the deletion of evidence: the standing rule is that EVERY commit is
+  # proved, not just the branch tip, and a cancelled run leaves the previous commit with no full
+  # verification at all. It happened twice in one session — `8ce77bf` and `244fa27` each had their
+  # only run destroyed by the next push — and the retention pair therefore reached a green tip
+  # having never itself been proved.
+  #
+  # The alternative was to keep `true` and wait for `backend` before every push. That treats the
+  # EFFECT and depends on remembering, which already failed twice; this repository's own opening
+  # principle is to prefer the form that cannot express the mistake over the form that requires you
+  # to notice it.
+  #
+  # The cost is runner compute on rapid pushes. This repository is PUBLIC, so Actions minutes are
+  # free, and GitHub's free concurrency ceiling is far above a session's worth of commits. Paying
+  # compute to keep the only proof a commit ever had is the right side of that trade.
+  #
+  # Reversible in one line if the concurrency ever becomes the problem.
+  cancel-in-progress: false
 
 jobs:
   frontend:
@@ -30,6 +49,23 @@ jobs:
 
       - name: Lint
         run: npx turbo run lint --filter=web
+
+      # THE OWNER FOUND THIS CLASS BY CLICKING, ON A THURSDAY EVENING. She opened
+      # /provider-register-office as the platform operator and got eight empty dropdowns: the page
+      # returned 200, her permission to open it was correct, and a supporting GET was gated on an
+      # OFFICE permission she does not hold and must not be given.
+      #
+      # No gate could see it. A page-load check passes (the page loads). A nav-reachability check
+      # passes (the nav entry is right). The api e2e suite passes (each route is correctly gated when
+      # asked about alone). So this step asks the only question that catches it: for every (role,
+      # screen) pair the role can OPEN, does every route that screen calls resolve for that role?
+      #
+      # It runs against a DECLARED SET rather than a count, so it fails BY NAME on a new mismatch and
+      # also on a declared one that no longer occurs - a baseline that cannot become a ceiling.
+      # Before the frontend's own tests, deliberately: it needs no install beyond the checkout and it
+      # names the defect in one line, so it should not wait behind a six-minute Playwright run.
+      - name: Screen/route permission fit
+        run: python scripts/measurements/screen-route-permission-fit.py --check
 
       - name: Unit/component tests
         run: npx turbo run test --filter=web

@@ -1,0 +1,26 @@
+{
+  "a-code-dropped-from-the-registration-list": {
+    "_": "Remove one code from the api declaration. The seed grid still grants it, so an office REGISTERED through the application gets a weaker administrator than one the seed built. Must kill the set-equality test.",
+    "file": "apps/api/src/modules/provider/office-administrator-grants.ts",
+    "from": "    'training.record',\n    'deprovisioning.execute',",
+    "to": "    'deprovisioning.execute',"
+  },
+  "a-code-added-to-the-registration-list-alone": {
+    "_": "The other direction, and the worse one: a registered office holds something the seeded one does not and nobody decided it should. Must kill the set-equality test.",
+    "file": "apps/api/src/modules/provider/office-administrator-grants.ts",
+    "from": "    'customer.bulk-import',\n    'customer.read',",
+    "to": "    'customer.bulk-import',\n    'customer.read',\n    'customer.360-view.read',"
+  },
+  "the-parser-stops-matching": {
+    "_": "Break the parse so it yields an empty set. Without the non-vacuity floor every equality below passes trivially. Must kill the floor test, which is the whole reason it exists.",
+    "file": "packages/db/prisma/office-administrator-grants.parity.spec.ts",
+    "from": "  const start = source.indexOf(\"export const OFFICE_ADMINISTRATOR_GRANT_GROUPS\");",
+    "to": "  const start = source.indexOf(\"export const NO_SUCH_CONSTANT_ANYWHERE\");"
+  },
+  "a-platform-code-granted-to-a-new-office": {
+    "_": "Item (j)'s boundary, broken at the one place that writes a brand-new office's grants. `setPermissions` would refuse it, so the registration would half-fail. Must kill the PLATFORM test.",
+    "file": "apps/api/src/modules/provider/office-administrator-grants.ts",
+    "from": "    'bcp-dr.manage',\n    'incident.report',",
+    "to": "    'bcp-dr.manage',\n    'provider.office-state.read',\n    'incident.report',"
+  }
+}

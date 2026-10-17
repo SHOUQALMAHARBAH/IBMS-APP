@@ -30,6 +30,7 @@
     "db:migrate:dev": "npm run migrate:dev --workspace=@ibms/db",
     "db:migrate:status": "npm run migrate:status --workspace=@ibms/db",
     "db:permission-catalogue": "dotenv -e .env.test -- tsx scripts/export-permission-catalogue.ts",
+    "db:reference-values": "dotenv -e .env.test -- tsx scripts/generate-reference-values.ts",
     "db:permission-descriptions": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts",
     "db:permission-descriptions:check": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts --check",
     "db:privileges": "npm run privileges --workspace=@ibms/db",
@@ -55,7 +56,10 @@
     "test:e2e": "turbo run test:e2e",
     "test:security": "node scripts/audit-check.mjs",
     "test:smoke": "bash scripts/smoke.sh api",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "db:migrate:diff": "npm run migrate:diff --workspace=@ibms/db",
+    "check:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py --check",
+    "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py"
   },
   "devDependencies": {
     "turbo": "2.10.11"

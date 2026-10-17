@@ -23,6 +23,23 @@ export type Destination = {
   labelKey: TranslationKey;
   /** Holding ANY of these reveals the destination. Omitted = always visible. */
   permissions?: readonly string[];
+  /**
+   * ITEM (f), COMPANY HALF — reveal this destination only to these ORGANIZATION TYPES.
+   *
+   * A second gate rather than a wider `permissions`, because one destination genuinely has no
+   * permission to be gated on: `GET /company/registry-record` asks whether the caller IS the company
+   * whose record it shows, which is identity rather than capability. A code there would be a checkbox
+   * an administrator could uncheck to blind their own company to its own record, and it is not even
+   * expressible in the grid — see `insurance-company-administrator-grants.ts`.
+   *
+   * Leaving it ungated was the alternative and it is worse in both directions: `permissions` omitted
+   * means ALWAYS VISIBLE, so every brokerage user would be shown a card that answers 403 — which is
+   * precisely the defect the header above says was measured and shipped once already.
+   *
+   * Omitted = any type, so no existing destination changes. The two gates are ANDed: a destination
+   * may require both a code and a type, and nothing today requires both.
+   */
+  organizationTypes?: readonly string[];
 };
 
 export type DestinationGroup = {
@@ -38,9 +55,22 @@ export type DestinationGroup = {
 export function canReach(
   // The same shape `hasAnyPermission` takes, so a caller cannot pass something narrower and get a
   // quietly permissive answer.
-  user: Pick<MeResponse, 'permissions'> | null | undefined,
+  user: Pick<MeResponse, 'permissions' | 'organizationType'> | null | undefined,
   destination: Destination,
 ): boolean {
+  /*
+   * BOTH GATES, ANDed. `organizationType` is OPTIONAL on `MeResponse` — ~80 spec files build that
+   * mock and a required field would fail every one of them over a value none of them are about — so
+   * an absent type means "unknown", and a destination that NAMES types is hidden rather than shown.
+   * Failing closed is the only safe default here: the alternative reveals a company-only card to
+   * every brokerage user whose mock predates this field.
+   */
+  if (
+    destination.organizationTypes &&
+    !destination.organizationTypes.includes(user?.organizationType ?? '')
+  ) {
+    return false;
+  }
   return (
     !destination.permissions || hasAnyPermission(user, destination.permissions)
   );
@@ -346,7 +376,11 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         href: '/retention-disposal',
         labelKey: 'navRetentionDisposal',
         permissions: [
-          'retention-schedule.manage',
+          // The umbrella split (module 0 close, decision 3). BOTH listed: a destination gate is
+          // satisfied by ANY of its codes, so a confirm-only holder must still be able to reach
+          // the screen — a gate nobody can satisfy makes a destination unreachable (§ 1.62).
+          'retention-schedule.update',
+          'retention-schedule.confirm',
           'legal-hold.manage',
           'retention.dispose.nominate',
           'retention.dispose.approve',
@@ -539,6 +573,42 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         href: '/provider-offices',
         labelKey: 'navProviderOffices',
         permissions: ['provider.office-state.read'],
+      },
+      /*
+       * MODULE 0-ب ITEM (f), COMPANY HALF — gated on the ORGANIZATION TYPE and on no permission,
+       * because `GET /company/registry-record` has none: it asks whether the caller IS the company
+       * whose record it shows. Leaving `permissions` off alone would mean ALWAYS VISIBLE, so every
+       * brokerage user would be shown a card that answers 403 — the exact defect this file's header
+       * records as measured and shipped once already.
+       *
+       * It sits in ADMINISTRATION beside the operator's own screens rather than in a group of its
+       * own: a company administrator holds six self-administration codes, so this is the only other
+       * destination it will ever see, and a one-item group for it would read as a product area.
+       */
+      {
+        href: '/company-record',
+        labelKey: 'navCompanyRecord',
+        organizationTypes: ['INSURANCE_COMPANY'],
+      },
+      // MODULE 0-ب ITEM (d) — registering an office. Beside the provider dashboard because both
+      // are the platform operator's, and in ADMINISTRATION for the same measured reason: this code
+      // is PLATFORM-scoped and held only by the provider, which already sees this group.
+      //
+      // Its own destination rather than a control on `/provider-offices`: that screen reads every
+      // office's state and this one creates a tenant, and a create button on a cross-office report
+      // is a control whose blast radius does not match what the reader is looking at.
+      {
+        href: '/provider-register-office',
+        labelKey: 'navProviderRegisterOffice',
+        permissions: ['provider.office.register'],
+      },
+      // MODULE 0-ب ITEM (e) — the other kind of tenant. Its own destination rather than a tab on the
+      // office one: the two forms share perhaps half their fields, and a reader who has mistaken which
+      // they are filling in has already made the only mistake this screen can make.
+      {
+        href: '/provider-register-insurer',
+        labelKey: 'navProviderRegisterInsurer',
+        permissions: ['provider.insurer.register'],
       },
       {
         href: '/settings/email',

@@ -1,0 +1,38 @@
+{
+  "article-14c-applies-to-every-suspension": {
+    "_": "The reason `basis` is a column at all. Without the check, art. 14/c — written for a VOLUNTARY withdrawal — fires on a CBJ penalty, and a brokerage serving a long sanction is reported CANCELLED. Must kill 'DOES NOT fire on an art. 21/b SANCTION'.",
+    "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
+    "from": "      suspension.basis === 'BROKER_REQUEST' &&\n      now.getTime() >",
+    "to": "      now.getTime() >"
+  },
+  "two-years-as-730-days": {
+    "_": "Day arithmetic instead of calendar arithmetic. Wrong by one day across a leap year, in the direction that deems a licence cancelled a day early. Must kill the leap-day test.",
+    "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
+    "from": "  d.setUTCFullYear(d.getUTCFullYear() + ARTICLE_14C_SUSPENSION_LIMIT_YEARS);\n  return d;",
+    "to": "  return new Date(d.getTime() + 730 * 24 * 60 * 60 * 1000);"
+  },
+  "exactly-two-years-already-exceeded": {
+    "_": "`>` becomes `>=`. The article says «تجاوزت» — exceeded. Must kill the boundary test and nothing else.",
+    "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
+    "from": "      now.getTime() > twoYearsAfter(suspension.effectiveFrom).getTime();",
+    "to": "      now.getTime() >= twoYearsAfter(suspension.effectiveFrom).getTime();"
+  },
+  "acts-never-answered-by-a-later-term": {
+    "_": "Drop the term-issue filter. A cancelled-then-re-licensed office is then reported CANCELLED for the rest of its life. Must kill 'an act is answered by a term issued AFTER it'.",
+    "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
+    "from": "    .filter(\n      (a) =>\n        termIssuedAt === null ||\n        a.effectiveFrom.getTime() >= termIssuedAt.getTime(),\n    )",
+    "to": "    .filter(() => true)"
+  },
+  "sanction-period-never-runs-out": {
+    "_": "A sanction whose stated period has passed keeps suspending forever. Must kill 'stops suspending the moment the period passes'.",
+    "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
+    "from": "  if (\n    suspension?.suspendedUntil &&\n    suspension.suspendedUntil.getTime() < now.getTime()\n  ) {\n    suspension = null;\n  }",
+    "to": "  if (false) {\n    suspension = null;\n  }"
+  },
+  "manual-marker-read-as-an-expiry": {
+    "_": "Remove the manual-lapse branch, so `status: 'lapsed'` falls through to the term arithmetic. Must kill the marker test — and the failure is the point: it reports a licence that never ran out as having run out.",
+    "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
+    "from": "  if (term.status === 'lapsed') {\n    return {\n      status: 'SUSPENDED',",
+    "to": "  if (false) {\n    return {\n      status: 'SUSPENDED',"
+  }
+}

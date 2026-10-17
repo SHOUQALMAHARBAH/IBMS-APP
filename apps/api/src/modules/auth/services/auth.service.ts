@@ -840,6 +840,21 @@ export class AuthService {
       // know the mode either asks everybody for a reason or asks nobody and then 422s. Not sensitive — a
       // governance posture, and anybody who can approve anything needs to know it.
       dutySegregationMode: office?.dutySegregationMode ?? 'SEGREGATED',
+      /*
+       * ITEM (f), COMPANY HALF — what KIND of organization the caller belongs to.
+       *
+       * It rides on the SAME `organizations.findById` the mode above already needed, so it costs no
+       * extra query. And it is here rather than behind a permission for the same reason the mode is:
+       * the NAVIGATION has to know. A company administrator's only screen is its own registry record,
+       * and that route is gated on organization TYPE rather than on a code — so without this the nav
+       * would either hide the entry from the one audience it exists for, or show it to every
+       * brokerage user and send them into a 403.
+       *
+       * NOT SENSITIVE: a caller already knows what kind of organization they work for. What it is not
+       * is an authorization signal — the server re-reads the type where the record is loaded, because
+       * a client-side branch is a hidden control and not a boundary.
+       */
+      organizationType: office?.type,
     };
   }
 

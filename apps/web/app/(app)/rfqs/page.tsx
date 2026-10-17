@@ -3,11 +3,15 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
+import { hasPermission } from '../../../lib/auth/permissions';
 import { listRfqs, type Rfq } from '../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
-import { rfqBadgeStyle, rfqCardStyle } from '../../../components/rfq/rfq.styles';
+import {
+  rfqBadgeStyle,
+  rfqCardStyle,
+} from '../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -57,7 +61,11 @@ function RfqList({
   }
   if (!rfqs) return <p>{t('commonLoading')}</p>;
   if (rfqs.length === 0) {
-    return <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('rfqListNone')}</p>;
+    return (
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+        {t('rfqListNone')}
+      </p>
+    );
   }
 
   return (
@@ -82,13 +90,17 @@ function RfqList({
             </strong>
             <span style={rfqBadgeStyle}>
               {t(
-                rfq.insurerSubmissions.length === 1 ? 'rfqInsurerCountOne' : 'rfqInsurerCountOther',
+                rfq.insurerSubmissions.length === 1
+                  ? 'rfqInsurerCountOne'
+                  : 'rfqInsurerCountOther',
                 { count: rfq.insurerSubmissions.length },
               )}
             </span>
           </div>
           <div style={cardMetaStyle}>
-            {t('rfqListIssuedMeta', { date: formatDate(rfq.issuedAt, language) })}
+            {t('rfqListIssuedMeta', {
+              date: formatDate(rfq.issuedAt, language),
+            })}
           </div>
         </button>
       ))}
@@ -131,6 +143,32 @@ export default function RfqsPage() {
   }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
+
+  /*
+   * ITEM 6 — THE GATE THAT WAS MISSING. Owner decision, 2026-10-17: "install the gate. Every role in
+   * the system can open those two pages today, including the DPO and the collections officer. This is
+   * a hole in the screen layer, not a decision."
+   *
+   * AND THE CORRECTION THAT BOUNDS IT, because it was first described to her as a security hole and
+   * it is not one: `rfq.controller.ts` requires `rfq.read` on `GET /rfqs` and `rfq.create` on
+   * `POST /rfqs`, so the API refuses a caller without them. Only the PAGE was reachable, and whoever
+   * opened it saw an empty screen and no data. Same harmless direction as the other findings — a
+   * screen that renders nothing rather than a screen that discloses something.
+   *
+   * What the gate buys is therefore not confidentiality; it is that a role which has no business here
+   * is TOLD so instead of being shown a blank page it cannot act on, which is this product's standing
+   * rule for a reader who is refused.
+   */
+  if (!hasPermission(user, 'rfq.read')) {
+    return (
+      <main style={pageStyle}>
+        <h1>{t('rfqListHeading')}</h1>
+        <p role="status" data-permission-refusal>
+          {permissionRefusal(t, 'rfqListRefusalAct', 'rfq.read')}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main style={pageStyle}>

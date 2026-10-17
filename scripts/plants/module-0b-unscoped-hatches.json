@@ -1,0 +1,22 @@
+{
+  "a-bypass-reads-a-role": {
+    "file": "apps/api/src/modules/auth/services/session.service.ts",
+    "from": "      this.sessions.findById(sessionId),",
+    "to": "      this.sessions.findById(sessionId) as unknown as Promise<never> ?? this.prisma.client.role.findMany({}),"
+  },
+  "the-matcher-finds-nothing": {
+    "file": "apps/api/src/common/unscoped-escape-hatches.inventory.spec.ts",
+    "from": "      const at = text.indexOf('.runUnscoped(', from);",
+    "to": "      const at = text.indexOf('.runUnscopedXX(', from);"
+  },
+  "a-bypass-performs-a-raw-write": {
+    "file": "apps/api/src/modules/auth/services/session.service.ts",
+    "from": "      this.sessions.findById(sessionId),",
+    "to": "      this.prisma.client.$executeRawUnsafe('SELECT 1') as unknown as never,"
+  },
+  "a-third-unscoped-reason-appears": {
+    "file": "apps/api/src/common/org-context/org-context.service.ts",
+    "from": "  | 'subdomain-resolution';",
+    "to": "  | 'subdomain-resolution'\n  | 'reporting-across-offices';"
+  }
+}

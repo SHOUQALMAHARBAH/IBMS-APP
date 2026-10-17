@@ -1,0 +1,17 @@
+{
+  "the-view-stops-sending-the-three-year-flag": {
+    "file": "apps/api/src/modules/compliance-risk/broker-license.config.ts",
+    "from": "    expiryMatchesThreeYearTerm: expiryMatchesThreeYearTerm(row),",
+    "to": "    expiryMatchesThreeYearTerm: undefined as unknown as boolean | null,"
+  },
+  "the-part-year-rule-is-dropped": {
+    "file": "apps/api/src/modules/compliance-risk/broker-license.config.ts",
+    "from": "  return new Date(Date.UTC(issuedAt.getUTCFullYear() + 2, 11, 31));",
+    "to": "  return new Date(Date.UTC(issuedAt.getUTCFullYear() + 3, 11, 31));"
+  },
+  "the-screen-treats-no-issue-date-as-a-mismatch": {
+    "file": "apps/web/app/(app)/regulatory-compliance/page.tsx",
+    "from": "          {license.expiryMatchesThreeYearTerm === false ? (",
+    "to": "          {!license.expiryMatchesThreeYearTerm ? ("
+  }
+}

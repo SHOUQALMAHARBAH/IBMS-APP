@@ -537,6 +537,41 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
   },
   {
+    /*
+     * MODULE 0-ب ITEM (e), DECISION 63 — LINKING THIS OFFICE'S COUNTERPARTY RECORD TO A REGISTERED
+     * INSURANCE COMPANY.
+     *
+     * Its own code, and SEPARATE from `insurer.update`, because the act is not an edit: it changes
+     * which SOURCE answers for the company's name, phone, email, website and address, and it makes
+     * this office's own columns read-only. An officer who may correct a phone number has not thereby
+     * been given the authority to decide that the record in front of them IS a particular licensed
+     * company.
+     *
+     * OFFICE-scoped, not PLATFORM: the office is asserting something about ITS OWN record. Nothing is
+     * written on the company's row — tenant scoping would not permit it, and nothing should be built
+     * that needs it.
+     */
+    code: "insurer.company.link",
+    module: "insurance-operations",
+    description:
+      "Link this office's insurer record to an insurance company registered on the platform. Changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's own copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record.",
+    roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
+  },
+  {
+    /*
+     * UNLINKING IS ITS OWN CODE, not the same one read twice. The owner's condition is that each act
+     * needs a permission, and the two are not symmetrical in consequence: linking narrows what this
+     * office may edit, while unlinking RETURNS a company's published details to being whatever the
+     * office last typed — which is the direction that can quietly make a screen show a stale phone
+     * number as though it were current.
+     */
+    code: "insurer.company.unlink",
+    module: "insurance-operations",
+    description:
+      "Remove the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note.",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
     code: "rfq.insurer.update",
     module: "insurance-operations",
     description: "Update an insurer's RFQ response status",
@@ -1481,10 +1516,43 @@ const pdpl: PermissionSeed[] = [
     roles: [DPO],
   },
   {
-    code: "retention-schedule.manage",
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — THE EDIT HALF.
+     *
+     * `retention-schedule.manage` gated BOTH the edit and the Legal Counsel confirmation, which made
+     * "a retention period one person chose and confirmed alone" unrepresentable as a defect: there
+     * was one code, so there was nothing to separate.
+     *
+     * Splitting it is only half the work, and the owner was explicit that the other half is what
+     * matters: "splitting the codes alone would leave two codes with no enforcement — separated in
+     * appearance only". So migration `20261128100000` gives the table a MAKER column, a CHECKER
+     * column, an escape column and a CHECK constraint, and the pair is registered in
+     * `maker-checker-pairs.config.ts` — which is what makes the database, the readiness signal and
+     * the office's declared separated/merged state pick it up automatically.
+     *
+     * WHICH OF THE TWO A PERSON HOLDS IS THE OFFICE'S CHOICE. Both successors go to both roles that
+     * held the umbrella, because withdrawing one from one role here would be this product deciding
+     * an office's separation of duties for it. A one-person office is covered by the declared merged
+     * state, with the hat recorded per step.
+     */
+    code: "retention-schedule.update",
     module: "pdpl",
     description:
-      "Maintain the retention-period table (record categories, months, Legal Counsel confirmation)",
+      "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded",
+    roles: [COMPLIANCE, DPO],
+  },
+  {
+    /*
+     * THE CONFIRM HALF — and it is the checker, so it is registered in `checker-roles.config.ts`
+     * too. A pair added to the maker/checker registry WITHOUT a code there is a pair whose checker
+     * half can be handed out silently: the database still refuses a self-confirmation, but nothing
+     * reports that an office granted one role both halves. That was found on 2026-10-13 for
+     * `needs-assessment.approve` and is not repeated here.
+     */
+    code: "retention-schedule.confirm",
+    module: "pdpl",
+    description:
+      "Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row",
     roles: [COMPLIANCE, DPO],
   },
   {
@@ -1779,6 +1847,103 @@ const admin: PermissionSeed[] = [
      * `20261117120000_withdraw_platform_grant_from_offices` removes the grants that already exist,
      * because the seed upserts and never revokes.
      */
+    roles: [],
+  },
+  {
+    /*
+     * MODULE 0-ب ITEM (d) — REGISTER A BROKERAGE OFFICE ON THE PLATFORM.
+     *
+     * PLATFORM-scoped and the SECOND such code. Its effect is the creation of a TENANT, which is as
+     * far outside the granting office as an effect can reach, so item (j)'s three layers all apply:
+     * the office matrix never offers it, `setPermissions` refuses it for a non-PROVIDER
+     * organization, and the route checks the caller's organization type.
+     *
+     * Nothing in this product could create a second office before it. Measured and recorded against
+     * `soleOrganizationIdOrThrow`: the only two writers of `Organization` were the seed and the demo
+     * script, neither reachable over HTTP, and the signup refusal says in its own message that a
+     * second office cannot be onboarded through the application. This is the route that changes it.
+     */
+    code: "provider.office.register",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its own roles", and no office may register another office. The PROVIDER organization's
+     * `PLATFORM_OPERATOR` role holds it, granted by `ensureProviderOrganization()` in the seed.
+     */
+    roles: [],
+  },
+  {
+    /*
+     * MODULE 0-ب ITEM (f) — INVITING A REGISTERED OFFICE'S FIRST ADMINISTRATOR.
+     *
+     * PLATFORM-scoped and the FOURTH such code. Its effect is not the creation of a tenant — item
+     * (d) already did that — it is the creation of an ACCOUNT INSIDE ONE, which is the only write in
+     * this product that crosses a tenancy boundary. Separate from `provider.office.register` because
+     * registering an office and giving somebody the keys to it are different acts: the first is a
+     * filing, the second hands over control, and an operator trusted to file is not thereby trusted
+     * to choose who runs the office.
+     *
+     * It is also NARROWER than its name suggests, by three refusals in the service: the target must
+     * be a brokerage office, and it must have NO account yet. So this is the right to bootstrap an
+     * empty office once — never a standing ability to add accounts to a live one.
+     */
+    code: "provider.office.administrator.invite",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its roles", and no office may hold a PLATFORM code. The provider's own grant comes from
+     * `PROVIDER_CODES` in the seed, and the grid guard REFUSES a PLATFORM code that names an office
+     * role here — by name.
+     */
+    roles: [],
+  },
+  {
+    /*
+     * ITEM (f), THE COMPANY HALF — and a SEPARATE code from the office invite rather than a reuse.
+     *
+     * Reusing `provider.office.administrator.invite` for a company would make the name promise
+     * "office" while the act reached a company, which is the exact defect class the close measured in
+     * `aml.monitor` and `sanctions-pep.screen`: a code whose name claims more, or other, than it does.
+     * A rename is the last option considered here, so the honest move is a second code.
+     *
+     * It is also a genuinely different act: an office administrator receives 47 codes and runs an
+     * office; a company administrator receives SIX and can administer users and roles only, because
+     * an insurance company has nothing else to do in this product yet.
+     */
+    code: "provider.insurance-company.administrator.invite",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its roles", and no office may hold a PLATFORM code. The provider's own grant comes from
+     * `PROVIDER_CODES` in the seed, and the grid guard REFUSES a PLATFORM code that names an office
+     * role here — by name.
+     */
+    roles: [],
+  },
+  {
+    /*
+     * MODULE 0-ب ITEM (e) — REGISTER AN INSURANCE COMPANY ON THE PLATFORM.
+     *
+     * PLATFORM-scoped and the THIRD such code, for the same reason as the second: its effect is the
+     * creation of a TENANT. Separate from `provider.office.register` because the two create different
+     * kinds of entity under different articles — a brokerage office is licensed under art. 10, an
+     * insurance company is not — and an operator trusted to register one has not thereby been trusted
+     * to register the other.
+     */
+    code: "provider.insurer.register",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform",
     roles: [],
   },
   {

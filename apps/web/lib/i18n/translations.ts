@@ -33,14 +33,16 @@ import { ENUMS } from './translations/enums';
 import { INSURERS } from './translations/insurers';
 import { EMAIL } from './translations/email';
 import { PERMISSIONS } from './translations/permissions';
+import { PROVIDER } from './translations/provider';
+import { COMPANY } from './translations/company';
 
 export type Language = 'AR' | 'EN';
 
 export const LANGUAGES: readonly Language[] = ['AR', 'EN'];
 
 const translations = {
-  AR: { ...COMMON.AR, ...AUTH.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR, ...COMPLAINTS.AR, ...CUSTOMER_SERVICE.AR, ...PDPL.AR, ...FINANCE.AR, ...COMPLIANCE_SCREENING.AR, ...COMPLIANCE_RISK.AR, ...DASHBOARDS.AR, ...OPERATIONS.AR, ...DETAIL_PAGES.AR, ...ENUMS.AR, ...INSURERS.AR, ...EMAIL.AR, ...PERMISSIONS.AR },
-  EN: { ...COMMON.EN, ...AUTH.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN, ...COMPLAINTS.EN, ...CUSTOMER_SERVICE.EN, ...PDPL.EN, ...FINANCE.EN, ...COMPLIANCE_SCREENING.EN, ...COMPLIANCE_RISK.EN, ...DASHBOARDS.EN, ...OPERATIONS.EN, ...DETAIL_PAGES.EN, ...ENUMS.EN, ...INSURERS.EN, ...EMAIL.EN, ...PERMISSIONS.EN },
+  AR: { ...COMMON.AR, ...AUTH.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR, ...COMPLAINTS.AR, ...CUSTOMER_SERVICE.AR, ...PDPL.AR, ...FINANCE.AR, ...COMPLIANCE_SCREENING.AR, ...COMPLIANCE_RISK.AR, ...DASHBOARDS.AR, ...OPERATIONS.AR, ...DETAIL_PAGES.AR, ...ENUMS.AR, ...INSURERS.AR, ...EMAIL.AR, ...PERMISSIONS.AR, ...PROVIDER.AR, ...COMPANY.AR },
+  EN: { ...COMMON.EN, ...AUTH.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN, ...COMPLAINTS.EN, ...CUSTOMER_SERVICE.EN, ...PDPL.EN, ...FINANCE.EN, ...COMPLIANCE_SCREENING.EN, ...COMPLIANCE_RISK.EN, ...DASHBOARDS.EN, ...OPERATIONS.EN, ...DETAIL_PAGES.EN, ...ENUMS.EN, ...INSURERS.EN, ...EMAIL.EN, ...PERMISSIONS.EN, ...PROVIDER.EN, ...COMPANY.EN },
 } as const;
 
 export type TranslationKey = keyof (typeof translations)['EN'];

@@ -41,6 +41,8 @@ import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module
 import { NotificationModule } from './modules/notification/notification.module';
 import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
+import { ProviderModule } from './modules/provider/provider.module';
+import { CompanyModule } from './modules/company/company.module';
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
 import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 import { RenewalModule } from './modules/renewal/renewal.module';
@@ -300,6 +302,9 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // recurring re-screen moved to a 4-hourly cadence to match.
     // sanctions-pep.screen / Compliance.
     ComplianceRiskModule,
+    // Module 0-ب — the platform operator registers offices and insurance companies.
+    ProviderModule,
+    CompanyModule,
     // Process 56 — a read-only scan across every maker/checker pair's DB
     // CHECK constraint (plus the one cross-table pair no single-table CHECK
     // can express) for a self-approval violation. internal-controls.view /

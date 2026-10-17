@@ -1,0 +1,7 @@
+{
+  "a-registry-constraint-is-swapped": {
+    "file": "apps/api/src/common/maker-checker-pairs.config.ts",
+    "from": "    dbCheckConstraint: 'Refund_maker_checker_distinct',",
+    "to": "    dbCheckConstraint: 'Settlement_maker_checker_distinct',"
+  }
+}

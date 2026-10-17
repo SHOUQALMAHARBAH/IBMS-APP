@@ -158,7 +158,11 @@ export const COMPLIANCE_RISK = {
     rcScopeColType: 'النوع',
     rcScopeSoleEstablishmentNote:
       'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',
+    rcScopeOneTypeBasisNote:
+      'وتُطبَّق قاعدةُ النوع الواحد على كلِّ مكتب وساطة، مباشرةً كان أو إعادةَ تأمين، لأنّ هذا النظام لا يحمل نصّاً تنظيميّاً منفصلاً لوساطة إعادة التأمين — فإن كان هذا المكتب وسيطَ إعادة تأمين فهذا هو سندُ تطبيق المادة ٣/أ عليه، ومسألةُ شمولها لوسيط إعادة التأمين غيرُ محسومةٍ هنا.',
     rcCapitalHeading: 'رأس المال (المادة 4/أ)',
+    rcCapitalCountingUnitUnverified:
+      'وحدةُ عدِّ الفروع التي تُحدَّد بها شريحةُ المادة ٤/أ قيدُ التحقّق مع البنك المركزي. يُحسَب الرقم أدناه بعدِّ فروع كتالوجنا البالغة ٣٢ فرعاً، وقد يكون التصنيفُ الرقابيُّ المعتمَد أقصرَ من ذلك — فيتغيّر العدد وتتغيّر معه الشريحة. الرقمُ للاطّلاع ولا يُعتمَد عليه التزاماً مالياً حتى يصل التصنيفُ الرسمي.',
     rcCapitalRequired: 'رأس المال المطلوب',
     rcCapitalPaidUp: 'رأس المال المدفوع',
     rcCapitalUnrecordedWarning:
@@ -169,8 +173,10 @@ export const COMPLIANCE_RISK = {
     rcRenewalDueBy: 'آخر موعد لتقديم طلب التجديد',
     rcExpiryNotEndOfYearWarning:
       'تاريخ الانتهاء المُدخل ليس 31 كانون الأول/ديسمبر. مدة الترخيص تنتهي في 31 كانون الأول (المادة 10/ب) — تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
-    rcValidByOperationOfLaw:
-      'انتهى تاريخ هذه المدة المطبوع، والترخيص ما زال ساريًا بحكم القانون لأن طلب التجديد قُدّم في موعده (المادة 11). يبقى ساريًا حتى صدور قرار البنك المركزي.',
+    rcExpiryNotThreeYearTermWarning:
+      'تاريخ الانتهاء المُدخل لا يطابق مدة الثلاث سنوات التي تقتضيها المادة 10/ب: المدة ثلاث سنوات ميلادية تنتهي في 31 كانون الأول، ويُعتبر جزء السنة الميلادية لهذه الغاية سنة — فسنة الإصدار تُحتسب سنة كاملة. تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
+    rcValidPendingRenewalDecision:
+      'انتهى تاريخ هذه المدة المطبوع، ويُعامَل الترخيص على أنه ما زال ساريًا لأن طلب التجديد قُدّم في موعده، إلى حين صدور قرار البنك المركزي. هذا قرار داخلي للمكتب ولا يستند إلى نص في تعليمات رقم (9) لسنة 2026.',
     rcRenewalFiledLate:
       'قُدّم طلب التجديد بعد الموعد المحدّد (المادة 11) — لن يستمر سريان الترخيص بعد تاريخ الانتهاء.',
     rcExpectedThreeYearExpiry: 'نهاية مدة الثلاث سنوات المتوقّعة',
@@ -553,7 +559,11 @@ export const COMPLIANCE_RISK = {
     rcScopeColType: 'Type',
     rcScopeSoleEstablishmentNote:
       'This office is registered as a sole establishment (natural person), which may be licensed for ONE insurance type only (art. 3/a). Adding a branch of the other type will be refused.',
+    rcScopeOneTypeBasisNote:
+      'The one-type rule is applied to every brokerage office, direct or reinsurance alike, because this product holds no separate regulatory text for reinsurance brokerage — so if this office is a reinsurance broker, that is the basis on which art. 3/a is being applied to it, and whether the article governs such a broker is not settled here.',
     rcCapitalHeading: 'Capital (art. 4/a)',
+    rcCapitalCountingUnitUnverified:
+      'The unit used to count branches for the art. 4/a slab is under verification with the Central Bank. The figure below counts the 32 lines of our own catalogue; the Bank may license against a shorter regulatory classification, which would change the count and with it the slab. Shown for information — do not rely on it as a financial obligation until the official classification arrives.',
     rcCapitalRequired: 'Required capital',
     rcCapitalPaidUp: 'Paid-up capital',
     rcCapitalUnrecordedWarning:
@@ -565,8 +575,10 @@ export const COMPLIANCE_RISK = {
     rcRenewalDueBy: 'Renewal application due by',
     rcExpiryNotEndOfYearWarning:
       'The expiry you entered is not a 31 December. A licence term ends on 31 December (art. 10/b) — check it against the date printed on the certificate. The entry was not refused.',
-    rcValidByOperationOfLaw:
-      "This term's printed expiry has passed, and the licence remains valid by operation of law because the renewal application was filed on time (art. 11). It stays valid until the CBJ's decision issues.",
+    rcExpiryNotThreeYearTermWarning:
+      'The expiry you entered does not match the three-year term art. 10/b requires: a term runs three calendar years ending 31 December, and part of a calendar year counts as a year — so the year of issue counts as a full first year. Check it against the date printed on the certificate. The entry was not refused.',
+    rcValidPendingRenewalDecision:
+      "This term's printed expiry has passed, and the licence is treated as still valid because the renewal application was filed on time, until the CBJ's decision issues. This is an internal decision and rests on no provision of Instructions No. 9 of 2026.",
     rcRenewalFiledLate:
       'The renewal application was filed after the deadline (art. 11) — the licence will not remain valid past its expiry.',
     rcExpectedThreeYearExpiry: 'Expected end of a three-year term',

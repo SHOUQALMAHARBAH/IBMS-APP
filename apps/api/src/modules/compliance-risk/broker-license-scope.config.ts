@@ -15,6 +15,28 @@ import {
  *              a NATURAL PERSON (sole establishment) may hold ONE type only.
  *   art. 4/a — capital: 5,000 JOD per type up to 6 branches, 7,500 up to 12, 10,000 above 12.
  *
+ * ## ART. 13/b/2 IS DECLARED UNIMPLEMENTED, AND MUST NOT BE BUILT FROM ITS CAPITAL FIGURE ALONE
+ *
+ * Art. 13/b allows a CORPORATE broker to open more than five branches INSIDE THE KINGDOM, or any
+ * branch abroad, subject to four CONJUNCTIVE conditions: three years since licensing with actual
+ * practice (13/b/1), paid-up capital of at least 50,000 JOD (13/b/2), operating profits in the two
+ * preceding years (13/b/3), and a legal form of public shareholding, private shareholding or LLC
+ * (13/b/4).
+ *
+ * NONE OF IT IS IMPLEMENTED, and the reason is that the system does not model what it counts: art.
+ * 13's فروع are PHYSICAL BRANCH OFFICES, and this product has no physical-branch concept at all.
+ * Art. 4/a's فروع above are INSURANCE BRANCHES — lines within a type — which is a different noun
+ * sharing a word.
+ *
+ * So a guard written against the branch count THIS file has would fire on insurance lines and tell
+ * every office holding six or more of them — the ordinary case — that it needs 50,000 JOD, with no
+ * basis in the text. That is the same class of false regulatory finding as the provider being
+ * reported as an unlicensed office, and it is why the article is named here and left unbuilt
+ * rather than approximated.
+ *
+ * Were physical branches modelled later, a capital-only guard would STILL be wrong: the four
+ * conditions are conjunctive, and capital is one of them.
+ *
  * ## The TYPE is derived from the branch, never stored beside it
  *
  * `InsuranceLineCategory` has exactly two values — GENERAL and LIFE — which is precisely the pair
@@ -93,6 +115,37 @@ export function typesInScope(
   const present = branchCountByType(branches);
   return INSURANCE_LINE_CATEGORIES.filter((t) => present.has(t));
 }
+
+/**
+ * THE UNIT THE BRANCHES ARE COUNTED IN IS UNDER VERIFICATION WITH THE CENTRAL BANK.
+ *
+ * Art. 4/a's slabs count BRANCHES within a type — up to 6, up to 12, more than 12 — so the counting
+ * unit decides how much capital an office must hold. This function counts rows of OUR catalogue,
+ * which is 32 lines.
+ *
+ * An unattributed reply to a question put to the Central Bank states that those 32 are a COMMERCIAL
+ * PRODUCT catalogue while the Bank licenses against a shorter REGULATORY classification — its
+ * example being that our several liability lines fall under one regulatory branch, "general
+ * liability". That is consistent with the 18-general-and-8-life list in the Bank's own published
+ * broker re-registration form, which reads like a licensing classification rather than a product
+ * list.
+ *
+ * ## WHY NOTHING IS CHANGED HERE, AND WHY THE NOTE EXISTS ANYWAY
+ *
+ * The reply is NOT AUTHORITATIVE and is recorded as unattributed: no reference number, no signature,
+ * it does not contain the form or the list that was asked for, and its own closing line directs us to
+ * submit a formal written request to obtain the annexes. Nothing is built on it.
+ *
+ * So the catalogue is untouched — merging or renaming a line would change what every existing licence
+ * MEANS — and no mapping column is added, because an empty column with no reader is the
+ * `dpoAlternateApproverUserId` precedent: it existed for exactly this kind of problem, acquired no
+ * reader, and is now marked superseded. The column arrives with the official list that populates it.
+ *
+ * What IS done is to stop the screens stating a settled answer. The figure below is still computed
+ * and still shown; what changes is that both surfaces displaying it now say the counting unit is
+ * under verification. The owner's rule is that the system does not state as settled what is not, and
+ * a capital requirement is a money figure an office acts on.
+ */
 
 /**
  * The capital art. 4/a requires for the WHOLE scope.

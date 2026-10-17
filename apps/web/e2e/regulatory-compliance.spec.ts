@@ -43,9 +43,12 @@ const LICENSE = {
   // expiry, and 2027-01-01 minus 45 days is 2026-11-17.
   renewalDueBy: '2026-11-17T00:00:00.000Z',
   renewalFiledOnTime: false,
-  validByOperationOfLaw: false,
+  validPendingRenewalDecision: false,
   expiryIsEndOfCalendarYear: false,
   expectedExpiryForThreeYearTerm: '2028-12-31T00:00:00.000Z',
+  // FALSE, and accurate rather than convenient: this fixture's term runs 2026-01-01 to
+  // 2027-01-01, which is neither a 31 December nor the three-year term art. 10/b requires.
+  expiryMatchesThreeYearTerm: false,
 };
 
 /*
@@ -315,7 +318,61 @@ test('an expiry that is not a 31 December WARNS and does not block (art. 10/b)',
   await expect(page.locator('main')).toContainText('CBJ-2026-001');
 });
 
-test('an expired term with a timely application says it is still valid by operation of law (art. 11)', async ({
+test('an expiry that is not the three-year term WARNS, and names the part-year rule (art. 10/b)', async ({
+  page,
+}) => {
+  /*
+   * Correction 0.3. Module 0 item (d) surfaced the expected expiry and deliberately warned about
+   * NOTHING, on the stated ground that "three calendar years" was ambiguous for a term issued
+   * mid-year. Art. 10/b answers it in its own sentence — part of a calendar year counts as a year —
+   * so the ambiguity was never there and the screen now says when the dates disagree.
+   *
+   * Same pair as the sibling above: the warning appears AND nothing is refused.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page);
+  await page.goto('/regulatory-compliance');
+
+  const warning = page.locator('[data-expiry-not-three-year-term]');
+  await expect(warning).toContainText('art. 10/b');
+  // The RULE, not just the article number — an officer reading "does not match art. 10/b" with no
+  // explanation cannot tell whether the entry or the regulation is being described.
+  await expect(warning).toContainText('part of a calendar year counts as a year');
+  await expect(warning).toContainText('was not refused');
+  await expect(page.locator('main')).toContainText('CBJ-2026-001');
+});
+
+test('NO three-year warning when the issue date was never recorded — a blank field is not a discrepancy', async ({
+  page,
+}) => {
+  /*
+   * THE THREE-STATE HALF, and the one that would rot silently. `expiryMatchesThreeYearTerm` is
+   * null when no issue date is on record, and collapsing that into `false` would accuse every
+   * office that left the field blank of disagreeing with the regulation.
+   *
+   * The absence is anchored on a positive read from the SAME render — without it an unhydrated
+   * page satisfies the absence and the test passes proving nothing.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      current: {
+        ...LICENSE,
+        issuedAt: null,
+        expectedExpiryForThreeYearTerm: null,
+        expiryMatchesThreeYearTerm: null,
+      },
+      terms: [LICENSE],
+    },
+  });
+  await page.goto('/regulatory-compliance');
+
+  // Anchor: the page rendered and the term is on it.
+  await expect(page.locator('main')).toContainText('CBJ-2026-001');
+  await expect(page.locator('[data-expiry-not-three-year-term]')).toHaveCount(0);
+});
+
+test('an expired term with a timely application says it is still valid, and does NOT cite art. 11', async ({
   page,
 }) => {
   // Without this the screen would show an expiry in the past beside a licence the system is
@@ -327,7 +384,7 @@ test('an expired term with a timely application says it is still valid by operat
     expiryIsEndOfCalendarYear: true,
     renewalRequestedAt: '2026-11-16T00:00:00.000Z',
     renewalFiledOnTime: true,
-    validByOperationOfLaw: true,
+    validPendingRenewalDecision: true,
     isCurrentlyLapsed: false,
   };
   await mockRegulatoryCompliance(page, {
@@ -335,9 +392,16 @@ test('an expired term with a timely application says it is still valid by operat
   });
   await page.goto('/regulatory-compliance');
 
-  const notice = page.locator('[data-valid-by-operation-of-law]');
-  await expect(notice).toContainText('by operation of law');
-  await expect(notice).toContainText('art. 11');
+  const notice = page.locator('[data-valid-pending-renewal-decision]');
+  // The rule still holds and the notice still explains it.
+  await expect(notice).toContainText('treated as still valid');
+  await expect(notice).toContainText('filed on time');
+  // AND IT NO LONGER CLAIMS A LEGAL AUTHORITY IT DOES NOT HAVE. This is the half that would
+  // rot silently: the behaviour is unchanged, so only an assertion on the ABSENCE of the
+  // citation can catch somebody putting it back.
+  await expect(notice).not.toContainText('art. 11');
+  await expect(notice).not.toContainText('by operation of law');
+  await expect(notice).toContainText('no provision of Instructions No. 9 of 2026');
   // And the two warnings are distinct states, not one: a 31-December expiry raises no art. 10/b
   // warning even while this one is showing.
   await expect(page.locator('[data-expiry-not-end-of-year]')).toHaveCount(0);
@@ -353,7 +417,7 @@ test('an application filed AFTER the deadline is called out while there is still
     expiryIsEndOfCalendarYear: true,
     renewalRequestedAt: '2026-12-20T00:00:00.000Z',
     renewalFiledOnTime: false,
-    validByOperationOfLaw: false,
+    validPendingRenewalDecision: false,
   };
   await mockRegulatoryCompliance(page, {
     licenseSeries: { current: late, terms: [late] },
@@ -465,6 +529,53 @@ test('a sole establishment is told the one-type limit BEFORE it hits the refusal
   await mockRegulatoryCompliance(page);
   await page.reload();
   await expect(page.locator('[data-sole-establishment]')).toHaveCount(0);
+});
+
+test('the one-type refusal DECLARES ITS BASIS — that the rule is applied however the office brokes', async ({
+  page,
+}) => {
+  /*
+   * REGISTER ENTRY 20, DECLARED RATHER THAN RESOLVED (owner's instruction, 2026-10-16).
+   *
+   * Art. 3/a's refusal is keyed on `brokerKind === 'NATURAL_PERSON'` and reads nothing about
+   * `brokerageKind`, so it fires on a reinsurance broker exactly as on a direct one — while whether
+   * Instructions No. 9 of 2026 govern a reinsurance broker at all is unresolved, and that column's
+   * own comment once claimed these guards "must not fire" for one. Entry 20 stays open; what this
+   * asserts is that the refusal is no longer SILENT about the basis on which it is being applied.
+   *
+   * THE THREE CLAUSES ARE ASSERTED SEPARATELY because each is a different promise, and a single
+   * `toContainText` of the whole sentence would pass against a reword that dropped any one of them:
+   * that it applies to EVERY office, WHY (no separate text for reinsurance brokerage), and that the
+   * question is NOT SETTLED here. The last is the one a well-meaning edit would delete as hedging.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page, {
+    scope: { ...SCOPE, brokerKind: 'NATURAL_PERSON' },
+  });
+  await page.goto('/regulatory-compliance');
+
+  const basis = page.locator('[data-one-type-basis]');
+  await expect(basis).toBeVisible();
+  await expect(basis).toContainText('every brokerage office');
+  await expect(basis).toContainText('reinsurance brokerage');
+  await expect(basis).toContainText('not settled here');
+
+  /*
+   * IT IS NOT A SECOND REFUSAL, and that is a visibility property rather than a wording one: the
+   * sole-establishment note states the limit and this states the basis of it, so both must be on the
+   * page together. A basis rendered where the limit is not would explain a rule nobody was told about.
+   */
+  await expect(page.locator('[data-sole-establishment]')).toBeVisible();
+
+  // Absent for a corporate broker, because the refusal cannot fire there and a basis with no refusal
+  // behind it is an unexplained paragraph about reinsurance on an unrelated office's screen.
+  await mockRegulatoryCompliance(page);
+  await page.reload();
+  // ANCHORED: the licence types are read from the same response, so this proves the scope section
+  // rendered before the two absences below are read as absences rather than as an unmounted page.
+  await expect(page.locator('[data-licence-types]')).toBeVisible();
+  await expect(page.locator('[data-sole-establishment]')).toHaveCount(0);
+  await expect(page.locator('[data-one-type-basis]')).toHaveCount(0);
 });
 
 test('the minimum-staff requirement is stated BEFORE the refusal, with both numbers', async ({

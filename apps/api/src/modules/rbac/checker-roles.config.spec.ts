@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAKER_CHECKER_REGISTRY } from '../../common/maker-checker-pairs.config';
 import {
   CHECKER_PERMISSIONS,
   checkerPermissionsIn,
@@ -159,7 +160,21 @@ describe('the segregation signal fires for the same grants it always did', () =>
   it('covers every maker/checker pair this system enforces', () => {
     // A pair added to `common/maker-checker.util.ts` without a code here is a
     // pair whose checker half can be handed out silently.
-    expect(CHECKER_PERMISSIONS).toHaveLength(13);
+    /*
+     * DERIVED, not pinned at 13.
+     *
+     * A hardcoded length is satisfied by any thirteen strings — including thirteen where one
+     * checker code was swapped for something else entirely. The set itself is asserted by the test
+     * above; what this one is FOR is the relationship to the pair registry, so it reads the
+     * registry rather than a number somebody typed.
+     *
+     * Converted on 2026-10-13 after a count check in `seed.ts` accepted a substituted permission
+     * and really granted it.
+     */
+    expect(CHECKER_PERMISSIONS.length).toBe(
+      new Set(MAKER_CHECKER_REGISTRY.map((pair) => pair.checkerPermission))
+        .size,
+    );
     expect(new Set(CHECKER_PERMISSIONS).size).toBe(CHECKER_PERMISSIONS.length);
   });
 });

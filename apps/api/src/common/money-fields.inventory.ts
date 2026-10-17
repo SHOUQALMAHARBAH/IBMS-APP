@@ -24,6 +24,10 @@ export const MONEY_DECIMAL_FIELDS: readonly string[] = [
   // bands. The first money column that is about the BROKERAGE itself rather than a customer's
   // business, and a real JOD amount either way, so it is quantized to fils like the rest.
   'Organization.paidUpCapital',
+  // Module 0-ب item (d). A real JOD amount, so every arithmetic touching it goes through
+  // `money.util.ts`. COLLECTED AND NEVER REQUIRED — the bank guarantee has no basis in
+  // Instructions No. 9 of 2026, which is recorded on the column itself.
+  'Organization.bankGuaranteeAmount',
   'Prospect.expectedPremium',
   'UpSellRecommendation.currentSumInsured',
   'UpSellRecommendation.currentAssetValue',

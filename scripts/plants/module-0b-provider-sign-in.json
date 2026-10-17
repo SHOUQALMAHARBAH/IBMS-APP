@@ -1,0 +1,7 @@
+{
+  "the-dashboard-does-not-require-mfa-enrolment": {
+    "file": "apps/api/src/modules/compliance-risk/provider-office-state.controller.ts",
+    "from": "  @Get()",
+    "to": "  @SkipMfaRequired()\n  @Get()"
+  }
+}

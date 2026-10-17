@@ -24,8 +24,57 @@ describe('MAKER_CHECKER_REGISTRY', () => {
     }
   });
 
-  it('has exactly 15 entries — one per DB CHECK constraint this process scans', () => {
-    expect(MAKER_CHECKER_REGISTRY).toHaveLength(15);
+  it('names exactly the DB CHECK constraints this process scans', () => {
+    /*
+     * THE SET, not the count — converted 2026-10-13 under the standing rule that wherever a number
+     * stands in for a set of named values, the substitution passes.
+     *
+     * `toHaveLength(15)` is satisfied by any fifteen entries, including fifteen where one pair's
+     * constraint was swapped for another table's. That matters more here than almost anywhere:
+     * this registry is what `CHECKER_PERMISSIONS` now derives from, and it is what
+     * `duty-segregation-schema.e2e-spec.ts` compares against `pg_constraint`. A silently wrong
+     * entry would propagate into both.
+     *
+     * ALL FIFTEEN carry a constraint name — measured, zero nulls — so every registered pair has a
+     * database backstop and not one is enforced in application code alone. That is worth pinning
+     * as much as the names themselves: a future pair added with `dbCheckConstraint: null` would be
+     * a maker/checker rule the database does not refuse, and it would fail here rather than slip in.
+     */
+    expect(
+      MAKER_CHECKER_REGISTRY.map((p) => p.dbCheckConstraint).sort(),
+      'the maker/checker registry no longer names the constraints it did. A pair added, removed or re-pointed changes what the duty-segregation signal reports AND what the schema guard compares against pg_constraint — so it is a deliberate edit here, not a number to bump.',
+    ).toEqual(
+      [
+        'AccessRecertificationItem_maker_checker_distinct',
+        'Complaint_closure_maker_checker_distinct',
+        'CommissionLedgerEntry_maker_checker_distinct',
+        'DataProcessingAgreement_maker_checker_distinct',
+        'DataSharingApproval_maker_checker_distinct',
+        'DataSubjectRequest_closure_maker_checker_distinct',
+        'DisposalBatch_maker_checker_distinct',
+        'IncidentReport_classification_maker_checker_distinct',
+        'KYCRecord_maker_checker_distinct',
+        'NeedsAssessment_approver_maker_checker_distinct',
+        'NeedsAssessment_reviewer_maker_checker_distinct',
+        'PolicyChecking_maker_checker_distinct',
+        'Recommendation_maker_checker_distinct',
+        'Refund_maker_checker_distinct',
+        /*
+         * MODULE 0 CLOSE, DECISION 3 — THE SIXTEENTH PAIR, and this is the deliberate edit the
+         * assertion's own message asks for.
+         *
+         * `RetentionScheduleItem` already had a confirm step — `confirmedByLegalCounselAt`, a date
+         * with NO ACTOR — so one person could set a retention period and confirm it as Legal Counsel
+         * and nothing could compare them. The period decides when a customer's records are
+         * destroyed.
+         *
+         * Adding it here is what makes it visible to the duty-segregation readiness signal and to
+         * the schema guard that compares this list against `pg_constraint` both ways.
+         */
+        'RetentionScheduleItem_maker_checker_distinct',
+        'Settlement_maker_checker_distinct',
+      ].sort(),
+    );
   });
 
   it('every dbCheckConstraint is either null or a non-empty, unique string', () => {

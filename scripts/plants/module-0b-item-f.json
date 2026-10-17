@@ -1,0 +1,20 @@
+{
+  "the-invitation-audits-into-the-office": {
+    "_": "Put the audit back inside `runAs`, which is where version two had it. It SUCCEEDS — that is why this is worse than the version that 500'd — and writes the row into the office's own tenant, which makes that office permanently undeletable (`ON DELETE RESTRICT` plus a trigger refusing DELETE) and names an actor the office's tenant-scoped lookup cannot resolve. Two offices were stranded in db-test proving it. Must kill the audit-location assertion, and the teardown guard must then name the office it stranded. ⚠ THIS PLANT STRANDS AN OFFICE AND REQUIRES A MANUAL REPAIR AFTERWARDS — observed, not predicted: running it left an undeletable office in db-test, after which the NEXT two plants reported '20 skipped' because createTestApp refused the whole file. That is the guard's own warning demonstrated live, and it is the cost of planting the exact defect 'strand an office'. To clear it: DISABLE TRIGGER audit_log_entry_no_delete, delete the off-* audit rows, ENABLE it again, then delete the off-* users, assignments, roles, grants, licences, PI policies, documents and organizations — and PROVE the trigger refuses a DELETE again before trusting the database.",
+    "file": "apps/api/src/modules/provider/office-administrator-invitation.service.ts",
+    "from": "      return {\n        officeId,\n        userId: created.userId,",
+    "to": "      await this.audit.record({\n        userId: actor.id,\n        action: 'CREATE',\n        entityType: 'User',\n        entityId: created.userId,\n        afterValue: { officeId, planted: true },\n      });\n      return {\n        officeId,\n        userId: created.userId,"
+  },
+  "an-office-can-be-invited-into-twice": {
+    "_": "Remove the no-account-yet refusal, so the provider gains a standing ability to add accounts to a LIVE office rather than the right to bootstrap an empty one once. Must kill the second-invitation test — and only that one, because every other test invites at most once.",
+    "file": "apps/api/src/modules/provider/office-administrator-invitation.service.ts",
+    "from": "        if (existing > 0) {",
+    "to": "        if (false && existing > 0) {"
+  },
+  "any-organization-type-can-be-invited-into": {
+    "_": "Drop the target-type refusal, so the provider could invite an administrator into the provider organization itself or into an insurance company — whose administrator is a different role with a different code set that does not exist yet. Must kill the not-a-brokerage-office test.",
+    "file": "apps/api/src/modules/provider/office-administrator-invitation.service.ts",
+    "from": "    if (office.type !== 'BROKERAGE_OFFICE') {",
+    "to": "    if (false && office.type !== 'BROKERAGE_OFFICE') {"
+  }
+}

@@ -33,10 +33,12 @@ export interface BrokerLicense {
   renewalDueBy: string;
   /** Whether the application was filed by that deadline. False when none was filed. */
   renewalFiledOnTime: boolean;
-  /** Past its printed expiry yet STILL VALID, because a timely application is pending (art. 11).
+  /** Past its printed expiry yet STILL VALID, because a timely application is pending a decision.
+   *  NOT art. 11 — that article contains no extension; this is the owner's decision.
+   *  See `RENEWAL_PENDING_RULE_BASIS` in the api's broker-license.config.ts.
    *  Its own field rather than folded into `isCurrentlyLapsed`, because a screen showing an expiry
    *  in the past has to be able to explain why the system is content. */
-  validByOperationOfLaw: boolean;
+  validPendingRenewalDecision: boolean;
   /** Art. 10/b — false means the entered expiry is not a 31 December. A WARNING TO VERIFY, never
    *  a block: the date is entered as printed on the certificate and the certificate is the
    *  authority. */
@@ -44,6 +46,9 @@ export interface BrokerLicense {
   /** Informational only. Nothing refuses on it — see the api config for why three-calendar-years
    *  is not a second warning condition. */
   expectedExpiryForThreeYearTerm: string | null;
+  /** Art. 10/b — whether the entered expiry matches the three-year term. NULL means no issue
+   *  date on record, which is NOT a mismatch. A warning on screen; nothing is blocked. */
+  expiryMatchesThreeYearTerm: boolean | null;
 }
 
 /**

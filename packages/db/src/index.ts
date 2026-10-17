@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -16,7 +16,7 @@ declare global {
  */
 export const prisma = globalThis.__ibmsPrisma ?? new PrismaClient();
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   globalThis.__ibmsPrisma = prisma;
 }
 
@@ -36,5 +36,17 @@ export function createAppPrismaClient(url: string): PrismaClient {
   return new PrismaClient({ datasources: { db: { url } } });
 }
 
-export * from '@prisma/client';
-export * from './password-policy';
+export * from "@prisma/client";
+export * from "./password-policy";
+
+/**
+ * MODULE 0-ب, item 1 half B — every organization gets a default Branch and Department at creation.
+ * Exported here because there are three creation paths in two packages: the two provider registration
+ * routes in `apps/api` and the provider organization in `prisma/seed.ts`.
+ */
+export {
+  DEFAULT_BRANCH,
+  DEFAULT_DEPARTMENT,
+  ensureDefaultOrgUnits,
+  type OrgUnitWriter,
+} from "./default-org-units";

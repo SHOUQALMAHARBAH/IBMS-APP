@@ -1,6 +1,6 @@
 # Permission catalogue — دليل الصلاحيات
 
-> **220 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
+> **227 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
 >
 > **The English text is the stored description.** It is developer-facing and often terse: a hint at what the code gates, not something to translate word for word.
 >
@@ -8,7 +8,7 @@
 >
 > **A code held by NO role is not a mistake.** It means the seeded grid grants it to nobody yet; an office can still grant it from the Role screen.
 
-## admin — الإدارة والأمن  (22)
+## admin — الإدارة والأمن  (26)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -25,15 +25,19 @@
 | `department.update` | Rename a department | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `diagnostics.view` | See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence | SYSTEM_SECURITY_ADMINISTRATOR |
 | `encryption-key.read` | View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `permission.read` | View the global permission catalogue (the codes a role can be granted) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `provider.office-state.read` | Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform | SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.create` | Define a new role in this office's catalogue | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.deactivate` | Retire a role, reactivate a retired one, and delete one that was never used | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.read` | View the office's role catalogue | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.update` | Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `permission.read` | View the global permission catalogue (the codes a role can be granted) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `provider.insurance-company.administrator.invite` | Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset | PLATFORM_OPERATOR |
+| `provider.insurer.register` | Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
+| `provider.office-state.read` | Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
+| `provider.office.administrator.invite` | Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password | PLATFORM_OPERATOR |
+| `provider.office.register` | Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform | E2E_PLATFORM_GRANT_179190811423235, PLATFORM_OPERATOR |
+| `role.create` | Define a new role in this office's catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.deactivate` | Retire a role, reactivate a retired one, and delete one that was never used | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.read` | View the office's role catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.update` | Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `security-config.manage` | Update the security configuration | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `security-config.read` | Read the security configuration (idle timeout, lockout policy, ...) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `user.manage` | Provision/deprovision user accounts and role assignments | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `user.manage` | Provision/deprovision user accounts and role assignments | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 
 ## claims — المطالبات  (13)
 
@@ -145,7 +149,7 @@
 | `client-accounting.read` | View the client accounts-receivable/ageing report | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR, FINANCE_COLLECTIONS_OFFICER |
 | `commission-override.approve` | Approve a manual commission override (separately logged from the raiser) | BRANCH_DEPARTMENT_MANAGER |
 | `commission-override.raise` | Raise a manual commission override with a mandatory reason | FINANCE_COLLECTIONS_OFFICER |
-| `commission-rate.manage` | Alter a commission rate agreement/table (Finance may never do this without approval) | BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER, E2E_SCOPED_1791747386117, E2E_SCOPED_1791747449534, E2E_SCOPED_1791747478636, E2E_SCOPED_1791747511183, E2E_SCOPED_1791747548194, E2E_SCOPED_1791747577626, E2E_SCOPED_1791747598466, E2E_SCOPED_1791747619161, E2E_SCOPED_1791747649698, E2E_SCOPED_1791747743120, E2E_SCOPED_1791747764660, E2E_SCOPED_1791747785377, E2E_SCOPED_1791750200179 |
+| `commission-rate.manage` | Alter a commission rate agreement/table (Finance may never do this without approval) | BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER, E2E_SCOPED_1791747386117, E2E_SCOPED_1791747449534, E2E_SCOPED_1791747478636, E2E_SCOPED_1791747511183, E2E_SCOPED_1791747548194, E2E_SCOPED_1791747577626, E2E_SCOPED_1791747598466, E2E_SCOPED_1791747619161, E2E_SCOPED_1791747649698, E2E_SCOPED_1791747743120, E2E_SCOPED_1791747764660, E2E_SCOPED_1791747785377, E2E_SCOPED_1791750200179, E2E_SCOPED_1791755811235, E2E_SCOPED_1791803778496, E2E_SCOPED_1791808688265, E2E_SCOPED_1792070245771 |
 | `commission.calculate` | Apply the governed commission rate from the agreement table | FINANCE_COLLECTIONS_OFFICER |
 | `commission.reconcile` | Reconcile a commission ledger entry against the insurer statement and mark it paid | FINANCE_COLLECTIONS_OFFICER |
 | `financial-report.view` | View financial reporting/dashboards | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR, FINANCE_COLLECTIONS_OFFICER |
@@ -159,7 +163,7 @@
 | `reconciliation-exception.resolve` | Close a reconciliation exception | BRANCH_DEPARTMENT_MANAGER, FINANCE_COLLECTIONS_OFFICER |
 | `remittance.record` | Record a remittance to an insurer | FINANCE_COLLECTIONS_OFFICER |
 
-## insurance-operations — العمليات التأمينية  (51)
+## insurance-operations — العمليات التأمينية  (53)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -179,6 +183,8 @@
 | `endorsement.read` | List/read endorsements, their premium adjustment, the tied commission reversal, the refund approval state and the versioned coverage schedule | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, FINANCE_COLLECTIONS_OFFICER, PLACEMENT_TECHNICAL_OFFICER, SALES_RELATIONSHIP_OFFICER |
 | `insurance-line.create` | Add a line of business to this office's vocabulary | OFFICE_ADMINISTRATOR |
 | `insurance-line.update` | Correct a line of business this office added | OFFICE_ADMINISTRATOR |
+| `insurer.company.link` | Link this office's insurer record to an insurance company registered on the platform. Changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's own copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record. | OFFICE_ADMINISTRATOR, PLACEMENT_TECHNICAL_OFFICER, SYSTEM_SECURITY_ADMINISTRATOR |
+| `insurer.company.unlink` | Remove the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note. | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `insurer.create` | Register an insurer for this office, whether it is in the global catalogue or in none | OFFICE_ADMINISTRATOR |
 | `insurer.deactivate` | Stop and resume dealing with an insurer, and read the live impact of doing so | OFFICE_ADMINISTRATOR |
 | `insurer.directory.read` | Search the cross-office insurer directory — companies any office has registered, with their public contact details and the lines they offer. Never shows which offices deal with a company, or any office's commercial terms. | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, OFFICE_ADMINISTRATOR, PLACEMENT_TECHNICAL_OFFICER, SALES_RELATIONSHIP_OFFICER |
@@ -233,7 +239,7 @@
 | `profitability-analysis.view` | View profitability analysis (commission income vs. cost-to-serve) | EXECUTIVE_MANAGEMENT, FINANCE_COLLECTIONS_OFFICER |
 | `sales-target.manage` | Set and revise sales targets per employee/team | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT |
 
-## pdpl — حماية البيانات الشخصية  (16)
+## pdpl — حماية البيانات الشخصية  (17)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -249,7 +255,8 @@
 | `legal-hold.manage` | Place/review a Legal Hold | DATA_PROTECTION_OFFICER |
 | `privacy-notice.publish` | Publish a version-controlled bilingual privacy notice | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
 | `privacy-notice.read` | Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission) | CLAIMS_OFFICER, COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER, PLACEMENT_TECHNICAL_OFFICER, SALES_RELATIONSHIP_OFFICER |
-| `retention-schedule.manage` | Maintain the retention-period table (record categories, months, Legal Counsel confirmation) | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
+| `retention-schedule.confirm` | Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
+| `retention-schedule.update` | Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
 | `retention.dispose.approve` | Give final DPO approval on a disposal batch (checker side of dual control) | DATA_PROTECTION_OFFICER |
 | `retention.dispose.nominate` | Nominate a disposal batch (maker side of dual control) | BRANCH_DEPARTMENT_MANAGER |
 | `ropa.manage` | Maintain the Records of Processing Activities register | DATA_PROTECTION_OFFICER |
@@ -292,8 +299,8 @@
 
 ## Measured, so the numbers are checkable
 
-- **220** codes, **12** modules.
-- **0** held by no seeded role; **87** held by exactly one.
+- **227** codes, **12** modules.
+- **0** held by no seeded role; **90** held by exactly one.
 - **0** have no stored English description.
 
 Regenerate after any permission change. The sibling file `docs/permission-catalogue-for-descriptions.txt` is the one to TYPE INTO — it carries an `ar:` line per code and is regenerated without destroying what is already written there.
