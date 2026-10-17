@@ -73,12 +73,62 @@ READ_VERBS = {"GET"}
 # ---------------------------------------------------------------------------- api side
 
 
+def collapse_interpolations(path):
+    """Replace every BALANCED `${...}` with `*`, counting braces so a nested one does not truncate.
+
+    `[^}]*` was not enough: `${qs ? `?${qs}` : ''}` contains a `}` in the middle, so a lazy match
+    ended at the wrong brace and left the tail behind. That is half of why 49 paths could not be
+    resolved.
+    """
+    out = []
+    i = 0
+    while i < len(path):
+        if path.startswith("${", i):
+            depth = 1
+            j = i + 2
+            while j < len(path) and depth:
+                if path[j] == "{":
+                    depth += 1
+                elif path[j] == "}":
+                    depth -= 1
+                j += 1
+            out.append("*")
+            i = j
+        else:
+            out.append(path[i])
+            i += 1
+    return "".join(out)
+
+
 def norm(path):
-    """`/customers/${id}/ubos` -> `customers/*/ubos`; `:id` -> `*`."""
-    path = re.sub(r"\$\{[^}]*\}", "*", path)
+    """`/customers/${id}/ubos` -> `customers/*/ubos`; `:id` -> `*`; a trailing querystring is dropped.
+
+    THE TRAILING `*` IS DROPPED, and that is the other half of the 49.
+
+    `/audit-trail${qs ? `?${qs}` : ''}` collapses to `/audit-trail*`, and `/renewal-cases${suffix}`
+    to `/renewal-cases*` — but in both the interpolation is a QUERYSTRING, not a path segment, so
+    the route is `/audit-trail` and `/renewal-cases`. A `*` in the MIDDLE is a real segment
+    (`/customers/*/ubos`) and stays.
+
+    This cannot confuse the two: a path parameter is always followed by more path, so it is never
+    the last thing in the string. A trailing interpolation is a suffix the caller appends, which in
+    this codebase is always `?...` or an empty string.
+    """
+    path = collapse_interpolations(path)
     path = re.sub(r":[A-Za-z_][\w]*", "*", path)
     path = path.split("?")[0]
     path = re.sub(r"\*+", "*", path)
+    # THE TRAILING `*` IS A QUERYSTRING ONLY WHEN IT IS NOT A SEGMENT, and the discriminator is the
+    # character before it. My first version stripped every trailing `*` on the theory that a
+    # trailing interpolation is always a suffix — which was FALSE for
+    # `/admin/users/${id}/${isActive ? 'activate' : 'deactivate'}`, where the last interpolation IS
+    # a path segment. Two routes stayed unresolved because of it.
+    #
+    #   /audit-trail*      -> `*` follows `l`, so it is glued to the segment: a querystring. Strip.
+    #   /admin/users/*/*   -> `*` follows `/`, so it is its own segment. Keep.
+    if path.endswith("*") and not path.endswith("/*"):
+        path = path[:-1]
+    path = path.rstrip("/")
     return path.strip("/")
 
 
@@ -94,8 +144,30 @@ def api_routes():
                 continue
             p = os.path.join(root, f)
             src = io.open(p, encoding="utf-8", errors="replace").read()
-            cm = re.search(r"@Controller\(\s*'([^']*)'", src)
-            prefix = cm.group(1) if cm else ""
+            # ONE PREFIX PER CLASS, NOT PER FILE. `provider.controller.ts` declares TWO
+            # `@Controller`s — `provider/brokerage-offices` and `provider/insurance-companies` — and
+            # taking the first match for the whole file gave every company route the office prefix.
+            # That is why `POST /provider/insurance-companies` read as addressed by no controller
+            # while being one of only two routes in this product that create a tenant. Measured: it
+            # is the only file in the api with more than one, which is exactly why a single-match
+            # parser survived this long.
+            sections = re.split(r"(?=@Controller\()", src)
+            for section in sections:
+                # A BARE `@Controller()` IS LEGAL AND COMMON — `kyc.controller.ts` and
+                # `sales-performance.controller.ts` both use it, mounting their routes at the root.
+                # Requiring a quoted prefix to recognise a controller section made this parser SKIP
+                # those files entirely, which turned three resolvable paths into unresolved ones. So
+                # the test is whether the section IS a controller, and the prefix is empty when it
+                # declares none.
+                if not section.startswith("@Controller("):
+                    continue
+                cm = re.match(r"@Controller\(\s*'([^']*)'", section)
+                prefix = cm.group(1) if cm else ""
+                _collect_routes(section, prefix, p, verb_re, out)
+    return out
+
+
+def _collect_routes(src, prefix, p, verb_re, out):
             pending = None
             for m in verb_re.finditer(src):
                 if m.group(1) is not None:
@@ -108,13 +180,50 @@ def api_routes():
                     "controller": p.replace(os.sep, "/"),
                 }
                 pending = None
-    return out
 
 
 # ---------------------------------------------------------------------------- web side
 
 CALL = re.compile(r"\bapi(Get|Post|Patch|Put|Delete|PostFormData|FetchBlob)\s*(?:<[^>]*>)?\s*\(")
-_STR = re.compile(r"([`'\"])((?:\\.|(?!\1)[^\\])*)\1", re.S)
+# A plain-quoted literal. Template literals are scanned separately, because a nested one
+# (`` `/a${x ? `?${x}` : ''}` ``) terminates this pattern at the INNER backtick and hands back a
+# truncated path — which is exactly how 49 routes came to be unresolvable.
+_STR = re.compile(r"(['\"])((?:\\.|(?!\1)[^\\])*)\1", re.S)
+
+
+def _template_literals(text):
+    """Every backtick template in `text`, with nesting counted rather than assumed away."""
+    out = []
+    i = 0
+    while i < len(text):
+        if text[i] != "`":
+            i += 1
+            continue
+        j = i + 1
+        depth = 0
+        while j < len(text):
+            c = text[j]
+            if c == "\\":
+                j += 2
+                continue
+            if text.startswith("${", j):
+                depth += 1
+                j += 2
+                continue
+            if c == "}" and depth:
+                depth -= 1
+            elif c == "`" and depth == 0:
+                break
+            elif c == "`" and depth:
+                # A nested template inside an interpolation: skip to ITS close.
+                k = j + 1
+                while k < len(text) and text[k] != "`":
+                    k += 1
+                j = k
+            j += 1
+        out.append(text[i + 1 : j])
+        i = j + 1
+    return out
 
 
 def first_arg_literals(text):
@@ -131,7 +240,10 @@ def first_arg_literals(text):
         elif ch == "," and depth == 0:
             end = i
             break
-    return [m.group(2) for m in _STR.finditer(text[:end]) if m.group(2).startswith("/")]
+    window = text[:end]
+    found = [m.group(2) for m in _STR.finditer(window) if m.group(2).startswith("/")]
+    found += [lit for lit in _template_literals(window) if lit.startswith("/")]
+    return found
 
 
 def client_functions():
@@ -317,6 +429,34 @@ def provider_role_codes():
 # ---------------------------------------------------------------------------- the question
 
 
+def resolve(routes, verb, rpath):
+    """Every controller route a web call could be addressing, as (key, info) pairs.
+
+    Usually exactly one. The exception is a call whose FINAL segment is interpolated:
+
+        apiPost(`/admin/users/${id}/${isActive ? 'activate' : 'deactivate'}`)
+
+    which normalises to `admin/users/*/*` and is addressing two different routes. Those were the last
+    two of the 49 unresolved paths, and listing them as matcher gaps would have been wrong — they are
+    resolvable, just not to ONE route. So a trailing `*` segment expands to every controller route
+    that shares the prefix and has one more segment, and the caller requires ALL of them to pass.
+    """
+    exact = routes.get((verb, rpath))
+    if exact is not None:
+        return [((verb, rpath), exact)]
+    if not rpath.endswith("/*"):
+        return []
+    prefix = rpath[: -len("/*")]
+    depth = len(prefix.split("/")) + 1
+    out = []
+    for (v, path), info in routes.items():
+        if v != verb or not path.startswith(prefix + "/"):
+            continue
+        if len(path.split("/")) == depth:
+            out.append(((v, path), info))
+    return out
+
+
 def satisfied(codes, held):
     """ANY-OF, because PermissionsGuard is `required.some`. No codes = open to any authenticated user."""
     return (not codes) or any(c in held for c in codes)
@@ -388,12 +528,24 @@ def main():
                 continue
             pairs_examined += 1
             for verb, rpath in sorted(called):
-                info = routes.get((verb, rpath))
-                if info is None:
+                candidates = resolve(routes, verb, rpath)
+                if not candidates:
                     unresolved_paths.add("%s /%s" % (verb, rpath))
                     continue
-                if satisfied(info["codes"], held):
+                # EVERY candidate must be satisfied, not any. One call site can address several
+                # routes — `/admin/users/${id}/${isActive ? 'activate' : 'deactivate'}` is one
+                # function reaching two — and the screen may call either, so a role refused by one of
+                # them cannot use the control. Requiring ANY would let a screen pass because the half
+                # the role happens to hold exists.
+                refused = [
+                    (key, info)
+                    for key, info in candidates
+                    if not satisfied(info["codes"], held)
+                ]
+                if not refused:
                     continue
+                key, info = refused[0]
+                rpath = key[1]
                 # Does the screen KNOW about this permission? If it names the code, the refusal is
                 # something it is handling — a hidden control, a gated section, a refusal sentence —
                 # and reporting it would be noise on a red build.
@@ -456,12 +608,27 @@ def main():
         print("  %-34s %s" % (s["screen"], s["file"]))
 
     if unresolved_paths:
+        # OWNER DECISION, 2026-10-17, item 9: "when a path genuinely cannot be resolved, the
+        # measurement must FAIL on the unresolved path rather than list it as a note — an unmatched
+        # path is a hole in the measurement, not a footnote to it."
+        #
+        # It was 49, and every one of them was a MATCHER defect rather than a product fact: a nested
+        # template literal truncating the scan, a trailing querystring read as a path segment, a file
+        # with two `@Controller`s, a bare `@Controller()`, and a call addressing two routes at once.
+        # While they were listed as notes the headline figure was a FLOOR and read like a total.
         print(
-            "\nC. PATHS THIS COULD NOT MATCH TO A CONTROLLER (%d) — not findings, matcher gaps:"
+            "\nC. UNRESOLVED PATHS (%d) — THE MEASUREMENT IS INCOMPLETE BY THIS MUCH:"
             % len(unresolved_paths)
         )
-        for p in sorted(unresolved_paths)[:40]:
-            print("    %s" % p)
+        for up in sorted(unresolved_paths):
+            print("    %s" % up)
+        print(
+            "\nEach of these is a screen call this check could NOT map to a controller, so that"
+            "\nscreen was examined with some of its calls invisible. Resolve the path form in"
+            "\n`norm`/`resolve`, or name the controller route it addresses. Do not add a tolerated"
+            "\nlist: the whole point of item 9 is that a gate believed total and actually partial is"
+            "\nworse than a known-partial one."
+        )
 
     # NON-VACUITY. A matcher that stops resolving imports reports a clean tree, which is the one
     # outcome indistinguishable from success.
@@ -490,7 +657,8 @@ def main():
         "\n%d screen(s) cannot render for at least one role that can open them."
         % len({(r["screen"], r["role"]) for r in render_failures})
     )
-    return 1 if render_failures else 0
+    # An unresolved path fails the run even when nothing else does — see section C.
+    return 1 if (render_failures or unresolved_paths) else 0
 
 
 DECLARED = os.path.join("scripts", "measurements", "screen-route-fit-declared.json")

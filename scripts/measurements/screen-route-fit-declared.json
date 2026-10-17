@@ -17,7 +17,13 @@
     "Nineteen rows were declared on 2026-10-16. Five were closed on 2026-10-17 by items 1, 3 and 6:",
     "the two `/settings/users` PLATFORM_OPERATOR rows, the two `/settings/roles` rows and",
     "`/commission`. `/rfqs/new` and `/rfqs` left the measurement entirely when item 6 installed",
-    "their screen gates."
+    "their screen gates.",
+    "",
+    "2026-10-17, decision 11: the two `/settings/users` x INSURANCE_COMPANY_ADMINISTRATOR rows LEFT",
+    "this file. The owner decided that role administers its own company's users, so it was granted",
+    "`branch.read` and `department.read` — which means it reaches both routes through the FIRST",
+    "disjunct and the gate needed no edit at all. Register entry 49 moved from RAISED to DECIDED.",
+    "Fourteen rows became twelve."
   ],
   "declared": [
     {
@@ -91,18 +97,6 @@
       "role": "DATA_PROTECTION_OFFICER",
       "route": "GET /rfqs/selectable-insurers",
       "decision": "ITEM 4 — DECLARE, and deliberately NOT widened. This list exists to ADD an insurer to an RFQ, and all three roles are already refused `POST /rfqs/:id/insurers` — so the section is to be hidden with a named reason. A control that cannot be used is not a control to show. NOT YET BUILT."
-    },
-    {
-      "screen": "/settings/users",
-      "role": "INSURANCE_COMPANY_ADMINISTRATOR",
-      "route": "GET /admin/branches",
-      "decision": "RAISED TO THE OWNER, NOT DECIDED. Item 1 half A's decided set is four roles and does not include INSURANCE_COMPANY_ADMINISTRATOR, so this row is left refused — but that role is in the IDENTICAL deadlock: it holds `user.manage`, faces the same two mandatory fields, and cannot populate them. PROVEN while choosing item 1's code: the company administrator's six codes are a strict SUBSET of the provider's eleven, so no code shared with an office role can separate the two — only a `provider.*` code can, which is why `provider.office.administrator.invite` was named and why this role did not come with it. Whether a company administrator should administer its company's users is the owner's call."
-    },
-    {
-      "screen": "/settings/users",
-      "role": "INSURANCE_COMPANY_ADMINISTRATOR",
-      "route": "GET /admin/departments",
-      "decision": "RAISED TO THE OWNER, NOT DECIDED — the same question as `GET /admin/branches` above."
     }
   ]
 }

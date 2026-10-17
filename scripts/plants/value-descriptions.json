@@ -33,5 +33,10 @@
     "file": "apps/api/src/modules/rbac/controllers/org-structure.controller.ts",
     "from": "  @RequirePermissions('branch.read', 'provider.office.administrator.invite')",
     "to": "  @RequirePermissions('branch.read', 'user.manage')"
+  },
+  "fit-measurement-loses-template-paths": {
+    "file": "scripts/measurements/screen-route-permission-fit.py",
+    "from": "    found += [lit for lit in _template_literals(window) if lit.startswith(\"/\")]",
+    "to": "    found += []"
   }
 }

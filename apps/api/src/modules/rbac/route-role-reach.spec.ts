@@ -36,11 +36,16 @@ import { join } from 'node:path';
  * ## WHY THE PROVIDER-SIDE ROLES ARE READ SEPARATELY, AND THE PROOF THAT MATTERS
  *
  * They are not in the office grid and cannot be: an OFFICE-scoped grid cannot express them. Reading
- * them is also what makes this spec able to state the finding that decided item 1 — the company
- * administrator's six codes are a strict SUBSET of the provider's eleven, so EVERY code shared
- * between the provider and an office role also reaches the company administrator, and only a
- * `provider.*` code can separate them. That is asserted below, because it is the fact a future
- * widening will otherwise rediscover the hard way.
+ * them is also what let this spec state the finding that decided item 1 — that the company
+ * administrator's codes were a strict SUBSET of the provider's, so no shared code could separate the
+ * two and only a `provider.*` code could.
+ *
+ * THE SUBSET NO LONGER HOLDS, by owner decision 11 of 2026-10-17: the company administrator was
+ * granted `branch.read` and `department.read`, which the provider does not hold. The assertion is
+ * RE-STATED rather than deleted — it now pins the direction of the break (exactly those two codes and
+ * no others) and asserts the property item 1 actually rests on, which is that every `provider.*` code
+ * is PLATFORM-scoped and reaches the provider alone. That is still true, so item 1's code choice
+ * stands.
  */
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -203,6 +208,7 @@ const DECIDED: {
       'being PLATFORM-scoped, cannot be granted to an office role later.',
     roles: [
       'BRANCH_DEPARTMENT_MANAGER',
+      'INSURANCE_COMPANY_ADMINISTRATOR',
       'OFFICE_ADMINISTRATOR',
       'PLATFORM_OPERATOR',
       'SYSTEM_SECURITY_ADMINISTRATOR',
@@ -213,6 +219,7 @@ const DECIDED: {
     why: 'Owner, 2026-10-17, item 1 half A — the same decision as `GET /admin/branches`.',
     roles: [
       'BRANCH_DEPARTMENT_MANAGER',
+      'INSURANCE_COMPANY_ADMINISTRATOR',
       'OFFICE_ADMINISTRATOR',
       'PLATFORM_OPERATOR',
       'SYSTEM_SECURITY_ADMINISTRATOR',
@@ -230,7 +237,16 @@ describe('a widened route is specified by the exact role set that reaches it', (
     expect(routes.size).toBeGreaterThan(300);
     expect(roles.size).toBeGreaterThanOrEqual(13);
     expect(roles.get('PLATFORM_OPERATOR')?.size).toBe(11);
-    expect(roles.get('INSURANCE_COMPANY_ADMINISTRATOR')?.size).toBe(6);
+    /*
+     * EIGHT SINCE OWNER DECISION 11, 2026-10-17 — re-stated deliberately, not relaxed.
+     *
+     * It was six. `branch.read` and `department.read` were added because a role trusted to provision
+     * users must be able to read the two lists the provisioning form makes mandatory. A pinned SIZE
+     * is the point: it is the thing that refuses a NINTH code arriving without a decision, which is
+     * the failure mode a tolerant assertion exists to prevent. If this fails, read entry 49 and the
+     * grants file's header before changing the number.
+     */
+    expect(roles.get('INSURANCE_COMPANY_ADMINISTRATOR')?.size).toBe(8);
   });
 
   describe.each(DECIDED)('$route', ({ route, roles: decided }) => {
@@ -259,7 +275,57 @@ describe('a widened route is specified by the exact role set that reaches it', (
     });
   });
 
-  it('PROVES the company administrator cannot be separated from the provider by any shared code', () => {
+  it("RE-STATED: the subset no longer holds, and item 1's code choice survives anyway", () => {
+    /*
+     * OWNER DECISION 11, 2026-10-17 — AND THIS TEST BREAKING IS WHAT IT WAS BUILT FOR.
+     *
+     * The previous assertion was that the company administrator's codes are a strict SUBSET of the
+     * provider's, which is what proved that no shared code could separate the two and therefore why
+     * item 1 named `provider.office.administrator.invite` rather than `user.manage`. The owner then
+     * granted the company administrator `branch.read` and `department.read`, which the provider does
+     * NOT hold — so the subset is gone, by decision.
+     *
+     * Her instruction was explicit: "RE-STATE it, deliberately and in writing; do not delete it and
+     * do not relax it." So the replacement says what is now true and why item 1 is unaffected:
+     *
+     *   1. The subset is BROKEN, and this test asserts the direction of the break — exactly the two
+     *      org-unit reads and nothing else. A third code appearing on the company administrator that
+     *      the provider lacks fails here, because that would be a capability decision nobody recorded.
+     *
+     *   2. Item 1's choice survives, and the reason is that it never depended on the subset. It
+     *      depended on `provider.*` codes being PLATFORM-scoped and held by `PLATFORM_OPERATOR`
+     *      alone, which is still true and is asserted below. A PLATFORM-scoped code still separates
+     *      the provider from every office role.
+     *
+     * What DID change is the asserted role SET for the two widened routes, which is now five — and
+     * that is pinned by name in `DECIDED` above rather than inferred here.
+     */
+    const prov = roles.get('PLATFORM_OPERATOR')!;
+    const comp = roles.get('INSURANCE_COMPANY_ADMINISTRATOR')!;
+
+    // The break, by name and in one direction only.
+    expect([...comp].filter((c) => !prov.has(c)).sort()).toEqual([
+      'branch.read',
+      'department.read',
+    ]);
+
+    // Still true, and this is the half item 1 actually rests on: every `provider.*` code is held by
+    // the provider alone, so naming one in an any-of reaches no office role and no company.
+    const providerOnly = [...prov].filter((c) => c.startsWith('provider.'));
+    expect(providerOnly.length).toBeGreaterThan(0);
+    for (const code of providerOnly) {
+      for (const [name, held] of roles) {
+        if (name === 'PLATFORM_OPERATOR') continue;
+        expect(
+          held.has(code),
+          `${name} holds ${code}, which is PLATFORM-scoped and should reach the provider alone — ` +
+            "item 1's code choice rests on this and would need re-taking",
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('the shared-code set is still what it was, so a widening cannot reach a company by accident', () => {
     /*
      * THE FACT THAT DECIDED ITEM 1's CODE, asserted so a future widening does not rediscover it.
      *
@@ -274,7 +340,6 @@ describe('a widened route is specified by the exact role set that reaches it', (
      */
     const prov = roles.get('PLATFORM_OPERATOR')!;
     const comp = roles.get('INSURANCE_COMPANY_ADMINISTRATOR')!;
-    expect([...comp].filter((c) => !prov.has(c))).toEqual([]);
 
     const office = [...roles.entries()].filter(
       ([n]) =>
