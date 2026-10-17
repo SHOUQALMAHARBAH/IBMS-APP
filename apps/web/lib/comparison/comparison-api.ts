@@ -47,7 +47,9 @@ export interface BuildComparisonInput {
 
 /** 404 when no matrix has been built for the RFQ yet — callers treat that as
  * an empty state, not an error. */
-export function getComparisonForRfq(rfqId: string): Promise<ComparisonMatrix> {
+export function getComparisonForRfq(
+  rfqId: string,
+): Promise<ComparisonMatrix> {
   return apiGet(`/comparison-matrices?rfqId=${encodeURIComponent(rfqId)}`);
 }
 

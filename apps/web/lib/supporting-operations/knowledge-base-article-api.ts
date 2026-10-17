@@ -22,9 +22,7 @@ export interface KnowledgeBaseArticle {
   publishedAt: string;
 }
 
-export function listKnowledgeBaseArticles(
-  category?: string,
-): Promise<KnowledgeBaseArticle[]> {
+export function listKnowledgeBaseArticles(category?: string): Promise<KnowledgeBaseArticle[]> {
   return apiGet(
     category
       ? `/knowledge-base-articles?category=${encodeURIComponent(category)}`
@@ -44,13 +42,7 @@ export function createKnowledgeBaseArticle(input: {
 
 export function updateKnowledgeBaseArticle(
   id: string,
-  input: {
-    title?: string;
-    titleAr?: string;
-    category?: KbCategory;
-    bodyEn?: string;
-    bodyAr?: string;
-  },
+  input: { title?: string; titleAr?: string; category?: KbCategory; bodyEn?: string; bodyAr?: string },
 ): Promise<KnowledgeBaseArticle> {
   return apiPatch(`/knowledge-base-articles/${id}`, input);
 }

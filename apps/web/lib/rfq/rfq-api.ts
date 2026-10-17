@@ -6,7 +6,11 @@
 import { apiGet, apiPost } from '../auth/api-client';
 
 export type RfqInsurerStatus =
-  'SENT' | 'VIEWED' | 'QUOTED' | 'DECLINED' | 'NO_RESPONSE';
+  | 'SENT'
+  | 'VIEWED'
+  | 'QUOTED'
+  | 'DECLINED'
+  | 'NO_RESPONSE';
 
 /** The response statuses a caller may move a submission *to* (SENT is the
  * initial state, never a target). Keep in sync with

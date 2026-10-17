@@ -53,9 +53,7 @@ export type MachineNameProblem = 'empty' | 'unreadable';
  * The refusal. An immutable string in the audit log that no human can read back to a role is worse
  * than an error message, so the form refuses to save rather than storing one.
  */
-export function machineNameProblem(
-  englishName: string,
-): MachineNameProblem | null {
+export function machineNameProblem(englishName: string): MachineNameProblem | null {
   if (englishName.trim().length === 0) return 'empty';
   const letters = (toMachineName(englishName).match(/[A-Z]/g) ?? []).length;
   return letters < MIN_LETTERS ? 'unreadable' : null;

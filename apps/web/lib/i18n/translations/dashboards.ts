@@ -43,10 +43,8 @@ export const DASHBOARDS = {
     dcmpSelfApprovalViolations: 'حالات موافقة ذاتية',
     dcmpScanAsOf: '(حتى {at})',
     dcmpNoScanYet: '(لم يُجرَ أي فحص بعد)',
-    slaDashDueSoonMeaning:
-      '«قريبة الاستحقاق» تعني غير مُنجَزة ويحلّ موعدها خلال {window}.',
-    slaDashBreachRateMeaning:
-      'نسبة الإخلال = المتأخِّرة أو المُخلَّة من بين كل المهل التي حلّ موعدها.',
+    slaDashDueSoonMeaning: '«قريبة الاستحقاق» تعني غير مُنجَزة ويحلّ موعدها خلال {window}.',
+    slaDashBreachRateMeaning: 'نسبة الإخلال = المتأخِّرة أو المُخلَّة من بين كل المهل التي حلّ موعدها.',
     provAsOf: 'الأرقام كما في {at}.',
     provGeneratedAtWithPeriod: 'صُدِّر في {at} — فترة السوق {period}.',
     provPeriod: 'الفترة {period} (من {from} إلى {to}).',
@@ -91,8 +89,7 @@ export const DASHBOARDS = {
       'العملاء المرتقبون الجدد المؤهَّلون مقارنةً بالحصة المستهدفة، لكل موظف علاقات/مبيعات أو لكل فرع أو فريق.',
     spLookUp: 'استعراض الأداء',
     spOwnerUserIdLabel: 'معرّف المستخدم المسؤول',
-    spPeriodOptionalLabel:
-      'تسمية الفترة (اختياري — الافتراضي هو الفترة الحالية)',
+    spPeriodOptionalLabel: 'تسمية الفترة (اختياري — الافتراضي هو الفترة الحالية)',
     spViewButton: 'عرض الأداء',
     spNoTarget: 'لم تُحدَّد حصة مستهدفة للفترة الحالية بعد.',
     spTargetNewProspects: 'الحصة المستهدفة — عملاء مرتقبون جدد',
@@ -238,8 +235,7 @@ export const DASHBOARDS = {
     diepCommissionEarned: 'العمولة المكتسبة',
     diepRenewalRate: 'معدّل التجديد',
     diepCrossSellRate: 'معدّل البيع المتبادل',
-    diepLoadError:
-      'تعذّر تحميل لوحة أداء شركات التأمين والموظفين — حاول مرة أخرى.',
+    diepLoadError: 'تعذّر تحميل لوحة أداء شركات التأمين والموظفين — حاول مرة أخرى.',
     diepRefusalAct: 'عرض لوحة أداء شركات التأمين والموظفين',
 
     // ---- Insurer performance (#60) ----------------------------------------------
@@ -258,8 +254,7 @@ export const DASHBOARDS = {
     ipComputeError: 'تعذّر احتساب الدرجة.',
     ipLoadError: 'تعذّر تحميل أداء شركة التأمين — حاول مرة أخرى.',
     ipRefusalAct: 'عرض لوحة أداء شركات التأمين',
-    ipComputeNote:
-      'يستخدم معرّف شركة التأمين أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
+    ipComputeNote: 'يستخدم معرّف شركة التأمين أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
     ipMostRecentPeriod: 'أحدث فترة: {label} (احتُسبت {computed}).',
 
     // ---- Employee performance (#61) -----------------------------------------------
@@ -278,11 +273,9 @@ export const DASHBOARDS = {
     epComputeError: 'تعذّر احتساب السجل.',
     epLoadError: 'تعذّر تحميل أداء الموظف — حاول مرة أخرى.',
     epMostRecentPeriod: 'أحدث فترة: {period}.',
-    epDashMeaning:
-      'الشَّرطة تعني أنه لم تتوفَّر نتائج لتقييم تلك الفترة، وليست صفرًا محسوبًا.',
+    epDashMeaning: 'الشَّرطة تعني أنه لم تتوفَّر نتائج لتقييم تلك الفترة، وليست صفرًا محسوبًا.',
     epRefusalAct: 'عرض لوحة أداء الموظفين',
-    epComputeNote:
-      'يستخدم معرّف الموظف أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
+    epComputeNote: 'يستخدم معرّف الموظف أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
 
     // ---- Portfolio analysis (#62) --------------------------------------------------
     paHeading: 'تحليل المحفظة',
@@ -327,15 +320,13 @@ export const DASHBOARDS = {
     pexLoading: 'جارٍ التحميل…',
     pexNoPolicies: 'لا توجد وثائق صادرة بعد.',
     pexRefusalAct: 'تصدير أرقام التخطيط الاستراتيجي',
-    pexPeriodNote:
-      'اتركه فارغاً لاحتساب الشهر الميلادي المنتهي بتوقيت UTC. بيانات المحفظة تعكس دائماً الدفتر الحالي بغضّ النظر عن الفترة.',
+    pexPeriodNote: 'اتركه فارغاً لاحتساب الشهر الميلادي المنتهي بتوقيت UTC. بيانات المحفظة تعكس دائماً الدفتر الحالي بغضّ النظر عن الفترة.',
 
     // ---- Executive Dashboard — CONVERTED, not rewritten ----------------
     // This screen was already bilingual via inline ternaries; the Arabic
     // below is that text moved verbatim. Keys are generated from the
     // English, hence the mechanical names.
-    execCouldNotLoadTheExecutive:
-      'تعذّر تحميل لوحة الإدارة التنفيذية — حاول مرة أخرى.',
+    execCouldNotLoadTheExecutive: 'تعذّر تحميل لوحة الإدارة التنفيذية — حاول مرة أخرى.',
     execRefusalAct: 'عرض اللوحة التنفيذية',
     execPeriodAsOf: 'الفترة {period} · كما في {asOf}',
     execExecutiveDashboard: 'لوحة الإدارة التنفيذية',
@@ -389,8 +380,7 @@ export const DASHBOARDS = {
     dcmpScanAsOf: '(as of {at})',
     dcmpNoScanYet: '(no scan has run yet)',
     slaDashDueSoonMeaning: '“Due soon” = unresolved and due within {window}.',
-    slaDashBreachRateMeaning:
-      'Breach rate = late-or-breached over all timers that have reached a deadline.',
+    slaDashBreachRateMeaning: 'Breach rate = late-or-breached over all timers that have reached a deadline.',
     provAsOf: 'Figures as of {at}.',
     provGeneratedAtWithPeriod: 'Generated {at} — market period {period}.',
     provPeriod: 'Period {period} ({from} to {to}).',
@@ -433,8 +423,7 @@ export const DASHBOARDS = {
       'New prospects qualified against quota, per Sales/Relationship Officer or per branch/team.',
     spLookUp: 'Look up performance',
     spOwnerUserIdLabel: 'Owner user ID',
-    spPeriodOptionalLabel:
-      'Period label (optional — defaults to the current period)',
+    spPeriodOptionalLabel: 'Period label (optional — defaults to the current period)',
     spViewButton: 'View performance',
     spNoTarget: 'No target set for the current period yet.',
     spTargetNewProspects: 'Target — new prospects',
@@ -567,16 +556,14 @@ export const DASHBOARDS = {
     diepPrice: 'Price',
     diepServiceQuality: 'Service quality',
     diepEmployeeSection: 'Employee KPI achievement',
-    diepNoEmployeeRecords:
-      'No employee performance records computed for this period yet.',
+    diepNoEmployeeRecords: 'No employee performance records computed for this period yet.',
     diepColEmployeeId: 'Employee ID',
     diepNewClients: 'New clients',
     diepPremiumWritten: 'Premium written',
     diepCommissionEarned: 'Commission earned',
     diepRenewalRate: 'Renewal rate',
     diepCrossSellRate: 'Cross-sell rate',
-    diepLoadError:
-      'Could not load the Insurer & Employee Performance Dashboard — try again.',
+    diepLoadError: 'Could not load the Insurer & Employee Performance Dashboard — try again.',
     diepRefusalAct: 'view the insurer and employee performance dashboard',
 
     ipHeading: 'Insurer Performance',
@@ -594,8 +581,7 @@ export const DASHBOARDS = {
     ipComputeError: 'Could not compute the score.',
     ipLoadError: 'Could not load insurer performance — try again.',
     ipRefusalAct: 'view the insurer performance dashboard',
-    ipComputeNote:
-      'Uses the Insurer ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
+    ipComputeNote: 'Uses the Insurer ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
     ipMostRecentPeriod: 'Most recent period: {label} (computed {computed}).',
 
     epHeading: 'Employee Performance',
@@ -613,11 +599,9 @@ export const DASHBOARDS = {
     epComputeError: 'Could not compute the record.',
     epLoadError: 'Could not load employee performance — try again.',
     epMostRecentPeriod: 'Most recent period: {period}.',
-    epDashMeaning:
-      'A dash means no outcomes existed to rate that period, not a computed 0%.',
+    epDashMeaning: 'A dash means no outcomes existed to rate that period, not a computed 0%.',
     epRefusalAct: 'view the employee performance dashboard',
-    epComputeNote:
-      'Uses the Employee ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
+    epComputeNote: 'Uses the Employee ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
 
     paHeading: 'Portfolio Analysis',
     paIntro:
@@ -659,15 +643,13 @@ export const DASHBOARDS = {
     pexLoading: 'Loading…',
     pexNoPolicies: 'No issued policies yet.',
     pexRefusalAct: 'export the strategic planning figures',
-    pexPeriodNote:
-      'Leave blank to score the UTC calendar month that just ended. Portfolio data is always the current book, regardless of period.',
+    pexPeriodNote: 'Leave blank to score the UTC calendar month that just ended. Portfolio data is always the current book, regardless of period.',
 
     // ---- Executive Dashboard — CONVERTED, not rewritten ----------------
     // This screen was already bilingual via inline ternaries; the Arabic
     // below is that text moved verbatim. Keys are generated from the
     // English, hence the mechanical names.
-    execCouldNotLoadTheExecutive:
-      'Could not load the Executive Dashboard — try again.',
+    execCouldNotLoadTheExecutive: 'Could not load the Executive Dashboard — try again.',
     execRefusalAct: 'view the executive dashboard',
     execPeriodAsOf: 'Period {period} · as of {asOf}',
     execExecutiveDashboard: 'Executive Dashboard',

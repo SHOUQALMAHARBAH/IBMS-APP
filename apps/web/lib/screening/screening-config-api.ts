@@ -1,4 +1,4 @@
-import { apiGet } from '../auth/api-client';
+import { apiGet } from "../auth/api-client";
 
 // Screening provider configuration + data health (task §23, §32, §33).
 //
@@ -8,7 +8,7 @@ import { apiGet } from '../auth/api-client';
 
 export type WatchlistSource = 'OFAC_SDN' | 'UN_CONSOLIDATED';
 
-export type ScreeningProviderKind = 'built_in' | 'on_premise' | 'commercial';
+export type ScreeningProviderKind = "built_in" | "on_premise" | "commercial";
 export type ScreeningAttemptOutcome =
   | 'NO_MATCH'
   | 'POTENTIAL_MATCH'
@@ -17,12 +17,16 @@ export type ScreeningAttemptOutcome =
   | 'UNABLE_TO_SCREEN';
 
 export type DatasetVersionStatus =
-  'DOWNLOADED' | 'VALIDATED' | 'PUBLISHED' | 'SUPERSEDED' | 'REJECTED';
+  | 'DOWNLOADED'
+  | 'VALIDATED'
+  | 'PUBLISHED'
+  | 'SUPERSEDED'
+  | 'REJECTED';
 
 export type WatchlistSyncRunStatus = 'running' | 'succeeded' | 'failed';
 
 export type ProviderHealthStatus =
-  'HEALTHY' | 'DEGRADED' | 'UNAVAILABLE' | 'NOT_CONFIGURED';
+  "HEALTHY" | "DEGRADED" | "UNAVAILABLE" | "NOT_CONFIGURED";
 
 export interface ScreeningHealth {
   provider: ScreeningProviderKind;
@@ -40,12 +44,12 @@ export interface ScreeningHealth {
   /** The provider's lifecycle state — richer than `status`: distinguishes
    * "never configured" from "configured and currently failing". */
   state:
-    | 'NOT_CONFIGURED'
-    | 'CONFIGURED'
-    | 'HEALTHY'
-    | 'DEGRADED'
-    | 'UNAVAILABLE'
-    | 'FAILED';
+    | "NOT_CONFIGURED"
+    | "CONFIGURED"
+    | "HEALTHY"
+    | "DEGRADED"
+    | "UNAVAILABLE"
+    | "FAILED";
   /** Whether credentials were accepted. `null` when the provider needs none. */
   authenticationValid?: boolean | null;
   /**
@@ -86,11 +90,11 @@ export interface ScreeningConfig {
 }
 
 export function getScreeningHealth(): Promise<ScreeningHealth> {
-  return apiGet('/screening/providers/health');
+  return apiGet("/screening/providers/health");
 }
 
 export function getScreeningConfig(): Promise<ScreeningConfig> {
-  return apiGet('/screening/providers/config');
+  return apiGet("/screening/providers/config");
 }
 
 /**

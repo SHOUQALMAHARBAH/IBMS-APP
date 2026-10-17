@@ -27,7 +27,12 @@ export interface SumInsuredSummary {
 export interface InsuranceProgramContext {
   needsAssessmentId: string | null;
   needsAssessmentStatus:
-    'DRAFT' | 'PENDING_REVIEW' | 'REVIEWED' | 'APPROVED' | 'REJECTED' | null;
+    | 'DRAFT'
+    | 'PENDING_REVIEW'
+    | 'REVIEWED'
+    | 'APPROVED'
+    | 'REJECTED'
+    | null;
   recommendedCoverageLines: string[];
   riskProfileId: string;
   customerId: string | null;

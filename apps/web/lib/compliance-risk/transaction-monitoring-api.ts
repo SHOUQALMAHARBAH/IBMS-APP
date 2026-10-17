@@ -76,10 +76,7 @@ export function escalateTransactionMonitoringAlert(
 export function reportTransactionMonitoringAlertToAuthority(
   id: string,
 ): Promise<TransactionMonitoringAlert> {
-  return apiPost(
-    `/transaction-monitoring-alerts/${id}/report-to-authority`,
-    {},
-  );
+  return apiPost(`/transaction-monitoring-alerts/${id}/report-to-authority`, {});
 }
 
 export function closeTransactionMonitoringAlert(

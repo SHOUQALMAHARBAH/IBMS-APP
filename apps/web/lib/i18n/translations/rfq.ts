@@ -27,8 +27,7 @@ export const RFQ = {
     oppNewBusiness: 'أعمال جديدة',
     oppCreatedMeta: '{type} · أُنشئت {date}',
     oppNoCustomerSelectedPrefix: 'لم يُحدَّد عميل — افتح عميلاً من',
-    oppNoCustomerSelectedSuffix:
-      'وصولاً إلى فرصه التجارية من برنامج تأمين معتمد نهائياً.',
+    oppNoCustomerSelectedSuffix: 'وصولاً إلى فرصه التجارية من برنامج تأمين معتمد نهائياً.',
 
     // opportunities/[id]/page.tsx
     oppDetailBackButton: '← كل الفرص التجارية',
@@ -66,8 +65,7 @@ export const RFQ = {
       'العملية 11 — إنشاء طلب عرض أسعار واحد لخط تأميني واحد وإرساله إلى قائمة مختصرة ' +
       'من شركات التأمين. يبدأ كل مؤمِّن بحالة "أُرسل".',
     rfqNewRefusalAct: 'إنشاء طلب عرض سعر',
-    rfqNewInsurerListLoadError:
-      'تعذر تحميل قائمة شركات التأمين — حاول مرة أخرى.',
+    rfqNewInsurerListLoadError: 'تعذر تحميل قائمة شركات التأمين — حاول مرة أخرى.',
     rfqNewLineLabel: 'الخط التأميني',
     rfqNewLineHint:
       'طلب عرض أسعار واحد لكل خط (مثال: "التأمين الشامل على الممتلكات"، "تعطل ' +
@@ -81,8 +79,7 @@ export const RFQ = {
     rfqNewCreatingButton: 'جارٍ الإنشاء…',
     rfqNewCreateButton: 'إنشاء طلب عرض الأسعار',
     rfqNewCreateError: 'تعذر إنشاء طلب عرض الأسعار — حاول مرة أخرى.',
-    rfqNewNoOpportunitySelectedPrefix:
-      'لم تُحدَّد فرصة تجارية — افتح فرصة تجارية من',
+    rfqNewNoOpportunitySelectedPrefix: 'لم تُحدَّد فرصة تجارية — افتح فرصة تجارية من',
     rfqNewNoOpportunitySelectedSuffix: 'وأنشئ طلب عرض الأسعار من هناك.',
 
     // rfqs/[id]/page.tsx
@@ -93,8 +90,7 @@ export const RFQ = {
     rfqDetailCommsLoadError: 'تعذر تحميل سجل المراسلات — حاول مرة أخرى.',
     rfqDetailHeading: 'طلب عرض أسعار — {line}',
     rfqFollowUpThresholdOne: 'صدر بتاريخ {date} · حد المتابعة {count} يوم عمل',
-    rfqFollowUpThresholdOther:
-      'صدر بتاريخ {date} · حد المتابعة {count} أيام عمل',
+    rfqFollowUpThresholdOther: 'صدر بتاريخ {date} · حد المتابعة {count} أيام عمل',
     rfqConsentLabel: 'موافقة طلب عرض الأسعار / الطرح في السوق',
     rfqSubmissionsHeading: 'مشاركات شركات التأمين',
     rfqSubmissionsHint:
@@ -109,8 +105,7 @@ export const RFQ = {
     rfqUpdateStatusError: 'تعذر تحديث حالة المؤمِّن — حاول مرة أخرى.',
     rfqAddInsurersHeading: 'إضافة مؤمِّنين إلى القائمة المختصرة',
     rfqAddInsurersLoadError: 'تعذر تحميل قائمة شركات التأمين — حاول مرة أخرى.',
-    rfqAllInsurersAlreadyOnRfq:
-      'كل شركات التأمين المسجلة موجودة بالفعل على طلب عرض الأسعار هذا.',
+    rfqAllInsurersAlreadyOnRfq: 'كل شركات التأمين المسجلة موجودة بالفعل على طلب عرض الأسعار هذا.',
     rfqAddingButton: 'جارٍ الإضافة…',
     rfqAddSelectedButton: 'إضافة المحدد',
     rfqAddInsurersError: 'تعذرت إضافة المؤمِّنين — حاول مرة أخرى.',
@@ -210,8 +205,7 @@ export const RFQ = {
     quoteSelectInsurerOption: 'اختر مؤمِّناً…',
     quoteAllShortlistedHaveQuote:
       'كل مؤمِّن في القائمة المختصرة لديه عرض بالفعل (راجعه) أو رفض.',
-    quoteRevisingHint:
-      'مراجعة الإصدار الحالي. معرّف طلب عرض الأسعار / المؤمِّن موروثان.',
+    quoteRevisingHint: 'مراجعة الإصدار الحالي. معرّف طلب عرض الأسعار / المؤمِّن موروثان.',
     quotePremiumLabel: 'القسط *',
     quoteCurrencyLabel: 'العملة',
     quoteDeductibleLabel: 'التحمُّل',
@@ -220,8 +214,7 @@ export const RFQ = {
     quoteCommissionRateLabel: 'نسبة العمولة %',
     quoteExclusionsLabel: 'الاستثناءات',
     quoteConditionsLabel: 'الشروط',
-    quoteNegotiationNotesLabel:
-      'ملاحظات التفاوض (ما طُلب / ما تم التنازل عنه في هذه الجولة)',
+    quoteNegotiationNotesLabel: 'ملاحظات التفاوض (ما طُلب / ما تم التنازل عنه في هذه الجولة)',
     quoteSavingButton: 'جارٍ الحفظ…',
     quoteCaptureQuoteButton: 'تسجيل العرض',
     quoteSaveNewVersionButton: 'حفظ إصدار جديد',
@@ -233,8 +226,7 @@ export const RFQ = {
       'والتحمُّلات والحدود، وتقييمات جودة/خدمة المؤمِّن (اختياري). لا تُقارَن الأسعار وحدها أبداً.',
     comparisonLoadError: 'تعذر تحميل المقارنة — حاول مرة أخرى.',
     comparisonNoneYet: 'لم تُبنَ مقارنة بعد.',
-    comparisonNoneYetPlacementHint:
-      ' سجّل عرضاً واحداً على الأقل، ثم ابنِ المصفوفة.',
+    comparisonNoneYetPlacementHint: ' سجّل عرضاً واحداً على الأقل، ثم ابنِ المصفوفة.',
     comparisonBuiltAt: 'بُنيت بتاريخ {date}',
     comparisonDownloadButton: 'تنزيل المقارنة (PDF)',
     comparisonDownloadError: 'تعذر إنشاء مستند المقارنة — حاول مرة أخرى.',
@@ -247,8 +239,7 @@ export const RFQ = {
     comparisonColumnService: 'الخدمة',
     comparisonColumnExclusionsConditions: 'الاستثناءات / الشروط',
     comparisonSupersededSuffix: 'مستبدَل',
-    comparisonSupersededTitle:
-      'رُوجع هذا العرض بعد بناء المصفوفة — أعد البناء للتحديث.',
+    comparisonSupersededTitle: 'رُوجع هذا العرض بعد بناء المصفوفة — أعد البناء للتحديث.',
     comparisonBiPeriodAbbrev: '{months} شهر',
     comparisonMissingInsurersLabel: 'لا يوجد عرض للمقارنة:',
     comparisonDeclinedInsurersLabel: 'رافضون:',
@@ -325,8 +316,7 @@ export const RFQ = {
     cdDecisionLabel: 'القرار',
     cdEvidenceTypeLabel: 'نوع الإثبات',
     cdEvidenceRefLabel: 'مرجع الإثبات',
-    cdEvidenceRefPlaceholder:
-      'معرّف المستند / مغلف التوقيع الإلكتروني / مرجع البريد الإلكتروني',
+    cdEvidenceRefPlaceholder: 'معرّف المستند / مغلف التوقيع الإلكتروني / مرجع البريد الإلكتروني',
     cdNotesLabel: 'ملاحظات (اختياري)',
     cdRecordingButton: 'جارٍ التسجيل…',
     cdRecordButton: 'تسجيل قرار العميل',
@@ -368,8 +358,7 @@ export const RFQ = {
     oppNewBusiness: 'New business',
     oppCreatedMeta: '{type} · created {date}',
     oppNoCustomerSelectedPrefix: 'No customer selected — open a customer from',
-    oppNoCustomerSelectedSuffix:
-      'and reach its opportunities from a finalized insurance program.',
+    oppNoCustomerSelectedSuffix: 'and reach its opportunities from a finalized insurance program.',
 
     // opportunities/[id]/page.tsx
     oppDetailBackButton: '← All opportunities',
@@ -381,8 +370,7 @@ export const RFQ = {
     oppDetailFromProgramPrefix: 'From insurance program',
     oppCreateRfqButton: 'Create RFQ for a line',
     oppRfqsHeading: 'RFQs',
-    oppRfqsNone:
-      'No RFQs yet. Create one per insurance line and send it to a shortlist of insurers.',
+    oppRfqsNone: 'No RFQs yet. Create one per insurance line and send it to a shortlist of insurers.',
     rfqInsurerCountOne: '{count} insurer',
     rfqInsurerCountOther: '{count} insurers',
     oppRfqIssuedMeta: 'Issued {date} · {breakdown}',
@@ -392,13 +380,11 @@ export const RFQ = {
     // rfqs/page.tsx
     rfqListHeading: 'RFQs',
     rfqListRefusalAct: 'view requests for quotation',
-    rfqListParentNotFound:
-      'That parent could not be found — it may not exist, or you may not have access to it.',
+    rfqListParentNotFound: 'That parent could not be found — it may not exist, or you may not have access to it.',
     rfqListLoadError: 'Could not load RFQs — try again.',
     rfqListNone: 'No RFQs.',
     rfqListIssuedMeta: 'Issued {date}',
-    rfqListNoParentPrefix:
-      'No opportunity or customer selected — open one from',
+    rfqListNoParentPrefix: 'No opportunity or customer selected — open one from',
     rfqListNoParentLinkLabel: 'RFQ / market',
 
     // rfqs/new/page.tsx
@@ -422,22 +408,17 @@ export const RFQ = {
     rfqNewCreatingButton: 'Creating…',
     rfqNewCreateButton: 'Create RFQ',
     rfqNewCreateError: 'Could not create the RFQ — try again.',
-    rfqNewNoOpportunitySelectedPrefix:
-      'No opportunity selected — open an opportunity from',
+    rfqNewNoOpportunitySelectedPrefix: 'No opportunity selected — open an opportunity from',
     rfqNewNoOpportunitySelectedSuffix: 'and create the RFQ from there.',
 
     // rfqs/[id]/page.tsx
     rfqDetailBackButton: '← Back to the opportunity',
-    rfqDetailNotFound:
-      'This RFQ could not be found — it may not exist, or you may not have access to it.',
+    rfqDetailNotFound: 'This RFQ could not be found — it may not exist, or you may not have access to it.',
     rfqDetailLoadError: 'Could not load this RFQ — try again.',
-    rfqDetailCommsLoadError:
-      'Could not load the correspondence log — try again.',
+    rfqDetailCommsLoadError: 'Could not load the correspondence log — try again.',
     rfqDetailHeading: 'RFQ — {line}',
-    rfqFollowUpThresholdOne:
-      'Issued {date} · follow-up threshold {count} business day',
-    rfqFollowUpThresholdOther:
-      'Issued {date} · follow-up threshold {count} business days',
+    rfqFollowUpThresholdOne: 'Issued {date} · follow-up threshold {count} business day',
+    rfqFollowUpThresholdOther: 'Issued {date} · follow-up threshold {count} business days',
     rfqConsentLabel: 'RFQ / market placement consent',
     rfqSubmissionsHeading: 'Insurer submissions',
     rfqSubmissionsHint:
@@ -471,8 +452,7 @@ export const RFQ = {
     rfqDirectionLabel: 'Direction',
     rfqChannelLabel: 'Channel',
     rfqLinePlaceholder: 'Property All Risks',
-    rfqNegotiationNotesPlaceholder:
-      'e.g. asked for 5% off and the flood exclusion struck',
+    rfqNegotiationNotesPlaceholder: 'e.g. asked for 5% off and the flood exclusion struck',
     rfqCommInsurerLabel: 'Insurer (optional)',
     rfqCommInsurerWholePanel: 'Whole panel',
     rfqCommSubjectLabel: 'Subject (optional)',
@@ -551,10 +531,8 @@ export const RFQ = {
     quoteSaveError: 'Could not save the quotation — try again.',
     quoteInsurerLabel: 'Insurer',
     quoteSelectInsurerOption: 'Select an insurer…',
-    quoteAllShortlistedHaveQuote:
-      'Every shortlisted insurer already has a quotation (revise it) or has declined.',
-    quoteRevisingHint:
-      'Revising the current version. rfqId / insurer are inherited.',
+    quoteAllShortlistedHaveQuote: 'Every shortlisted insurer already has a quotation (revise it) or has declined.',
+    quoteRevisingHint: 'Revising the current version. rfqId / insurer are inherited.',
     quotePremiumLabel: 'Premium *',
     quoteCurrencyLabel: 'Currency',
     quoteDeductibleLabel: 'Deductible',
@@ -563,8 +541,7 @@ export const RFQ = {
     quoteCommissionRateLabel: 'Commission rate %',
     quoteExclusionsLabel: 'Exclusions',
     quoteConditionsLabel: 'Conditions',
-    quoteNegotiationNotesLabel:
-      'Negotiation notes (what was requested / conceded this round)',
+    quoteNegotiationNotesLabel: 'Negotiation notes (what was requested / conceded this round)',
     quoteSavingButton: 'Saving…',
     quoteCaptureQuoteButton: 'Capture quote',
     quoteSaveNewVersionButton: 'Save new version',
@@ -577,12 +554,10 @@ export const RFQ = {
       'service scores. Never price alone.',
     comparisonLoadError: 'Could not load the comparison — try again.',
     comparisonNoneYet: 'No comparison built yet.',
-    comparisonNoneYetPlacementHint:
-      ' Capture at least one quotation, then build the matrix.',
+    comparisonNoneYetPlacementHint: ' Capture at least one quotation, then build the matrix.',
     comparisonBuiltAt: 'Built {date}',
     comparisonDownloadButton: 'Download comparison (PDF)',
-    comparisonDownloadError:
-      'Could not generate the comparison document — try again.',
+    comparisonDownloadError: 'Could not generate the comparison document — try again.',
     comparisonColumnPremium: 'Premium',
     comparisonColumnDeductible: 'Deductible',
     comparisonColumnLiabilityLimit: 'Liability limit',
@@ -592,13 +567,11 @@ export const RFQ = {
     comparisonColumnService: 'Service',
     comparisonColumnExclusionsConditions: 'Exclusions / conditions',
     comparisonSupersededSuffix: 'superseded',
-    comparisonSupersededTitle:
-      'This quotation was revised after the matrix was built — rebuild to refresh.',
+    comparisonSupersededTitle: 'This quotation was revised after the matrix was built — rebuild to refresh.',
     comparisonBiPeriodAbbrev: '{months} mo',
     comparisonMissingInsurersLabel: 'No quote to compare:',
     comparisonDeclinedInsurersLabel: 'Declined:',
-    comparisonScoresHeading:
-      'Insurer quality / service scores (0–100, optional)',
+    comparisonScoresHeading: 'Insurer quality / service scores (0–100, optional)',
     comparisonScoreColumnInsurer: 'Insurer',
     comparisonScoreColumnQuality: 'Quality',
     comparisonScoreColumnService: 'Service',
@@ -625,8 +598,7 @@ export const RFQ = {
     recQuoteLabel: 'Recommended quotation',
     recSelectQuoteOption: 'Select the recommended quote…',
     recCommissionSuffix: ' · {percent}% commission',
-    recNoCurrentQuotes:
-      'No current-version quotations on this opportunity yet.',
+    recNoCurrentQuotes: 'No current-version quotations on this opportunity yet.',
     recRationaleLabel: 'Overall rationale',
     recDraftingButton: 'Drafting…',
     recDraftButton: 'Draft recommendation',
@@ -646,8 +618,7 @@ export const RFQ = {
     recApproveButton: 'Approve',
     recSendButton: 'Send to client',
     recDownloadReportButton: 'Download report (PDF)',
-    recDownloadError:
-      'Could not generate the recommendation report — try again.',
+    recDownloadError: 'Could not generate the recommendation report — try again.',
     recActionError: 'That action could not be completed — try again.',
     recCoiDisclosureLabel: 'Conflict-of-interest disclosure',
     recCoiDisclosurePlaceholder: 'What was disclosed to the client, and when.',

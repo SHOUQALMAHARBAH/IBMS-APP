@@ -4,21 +4,21 @@
 // drives it through the collection cycle — receipt (INVOICED → COLLECTED),
 // reconcile (COLLECTED → RECONCILED), remittance (RECONCILED → REMITTED) — #32.
 
-import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
+import { apiFetchBlob, apiGet, apiPost } from "../auth/api-client";
 
 export type InvoiceStatus =
-  | 'INVOICED'
-  | 'COLLECTED'
-  | 'RECONCILED'
-  | 'REMITTED'
-  | 'EXCEPTION_RAISED'
-  | 'EXCEPTION_RESOLVED';
+  | "INVOICED"
+  | "COLLECTED"
+  | "RECONCILED"
+  | "REMITTED"
+  | "EXCEPTION_RAISED"
+  | "EXCEPTION_RESOLVED";
 
 export const RECEIPT_METHOD_OPTIONS = [
-  'bank_transfer',
-  'cheque',
-  'card',
-  'cash',
+  "bank_transfer",
+  "cheque",
+  "card",
+  "cash",
 ] as const;
 export type ReceiptMethod = (typeof RECEIPT_METHOD_OPTIONS)[number];
 
@@ -80,7 +80,7 @@ export function listInvoicesForPolicy(policyId: string): Promise<Invoice[]> {
 }
 
 export function createInvoice(input: CreateInvoiceInput): Promise<Invoice> {
-  return apiPost('/invoices', input);
+  return apiPost("/invoices", input);
 }
 
 /** Process 32 — record one collection instalment. `amount` may be less than
@@ -115,8 +115,8 @@ export function recordRemittance(invoiceId: string): Promise<Invoice> {
 // FinanceSection.tsx).
 export function downloadInvoiceDocument(
   id: string,
-  language?: 'AR' | 'EN' | 'DUAL',
+  language?: "AR" | "EN" | "DUAL",
 ): Promise<Blob> {
-  const qs = language ? `?language=${language}` : '';
+  const qs = language ? `?language=${language}` : "";
   return apiFetchBlob(`/invoices/${encodeURIComponent(id)}/document${qs}`);
 }

@@ -1,11 +1,11 @@
-import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
+import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOnRecord";
 // Process 16 — Broker Recommendation (backlog Part C #16, Domain B). Talks to
 // apps/api's recommendation module (recommendation.controller.ts): draft the
 // documented recommendation, clear the senior-officer approval gate and the
 // mandatory conflict-of-interest disclosure, then send it to the client.
 
-import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
-import type { DiscardBlock } from '../discard/discard-api';
+import { apiFetchBlob, apiGet, apiPost } from "../auth/api-client";
+import type { DiscardBlock } from "../discard/discard-api";
 
 export interface RecommendationInsurer {
   id: string;
@@ -35,12 +35,12 @@ export const RATIONALE_FACTOR_FIELDS: {
   key: keyof RationaleFactors;
   label: string;
 }[] = [
-  { key: 'coverage', label: 'Coverage' },
-  { key: 'price', label: 'Price' },
-  { key: 'financialStrength', label: 'Insurer financial strength' },
-  { key: 'claimsService', label: 'Claims service' },
-  { key: 'deductible', label: 'Deductible' },
-  { key: 'policyConditions', label: 'Policy conditions' },
+  { key: "coverage", label: "Coverage" },
+  { key: "price", label: "Price" },
+  { key: "financialStrength", label: "Insurer financial strength" },
+  { key: "claimsService", label: "Claims service" },
+  { key: "deductible", label: "Deductible" },
+  { key: "policyConditions", label: "Policy conditions" },
 ];
 
 export interface ConflictOfInterestDisclosure {
@@ -110,7 +110,7 @@ export function listRecommendationsForOpportunity(
 export function draftRecommendation(
   input: DraftRecommendationInput,
 ): Promise<Recommendation> {
-  return apiPost('/recommendations', input);
+  return apiPost("/recommendations", input);
 }
 
 export function approveRecommendation(
@@ -150,8 +150,8 @@ export function sendRecommendation(id: string): Promise<Recommendation> {
 // `blockedFromSend` is empty (see RecommendationSection.tsx).
 export function downloadRecommendationDocument(
   id: string,
-  language?: 'AR' | 'EN' | 'DUAL',
+  language?: "AR" | "EN" | "DUAL",
 ): Promise<Blob> {
-  const qs = language ? `?language=${language}` : '';
+  const qs = language ? `?language=${language}` : "";
   return apiFetchBlob(`/recommendations/${id}/document${qs}`);
 }

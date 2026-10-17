@@ -49,12 +49,9 @@ export function convertLeadToProspect(
   return apiPost('/prospects', input);
 }
 
-export function listProspects(
-  filter: ListProspectsFilter = {},
-): Promise<Prospect[]> {
+export function listProspects(filter: ListProspectsFilter = {}): Promise<Prospect[]> {
   const params = new URLSearchParams();
-  if (filter.salesOwnerUserId)
-    params.set('salesOwnerUserId', filter.salesOwnerUserId);
+  if (filter.salesOwnerUserId) params.set('salesOwnerUserId', filter.salesOwnerUserId);
   if (filter.search) params.set('search', filter.search);
   const qs = params.toString();
   return apiGet(`/prospects${qs ? `?${qs}` : ''}`);

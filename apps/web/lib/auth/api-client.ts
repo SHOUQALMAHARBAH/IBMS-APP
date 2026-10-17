@@ -35,17 +35,10 @@ export class ApiError extends Error {
  * which is which in its `code` field; nothing on the web side was reading it.
  */
 export function isMfaEnrolmentError(err: unknown): boolean {
-  return (
-    err instanceof ApiError &&
-    err.status === 403 &&
-    err.code === 'MFA_ENROLLMENT_REQUIRED'
-  );
+  return err instanceof ApiError && err.status === 403 && err.code === 'MFA_ENROLLMENT_REQUIRED';
 }
 
-async function rawFetch(
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
+async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   // NOT for a FormData body. The browser has to set `multipart/form-data` ITSELF, because only it
@@ -60,11 +53,7 @@ async function rawFetch(
   ) {
     headers.set('Content-Type', 'application/json');
   }
-  return fetch(`${API_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  return fetch(`${API_URL}${path}`, { ...init, headers, credentials: 'include' });
 }
 
 // Multiple concurrent 401s should trigger exactly one refresh call, not one
@@ -94,9 +83,7 @@ async function tryRefresh(): Promise<boolean> {
   }
 }
 
-async function parseErrorBody(
-  res: Response,
-): Promise<{ message?: string; code?: string }> {
+async function parseErrorBody(res: Response): Promise<{ message?: string; code?: string }> {
   try {
     return (await res.json()) as { message?: string; code?: string };
   } catch {
@@ -115,20 +102,14 @@ async function fetchWithRetry(
 ): Promise<Response> {
   let res = await rawFetch(path, init);
 
-  if (
-    res.status === 401 &&
-    !options.skipAuthRetry &&
-    path !== '/auth/refresh'
-  ) {
+  if (res.status === 401 && !options.skipAuthRetry && path !== '/auth/refresh') {
     const refreshed = await tryRefresh();
     if (refreshed) res = await rawFetch(path, init);
   }
 
   if (!res.ok) {
     const body = await parseErrorBody(res);
-    const message = Array.isArray(body.message)
-      ? body.message.join(', ')
-      : (body.message ?? res.statusText);
+    const message = Array.isArray(body.message) ? body.message.join(', ') : (body.message ?? res.statusText);
     throw new ApiError(message, res.status, body.code);
   }
   return res;
@@ -168,16 +149,8 @@ export async function apiFetchBlob(
   return res.blob();
 }
 
-export function apiPost<T>(
-  path: string,
-  body?: unknown,
-  options?: { skipAuthRetry?: boolean },
-): Promise<T> {
-  return apiFetch<T>(
-    path,
-    { method: 'POST', body: body ? JSON.stringify(body) : undefined },
-    options,
-  );
+export function apiPost<T>(path: string, body?: unknown, options?: { skipAuthRetry?: boolean }): Promise<T> {
+  return apiFetch<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }, options);
 }
 
 /**
@@ -191,25 +164,16 @@ export function apiPostFormData<T>(path: string, form: FormData): Promise<T> {
   return apiFetch<T>(path, { method: 'POST', body: form });
 }
 
-export function apiGet<T>(
-  path: string,
-  options?: { skipAuthRetry?: boolean },
-): Promise<T> {
+export function apiGet<T>(path: string, options?: { skipAuthRetry?: boolean }): Promise<T> {
   return apiFetch<T>(path, { method: 'GET' }, options);
 }
 
 export function apiPut<T>(path: string, body?: unknown): Promise<T> {
-  return apiFetch<T>(path, {
-    method: 'PUT',
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  return apiFetch<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined });
 }
 
 export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
-  return apiFetch<T>(path, {
-    method: 'PATCH',
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  return apiFetch<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined });
 }
 
 export function apiDelete<T>(path: string): Promise<T> {

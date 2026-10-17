@@ -33,8 +33,7 @@ export type DataSharingChannel =
   | 'POSTAL_MAIL'
   | 'OTHER_UNSECURED';
 
-export type DataClassification =
-  'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
+export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
 
 export interface DataSharingApproval {
   id: string;
@@ -62,17 +61,12 @@ export interface DataSharingApproval {
 }
 
 export function listDataSharingApprovals(
-  opts: {
-    vendorId?: string;
-    classification?: string;
-    pendingOnly?: boolean;
-  } = {},
+  opts: { vendorId?: string; classification?: string; pendingOnly?: boolean } = {},
 ): Promise<DataSharingApproval[]> {
   const params = new URLSearchParams();
   if (opts.vendorId) params.set('vendorId', opts.vendorId);
   if (opts.classification) params.set('classification', opts.classification);
-  if (opts.pendingOnly !== undefined)
-    params.set('pendingOnly', String(opts.pendingOnly));
+  if (opts.pendingOnly !== undefined) params.set('pendingOnly', String(opts.pendingOnly));
   const qs = params.toString();
   return apiGet(`/data-sharing-approvals${qs ? `?${qs}` : ''}`);
 }
@@ -101,8 +95,6 @@ export function approveDataSharingApproval(
   );
 }
 
-export function declineDataSharingApproval(
-  id: string,
-): Promise<DataSharingApproval> {
+export function declineDataSharingApproval(id: string): Promise<DataSharingApproval> {
   return apiPost(`/data-sharing-approvals/${id}/decline`, {});
 }

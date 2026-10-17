@@ -95,9 +95,7 @@ const CODE_LINE = /^[a-z0-9.-]+$/;
  * A row of dots is the placeholder this generator emits, and it is NOT an answer — that distinction
  * is the whole job. Exported for its own spec.
  */
-export function harvestExistingArabic(
-  existing: string,
-): Record<string, string> {
+export function harvestExistingArabic(existing: string): Record<string, string> {
   const out: Record<string, string> = {};
   let code: string | null = null;
   for (const line of existing.split('\n')) {
@@ -173,8 +171,7 @@ export function render(
         familyCodes += codes.length;
         const states = Object.keys(row.codes).sort().join(' / ');
         lines.push(`  [5-STATE] ${row.family}   (${states})`);
-        for (const code of codes)
-          lines.push(...entry(code, descriptions, written));
+        for (const code of codes) lines.push(...entry(code, descriptions, written));
       } else {
         toggles += 1;
         lines.push(`  [toggle]  ${row.code}`);

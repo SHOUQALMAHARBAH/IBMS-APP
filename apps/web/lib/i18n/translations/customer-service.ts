@@ -72,8 +72,7 @@ export const CUSTOMER_SERVICE = {
     // ---- Communications (#44) ------------------------------------------
     commHeading: 'المراسلات',
     commCustomerIdLabel: 'العميل',
-    commChannelLabel:
-      'القناة (اتركها فارغة لاستخدام القناة المفضّلة المسجّلة للعميل)',
+    commChannelLabel: 'القناة (اتركها فارغة لاستخدام القناة المفضّلة المسجّلة للعميل)',
     commMarketingLabel: 'مراسلة تسويقية (مشروطة بموافقة العميل)',
     commSubjectLabel: 'الموضوع (اختياري)',
     commMessageLabel: 'نص الرسالة',
@@ -123,8 +122,7 @@ export const CUSTOMER_SERVICE = {
     retLoading: 'جارٍ التحميل…',
     retNone: 'لا توجد حالات احتفاظ مفتوحة.',
     retLoadError: 'تعذّر تحميل حالات الاحتفاظ — حاول مرة أخرى.',
-    retScanSummary:
-      'تم فحص {scanned} حالة تجديد — فُتحت {inactivity} لعدم النشاط، و{lapse} لخطر الانقطاع، وفشلت {failed}.',
+    retScanSummary: 'تم فحص {scanned} حالة تجديد — فُتحت {inactivity} لعدم النشاط، و{lapse} لخطر الانقطاع، وفشلت {failed}.',
     retActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     retRefusalAct: 'عرض حالات الاحتفاظ',
     retStatusOpen: 'مفتوحة',
@@ -158,8 +156,7 @@ export const CUSTOMER_SERVICE = {
     slaDashOverdue: 'متأخر',
     slaDashEscalatesTo: 'يُصعَّد إلى',
     slaDashStateFilterAria: 'تصفية حالة المؤقت',
-    slaDashDraftNote:
-      'قيمة المهلة المُعدّة هي قيمة افتراضية مسودّة غير مستندة إلى مرجع رسمي.',
+    slaDashDraftNote: 'قيمة المهلة المُعدّة هي قيمة افتراضية مسودّة غير مستندة إلى مرجع رسمي.',
     slaDashLoading: 'جارٍ التحميل…',
     slaDashNoTimers: 'لا توجد مؤقتات مهل بعد.',
     slaDashNoTimersInState: 'لا توجد مؤقتات في هذه الحالة.',
@@ -193,8 +190,7 @@ export const CUSTOMER_SERVICE = {
     slaDashStateResolvedLate: 'حُلّت متأخرة',
     slaDashStateOpen: 'مفتوحة (لم تُحل)',
     slaDashStateOpenBreached: 'متجاوزة أو مُصعَّدة',
-    slaDashStateAtRisk:
-      'معرّضة للخطر (تقترب من الاستحقاق / متجاوزة / مُصعَّدة)',
+    slaDashStateAtRisk: 'معرّضة للخطر (تقترب من الاستحقاق / متجاوزة / مُصعَّدة)',
     slaDashStateResolved: 'محلولة (أياً كان)',
     slaDashIntro:
       'مؤقتات اتفاقيات مستوى الخدمة لكل الوحدات في عرض واحد — ما هو ضمن ' +
@@ -308,8 +304,7 @@ export const CUSTOMER_SERVICE = {
     retLoading: 'Loading…',
     retNone: 'No retention cases.',
     retLoadError: 'Could not load retention cases — try again.',
-    retScanSummary:
-      'Scanned {scanned} renewal case(s) — opened {inactivity} for inactivity, {lapse} for lapse risk, {failed} failed.',
+    retScanSummary: 'Scanned {scanned} renewal case(s) — opened {inactivity} for inactivity, {lapse} for lapse risk, {failed} failed.',
     retActionError: 'That action failed — try again.',
     retRefusalAct: 'view customer retention cases',
     retStatusOpen: 'Open',
@@ -342,8 +337,7 @@ export const CUSTOMER_SERVICE = {
     slaDashOverdue: 'Overdue',
     slaDashEscalatesTo: 'Escalates to',
     slaDashStateFilterAria: 'Timer state filter',
-    slaDashDraftNote:
-      'The configured SLA figure is a drafted / unsourced default.',
+    slaDashDraftNote: 'The configured SLA figure is a drafted / unsourced default.',
     slaDashLoading: 'Loading…',
     slaDashNoTimers: 'No SLA timers yet.',
     slaDashNoTimersInState: 'No timers in this state.',
@@ -362,8 +356,7 @@ export const CUSTOMER_SERVICE = {
     slaDashConfirmPause: 'Confirm pause',
     slaDashCancel: 'Cancel',
     slaDashRegulatory: 'Regulatory',
-    slaDashRegulatoryTitle:
-      'This deadline comes from a regulatory source, not an internal target.',
+    slaDashRegulatoryTitle: 'This deadline comes from a regulatory source, not an internal target.',
     slaDashPauseError: 'Could not pause the clock — try again.',
     slaDashResumeError: 'Could not resume the clock — try again.',
     slaDashPauseCanAct: 'see every deadline and how it is counted',

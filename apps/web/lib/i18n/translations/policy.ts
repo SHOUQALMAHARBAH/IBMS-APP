@@ -14,8 +14,7 @@ export const POLICY = {
     policyRequestedPerilsLabel: 'الأخطار المسمّاة المطلوبة (مفصولة بفواصل)',
     policyRequestedSumsLabel: 'مبالغ التأمين المطلوبة (JSON)',
     policyRequestedLimitsLabel: 'الحدود المطلوبة (JSON)',
-    policyRequestedCoverageNote:
-      'أدخل التغطية المطلوبة — يقارنها النظام بنداً بنداً مع الجدول الصادر.',
+    policyRequestedCoverageNote: 'أدخل التغطية المطلوبة — يقارنها النظام بنداً بنداً مع الجدول الصادر.',
     policyPiRiskEventLogged: 'تم تسجيل واقعة مخاطر مسؤولية مهنية.',
     policyAttachDocumentHeading: 'إرفاق مستند',
     policyElectronicFileHeading: 'مستندات الملف الإلكتروني',
@@ -35,8 +34,7 @@ export const POLICY = {
     policyRecordDeliveryButton: 'تسجيل التسليم',
     policyNoClaimsYet: 'لا توجد مطالبات بعد.',
     policyDownloadInvoiceButton: 'تنزيل الفاتورة (PDF)',
-    policyIntro:
-      'تُحدَّد الوثيقة بعد قبول العميل؛ يسجل الإصدار رقم الوثيقة الصادر من المؤمِّن والقسط وجدول التغطية والمستندات.',
+    policyIntro: 'تُحدَّد الوثيقة بعد قبول العميل؛ يسجل الإصدار رقم الوثيقة الصادر من المؤمِّن والقسط وجدول التغطية والمستندات.',
     policyInceptionDateLabel: 'تاريخ بدء التغطية',
     policyExpiryDateLabel: 'تاريخ الانتهاء (اختياري)',
     policyPlaceButton: 'إحلال الوثيقة',
@@ -55,14 +53,12 @@ export const POLICY = {
     policyCertificateDownloadError: 'تعذر إنشاء الشهادة — حاول مرة أخرى.',
     policyActionError: 'تعذر إتمام هذا الإجراء — حاول مرة أخرى.',
     policyDeliveryRecipientLabel: 'المستقبِل',
-    policyDeliveryRecipientPlaceholder:
-      'الاسم / البريد الإلكتروني / مرجع شركة الشحن',
+    policyDeliveryRecipientPlaceholder: 'الاسم / البريد الإلكتروني / مرجع شركة الشحن',
     policyRecordDeliveryButtonText: 'تسجيل التسليم',
 
     // EndorsementSection.tsx
     endorsementSectionHeading: 'التعديلات',
-    endorsementIntro:
-      'العملية 22 — تعديل الوثيقة بعد الإصدار: إضافة خطوط، زيادة الحدود، تغيير المؤمِّن.',
+    endorsementIntro: 'العملية 22 — تعديل الوثيقة بعد الإصدار: إضافة خطوط، زيادة الحدود، تغيير المؤمِّن.',
     endorsementLoadError: 'تعذر تحميل التعديلات — حاول مرة أخرى.',
     endorsementNoneYet: 'لم يُسجَّل تعديل بعد.',
     endorsementCreateButton: 'طلب ملحق',
@@ -85,8 +81,7 @@ export const POLICY = {
 
     // ClaimSection.tsx
     claimSectionHeading: 'المطالبات',
-    claimIntro:
-      'العمليات 23-30 — إشعار المطالبة → التسجيل → التوثيق → التقييم → المتابعة → التسوية → الإغلاق.',
+    claimIntro: 'العمليات 23-30 — إشعار المطالبة → التسجيل → التوثيق → التقييم → المتابعة → التسوية → الإغلاق.',
     claimLoadError: 'تعذر تحميل المطالبات — حاول مرة أخرى.',
     claimNotifyButton: 'إشعار بمطالبة',
     claimLossDueDateLabel: 'تاريخ تقديم الخسارة',
@@ -149,8 +144,7 @@ export const POLICY = {
     claimCompleteDocsFirst: 'أكمل التوثيق الإلزامي أولاً.',
     claimSubrogationFlag: 'وسم للحلول محل المؤمَّن له / الاسترداد',
     claimSubrogationFlagged: 'موسوم للحلول محل المؤمَّن له / الاسترداد',
-    claimThirdPartyContact:
-      'بيانات الاتصال بالطرف الثالث (اختياري، تُخزَّن مشفَّرة)',
+    claimThirdPartyContact: 'بيانات الاتصال بالطرف الثالث (اختياري، تُخزَّن مشفَّرة)',
     claimThirdPartyName: 'اسم الطرف الثالث (اختياري)',
     claimThirdPartyInvolved: 'يوجد طرف ثالث',
     claimEstimatedLossLabel: 'الخسارة التقديرية',
@@ -158,17 +152,14 @@ export const POLICY = {
     claimsQueueIntro:
       'كل مطالبة ضمن نطاق عملك، الأحدث أولاً. افتح مطالبة لتسجيلها أو توثيقها أو تقييمها أو تسويتها أو إغلاقها.',
     claimsQueueSearchLabel: 'بحث',
-    claimsQueueSearchPlaceholder:
-      'رقم المطالبة أو مرجع المؤمِّن أو رقم الوثيقة',
+    claimsQueueSearchPlaceholder: 'رقم المطالبة أو مرجع المؤمِّن أو رقم الوثيقة',
     claimsQueueStatusFilterLabel: 'الحالة',
     claimsQueueStatusAll: 'كل الحالات',
     claimsQueueAlertOnlyLabel: 'التي تحتاج متابعة فقط',
-    claimsQueueAlertOnlyHint:
-      'مطالبات لديها تنبيه متابعة غير مُغلق مع المؤمِّن.',
+    claimsQueueAlertOnlyHint: 'مطالبات لديها تنبيه متابعة غير مُغلق مع المؤمِّن.',
     claimsQueueNoneYet:
       'لا توجد مطالبات بعد. تظهر المطالبة هنا فور الإبلاغ عنها على وثيقة صادرة.',
-    claimsQueueNoneMatch:
-      'لا توجد مطالبة تطابق هذا البحث. جرّب مرجعاً أو حالة أخرى.',
+    claimsQueueNoneMatch: 'لا توجد مطالبة تطابق هذا البحث. جرّب مرجعاً أو حالة أخرى.',
     claimsQueueCountLabel: '{count} مطالبة',
     claimsQueueRefusalAct: 'عرض المطالبات',
     claimsQueueLoadError: 'تعذر تحميل المطالبات — حاول مرة أخرى.',
@@ -181,7 +172,8 @@ export const POLICY = {
     claimsQueueDocsIncompleteBadge: 'التوثيق ناقص',
     claimsDetailBackButton: '→ كل المطالبات',
     claimsDetailLoadError: 'تعذر تحميل هذه المطالبة — حاول مرة أخرى.',
-    claimsDetailNotFound: 'لا توجد مطالبة بهذا المعرّف ضمن نطاق عملك.',
+    claimsDetailNotFound:
+      'لا توجد مطالبة بهذا المعرّف ضمن نطاق عملك.',
     claimsDetailHeading: 'المطالبة {name}',
     claimsDetailHeadingByLoss: 'مطالبة عن خسارة بتاريخ {at}',
     claimLossOnLabel: 'الخسارة بتاريخ',
@@ -196,12 +188,10 @@ export const POLICY = {
     claimLocationLabel: 'الموقع (اختياري)',
     claimInsurerRefShort: 'مرجع شركة التأمين',
     claimClientReceivedOn: 'استلم العميل مبلغ التسوية بتاريخ',
-    claimDeclinedNote:
-      'مرفوضة من شركة التأمين — لا توجد دفعة. أغلق المطالبة لتشغيل إعادة احتساب معدّل الخسارة.',
+    claimDeclinedNote: 'مرفوضة من شركة التأمين — لا توجد دفعة. أغلق المطالبة لتشغيل إعادة احتساب معدّل الخسارة.',
     claimSecondApproveButton: 'الاعتماد الثاني للتسوية',
     claimRecordSettlementButton: 'تسجيل التسوية',
-    claimBrokerProcessesPayment:
-      'الوسيط هو من ينفّذ هذه الدفعة (يستلزم معتمداً ثانياً)',
+    claimBrokerProcessesPayment: 'الوسيط هو من ينفّذ هذه الدفعة (يستلزم معتمداً ثانياً)',
     claimApprovedAmountLabel: 'المبلغ المعتمد',
     claimFollowUpAlertHeading: 'تنبيه متابعة شركة التأمين',
 
@@ -229,8 +219,7 @@ export const POLICY = {
     financeReconcileButton: 'تسوية الأموال المستلمة',
     financeRemitButton: 'تحويل {amount} إلى المؤمِّن',
     financeMethodLabel: 'الطريقة',
-    financeNoInvoiceMessage:
-      'لا توجد فاتورة قسط بعد. القسط المراد إصداره فاتورة: {amount} (يتم خصم العمولة تلقائياً من سعر العرض المُحدَّد).',
+    financeNoInvoiceMessage: 'لا توجد فاتورة قسط بعد. القسط المراد إصداره فاتورة: {amount} (يتم خصم العمولة تلقائياً من سعر العرض المُحدَّد).',
     financeCreateError: 'تعذر إتمام هذا الإجراء — حاول مرة أخرى.',
 
     // CommissionSection.tsx
@@ -247,6 +236,7 @@ export const POLICY = {
     commissionCreateError: 'تعذر إتمام هذا الإجراء — حاول مرة أخرى.',
 
     // Enum labels
+
 
     claimStatusClosed: 'مغلقة',
     claimCoverageUnresolved: 'تعذّر تحديد التغطية بتاريخ الخسارة',
@@ -286,8 +276,7 @@ export const POLICY = {
     policiesStatusAll: 'كل الحالات',
     policiesNoneYet:
       'لا توجد وثائق لعرضها. تظهر الوثيقة هنا بعد وضع فرصة مقبولة من العميل وإصدارها.',
-    policiesNoneMatch:
-      'لا توجد وثيقة تطابق هذا البحث. جرّب رقم وثيقة أو اسم عميل آخر.',
+    policiesNoneMatch: 'لا توجد وثيقة تطابق هذا البحث. جرّب رقم وثيقة أو اسم عميل آخر.',
     policiesRefusalAct: 'عرض الوثائق',
     policiesLoadError: 'تعذر تحميل الوثائق — حاول مرة أخرى.',
     policiesCapNotice:
@@ -346,10 +335,8 @@ export const POLICY = {
     policyRequestedPerilsLabel: 'Requested named perils (comma-separated)',
     policyRequestedSumsLabel: 'Requested sums insured (JSON)',
     policyRequestedLimitsLabel: 'Requested limits (JSON)',
-    policyRequestedCoverageNote:
-      'Enter the Requested Coverage — the system compares it line-by-line against the issued schedule.',
-    policyPiRiskEventLogged:
-      'A Professional Indemnity risk event has been logged.',
+    policyRequestedCoverageNote: 'Enter the Requested Coverage — the system compares it line-by-line against the issued schedule.',
+    policyPiRiskEventLogged: 'A Professional Indemnity risk event has been logged.',
     policyAttachDocumentHeading: 'Attach a document',
     policyElectronicFileHeading: 'Electronic file documents',
     policyDownloadCertificate: 'Download certificate (PDF)',
@@ -368,8 +355,7 @@ export const POLICY = {
     policyRecordDeliveryButton: 'Record delivery',
     policyNoClaimsYet: 'No claims yet.',
     policyDownloadInvoiceButton: 'Download invoice (PDF)',
-    policyIntro:
-      'Placed once the client accepts; issuance records the insurer-issued policy number, premium, coverage schedule and documents.',
+    policyIntro: 'Placed once the client accepts; issuance records the insurer-issued policy number, premium, coverage schedule and documents.',
     policyInceptionDateLabel: 'Inception date',
     policyExpiryDateLabel: 'Expiry date (optional)',
     policyPlaceButton: 'Place policy',
@@ -384,10 +370,8 @@ export const POLICY = {
     policyIssuingButton: 'Recording…',
     policyCheckButton: 'Run check',
     policyCheckingButton: 'Checking…',
-    policyScheduleDownloadError:
-      'Could not generate the schedule summary — try again.',
-    policyCertificateDownloadError:
-      'Could not generate the certificate — try again.',
+    policyScheduleDownloadError: 'Could not generate the schedule summary — try again.',
+    policyCertificateDownloadError: 'Could not generate the certificate — try again.',
     policyActionError: 'That action could not be completed — try again.',
     policyDeliveryRecipientLabel: 'Recipient',
     policyDeliveryRecipientPlaceholder: 'name / email / courier reference',
@@ -395,8 +379,7 @@ export const POLICY = {
 
     // EndorsementSection.tsx
     endorsementSectionHeading: 'Endorsements',
-    endorsementIntro:
-      'Process 22 — amend the policy after issuance: add lines, increase limits, change insurer.',
+    endorsementIntro: 'Process 22 — amend the policy after issuance: add lines, increase limits, change insurer.',
     endorsementLoadError: 'Could not load endorsements — try again.',
     endorsementNoneYet: 'No endorsements recorded yet.',
     endorsementCreateButton: 'Request endorsement',
@@ -419,8 +402,7 @@ export const POLICY = {
 
     // ClaimSection.tsx
     claimSectionHeading: 'Claims',
-    claimIntro:
-      'Processes 23–30 — notify claim → register → document → assess → follow up → settle → close.',
+    claimIntro: 'Processes 23–30 — notify claim → register → document → assess → follow up → settle → close.',
     claimLoadError: 'Could not load claims — try again.',
     claimNotifyButton: 'Notify a claim',
     claimLossDueDateLabel: 'Loss date',
@@ -446,19 +428,16 @@ export const POLICY = {
     claimFilingButton: 'Filing…',
     claimDocError: 'That document could not be filed — try again.',
     claimAssessmentHeading: 'Assessment',
-    claimCompletionDateLabel:
-      'Completion date (adjuster survey / investigation)',
+    claimCompletionDateLabel: 'Completion date (adjuster survey / investigation)',
     claimSurveyButton: 'Mark survey complete',
     claimInvestigationButton: 'Mark investigation complete',
     claimSubmitButton: 'Submit for assessment',
     claimVerdictLabel: 'Assessment verdict',
     claimRecordVerdictButton: 'Record verdict',
-    claimAssessmentError:
-      'That assessment step could not be completed — try again.',
+    claimAssessmentError: 'That assessment step could not be completed — try again.',
     claimResolveAlertButton: 'Resolve',
     claimSettlementHeading: 'Settlement',
-    claimSettlementError:
-      'That settlement step could not be completed — try again.',
+    claimSettlementError: 'That settlement step could not be completed — try again.',
     claimCloseButton: 'Close claim',
     claimRunning: 'Running…',
     endorsementRequesting: 'Requesting…',
@@ -494,17 +473,14 @@ export const POLICY = {
     claimsQueueIntro:
       'Every claim in your book, newest first. Open a claim to register, document, assess, settle or close it.',
     claimsQueueSearchLabel: 'Search',
-    claimsQueueSearchPlaceholder:
-      'Claim number, insurer reference or policy number',
+    claimsQueueSearchPlaceholder: 'Claim number, insurer reference or policy number',
     claimsQueueStatusFilterLabel: 'Status',
     claimsQueueStatusAll: 'All statuses',
     claimsQueueAlertOnlyLabel: 'Needs follow-up only',
-    claimsQueueAlertOnlyHint:
-      'Claims with an unresolved insurer follow-up alert.',
+    claimsQueueAlertOnlyHint: 'Claims with an unresolved insurer follow-up alert.',
     claimsQueueNoneYet:
       'No claims yet. A claim appears here as soon as one is notified against an issued policy.',
-    claimsQueueNoneMatch:
-      'No claim matches this search. Try another reference or status.',
+    claimsQueueNoneMatch: 'No claim matches this search. Try another reference or status.',
     claimsQueueCountLabel: '{count} claims',
     claimsQueueRefusalAct: 'view claims',
     claimsQueueLoadError: 'Could not load claims — try again.',
@@ -517,7 +493,8 @@ export const POLICY = {
     claimsQueueDocsIncompleteBadge: 'Documentation incomplete',
     claimsDetailBackButton: '← All claims',
     claimsDetailLoadError: 'Could not load this claim — try again.',
-    claimsDetailNotFound: 'No claim with that id is in your book.',
+    claimsDetailNotFound:
+      'No claim with that id is in your book.',
     claimsDetailHeading: 'Claim {name}',
     claimsDetailHeadingByLoss: 'Claim for a loss on {at}',
     claimLossOnLabel: 'Loss',
@@ -527,18 +504,15 @@ export const POLICY = {
     claimEstimatedShort: 'Estimated',
     claimSettlementApprovedSeparator: 'approved',
     claimClientPaymentConfirmedLabel: 'Client payment confirmed',
-    claimAdjusterWorkFirstTitle:
-      'Record the adjuster survey + investigation first.',
+    claimAdjusterWorkFirstTitle: 'Record the adjuster survey + investigation first.',
     claimAdjusterInlineLabel: 'adjuster',
     claimLocationLabel: 'Location (optional)',
     claimInsurerRefShort: 'Insurer ref',
     claimClientReceivedOn: 'Client received the settlement payment on',
-    claimDeclinedNote:
-      'Declined by the insurer — no payment. Close the claim to trigger the Loss Ratio recompute.',
+    claimDeclinedNote: 'Declined by the insurer — no payment. Close the claim to trigger the Loss Ratio recompute.',
     claimSecondApproveButton: 'Second-approve settlement',
     claimRecordSettlementButton: 'Record settlement',
-    claimBrokerProcessesPayment:
-      'The broker processes this payment (forces a second approver)',
+    claimBrokerProcessesPayment: 'The broker processes this payment (forces a second approver)',
     claimApprovedAmountLabel: 'Approved amount',
     claimFollowUpAlertHeading: 'Insurer follow-up alert',
 
@@ -566,14 +540,12 @@ export const POLICY = {
     financeReconcileButton: 'Reconcile collected funds',
     financeRemitButton: 'Remit {amount} to insurer',
     financeMethodLabel: 'Method',
-    financeNoInvoiceMessage:
-      'No premium invoice yet. Premium to bill: {amount} (commission is netted automatically from the placed quotation rate).',
+    financeNoInvoiceMessage: 'No premium invoice yet. Premium to bill: {amount} (commission is netted automatically from the placed quotation rate).',
     financeCreateError: 'That action could not be completed — try again.',
 
     // CommissionSection.tsx
     commissionSectionHeading: 'Commission',
-    commissionIntro:
-      'Process 35 — calculate broker commission on the collected premium.',
+    commissionIntro: 'Process 35 — calculate broker commission on the collected premium.',
     commissionLoadError: 'Could not load commission data — try again.',
     commissionNoneYet: 'No commission entry for this policy yet.',
     commissionAmountLabel: 'Amount',
@@ -585,6 +557,7 @@ export const POLICY = {
     commissionCreateError: 'That action could not be completed — try again.',
 
     // Enum labels
+
 
     claimStatusClosed: 'Closed',
     claimCoverageUnresolved: 'coverage at loss date could not be resolved',

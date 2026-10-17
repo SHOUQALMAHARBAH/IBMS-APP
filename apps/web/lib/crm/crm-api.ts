@@ -48,8 +48,7 @@ export interface Interaction {
   createdAt: string;
 }
 
-export type TimelineEventKind =
-  'INTERACTION' | 'POLICY' | 'CLAIM' | 'COMPLAINT';
+export type TimelineEventKind = 'INTERACTION' | 'POLICY' | 'CLAIM' | 'COMPLAINT';
 
 export interface TimelineEvent {
   kind: TimelineEventKind;

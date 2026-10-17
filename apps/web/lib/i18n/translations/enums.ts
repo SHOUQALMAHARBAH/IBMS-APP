@@ -271,8 +271,7 @@ export const ENUMS = {
     pnTouchpointNeedsRiskAssessment: 'تقييم الاحتياجات والمخاطر',
     pnTouchpointRfqMarketPlacement: 'طلب عروض الأسعار والتنسيب',
     pnTouchpointClaims: 'المطالبات',
-    pnTouchpointGroupMedicalLifeMotorFleet:
-      'الطبي الجماعي والحياة وأساطيل المركبات',
+    pnTouchpointGroupMedicalLifeMotorFleet: 'الطبي الجماعي والحياة وأساطيل المركبات',
     pnTouchpointRenewalCrossSell: 'التجديد والبيع المتبادل',
     // RiskRegisterType
     rrTypeOperational: 'تشغيلية',
@@ -544,8 +543,7 @@ export const ENUMS = {
     cbtBasisStandardContractualClauses: 'Standard contractual clauses',
     cbtBasisExplicitConsent: 'Explicit consent',
     // DisposalMethod
-    disposalMethodCertifiedSecureWipeNist80088:
-      'Certified secure wipe (NIST 800-88)',
+    disposalMethodCertifiedSecureWipeNist80088: 'Certified secure wipe (NIST 800-88)',
     disposalMethodPhysicalDestruction: 'Physical destruction',
     disposalMethodCertifiedShredding: 'Certified shredding',
     // EndorsementChangeType
@@ -582,8 +580,7 @@ export const ENUMS = {
     pnTouchpointNeedsRiskAssessment: 'Needs / risk assessment',
     pnTouchpointRfqMarketPlacement: 'RFQ / market placement',
     pnTouchpointClaims: 'Claims',
-    pnTouchpointGroupMedicalLifeMotorFleet:
-      'Group medical / life / motor fleet',
+    pnTouchpointGroupMedicalLifeMotorFleet: 'Group medical / life / motor fleet',
     pnTouchpointRenewalCrossSell: 'Renewal / cross-sell',
     // RiskRegisterType
     rrTypeOperational: 'Operational',

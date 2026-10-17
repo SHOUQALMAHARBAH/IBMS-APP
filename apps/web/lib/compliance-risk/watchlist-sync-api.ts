@@ -65,7 +65,11 @@ export function runRecurringScreeningBatch(): Promise<ScreeningBatchResult> {
  */
 
 export type DatasetVersionStatus =
-  'DOWNLOADED' | 'VALIDATED' | 'PUBLISHED' | 'SUPERSEDED' | 'REJECTED';
+  | 'DOWNLOADED'
+  | 'VALIDATED'
+  | 'PUBLISHED'
+  | 'SUPERSEDED'
+  | 'REJECTED';
 
 export interface WatchlistDatasetVersion {
   id: string;
@@ -97,12 +101,9 @@ export function rollbackWatchlistDataset(
   id: string,
   reason: string,
 ): Promise<WatchlistDatasetVersion> {
-  return apiPost(
-    `/watchlist-sync/datasets/${encodeURIComponent(id)}/rollback`,
-    {
-      reason: reason.trim(),
-    },
-  );
+  return apiPost(`/watchlist-sync/datasets/${encodeURIComponent(id)}/rollback`, {
+    reason: reason.trim(),
+  });
 }
 
 /** The DTO's floor. Restoring an older sanctions list narrows what screening can

@@ -24,12 +24,8 @@ export interface PrivacyNotice {
   publishedAt: string;
 }
 
-export function listPrivacyNotices(
-  touchpoint?: string,
-): Promise<PrivacyNotice[]> {
-  return apiGet(
-    `/privacy-notices${touchpoint ? `?touchpoint=${touchpoint}` : ''}`,
-  );
+export function listPrivacyNotices(touchpoint?: string): Promise<PrivacyNotice[]> {
+  return apiGet(`/privacy-notices${touchpoint ? `?touchpoint=${touchpoint}` : ''}`);
 }
 
 export async function currentPrivacyNotice(
@@ -49,8 +45,6 @@ export function createPrivacyNotice(body: {
   return apiPost('/privacy-notices', body);
 }
 
-export function recordPrivacyNoticeLegalReview(
-  id: string,
-): Promise<PrivacyNotice> {
+export function recordPrivacyNoticeLegalReview(id: string): Promise<PrivacyNotice> {
   return apiPost(`/privacy-notices/${id}/legal-review`, {});
 }

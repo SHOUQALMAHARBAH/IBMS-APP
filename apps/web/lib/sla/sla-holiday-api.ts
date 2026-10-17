@@ -96,12 +96,7 @@ export interface HolidayYearView {
   missingFixed: { nameEn: string; nameAr: string; observedOn: string }[];
   /** Occasions with no row naming them in this year. `days` is how many consecutive
    * non-working days the occasion covers, which is why it cannot be entered as one. */
-  missingOccasions: {
-    key: string;
-    nameEn: string;
-    nameAr: string;
-    days: number;
-  }[];
+  missingOccasions: { key: string; nameEn: string; nameAr: string; days: number }[];
 }
 
 export function getHolidayYear(year: number): Promise<HolidayYearView> {

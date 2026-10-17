@@ -39,8 +39,7 @@ export const COMPLIANCE_SCREENING = {
     smCaseEscalated: 'مُصعَّد',
     smCaseClosed: 'مُغلق',
     smCaseAssignee: 'المراجع',
-    smCaseUnknownReviewer:
-      'مُسنَد إلى شخص لم يبقَ مؤهلاً للمراجعة — أعِد الإسناد',
+    smCaseUnknownReviewer: 'مُسنَد إلى شخص لم يبقَ مؤهلاً للمراجعة — أعِد الإسناد',
     smCaseReviewerLabel: 'اختر مراجعاً',
     smCaseAssign: 'إسناد',
     smCaseReassign: 'إعادة الإسناد',
@@ -64,8 +63,7 @@ export const COMPLIANCE_SCREENING = {
     smComplianceOfficerOnly: 'مسؤول الامتثال فقط',
     smReviewReasonAria: 'سبب المراجعة لـ {name}',
     slapRefusalAct: 'عرض سياسات مستويات الخدمة',
-    slapCouldNotLoadSlaPolicies:
-      'تعذّر تحميل سياسات مستوى الخدمة — حاول مرة أخرى.',
+    slapCouldNotLoadSlaPolicies: 'تعذّر تحميل سياسات مستوى الخدمة — حاول مرة أخرى.',
     slapThatActionFailedTryAgain: 'فشل تنفيذ الإجراء — حاول مرة أخرى.',
     slapSlaPolicies: 'سياسات مستوى الخدمة',
     slapEveryDeadlineInTheSystem:
@@ -127,8 +125,7 @@ export const COMPLIANCE_SCREENING = {
       'يُقتبس في مستندات الحوكمة، فلا يتغير عند تغيّر المدة.',
     slapCreateName: 'اسم السياسة',
     slapCreateProcess: 'العملية',
-    slapCreateWorkflowState:
-      'حالة سير العمل (اتركها فارغة لتشمل العملية كاملة)',
+    slapCreateWorkflowState: 'حالة سير العمل (اتركها فارغة لتشمل العملية كاملة)',
     slapCreateDescription: 'الوصف',
     slapCreateDuration: 'المدة',
     slapCreateUnit: 'الوحدة',
@@ -236,8 +233,7 @@ export const COMPLIANCE_SCREENING = {
     slapLoading: 'Loading…',
     smRefusalAct: 'view the sanctions review queue',
     smCouldNotLoadTheMatch: 'Could not load the match queue — try again.',
-    smRecordingThatDecisionFailedTry:
-      'Recording that decision failed — try again.',
+    smRecordingThatDecisionFailedTry: 'Recording that decision failed — try again.',
     smSanctionsMatchReview: 'Sanctions match review',
     smNamesAreCheckedAgainstThe:
       'Names are checked against the synced OFAC and UN sanctions lists using fuzzy matching, which covers romanisation variants (Mohammed / Muhammad) and Jordan’s four-part naming convention against shorter list entries. A match here is a QUESTION, not a verdict — nothing is blocked automatically; the decision is a Compliance Officer’s.',
@@ -321,10 +317,9 @@ export const COMPLIANCE_SCREENING = {
     slapHolidayFixedMissing: 'Fixed-date holidays not yet entered',
     slapHolidayAddFixed: 'Add the fixed holidays for this year',
     slapHolidayFixedNote:
-      "Four holidays fall on the same date every year: New Year's Day (1 Jan), Labour " +
+      'Four holidays fall on the same date every year: New Year\'s Day (1 Jan), Labour ' +
       'Day (1 May), Independence Day (25 May), Christmas (25 Dec).',
-    slapHolidayMovingHeading:
-      'Islamic occasions — entered from the official announcement',
+    slapHolidayMovingHeading: 'Islamic occasions — entered from the official announcement',
     slapHolidayMovingNote:
       'These dates are set by official announcement in Jordan and can differ by a day ' +
       'from any calendar conversion, so the system does not compute them. Enter the ' +
@@ -334,8 +329,7 @@ export const COMPLIANCE_SCREENING = {
     slapHolidayStartDate: 'First day',
     slapHolidayAddOccasion: 'Enter the occasion',
     slapHolidayDays: 'days',
-    slapHolidayYearComplete:
-      'This year is complete — every known holiday is entered.',
+    slapHolidayYearComplete: 'This year is complete — every known holiday is entered.',
     slapHolidayOccasionError: 'Could not enter that occasion — try again.',
     slapProcess: 'Process',
     slapDuration: 'Duration',
@@ -353,8 +347,7 @@ export const COMPLIANCE_SCREENING = {
       'It is quoted in governance documents, so it does not change when the duration does.',
     slapCreateName: 'Policy name',
     slapCreateProcess: 'Process',
-    slapCreateWorkflowState:
-      'Workflow state (leave empty for the whole process)',
+    slapCreateWorkflowState: 'Workflow state (leave empty for the whole process)',
     slapCreateDescription: 'Description',
     slapCreateDuration: 'Duration',
     slapCreateUnit: 'Unit',
@@ -381,8 +374,7 @@ export const COMPLIANCE_SCREENING = {
     slapReadOnly: 'Read only',
     slapDurationAria: 'Duration for {name}',
     shRefusalAct: 'view the screening health report',
-    shCouldNotLoadScreeningHealth:
-      'Could not load screening health — try again.',
+    shCouldNotLoadScreeningHealth: 'Could not load screening health — try again.',
     shScreeningHealth: 'Screening health',
     shWhichProviderActuallyPerformsScreening:
       'Which provider actually performs screening, whether its data is current, and what it covers. NOT_CONFIGURED or UNAVAILABLE means screening did not happen — it is not a negative result.',
@@ -420,8 +412,7 @@ export const COMPLIANCE_SCREENING = {
     shNo: 'No',
     shAHealthCheckAnswersWhether:
       'A health check answers whether the provider is reachable. These numbers answer how many customers were actually screened.',
-    shNoScreeningAttemptsRecordedIn:
-      'No screening attempts recorded in this window.',
+    shNoScreeningAttemptsRecordedIn: 'No screening attempts recorded in this window.',
     shTotal: 'Total',
     shDidNotProduceAUsable: 'Did not produce a usable answer',
     shTheseCustomersWereNotScreened:

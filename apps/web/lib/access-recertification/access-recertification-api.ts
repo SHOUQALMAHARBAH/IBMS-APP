@@ -1,11 +1,11 @@
-import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
+import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOnRecord";
 // Part 10.1 / Process #40 — talks to apps/api's rbac module
 // (access-recertification.controller.ts). Mirrors lib/auth/auth-api.ts's
 // conventions (thin typed wrappers over apiGet/apiPost).
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPost } from "../auth/api-client";
 
-export type RecertificationDecision = 'confirmed' | 'revoked' | 'changed';
+export type RecertificationDecision = "confirmed" | "revoked" | "changed";
 
 export interface RecertificationItem {
   id: string;
@@ -72,7 +72,7 @@ export interface RecertificationDecisionResult {
 }
 
 export function listMyRecertificationItems(): Promise<RecertificationItem[]> {
-  return apiGet('/access-recertification/items');
+  return apiGet("/access-recertification/items");
 }
 
 /**
@@ -83,7 +83,7 @@ export function listMyRecertificationItems(): Promise<RecertificationItem[]> {
  * cycle you had just started in this session and for no earlier one.
  */
 export function listRecertificationCycles(): Promise<RecertificationCycle[]> {
-  return apiGet('/access-recertification/cycles');
+  return apiGet("/access-recertification/cycles");
 }
 
 /**
@@ -113,7 +113,7 @@ export function startRecertificationCycle(input: {
    */
   combinedDutyReason?: string;
 }): Promise<RecertificationCycle> {
-  return apiPost('/access-recertification/cycles', input);
+  return apiPost("/access-recertification/cycles", input);
 }
 
 export function decideRecertificationItem(
