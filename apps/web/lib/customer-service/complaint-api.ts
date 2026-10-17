@@ -1,4 +1,4 @@
-import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOnRecord";
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 // Process 42 — Complaints Management (backlog Part C #42, Domain E). Reads
 // apps/api's /complaints endpoints: log a customer complaint (optionally
 // against a disputed claim), assign / work / resolve it, escalate it to the
@@ -8,7 +8,7 @@ import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOn
 //   - complaint.escalate (Manager, Compliance)
 //   - complaint.close     (Manager)
 
-import { apiFetchBlob, apiGet, apiPost } from "../auth/api-client";
+import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
 
 export interface ComplaintSla {
   timerId: string;
@@ -61,11 +61,11 @@ export interface Complaint {
 }
 
 export const COMPLAINT_CATEGORIES = [
-  "denied_claim",
-  "delayed_issuance",
-  "premium_dispute",
-  "unanswered_claim",
-  "other",
+  'denied_claim',
+  'delayed_issuance',
+  'premium_dispute',
+  'unanswered_claim',
+  'other',
 ] as const;
 
 export function listComplaints(
@@ -77,13 +77,13 @@ export function listComplaints(
   } = {},
 ): Promise<Complaint[]> {
   const params = new URLSearchParams();
-  if (opts.customerId) params.set("customerId", opts.customerId);
-  if (opts.status) params.set("status", opts.status);
-  if (opts.claimId) params.set("claimId", opts.claimId);
+  if (opts.customerId) params.set('customerId', opts.customerId);
+  if (opts.status) params.set('status', opts.status);
+  if (opts.claimId) params.set('claimId', opts.claimId);
   if (opts.responsibleEmployeeUserId)
-    params.set("responsibleEmployeeUserId", opts.responsibleEmployeeUserId);
+    params.set('responsibleEmployeeUserId', opts.responsibleEmployeeUserId);
   const qs = params.toString();
-  return apiGet(`/complaints${qs ? `?${qs}` : ""}`);
+  return apiGet(`/complaints${qs ? `?${qs}` : ''}`);
 }
 
 export function createComplaint(body: {
@@ -94,7 +94,7 @@ export function createComplaint(body: {
   policyId?: string;
   responsibleEmployeeUserId?: string;
 }): Promise<Complaint> {
-  return apiPost("/complaints", body);
+  return apiPost('/complaints', body);
 }
 
 export function assignComplaint(
@@ -148,8 +148,8 @@ export function closeComplaint(
 // languagePreference; 'DUAL' renders both, Arabic section first.
 export function downloadComplaintAcknowledgement(
   id: string,
-  language?: "AR" | "EN" | "DUAL",
+  language?: 'AR' | 'EN' | 'DUAL',
 ): Promise<Blob> {
-  const qs = language ? `?language=${language}` : "";
+  const qs = language ? `?language=${language}` : '';
   return apiFetchBlob(`/complaints/${id}/acknowledgement${qs}`);
 }

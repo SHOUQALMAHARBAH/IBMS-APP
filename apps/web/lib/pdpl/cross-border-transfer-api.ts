@@ -21,7 +21,9 @@ export interface CrossBorderTransferRecord {
   transferredAt: string;
 }
 
-export function listCrossBorderTransfers(): Promise<CrossBorderTransferRecord[]> {
+export function listCrossBorderTransfers(): Promise<
+  CrossBorderTransferRecord[]
+> {
   return apiGet('/cross-border-transfers');
 }
 

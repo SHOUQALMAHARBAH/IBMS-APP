@@ -218,7 +218,7 @@ export const INSURERS = {
     // page.tsx — the list
     insListHeading: 'Insurers',
     insListIntro:
-      "The insurance companies your office deals with. You can register one from the shared " +
+      'The insurance companies your office deals with. You can register one from the shared ' +
       'catalogue, or one no catalogue has heard of — both paths run through here.',
     insListRefusalAct: "view this office's insurers",
     insMfaRequired:
@@ -283,7 +283,8 @@ export const INSURERS = {
     insDetailNotFound: 'Could not find that insurer.',
     insDetailCompanyHeading: 'Company details',
     insDetailRelationshipHeading: "Your office's terms and contacts",
-    insDetailRelationshipNote: 'None of these fields crosses an office boundary.',
+    insDetailRelationshipNote:
+      'None of these fields crosses an office boundary.',
     insDetailStructureLabel: 'Structure',
     insDetailPhoneLabel: 'Phone',
     insDetailEmailLabel: 'Email',
@@ -312,7 +313,8 @@ export const INSURERS = {
     insImpactLoading: 'Working out the impact…',
     insImpactError: 'Could not work out the impact.',
     insDeactivateReasonLabel: 'Reason',
-    insDeactivateReasonRequired: 'A reason is required to stop dealing with an insurer.',
+    insDeactivateReasonRequired:
+      'A reason is required to stop dealing with an insurer.',
     insDeactivateConfirmButton: 'Confirm — stop dealing',
     insReactivateReasonLabel: 'Reason (optional)',
     insReactivateConfirmButton: 'Confirm — back in play',
@@ -334,7 +336,8 @@ export const INSURERS = {
     insDirLineAny: 'Any line',
     insDirSearchButton: 'Search',
     insDirEmpty: 'No company matches.',
-    insDirEmptyForLine: 'No office has registered a company that writes this line.',
+    insDirEmptyForLine:
+      'No office has registered a company that writes this line.',
     insDirLoading: 'Loading…',
     insDirTotal: '{count} companies',
     insDirNoContact: 'No contact details recorded.',

@@ -33,7 +33,11 @@ export interface ServiceRequest {
 }
 
 export function listServiceRequests(
-  opts: { customerId?: string; status?: string; assignedToUserId?: string } = {},
+  opts: {
+    customerId?: string;
+    status?: string;
+    assignedToUserId?: string;
+  } = {},
 ): Promise<ServiceRequest[]> {
   const params = new URLSearchParams();
   if (opts.customerId) params.set('customerId', opts.customerId);

@@ -26,7 +26,12 @@
   },
   "insurance-lines-gate-renarrowed": {
     "file": "apps/api/src/modules/insurer/insurance-line.controller.ts",
-    "from": "  @RequirePermissions(\n    'insurer.read',\n    'provider.office.register',\n    'provider.insurer.register',\n  )",
+    "from": "  @RequirePermissions(\n    'insurer.read',\n    'provider.office.register',\n    'provider.insurer.register',\n    'role.read',\n    'commission.calculate',\n  )",
     "to": "  @RequirePermissions('insurer.read')"
+  },
+  "branches-gate-named-user-manage-instead": {
+    "file": "apps/api/src/modules/rbac/controllers/org-structure.controller.ts",
+    "from": "  @RequirePermissions('branch.read', 'provider.office.administrator.invite')",
+    "to": "  @RequirePermissions('branch.read', 'user.manage')"
   }
 }

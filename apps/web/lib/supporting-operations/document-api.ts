@@ -66,7 +66,11 @@ export function listDocuments(filter?: {
 
 export function createDocumentVersion(
   id: string,
-  input: { classification: DataClassification; fileName: string; storageRef: string },
+  input: {
+    classification: DataClassification;
+    fileName: string;
+    storageRef: string;
+  },
 ): Promise<DocumentRecord> {
   return apiPost(`/documents/${id}/versions`, input);
 }

@@ -55,7 +55,8 @@ export type DocumentCategory =
   | 'CORRESPONDENCE'
   | 'OTHER';
 
-export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
+export type DataClassification =
+  'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
 
 /** One person who appears as an actor in the audit log — the actor picker's option shape. */
 export interface AuditActor {

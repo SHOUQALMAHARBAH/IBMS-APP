@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 import { PERMISSIONS } from '../i18n/translations/permissions';
-import { codeFromPermissionKey, permissionDescriptionKey } from '../i18n/permission-key';
-import { describePermission, hasWrittenDescription } from './permission-descriptions';
+import {
+  codeFromPermissionKey,
+  permissionDescriptionKey,
+} from '../i18n/permission-key';
+import {
+  describePermission,
+  hasWrittenDescription,
+} from './permission-descriptions';
 
 /*
  * THE COVERAGE OF THE PERMISSION DESCRIPTIONS, in both directions.
@@ -202,12 +208,17 @@ describe('permission descriptions cover the catalogue', () => {
   it('is not vacuous — the catalogue and the dictionary are both really being read', () => {
     // Without this, an empty import or a renamed export would make every check below pass on nothing,
     // which is the failure mode this repo has paid for four times.
-    expect(CODES.length, 'the catalogue is empty or unreadable').toBeGreaterThan(200);
+    expect(
+      CODES.length,
+      'the catalogue is empty or unreadable',
+    ).toBeGreaterThan(200);
     expect(
       Object.keys(PERMISSIONS.AR).length,
       'the permissions dictionary is empty',
     ).toBeGreaterThan(0);
-    expect(Object.keys(PERMISSIONS.AR).length).toBe(Object.keys(PERMISSIONS.EN).length);
+    expect(Object.keys(PERMISSIONS.AR).length).toBe(
+      Object.keys(PERMISSIONS.EN).length,
+    );
   });
 
   it('has no more codes without a description than the recorded budget', () => {
@@ -231,7 +242,9 @@ describe('permission descriptions cover the catalogue', () => {
   it('has no more codes showing the carried English hint than the recorded budget', () => {
     // Mechanical, so no exemption list: a code whose EN value equals the catalogue's stored description has
     // not been given reviewed English yet. Both directions, like the Arabic ratchet.
-    const stored = new Map(PERMISSION_CATALOGUE.map((e) => [e.code, e.description]));
+    const stored = new Map(
+      PERMISSION_CATALOGUE.map((e) => [e.code, e.description]),
+    );
     const carried = CODES.filter((code) => {
       const en = (PERMISSIONS.EN as Record<string, string | undefined>)[
         permissionDescriptionKey(code)
@@ -269,7 +282,10 @@ describe('permission descriptions cover the catalogue', () => {
     for (const code of CODES) {
       expect(codeFromPermissionKey(permissionDescriptionKey(code))).toBe(code);
     }
-    expect(codeFromPermissionKey('commonSave'), 'a non-permission key must not parse as one').toBeNull();
+    expect(
+      codeFromPermissionKey('commonSave'),
+      'a non-permission key must not parse as one',
+    ).toBeNull();
   });
 });
 
@@ -279,13 +295,17 @@ describe('the stored English fallback', () => {
     // but `describePermission` is also reachable with a code the catalogue does not contain — a stale grant
     // row, or a code withdrawn between a page load and a render — and the stored hint beats nothing at all
     // for somebody deciding a grant.
-    expect(describePermission('role.read', 'AR', 'stored hint')).not.toBe('stored hint');
+    expect(describePermission('role.read', 'AR', 'stored hint')).not.toBe(
+      'stored hint',
+    );
     // NOT a catalogue code. Every one of the 219 now has a line, so the fallback is unreachable THROUGH the
     // catalogue — which is the design. It stays reachable with a code the catalogue does not contain: a
     // stale grant row, or a code withdrawn between a page load and a render. This assertion used
     // `claim.delete` until the owner's lines landed, and then correctly broke, because that code now has a
     // real Arabic line saying it does nothing today.
-    expect(describePermission('never.was.a.code', 'AR', 'stored hint')).toBe('stored hint');
+    expect(describePermission('never.was.a.code', 'AR', 'stored hint')).toBe(
+      'stored hint',
+    );
     // And with neither, NULL rather than the code: repeating the code beneath the code is noise that looks
     // like an explanation.
     expect(describePermission('never.was.a.code', 'AR', '   ')).toBeNull();

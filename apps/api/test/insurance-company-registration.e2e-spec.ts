@@ -8,7 +8,7 @@ import {
   createUserInOrganization,
   bearerHeader,
 } from './utils/provider-user';
-import { rawPrisma } from './tenant-prisma';
+import { deleteOrganizationCascade, rawPrisma } from './tenant-prisma';
 
 /**
  * MODULE 0-ب ITEM (e) — REGISTERING AN INSURANCE COMPANY, over real HTTP.
@@ -146,7 +146,8 @@ async function deleteCompany(organizationId: string) {
   await rawPrisma.rolePermission.deleteMany({ where: { organizationId } });
   await rawPrisma.role.deleteMany({ where: { organizationId } });
 
-  await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
+  // Branch and Department now BLOCK this delete — see `deleteOrganizationCascade`.
+  await deleteOrganizationCascade(organizationId);
 }
 
 beforeAll(async () => {

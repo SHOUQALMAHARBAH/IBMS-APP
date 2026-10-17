@@ -7,7 +7,13 @@ import { heartbeat } from './auth-api';
 // thresholds: `idleTimeoutMinutes` locks the screen (still signed in,
 // requires a password re-entry to resume); `hardLogoutAfterIdleMinutes` (a
 // further grace period past that) signs the session out entirely.
-const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'mousedown', 'scroll', 'touchstart'];
+const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
+  'mousemove',
+  'keydown',
+  'mousedown',
+  'scroll',
+  'touchstart',
+];
 const HEARTBEAT_THROTTLE_MS = 30_000;
 const CHECK_INTERVAL_MS = 5_000;
 
@@ -17,7 +23,11 @@ interface UseIdleTimerOptions {
   onHardLogout: () => void;
 }
 
-export function useIdleTimer({ idleTimeoutMinutes, hardLogoutAfterIdleMinutes, onHardLogout }: UseIdleTimerOptions) {
+export function useIdleTimer({
+  idleTimeoutMinutes,
+  hardLogoutAfterIdleMinutes,
+  onHardLogout,
+}: UseIdleTimerOptions) {
   const [isLocked, setIsLocked] = useState(false);
   // 0, not Date.now() — reading the clock is a side effect and isn't allowed
   // during render; the real starting timestamp is set in the effect below.
@@ -48,9 +58,11 @@ export function useIdleTimer({ idleTimeoutMinutes, hardLogoutAfterIdleMinutes, o
   }, []);
 
   useEffect(() => {
-    for (const event of ACTIVITY_EVENTS) window.addEventListener(event, recordActivity, { passive: true });
+    for (const event of ACTIVITY_EVENTS)
+      window.addEventListener(event, recordActivity, { passive: true });
     return () => {
-      for (const event of ACTIVITY_EVENTS) window.removeEventListener(event, recordActivity);
+      for (const event of ACTIVITY_EVENTS)
+        window.removeEventListener(event, recordActivity);
     };
   }, [recordActivity]);
 

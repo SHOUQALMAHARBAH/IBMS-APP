@@ -22,12 +22,19 @@ export const LEAD_SOURCES = [
 
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
-export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CONVERTED_TO_PROSPECT' | 'DISQUALIFIED';
+export type LeadStatus =
+  'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CONVERTED_TO_PROSPECT' | 'DISQUALIFIED';
 
 // Pipeline-board column order. Mirrors apps/api's WORKFLOW_TRANSITIONS.Lead
 // (workflow-transitions.config.ts) for which forward move is offered per
 // column — kept in sync by hand, same caveat as LEAD_SOURCES above.
-export const LEAD_STATUSES: LeadStatus[] = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED_TO_PROSPECT', 'DISQUALIFIED'];
+export const LEAD_STATUSES: LeadStatus[] = [
+  'NEW',
+  'CONTACTED',
+  'QUALIFIED',
+  'CONVERTED_TO_PROSPECT',
+  'DISQUALIFIED',
+];
 
 export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   NEW: 'New',
@@ -102,6 +109,9 @@ export function listLeads(filter: ListLeadsFilter = {}): Promise<Lead[]> {
   return apiGet(`/leads${qs ? `?${qs}` : ''}`);
 }
 
-export function transitionLead(leadId: string, toStatus: LeadStatus): Promise<LeadTransitionResult> {
+export function transitionLead(
+  leadId: string,
+  toStatus: LeadStatus,
+): Promise<LeadTransitionResult> {
   return apiPost(`/leads/${leadId}/transition`, { toStatus });
 }

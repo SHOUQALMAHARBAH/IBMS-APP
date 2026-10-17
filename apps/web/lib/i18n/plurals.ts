@@ -28,13 +28,7 @@ import { formatNumber, LOCALE_BY_LANGUAGE } from './format';
 // `Intl` is the only way to stay correct without shipping our own copy of
 // that data.
 
-export type PluralCategory =
-  | 'zero'
-  | 'one'
-  | 'two'
-  | 'few'
-  | 'many'
-  | 'other';
+export type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
 
 /** `other` is mandatory because CLDR guarantees it for every locale and every
  *  count — it is the fallback the resolver can always reach. Every other

@@ -1,11 +1,11 @@
-import { apiGet, apiPost } from "../auth/api-client";
+import { apiGet, apiPost } from '../auth/api-client';
 
 // Process 49 — the sanctions match review queue. Fuzzy name matching
 // deliberately over-fires (transliteration variants, extra middle names), so
 // every candidate is adjudicated by a Compliance Officer. Nothing in the
 // system blocks a customer on a match; this queue is the decision point.
 
-export type ScreeningMatchStatus = "pending" | "cleared" | "confirmed";
+export type ScreeningMatchStatus = 'pending' | 'cleared' | 'confirmed';
 
 export interface ScreeningMatch {
   id: string;
@@ -48,11 +48,11 @@ export interface ScreeningMatch {
 
 /** The workflow states, mirroring `ScreeningCaseStatus` in the schema. */
 export const SCREENING_CASE_STATUSES = [
-  "OPEN",
-  "ASSIGNED",
-  "UNDER_REVIEW",
-  "ESCALATED",
-  "CLOSED",
+  'OPEN',
+  'ASSIGNED',
+  'UNDER_REVIEW',
+  'ESCALATED',
+  'CLOSED',
 ] as const;
 export type ScreeningCaseStatus = (typeof SCREENING_CASE_STATUSES)[number];
 
@@ -60,7 +60,7 @@ export type ScreeningCaseStatus = (typeof SCREENING_CASE_STATUSES)[number];
  * side. Mirrored so the screen does not offer a decision it knows will be
  * refused; the server stays the authority. */
 export function caseCanBeDecided(status: ScreeningCaseStatus): boolean {
-  return status === "UNDER_REVIEW" || status === "ESCALATED";
+  return status === 'UNDER_REVIEW' || status === 'ESCALATED';
 }
 
 export interface ScreeningCaseNote {
@@ -81,7 +81,7 @@ export interface ScreeningReviewer {
 }
 
 export function listScreeningMatches(
-  status: ScreeningMatchStatus = "pending",
+  status: ScreeningMatchStatus = 'pending',
 ): Promise<ScreeningMatch[]> {
   return apiGet(`/screening/matches?status=${encodeURIComponent(status)}`);
 }
@@ -92,7 +92,7 @@ export function getPendingMatchCount(): Promise<{
   pending: number;
   watchlistReady: boolean;
 }> {
-  return apiGet("/screening/matches/pending-count");
+  return apiGet('/screening/matches/pending-count');
 }
 
 /** `cleared` = false positive. `confirmed` = a true match; the customer stays
@@ -101,7 +101,7 @@ export function getPendingMatchCount(): Promise<{
  * through. A recorded decision is final here. */
 export function reviewScreeningMatch(
   id: string,
-  decision: "cleared" | "confirmed",
+  decision: 'cleared' | 'confirmed',
   reviewReason: string,
 ): Promise<ScreeningMatch> {
   return apiPost(`/screening/matches/${encodeURIComponent(id)}/review`, {
@@ -130,7 +130,7 @@ export function reviewScreeningMatch(
  * access window respected. Its own endpoint rather than the admin user list,
  * which a Compliance Officer cannot read. */
 export function listScreeningReviewers(): Promise<ScreeningReviewer[]> {
-  return apiGet("/screening/reviewers");
+  return apiGet('/screening/reviewers');
 }
 
 /** The match plus its working notes — the evidence trail the AMLU requires
@@ -155,7 +155,10 @@ export function assignScreeningCase(
  * purpose: it is the difference between a case somebody is working and one
  * sitting in their queue untouched, which is what an SLA is actually about. */
 export function startScreeningReview(id: string): Promise<ScreeningMatch> {
-  return apiPost(`/screening/matches/${encodeURIComponent(id)}/start-review`, {});
+  return apiPost(
+    `/screening/matches/${encodeURIComponent(id)}/start-review`,
+    {},
+  );
 }
 
 /** The floors the DTOs enforce. Mirrored so the screen never sends a request it

@@ -63,7 +63,8 @@ export const COMMON = {
     pagingNext: 'التالي',
     customerPickerSearchLabel: 'ابحث عن عميل',
     customerPickerSearchPlaceholder: 'الاسم، بالعربية أو الإنجليزية',
-    entitySearchCustomerPlaceholder: 'الاسم أو رقم السجل التجاري — ثلاثة أحرف على الأقل',
+    entitySearchCustomerPlaceholder:
+      'الاسم أو رقم السجل التجاري — ثلاثة أحرف على الأقل',
     customerPickerNonePlaceholder: '— اختر عميلاً —',
     customerPickerNoMatches: 'لا يوجد عميل مطابق لما أدخلته.',
     customerPickerSearchError: 'تعذّر تنفيذ بحث العملاء. حاول مرة أخرى.',
@@ -84,9 +85,11 @@ export const COMMON = {
     entitySearchInsurerLabel: 'ابحث عن شركة تأمين',
     entitySearchInsurerPlaceholder: 'اسم الشركة بالعربية أو بالإنجليزية',
     entitySearchInsurerNoMatches: 'لا توجد شركة تأمين مطابقة لما أدخلته.',
-    entitySearchInsurerError: 'تعذّر تنفيذ البحث عن شركات التأمين. حاول مرة أخرى.',
+    entitySearchInsurerError:
+      'تعذّر تنفيذ البحث عن شركات التأمين. حاول مرة أخرى.',
     entitySearchPolicyLabel: 'ابحث عن وثيقة',
-    entitySearchPolicyPlaceholder: 'رقم الوثيقة أو اسم العميل — ثلاثة أحرف على الأقل',
+    entitySearchPolicyPlaceholder:
+      'رقم الوثيقة أو اسم العميل — ثلاثة أحرف على الأقل',
     entitySearchPolicyNoMatches: 'لا توجد وثيقة مطابقة لما أدخلته.',
     entitySearchPolicyError: 'تعذّر تنفيذ البحث عن الوثائق. حاول مرة أخرى.',
     // A policy is placed before it is issued, and the number arrives with issuance. Stated as a state
@@ -146,7 +149,8 @@ export const COMMON = {
       'لا يمكن إعلان الوضع المدمج بعد: تقرير الاعتمادات الذاتية الذي يعتمد عليه غير موجود حتى الآن.',
     dutyModeSaved: 'تم إعلان الوضع وتسجيله في سجل التدقيق.',
     // The act ON the record (step 5). «الشخص نفسه» — names what happened, not a euphemism for it.
-    combinedDutyOnRecord: 'نفّذ الشخص نفسه طرفي هذه العملية بصفته ({roles})، والسبب المسجّل:',
+    combinedDutyOnRecord:
+      'نفّذ الشخص نفسه طرفي هذه العملية بصفته ({roles})، والسبب المسجّل:',
     // When MORE THAN ONE of the actor's roles granted the checker permission, the record says it
     // cannot tell which — naming one would assert something the system does not know.
     combinedDutyOnRecordAmbiguous:
@@ -190,7 +194,8 @@ export const COMMON = {
       'You can {can}, but not {cannot} — ask whoever manages permissions in your office to change that. ({code})',
     permissionMayBeMissing:
       'Could not {act} — you may not hold the permission for it. Ask whoever manages permissions in your office. ({code})',
-    mfaBannerTitle: 'One step before the system works: pair an authenticator app',
+    mfaBannerTitle:
+      'One step before the system works: pair an authenticator app',
     mfaBannerBody:
       'Most screens will refuse to load until you pair an authenticator app with your account. This is not a problem with your permissions.',
     mfaBannerCta: 'Go to Security to finish pairing',
@@ -200,7 +205,8 @@ export const COMMON = {
     pagingNext: 'Next',
     customerPickerSearchLabel: 'Find a customer',
     customerPickerSearchPlaceholder: 'Name, in Arabic or English',
-    entitySearchCustomerPlaceholder: 'Name or commercial registration number — at least three characters',
+    entitySearchCustomerPlaceholder:
+      'Name or commercial registration number — at least three characters',
     customerPickerNonePlaceholder: '— select a customer —',
     customerPickerNoMatches: 'No customer matches what you entered.',
     customerPickerSearchError: 'The customer search could not run. Try again.',
@@ -211,7 +217,8 @@ export const COMMON = {
     entitySearchActorError: 'The person search could not be run. Try again.',
     // THE FOUR PICKERS added 2026-10-02 — see the note in the Arabic block above.
     entitySearchEmployeeLabel: 'Find an employee',
-    entitySearchEmployeePlaceholder: "The person's name — at least two characters",
+    entitySearchEmployeePlaceholder:
+      "The person's name — at least two characters",
     entitySearchEmployeeNoMatches: 'No employee by that name.',
     entitySearchEmployeeError: 'The employee search could not run. Try again.',
     entitySearchEmployeeFormer: 'no longer employed here',
@@ -264,7 +271,8 @@ export const COMMON = {
       'At least {min} characters. Kept permanently in the audit trail, and it is what answers "who decided this, and when".',
     dutyModeDeclareButton: 'Declare setting',
     dutyModeWorkingButton: 'Saving…',
-    dutyModeLoadError: 'Could not load the separation-of-duties setting. Try again.',
+    dutyModeLoadError:
+      'Could not load the separation-of-duties setting. Try again.',
     dutyModeRefusalAct: 'view how this office separates duties',
     dutyModeSaveError: 'Could not declare the setting. Try again.',
     dutyModeReadOnly:

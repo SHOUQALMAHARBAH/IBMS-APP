@@ -76,7 +76,10 @@ export function formatDate(value: string | Date, language: Language): string {
 }
 
 /** Locale-aware `Date.prototype.toLocaleString()` replacement (date + time). */
-export function formatDateTime(value: string | Date, language: Language): string {
+export function formatDateTime(
+  value: string | Date,
+  language: Language,
+): string {
   const d = typeof value === 'string' ? new Date(value) : value;
   return d.toLocaleString(LOCALE_BY_LANGUAGE[language]);
 }

@@ -38,7 +38,8 @@ export function listInformationAssets(filter?: {
 }): Promise<InformationAsset[]> {
   const params = new URLSearchParams();
   if (filter?.assetType) params.set('assetType', filter.assetType);
-  if (filter?.classification) params.set('classification', filter.classification);
+  if (filter?.classification)
+    params.set('classification', filter.classification);
   const query = params.toString();
   return apiGet(`/information-assets${query ? `?${query}` : ''}`);
 }
@@ -54,7 +55,11 @@ export function createInformationAsset(input: {
 
 export function updateInformationAsset(
   id: string,
-  input: { name?: string; assetType?: AssetType; classification?: DataClassification },
+  input: {
+    name?: string;
+    assetType?: AssetType;
+    classification?: DataClassification;
+  },
 ): Promise<InformationAsset> {
   return apiPatch(`/information-assets/${id}`, input);
 }

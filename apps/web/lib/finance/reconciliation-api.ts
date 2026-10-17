@@ -6,7 +6,8 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
-export type ReconciliationExceptionStatus = 'open' | 'investigating' | 'resolved';
+export type ReconciliationExceptionStatus =
+  'open' | 'investigating' | 'resolved';
 
 export interface ReconciliationException {
   id: string;

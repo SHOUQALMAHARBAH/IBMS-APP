@@ -98,6 +98,8 @@ export async function loadIndependently(
  * The caller supplies the frame so the wording stays in the dictionary and in both languages; this
  * only assembles the list of names, which is the part that cannot live in a static string.
  */
-export function namedFailures(failures: readonly IndependentLoadFailure[]): string {
+export function namedFailures(
+  failures: readonly IndependentLoadFailure[],
+): string {
   return failures.map((f) => f.label).join(' · ');
 }

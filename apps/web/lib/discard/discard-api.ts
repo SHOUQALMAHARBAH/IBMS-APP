@@ -26,15 +26,14 @@ export const DISCARD_REASON_MIN_LENGTH = 10;
 
 /** The collections that accept a discard. A union rather than a string so a mistyped path cannot compile. */
 export type DiscardableCollection =
-  | 'policies'
-  | 'claims'
-  | 'endorsements'
-  | 'recommendations';
+  'policies' | 'claims' | 'endorsements' | 'recommendations';
 
 export function discardRecord(
   collection: DiscardableCollection,
   id: string,
   reason: string,
 ): Promise<unknown> {
-  return apiPost(`/${collection}/${encodeURIComponent(id)}/discard`, { reason });
+  return apiPost(`/${collection}/${encodeURIComponent(id)}/discard`, {
+    reason,
+  });
 }

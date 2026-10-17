@@ -31,7 +31,9 @@ import type { MeResponse } from './auth-api';
  * one — and it must not throw, because this runs inside the render path of
  * every authenticated screen.
  */
-function codesOf(user: Pick<MeResponse, 'permissions'> | null | undefined): readonly string[] {
+function codesOf(
+  user: Pick<MeResponse, 'permissions'> | null | undefined,
+): readonly string[] {
   return Array.isArray(user?.permissions) ? user.permissions : [];
 }
 

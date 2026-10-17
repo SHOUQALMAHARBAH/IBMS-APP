@@ -17,7 +17,8 @@ export const LEADS = {
     leadsSourceLabel: 'المصدر',
     leadsPhoneLabel: 'رقم الهاتف (اختياري)',
     leadsEmailLabel: 'البريد الإلكتروني (اختياري)',
-    leadsMarketingConsentLabel: 'وافق هذا العميل المحتمل على تلقي الرسائل التسويقية',
+    leadsMarketingConsentLabel:
+      'وافق هذا العميل المحتمل على تلقي الرسائل التسويقية',
     leadsConsentTextVersionLabel: 'إصدار نص الموافقة',
     leadsAddButton: 'إضافة عميل محتمل',
     leadsAddingButton: 'جارٍ الإضافة…',
@@ -64,7 +65,8 @@ export const LEADS = {
     leadsSourceLabel: 'Source',
     leadsPhoneLabel: 'Contact phone (optional)',
     leadsEmailLabel: 'Contact email (optional)',
-    leadsMarketingConsentLabel: 'This lead has agreed to receive marketing communications',
+    leadsMarketingConsentLabel:
+      'This lead has agreed to receive marketing communications',
     leadsConsentTextVersionLabel: 'Consent text version',
     leadsAddButton: 'Add lead',
     leadsAddingButton: 'Adding…',

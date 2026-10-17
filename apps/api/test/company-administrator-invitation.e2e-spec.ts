@@ -8,7 +8,11 @@ import {
   createUserInOrganization,
   bearerHeader,
 } from './utils/provider-user';
-import { rawPrisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
+import {
+  TEST_ORGANIZATION_ID,
+  deleteOrganizationCascade,
+  rawPrisma,
+} from './tenant-prisma';
 import { INSURANCE_COMPANY_ADMINISTRATOR_GRANTS } from '../src/modules/provider/insurance-company-administrator-grants';
 
 /**
@@ -97,7 +101,8 @@ async function deleteCompany(organizationId: string) {
     data: { insurerLicenseCertificateDocumentId: null },
   });
   await rawPrisma.document.deleteMany({ where: { organizationId } });
-  await rawPrisma.organization.delete({ where: { id: organizationId } });
+  // Branch and Department now BLOCK this delete — see `deleteOrganizationCascade`.
+  await deleteOrganizationCascade(organizationId);
 }
 
 async function sweepRunLeftovers() {

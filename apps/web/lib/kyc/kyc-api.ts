@@ -1,18 +1,18 @@
 // Process 3-4 — the KYC lifecycle. Talks to apps/api's kyc.controller.ts.
 // Mirrors lib/lead/lead-api.ts's conventions.
 
-import { apiGet, apiPost } from "../auth/api-client";
+import { apiGet, apiPost } from '../auth/api-client';
 import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
 export type KycStatus =
-  | "DRAFT"
-  | "SUBMITTED"
-  | "SCREENING"
-  | "EDD"
-  | "COMPLIANCE_REVIEW"
-  | "APPROVED"
-  | "REJECTED"
-  | "PERIODIC_REVIEW_DUE";
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'SCREENING'
+  | 'EDD'
+  | 'COMPLIANCE_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PERIODIC_REVIEW_DUE';
 
 export interface KycRecord {
   id: string;
@@ -42,7 +42,7 @@ export interface KycRecord {
 // see KycRecordRepository.findMany's `include` (apps/api). Neither
 // legalName nor customerType is sensitive.
 export interface KycQueueRecord extends KycRecord {
-  customer: { legalName: string; customerType: "INDIVIDUAL" | "CORPORATE" };
+  customer: { legalName: string; customerType: 'INDIVIDUAL' | 'CORPORATE' };
 }
 
 export interface ListKycRecordsFilter {
@@ -51,14 +51,14 @@ export interface ListKycRecordsFilter {
 }
 
 export const KYC_STATUS_LABEL: Record<KycStatus, string> = {
-  DRAFT: "Draft",
-  SUBMITTED: "Submitted",
-  SCREENING: "Screening",
-  EDD: "Enhanced due diligence",
-  COMPLIANCE_REVIEW: "Compliance review",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
-  PERIODIC_REVIEW_DUE: "Periodic review due",
+  DRAFT: 'Draft',
+  SUBMITTED: 'Submitted',
+  SCREENING: 'Screening',
+  EDD: 'Enhanced due diligence',
+  COMPLIANCE_REVIEW: 'Compliance review',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  PERIODIC_REVIEW_DUE: 'Periodic review due',
 };
 
 export function startKyc(customerId: string): Promise<KycRecord> {
@@ -119,10 +119,10 @@ export function listKycRecords(
   filter: ListKycRecordsFilter = {},
 ): Promise<KycQueueRecord[]> {
   const params = new URLSearchParams();
-  if (filter.status) params.set("status", filter.status);
-  if (filter.customerId) params.set("customerId", filter.customerId);
+  if (filter.status) params.set('status', filter.status);
+  if (filter.customerId) params.set('customerId', filter.customerId);
   const qs = params.toString();
-  return apiGet(`/kyc-records${qs ? `?${qs}` : ""}`);
+  return apiGet(`/kyc-records${qs ? `?${qs}` : ''}`);
 }
 
 export function getKycRecord(kycId: string): Promise<KycRecord> {
@@ -130,7 +130,7 @@ export function getKycRecord(kycId: string): Promise<KycRecord> {
 }
 
 /** Part B §17 — what is holding this file, and whether it can be released. */
-export type ScreeningHoldLevel = "NO_HOLD" | "REVIEW_REQUIRED" | "BLOCKED";
+export type ScreeningHoldLevel = 'NO_HOLD' | 'REVIEW_REQUIRED' | 'BLOCKED';
 
 export interface ScreeningHoldReason {
   condition: string;

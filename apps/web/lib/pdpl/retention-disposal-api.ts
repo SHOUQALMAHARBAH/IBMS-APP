@@ -15,11 +15,7 @@ export const DISPOSAL_METHODS = [
 ] as const;
 
 export type DisposalBatchStatus =
-  | 'NOMINATED'
-  | 'MANAGER_APPROVED'
-  | 'DPO_APPROVED'
-  | 'EXECUTED'
-  | 'CLOSED';
+  'NOMINATED' | 'MANAGER_APPROVED' | 'DPO_APPROVED' | 'EXECUTED' | 'CLOSED';
 
 export interface RetentionScheduleItem {
   id: string;
@@ -157,14 +153,17 @@ export function managerApproveDisposalBatch(
 }
 
 export function dpoApproveDisposalBatch(
-id: string,
+  id: string,
   /**
    * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
    * every ordinary two-person approval, which sends the same body it always did.
    */
   combinedDutyReason?: string,
 ): Promise<DisposalBatch> {
-  return apiPost(`/disposal-batches/${id}/dpo-approve`, combinedDutyReason ? { combinedDutyReason } : {});
+  return apiPost(
+    `/disposal-batches/${id}/dpo-approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 export function executeDisposalBatch(

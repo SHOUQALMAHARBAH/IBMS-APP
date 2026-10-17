@@ -236,7 +236,10 @@ export function revealCustomerField(
   return apiPost(`/customers/${id}/reveal-field`, { field, reason });
 }
 
-export function addUbo(customerId: string, input: CreateUboInput): Promise<Ubo> {
+export function addUbo(
+  customerId: string,
+  input: CreateUboInput,
+): Promise<Ubo> {
   return apiPost(`/customers/${customerId}/ubos`, input);
 }
 
@@ -251,7 +254,9 @@ export function addCustomerDocument(
   return apiPost(`/customers/${customerId}/documents`, input);
 }
 
-export function listCustomerDocuments(customerId: string): Promise<CustomerDocument[]> {
+export function listCustomerDocuments(
+  customerId: string,
+): Promise<CustomerDocument[]> {
   return apiGet(`/customers/${customerId}/documents`);
 }
 
@@ -306,7 +311,9 @@ export function updateCustomerContactDetails(
 
 /** At least one of the three fields carries a value — the service refuses an empty
  * correction with a 422, and a screen should not send one. */
-export function hasSomethingToCorrect(input: CustomerContactCorrection): boolean {
+export function hasSomethingToCorrect(
+  input: CustomerContactCorrection,
+): boolean {
   return [input.contactPhone, input.contactEmail, input.registeredAddress].some(
     (v) => (v ?? '').trim() !== '',
   );

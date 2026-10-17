@@ -202,10 +202,7 @@ export function refundIsPayable(
  * unreachability has a balance attached to it.
  */
 export function disburseRefund(refundId: string): Promise<{ paidAt: string }> {
-  return apiPost(
-    `/refunds/${encodeURIComponent(refundId)}/disburse`,
-    {},
-  );
+  return apiPost(`/refunds/${encodeURIComponent(refundId)}/disburse`, {});
 }
 
 export function notifyEndorsementClient(id: string): Promise<Endorsement> {

@@ -9,9 +9,9 @@
 // gates the DPO-approval step; everything else is under the `vendor.*` code for its action.
 
 import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
-import { apiGet, apiPatch, apiPost } from "../auth/api-client";
+import { apiGet, apiPatch, apiPost } from '../auth/api-client';
 
-export const RISK_TIERS = ["low", "medium", "high"] as const;
+export const RISK_TIERS = ['low', 'medium', 'high'] as const;
 export type RiskTier = (typeof RISK_TIERS)[number];
 
 export interface DataProcessingAgreement {
@@ -37,13 +37,13 @@ export interface DataShareReadiness {
 }
 
 export const VENDOR_TYPES = [
-  "insurer",
-  "reinsurer",
-  "loss_adjuster",
-  "it_cloud",
-  "printing_archiving",
-  "marketing_call_centre",
-  "other",
+  'insurer',
+  'reinsurer',
+  'loss_adjuster',
+  'it_cloud',
+  'printing_archiving',
+  'marketing_call_centre',
+  'other',
 ] as const;
 export type VendorType = (typeof VENDOR_TYPES)[number];
 
@@ -64,10 +64,10 @@ export function listVendors(
   search?: string,
 ): Promise<Vendor[]> {
   const params = new URLSearchParams();
-  if (vendorType) params.set("vendorType", vendorType);
-  if (search) params.set("search", search);
+  if (vendorType) params.set('vendorType', vendorType);
+  if (search) params.set('search', search);
   const qs = params.toString();
-  return apiGet(`/vendors${qs ? `?${qs}` : ""}`);
+  return apiGet(`/vendors${qs ? `?${qs}` : ''}`);
 }
 
 export function getVendor(id: string): Promise<Vendor> {
@@ -78,7 +78,7 @@ export function createVendor(input: {
   name: string;
   vendorType: VendorType;
 }): Promise<Vendor> {
-  return apiPost("/vendors", input);
+  return apiPost('/vendors', input);
 }
 
 export function updateVendor(

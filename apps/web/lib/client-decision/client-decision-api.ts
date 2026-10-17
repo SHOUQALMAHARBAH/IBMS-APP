@@ -23,8 +23,14 @@ export const DECISION_TYPE_OPTIONS: {
 }[] = [
   { value: 'ACCEPT', label: 'Accept as recommended' },
   { value: 'REJECT', label: 'Reject' },
-  { value: 'REQUEST_FURTHER_NEGOTIATION', label: 'Request further negotiation' },
-  { value: 'REQUEST_ALTERNATIVE_OPTIONS', label: 'Request alternative options' },
+  {
+    value: 'REQUEST_FURTHER_NEGOTIATION',
+    label: 'Request further negotiation',
+  },
+  {
+    value: 'REQUEST_ALTERNATIVE_OPTIONS',
+    label: 'Request alternative options',
+  },
   { value: 'REQUEST_PRICE_REDUCTION', label: 'Request price reduction' },
   { value: 'REQUEST_COVERAGE_INCREASE', label: 'Request coverage increase' },
 ];

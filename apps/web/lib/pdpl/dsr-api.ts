@@ -7,7 +7,12 @@
 import { apiGet, apiPost } from '../auth/api-client';
 import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
-export const DSR_TYPES = ['ACCESS', 'CORRECTION', 'DELETION', 'OBJECTION'] as const;
+export const DSR_TYPES = [
+  'ACCESS',
+  'CORRECTION',
+  'DELETION',
+  'OBJECTION',
+] as const;
 
 export type DsrType = 'ACCESS' | 'CORRECTION' | 'DELETION' | 'OBJECTION';
 
@@ -80,7 +85,8 @@ export function listDsrs(
   if (opts.insuredPersonId) params.set('insuredPersonId', opts.insuredPersonId);
   if (opts.status) params.set('status', opts.status);
   if (opts.type) params.set('type', opts.type);
-  if (opts.dpoHandlerUserId) params.set('dpoHandlerUserId', opts.dpoHandlerUserId);
+  if (opts.dpoHandlerUserId)
+    params.set('dpoHandlerUserId', opts.dpoHandlerUserId);
   const qs = params.toString();
   return apiGet(`/dsr${qs ? `?${qs}` : ''}`);
 }
@@ -124,24 +130,33 @@ export function fulfilDsr(
 
 export function partiallyFulfilDsr(
   id: string,
-  body: { retentionScheduleReference: string; partialFulfilmentJustification: string },
+  body: {
+    retentionScheduleReference: string;
+    partialFulfilmentJustification: string;
+  },
 ): Promise<DataSubjectRequest> {
   return apiPost(`/dsr/${id}/partially-fulfil`, body);
 }
 
-export function rejectDsr(id: string, reason: string): Promise<DataSubjectRequest> {
+export function rejectDsr(
+  id: string,
+  reason: string,
+): Promise<DataSubjectRequest> {
   return apiPost(`/dsr/${id}/reject`, { reason });
 }
 
 export function closeDsr(
-id: string,
+  id: string,
   /**
    * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
    * every ordinary two-person approval, which sends the same body it always did.
    */
   combinedDutyReason?: string,
 ): Promise<DataSubjectRequest> {
-  return apiPost(`/dsr/${id}/close`, combinedDutyReason ? { combinedDutyReason } : {});
+  return apiPost(
+    `/dsr/${id}/close`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 /*

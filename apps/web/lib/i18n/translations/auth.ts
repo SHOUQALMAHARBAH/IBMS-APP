@@ -41,7 +41,8 @@ export const AUTH = {
     authUnlockError: 'تعذّر إلغاء القفل — حاول مرة أخرى.',
     authSignOutInstead: 'تسجيل الخروج بدلاً من ذلك',
     authSessionLocked: 'الجلسة مقفلة',
-    authIdlePrompt: 'لم يُسجَّل أي نشاط منذ فترة. أعد إدخال كلمة المرور للمتابعة.',
+    authIdlePrompt:
+      'لم يُسجَّل أي نشاط منذ فترة. أعد إدخال كلمة المرور للمتابعة.',
 
     authResetHeading: 'إعادة تعيين كلمة المرور',
     authResetMissingToken: 'هذا الرابط ينقصه الرمز — اطلب رابطاً جديداً من',
@@ -65,7 +66,8 @@ export const AUTH = {
     authPasswordMismatch: 'كلمتا المرور غير متطابقتين.',
     authChangeSubmit: 'حفظ ومتابعة',
     authChangingButton: 'جارٍ الحفظ…',
-    authChangeMissingToken: 'انتهت صلاحية هذه الخطوة. سجّل الدخول مرة أخرى للبدء من جديد.',
+    authChangeMissingToken:
+      'انتهت صلاحية هذه الخطوة. سجّل الدخول مرة أخرى للبدء من جديد.',
   },
   EN: {
     authSignInHeading: 'Sign in',
@@ -102,17 +104,20 @@ export const AUTH = {
     authUnlockError: 'Could not unlock — try again.',
     authSignOutInstead: 'Sign out instead',
     authSessionLocked: 'Session locked',
-    authIdlePrompt: "You've been idle for a while. Re-enter your password to continue.",
+    authIdlePrompt:
+      "You've been idle for a while. Re-enter your password to continue.",
 
     authResetHeading: 'Reset password',
-    authResetMissingToken: 'This reset link is missing its token — request a new one from',
+    authResetMissingToken:
+      'This reset link is missing its token — request a new one from',
     authResetDone: 'Password updated — redirecting to sign in…',
     authNewPasswordLabel: 'New password',
     authResetting: 'Resetting…',
     authResetButton: 'Reset password',
     pwRequirementsLabel: 'Password requirements',
     pwRuleMinLength: 'At least 12 characters',
-    pwRuleMaxBytes: 'No more than 72 bytes — an Arabic letter takes more than one',
+    pwRuleMaxBytes:
+      'No more than 72 bytes — an Arabic letter takes more than one',
     pwRuleLowercase: 'A lowercase letter',
     pwRuleUppercase: 'An uppercase letter',
     pwRuleDigit: 'A digit',
@@ -126,6 +131,7 @@ export const AUTH = {
     authPasswordMismatch: 'The two passwords do not match.',
     authChangeSubmit: 'Save and continue',
     authChangingButton: 'Saving…',
-    authChangeMissingToken: 'This step has expired. Sign in again to start over.',
+    authChangeMissingToken:
+      'This step has expired. Sign in again to start over.',
   },
 } as const;

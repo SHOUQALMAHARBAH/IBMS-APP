@@ -49,7 +49,8 @@ export const EMAIL = {
     emailRedirectStateMismatch:
       'لا يطابق العنوان الملصق طلب الربط الذي بدأته من هذه الشاشة، فلم يُكمل الربط. ' +
       'ابدأ الربط من جديد وأتمّه في الجلسة نفسها.',
-    emailConnectedNotice: 'تم ربط صندوق البريد {address}. لم تُرسل أي رسالة بعد.',
+    emailConnectedNotice:
+      'تم ربط صندوق البريد {address}. لم تُرسل أي رسالة بعد.',
     emailConnectFailed: 'تعذر إتمام الربط.',
     emailAuthorizeFailed: 'تعذر إنشاء رابط موافقة المزوّد.',
     emailNotConfiguredOnDeployment:
@@ -69,7 +70,8 @@ export const EMAIL = {
     emailTestSendFailed: 'وصل الطلب إلى المزوّد ورفض الإرسال. {detail}',
     emailTestFailed: 'تعذر إرسال رسالة الاختبار.',
     emailRevokeButton: 'فصل الصندوق',
-    emailRevokedNotice: 'فُصل الصندوق. لن يُرسل النظام أي رسالة حتى يُربط صندوق من جديد.',
+    emailRevokedNotice:
+      'فُصل الصندوق. لن يُرسل النظام أي رسالة حتى يُربط صندوق من جديد.',
     emailRevokeFailed: 'تعذر فصل الصندوق.',
   },
   EN: {
@@ -114,7 +116,8 @@ export const EMAIL = {
     emailRedirectStateMismatch:
       'The address you pasted does not match the connection this screen started, so nothing was ' +
       'connected. Start connecting again and finish it in the same sitting.',
-    emailConnectedNotice: 'Mailbox {address} is connected. Nothing has been sent yet.',
+    emailConnectedNotice:
+      'Mailbox {address} is connected. Nothing has been sent yet.',
     emailConnectFailed: 'Could not finish connecting the mailbox.',
     emailAuthorizeFailed: "Could not build the provider's consent link.",
     emailNotConfiguredOnDeployment:
@@ -122,7 +125,8 @@ export const EMAIL = {
       'provider you chose. This is not something you can change from this screen — tell ' +
       'whoever runs the deployment.',
     emailVerifyButton: 'Verify the credential',
-    emailVerifyOk: 'Mailbox {address} is working and can send right now. {detail}',
+    emailVerifyOk:
+      'Mailbox {address} is working and can send right now. {detail}',
     emailVerifyNotOperational:
       'The mailbox is connected and cannot send right now. {detail} Connect it again if consent ' +
       'was withdrawn.',
@@ -131,11 +135,13 @@ export const EMAIL = {
     emailTestSent:
       "A test message was sent to your office's own mailbox ({address}). Open that mailbox to " +
       'see it. {detail}',
-    emailTestNotConfigured: 'No mailbox is connected, so there is nothing to send from.',
+    emailTestNotConfigured:
+      'No mailbox is connected, so there is nothing to send from.',
     emailTestCredentialRejected:
       'The provider rejected the credential, so nothing was sent. {detail} Connect the mailbox ' +
       'again to restore sending.',
-    emailTestSendFailed: 'The request reached the provider and it refused to send. {detail}',
+    emailTestSendFailed:
+      'The request reached the provider and it refused to send. {detail}',
     emailTestFailed: 'Could not send the test message.',
     emailRevokeButton: 'Disconnect the mailbox',
     emailRevokedNotice:

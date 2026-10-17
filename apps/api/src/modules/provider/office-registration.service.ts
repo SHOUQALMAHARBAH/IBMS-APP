@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 
+import { ensureDefaultOrgUnits } from '@ibms/db';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { TenantTransactionClient } from '../../prisma/tenant-scope.extension';
 import { OrgContextService } from '../../common/org-context/org-context.service';
@@ -286,6 +287,20 @@ export class OfficeRegistrationService {
           },
           select: { id: true, legalName: true, legalNameAr: true, code: true },
         });
+
+        /*
+         * ITEM 1 HALF B — the new organization gets a default Branch and Department.
+         *
+         * `provision-user.dto.ts` makes `departmentId` and `branchId` flatly required, so without
+         * these two rows this organization's own administrator meets two empty mandatory dropdowns
+         * on day one and cannot create a single user. MEASURED, not predicted: the 2026-10-17
+         * `seed:demo` run created 1298 rows with ZERO branches and ZERO departments.
+         *
+         * INSIDE THE TRANSACTION, deliberately — created outside it the defaults would survive a
+         * registration that rolled back, leaving two rows pointing at an organization that does not
+         * exist.
+         */
+        await ensureDefaultOrgUnits(tx, organization.id);
 
         /*
          * THE CERTIFICATE IS A `Document`, and `BrokerLicense.certificateDocumentId` is NOT NULL —

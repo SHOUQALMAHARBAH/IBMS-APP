@@ -45,9 +45,12 @@ describe('translatePlural — category selection', () => {
     [100, '100 invoices'],
   ];
 
-  it.each(ENGLISH_CASES)('English selects the right form for %i', (count, expected) => {
-    expect(translatePlural('EN', 'frInvoiceCount', count)).toBe(expected);
-  });
+  it.each(ENGLISH_CASES)(
+    'English selects the right form for %i',
+    (count, expected) => {
+      expect(translatePlural('EN', 'frInvoiceCount', count)).toBe(expected);
+    },
+  );
 
   it('English is not tripped by the categories it does not have', () => {
     // 2 is `two` in Arabic and `other` in English; 3 is `few` vs `other`.

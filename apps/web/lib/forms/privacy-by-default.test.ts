@@ -28,19 +28,17 @@ describe('assertNoPresetSensitiveDefaults', () => {
 
   it('rejects a pre-filled sensitive field', () => {
     expect(() =>
-      assertNoPresetSensitiveDefaults(
-        { nationalId: '9871234567' },
-        ['nationalId'],
-      ),
+      assertNoPresetSensitiveDefaults({ nationalId: '9871234567' }, [
+        'nationalId',
+      ]),
     ).toThrow(/nationalId/);
   });
 
   it('rejects a pre-selected sensitive field with a non-empty array', () => {
     expect(() =>
-      assertNoPresetSensitiveDefaults(
-        { diagnoses: ['diabetes'] },
-        ['diagnoses'],
-      ),
+      assertNoPresetSensitiveDefaults({ diagnoses: ['diabetes'] }, [
+        'diagnoses',
+      ]),
     ).toThrow(/diagnoses/);
   });
 

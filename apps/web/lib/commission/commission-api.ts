@@ -89,7 +89,9 @@ export function listCommissionEntriesForPolicy(
   return apiGet(`/commission/entries?policyId=${encodeURIComponent(policyId)}`);
 }
 
-export function calculateCommission(policyId: string): Promise<CommissionEntry> {
+export function calculateCommission(
+  policyId: string,
+): Promise<CommissionEntry> {
   return apiPost('/commission/entries', { policyId });
 }
 
@@ -101,7 +103,6 @@ export function raiseCommissionOverride(
 }
 
 export function approveCommissionOverride(
-
   entryId: string,
   /**
    * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
@@ -109,7 +110,10 @@ export function approveCommissionOverride(
    */
   combinedDutyReason?: string,
 ): Promise<CommissionEntry> {
-  return apiPost(`/commission/entries/${entryId}/override/approve`, combinedDutyReason ? { combinedDutyReason } : {});
+  return apiPost(
+    `/commission/entries/${entryId}/override/approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 /** Process 36 — reconcile the entry against an insurer statement and mark it

@@ -1,14 +1,14 @@
-import type { CombinedDutyActOnRecord } from "../../components/ui/CombinedDutyOnRecord";
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 // Process 5 — Needs Assessment. Talks to apps/api's needs-assessment module
 // (needs-assessment.controller.ts). Mirrors lib/prospect/prospect-api.ts's
 // conventions (thin typed wrappers over apiGet/apiPost/apiPatch).
 
-import { apiGet, apiPatch, apiPost } from "../auth/api-client";
+import { apiGet, apiPatch, apiPost } from '../auth/api-client';
 
 export type NeedsAssessmentStatus =
-  "DRAFT" | "PENDING_REVIEW" | "REVIEWED" | "APPROVED" | "REJECTED";
+  'DRAFT' | 'PENDING_REVIEW' | 'REVIEWED' | 'APPROVED' | 'REJECTED';
 
-export type QuestionType = "boolean" | "number";
+export type QuestionType = 'boolean' | 'number';
 
 export interface NeedsAssessmentQuestion {
   id: string;
@@ -55,24 +55,24 @@ export interface ListNeedsAssessmentsFilter {
 }
 
 export function getQuestionnaire(): Promise<Questionnaire> {
-  return apiGet("/needs-assessments/questionnaire");
+  return apiGet('/needs-assessments/questionnaire');
 }
 
 export function createNeedsAssessment(input: {
   riskProfileId: string;
   questionnaireAnswers: Record<string, boolean | number>;
 }): Promise<NeedsAssessment> {
-  return apiPost("/needs-assessments", input);
+  return apiPost('/needs-assessments', input);
 }
 
 export function listNeedsAssessments(
   filter: ListNeedsAssessmentsFilter = {},
 ): Promise<NeedsAssessment[]> {
   const params = new URLSearchParams();
-  if (filter.riskProfileId) params.set("riskProfileId", filter.riskProfileId);
-  if (filter.status) params.set("status", filter.status);
+  if (filter.riskProfileId) params.set('riskProfileId', filter.riskProfileId);
+  if (filter.status) params.set('status', filter.status);
   const qs = params.toString();
-  return apiGet(`/needs-assessments${qs ? `?${qs}` : ""}`);
+  return apiGet(`/needs-assessments${qs ? `?${qs}` : ''}`);
 }
 
 export function getNeedsAssessment(id: string): Promise<NeedsAssessment> {

@@ -25,7 +25,8 @@ export type IncidentStatus =
   | 'RECOVERED'
   | 'CLOSED';
 
-export type DpiaOutcome = 'AUTO_APPROVED' | 'DPO_REVIEW_REQUIRED' | 'ESCALATED_FULL_DPIA';
+export type DpiaOutcome =
+  'AUTO_APPROVED' | 'DPO_REVIEW_REQUIRED' | 'ESCALATED_FULL_DPIA';
 
 export interface DsrQueueItem {
   id: string;
@@ -62,7 +63,11 @@ export interface CrossBorderTransferRegisterItem {
 
 export interface DpoWorkspaceSummary {
   generatedAt: string;
-  consentStatus: { activeCount: number; withdrawnCount: number; declinedCount: number };
+  consentStatus: {
+    activeCount: number;
+    withdrawnCount: number;
+    declinedCount: number;
+  };
   dsrQueue: DsrQueueItem[];
   incidentRegister: IncidentRegisterItem[];
   dpiaRegister: DpiaRegisterItem[];

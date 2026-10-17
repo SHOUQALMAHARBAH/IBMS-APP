@@ -1,117 +1,108 @@
 {
   "_why": [
-    "DECLARED, NOT ACCEPTED. Each row is a (screen, role, route) triple where a holder of that",
-    "role can open that screen and a GET it needs refuses - so the page renders empty.",
+    "DECLARED, NOT ACCEPTED — and every row now carries the owner's DECISION, which is item 10.",
     "",
-    "This file exists so the GATE can be switched on today. Nineteen of these were found by the",
-    "first run of screen-route-permission-fit.py, and every one is a decision the OWNER has to",
-    "make: some are routes gated on the wrong permission and want widening, and some are correct",
-    "refusals that want DECLARING on screen. Neither is a thing to choose on her behalf, and a",
-    "gate that went red on all nineteen would be a permanently red build nobody reads - the",
-    "MISSING_DESCRIPTION_BUDGET lesson, applied one more time.",
+    "Each row is a (screen, role, route) triple where a holder of that role can open that screen",
+    "and a GET it needs refuses, so the page renders empty. The gate",
+    "`screen-route-permission-fit.py --check` fails on any triple absent from this list AND on any",
+    "triple here that no longer occurs, so the list can be neither a ceiling nor a graveyard.",
     "",
-    "IT IS A SET AND NOT A COUNT, deliberately: a count survives a substitution, so nineteen",
-    "could become nineteen different mismatches and the gate would stay quiet. The check fails on",
-    "any triple absent from this list AND on any triple here that no longer occurs, so the list",
-    "cannot rot and cannot be used as a ceiling.",
+    "IT IS A SET AND NOT A COUNT, deliberately: a count survives a substitution, so fourteen could",
+    "become fourteen different mismatches and the gate would stay quiet.",
     "",
-    "REMOVE a row when the mismatch is fixed. Never ADD one without the owner's decision."
+    "REMOVE a row when its decision is BUILT. Never ADD one without an owner decision recorded in",
+    "the `decision` field. When the file is empty, delete it and make the check fail on ANY",
+    "mismatch — the owner's instruction.",
+    "",
+    "Nineteen rows were declared on 2026-10-16. Five were closed on 2026-10-17 by items 1, 3 and 6:",
+    "the two `/settings/users` PLATFORM_OPERATOR rows, the two `/settings/roles` rows and",
+    "`/commission`. `/rfqs/new` and `/rfqs` left the measurement entirely when item 6 installed",
+    "their screen gates."
   ],
   "declared": [
     {
-      "screen": "/commission",
-      "role": "FINANCE_COLLECTIONS_OFFICER",
-      "route": "GET /insurance-lines"
-    },
-    {
       "screen": "/employees",
       "role": "BRANCH_DEPARTMENT_MANAGER",
-      "route": "GET /rbac/roles"
+      "route": "GET /rbac/roles",
+      "decision": "ITEM 5 — DECLARE, not widen. Owner, 2026-10-17: changing people's roles is not a branch manager's act, so the refusal is correct. The role field is to be hidden for that role with the reason named on screen in both languages. Do NOT grant `role.read`. NOT YET BUILT."
     },
     {
       "screen": "/employees/[id]",
       "role": "BRANCH_DEPARTMENT_MANAGER",
-      "route": "GET /rbac/roles"
+      "route": "GET /rbac/roles",
+      "decision": "ITEM 5 — DECLARE. The same decision as `/employees`. NOT YET BUILT."
     },
     {
       "screen": "/insurers/new",
       "role": "COMPLIANCE_OFFICER",
-      "route": "GET /insurer-masters"
+      "route": "GET /insurer-masters",
+      "decision": "ITEM 2 — TWO DIFFERENT MOVES ON ONE ROUTE, which is why both rows are still here. OFFICE_ADMINISTRATOR: WIDEN — the master catalogue is a GLOBAL vocabulary describing the software, so reading it discloses nothing, and the role that registers an insurer must be able to read what it registers from. Decided set: the current holders (SALES, PLACEMENT, MANAGER, EXEC, AUDITOR) plus OFFICE_ADMINISTRATOR and nobody else. COMPLIANCE_OFFICER: CLOSE THE DOOR — the compliance officer does not register insurers; the defect is that the screen is reachable. Remove `/insurers/new` from that role's nav and drop this row. BOTH NOT YET BUILT."
     },
     {
       "screen": "/insurers/new",
       "role": "OFFICE_ADMINISTRATOR",
-      "route": "GET /insurer-masters"
+      "route": "GET /insurer-masters",
+      "decision": "ITEM 2 — TWO DIFFERENT MOVES ON ONE ROUTE, which is why both rows are still here. OFFICE_ADMINISTRATOR: WIDEN — the master catalogue is a GLOBAL vocabulary describing the software, so reading it discloses nothing, and the role that registers an insurer must be able to read what it registers from. Decided set: the current holders (SALES, PLACEMENT, MANAGER, EXEC, AUDITOR) plus OFFICE_ADMINISTRATOR and nobody else. COMPLIANCE_OFFICER: CLOSE THE DOOR — the compliance officer does not register insurers; the defect is that the screen is reachable. Remove `/insurers/new` from that role's nav and drop this row. BOTH NOT YET BUILT."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "CLAIMS_OFFICER",
-      "route": "GET /rfqs/*"
+      "route": "GET /rfqs/*",
+      "decision": "ITEM 4 — WIDEN. Owner reversed the recommendation to close the door, and her reasoning stands: a claims officer assessing a claim must read the request history that produced the policy; a compliance officer examines whether the disclosure duty was met; a DPO cannot assemble a subject access request from a record he cannot read. Decided set: SALES, PLACEMENT, MANAGER, EXEC (unchanged) + CLAIMS, COMPLIANCE, DPO, and specifically NOT SYSTEM_SECURITY_ADMINISTRATOR. NOT YET BUILT — and it carries a NEW REQUIREMENT that is part of the decision: every read by a role outside the placement path is AUDITED (actor, the role the read came under, the RFQ id, the time), because in an office that declared its duties MERGED one person may hold both hats and the log is then the only thing that makes the read answerable. Measured: there is NO read-logging precedent in this codebase, so that is new ground and its write volume is to be measured before it is committed."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "CLAIMS_OFFICER",
-      "route": "GET /rfqs/*/communications"
+      "route": "GET /rfqs/*/communications",
+      "decision": "ITEM 4 — WIDEN, same decided set and same audit requirement as `GET /rfqs/*`. The correspondence with the insurer is where what was disclosed and what was not is recorded, which is the half that makes a claim assessable. NOT YET BUILT."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "CLAIMS_OFFICER",
-      "route": "GET /rfqs/selectable-insurers"
+      "route": "GET /rfqs/selectable-insurers",
+      "decision": "ITEM 4 — DECLARE, and deliberately NOT widened. This list exists to ADD an insurer to an RFQ, and all three roles are already refused `POST /rfqs/:id/insurers` — so the section is to be hidden with a named reason. A control that cannot be used is not a control to show. NOT YET BUILT."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "COMPLIANCE_OFFICER",
-      "route": "GET /rfqs/*"
+      "route": "GET /rfqs/*",
+      "decision": "ITEM 4 — WIDEN. Owner reversed the recommendation to close the door, and her reasoning stands: a claims officer assessing a claim must read the request history that produced the policy; a compliance officer examines whether the disclosure duty was met; a DPO cannot assemble a subject access request from a record he cannot read. Decided set: SALES, PLACEMENT, MANAGER, EXEC (unchanged) + CLAIMS, COMPLIANCE, DPO, and specifically NOT SYSTEM_SECURITY_ADMINISTRATOR. NOT YET BUILT — and it carries a NEW REQUIREMENT that is part of the decision: every read by a role outside the placement path is AUDITED (actor, the role the read came under, the RFQ id, the time), because in an office that declared its duties MERGED one person may hold both hats and the log is then the only thing that makes the read answerable. Measured: there is NO read-logging precedent in this codebase, so that is new ground and its write volume is to be measured before it is committed."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "COMPLIANCE_OFFICER",
-      "route": "GET /rfqs/*/communications"
+      "route": "GET /rfqs/*/communications",
+      "decision": "ITEM 4 — WIDEN, same decided set and same audit requirement as `GET /rfqs/*`. The correspondence with the insurer is where what was disclosed and what was not is recorded, which is the half that makes a claim assessable. NOT YET BUILT."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "DATA_PROTECTION_OFFICER",
-      "route": "GET /rfqs/*"
+      "route": "GET /rfqs/*",
+      "decision": "ITEM 4 — WIDEN. Owner reversed the recommendation to close the door, and her reasoning stands: a claims officer assessing a claim must read the request history that produced the policy; a compliance officer examines whether the disclosure duty was met; a DPO cannot assemble a subject access request from a record he cannot read. Decided set: SALES, PLACEMENT, MANAGER, EXEC (unchanged) + CLAIMS, COMPLIANCE, DPO, and specifically NOT SYSTEM_SECURITY_ADMINISTRATOR. NOT YET BUILT — and it carries a NEW REQUIREMENT that is part of the decision: every read by a role outside the placement path is AUDITED (actor, the role the read came under, the RFQ id, the time), because in an office that declared its duties MERGED one person may hold both hats and the log is then the only thing that makes the read answerable. Measured: there is NO read-logging precedent in this codebase, so that is new ground and its write volume is to be measured before it is committed."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "DATA_PROTECTION_OFFICER",
-      "route": "GET /rfqs/*/communications"
+      "route": "GET /rfqs/*/communications",
+      "decision": "ITEM 4 — WIDEN, same decided set and same audit requirement as `GET /rfqs/*`. The correspondence with the insurer is where what was disclosed and what was not is recorded, which is the half that makes a claim assessable. NOT YET BUILT."
     },
     {
       "screen": "/rfqs/[id]",
       "role": "DATA_PROTECTION_OFFICER",
-      "route": "GET /rfqs/selectable-insurers"
-    },
-    {
-      "screen": "/settings/roles",
-      "role": "INSURANCE_COMPANY_ADMINISTRATOR",
-      "route": "GET /insurance-lines"
-    },
-    {
-      "screen": "/settings/roles",
-      "role": "SYSTEM_SECURITY_ADMINISTRATOR",
-      "route": "GET /insurance-lines"
+      "route": "GET /rfqs/selectable-insurers",
+      "decision": "ITEM 4 — DECLARE, and deliberately NOT widened. This list exists to ADD an insurer to an RFQ, and all three roles are already refused `POST /rfqs/:id/insurers` — so the section is to be hidden with a named reason. A control that cannot be used is not a control to show. NOT YET BUILT."
     },
     {
       "screen": "/settings/users",
       "role": "INSURANCE_COMPANY_ADMINISTRATOR",
-      "route": "GET /admin/branches"
+      "route": "GET /admin/branches",
+      "decision": "RAISED TO THE OWNER, NOT DECIDED. Item 1 half A's decided set is four roles and does not include INSURANCE_COMPANY_ADMINISTRATOR, so this row is left refused — but that role is in the IDENTICAL deadlock: it holds `user.manage`, faces the same two mandatory fields, and cannot populate them. PROVEN while choosing item 1's code: the company administrator's six codes are a strict SUBSET of the provider's eleven, so no code shared with an office role can separate the two — only a `provider.*` code can, which is why `provider.office.administrator.invite` was named and why this role did not come with it. Whether a company administrator should administer its company's users is the owner's call."
     },
     {
       "screen": "/settings/users",
       "role": "INSURANCE_COMPANY_ADMINISTRATOR",
-      "route": "GET /admin/departments"
-    },
-    {
-      "screen": "/settings/users",
-      "role": "PLATFORM_OPERATOR",
-      "route": "GET /admin/branches"
-    },
-    {
-      "screen": "/settings/users",
-      "role": "PLATFORM_OPERATOR",
-      "route": "GET /admin/departments"
+      "route": "GET /admin/departments",
+      "decision": "RAISED TO THE OWNER, NOT DECIDED — the same question as `GET /admin/branches` above."
     }
   ]
 }

@@ -151,7 +151,8 @@ export function listInsurers(
   if (opts.search) params.set('search', opts.search);
   // Sent only when set: the API treats an ABSENT filter as "both", and `String(false)` would
   // silently mean "inactive only". The distinction matters because the default view is both.
-  if (opts.isActive !== undefined) params.set('isActive', String(opts.isActive));
+  if (opts.isActive !== undefined)
+    params.set('isActive', String(opts.isActive));
   if (opts.page !== undefined) params.set('page', String(opts.page));
   const query = params.toString();
   return apiGet(`/insurers${query ? `?${query}` : ''}`);

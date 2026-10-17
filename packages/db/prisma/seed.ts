@@ -52,6 +52,7 @@ import {
   REGULATORY_ACTION_BASIS_DESCRIPTIONS,
   REGULATORY_ACTION_KIND_DESCRIPTIONS,
 } from "./seed-data/enum-descriptions";
+import { ensureDefaultOrgUnits } from "../src/default-org-units";
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
 import { validatePasswordPolicy } from "../src/password-policy";
 import { SAMPLE_INSURERS } from "./seed-data/insurers";
@@ -135,6 +136,13 @@ async function ensureDefaultOrganization(): Promise<void> {
       brokerKind: "CORPORATE",
     },
   });
+
+  /*
+   * ITEM 1 HALF B, for the default office — the same reason as the provider. This office is created
+   * by the seed rather than by the registration route, so it never passes through
+   * `office-registration.service.ts`. Unconditional and idempotent by count, like the provider's.
+   */
+  await ensureDefaultOrgUnits(prisma, DEFAULT_ORGANIZATION_ID);
   console.log("Seeded the default organization.");
 }
 
@@ -183,6 +191,7 @@ async function ensureProviderOrganization(): Promise<void> {
         brokerKind: null,
       },
     });
+
   }
 
   /*
@@ -327,6 +336,22 @@ async function ensureProviderOrganization(): Promise<void> {
   console.log(
     `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (${PROVIDER_CODES.length} permissions: ${expectedCodes.join(", ")}).`,
   );
+  /*
+   * ITEM 1 HALF B — the provider gets a default Branch and Department like every other organization.
+   *
+   * `provision-user.dto.ts` makes both flatly required, so without these rows the provider's own
+   * `/settings/users` meets two empty mandatory dropdowns and cannot create a single user. That is
+   * the deadlock item 1 is about, and the provider meets it first because on a fresh database it is
+   * one of only two organizations that exist.
+   *
+   * OUTSIDE the `!existing` branch, and that placement is a correction worth keeping: the first
+   * version sat inside it, so an ALREADY-SEEDED database never got the rows — which is every
+   * database that matters, including the owner's dev. Measured: a re-seed of db-test created nothing
+   * and the provider still had zero of each. `ensureDefaultOrgUnits` is idempotent by COUNT, so
+   * running it unconditionally creates the defaults exactly where there are none and leaves a
+   * renamed or retired structure alone.
+   */
+  await ensureDefaultOrgUnits(prisma, PROVIDER_ORGANIZATION_ID);
 }
 
 /**

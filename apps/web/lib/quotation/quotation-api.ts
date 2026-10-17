@@ -99,9 +99,7 @@ export interface ReviseQuotationInput extends QuotationTermsInput {
   negotiationNotes?: string;
 }
 
-export function listQuotationsForRfq(
-  rfqId: string,
-): Promise<QuotationChain[]> {
+export function listQuotationsForRfq(rfqId: string): Promise<QuotationChain[]> {
   return apiGet(`/quotations?rfqId=${encodeURIComponent(rfqId)}`);
 }
 

@@ -303,10 +303,9 @@ export function decideClaimAssessment(
   claimId: string,
   outcome: ClaimAssessmentOutcome,
 ): Promise<Claim> {
-  return apiPost(
-    `/claims/${encodeURIComponent(claimId)}/assessment/decision`,
-    { outcome },
-  );
+  return apiPost(`/claims/${encodeURIComponent(claimId)}/assessment/decision`, {
+    outcome,
+  });
 }
 
 /** Process 27 — run the insurer non-response follow-up sweep now (otherwise
@@ -336,10 +335,7 @@ export function recordClaimSettlement(
   claimId: string,
   input: RecordSettlementInput,
 ): Promise<Claim> {
-  return apiPost(
-    `/claims/${encodeURIComponent(claimId)}/settlement`,
-    input,
-  );
+  return apiPost(`/claims/${encodeURIComponent(claimId)}/settlement`, input);
 }
 
 /** Process 28 — the mandatory second approval (never the first approver). */

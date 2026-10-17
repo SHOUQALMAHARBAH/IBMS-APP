@@ -8,8 +8,11 @@ import {
   createUserInOrganization,
   bearerHeader,
 } from './utils/provider-user';
-import { rawPrisma } from './tenant-prisma';
+import { deleteOrganizationCascade, rawPrisma } from './tenant-prisma';
 import { OFFICE_ADMINISTRATOR_GRANTS } from '../src/modules/provider/office-administrator-grants';
+import { OrgContextService } from '../src/common/org-context/org-context.service';
+import { UserAdminService } from '../src/modules/rbac/services/user-admin.service';
+import { DEFAULT_BRANCH, DEFAULT_DEPARTMENT } from '@ibms/db';
 
 /**
  * MODULE 0-ب ITEM (d) — REGISTERING A BROKERAGE OFFICE, over real HTTP.
@@ -193,7 +196,8 @@ async function deleteOffice(organizationId: string) {
   });
   await rawPrisma.rolePermission.deleteMany({ where: { organizationId } });
   await rawPrisma.role.deleteMany({ where: { organizationId } });
-  await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
+  // Branch and Department now BLOCK this delete — see `deleteOrganizationCascade`.
+  await deleteOrganizationCascade(organizationId);
 }
 
 beforeAll(async () => {
@@ -1033,4 +1037,143 @@ describe('decision 88 — the two art. 10/a documents do NOT block a save', () =
       'an incomplete pack withheld the administrator role',
     ).toBeTruthy();
   }, 180_000);
+});
+
+describe('ITEM 1 HALF B — a newly registered office can provision its FIRST user', () => {
+  /*
+   * THE EVIDENCE THE OWNER ASKED FOR, in her words: "a test that provisions a user in an
+   * organization created by the normal registration path, with no manual branch/department setup,
+   * and a negative assertion that the two lists are non-empty on first load."
+   *
+   * ## WHAT WAS WRONG, AND WHY NO PERMISSION CHANGE COULD FIX IT
+   *
+   * `provision-user.dto.ts` makes `departmentId` and `branchId` FLATLY REQUIRED. A newly registered
+   * office could not create its first user — not because its administrator lacked a code (it holds
+   * `branch.read` and `department.read`) but because the lists were EMPTY. Measured rather than
+   * predicted: the owner's 2026-10-17 `seed:demo` run produced 1298 rows with ZERO Branch and ZERO
+   * Department rows.
+   *
+   * ## WHY THIS SIGNS NOBODY IN
+   *
+   * Authenticating inside a registered organization writes append-only `AuditLogEntry` rows into that
+   * tenant, whose FK is `ON DELETE RESTRICT` behind a trigger that refuses DELETE outright — so one
+   * login makes the organization PERMANENT and this cumulative suite would gain an office per run.
+   * Two were stranded proving exactly that in item (d). The provisioning therefore goes through the
+   * SERVICE inside `orgContext.runAs`, which `last-administrator-lock.e2e-spec.ts` establishes as the
+   * same code path a request takes once `JwtStrategy` has settled the office.
+   *
+   * ## THE ASSERTIONS ARE EXACT, NOT TOLERANT
+   *
+   * `toHaveLength(1)` rather than `toBeGreaterThan(0)`: the defect was EMPTINESS, and a tolerant
+   * assertion cannot see a bootstrap that half ran or one that ran twice. And the provisioning uses
+   * the ids THOSE LISTS RETURNED, not ids this test created — a branch created by the test would
+   * prove the DTO accepts one and say nothing about whether a real office has anything to offer.
+   */
+  let officeId: string;
+
+  beforeAll(async () => {
+    const res = await register(validOffice());
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    officeId = (res.body as RegistrationBody).id;
+  }, 300_000);
+
+  it('has EXACTLY one default branch and one default department, created by registration', async () => {
+    const [branches, departments] = await Promise.all([
+      rawPrisma.branch.findMany({
+        where: { organizationId: officeId },
+        select: { name: true, nameAr: true },
+      }),
+      rawPrisma.department.findMany({
+        where: { organizationId: officeId },
+        select: { name: true, nameAr: true },
+      }),
+    ]);
+    expect(branches).toHaveLength(1);
+    expect(departments).toHaveLength(1);
+    /*
+     * Against the exported constants rather than against literals, so the names have one home. And
+     * the ARABIC is asserted because this is an Arabic-first product: a default with no `nameAr`
+     * renders blank in the language the office actually uses, which is the same half-delivered shape
+     * as a description that reaches no screen.
+     */
+    expect(branches[0].name).toBe(DEFAULT_BRANCH.name);
+    expect(branches[0].nameAr).toBe(DEFAULT_BRANCH.nameAr);
+    expect(departments[0].name).toBe(DEFAULT_DEPARTMENT.name);
+    expect(departments[0].nameAr).toBe(DEFAULT_DEPARTMENT.nameAr);
+  }, 300_000);
+
+  it('provisions a user with NO manual setup, in the PROVIDER organization', async () => {
+    /*
+     * THE PROVISIONING HALF RUNS IN THE PROVIDER, NOT IN THE OFFICE REGISTERED ABOVE, and the reason
+     * is this file's own guard rather than a preference.
+     *
+     * `provision` writes an `AuditLogEntry` into the acting organization. That table's
+     * `organizationId` FK is `ON DELETE RESTRICT` behind a trigger that refuses DELETE outright, so
+     * ONE audit row makes an organization permanently undeletable — and this file asserts, by name,
+     * that a registered office carries ZERO audit rows precisely so a later spec does not meet a
+     * `createTestApp` failure that looks like its own fault. The first version of this test
+     * provisioned into the registered office and that guard caught it, correctly; the office had to
+     * be unstranded by hand.
+     *
+     * The PROVIDER is the right place for three reasons, not one: it is created by the SEED's
+     * bootstrap, which is the other half of item 1 half B; it is permanent by design, so an audit row
+     * there costs nothing and provider users already accumulate across runs by existing practice
+     * (`createProviderUser` does the same); and it is the exact organization whose deadlock the owner
+     * reported — she could not create a user as the provider.
+     *
+     * WHAT THIS SPLIT DOES NOT PROVE, stated rather than implied: that a REGISTERED office can
+     * provision a user end to end in one act. Proving that in one organization would require either a
+     * permanent fixture office or disabling an append-only guarantee, and both are the owner's
+     * decision rather than mine. What the test above proves is that registration creates the two
+     * rows; what this proves is that an organization holding those rows can provision with them.
+     */
+    const orgContext = app.get(OrgContextService);
+    const users = app.get(UserAdminService);
+    const providerId = operator.organizationId;
+
+    const [branch, department, role] = await Promise.all([
+      rawPrisma.branch.findFirstOrThrow({
+        where: { organizationId: providerId },
+        select: { id: true, name: true },
+      }),
+      rawPrisma.department.findFirstOrThrow({
+        where: { organizationId: providerId },
+        select: { id: true, name: true },
+      }),
+      rawPrisma.role.findFirstOrThrow({
+        where: { organizationId: providerId },
+        select: { id: true },
+      }),
+    ]);
+    // The ids come from the BOOTSTRAP's rows, not from rows this test created — using its own would
+    // prove the DTO accepts two ids and say nothing about whether a real organization has any.
+    expect(branch.name).toBe(DEFAULT_BRANCH.name);
+    expect(department.name).toBe(DEFAULT_DEPARTMENT.name);
+
+    const email = `boot-first-user-${Date.now()}@ibms.test`;
+    await orgContext.runAs(providerId, () =>
+      users.provision(
+        {
+          email,
+          // REQUIRED for an account with no person record behind it, and the service says why: it is
+          // what every audit row of this account will be read by.
+          fullName: 'Provider First User',
+          password: 'FirstUser#2026!aA',
+          departmentId: department.id,
+          branchId: branch.id,
+          roleIds: [role.id],
+        },
+        operator.userId,
+      ),
+    );
+
+    const row = await rawPrisma.user.findFirstOrThrow({
+      where: { organizationId: providerId, email },
+      select: { branchId: true, departmentId: true },
+    });
+    // The two ids actually LANDED. A provisioning that stored nulls would satisfy a "did it return"
+    // assertion, and being recorded is the whole purpose of the two fields.
+    expect(row.branchId).toBe(branch.id);
+    expect(row.departmentId).toBe(department.id);
+  }, 300_000);
 });

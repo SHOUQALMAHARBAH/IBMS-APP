@@ -23,10 +23,7 @@ import { apiGet, apiPost } from '../auth/api-client';
 export type EmailProviderKind = 'MICROSOFT365' | 'GOOGLE_WORKSPACE';
 
 export type EmailSendOutcome =
-  | 'SENT'
-  | 'NOT_CONFIGURED'
-  | 'CREDENTIAL_REJECTED'
-  | 'SEND_FAILED';
+  'SENT' | 'NOT_CONFIGURED' | 'CREDENTIAL_REJECTED' | 'SEND_FAILED';
 
 /** `GET /admin/email-integration`. Every field null when no mailbox is connected. */
 export interface EmailIntegrationStatus {

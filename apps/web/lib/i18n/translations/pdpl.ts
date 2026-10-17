@@ -59,7 +59,8 @@ export const PDPL = {
     consNone: 'لا توجد سجلات موافقة بعد.',
     consLoadError: 'تعذّر تحميل سجلات الموافقة — حاول مرة أخرى.',
     consSubmitError: 'تعذّر حفظ القرار — حاول مرة أخرى.',
-    consWithdrawalLogged: 'سُجِّل طلب سحب الموافقة — يجب تحديث السجل قبل {due}.',
+    consWithdrawalLogged:
+      'سُجِّل طلب سحب الموافقة — يجب تحديث السجل قبل {due}.',
     consWithdrawalSlaDeadline: 'الموعد النهائي المقرَّر',
     consRequestError: 'تعذّر تنفيذ الطلب — حاول مرة أخرى.',
     consWithdrawError: 'تعذّر تنفيذ السحب — حاول مرة أخرى.',
@@ -339,7 +340,8 @@ export const PDPL = {
     dpowColOutcome: 'النتيجة',
     dpowColReviewDue: 'استحقاق المراجعة',
     dpowLoading: 'جارٍ التحميل…',
-    dpowLoadError: 'تعذّر تحميل مساحة عمل مسؤول حماية البيانات — حاول مرة أخرى.',
+    dpowLoadError:
+      'تعذّر تحميل مساحة عمل مسؤول حماية البيانات — حاول مرة أخرى.',
     dpowOverdueBy: 'متأخِّر بـ {days} يومًا',
     dpowConsentActive: 'سارية:',
     dpowConsentWithdrawn: 'مسحوبة:',
@@ -387,7 +389,8 @@ export const PDPL = {
     consNone: 'No consent records.',
     consLoadError: 'Could not load consent records — try again.',
     consSubmitError: 'The submit failed — try again.',
-    consWithdrawalLogged: 'Withdrawal request logged — reflect it in the register by {due}.',
+    consWithdrawalLogged:
+      'Withdrawal request logged — reflect it in the register by {due}.',
     consWithdrawalSlaDeadline: 'the SLA deadline',
     consRequestError: 'The request failed — try again.',
     consWithdrawError: 'The withdrawal failed — try again.',
@@ -529,7 +532,8 @@ export const PDPL = {
     cbtColTransferredAt: 'Transferred at',
     cbtLoading: 'Loading…',
     cbtNone: 'No cross-border transfers logged yet.',
-    cbtLoadError: 'Could not load the cross-border transfer register — try again.',
+    cbtLoadError:
+      'Could not load the cross-border transfer register — try again.',
     cbtActionError: 'That action failed — try again.',
     cbtRefusalAct: 'approve sending personal data outside Jordan',
 

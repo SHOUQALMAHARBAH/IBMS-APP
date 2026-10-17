@@ -68,7 +68,8 @@ export const PROVIDER = {
     regOfficePackMissingIntro: 'الناقص:',
     regOfficePackNotHeld: 'هذه الوثيقة غير محفوظة في النظام',
     regOfficePackPremisesTenure: 'عقد الإيجار أو سند الملكية',
-    regOfficePackAssociation: 'إثبات الانتساب إلى الجمعية الأردنية لوسطاء التأمين',
+    regOfficePackAssociation:
+      'إثبات الانتساب إلى الجمعية الأردنية لوسطاء التأمين',
     regOfficePackScope:
       'هذا بيانٌ عمّا يُسجّله النظام، لا حُكمٌ على المكتب. والمكتبُ المرخَّص من البنك المركزي قد قدّم هذه الوثائق إلى الجهة الرقابية بالفعل، فغيابُ سجلٍّ عندنا نقصٌ في سجلّنا نحن. والنظامُ لا يحفظ الملفات نفسها؛ ما يُحفَظ سجلٌّ بالوثيقة — اسمُها وموضعُ حفظها ومَن سجّلها — فـ«مُسجَّلة» تعني مُثبَتةً ومنسوبةً إلى مَن سجّلها، لا أنّ الملفَّ قابلٌ للاسترجاع من هنا.',
     regOfficeRefusalAct: 'تسجيل مكتب وساطة على المنصّة',
@@ -155,7 +156,8 @@ export const PROVIDER = {
     regOfficeLoadError: 'تعذّر تحميل القوائم المرجعية — حاول مرة أخرى.',
     regOfficeListsMissing:
       'تعذّر تحميل بعض القوائم، وما ظهر منها صالحٌ للاستخدام. القوائم التي لم تُحمَّل:',
-    regOfficeListReference: 'القوائم المرجعية (الشكل القانوني، الجهة المرخِّصة، الدولة، المدينة، البنك، العملة، نموذج العمل)',
+    regOfficeListReference:
+      'القوائم المرجعية (الشكل القانوني، الجهة المرخِّصة، الدولة، المدينة، البنك، العملة، نموذج العمل)',
     regOfficeListLines: 'قائمة فروع التأمين',
     regOfficeSuccessHeading: 'تمّ تسجيل المكتب',
     regOfficeSuccessAdministrator:
@@ -312,7 +314,8 @@ export const PROVIDER = {
     regOfficeLoadError: 'Could not load the reference lists — try again.',
     regOfficeListsMissing:
       'Some lists did not load. What you can see is usable. Did not load:',
-    regOfficeListReference: 'the reference lists (legal form, licensing authority, country, city, bank, currency, business model)',
+    regOfficeListReference:
+      'the reference lists (legal form, licensing authority, country, city, bank, currency, business model)',
     regOfficeListLines: 'the insurance-branches list',
     regOfficeSuccessHeading: 'Office registered',
     regOfficeSuccessAdministrator:

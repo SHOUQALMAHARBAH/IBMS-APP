@@ -42,12 +42,7 @@ export function passwordByteLength(password: string): number {
  * one set of RULES, two sets of words, and no second copy of the logic.
  */
 export type PasswordRuleId =
-  | "minLength"
-  | "maxBytes"
-  | "lowercase"
-  | "uppercase"
-  | "digit"
-  | "symbol";
+  "minLength" | "maxBytes" | "lowercase" | "uppercase" | "digit" | "symbol";
 
 export interface PasswordRule {
   id: PasswordRuleId;
@@ -62,7 +57,8 @@ export const PASSWORD_RULES: readonly PasswordRule[] = [
   {
     id: "minLength",
     satisfiedBy: (p) => p.length >= PASSWORD_MIN_LENGTH,
-    message: () => `Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+    message: () =>
+      `Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
   },
   {
     id: "maxBytes",

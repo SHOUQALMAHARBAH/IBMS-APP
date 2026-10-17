@@ -31,7 +31,9 @@ export interface ScenarioCoverage {
 
 export function listBcpDrPlans(scenario?: string): Promise<BcpDrPlan[]> {
   return apiGet(
-    scenario ? `/bcp-dr-plans?scenario=${encodeURIComponent(scenario)}` : '/bcp-dr-plans',
+    scenario
+      ? `/bcp-dr-plans?scenario=${encodeURIComponent(scenario)}`
+      : '/bcp-dr-plans',
   );
 }
 

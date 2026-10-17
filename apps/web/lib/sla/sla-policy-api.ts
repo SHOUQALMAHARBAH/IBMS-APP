@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from "../auth/api-client";
+import { apiGet, apiPatch, apiPost } from '../auth/api-client';
 
 // Configurable SLA policies (task Part A).
 //
@@ -8,12 +8,12 @@ import { apiGet, apiPatch, apiPost } from "../auth/api-client";
 // exists to prevent, and that decision should have exactly one home.
 
 export type SlaSourceType =
-  "REGULATORY" | "INTERNAL_POLICY" | "CONTRACTUAL" | "OPERATIONAL" | "OTHER";
+  'REGULATORY' | 'INTERNAL_POLICY' | 'CONTRACTUAL' | 'OPERATIONAL' | 'OTHER';
 
-export type SlaPolicyStatus = "DRAFT" | "ACTIVE" | "INACTIVE";
+export type SlaPolicyStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
 
 export type SlaDurationUnit =
-  "MINUTES" | "HOURS" | "BUSINESS_DAYS" | "CALENDAR_DAYS" | "MONTHS";
+  'MINUTES' | 'HOURS' | 'BUSINESS_DAYS' | 'CALENDAR_DAYS' | 'MONTHS';
 
 export interface SlaPolicy {
   id: string;
@@ -24,7 +24,7 @@ export interface SlaPolicy {
   description: string | null;
   durationValue: number;
   durationUnit: SlaDurationUnit;
-  calendarType: "JORDAN_STANDARD" | "CONTINUOUS_24_7" | "CUSTOM";
+  calendarType: 'JORDAN_STANDARD' | 'CONTINUOUS_24_7' | 'CUSTOM';
   customWeekendDays: number[];
   workingHoursStart: string | null;
   workingHoursEnd: string | null;
@@ -59,10 +59,10 @@ export function listSlaPolicies(filter?: {
   status?: SlaPolicyStatus;
 }): Promise<SlaPolicy[]> {
   const params = new URLSearchParams();
-  if (filter?.processType) params.set("processType", filter.processType);
-  if (filter?.status) params.set("status", filter.status);
+  if (filter?.processType) params.set('processType', filter.processType);
+  if (filter?.status) params.set('status', filter.status);
   const query = params.toString();
-  return apiGet(`/sla/policies${query ? `?${query}` : ""}`);
+  return apiGet(`/sla/policies${query ? `?${query}` : ''}`);
 }
 
 /**
@@ -111,14 +111,14 @@ export function updateSlaPolicy(
   patch: Partial<
     Pick<
       SlaPolicy,
-      | "policyName"
-      | "description"
-      | "durationValue"
-      | "durationUnit"
-      | "calendarType"
-      | "timezone"
-      | "escalationEnabled"
-      | "warningThreshold"
+      | 'policyName'
+      | 'description'
+      | 'durationValue'
+      | 'durationUnit'
+      | 'calendarType'
+      | 'timezone'
+      | 'escalationEnabled'
+      | 'warningThreshold'
     >
   >,
 ): Promise<SlaPolicy> {
@@ -137,9 +137,9 @@ export function deactivateSlaPolicy(id: string): Promise<SlaPolicy> {
  * translated by the caller; this only handles the shape. */
 export function durationUnitKey(unit: SlaDurationUnit): string {
   return `slaUnit${unit
-    .split("_")
+    .split('_')
     .map((p) => p.charAt(0) + p.slice(1).toLowerCase())
-    .join("")}`;
+    .join('')}`;
 }
 
 /** Change what the system CLAIMS about an SLA's legal force. Needs

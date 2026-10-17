@@ -248,6 +248,13 @@ def role_codes():
     roles, which its own non-vacuity assertion caught rather than reporting a clean sweep.
     """
     src = io.open(GRID, encoding="utf-8").read()
+    # STRIP COMMENTS FIRST. The grid's entry for `provider.office-state.read` explains, IN A COMMENT,
+    # that the code used to read `roles: [ADMIN]` before the PROVIDER type existed — and the parser
+    # matched that sentence instead of the real `roles: []` four lines below, attributing a
+    # PLATFORM-scoped code to the security administrator. A comment that quotes code is the window
+    # artefact this repository keeps recording; here it reached a measurement's output.
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    src = re.sub(r"(?m)^\s*//.*$", "", src)
     aliases = {}
     for m in re.finditer(r"const\s+([A-Z][A-Z_0-9]*)\s*=\s*RoleName\.([A-Z_]+)\s*;", src):
         aliases[m.group(1)] = m.group(2)
@@ -504,6 +511,24 @@ def check(render_failures):
     removed, which is a reviewed edit to this file rather than a silent pass.
     """
     declared = json.load(io.open(DECLARED, encoding="utf-8"))["declared"]
+    # ITEM 10 — every row carries the owner's decision, and a row without one is refused here rather
+    # than quietly tolerated. A declaration nobody can account for is the thing this file exists to
+    # prevent, so an empty or missing `decision` is a failure of the gate and not a lint nit.
+    undecided = [
+        d
+        for d in declared
+        if not str(d.get("decision", "")).strip()
+        or "NO DECISION RECORDED" in str(d.get("decision"))
+    ]
+    if undecided:
+        print("\nDECLARED WITH NO RECORDED DECISION (%d):\n" % len(undecided))
+        for d in undecided:
+            print("  %-26s %-32s %s" % (d["screen"], d["role"], d["route"]))
+        print(
+            "\nEvery row needs the owner's decision in its `decision` field — widen the route,"
+            "\ndeclare the refusal, or close the door. A row without one cannot be reviewed."
+        )
+        return 1
     want = {(d["screen"], d["role"], d["route"]) for d in declared}
     got = {(r["screen"], r["role"], r["route"]) for r in render_failures}
 
