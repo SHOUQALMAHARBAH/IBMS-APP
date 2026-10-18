@@ -480,8 +480,27 @@ def main():
     for route, path in screens():
         src = io.open(path, encoding="utf-8", errors="replace").read()
         called = set()
+        caught = set()
         for name in screen_imports(src):
-            called |= fns.get(name, set())
+            routes_of = fns.get(name, set())
+            called |= routes_of
+            # A CALL WITH ITS OWN `.catch` IS A REFUSAL THE SCREEN HANDLES, and missing this was the
+            # second false-positive source. `/insurers/new` does
+            # `listInsurerMasters().catch(() => null)` and its own comment says the `null` "disables
+            # the path and explains why" — the declared-refusal shape, already built. Reporting that
+            # as "cannot render" would have had me widen a route to fix a screen that is correct.
+            #
+            # The sibling measurement `all-or-nothing-loaders.py` already treats `.catch(` as
+            # isolation for the same reason; this is the same rule applied per call rather than per
+            # loader.
+            # NOTE: this line is maintained with the Edit tool, NEVER through a shell
+            # heredoc. Its first version was authored in one and the leading word-boundary
+            # escape arrived as a literal BACKSPACE character, so the pattern required a
+            # backspace before the function name and matched nothing. The measurement then
+            # reported a handled refusal as a real finding, which is the vacuous-guard shape.
+            # This repository already records that quirk three times.
+            if re.search(r"%s\s*\([^)]*\)\s*\.catch\s*\(" % re.escape(name), src):
+                caught |= routes_of
         if not called:
             continue
         screens_examined += 1
@@ -511,13 +530,25 @@ def main():
         # So: the destination's codes decide it when there is a destination, and the screen's own
         # gate is the fallback only for a screen with no nav entry at all.
         own = screen_open_codes(src)
-        open_codes = sorted(dest_codes) if dest_codes else sorted(own)
+        # TWO GATES, ANDed — and getting this wrong produced false positives in BOTH directions.
+        #
+        # The nav gate decides VISIBILITY; the screen's own `hasPermission` decides whether anything
+        # RENDERS. A role must satisfy both, so they are separate tests rather than one merged list.
+        #
+        # The first version UNIONED them, which made a screen mentioning any code a role happens to
+        # hold count as openable — that put PLATFORM_OPERATOR on `/prospects/[id]`. The second
+        # preferred the nav gate and fell back to the screen's only when there was no nav entry, which
+        # was wrong the other way: `/insurers/new` has NO nav entry of its own, inherited `/insurers`'
+        # `insurer.read` through the ancestor rule, and so reported COMPLIANCE_OFFICER — while the
+        # screen itself refuses anybody without `insurer.create`, which Compliance does not hold.
+        open_codes = sorted(dest_codes)
+        own_codes = sorted(own)
 
         # A SCREEN WITH NO GATE AT ALL IS ITS OWN FINDING, and reporting it as N render failures
         # would be wrong twice: the role set is unfiltered, so every role appears, and the real
         # defect is upstream of any route. `/rfqs/new` and `/rfqs/[id]` are in neither the nav map
         # nor gated by their own code, which is why they produced a row for every seeded role.
-        if not open_codes:
+        if not open_codes and not own_codes:
             ungated_screens.append({"screen": route, "file": path.replace(os.sep, "/")})
             continue
         mentioned = screen_mentions(src)
@@ -525,6 +556,9 @@ def main():
         for role, held in sorted(roles.items()):
             # Can this role open it at all? If not, the screen is correctly invisible to them.
             if open_codes and not any(c in held for c in open_codes):
+                continue
+            # The screen's own gate, ANDed with the nav gate above.
+            if own_codes and not any(c in held for c in own_codes):
                 continue
             pairs_examined += 1
             for verb, rpath in sorted(called):
@@ -549,7 +583,10 @@ def main():
                 # Does the screen KNOW about this permission? If it names the code, the refusal is
                 # something it is handling — a hidden control, a gated section, a refusal sentence —
                 # and reporting it would be noise on a red build.
-                handled = any(c in mentioned for c in info["codes"])
+                handled = any(c in mentioned for c in info["codes"]) or (
+                    verb,
+                    rpath,
+                ) in caught
                 row = {
                     "screen": route,
                     "role": role,

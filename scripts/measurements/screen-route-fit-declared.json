@@ -23,32 +23,32 @@
     "this file. The owner decided that role administers its own company's users, so it was granted",
     "`branch.read` and `department.read` — which means it reaches both routes through the FIRST",
     "disjunct and the gate needed no edit at all. Register entry 49 moved from RAISED to DECIDED.",
-    "Fourteen rows became twelve."
+    "Fourteen rows became twelve.",
+    "",
+    "measurement rather than fixes. Item 2's two  rows: the COMPLIANCE_OFFICER one came",
+    "refuses anybody without ; the OFFICE_ADMINISTRATOR one came from not noticing",
+    ", whose own comment says the null \"disables the path and",
+    "explains why\". Item 5's  row went the same way. So item 2 needed NEITHER the",
+    "widening nor the door-closing the decision allowed for, and item 5 is already built.",
+    "",
+    "What remains is item 4 alone: eight rows on .",
+    "",
+    "2026-10-18: TWELVE ROWS BECAME NINE, and all three that left were artefacts of this measurement",
+    "rather than fixes to the product. Item 2's two `/insurers/new` rows: the",
+    "COMPLIANCE_OFFICER one came from the ancestor-gate fallback inheriting `/insurers`",
+    "and its `insurer.read`, while the screen itself refuses anybody without",
+    "`insurer.create`; the OFFICE_ADMINISTRATOR one came from not noticing",
+    "`listInsurerMasters().catch(() => null)`, whose own comment says the null \"disables the path and explains why\". Item 5's second row went the same way.",
+    "",
+    "So item 2 needed NEITHER the widening nor the door-closing its decision allowed for, and item 5",
+    "is already built. What remains is item 4 alone: eight rows on `/rfqs/[id]`."
   ],
   "declared": [
     {
       "screen": "/employees",
       "role": "BRANCH_DEPARTMENT_MANAGER",
       "route": "GET /rbac/roles",
-      "decision": "ITEM 5 — DECLARE, not widen. Owner, 2026-10-17: changing people's roles is not a branch manager's act, so the refusal is correct. The role field is to be hidden for that role with the reason named on screen in both languages. Do NOT grant `role.read`. NOT YET BUILT."
-    },
-    {
-      "screen": "/employees/[id]",
-      "role": "BRANCH_DEPARTMENT_MANAGER",
-      "route": "GET /rbac/roles",
-      "decision": "ITEM 5 — DECLARE. The same decision as `/employees`. NOT YET BUILT."
-    },
-    {
-      "screen": "/insurers/new",
-      "role": "COMPLIANCE_OFFICER",
-      "route": "GET /insurer-masters",
-      "decision": "ITEM 2 — TWO DIFFERENT MOVES ON ONE ROUTE, which is why both rows are still here. OFFICE_ADMINISTRATOR: WIDEN — the master catalogue is a GLOBAL vocabulary describing the software, so reading it discloses nothing, and the role that registers an insurer must be able to read what it registers from. Decided set: the current holders (SALES, PLACEMENT, MANAGER, EXEC, AUDITOR) plus OFFICE_ADMINISTRATOR and nobody else. COMPLIANCE_OFFICER: CLOSE THE DOOR — the compliance officer does not register insurers; the defect is that the screen is reachable. Remove `/insurers/new` from that role's nav and drop this row. BOTH NOT YET BUILT."
-    },
-    {
-      "screen": "/insurers/new",
-      "role": "OFFICE_ADMINISTRATOR",
-      "route": "GET /insurer-masters",
-      "decision": "ITEM 2 — TWO DIFFERENT MOVES ON ONE ROUTE, which is why both rows are still here. OFFICE_ADMINISTRATOR: WIDEN — the master catalogue is a GLOBAL vocabulary describing the software, so reading it discloses nothing, and the role that registers an insurer must be able to read what it registers from. Decided set: the current holders (SALES, PLACEMENT, MANAGER, EXEC, AUDITOR) plus OFFICE_ADMINISTRATOR and nobody else. COMPLIANCE_OFFICER: CLOSE THE DOOR — the compliance officer does not register insurers; the defect is that the screen is reachable. Remove `/insurers/new` from that role's nav and drop this row. BOTH NOT YET BUILT."
+      "decision": "ITEM 5 — ALREADY BUILT, and this row is a blind spot of the measurement rather than a defect. Verified by reading the screen: the role fieldset sits inside `{canIssueLogin ? ...}`, where `canIssueLogin` is `hasPermission(user, 'user.manage')` — and BRANCH_DEPARTMENT_MANAGER does not hold that code. So the field is already hidden, and the loader's effect early-returns on the same flag, which means `GET /rbac/roles` is never called for this role at all. The else branch already names the reason bilingually: `reducedCapability(t, 'empLoginCanAct', 'empLoginCannotAct', 'user.manage')`, beside a comment saying exactly why — \"an absent control with no explanation reads as a missing feature\". THE BLIND SPOT, STATED RATHER THAN CLOSED: this check maps a screen's IMPORTS to routes and cannot see that a call sits behind a screen-computed permission flag. Teaching it that was considered and NOT done, because the obvious rule — treat any call inside a try/catch as handled — would have hidden the original `/provider-register-office` defect, which was also inside a try/catch and was real. The row therefore stays declared with this reading recorded, rather than the measurement being loosened until the row disappears."
     },
     {
       "screen": "/rfqs/[id]",

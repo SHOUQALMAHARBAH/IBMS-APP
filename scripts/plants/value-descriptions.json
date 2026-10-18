@@ -38,5 +38,15 @@
     "file": "scripts/measurements/screen-route-permission-fit.py",
     "from": "    found += [lit for lit in _template_literals(window) if lit.startswith(\"/\")]",
     "to": "    found += []"
+  },
+  "e2e-batch-one-file-never-ran": {
+    "file": "scripts/api-e2e-batches.sh",
+    "from": "  want=\"$(expected_files \"${slice[@]}\")\"",
+    "to": "  want=$(( $(expected_files \"${slice[@]}\") + 1 ))"
+  },
+  "e2e-batch-workers-failed-to-start": {
+    "file": "scripts/api-e2e-batches.sh",
+    "from": "  files=\"${files:-0}\"; tests=\"${tests:-0}\"; errs=\"${errs:-0}\"",
+    "to": "  files=\"${files:-0}\"; tests=\"${tests:-0}\"; errs=9"
   }
 }
