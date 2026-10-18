@@ -177,7 +177,7 @@ export default function RegisterBrokerageOfficePage() {
       setLoadError(
         failures.length === 0
           ? null
-          : `${t('regOfficeListsMissing')} ${namedFailures(failures)}`,
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
       );
     })();
   }, [canRegister, t]);

@@ -67,6 +67,17 @@ jobs:
       - name: Screen/route permission fit
         run: python scripts/measurements/screen-route-permission-fit.py --check
 
+      # ITEM 8 - a screen must not discard the lists that DID resolve.
+      #
+      # The owner met this as eight empty dropdowns on /provider-register-office: one Promise.all,
+      # one refused call, and seven reference lists that had arrived perfectly thrown away under a
+      # sentence naming none of them. Eleven of thirteen screens had the same shape; all eleven are
+      # converted, so the measurement is at zero - and a measurement at zero that nothing runs goes
+      # back to eleven. No allow-list: a screen that genuinely needs all-or-nothing says so by
+      # discriminating in its rejection path, which is what the detector reads.
+      - name: No all-or-nothing screen loaders
+        run: python scripts/measurements/all-or-nothing-loaders.py --check
+
       - name: Unit/component tests
         run: npx turbo run test --filter=web
 

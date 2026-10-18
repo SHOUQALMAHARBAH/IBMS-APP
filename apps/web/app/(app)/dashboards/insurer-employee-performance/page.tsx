@@ -15,6 +15,10 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 import { permissionRefusalAllOf } from '../../../../lib/i18n/permission-refusal';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
@@ -48,32 +52,50 @@ export default function InsurerEmployeePerformanceDashboardPage() {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router, t]);
 
+  /*
+   * ITEM 8 — the OTHER screen CLAUDE.md named. Two panels behind two separate codes, and holding
+   * one of them used to show neither: `insurer-performance.view` without
+   * `employee-performance.view` produced an empty screen and a sentence naming both. The all-of
+   * refusal stays for the reader who holds neither.
+   */
   const load = useCallback(async () => {
-    try {
-      const [scores, records] = await Promise.all([
-        listInsurerPerformance({
-          periodLabel: periodLabel.trim() || undefined,
-          insurerId: insurerId.trim() || undefined,
-        }),
-        listEmployeePerformance({
-          periodLabel: periodLabel.trim() || undefined,
-          branchId: branchId.trim() || undefined,
-        }),
-      ]);
-      setInsurerScores(scores);
-      setEmployeeRecords(records);
-      setLoadError(null);
-    } catch (err) {
-      setInsurerScores(null);
-      setEmployeeRecords(null);
-      setLoadError(
-        err instanceof ApiError && err.status === 403
-          ? permissionRefusalAllOf(t, 'diepRefusalAct', ['insurer-performance.view', 'employee-performance.view'])
-          : err instanceof ApiError
-            ? err.message
-            : t('diepLoadError'),
-      );
-    }
+    const { values, failures } = await loadIndependently([
+      {
+        key: 'scores',
+        label: t('diepListInsurerScores'),
+        load: () =>
+          listInsurerPerformance({
+            periodLabel: periodLabel.trim() || undefined,
+            insurerId: insurerId.trim() || undefined,
+          }),
+      },
+      {
+        key: 'records',
+        label: t('diepListEmployeeRecords'),
+        load: () =>
+          listEmployeePerformance({
+            periodLabel: periodLabel.trim() || undefined,
+            branchId: branchId.trim() || undefined,
+          }),
+      },
+    ]);
+    setInsurerScores((values.scores as InsurerPerformanceScore[] | undefined) ?? null);
+    setEmployeeRecords(
+      (values.records as EmployeePerformanceRecord[] | undefined) ?? null,
+    );
+    const allRefused =
+      failures.length === 2 &&
+      failures.every((f) => f.error instanceof ApiError && f.error.status === 403);
+    setLoadError(
+      failures.length === 0
+        ? null
+        : allRefused
+          ? permissionRefusalAllOf(t, 'diepRefusalAct', [
+              'insurer-performance.view',
+              'employee-performance.view',
+            ])
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
   }, [periodLabel, branchId, insurerId, t]);
 
   useEffect(() => {

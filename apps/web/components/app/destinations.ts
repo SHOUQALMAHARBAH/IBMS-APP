@@ -622,6 +622,29 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         href: '/settings/roles',
         labelKey: 'navRoleAdmin',
         permissions: ['role.read'],
+        /*
+         * ITEM 7 — THE DOOR IS CLOSED TO THE PROVIDER, and a permission gate cannot close it.
+         *
+         * The provider holds `role.read` (and create/update/deactivate) deliberately: module 0
+         * item (b) gave it self-administration over its own users and roles. So the code does not
+         * separate it from an office, and withdrawing the code would take away a capability rather
+         * than hide a screen.
+         *
+         * What makes the screen wrong for the provider is the MATRIX, not the permission.
+         * `buildMatrix` skips every PLATFORM-scoped code — correct for an office, and exactly
+         * inverted here: the provider is shown all the office codes it will never use and not the
+         * five PLATFORM codes its own role actually holds. Inverting or parameterising that filter
+         * was considered and REFUSED by decision; the screen for the provider's own capabilities
+         * does not exist, which is recorded in the deferred register rather than half-built.
+         *
+         * An ALLOW-list rather than a new deny-list field: one mechanism for one concept, and it
+         * fails CLOSED, so a fourth organization type is hidden until somebody decides it belongs.
+         * The cost was measured before choosing — `canReach` hides a type-naming destination when
+         * the type is unknown, and only ONE of the 116 web specs reads this destination through
+         * `canReach` (`home-launcher.spec.ts`; the other three reach the screen with `page.goto`,
+         * which this gate does not govern).
+         */
+        organizationTypes: ['BROKERAGE_OFFICE', 'INSURANCE_COMPANY'],
       },
       {
         href: '/settings/duty-segregation',

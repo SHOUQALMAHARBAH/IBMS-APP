@@ -1542,6 +1542,62 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### OPEN — an oversight role cannot read an RFQ, and widening the route does not change that
+
+The owner decided that Claims, Compliance and the Data Protection Officer may read an RFQ and its
+broker/insurer correspondence. Widening the route's gate is NOT enough and this was measured over
+real HTTP rather than reasoned about: with the decided any-of applied, a Branch/Department Manager
+got 200 and all three of those roles got **404 `"RFQ not found"` about an RFQ that exists**.
+
+`RfqService` resolves an RFQ through its parent Opportunity's CUSTOMER, and
+`assertCustomerVisible` admits only the file's owner or a holder of
+`customer-file.all-owners.read` — held by BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT and
+PLACEMENT_TECHNICAL_OFFICER, and by none of the three. The DPO holds no `*.all-owners.read` code of
+any kind.
+
+So the widening was reverted: it delivers no capability and replaces an honest 403 ("you do not hold
+the permission") with a sentence that is false. `apps/api/test/rfq-oversight-read.e2e-spec.ts` pins
+the current state — the Manager's 200 as a non-vacuity floor, and all six oversight refusals as
+**403** — so a future widening without the visibility layer fails by name. Do not loosen those
+assertions to accept either status: 403 and 404 are different claims and only one is true.
+
+**What it would take is a decision the owner has not been asked for**, because granting
+`customer-file.all-owners.read` reaches **8 services and 46 routes** — every customer's needs
+assessment, risk profile, insurance programme, opportunities, RFQs, quotations, comparison and
+client decision, across all owners. That is a privacy question about what an oversight role may see
+of a customer's commercial file, not a permission adjustment. `docs/deferred-register.md` entry 57.
+
+### OPEN — the provider cannot see or build roles over its own platform capabilities
+
+`/settings/roles` is the OFFICE role builder: `buildMatrix` skips every PLATFORM-scoped code, which
+is right for an office and exactly inverted for the provider, whose own role holds nothing else. The
+destination is therefore closed to `PROVIDER` by organization type (`organizationTypes` on the
+destination, not a permission — the provider holds every code that screen is gated on, deliberately,
+from module 0 item (b)'s self-administration).
+
+A provider-facing roles screen **does not exist**. The provider's `PLATFORM_OPERATOR` role is
+seeded, is `isSystem`, and `assertNotSystem` already refuses re-granting it from a screen — so the
+platform grant is made by the seed and not by a screen, which is a deliberate narrowing rather than
+a gap to be filled by inverting the scope filter. `/settings/users` stays open to the provider and
+is correct: `Role` and `User` both carry `organizationId`, so every list on it is the provider's own.
+Entry 60.
+
+### CLOSED 2026-10-18 — a screen no longer discards the lists that DID load
+
+Eleven of thirteen screens using `Promise.all` threw away every value that resolved when one
+supporting call refused — the defect the owner met as eight empty dropdowns on
+`/provider-register-office`. All eleven now use `loadIndependently`
+(`apps/web/lib/load-independently.ts`): keep what arrived, and NAME what did not, in both languages.
+
+`npm run check:loaders` is a CI step in the `frontend` job and fails by name on any screen with the
+discard shape. **There is no allow-list and there must not be one** — a screen that genuinely needs
+all-or-nothing says so by DISCRIMINATING in its rejection path, which is the thing the detector
+reads.
+
+Converting the loader is only half of it: `/risk-profiles` early-returned
+`if (loadError) return <alert/>`, so the RENDER discarded what the loader had just kept, and the
+measurement cannot see that. Check the render too. Entry 61.
+
 ### CLOSED 2026-10-12 — the provider dashboard discloses office state to any office granted its code
 
 Module 0 item (j)'s `/provider-offices` is a CROSS-OFFICE read, gated on

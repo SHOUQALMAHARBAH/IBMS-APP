@@ -34,6 +34,10 @@ import {
   summaryPanelStyle,
 } from '../../../components/risk-profile/risk-profile.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../lib/load-independently';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
@@ -97,26 +101,43 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
   const canEdit =
     hasPermission(user, 'risk-profile.create');
 
+  /*
+   * ITEM 8 — the records and the consolidated roll-up are two reads, and losing one used to lose
+   * both. A 403 keeps its refusal sentence, because a reader who holds neither code needs the code
+   * named rather than a list of panels.
+   */
   const load = useCallback(async () => {
-    try {
-      const [list, roll] = await Promise.all([
-        listRiskProfiles(customerId),
-        getConsolidatedRiskProfiles(customerId),
-      ]);
-      setProfiles(list);
-      setConsolidated(roll);
-      setLoadError(null);
-    } catch (err) {
-      setLoadError(
-        err instanceof ApiError && err.status === 403
+    const { values, failures } = await loadIndependently([
+      {
+        key: 'profiles',
+        label: t('rpListProfiles'),
+        load: () => listRiskProfiles(customerId),
+      },
+      {
+        key: 'consolidated',
+        label: t('rpListConsolidated'),
+        load: () => getConsolidatedRiskProfiles(customerId),
+      },
+    ]);
+    if (values.profiles) setProfiles(values.profiles as RiskProfile[]);
+    if (values.consolidated)
+      setConsolidated(values.consolidated as ConsolidatedSurvey);
+
+    const refused = failures.find(
+      (f) => f.error instanceof ApiError && f.error.status === 403,
+    );
+    const missing = failures.find(
+      (f) => f.error instanceof ApiError && f.error.status === 404,
+    );
+    setLoadError(
+      failures.length === 0
+        ? null
+        : failures.length === 2 && refused
           ? permissionRefusal(t, 'rpRefusalAct', 'risk-profile.read')
-          : err instanceof ApiError && err.status === 404
+          : missing && failures.length === 2
             ? t('rpCustomerNotFound')
-            : err instanceof ApiError
-              ? err.message
-              : t('rpLoadError'),
-      );
-    }
+            : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
   }, [customerId, t]);
 
   useEffect(() => {
@@ -149,7 +170,19 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
     }
   }
 
-  if (loadError) {
+  /*
+   * ITEM 8, SECOND HALF — the loader stopped discarding what resolved, and this early return was
+   * still throwing it away one layer down.
+   *
+   * `if (loadError) return <alert/>` replaced the WHOLE page, so a refused roll-up blanked the site
+   * list that had arrived — the same defect as the `Promise.all`, surviving in the render, where the
+   * loader measurement cannot see it. It is now conditional on there being nothing to show: a reader
+   * who holds neither code gets the full-page refusal naming the code, and a reader who lost ONE
+   * read keeps the page with the sentence above it. This is what the loader's own header means by
+   * not deciding a screen's empty state from one layer away — the decision belongs here, and here it
+   * is two different answers.
+   */
+  if (loadError && !profiles) {
     return (
       <p role="alert" style={errorStyle}>
         {loadError}
@@ -160,6 +193,12 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
 
   return (
     <>
+      {loadError ? (
+        <p role="alert" style={errorStyle}>
+          {loadError}
+        </p>
+      ) : null}
+
       {consolidated && profiles.length > 0 ? (
         <ConsolidatedPanel survey={consolidated} />
       ) : null}

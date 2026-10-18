@@ -153,8 +153,6 @@ export const PROVIDER = {
     regOfficeSubmit: 'تسجيل المكتب',
     regOfficeSubmitting: 'جارٍ التسجيل…',
     regOfficeLoadError: 'تعذّر تحميل القوائم المرجعية — حاول مرة أخرى.',
-    regOfficeListsMissing:
-      'تعذّر تحميل بعض القوائم، وما ظهر منها صالحٌ للاستخدام. القوائم التي لم تُحمَّل:',
     regOfficeListReference: 'القوائم المرجعية (الشكل القانوني، الجهة المرخِّصة، الدولة، المدينة، البنك، العملة، نموذج العمل)',
     regOfficeListLines: 'قائمة فروع التأمين',
     regOfficeSuccessHeading: 'تمّ تسجيل المكتب',
@@ -310,8 +308,6 @@ export const PROVIDER = {
     regOfficeSubmit: 'Register office',
     regOfficeSubmitting: 'Registering…',
     regOfficeLoadError: 'Could not load the reference lists — try again.',
-    regOfficeListsMissing:
-      'Some lists did not load. What you can see is usable. Did not load:',
     regOfficeListReference: 'the reference lists (legal form, licensing authority, country, city, bank, currency, business model)',
     regOfficeListLines: 'the insurance-branches list',
     regOfficeSuccessHeading: 'Office registered',

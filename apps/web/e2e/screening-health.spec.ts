@@ -295,9 +295,18 @@ test("surfaces a permission failure rather than an empty page", async ({
   page,
 }) => {
   await mockAuth(page);
-  await page.route("**/screening/providers/health", (route) =>
-    route.fulfill({ status: 403, json: { message: "Forbidden" } }),
-  );
+  // ITEM 8 — BOTH reads. `GET /screening/providers/health` and `GET /screening/overview` are both
+  // gated on `sanctions-pep.screen` (verified in their controllers), so a reader who lacks it is
+  // refused both; refusing only one was indistinguishable from refusing both while `Promise.all`
+  // collapsed them, and is not any more.
+  for (const path of [
+    "**/screening/providers/health",
+    "**/screening/overview**",
+  ]) {
+    await page.route(path, (route) =>
+      route.fulfill({ status: 403, json: { message: "Forbidden" } }),
+    );
+  }
 
   await page.goto("/screening-health");
 

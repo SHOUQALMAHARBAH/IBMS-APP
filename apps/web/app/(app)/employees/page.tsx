@@ -23,6 +23,10 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle, successStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../lib/load-independently';
 import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
 
 const cell: CSSProperties = {
@@ -101,6 +105,9 @@ export default function EmployeesPage() {
 
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
   const [branches, setBranches] = useState<OrgUnit[]>([]);
+  /* ITEM 8 — its own state. A refused picker list must not hide what the rest of the screen
+   * has: this page is mostly a record somebody came to read. */
+  const [listsMissing, setListsMissing] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
 
@@ -144,19 +151,35 @@ export default function EmployeesPage() {
 
   // The org units and the role catalogue, each behind its own permission. A failure here must not
   // take the employee list down with it: the person half of this form works without either.
+  //
+  // ITEM 8 — and the old shape made that comment untrue of itself. `Promise.all` rejected on the
+  // first refusal and the `catch` emptied BOTH, so a 403 on branches alone also cleared the
+  // departments that had arrived, silently. `loadIndependently` keeps what resolved and names what
+  // did not, in a line that does not hide the list of people.
   useEffect(() => {
     if (!user || !canReadOrgUnits) return;
     void (async () => {
-      try {
-        const [d, b] = await Promise.all([listDepartments(), listBranches()]);
-        setDepartments(d);
-        setBranches(b);
-      } catch {
-        setDepartments([]);
-        setBranches([]);
-      }
+      const { values, failures } = await loadIndependently([
+        {
+          key: 'departments',
+          label: t('commonListDepartments'),
+          load: listDepartments,
+        },
+        {
+          key: 'branches',
+          label: t('commonListBranches'),
+          load: listBranches,
+        },
+      ]);
+      setDepartments((values.departments as OrgUnit[] | undefined) ?? []);
+      setBranches((values.branches as OrgUnit[] | undefined) ?? []);
+      setListsMissing(
+        failures.length === 0
+          ? null
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+      );
     })();
-  }, [user, canReadOrgUnits]);
+  }, [user, canReadOrgUnits, t]);
 
   useEffect(() => {
     if (!user || !canIssueLogin) return;
@@ -258,6 +281,11 @@ export default function EmployeesPage() {
         {t('empIntro')}
       </p>
 
+      {listsMissing ? (
+        <p role="status" data-lists-missing style={{ color: 'var(--ink-muted)' }}>
+          {listsMissing}
+        </p>
+      ) : null}
       {loadError ? (
         <p role="alert" style={errorStyle}>
           {loadError}

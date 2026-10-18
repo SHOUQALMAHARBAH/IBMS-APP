@@ -90,6 +90,8 @@ async function mockRiskProfiles(
   opts: {
     list?: unknown;
     listStatus?: number;
+    /** Set it apart from `listStatus` to refuse ONE of the two reads — the partial case. */
+    consolidatedStatus?: number;
     survey?: unknown;
     onAssetPost?: () => void;
   } = {},
@@ -103,7 +105,20 @@ async function mockRiskProfiles(
     const method = route.request().method();
 
     if (url.includes("/risk-profiles/consolidated")) {
-      return route.fulfill({ status: 200, json: CONSOLIDATED });
+      // ITEM 8 — the consolidated read is gated on `risk-profile.read`, the SAME code as the list
+      // (verified in `risk-profile.controller.ts`), so a reader who lacks it is refused BOTH. This
+      // mock used to refuse only the list, which was indistinguishable from refusing both while
+      // `Promise.all` collapsed them — and is not any more.
+      return route.fulfill({
+        status: opts.consolidatedStatus ?? opts.listStatus ?? 200,
+        json:
+          (opts.consolidatedStatus ?? opts.listStatus) === 403
+            ? {
+                message:
+                  "You do not hold a permission required to perform this action",
+              }
+            : CONSOLIDATED,
+      });
     }
     if (/\/risk-profiles\/rp-1\/assets/.test(url)) {
       if (method === "POST") {
@@ -162,12 +177,30 @@ test("prompts to pick a customer when none is in the URL", async ({ page }) => {
 
 test("shows a friendly message when the user lacks read permission", async ({ page }) => {
   await mockAuth(page, ["CLAIMS_OFFICER"]);
+  // BOTH reads, because both are gated on the same code and a real reader loses both.
   await mockRiskProfiles(page, { listStatus: 403 });
 
   await page.goto("/risk-profiles?customerId=cust-1");
   await expect(page.locator('p[role="alert"]')).toContainText(
     "(risk-profile.read)",
   );
+});
+
+test("ITEM 8 — one refused read names ITSELF and leaves the other rendered", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  // Only the roll-up refuses. Before item 8 this emptied the site list too, under a sentence
+  // naming a permission the reader actually holds.
+  await mockRiskProfiles(page, { consolidatedStatus: 403 });
+
+  await page.goto("/risk-profiles?customerId=cust-1");
+  // The list that arrived is on screen...
+  await expect(page.getByText("Head office")).toBeVisible();
+  // ...and the one that did not is NAMED, not described as a permission problem.
+  const alert = page.locator('p[role="alert"]');
+  await expect(alert).toContainText("the consolidated summary");
+  await expect(alert).not.toContainText("(risk-profile.read)");
 });
 
 test("captures an asset from the survey screen", async ({ page }) => {

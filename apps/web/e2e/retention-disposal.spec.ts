@@ -87,7 +87,12 @@ const BATCHES = [
 
 async function mockRegister(
   page: Page,
-  opts: { scheduleStatus?: number; batches?: unknown[] } = {},
+  opts: {
+    scheduleStatus?: number;
+    holdsStatus?: number;
+    batchesStatus?: number;
+    batches?: unknown[];
+  } = {},
 ) {
   await page.route('http://localhost:4000/retention-schedule**', (route) => {
     if (opts.scheduleStatus && opts.scheduleStatus !== 200) {
@@ -101,11 +106,18 @@ async function mockRegister(
     }
     return route.fulfill({ status: 200, json: SCHEDULE });
   });
+  const REFUSED = {
+    message: 'You do not hold a permission required to perform this action',
+  };
   await page.route('http://localhost:4000/legal-holds**', (route) =>
-    route.fulfill({ status: 200, json: HOLDS }),
+    opts.holdsStatus && opts.holdsStatus !== 200
+      ? route.fulfill({ status: opts.holdsStatus, json: REFUSED })
+      : route.fulfill({ status: 200, json: HOLDS }),
   );
   await page.route('http://localhost:4000/disposal-batches**', (route) =>
-    route.fulfill({ status: 200, json: opts.batches ?? BATCHES }),
+    opts.batchesStatus && opts.batchesStatus !== 200
+      ? route.fulfill({ status: opts.batchesStatus, json: REFUSED })
+      : route.fulfill({ status: 200, json: opts.batches ?? BATCHES }),
   );
 }
 
@@ -212,11 +224,20 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
   });
 });
 
-test('a user without the schedule permission sees the translated 403 message', async ({
+test('a user holding NONE of the three permissions sees the translated 403 message', async ({
   page,
 }) => {
   await mockAuth(page, ['PLACEMENT_TECHNICAL_OFFICER']);
-  await mockRegister(page, { scheduleStatus: 403 });
+  // ITEM 8 — all three, which is what this reader really gets. The three panels sit behind THREE
+  // different codes, so refusing one is a genuine partial state (the test below) and the all-of
+  // refusal belongs to the reader who holds none of them. This test used to refuse the schedule
+  // alone and still expect the three-code sentence, because `Promise.all` made one refusal look
+  // like three.
+  await mockRegister(page, {
+    scheduleStatus: 403,
+    holdsStatus: 403,
+    batchesStatus: 403,
+  });
 
   await page.goto('/retention-disposal');
   // The screen's own translated 403 copy, not the API's English message.
@@ -231,6 +252,31 @@ test('a user without the schedule permission sees the translated 403 message', a
   ).toBeVisible();
   await expect(
     page.getByText('You do not hold a permission required', { exact: false }),
+  ).toHaveCount(0);
+});
+
+test('ITEM 8 — one refused panel is NAMED and the other two still render', async ({
+  page,
+}) => {
+  await mockAuth(page, ['DATA_PROTECTION_OFFICER']);
+  // Only the schedule refuses. This is the case the old shape got wrong: a reader holding
+  // `legal-hold.manage` saw an empty screen and a sentence listing three codes, two of which
+  // they held.
+  await mockRegister(page, { scheduleStatus: 403 });
+
+  await page.goto('/retention-disposal');
+  // Scoped to `main`: Next renders its own empty `role="alert"` route announcer, and a page-wide
+  // `.first()` matches THAT — the trap IMPROVEMENTS § 1.85 records.
+  const alert = page.locator('main p[role="alert"]');
+  await expect(alert).toContainText('the retention schedule');
+  // The non-vacuity half: a panel the reader DOES hold is on screen.
+  await expect(page.getByRole('heading', { name: 'Legal holds' })).toBeVisible();
+  // NOT the all-of refusal: naming three codes to somebody who holds two of them sends them to
+  // ask for grants they already have.
+  await expect(
+    page.getByText('view the retention and disposal register', {
+      exact: false,
+    }),
   ).toHaveCount(0);
 });
 

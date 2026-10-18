@@ -236,6 +236,8 @@ export const DASHBOARDS = {
     diepRenewalRate: 'معدّل التجديد',
     diepCrossSellRate: 'معدّل البيع المتبادل',
     diepLoadError: 'تعذّر تحميل لوحة أداء شركات التأمين والموظفين — حاول مرة أخرى.',
+    diepListInsurerScores: 'تقييمات شركات التأمين',
+    diepListEmployeeRecords: 'سجلّات أداء الموظفين',
     diepRefusalAct: 'عرض لوحة أداء شركات التأمين والموظفين',
 
     // ---- Insurer performance (#60) ----------------------------------------------
@@ -564,6 +566,8 @@ export const DASHBOARDS = {
     diepRenewalRate: 'Renewal rate',
     diepCrossSellRate: 'Cross-sell rate',
     diepLoadError: 'Could not load the Insurer & Employee Performance Dashboard — try again.',
+    diepListInsurerScores: 'the insurer scores',
+    diepListEmployeeRecords: 'the employee performance records',
     diepRefusalAct: 'view the insurer and employee performance dashboard',
 
     ipHeading: 'Insurer Performance',

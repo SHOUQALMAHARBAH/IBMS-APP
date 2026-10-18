@@ -30,6 +30,14 @@ export const COMMON = {
     commonActions: 'الإجراءات',
     commonStatus: 'الحالة',
     commonTryAgain: 'تعذر تحميل البيانات — حاول مرة أخرى.',
+
+    /* ITEM 8 — the sentence a screen shows when SOME of its lists did not arrive, and the
+     * names of the lists that recur across screens. One home: nine screens say this. */
+    commonListsMissing:
+      'تعذّر تحميل بعض القوائم، وما ظهر منها صالحٌ للاستخدام. القوائم التي لم تُحمَّل:',
+    commonListDepartments: 'قائمة الأقسام',
+    commonListBranches: 'قائمة الفروع',
+    commonListRoles: 'قائمة الأدوار',
     // THE REFUSAL SENTENCE — the one place all 91 permission refusals are worded.
     // `{act}` is the screen's own act, in the language of the WORK rather than of the permission. The
     // grantor is named BY FUNCTION, never by role name: an office defines its own role names, so
@@ -180,6 +188,13 @@ export const COMMON = {
     commonActions: 'Actions',
     commonStatus: 'Status',
     commonTryAgain: 'Could not load this — try again.',
+
+    /* ITEM 8 — see the Arabic above. */
+    commonListsMissing:
+      'Some lists did not load. What you can see is usable. Did not load:',
+    commonListDepartments: 'the departments list',
+    commonListBranches: 'the branches list',
+    commonListRoles: 'the roles list',
     permissionRefusal:
       'You do not hold permission to {act} — ask whoever manages permissions in your office. ({code})',
     permissionRefusalAnyOf:

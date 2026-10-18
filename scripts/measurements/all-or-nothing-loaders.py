@@ -107,6 +107,28 @@ def main():
     if examined == 0 or all_sites == 0:
         print("\nexamined no Promise.all sites, which is not a clean result")
         return 1
+
+    # --check: FAIL on any discard-shape call site.
+    #
+    # Item 8 took this class from eleven to ZERO, and a measurement at zero that nothing runs goes
+    # back to eleven — the same argument that made the screen/route fit check a CI step rather than
+    # a script somebody remembers to run. The rule it enforces is already written down: never
+    # `Promise.all` a screen's independent lists; use `loadIndependently`, and give every entry a
+    # label in BOTH languages.
+    #
+    # There is deliberately NO allow-list. A screen that genuinely needs all-or-nothing says so by
+    # DISCRIMINATING in its rejection path — which is the thing the detector reads — so a
+    # declaration file would buy nothing except a place for exceptions to accumulate.
+    if "--check" in sys.argv:
+        if findings:
+            print(
+                "all-or-nothing-loaders: %d screen(s) discard what resolved. Convert each to "
+                "`loadIndependently` from `apps/web/lib/load-independently.ts`: keep what arrived, "
+                "and NAME what did not, with a label in BOTH languages. There is no allow-list "
+                "here, by design." % len(findings)
+            )
+            return 1
+        print("all-or-nothing-loaders: no screen discards a list that resolved.")
     return 0
 
 

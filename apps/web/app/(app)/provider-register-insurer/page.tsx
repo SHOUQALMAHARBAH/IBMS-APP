@@ -154,7 +154,7 @@ export default function RegisterInsuranceCompanyPage() {
       setLoadError(
         failures.length === 0
           ? null
-          : `${t('regOfficeListsMissing')} ${namedFailures(failures)}`,
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
       );
     })();
   }, [canRegister, t]);

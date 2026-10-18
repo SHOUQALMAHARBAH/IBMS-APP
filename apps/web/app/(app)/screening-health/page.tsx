@@ -9,6 +9,10 @@ import { errorStyle } from "../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import {
+  loadIndependently,
+  namedFailures,
+} from '../../../lib/load-independently';
+import {
   getScreeningHealth,
   getScreeningOverview,
   type ScreeningHealth,
@@ -79,31 +83,36 @@ export default function ScreeningHealthPage() {
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      // Both in one pass: the provider answers "can I reach it right now?",
-      // the overview answers "how many customers were actually screened?".
-      // A screen showing only the first is the one that reads green while a
-      // third of screenings are failing.
-      const [nextHealth, nextOverview] = await Promise.all([
-        getScreeningHealth(),
-        getScreeningOverview(30),
-      ]);
-      setHealth(nextHealth);
-      setOverview(nextOverview);
-      setLoadError(null);
-    } catch (err) {
-      setHealth(null);
-      setOverview(null);
-      setLoadError(
-        err instanceof ApiError && err.status === 403
+    // Both in one pass: the provider answers "can I reach it right now?",
+    // the overview answers "how many customers were actually screened?".
+    // A screen showing only the first is the one that reads green while a
+    // third of screenings are failing.
+    //
+    // ITEM 8 — which is exactly why losing one must not blank the other. The old shape set BOTH to
+    // null on either failure, so a refused overview produced a screen claiming nothing at all is
+    // known about screening, including the provider status that had answered. Each panel renders
+    // what arrived and the sentence names what did not.
+    const { values, failures } = await loadIndependently([
+      { key: 'health', label: t('shListHealth'), load: getScreeningHealth },
+      {
+        key: 'overview',
+        label: t('shListOverview'),
+        load: () => getScreeningOverview(30),
+      },
+    ]);
+    setHealth((values.health as ScreeningHealth | undefined) ?? null);
+    setOverview((values.overview as ScreeningOverview | undefined) ?? null);
+    const refused = failures.find(
+      (f) => f.error instanceof ApiError && f.error.status === 403,
+    );
+    setLoadError(
+      failures.length === 0
+        ? null
+        : failures.length === 2 && refused
           ? permissionRefusal(t, 'shRefusalAct', 'sanctions-pep.screen')
-          : err instanceof ApiError
-            ? err.message
-            : t('shCouldNotLoadScreeningHealth'),
-      );
-    } finally {
-      setLoaded(true);
-    }
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
+    setLoaded(true);
   }, [t]);
 
   useEffect(() => {

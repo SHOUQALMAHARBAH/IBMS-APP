@@ -37,6 +37,10 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../lib/load-independently';
 import { permissionRefusalAllOf } from '../../../lib/i18n/permission-refusal';
 
 const SCHEDULE_ROLES = [
@@ -98,29 +102,42 @@ export default function RetentionDisposalPage() {
   const [nominateCategoryId, setNominateCategoryId] = useState('');
   const [method, setMethod] = useState<string>(DISPOSAL_METHODS[0]);
 
+  /*
+   * ITEM 8 — THIS IS ONE OF THE TWO SCREENS CLAUDE.md NAMED, and the fix it named was "copy
+   * `/settings/org-units`", which computes what the reader holds and renders that half.
+   *
+   * Three independent panels, three permissions, and one `Promise.all` that nulled all three on
+   * any refusal — so somebody holding `legal-hold.manage` and nothing else saw a screen with no
+   * holds on it and a sentence listing three codes. Each panel now stands alone; the all-of
+   * refusal is kept for the reader who holds NONE of them, which is the case it was written for.
+   */
   const load = useCallback(async () => {
-    try {
-      const [s, h, b] = await Promise.all([
-        listRetentionSchedule(),
-        listLegalHolds(),
-        listDisposalBatches(),
-      ]);
-      setSchedule(s);
-      setHolds(h);
-      setBatches(b);
-      setLoadError(null);
-    } catch (err) {
-      setSchedule(null);
-      setHolds(null);
-      setBatches(null);
-      setLoadError(
-        err instanceof ApiError && err.status === 403
-          ? permissionRefusalAllOf(t, 'rdRefusalAct', ['retention-schedule.update / retention-schedule.confirm', 'legal-hold.manage', 'retention.dispose.nominate / retention.dispose.approve'])
-          : err instanceof ApiError
-            ? err.message
-            : t('rdLoadError'),
-      );
-    }
+    const { values, failures } = await loadIndependently([
+      {
+        key: 'schedule',
+        label: t('rdListSchedule'),
+        load: listRetentionSchedule,
+      },
+      { key: 'holds', label: t('rdListHolds'), load: listLegalHolds },
+      { key: 'batches', label: t('rdListBatches'), load: listDisposalBatches },
+    ]);
+    setSchedule((values.schedule as RetentionScheduleItem[] | undefined) ?? null);
+    setHolds((values.holds as LegalHold[] | undefined) ?? null);
+    setBatches((values.batches as DisposalBatch[] | undefined) ?? null);
+    const allRefused =
+      failures.length === 3 &&
+      failures.every((f) => f.error instanceof ApiError && f.error.status === 403);
+    setLoadError(
+      failures.length === 0
+        ? null
+        : allRefused
+          ? permissionRefusalAllOf(t, 'rdRefusalAct', [
+              'retention-schedule.update / retention-schedule.confirm',
+              'legal-hold.manage',
+              'retention.dispose.nominate / retention.dispose.approve',
+            ])
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
   }, [t]);
 
   useEffect(() => {

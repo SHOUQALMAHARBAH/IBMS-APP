@@ -36,6 +36,10 @@ import {
 } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 import { CbjApprovalPanel } from '../../../../components/supporting-operations/CbjApprovalPanel';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
@@ -101,6 +105,9 @@ export default function EmployeeDetailPage() {
   const [password, setPassword] = useState('');
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
   const [branches, setBranches] = useState<OrgUnit[]>([]);
+  /* ITEM 8 — its own state. A refused picker list must not hide what the rest of the screen
+   * has: this page is mostly a record somebody came to read. */
+  const [listsMissing, setListsMissing] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
   const [roles, setRoles] = useState<RoleCatalogueEntry[]>([]);
@@ -137,27 +144,42 @@ export default function EmployeeDetailPage() {
 
   // Only fetched once someone opens the login form: three requests nobody needs on a page that is
   // mostly read.
+  //
+  // ITEM 8 — three lists where one refusal used to empty all three. The role list is the one that
+  // matters most here: with it gone the form cannot be submitted at all (a login needs a role), so
+  // naming it is the difference between "ask for `role.read`" and a form that refuses silently.
   useEffect(() => {
     if (!user || !canIssueLogin || !showLoginForm) return;
     void (async () => {
-      try {
-        const [d, b, r] = await Promise.all([
-          listDepartments(),
-          listBranches(),
-          listRoles(),
-        ]);
-        setDepartments(d);
-        setBranches(b);
-        // ACTIVE only: a retired role grants nothing, so offering one would hand the account a row
-        // that reads as access and confers none.
-        setRoles(r.filter((entry) => entry.status === 'ACTIVE'));
-      } catch {
-        setDepartments([]);
-        setBranches([]);
-        setRoles([]);
-      }
+      const { values, failures } = await loadIndependently([
+        {
+          key: 'departments',
+          label: t('commonListDepartments'),
+          load: listDepartments,
+        },
+        {
+          key: 'branches',
+          label: t('commonListBranches'),
+          load: listBranches,
+        },
+        { key: 'roles', label: t('commonListRoles'), load: listRoles },
+      ]);
+      setDepartments((values.departments as OrgUnit[] | undefined) ?? []);
+      setBranches((values.branches as OrgUnit[] | undefined) ?? []);
+      // ACTIVE only: a retired role grants nothing, so offering one would hand the account a row
+      // that reads as access and confers none.
+      setRoles(
+        ((values.roles as RoleCatalogueEntry[] | undefined) ?? []).filter(
+          (entry) => entry.status === 'ACTIVE',
+        ),
+      );
+      setListsMissing(
+        failures.length === 0
+          ? null
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+      );
     })();
-  }, [user, canIssueLogin, showLoginForm]);
+  }, [user, canIssueLogin, showLoginForm, t]);
 
   async function onCreateLogin(e: FormEvent) {
     e.preventDefault();
@@ -285,6 +307,11 @@ export default function EmployeeDetailPage() {
     <main style={pageStyle}>
       <h1>{t('empdHeading')}</h1>
 
+      {listsMissing ? (
+        <p role="status" data-lists-missing style={{ color: 'var(--ink-muted)' }}>
+          {listsMissing}
+        </p>
+      ) : null}
       {loadError ? (
         <p role="alert" style={errorStyle}>
           {loadError}

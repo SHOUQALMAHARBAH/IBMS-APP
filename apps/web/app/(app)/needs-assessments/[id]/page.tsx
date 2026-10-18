@@ -33,6 +33,10 @@ import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCapture
 import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 
 export default function NeedsAssessmentDetailPage() {
   const { t } = useLanguage();
@@ -46,16 +50,35 @@ export default function NeedsAssessmentDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  /*
+   * ITEM 8 — the two reads are NOT equally load-bearing, and the old `Promise.all` treated them
+   * as if they were.
+   *
+   * The assessment IS the page: without it there is nothing to show, so its failure keeps the
+   * not-found sentence exactly as before. The QUESTIONNAIRE only supplies the question text, and
+   * losing it used to take down an assessment that had arrived — so a refused questionnaire now
+   * leaves the record on screen and says which list is missing.
+   */
   const load = useCallback(async () => {
-    try {
-      const [result, questionnaire] = await Promise.all([
-        getNeedsAssessment(params.id),
-        getQuestionnaire(),
-      ]);
-      setAssessment(result);
-      setQuestions(questionnaire.questions);
-      setLoadError(null);
-    } catch (err) {
+    const { values, failures } = await loadIndependently([
+      {
+        key: 'assessment',
+        label: t('nadListAssessment'),
+        load: () => getNeedsAssessment(params.id),
+      },
+      {
+        key: 'questionnaire',
+        label: t('nadListQuestionnaire'),
+        load: getQuestionnaire,
+      },
+    ]);
+    if (values.assessment) setAssessment(values.assessment as NeedsAssessment);
+    if (values.questionnaire)
+      setQuestions((values.questionnaire as { questions: NeedsAssessmentQuestion[] }).questions);
+
+    const assessmentFailure = failures.find((f) => f.key === 'assessment');
+    if (assessmentFailure) {
+      const err = assessmentFailure.error;
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
           ? t('nadNotFound')
@@ -63,7 +86,13 @@ export default function NeedsAssessmentDetailPage() {
             ? err.message
             : t('nadLoadError'),
       );
+      return;
     }
+    setLoadError(
+      failures.length === 0
+        ? null
+        : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
   }, [params.id, t]);
 
   useEffect(() => {
