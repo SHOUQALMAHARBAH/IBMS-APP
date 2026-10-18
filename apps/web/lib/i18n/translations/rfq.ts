@@ -84,8 +84,12 @@ export const RFQ = {
 
     // rfqs/[id]/page.tsx
     rfqDetailBackButton: '← العودة إلى الفرصة التجارية',
+    /* The 404-or-403 ambiguity is DELIBERATE and stays: a 403 here would confirm that another
+     * office's record exists. What was wrong is that the sentence named neither a cause nor a way
+     * forward — the class this module was spent removing, in our own error path. The replacement
+     * is true in BOTH cases and confirms nothing. */
     rfqDetailNotFound:
-      'تعذر العثور على طلب عرض الأسعار هذا — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
+      'تعذر العثور على طلب عرض الأسعار هذا. إن كنت تتوقّع وجود هذا السجل ولا تراه، فقد لا يكون من ملفاتك — راجع مدير فرعك.',
     rfqDetailLoadError: 'تعذر تحميل طلب عرض الأسعار هذا — حاول مرة أخرى.',
     rfqDetailCommsLoadError: 'تعذر تحميل سجل المراسلات — حاول مرة أخرى.',
     rfqDetailHeading: 'طلب عرض أسعار — {line}',
@@ -413,7 +417,9 @@ export const RFQ = {
 
     // rfqs/[id]/page.tsx
     rfqDetailBackButton: '← Back to the opportunity',
-    rfqDetailNotFound: 'This RFQ could not be found — it may not exist, or you may not have access to it.',
+    /* See the Arabic above: the ambiguity is deliberate, the uninformative tail was not. */
+    rfqDetailNotFound:
+      'This RFQ could not be found. If you expected this record and cannot see it, it may not be one of your files — check with your branch manager.',
     rfqDetailLoadError: 'Could not load this RFQ — try again.',
     rfqDetailCommsLoadError: 'Could not load the correspondence log — try again.',
     rfqDetailHeading: 'RFQ — {line}',
