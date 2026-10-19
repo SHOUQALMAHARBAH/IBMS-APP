@@ -1542,7 +1542,7 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
-### OPEN — an oversight role cannot read an RFQ, and widening the route does not change that
+### CLOSED 2026-10-19 for Compliance and the DPO, STILL OPEN for Claims — an oversight read of an RFQ is ANCHORED
 
 The owner decided that Claims, Compliance and the Data Protection Officer may read an RFQ and its
 broker/insurer correspondence. Widening the route's gate is NOT enough and this was measured over
@@ -1561,11 +1561,24 @@ the current state — the Manager's 200 as a non-vacuity floor, and all six over
 **403** — so a future widening without the visibility layer fails by name. Do not loosen those
 assertions to accept either status: 403 and 404 are different claims and only one is true.
 
-**What it would take is a decision the owner has not been asked for**, because granting
-`customer-file.all-owners.read` reaches **8 services and 46 routes** — every customer's needs
-assessment, risk profile, insurance programme, opportunities, RFQs, quotations, comparison and
-client decision, across all owners. That is a privacy question about what an oversight role may see
-of a customer's commercial file, not a permission adjustment. `docs/deferred-register.md` entry 57.
+**WHAT WAS BUILT INSTEAD, 2026-10-19 — door four.** Granting `customer-file.all-owners.read`
+would have reached **8 services and 46 routes**, so the owner paid for the narrower mechanism: an
+oversight role reads one customer's RFQ chain only while an OPEN piece of work on that customer is
+ASSIGNED to them, and the window shuts when the work closes. The DPO's anchor is an open
+`DataSubjectRequest` they are handling; the Compliance Officer's is an open `ScreeningMatch`
+assigned to them. **The route widening was the FIRST of two layers** — `PermissionsGuard` refuses
+before the service is reached, so the gate (now an any-of over `rfq.read` and
+`dashboard.compliance.view`, exactly six roles) decides who may ASK and
+`CustomerFileAnchorService` decides whose file. Read that service's header before touching either
+half; it is deliberately local to the RFQ module, with a spec that fails if a second module imports
+it. The anchored read is AUDITED — only when the ownership filter would have refused, so a
+one-person office logs nothing — and that row is half the guard, not a decoration.
+
+**THE CLAIMS OFFICER IS STILL REFUSED, at 403, deliberately.** Its anchor was to be *a claim
+assigned to him* and this product cannot express that: `Claim` carries no staff user field at all.
+**Today nobody in this system can say who is handling a claim**, which is recorded as a missing
+CAPABILITY for the claims module rather than a column to be added here —
+`docs/deferred-register.md` entries 67 and 68.
 
 ### OPEN — the provider cannot see or build roles over its own platform capabilities
 

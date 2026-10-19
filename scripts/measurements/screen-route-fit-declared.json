@@ -41,7 +41,24 @@
     "`listInsurerMasters().catch(() => null)`, whose own comment says the null \"disables the path and explains why\". Item 5's second row went the same way.",
     "",
     "So item 2 needed NEITHER the widening nor the door-closing its decision allowed for, and item 5",
-    "is already built. What remains is item 4 alone: eight rows on `/rfqs/[id]`."
+    "is already built. What remains is item 4 alone: eight rows on `/rfqs/[id]`.",
+    "",
+    "2026-10-19: DOOR FOUR CLOSED FOUR ROWS — the two COMPLIANCE_OFFICER and two",
+    "DATA_PROTECTION_OFFICER rows on `/rfqs/[id]`. The route is now an any-of over",
+    "`rfq.read` and `dashboard.compliance.view` (exactly SIX roles, asserted",
+    "by name in `route-role-reach.spec.ts`), and `CustomerFileAnchorService`",
+    "decides whose file: an open DSR handled by that DPO, or an open screening case assigned to that",
+    "Compliance Officer. Nine rows -> five.",
+    "",
+    "FIVE, NOT THE THREE THE DECISION EXPECTED, and the two extra are the two",
+    "`selectable-insurers` rows. They were expected to close as instrument artefacts, and",
+    "they cannot: this check still REPORTS them, because CLAIMS_OFFICER and the DPO genuinely lack",
+    "`insurer.read` and the check cannot see that the call sits behind a button inside",
+    "`{isPlacement ? ...}`. Removing a row the check still reports makes it fail as a STALE",
+    "declaration, which is the half that stops this list becoming a ceiling. So they stay, with the",
+    "reading recorded — the same treatment as the `/employees` row, and for the same",
+    "reason: teaching the matcher to skip flag-guarded calls would have hidden the original",
+    "`/provider-register-office` defect, which was also behind a try/catch and was real."
   ],
   "declared": [
     {
@@ -54,7 +71,7 @@
       "screen": "/rfqs/[id]",
       "role": "CLAIMS_OFFICER",
       "route": "GET /rfqs/*",
-      "decision": "ITEM 4 — WIDEN. Owner reversed the recommendation to close the door, and her reasoning stands: a claims officer assessing a claim must read the request history that produced the policy; a compliance officer examines whether the disclosure duty was met; a DPO cannot assemble a subject access request from a record he cannot read. Decided set: SALES, PLACEMENT, MANAGER, EXEC (unchanged) + CLAIMS, COMPLIANCE, DPO, and specifically NOT SYSTEM_SECURITY_ADMINISTRATOR. NOT YET BUILT — and it carries a NEW REQUIREMENT that is part of the decision: every read by a role outside the placement path is AUDITED (actor, the role the read came under, the RFQ id, the time), because in an office that declared its duties MERGED one person may hold both hats and the log is then the only thing that makes the read answerable. Measured: there is NO read-logging precedent in this codebase, so that is new ground and its write volume is to be measured before it is committed."
+      "decision": "DOOR FOUR, 2026-10-19 — THE CLAIMS HALF WAITS, and what it waits for is a CAPABILITY this product does not have. The decision was that a Claims Officer may read an RFQ while a claim on that customer is ASSIGNED TO HIM. Measured: `Claim` carries no staff user field at all (31 fields; the only user on it is `discardedByUserId`), and its `adjuster` relation is an EXTERNAL loss-adjusting firm. The near-neighbour — a `ClaimStatusHistory` row in his name — was refused twice over: it means ACTED ON ONCE rather than assigned to, and such a row NEVER CLOSES, so the window it opens would never shut, which is the whole property door four exists for. If it is ever revisited it must be 'acted on AND the claim is still open', and it needs an index: `ClaimStatusHistory` is indexed on `organizationId` only. SO THE ROUTE DELIBERATELY DOES NOT ADMIT THIS ROLE: `GET /rfqs/:id` is an any-of over `rfq.read` and `dashboard.compliance.view` — SIX roles — and admitting Claims would swap an honest 403 for a 404 about a record that exists, for a role that can never satisfy the second layer. The 403 is pinned by name in `rfq-oversight-read.e2e-spec.ts`. This row closes when the claims module gives a claim a handler."
     },
     {
       "screen": "/rfqs/[id]",
@@ -66,37 +83,13 @@
       "screen": "/rfqs/[id]",
       "role": "CLAIMS_OFFICER",
       "route": "GET /rfqs/selectable-insurers",
-      "decision": "ITEM 4 — DECLARE, and deliberately NOT widened. This list exists to ADD an insurer to an RFQ, and all three roles are already refused `POST /rfqs/:id/insurers` — so the section is to be hidden with a named reason. A control that cannot be used is not a control to show. NOT YET BUILT."
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "COMPLIANCE_OFFICER",
-      "route": "GET /rfqs/*",
-      "decision": "ITEM 4 — WIDEN. Owner reversed the recommendation to close the door, and her reasoning stands: a claims officer assessing a claim must read the request history that produced the policy; a compliance officer examines whether the disclosure duty was met; a DPO cannot assemble a subject access request from a record he cannot read. Decided set: SALES, PLACEMENT, MANAGER, EXEC (unchanged) + CLAIMS, COMPLIANCE, DPO, and specifically NOT SYSTEM_SECURITY_ADMINISTRATOR. NOT YET BUILT — and it carries a NEW REQUIREMENT that is part of the decision: every read by a role outside the placement path is AUDITED (actor, the role the read came under, the RFQ id, the time), because in an office that declared its duties MERGED one person may hold both hats and the log is then the only thing that makes the read answerable. Measured: there is NO read-logging precedent in this codebase, so that is new ground and its write volume is to be measured before it is committed."
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "COMPLIANCE_OFFICER",
-      "route": "GET /rfqs/*/communications",
-      "decision": "ITEM 4 — WIDEN, same decided set and same audit requirement as `GET /rfqs/*`. The correspondence with the insurer is where what was disclosed and what was not is recorded, which is the half that makes a claim assessable. NOT YET BUILT."
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "DATA_PROTECTION_OFFICER",
-      "route": "GET /rfqs/*",
-      "decision": "ITEM 4 — WIDEN. Owner reversed the recommendation to close the door, and her reasoning stands: a claims officer assessing a claim must read the request history that produced the policy; a compliance officer examines whether the disclosure duty was met; a DPO cannot assemble a subject access request from a record he cannot read. Decided set: SALES, PLACEMENT, MANAGER, EXEC (unchanged) + CLAIMS, COMPLIANCE, DPO, and specifically NOT SYSTEM_SECURITY_ADMINISTRATOR. NOT YET BUILT — and it carries a NEW REQUIREMENT that is part of the decision: every read by a role outside the placement path is AUDITED (actor, the role the read came under, the RFQ id, the time), because in an office that declared its duties MERGED one person may hold both hats and the log is then the only thing that makes the read answerable. Measured: there is NO read-logging precedent in this codebase, so that is new ground and its write volume is to be measured before it is committed."
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "DATA_PROTECTION_OFFICER",
-      "route": "GET /rfqs/*/communications",
-      "decision": "ITEM 4 — WIDEN, same decided set and same audit requirement as `GET /rfqs/*`. The correspondence with the insurer is where what was disclosed and what was not is recorded, which is the half that makes a claim assessable. NOT YET BUILT."
+      "decision": "INSTRUMENT ARTEFACT, 2026-10-18, and it could NOT be closed by the door-four work. `listSelectableInsurers()` is called only from `openAdd()`, which is reached only from the 'Add insurers' button, which sits inside `{isPlacement ? ...}` where `isPlacement` is `hasPermission(user, 'rfq.insurer.update')` — PLACEMENT alone. So for this role the route is never called and there is nothing being refused to declare. THE ROW STAYS BECAUSE THIS CHECK STILL REPORTS IT: it maps a screen's imports to routes and cannot see that a call sits behind a screen-computed permission flag, and removing a row the check still reports makes it fail as a STALE declaration — which is the half that stops this list becoming a ceiling. Teaching the matcher to treat any try/catch call as handled was considered and REFUSED: that rule would have hidden the original `/provider-register-office` defect, which was also inside a try/catch and was real. (COMPLIANCE_OFFICER has no such row because it holds `insurer.read` and the route resolves for it anyway.)"
     },
     {
       "screen": "/rfqs/[id]",
       "role": "DATA_PROTECTION_OFFICER",
       "route": "GET /rfqs/selectable-insurers",
-      "decision": "ITEM 4 — DECLARE, and deliberately NOT widened. This list exists to ADD an insurer to an RFQ, and all three roles are already refused `POST /rfqs/:id/insurers` — so the section is to be hidden with a named reason. A control that cannot be used is not a control to show. NOT YET BUILT."
+      "decision": "INSTRUMENT ARTEFACT, 2026-10-18, and it could NOT be closed by the door-four work. `listSelectableInsurers()` is called only from `openAdd()`, which is reached only from the 'Add insurers' button, which sits inside `{isPlacement ? ...}` where `isPlacement` is `hasPermission(user, 'rfq.insurer.update')` — PLACEMENT alone. So for this role the route is never called and there is nothing being refused to declare. THE ROW STAYS BECAUSE THIS CHECK STILL REPORTS IT: it maps a screen's imports to routes and cannot see that a call sits behind a screen-computed permission flag, and removing a row the check still reports makes it fail as a STALE declaration — which is the half that stops this list becoming a ceiling. Teaching the matcher to treat any try/catch call as handled was considered and REFUSED: that rule would have hidden the original `/provider-register-office` defect, which was also inside a try/catch and was real. (COMPLIANCE_OFFICER has no such row because it holds `insurer.read` and the route resolves for it anyway.)"
     }
   ]
 }

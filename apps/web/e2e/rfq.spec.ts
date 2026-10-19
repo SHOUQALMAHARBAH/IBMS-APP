@@ -3114,8 +3114,27 @@ for (const status of [404, 403] as const) {
       page.getByText("may not be one of your files", { exact: false }),
     ).toBeVisible();
     await expect(
-      page.getByText("check with your branch manager", { exact: false }),
+      page.getByText("check the reference, or ask the file", { exact: false }),
     ).toBeVisible();
+    // AND NO ROLE NAME IN THE SENTENCE. The first wording said "your branch manager" and was
+    // withdrawn on measurement: zero `Branch` rows exist, and the reader most likely to see this
+    // sentence is the sole practitioner who owns every file. Asserted as an ABSENCE, which is the
+    // only form that can fail if somebody adds one back to be helpful.
+    //
+    // SCOPED TO THE NOTICE, not page-wide. The first version of this loop was page-wide and matched
+    // "Compliance" in the NAV SIDEBAR — a real label, nothing to do with this sentence — so it
+    // failed on a correct tree. Page-wide text assertions on this app are the trap IMPROVEMENTS
+    // § 1.85 records, and this is the fourth time it has been paid for.
+    const sentence = (await notice.textContent()) ?? "";
+    for (const role of [
+      "branch manager",
+      "Manager",
+      "Administrator",
+      "Compliance",
+      "Executive",
+    ]) {
+      expect(sentence).not.toContain(role);
+    }
     // AND IT CONFIRMS NOTHING. Anchored on the notice above already being visible, so this cannot
     // pass on a page that never rendered. The API's own English message must be absent too —
     // passing it straight through is the behaviour this scheme replaced.

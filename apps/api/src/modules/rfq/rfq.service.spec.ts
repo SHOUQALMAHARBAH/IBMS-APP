@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
+import { CustomerFileAnchorService } from './customer-file-anchor.service';
 import {
   ConflictException,
   NotFoundException,
@@ -174,12 +175,15 @@ function makeDeps() {
   const record = vi.fn().mockResolvedValue(undefined);
   const audit = { record } as unknown as AuditService;
 
+  const resolveAnchor = vi.fn().mockResolvedValue(null);
+
   const transition = vi
     .fn()
     .mockResolvedValue({ id: 'opp-1', status: 'RFQ_ISSUED' });
   const workflow = { transition } as unknown as WorkflowTransitionService;
 
   return {
+    resolveAnchor,
     service: new RfqService(
       rfqs,
       opportunities,
@@ -192,6 +196,14 @@ function makeDeps() {
       {
         findCategory: vi.fn().mockResolvedValue('GENERAL'),
       } as unknown as InsuranceLineRepository,
+      // DOOR FOUR. Resolves NO anchor, which is the NON-WIDENING value: every test in this file
+      // keeps the behaviour it had, and a test that wants an anchored read says so by overriding
+      // this. The real refusal is proven over HTTP in `rfq-oversight-read.e2e-spec.ts`, because a
+      // mock cannot refuse you — the lesson from the five screening routes whose precondition only
+      // an api e2e could see.
+      {
+        resolve: resolveAnchor,
+      } as unknown as CustomerFileAnchorService,
     ),
     mocks: {
       createRfq,

@@ -225,6 +225,40 @@ const DECIDED: {
       'SYSTEM_SECURITY_ADMINISTRATOR',
     ],
   },
+  {
+    route: 'GET /rfqs/:id',
+    why:
+      'Owner, 2026-10-19, door four. An oversight role may read one customer RFQ chain while an ' +
+      'OPEN piece of work on that customer is assigned to them — not through a blanket ' +
+      '`customer-file.all-owners.read`, which was measured to reach 8 services and 46 routes. This ' +
+      'gate is only the FIRST layer: `CustomerFileAnchorService` decides WHOSE file, and neither ' +
+      'works alone. SIX roles, not the seven first decided: CLAIMS_OFFICER is deliberately absent ' +
+      'because its anchor (a claim ASSIGNED to him) is not expressible — `Claim` has no staff user ' +
+      'field — so admitting it would swap an honest 403 for a false 404.',
+    roles: [
+      'BRANCH_DEPARTMENT_MANAGER',
+      'COMPLIANCE_OFFICER',
+      'DATA_PROTECTION_OFFICER',
+      'EXECUTIVE_MANAGEMENT',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    ],
+  },
+  {
+    route: 'GET /rfqs/:id/communications',
+    why:
+      'Owner, 2026-10-19, door four — THE SAME gate as the RFQ itself, deliberately. A reader who ' +
+      'may see the RFQ and not its correspondence, or the reverse, would be a second answer to one ' +
+      'question. The write (`POST`) keeps `rfq.communication.log` and is untouched.',
+    roles: [
+      'BRANCH_DEPARTMENT_MANAGER',
+      'COMPLIANCE_OFFICER',
+      'DATA_PROTECTION_OFFICER',
+      'EXECUTIVE_MANAGEMENT',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    ],
+  },
 ];
 
 describe('a widened route is specified by the exact role set that reaches it', () => {
