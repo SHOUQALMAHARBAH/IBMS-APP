@@ -249,6 +249,44 @@ describe('Broker licence scope (e2e) — Module 0 item (e)', () => {
       expect(message).toMatch(/sole establishment/i);
       expect(message).toMatch(/art\. 3\/a/);
 
+      /*
+       * THE TWO ACTIONABLE CLAUSES, asserted separately — batch 5.
+       *
+       * The sentence names WHICH types the office already holds and WHICH category is being
+       * refused, and a reword that dropped either would keep the two assertions above green while
+       * leaving the reader with a rule and no way to see which of his own branches triggered it.
+       */
+      expect(message).toMatch(/already holds branches in GENERAL/);
+      expect(message).toMatch(/a LIFE branch cannot be added/);
+
+      /*
+       * AND THE REFUSAL FIRES FOR THE ARTICLE, NOT FOR THE STAFFING RULE — the half the
+       * owner's batch-5 instruction asks for, because a refusal that fires for the wrong reason is
+       * not the refusal.
+       *
+       * Adding LIFE here satisfies the conditions of BOTH checks at once: art. 3/a (a natural
+       * person spanning two types) and item (f) (both types with fewer than two CBJ-approved
+       * people). The service checks art. 3/a FIRST, and that order is load-bearing rather than
+       * incidental: item (f)'s message tells the reader to record a CBJ approval on each approved
+       * person, which is work a sole establishment can complete in full and still not be allowed a
+       * second type. Refuse on the thing the caller cannot change by editing the request — the same
+       * rule the commission scope check already earned.
+       *
+       * The floor comes first, or the absence assertion passes for the wrong reason: if this office
+       * already recorded two approved people, item (f) would not fire at all and "the staffing
+       * message is absent" would prove nothing about the ordering.
+       */
+      const approvedNow = await rawPrisma.employee.count({
+        where: { cbjApprovalStatus: 'CURRENT', terminationDate: null },
+      });
+      expect(
+        approvedNow,
+        'this office records 2 or more CBJ-approved people, so item (f) would not fire on a' +
+          ' second type and the ordering assertion below would be vacuous',
+      ).toBeLessThan(2);
+      expect(message).not.toMatch(/CBJ-approved people/);
+      expect(message).not.toMatch(/Record the CBJ approval/);
+
       // And it refused by REFUSING, not by writing and rolling back: the LIFE branch is absent.
       const stillOneType = await request(target.getHttpServer())
         .get('/broker-license/scope')

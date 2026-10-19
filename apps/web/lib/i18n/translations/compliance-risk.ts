@@ -140,6 +140,30 @@ export const COMPLIANCE_RISK = {
     providerOfficesBranchesValue: '{total} ({dormant} بلا أي عمل)',
     providerOfficesUsersValue: '{active} نشط من {total}',
     providerOfficesNeverUsed: 'لم يُستخدم بعد',
+    providerOfficesColAdministrator: 'المسؤول الأول',
+    providerOfficesHasAdministrator: 'له حساب',
+    providerOfficesNoAccountYet: 'لا يوجد حساب — لا يستطيع أحد الدخول',
+    providerOfficesInviteOpen: 'دعوة المسؤول الأول',
+    providerOfficesInviteCancel: 'إلغاء الدعوة',
+    providerOfficesInviteHeading: 'دعوة المسؤول الأول لهذه المنظمة',
+    providerOfficesInviteEmailLabel: 'البريد الإلكتروني للعمل (يصبح هوية الدخول)',
+    providerOfficesInviteNameLabel: 'الاسم الكامل كما يظهر على الحساب',
+    providerOfficesInviteReasonLabel:
+      'سبب منح هذه المنظمة مسؤولاً أول (١٠ أحرف على الأقل)',
+    providerOfficesInviteSubmit: 'إرسال الدعوة',
+    providerOfficesInviteSending: 'جارٍ الإرسال…',
+    providerOfficesInviteReasonTooShort:
+      'السبب يحتاج ١٠ أحرف على الأقل — يُسجَّل في سجل التدقيق ويجعل هذا الإنشاء قابلاً للمساءلة.',
+    providerOfficesInviteNoPasswordNote:
+      'لا يُنشئ النظام كلمة مرور ولا يولّدها ولا يحفظها ولا يعرضها على أحد في أي مرحلة. يدخل المسؤول المدعو بطلب إعادة تعيين كلمة المرور على بريده.',
+    providerOfficesInviteNotLicensingNote:
+      'هذه دعوة أول حساب يفتح المنظمة على المنصّة، وليست استيفاءً لأي شرط ترخيص. الحد الأدنى للكوادر المعتمدة — مدير الأعمال التأمينية والقائم بأعمال الوساطة — شرطٌ من البنك المركزي يُسجَّل على الموظفين، وهو شيء آخر.',
+    providerOfficesInviteCompanyLimitNote:
+      'تنبيه قبل دعوة شركة تأمين: سيستطيع هذا المسؤول الدخول وقراءة سجل شركته وحده، ولا شيء غير ذلك. لا صندوق طلبات تسعير ولا تسعير ولا إصدار — تلك هي البوابة، وهي مديول منفصل لم يُبنَ بعد. وجود حساب للشركة لا يعني أنها جاهزة للعمل.',
+    providerOfficesInviteDone:
+      'أُرسلت الدعوة. أُنشئ الحساب {email} بدور {roleName}، ويدخل بطلب إعادة تعيين كلمة المرور.',
+    providerOfficesInviteFailed: 'لم تُرسل الدعوة',
+    providerOfficesLicenceNotApplicable: 'لا ينطبق — ليست مكتب وساطة',
     rcStaffingHeading: 'الحد الأدنى للكوادر المعتمدة',
     rcStaffingRequired: 'العدد المطلوب:',
     rcStaffingCurrent: 'المسجَّل حالياً:',
@@ -541,6 +565,30 @@ export const COMPLIANCE_RISK = {
     providerOfficesBranchesValue: '{total} ({dormant} with no business)',
     providerOfficesUsersValue: '{active} active of {total}',
     providerOfficesNeverUsed: 'never used',
+    providerOfficesColAdministrator: 'First administrator',
+    providerOfficesHasAdministrator: 'has an account',
+    providerOfficesNoAccountYet: 'no account — nobody can sign in',
+    providerOfficesInviteOpen: 'Invite the first administrator',
+    providerOfficesInviteCancel: 'Cancel invitation',
+    providerOfficesInviteHeading: 'Invite this organization its first administrator',
+    providerOfficesInviteEmailLabel: 'Work email (becomes the sign-in identity)',
+    providerOfficesInviteNameLabel: 'Full name, as it should appear on the account',
+    providerOfficesInviteReasonLabel:
+      'Why this organization is being given a first administrator (at least 10 characters)',
+    providerOfficesInviteSubmit: 'Send the invitation',
+    providerOfficesInviteSending: 'Sending…',
+    providerOfficesInviteReasonTooShort:
+      'The reason needs at least 10 characters — it is recorded on the audit row and is what makes this creation answerable rather than merely recorded.',
+    providerOfficesInviteNoPasswordNote:
+      'No password is created, generated, recorded or displayed anywhere, by anyone, at any point. The invited administrator signs in by requesting a password reset on their own email.',
+    providerOfficesInviteNotLicensingNote:
+      'This invites the first account that OPENS the organization on this platform. It satisfies no licensing requirement: the minimum approved staff — the insurance-business manager and the broker-in-charge — is a Central Bank requirement recorded against employees, and is a different thing.',
+    providerOfficesInviteCompanyLimitNote:
+      'Before inviting an insurance company: this administrator will be able to sign in and read the company own record, and nothing more. No RFQ inbox, no pricing, no issuance — those are the gateway, which is a separate module and is not built. A company having an account does not make it operational.',
+    providerOfficesInviteDone:
+      'Invitation sent. The account {email} was created with the role {roleName}, and signs in by requesting a password reset.',
+    providerOfficesInviteFailed: 'The invitation was not sent',
+    providerOfficesLicenceNotApplicable: 'not applicable — not a brokerage office',
     rcStaffingHeading: 'Minimum approved staff',
     rcStaffingRequired: 'Required:',
     rcStaffingCurrent: 'Currently recorded:',

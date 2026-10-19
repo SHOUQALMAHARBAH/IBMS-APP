@@ -1620,6 +1620,23 @@ Module 0 item (j)'s `/provider-offices` is a CROSS-OFFICE read, gated on
 other brokerage offices' licence state, their dormant licensed branches, their user counts and when
 they were last used — all of which is commercially meaningful between competitors.
 
+> **UPDATED 2026-10-19 (batch 5, item (و)).** That view now carries **registered insurance
+> companies as well as brokerage offices** — one line changed, the `WHERE`, in migration
+> `20261201100000`. It had to: the invite surface for an organization's first administrator lives on
+> the organization row, and **no route in this product lists `INSURANCE_COMPANY` organizations at
+> all** (measured — every other occurrence is a single-row read or a type guard), so there was
+> nothing to union a screen against. The **column list did not change**, byte for byte, so the
+> privacy boundary and its three guards are the reviewed ones; `PROVIDER` stays excluded and the
+> migration asserts its absence as a ZERO.
+>
+> **Any licence fact on that screen must branch on `organizationType`.** A company has no broker
+> licence by nature, so every licence column is NULL, which the mapper turns into
+> `isCurrentlyLapsed === null` — "no term on record", which blocks new business under art. 21/a/9.
+> Rendered unbranched, the screen reports a company the provider itself registered as being in
+> **regulatory default**, which is the same false finding the old `BROKERAGE_OFFICE` filter existed
+> to prevent, moved one type over. `provider-offices.spec.ts` asserts both halves and a plant proves
+> it can fail.
+
 **This product has no platform-operator concept**: every user belongs to an `Organization`, so
 "only the provider may hold this code" is not expressible. An office granted it sees every office.
 
