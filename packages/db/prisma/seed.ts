@@ -336,7 +336,9 @@ async function ensureProviderOrganization(): Promise<void> {
    *
    * It compares the SET and not the COUNT, and that distinction was demonstrated rather than
    * argued: with the check reduced to a count, a swapped-in `customer.create` was accepted and
-   * granted. A count of seven is satisfied by a set containing a brokerage capability.
+   * granted. A count is satisfied by any set of that size,
+   * including one containing a brokerage capability. (This said "seven" until 2026-10-19; the set is
+   * ELEVEN today, and the argument never depended on the number — which is why it no longer states one.)
    */
   await prisma.$transaction(async (tx) => {
     for (const permission of permissions) {

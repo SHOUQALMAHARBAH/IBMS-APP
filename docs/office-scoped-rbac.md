@@ -284,7 +284,7 @@ for every spec — which is why the fixture specs clean up in `beforeAll` as wel
 
 An Office Administrator must be able to create an insurer absent from the global
 `InsurerMaster`, office-scoped, enforced in RLS and backend authorization rather
-than by frontend filtering. The proposed code is `insurer.relationship.manage`,
+than by frontend filtering. The proposed code is `insurer.relationship.manage` — **NOT BUILT UNDER THAT NAME: it was split five ways and the five that exist are `insurer.create`/`update`/`deactivate`, `insurance-line.create` and `insurance-line.update` (2026-10-19)** —,
 never `insurer.master.manage`.
 
 It was deferred from Phase 3 for a reason worth keeping: including that code in the

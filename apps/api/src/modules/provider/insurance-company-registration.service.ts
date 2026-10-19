@@ -257,8 +257,9 @@ export class InsuranceCompanyRegistrationService {
         licensedLineCount: result.licensedLineCount,
         licensedCategories: result.licensedCategories,
         // The role is part of what this act created, so it belongs in the row that records the act.
-        // The COUNT and not the codes: the grant set is a catalogue selection, and copying six code
-        // names into an append-only audit row would be a second home for a list one file owns.
+        // The COUNT and not the codes: the grant set is a catalogue selection, and copying the code NAMES into an
+        // append-only audit row would be a second home for a list one file owns. (It said "six" until
+        // 2026-10-19; decision 11 made it EIGHT, which is exactly why the sentence names no number.)
         administratorRoleId: result.administratorRoleId,
         administratorGrantCount: result.administratorGrantCount,
       },

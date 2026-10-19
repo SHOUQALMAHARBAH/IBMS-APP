@@ -843,7 +843,7 @@ build actually is today:
   several roles cannot weaken
   separation of duties. The `RoleName` enum type and the pre-migration global role rows
   are deliberately kept for at least one release so rollback stays cheap. **Insurer CRUD
-  and `insurer.relationship.manage` have since SHIPPED** — this sentence said they
+  has since SHIPPED** — as `insurer.create`/`update`/`deactivate` plus `insurer.read`, `insurer.directory.read` and `insurer.office-form.map`. **This named `insurer.relationship.manage` until 2026-10-19 and that code DOES NOT EXIST**: Phase 1 split the umbrella five ways because it gated two entities, and this sentence kept the old name — — this sentence said they
   "remain specification-only" throughout the branch that built them, which is the doc rot
   `meta/lex/definition-of-done.md` names: a deferral is true when written and nobody
   revisits it. The reason for the deferral was real and its PROPERTY survives: including

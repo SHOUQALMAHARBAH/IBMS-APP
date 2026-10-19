@@ -7,17 +7,36 @@ import { prisma, rawPrisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 /**
- * PART 4 STEP 4 — declaring the office's mode, and THE SHIPPING GATE as a test.
+ * PART 4 STEP 4 — declaring the office's mode. **THE SHIPPING GATE IS LIFTED AND THIS HEADER USED TO
+ * SAY OTHERWISE.**
  *
- * The gate is the reason this file exists in this shape. `docs/duty-segregation-mode.md` states at the top
- * that COMBINED mode may not ship before the self-approval report exists and works — a commitment made to the
- * owner, on the strength of which a control was weakened. A gate written only in a document is a gate
- * somebody ships past, so the service refuses COMBINED while `SELF_APPROVAL_REPORT_EXISTS` is false, and the
- * test below asserts that refusal.
+ * ## THE CORRECTION, kept beside the claim it replaces (item 10 / S3, 2026-10-19)
  *
- * **When the report ships, that flag, that refusal and this test are deleted in one commit.** A test that
- * asserts the gate is a liability the moment the gate is lifted, which is why it says so here rather than
- * leaving somebody to discover a failing assertion and delete it without knowing what it meant.
+ * This header described a gate as live. It said: *"the service refuses COMBINED while
+ * `SELF_APPROVAL_REPORT_EXISTS` is false, and the test below asserts that refusal"*, and
+ * *"when the report ships, that flag, that refusal and this test are deleted in one commit"*.
+ *
+ * The report shipped on 2026-09-26. The flag, the refusal and that test were all deleted in that
+ * commit, exactly as instructed — **and this header was not**, which is the one thing its own
+ * instruction did not cover. Measured before rewriting: `SELF_APPROVAL_REPORT_EXISTS` occurs ZERO
+ * times in `apps/api/src`, this file's first test reads *"COMBINED can now be declared, because the
+ * report the gate demanded exists"*, and `GET /internal-controls/combined-duty-acts` is live.
+ *
+ * Why it survived a re-identification that was looking for it: § 1 of `docs/module-1-preflight.md`
+ * reported S3 as absent, on the ground that the constant "appears nowhere in the tree, so a comment
+ * naming it would have surfaced". A COMMENT is precisely where it does not surface — a grep of
+ * `src` finds nothing, and this file is a test. The lesson is the search, not the comment: a
+ * constant that has been deleted lives on in prose, so search the whole tree and not the
+ * implementation.
+ *
+ * ## WHAT THIS FILE PROVES NOW
+ *
+ * That an office can declare its mode, that the declaration is recorded and audited with who and
+ * when, that the READ is open to whoever reviews the acts while the WRITE is not, and that
+ * `/auth/me` carries the mode so an approve screen knows whether to ask for a reason. The gate it
+ * was once built around is history, and the history is kept here rather than deleted because the
+ * reason COMBINED mode was allowed to exist at all is that a report would make every such act
+ * visible — which is a commitment, not a detail.
  */
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 const RUN = Math.random().toString(36).slice(2, 8);

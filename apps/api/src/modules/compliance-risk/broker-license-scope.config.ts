@@ -145,6 +145,45 @@ export function typesInScope(
  * and still shown; what changes is that both surfaces displaying it now say the counting unit is
  * under verification. The owner's rule is that the system does not state as settled what is not, and
  * a capital requirement is a money figure an office acts on.
+ *
+ * ## 2026-10-19 — THE REOPENING CONDITION ABOVE IS MET. THE ANSWER IS WRITTEN AND ATTRIBUTED.
+ *
+ * The owner's folder holds a written answer from the Central Bank's insurance supervision side:
+ * **26 officially recognised branches, 18 general and 8 life/medical**, with the instruction that
+ * *"for the purposes of the article 4/a capital tiers you must base your screen on the 26 official
+ * branches only, and any extra branch in your catalogue must be programmatically linked as a
+ * Sub-category belonging to one of the 18 general or the 8 life, so that your arithmetic matches the
+ * supervisory system."*
+ *
+ * So this function is WRONG as it stands — it counts our rows — and the fix is authorised. It is not
+ * built yet, and what is missing is the LIST: which 18 and which 8, and which of our 32 belongs to
+ * each. That is a regulatory classification, and inventing it would put an internal guess inside a
+ * capital figure, which is the one thing this whole comment exists to refuse.
+ *
+ * ## AND THE MEASUREMENT THAT DECIDES THE SHAPE — it is NOT the collapse the instruction assumes
+ *
+ * Measured on the seeded catalogue: ours is **27 GENERAL and 5 LIFE**.
+ *
+ *     GENERAL   27 ours -> 18 official   nine of ours collapse into parents
+ *     LIFE       5 ours ->  8 official   THREE OFFICIAL BRANCHES HAVE NO CHILD IN OUR CATALOGUE
+ *
+ * A parent FK on our 32 rows can express the first line and CANNOT express the second: three
+ * official life/medical branches would exist only as the absence of a row. Since the tier counts
+ * DISTINCT OFFICIAL BRANCHES an office is licensed for, an office licensed for one of those three
+ * could not be represented at all, and its capital tier would be computed on a scope that cannot
+ * include it — the same arithmetic error one level down.
+ *
+ * So the 26 must be their OWN managed table, seeded with all 26 including the three we have no child
+ * for, and `InsuranceLine` points INTO it. That is a bigger change than "a parent column", it is the
+ * only shape that makes the arithmetic match the supervisory system, and it is what the list will
+ * populate when it arrives.
+ *
+ * ## WHY THE WARNING LINE IS STILL HERE
+ *
+ * The instruction drops it, on the ground that there is no longer a divergence to warn about. There
+ * is, until the mapping lands: this function still counts our rows, so the figure can still name a
+ * higher tier than the regulator would. Dropping the sentence now would leave the figure wrong AND
+ * unflagged, which is strictly worse than either. It goes with the mapping, in one change.
  */
 
 /**

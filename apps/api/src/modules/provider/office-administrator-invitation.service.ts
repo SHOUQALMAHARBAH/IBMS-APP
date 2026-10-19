@@ -54,6 +54,45 @@ import type { InviteOfficeAdministratorDto } from './dto/invite-office-administr
  * person gets in; telling the operator is the operator's job until the sender exists.
  */
 @Injectable()
+/**
+ * DECISION 18, 2026-10-19 — THIS ROUTE INVITES AN `OFFICE_ADMINISTRATOR`, AND IT MUST NOT BE
+ * "CORRECTED" TO INVITE THE MANAGER ROLE.
+ *
+ * ## THE OWNER'S REASONING
+ *
+ * The architecture is that an office builds its OWN roles. So the first account in a new office has
+ * to be able to create a role and create a user, or the architecture cannot start — the office would
+ * be handed a platform it has no way to populate.
+ *
+ * ## THE MEASUREMENT THAT SETTLED IT (E/1, run before this was built)
+ *
+ * Measured from the seeded database, in both offices:
+ *
+ *     OFFICE_ADMINISTRATOR       47 codes   role.create YES   user.manage YES
+ *     BRANCH_DEPARTMENT_MANAGER  87 codes   role.create NO    user.manage NO
+ *
+ * and the cause, verified independently: `user.manage` and `role.create` are each granted to
+ * [SYSTEM_SECURITY_ADMINISTRATOR, OFFICE_ADMINISTRATOR] and to nobody else. A manager invited first
+ * could record a PERSON with `employee.create` and then give them nothing — no login, and no role to
+ * give them. That is "a condition nobody satisfies", which is the defect this product has shipped
+ * once before.
+ *
+ * ## THE DISTINCTION THE ITEM'S OWN NAME WAS HIDING, AND THE REASON THIS COMMENT EXISTS
+ *
+ * "The office's first manager" means THE FIRST ACCOUNT THAT OPENS THE OFFICE ON THIS PLATFORM. It
+ * does NOT mean the licence's minimum staff.
+ *
+ * The owner's staffing floor — one approved person for a single insurance type, two for both, more
+ * at the office's discretion — is a CENTRAL BANK LICENSING requirement about the insurance-business
+ * manager and the broker-in-charge. It is a fact about who may run an insurance brokerage, recorded
+ * against `Employee` and counted by `countCurrentApprovals` for item (f)'s staffing rule. It has
+ * nothing to do with who holds this platform's bootstrap key, and the two must not be conflated
+ * again.
+ *
+ * So: a change that points this route at `BRANCH_DEPARTMENT_MANAGER` because "manager" appears in
+ * the requirement is the exact mistake named above. The role invited here is the one that can start
+ * the office, and `office-administrator-grants.ts` is where its 47 codes are decided.
+ */
 export class OfficeAdministratorInvitationService {
   constructor(
     private readonly prisma: PrismaService,
