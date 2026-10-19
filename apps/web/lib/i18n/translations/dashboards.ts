@@ -18,11 +18,11 @@
 export const DASHBOARDS = {
   AR: {
     // ---- shared dashboard chrome ----------------------------------------
-    dashBranchIdLabel: 'معرّف الفرع',
+    dashBranchIdLabel: 'اعرض فرعاً واحداً فقط',
     dashBranchIdFilterAria: 'تصفية حسب معرّف الفرع',
     dashInsuranceLineLabel: 'فرع التأمين',
     dashInsuranceLineFilterAria: 'تصفية حسب فرع التأمين',
-    dashInsurerIdLabel: 'معرّف شركة التأمين',
+    dashInsurerIdLabel: 'اعرض شركة تأمين واحدة فقط',
     dashInsurerIdFilterAria: 'تصفية حسب معرّف شركة التأمين',
     dashPeriodLabel: 'تسمية الفترة',
     dashPeriodStart: 'بداية الفترة',
@@ -88,7 +88,7 @@ export const DASHBOARDS = {
     spIntro:
       'العملاء المرتقبون الجدد المؤهَّلون مقارنةً بالحصة المستهدفة، لكل موظف علاقات/مبيعات أو لكل فرع أو فريق.',
     spLookUp: 'استعراض الأداء',
-    spOwnerUserIdLabel: 'معرّف المستخدم المسؤول',
+    spOwnerUserIdLabel: 'اعرض محفظة موظف واحد فقط',
     spPeriodOptionalLabel: 'تسمية الفترة (اختياري — الافتراضي هو الفترة الحالية)',
     spViewButton: 'عرض الأداء',
     spNoTarget: 'لم تُحدَّد حصة مستهدفة للفترة الحالية بعد.',
@@ -334,7 +334,7 @@ export const DASHBOARDS = {
     execExecutiveDashboard: 'لوحة الإدارة التنفيذية',
     execTheSalesPolicyClaimsFinancial:
       'ملخّص تنفيذي يجمع لوحات المبيعات والوثائق والمطالبات والمالية والامتثال. كل رقم مأخوذ كما هو من لوحته الأصلية — لا يُعاد احتسابه هنا، حتى لا يختلف الملخّص عمّا يلخّصه.',
-    execBranchId: 'رقم الفرع',
+    execBranchId: 'اعرض فرعاً واحداً فقط',
     execInsuranceLine: 'فرع التأمين',
     execAsOf: 'كما في تاريخ',
     execApplyFilters: 'تطبيق المرشّحات',
@@ -358,11 +358,11 @@ export const DASHBOARDS = {
       'الاستثناءات = تنبيهات غسل الأموال المفتوحة + سجل الاختراقات المفتوح.',
   },
   EN: {
-    dashBranchIdLabel: 'Branch ID',
+    dashBranchIdLabel: 'Show one branch only',
     dashBranchIdFilterAria: 'Branch ID filter',
     dashInsuranceLineLabel: 'Insurance line',
     dashInsuranceLineFilterAria: 'Insurance line filter',
-    dashInsurerIdLabel: 'Insurer ID',
+    dashInsurerIdLabel: 'Show one insurance company only',
     dashInsurerIdFilterAria: 'Insurer ID filter',
     dashPeriodLabel: 'Period label',
     dashPeriodStart: 'Period start',
@@ -424,7 +424,7 @@ export const DASHBOARDS = {
     spIntro:
       'New prospects qualified against quota, per Sales/Relationship Officer or per branch/team.',
     spLookUp: 'Look up performance',
-    spOwnerUserIdLabel: 'Owner user ID',
+    spOwnerUserIdLabel: 'Show the book of one officer only',
     spPeriodOptionalLabel: 'Period label (optional — defaults to the current period)',
     spViewButton: 'View performance',
     spNoTarget: 'No target set for the current period yet.',
@@ -659,7 +659,7 @@ export const DASHBOARDS = {
     execExecutiveDashboard: 'Executive Dashboard',
     execTheSalesPolicyClaimsFinancial:
       'The Sales, Policy, Claims, Financial and Compliance dashboards rolled up. Every figure is lifted verbatim from the dashboard that produced it — nothing is recalculated here, so the summary can never disagree with what it summarises.',
-    execBranchId: 'Branch ID',
+    execBranchId: 'Show one branch only',
     execInsuranceLine: 'Insurance line',
     execAsOf: 'As of',
     execApplyFilters: 'Apply filters',

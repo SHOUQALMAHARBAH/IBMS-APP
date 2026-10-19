@@ -90,6 +90,14 @@ jobs:
       - name: No new page-wide text absence assertions
         run: python scripts/measurements/page-wide-absence-assertions.py --check
 
+      # DECISION 21 — a label says what a field is FOR, never what our column is called. The
+      # hiding of displayed ids became a BUILD RULE rather than a backlog row, and this is the
+      # half a script can police: it classifies each candidate by HOW the screens render it
+      # (prompt / heading / dead), counts PROMPTS, and fails in both directions. The three
+      # polymorphic `/audit-trail` fields are declared BY NAME inside it, not absorbed.
+      - name: No label names a column instead of its purpose
+        run: python scripts/measurements/identifier-labels.py --check
+
       - name: Unit/component tests
         run: npx turbo run test --filter=web
 
