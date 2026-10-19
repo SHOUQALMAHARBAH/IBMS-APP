@@ -12,6 +12,7 @@ import { ThemeToggle } from './ThemeToggle';
 import {
   avatarStyle,
   navbarBrandStyle,
+  navbarOrganizationStyle,
   navbarStyle,
   profileDeptStyle,
   profileMenuItemStyle,
@@ -72,6 +73,24 @@ export function AppNavbar() {
       ? (user.department?.nameAr ?? user.department?.name ?? null)
       : (user.department?.name ?? null);
 
+  /*
+   * BATCH 1 ITEM 4 COMPLETED — the signed-in organization's own name.
+   *
+   * Resolved at RENDER by the reader's language, the same way `department` above is and for the
+   * same reason: the server sends both forms and the caller is the one that knows which script it
+   * is drawing. Picking server-side pins the language to whatever `me()` was fetched under, which
+   * is the defect `EntitySearch` was built to fix.
+   *
+   * NOTHING renders when the field is absent. An organization name is the one string on this page
+   * a person reads as authoritative, so a placeholder would have the system assert something
+   * untrue about her employer — and the field is optional on the type only because ~80 spec mocks
+   * predate it.
+   */
+  const organizationName =
+    language === 'AR'
+      ? (user.organizationName?.ar ?? null)
+      : (user.organizationName?.en ?? null);
+
   async function handleSignOut() {
     await logout();
     clearUser();
@@ -83,18 +102,31 @@ export function AppNavbar() {
       <Link href="/" style={navbarBrandStyle}>
         IBMS
       </Link>
+      {organizationName ? (
+        /* `bdi`, not `span`: an Arabic organization name beside the Latin brand is exactly the
+           bidirectional neighbour that reorders a line without it. */
+        <bdi data-organization-name style={navbarOrganizationStyle}>
+          {organizationName}
+        </bdi>
+      ) : null}
 
       <div style={trailingGroupStyle}>
         {/* Item 1b landed: the reserved slot is a real button with a badge,
             exactly as the placeholder comment said it would become. */}
         <NotificationBell />
 
-        <div role="group" aria-label={t('language')} style={{ display: 'flex', gap: 'var(--space-1)' }}>
+        <div
+          role="group"
+          aria-label={t('language')}
+          style={{ display: 'flex', gap: 'var(--space-1)' }}
+        >
           <button
             type="button"
             aria-pressed={language === 'AR'}
             onClick={() => setLanguage('AR')}
-            style={language === 'AR' ? navbarToggleActiveStyle : navbarToggleStyle}
+            style={
+              language === 'AR' ? navbarToggleActiveStyle : navbarToggleStyle
+            }
           >
             {t('switchToArabic')}
           </button>
@@ -102,7 +134,9 @@ export function AppNavbar() {
             type="button"
             aria-pressed={language === 'EN'}
             onClick={() => setLanguage('EN')}
-            style={language === 'EN' ? navbarToggleActiveStyle : navbarToggleStyle}
+            style={
+              language === 'EN' ? navbarToggleActiveStyle : navbarToggleStyle
+            }
           >
             {t('switchToEnglish')}
           </button>
@@ -125,7 +159,9 @@ export function AppNavbar() {
             </span>
             <span style={{ display: 'grid', minWidth: 0 }}>
               <span style={profileNameStyle}>{user.fullName}</span>
-              {department ? <span style={profileDeptStyle}>{department}</span> : null}
+              {department ? (
+                <span style={profileDeptStyle}>{department}</span>
+              ) : null}
             </span>
           </summary>
 
@@ -140,7 +176,11 @@ export function AppNavbar() {
             <button
               type="button"
               onClick={() => void handleSignOut()}
-              style={{ ...profileMenuItemStyle, width: '100%', textAlign: 'start' }}
+              style={{
+                ...profileMenuItemStyle,
+                width: '100%',
+                textAlign: 'start',
+              }}
             >
               {t('signOut')}
             </button>

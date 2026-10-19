@@ -162,3 +162,48 @@ test("the navbar screen has no serious/critical accessibility violations @a11y",
   );
   expect(serious).toEqual([]);
 });
+
+/**
+ * BATCH 1 ITEM 4, COMPLETED — the signed-in organization's own name in the shell.
+ *
+ * The item existed because the provider's name is the first thing the owner reads on screen one,
+ * and the rename was half delivered: seeded, byte-asserted in CI, and rendered by nothing. Under
+ * the standing rule a half-built decision is worse than an unbuilt one, because it reads as a
+ * guarantee — so this asserts the render in BOTH languages and asserts the no-name case too.
+ *
+ * It reads under NO permission, deliberately: it rides on `me()` beside `organizationType`, which
+ * every authenticated caller already receives. A code whose absence hides a person's own employer
+ * from them is a gate nobody can fail.
+ */
+test("the shell renders the signed-in organization's name, by language", async ({
+  page,
+}) => {
+  await openApp(page, {
+    ...ME,
+    organizationName: { en: "GO Global", ar: "جو جلوبال" },
+  });
+  const name = navbar(page).locator("[data-organization-name]");
+  await expect(name).toBeVisible();
+  await expect(name).toHaveText("GO Global");
+
+  // The Arabic form, resolved at RENDER rather than chosen by the server: picking server-side pins
+  // the language to whatever `me()` was fetched under.
+  await navbar(page)
+    .getByRole("button", { name: /العربية|Arabic/ })
+    .click();
+  await expect(name).toHaveText("جو جلوبال");
+});
+
+test("the shell renders NO organization name when the field is absent", async ({
+  page,
+}) => {
+  // Anchored on something positive from the same render, so the absence cannot pass against a page
+  // that never mounted — and the absence is SCOPED to the navbar, never page-wide, which is the
+  // rule decision 13 made unwritable.
+  await openApp(page, ME);
+  await expect(navbar(page)).toBeVisible();
+  await expect(navbar(page).locator("[data-organization-name]")).toHaveCount(0);
+  // NOT a placeholder: an organization name is the one string here a person reads as
+  // authoritative, so inventing one would have the system assert something untrue about her
+  // employer. ~80 spec mocks predate the field, which is why absent is a real state.
+});

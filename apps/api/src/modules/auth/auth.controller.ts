@@ -71,6 +71,14 @@ const meSchema = {
     hardLogoutAfterIdleMinutes: { type: 'number' as const },
     stepUpFresh: { type: 'boolean' as const },
     organizationType: { type: 'string' as const },
+    organizationName: {
+      type: 'object' as const,
+      nullable: true,
+      properties: {
+        en: { type: 'string' as const },
+        ar: { type: 'string' as const },
+      },
+    },
   },
   required: [
     'id',

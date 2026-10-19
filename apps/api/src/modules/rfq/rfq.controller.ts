@@ -42,7 +42,20 @@ export class RfqController {
     return this.rfqs.listSelectableInsurers();
   }
 
-  @RequirePermissions('rfq.read')
+  /**
+   * DOOR FOUR ON THE LIST — the SAME six-role gate as `:id`, and the same anchor behind it.
+   *
+   * The owner's answer to "is a customer-filtered list inside the chain you decided?" is yes, and
+   * the shape is safe here because this route has NO unfiltered mode: it refuses unless exactly one
+   * of `opportunityId` or `customerId` is given. So the thing an anchored reader could be handed is
+   * one customer's chain and never the book — the unfiltered list would have been the blanket key
+   * the design refused, and it is not expressible on this route.
+   *
+   * `opportunityId` stays owner-only, deliberately: an anchor is per CUSTOMER, and an Opportunity
+   * is a placement-path object whose id a reader outside that path has no way to know. See
+   * `RfqService.list`.
+   */
+  @RequirePermissions('rfq.read', 'dashboard.compliance.view')
   @Get()
   list(
     @Query() query: ListRfqsQueryDto,

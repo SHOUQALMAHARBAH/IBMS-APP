@@ -202,7 +202,28 @@ export default function DsrPage() {
               <tbody>
                 {rows.map((d) => (
                   <tr key={d.id}>
-                    <td style={cell}>{(d.customerId ?? d.insuredPersonId ?? '—').slice(0, 8)}…</td>
+                    <td style={cell}>
+                      {/*
+                        DOOR FOUR'S WAY IN, for the DPO. An open DSR he is handling opens that
+                        customer's RFQ chain, and until this link existed the system admitted him to
+                        a record no screen told him the id of.
+                        CONDITIONAL ON THERE BEING A CUSTOMER: `customerId` is nullable and an
+                        insured-person request names none, so a request about nobody links nowhere.
+                        And it goes to the customer-FILTERED list, never to `/customers/[id]` —
+                        the customer page is not what the anchor opens, so linking it would answer
+                        404 from the ownership layer about a record that exists.
+                      */}
+                      {d.customerId ? (
+                        <a
+                          href={`/rfqs?customerId=${encodeURIComponent(d.customerId)}`}
+                          data-customer-rfqs={d.customerId}
+                        >
+                          {t('dsrViewCustomerRfqs')}
+                        </a>
+                      ) : (
+                        `${(d.insuredPersonId ?? '—').slice(0, 8)}…`
+                      )}
+                    </td>
                     <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
                     <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
                     <td style={cell}>

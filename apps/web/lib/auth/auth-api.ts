@@ -80,6 +80,16 @@ export interface MeResponse {
    */
   organizationType?: 'BROKERAGE_OFFICE' | 'INSURANCE_COMPANY' | 'PROVIDER';
   /**
+   * BATCH 1 ITEM 4 COMPLETED — the signed-in organization's own name, both forms.
+   *
+   * OPTIONAL for the same measured reason as the two fields around it: ~80 spec files build this
+   * mock, and a required field would fail every one of them over a value none of them are about.
+   * An absent value renders NOTHING rather than a placeholder — an organization name is the one
+   * string on the page a person would read as authoritative, so inventing one is worse than
+   * omitting it.
+   */
+  organizationName?: { en: string; ar: string } | null;
+  /**
    * Part 4 — whether this office has declared that one person may perform both halves of a maker/checker
    * pair. Optional on the type rather than required, because ~80 spec files build a `MeResponse` mock and a
    * required field would make every one of them fail to compile for a value none of them are about. Every

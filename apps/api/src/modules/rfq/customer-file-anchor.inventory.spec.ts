@@ -101,6 +101,13 @@ describe('the customer-file anchor has exactly one consumer', () => {
     const visible = service.match(/this\.findVisibleRfq\(/g) ?? [];
     // Two READS use the anchored policy: `get` and `listCommunications`.
     expect(readable).toHaveLength(2);
+    // AND THE DECISION ITSELF HAS ONE HOME WITH TWO CALLERS — the LIST and the DETAIL.
+    // `resolveCustomerReadAccess` is the only place that compares an actor against a customer file
+    // and falls back to an anchor. A third caller is a new surface that nobody decided; a second
+    // COPY of the comparison would be the drift this whole design is built to avoid, and the list
+    // is the copy that would drift (it was written three days after the detail).
+    const decision = service.match(/this\.resolveCustomerReadAccess\(/g) ?? [];
+    expect(decision).toHaveLength(2);
     // Two WRITES keep the owner-only policy: `addInsurers` and `logCommunication`. If this becomes
     // 1, a write path was moved onto the anchored policy — which no behaviour test would catch,
     // because an owner and a whole-book reader behave identically under both policies.

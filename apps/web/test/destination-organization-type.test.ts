@@ -4,6 +4,7 @@ import {
   DESTINATION_GROUPS,
   type Destination,
 } from '../components/app/destinations';
+import { permissionsForRoles } from '../e2e/fixtures/role-permissions';
 
 /**
  * ITEM 7 — the door to `/settings/roles` is closed to the provider, and this is the exact set
@@ -83,6 +84,74 @@ describe('item 7: who may reach /settings/roles', () => {
         roles,
       ),
     ).toBe(false);
+  });
+});
+
+describe('decision 12: the /rfqs nav entry and the set it produces', () => {
+  /**
+   * THE EXACT ROLE SET, asserted by name — the acceptance criterion applied to a NAV entry rather
+   * than to a route, because a destination is a gate too.
+   *
+   * `rfq.read`'s four holders, read from the seeded grid fixture rather than restated here. And the
+   * two oversight roles are asserted ABSENT: `GET /rfqs` now admits them through door four, but
+   * their route is the LINK from the work that anchors them, and a nav entry would offer them a
+   * register they can only ever see one customer of.
+   */
+  const rfqs = destination('/rfqs');
+
+  it('is gated on rfq.read alone — an existing code, no key added to any role', () => {
+    expect(rfqs.permissions).toEqual(['rfq.read']);
+    // No type gate: every organization type that holds the code may open it.
+    expect(rfqs.organizationTypes).toBeUndefined();
+  });
+
+  it('is reachable by exactly the four placement-path roles, and by neither oversight role', () => {
+    const REACHES = [
+      'SALES_RELATIONSHIP_OFFICER',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'BRANCH_DEPARTMENT_MANAGER',
+      'EXECUTIVE_MANAGEMENT',
+    ];
+    const DOES_NOT = [
+      'COMPLIANCE_OFFICER',
+      'DATA_PROTECTION_OFFICER',
+      'CLAIMS_OFFICER',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+      'FINANCE_COLLECTIONS_OFFICER',
+      'EXTERNAL_AUDITOR',
+    ];
+    for (const role of REACHES) {
+      expect(
+        canReach(
+          {
+            permissions: permissionsForRoles([role]),
+            organizationType: 'BROKERAGE_OFFICE',
+          },
+          rfqs,
+        ),
+        `${role} should reach /rfqs`,
+      ).toBe(true);
+    }
+    for (const role of DOES_NOT) {
+      expect(
+        canReach(
+          {
+            permissions: permissionsForRoles([role]),
+            organizationType: 'BROKERAGE_OFFICE',
+          },
+          rfqs,
+        ),
+        `${role} must NOT reach /rfqs`,
+      ).toBe(false);
+    }
+  });
+
+  it('the opportunities entry no longer calls itself the RFQ screen', () => {
+    // The defect was a label, not a gate: this entry was the only one a reader would take for the
+    // RFQ screen and it opens somewhere else.
+    expect(destination('/opportunities').labelKey).toBe(
+      'navOpportunitiesMarket',
+    );
   });
 });
 

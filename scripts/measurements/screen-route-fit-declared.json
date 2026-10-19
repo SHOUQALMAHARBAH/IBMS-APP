@@ -58,7 +58,19 @@
     "declaration, which is the half that stops this list becoming a ceiling. So they stay, with the",
     "reading recorded — the same treatment as the `/employees` row, and for the same",
     "reason: teaching the matcher to skip flag-guarded calls would have hidden the original",
-    "`/provider-register-office` defect, which was also behind a try/catch and was real."
+    "`/provider-register-office` defect, which was also behind a try/catch and was real.",
+    "",
+    "2026-10-19 (decision 12): FIVE ROWS BECAME ONE, and the cause is the nav entry rather than a",
+    "permission. `/rfqs` had NO destination, so this check treated",
+    "`/rfqs/[id]` as an ungated screen that every role could OPEN. Connecting it on",
+    "`rfq.read` gave the detail page a real ancestor gate, so CLAIMS_OFFICER and the",
+    "DPO can no longer open it by navigation and their rows stopped occurring.",
+    "",
+    "THAT IS TRUE OF THE NAVIGATION AND NOT OF THE REFUSALS, which is why the rows can go: the",
+    "Claims Officer's 403 on both RFQ routes is pinned BY NAME in",
+    "`apps/api/test/rfq-oversight-read.e2e-spec.ts`, and the oversight roles reach the",
+    "screen by LINK from the work that anchors them, which this check cannot see and entry 69",
+    "records. One row remains: the `/employees` blind spot."
   ],
   "declared": [
     {
@@ -66,30 +78,6 @@
       "role": "BRANCH_DEPARTMENT_MANAGER",
       "route": "GET /rbac/roles",
       "decision": "ITEM 5 — ALREADY BUILT, and this row is a blind spot of the measurement rather than a defect. Verified by reading the screen: the role fieldset sits inside `{canIssueLogin ? ...}`, where `canIssueLogin` is `hasPermission(user, 'user.manage')` — and BRANCH_DEPARTMENT_MANAGER does not hold that code. So the field is already hidden, and the loader's effect early-returns on the same flag, which means `GET /rbac/roles` is never called for this role at all. The else branch already names the reason bilingually: `reducedCapability(t, 'empLoginCanAct', 'empLoginCannotAct', 'user.manage')`, beside a comment saying exactly why — \"an absent control with no explanation reads as a missing feature\". THE BLIND SPOT, STATED RATHER THAN CLOSED: this check maps a screen's IMPORTS to routes and cannot see that a call sits behind a screen-computed permission flag. Teaching it that was considered and NOT done, because the obvious rule — treat any call inside a try/catch as handled — would have hidden the original `/provider-register-office` defect, which was also inside a try/catch and was real. The row therefore stays declared with this reading recorded, rather than the measurement being loosened until the row disappears."
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "CLAIMS_OFFICER",
-      "route": "GET /rfqs/*",
-      "decision": "DOOR FOUR, 2026-10-19 — THE CLAIMS HALF WAITS, and what it waits for is a CAPABILITY this product does not have. The decision was that a Claims Officer may read an RFQ while a claim on that customer is ASSIGNED TO HIM. Measured: `Claim` carries no staff user field at all (31 fields; the only user on it is `discardedByUserId`), and its `adjuster` relation is an EXTERNAL loss-adjusting firm. The near-neighbour — a `ClaimStatusHistory` row in his name — was refused twice over: it means ACTED ON ONCE rather than assigned to, and such a row NEVER CLOSES, so the window it opens would never shut, which is the whole property door four exists for. If it is ever revisited it must be 'acted on AND the claim is still open', and it needs an index: `ClaimStatusHistory` is indexed on `organizationId` only. SO THE ROUTE DELIBERATELY DOES NOT ADMIT THIS ROLE: `GET /rfqs/:id` is an any-of over `rfq.read` and `dashboard.compliance.view` — SIX roles — and admitting Claims would swap an honest 403 for a 404 about a record that exists, for a role that can never satisfy the second layer. The 403 is pinned by name in `rfq-oversight-read.e2e-spec.ts`. This row closes when the claims module gives a claim a handler."
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "CLAIMS_OFFICER",
-      "route": "GET /rfqs/*/communications",
-      "decision": "ITEM 4 — WIDEN, same decided set and same audit requirement as `GET /rfqs/*`. The correspondence with the insurer is where what was disclosed and what was not is recorded, which is the half that makes a claim assessable. NOT YET BUILT."
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "CLAIMS_OFFICER",
-      "route": "GET /rfqs/selectable-insurers",
-      "decision": "INSTRUMENT ARTEFACT, 2026-10-18, and it could NOT be closed by the door-four work. `listSelectableInsurers()` is called only from `openAdd()`, which is reached only from the 'Add insurers' button, which sits inside `{isPlacement ? ...}` where `isPlacement` is `hasPermission(user, 'rfq.insurer.update')` — PLACEMENT alone. So for this role the route is never called and there is nothing being refused to declare. THE ROW STAYS BECAUSE THIS CHECK STILL REPORTS IT: it maps a screen's imports to routes and cannot see that a call sits behind a screen-computed permission flag, and removing a row the check still reports makes it fail as a STALE declaration — which is the half that stops this list becoming a ceiling. Teaching the matcher to treat any try/catch call as handled was considered and REFUSED: that rule would have hidden the original `/provider-register-office` defect, which was also inside a try/catch and was real. (COMPLIANCE_OFFICER has no such row because it holds `insurer.read` and the route resolves for it anyway.)"
-    },
-    {
-      "screen": "/rfqs/[id]",
-      "role": "DATA_PROTECTION_OFFICER",
-      "route": "GET /rfqs/selectable-insurers",
-      "decision": "INSTRUMENT ARTEFACT, 2026-10-18, and it could NOT be closed by the door-four work. `listSelectableInsurers()` is called only from `openAdd()`, which is reached only from the 'Add insurers' button, which sits inside `{isPlacement ? ...}` where `isPlacement` is `hasPermission(user, 'rfq.insurer.update')` — PLACEMENT alone. So for this role the route is never called and there is nothing being refused to declare. THE ROW STAYS BECAUSE THIS CHECK STILL REPORTS IT: it maps a screen's imports to routes and cannot see that a call sits behind a screen-computed permission flag, and removing a row the check still reports makes it fail as a STALE declaration — which is the half that stops this list becoming a ceiling. Teaching the matcher to treat any try/catch call as handled was considered and REFUSED: that rule would have hidden the original `/provider-register-office` defect, which was also inside a try/catch and was real. (COMPLIANCE_OFFICER has no such row because it holds `insurer.read` and the route resolves for it anyway.)"
     }
   ]
 }

@@ -300,6 +300,60 @@ describe('door four: an anchored oversight read of an RFQ', () => {
     });
   }, 300_000);
 
+  it('9 — THE CUSTOMER-FILTERED LIST is open to an anchored reader, and audited', async () => {
+    // Door four completed, owner 2026-10-19. The LIST is inside the chain the anchor opens.
+    const res = await request(app!.getHttpServer())
+      .get(`/rfqs?customerId=${target.customerId}`)
+      .set(bearer(dpo.accessToken))
+      .expect(200);
+    const rows = res.body as { id: string }[];
+    expect(Array.isArray(rows)).toBe(true);
+    // Non-vacuity: the target RFQ is IN the list, so a later absence assertion cannot pass against
+    // an empty page.
+    expect(rows.map((r) => r.id)).toContain(target.rfqId);
+
+    const logged = await prisma.auditLogEntry.findMany({
+      where: {
+        action: 'READ',
+        entityType: 'Customer',
+        entityId: target.customerId,
+        userId: dpo.userId,
+      },
+      select: { afterValue: true },
+      orderBy: { occurredAt: 'desc' },
+      take: 1,
+    });
+    expect(logged).toHaveLength(1);
+    // The entity is the CUSTOMER, not an RFQ: a list read is not a read of one record, and the
+    // COUNT goes on the row rather than the ids, which would duplicate what is being searched.
+    expect(logged[0].afterValue).toMatchObject({
+      view: 'rfq-list',
+      anchorType: 'DSR',
+      anchorId: dsrId,
+      customerId: target.customerId,
+      rfqCount: rows.length,
+    });
+  }, 300_000);
+
+  it('9 — the LIST refuses an anchored reader a DIFFERENT customer, and refuses no filter at all', async () => {
+    // One file, not the book.
+    await request(app!.getHttpServer())
+      .get(`/rfqs?customerId=${other.customerId}`)
+      .set(bearer(dpo.accessToken))
+      .expect(404);
+    // And there is no unfiltered mode to be handed: exactly one filter, never neither.
+    await request(app!.getHttpServer())
+      .get('/rfqs')
+      .set(bearer(dpo.accessToken))
+      .expect(422);
+    // `opportunityId` stays owner-only — an anchor is per CUSTOMER, and an Opportunity is a
+    // placement-path object whose id a reader outside that path has no way to know.
+    await request(app!.getHttpServer())
+      .get(`/rfqs?opportunityId=${target.rfqId}`)
+      .set(bearer(dpo.accessToken))
+      .expect(404);
+  }, 300_000);
+
   it('4 — THE WINDOW SHUTS: closing the DSR makes the same request 404 again', async () => {
     // Asserted last, because it changes the fixture. The DPO's only anchor is this DSR.
     await read(dpo, target.rfqId).expect(200);

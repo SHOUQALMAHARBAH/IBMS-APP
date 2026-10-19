@@ -60,6 +60,7 @@
     "db:migrate:diff": "npm run migrate:diff --workspace=@ibms/db",
     "check:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py --check",
     "check:loaders": "python scripts/measurements/all-or-nothing-loaders.py --check",
+    "check:absence": "python scripts/measurements/page-wide-absence-assertions.py --check",
     "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py"
   },
   "devDependencies": {

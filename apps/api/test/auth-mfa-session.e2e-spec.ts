@@ -343,6 +343,27 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
     expect(body.department).not.toBeNull();
     expect(body.department!.name).toBe(`Claims ${tag}`);
     expect(body.department!.nameAr).toBe(`المطالبات ${tag}`);
+
+    /*
+     * BATCH 1 ITEM 4 COMPLETED — the ORGANIZATION's own name, asserted ON THE RESPONSE BODY.
+     *
+     * This assertion exists because its absence was caught by a plant. Making `me()` send
+     * `organizationName: null` left the whole api e2e suite GREEN and killed only a Playwright
+     * test — the §1.80 shape: the web's `MeResponse` is hand-copied over HTTP, so `tsc` cannot see
+     * a field that stopped being sent, and a Playwright mock supplies the field itself. The only
+     * layer that can catch it is an assertion on the real body.
+     *
+     * BOTH FORMS, for the same reason the department carries both: `legalNameAr` is NOT NULL on
+     * `Organization` and the caller is what knows which script it is drawing.
+     */
+    const withOrg = me.body as {
+      organizationName: { en: string; ar: string } | null;
+    };
+    expect(withOrg.organizationName).not.toBeNull();
+    expect(typeof withOrg.organizationName!.en).toBe('string');
+    expect(withOrg.organizationName!.en.length).toBeGreaterThan(0);
+    expect(typeof withOrg.organizationName!.ar).toBe('string');
+    expect(withOrg.organizationName!.ar.length).toBeGreaterThan(0);
   });
 
   /*

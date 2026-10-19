@@ -26,7 +26,10 @@ export const NAV = {
     navCrossSell: 'البيع المتبادل',
     navUpSell: 'البيع الإضافي',
     navCrm: 'إدارة علاقات العملاء',
-    navRfqMarket: 'طلب عروض الأسعار / السوق',
+    /* RENAMED 2026-10-19: this entry opens `/opportunities`, and calling it the RFQ screen is
+     * what made the RFQ list look connected when it had no entry at all. */
+    navOpportunitiesMarket: 'الفرص / السوق',
+    navRfqs: 'طلبات عروض الأسعار',
     navPolicies: 'الوثائق',
     navClaimsAnalytics: 'تحليلات المطالبات',
     navClientAccounting: 'حسابات العملاء',
@@ -147,7 +150,9 @@ export const NAV = {
     navCrossSell: 'Cross-sell',
     navUpSell: 'Up-sell',
     navCrm: 'Relationship (CRM)',
-    navRfqMarket: 'RFQ / market',
+    /* See the Arabic above. */
+    navOpportunitiesMarket: 'Opportunities / market',
+    navRfqs: 'RFQs',
     navPolicies: 'Policies',
     navClaimsAnalytics: 'Claims analytics',
     navClientAccounting: 'Client accounting',

@@ -61,6 +61,18 @@ export const navbarBrandStyle: CSSProperties = {
   // Wordmark today. An SVG drops in here without touching the layout.
 };
 
+/* BATCH 1 ITEM 4 — the organization's own name beside the brand. Quieter than the brand and
+ * never a link: it is who you are signed in as, not somewhere to go. */
+export const navbarOrganizationStyle: CSSProperties = {
+  color: 'var(--ink-secondary)',
+  fontSize: '0.9rem',
+  marginInlineStart: 'var(--space-2)',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '18rem',
+};
+
 /** Pushed to the trailing edge by `margin-inline-start: auto` — logical, so
  *  it lands on the correct side in both directions. */
 export const trailingGroupStyle: CSSProperties = {

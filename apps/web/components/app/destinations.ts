@@ -106,9 +106,34 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         permissions: ['program.read'],
       },
       {
+        /*
+         * RENAMED, 2026-10-19. This entry was labelled `navRfqMarket` — "RFQ / market" — and
+         * points at `/opportunities`. It was the only entry a reader would take for the RFQ screen,
+         * so the door was visible in the sidebar under exactly the right name and opened somewhere
+         * else; the RFQ list below had no entry at all. The label now says what it opens.
+         */
         href: '/opportunities',
-        labelKey: 'navRfqMarket',
+        labelKey: 'navOpportunitiesMarket',
         permissions: ['opportunity.read'],
+      },
+      {
+        /*
+         * THE RFQ LIST, connected. Owner's decision 12.
+         *
+         * THE EXACT SET THIS PRODUCES is `rfq.read`'s four holders:
+         * SALES_RELATIONSHIP_OFFICER, PLACEMENT_TECHNICAL_OFFICER, BRANCH_DEPARTMENT_MANAGER,
+         * EXECUTIVE_MANAGEMENT — asserted by name in `destination-organization-type.test.ts`. An
+         * EXISTING code, so no key is added to anybody's set.
+         *
+         * COMPLIANCE_OFFICER and DATA_PROTECTION_OFFICER deliberately do NOT appear here, even
+         * though `GET /rfqs` now admits them: their route is the LINK from the work that anchors
+         * them — an open DSR or an open screening case — and the list they may read is ONE
+         * customer's. A navigation entry would offer them a register they can only ever see a
+         * single customer of, which is the shape that teaches a person the product is broken.
+         */
+        href: '/rfqs',
+        labelKey: 'navRfqs',
+        permissions: ['rfq.read'],
       },
       // ## Why the insurer register lives HERE and not in Operations
       //

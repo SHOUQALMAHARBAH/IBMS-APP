@@ -855,6 +855,28 @@ export class AuthService {
        * a client-side branch is a hidden control and not a boundary.
        */
       organizationType: office?.type,
+      /*
+       * BATCH 1 ITEM 4 COMPLETED — the signed-in organization's OWN name, both languages.
+       *
+       * The provider was renamed to "GO Global" / «جو جلوبال» in the seed and NOTHING rendered it:
+       * `me()` did not carry an organization name at all, and every `legalName` render in the web
+       * app belongs to a customer, an insurer, or an insurance company's own registry record. So
+       * the rename was half delivered, which under the standing rule is worse than not delivered —
+       * it read as a guarantee that the owner would see the new name.
+       *
+       * NO PERMISSION. It rides on the office row `dutySegregationMode` and `organizationType`
+       * already load, so it costs no query, and it is ungated for their reason: a caller already
+       * knows which organization they work for, and a code whose absence hides a person's own
+       * employer from them is a gate nobody can fail. NOT an authorization signal — nothing
+       * branches on it.
+       *
+       * BOTH FORMS, because `legalNameAr` is NOT NULL on `Organization` and the caller is the one
+       * that knows which language it is rendering.
+       */
+      organizationName:
+        office === null
+          ? null
+          : { en: office.legalName, ar: office.legalNameAr },
     };
   }
 

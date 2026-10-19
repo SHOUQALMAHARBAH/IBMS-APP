@@ -78,6 +78,18 @@ jobs:
       - name: No all-or-nothing screen loaders
         run: python scripts/measurements/all-or-nothing-loaders.py --check
 
+      # DECISION 13 — a page-wide TEXT absence assertion can match an element the test is not
+      # about, and did: a role-name loop on one notice matched a NAV LABEL and failed on a correct
+      # tree. A flat ban is a red build across 54 files, so this RATCHETS the one dangerous shape
+      # and fails in BOTH directions — above the budget (a new one shipped) and below it (the
+      # budget must follow, or a ratchet becomes a ceiling).
+      #
+      # It reads the script's OWN output and exit code; the figure is not restated here. The
+      # earlier version of that script printed a breakdown by scoping and not by shape, so the
+      # number carrying the rule existed only in a report.
+      - name: No new page-wide text absence assertions
+        run: python scripts/measurements/page-wide-absence-assertions.py --check
+
       - name: Unit/component tests
         run: npx turbo run test --filter=web
 

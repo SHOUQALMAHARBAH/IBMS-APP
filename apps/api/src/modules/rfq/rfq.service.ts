@@ -268,26 +268,22 @@ export class RfqService {
     if (!opportunity) {
       throw new NotFoundException('RFQ not found');
     }
-    const customer = await this.customers.findById(opportunity.customerId);
-    if (!customer) {
-      throw new NotFoundException('RFQ not found');
-    }
-
-    // The ordinary path, unchanged and costing nothing: no anchor query runs for the owner or for
-    // a whole-book reader, and no audit row is written for them either.
-    if (this.canReachAnyCustomer(actor) || customer.ownerUserId === actor.id) {
-      return {
-        rfq,
-        opportunityCustomerId: opportunity.customerId,
-        anchor: null,
-      };
-    }
-
-    const anchor = await this.anchors.resolve(opportunity.customerId, actor);
-    if (!anchor) {
-      // The SAME sentence the ownership filter gives, because a 403 here would confirm that
-      // another office's — or another officer's — record exists. The screen names a likely cause
-      // and a way forward; the API discloses nothing.
+    /*
+     * ONE DECISION FOR THE LIST AND THE DETAIL. `resolveCustomerReadAccess` is the only place that
+     * compares an actor against a customer file and falls back to an anchor; two copies would be
+     * two answers to one question, and the list is the copy that would drift.
+     *
+     * The sentence is re-thrown as "RFQ not found" rather than "Customer not found" because that
+     * is what the caller asked for — and both are the same refusal, deliberately: a 403 here would
+     * confirm that another officer's record exists.
+     */
+    let anchor: CustomerFileAnchor | null;
+    try {
+      anchor = await this.resolveCustomerReadAccess(
+        opportunity.customerId,
+        actor,
+      );
+    } catch {
       throw new NotFoundException('RFQ not found');
     }
     return { rfq, opportunityCustomerId: opportunity.customerId, anchor };
@@ -312,16 +308,25 @@ export class RfqService {
    */
   private async auditAnchoredRead(
     actor: AuthenticatedUser,
-    rfqId: string,
+    entity: { type: 'RFQ' | 'Customer'; id: string },
     customerId: string,
-    view: 'rfq' | 'communications',
+    view: 'rfq' | 'communications' | 'rfq-list',
     anchor: CustomerFileAnchor,
+    extra: Record<string, string | number> = {},
   ): Promise<void> {
     await this.audit.record({
       userId: actor.id,
       action: 'READ',
-      entityType: 'RFQ',
-      entityId: rfqId,
+      entityType: entity.type,
+      /*
+       * THE ENTITY IS THE THING READ, and for the LIST that is the CUSTOMER rather than any one
+       * RFQ. A list read is not a read of an RFQ, and recording it against one id would make the
+       * audit trail answer "who read RFQ X" with somebody who read a chain X happened to be in.
+       * The count goes in `afterValue` instead — a count is not a set, and copying the ids of what
+       * was read into the log duplicates the thing being searched (the `/internal-controls`
+       * precedent).
+       */
+      entityId: entity.id,
       // A cross-owner read of a customer's commercial file. The RFQ header names which customer is
       // in the market for what cover; the correspondence carries loss history and sums insured.
       isSensitiveDataAccess: true,
@@ -332,6 +337,7 @@ export class RfqService {
         anchorType: anchor.type,
         anchorId: anchor.id,
         customerId,
+        ...extra,
       },
     });
     // The ROLE the read came under is on the row already: `AuditService.record` stamps
@@ -696,6 +702,13 @@ export class RfqService {
       );
     }
     if (opportunityId) {
+      /*
+       * THE OPPORTUNITY FILTER IS NOT ANCHORED, DELIBERATELY, and it already refuses an
+       * anchored-only reader through `assertCustomerVisible` below it. That is the right answer
+       * rather than an oversight: an anchor is per CUSTOMER, and an Opportunity is a placement-path
+       * object whose own id a reader outside that path has no way to know. Anchoring it would also
+       * reopen the thing the design refused — a filter whose scope the anchor does not bound.
+       */
       await this.assertOpportunityVisible(
         opportunityId,
         actor,
@@ -703,8 +716,52 @@ export class RfqService {
       );
       return this.rfqs.findRfqsByOpportunityId(opportunityId);
     }
-    await this.assertCustomerVisible(customerId as string, actor);
-    return this.rfqs.findRfqsByCustomerId(customerId as string);
+
+    /*
+     * DOOR FOUR ON THE LIST. `customerId` is REQUIRED here by the refusal at the top of this
+     * method — exactly one of the two filters, never neither — so an UNFILTERED list is not a
+     * thing this route can produce. That matters more for an anchored reader than for anybody
+     * else: an unfiltered list handed to a reader whose anchor is one customer would be the
+     * blanket key the whole design refused.
+     */
+    const anchor = await this.resolveCustomerReadAccess(
+      customerId as string,
+      actor,
+    );
+    const rows = await this.rfqs.findRfqsByCustomerId(customerId as string);
+    if (anchor) {
+      await this.auditAnchoredRead(
+        actor,
+        { type: 'Customer', id: customerId as string },
+        customerId as string,
+        'rfq-list',
+        anchor,
+        { rfqCount: rows.length },
+      );
+    }
+    return rows;
+  }
+
+  /**
+   * DOOR FOUR's visibility decision, factored out so the LIST and the DETAIL cannot disagree.
+   *
+   * Returns `null` when the ownership filter admits the caller — the ordinary path, costing no
+   * anchor query and writing no audit row — and the anchor when it is the anchor that admitted
+   * them. Throws the same NotFound the ownership filter throws when neither does, because a 403
+   * would confirm that another officer's record exists.
+   */
+  private async resolveCustomerReadAccess(
+    customerId: string,
+    actor: AuthenticatedUser,
+  ): Promise<CustomerFileAnchor | null> {
+    const customer = await this.customers.findById(customerId);
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (this.canReachAnyCustomer(actor) || customer.ownerUserId === actor.id) {
+      return null;
+    }
+    const anchor = await this.anchors.resolve(customerId, actor);
+    if (!anchor) throw new NotFoundException('Customer not found');
+    return anchor;
   }
 
   /** `opportunity.customerId` is resolved for the web RFQ detail page's
@@ -723,7 +780,7 @@ export class RfqService {
     if (anchor) {
       await this.auditAnchoredRead(
         actor,
-        rfq.id,
+        { type: 'RFQ', id: rfq.id },
         opportunityCustomerId,
         'rfq',
         anchor,
@@ -814,7 +871,7 @@ export class RfqService {
     if (anchor) {
       await this.auditAnchoredRead(
         actor,
-        rfqId,
+        { type: 'RFQ', id: rfqId },
         opportunityCustomerId,
         'communications',
         anchor,

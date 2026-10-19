@@ -226,6 +226,23 @@ const DECIDED: {
     ],
   },
   {
+    route: 'GET /rfqs',
+    why:
+      'Owner, 2026-10-19, door four completed. The customer-filtered LIST is inside the chain the ' +
+      'anchor opens. Safe because this route has NO unfiltered mode — it refuses unless exactly ' +
+      'one of opportunityId or customerId is given — so an anchored reader can be handed one ' +
+      "customer's chain and never the book. SAME six roles as the detail, because a reader who " +
+      'may see an RFQ and not the list it sits in would be a second answer to one question.',
+    roles: [
+      'BRANCH_DEPARTMENT_MANAGER',
+      'COMPLIANCE_OFFICER',
+      'DATA_PROTECTION_OFFICER',
+      'EXECUTIVE_MANAGEMENT',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    ],
+  },
+  {
     route: 'GET /rfqs/:id',
     why:
       'Owner, 2026-10-19, door four. An oversight role may read one customer RFQ chain while an ' +
