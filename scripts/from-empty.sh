@@ -123,6 +123,31 @@ check "the eight reference tables are seeded" 8 \
   "$(psql_scratch 'SELECT count(*) FROM (SELECT 1 FROM "LegalForm" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "LicensingAuthority" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Country" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "City" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Bank" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Currency" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "BusinessModel" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "RatingAgency" HAVING count(*) > 0) t')"
 check "insurance lines" 32 \
   "$(psql_scratch 'SELECT count(*) FROM "InsuranceLine"')"
+
+# BATCH 1 ITEM 1 HALF B — EVERY ORGANIZATION HAS A DEFAULT BRANCH AND DEPARTMENT.
+#
+# This is the assertion the defect needed. The code was built and WIRED and the data was still
+# missing, because the default office's `ensureDefaultOrgUnits` call sat inside a function that
+# returns EARLY when the organization already exists — unreachable on any database that had ever
+# been seeded, and nothing failed. A call in an unreachable place is what a count assertion catches
+# and a reading does not.
+#
+# Expressed as "organizations with NO branch" = 0 rather than as a total, so it stays true when a
+# fourth organization is seeded. The provisioning form makes both mandatory, so an organization with
+# neither cannot provision its first user at all — which is the failure this closes.
+check "every organization has a default branch" 0 \
+  "$(psql_scratch 'SELECT count(*) FROM "Organization" o WHERE NOT EXISTS (SELECT 1 FROM "Branch" b WHERE b."organizationId" = o.id)')"
+check "every organization has a default department" 0 \
+  "$(psql_scratch 'SELECT count(*) FROM "Organization" o WHERE NOT EXISTS (SELECT 1 FROM "Department" d WHERE d."organizationId" = o.id)')"
+
+# BATCH 1 ITEM 4 — the provider's own name, owner's ruling of 19 October. Both capital Gs.
+# Pinned because it is the organization's identity AND because the seed now UPSERTS it: a
+# create-only literal named it correctly on a database built from nothing and left every existing
+# database reading the old name forever.
+check "the provider English name" "GO Global" \
+  "$(psql_scratch $'SELECT "legalName" FROM "Organization" WHERE type = \'PROVIDER\'')"
+check "the provider Arabic name" "جو جلوبال" \
+  "$(psql_scratch $'SELECT "legalNameAr" FROM "Organization" WHERE type = \'PROVIDER\'')"
 # THE SIXTEENTH MAKER/CHECKER PAIR (module 0 close, decision 3). Pinned here because a pair is a
 # DATABASE fact: the registry, the readiness signal and the schema guard all derive from it, and a
 # migration that silently failed to add the constraint would leave two split codes enforcing

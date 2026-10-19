@@ -137,12 +137,6 @@ async function ensureDefaultOrganization(): Promise<void> {
     },
   });
 
-  /*
-   * ITEM 1 HALF B, for the default office — the same reason as the provider. This office is created
-   * by the seed rather than by the registration route, so it never passes through
-   * `office-registration.service.ts`. Unconditional and idempotent by count, like the provider's.
-   */
-  await ensureDefaultOrgUnits(prisma, DEFAULT_ORGANIZATION_ID);
   console.log("Seeded the default organization.");
 }
 
@@ -172,6 +166,22 @@ async function ensureDefaultOrganization(): Promise<void> {
  */
 export const PROVIDER_ORGANIZATION_ID = "00000000-0000-0000-0000-0000000000f0";
 
+/**
+ * THE PROVIDER'S OWN NAME, owner's ruling of 19 October — exactly this spelling, both capital Gs.
+ *
+ * One home for it, because the branch below upserts it and the create above uses it: two literals
+ * would be two answers to what this organization is called, and the copy is the one that drifts.
+ *
+ * WHAT IT DOES NOT DO, stated so it is not read as more than it is: NOTHING IN THE WEB APP RENDERS
+ * THE SIGNED-IN ORGANIZATION'S OWN NAME. Measured — `/auth/me` does not carry it, and every
+ * `legalName` render in `apps/web` belongs to a CUSTOMER, an INSURER, or `/company-record`, which is
+ * an insurance company's view of its own registry row and is gated on organization TYPE. So this
+ * fixes what the database says the organization IS; putting it on screen is a separate change
+ * (a field on `/auth/me` plus a render) and is recorded rather than smuggled in here.
+ */
+const PROVIDER_LEGAL_NAME_EN = "GO Global";
+const PROVIDER_LEGAL_NAME_AR = "جو جلوبال";
+
 async function ensureProviderOrganization(): Promise<void> {
   const existing = await prisma.organization.findUnique({
     where: { id: PROVIDER_ORGANIZATION_ID },
@@ -183,15 +193,41 @@ async function ensureProviderOrganization(): Promise<void> {
     await prisma.organization.create({
       data: {
         id: PROVIDER_ORGANIZATION_ID,
-        legalName: "IBMS Platform Operator",
-        legalNameAr: "مُشغّل منصّة IBMS",
+        legalName: PROVIDER_LEGAL_NAME_EN,
+        legalNameAr: PROVIDER_LEGAL_NAME_AR,
         subdomain: "provider",
         type: "PROVIDER",
         // NULL, required by the item (b) CHECK for every type that is not a brokerage office.
         brokerKind: null,
       },
     });
-
+  } else if (
+    existing.legalName !== PROVIDER_LEGAL_NAME_EN ||
+    existing.legalNameAr !== PROVIDER_LEGAL_NAME_AR
+  ) {
+    /*
+     * THE NAME IS UPSERTED, NOT CREATE-ONLY, and that is the whole point of this branch.
+     *
+     * The seed used to create the row and never touch it again, so changing the literal would have
+     * named the organization correctly on a database built from NOTHING and left every existing
+     * database reading the old name forever. That is the seed-only asymmetry this repository has
+     * now paid for three times: a permission row that reached db-test and not dev, the default
+     * branch and department that reached neither, and this.
+     *
+     * IT TOUCHES THE TWO NAME FIELDS AND NOTHING ELSE. `subdomain` is addressing and `type` is
+     * identity; an upsert that reset either would make a hand-correction unrecoverable, which is a
+     * different and worse failure than a stale name.
+     */
+    await prisma.organization.update({
+      where: { id: PROVIDER_ORGANIZATION_ID },
+      data: {
+        legalName: PROVIDER_LEGAL_NAME_EN,
+        legalNameAr: PROVIDER_LEGAL_NAME_AR,
+      },
+    });
+    console.log(
+      `  provider organization renamed to ${PROVIDER_LEGAL_NAME_EN} (was ${existing.legalName})`,
+    );
   }
 
   /*
@@ -351,7 +387,8 @@ async function ensureProviderOrganization(): Promise<void> {
    * running it unconditionally creates the defaults exactly where there are none and leaves a
    * renamed or retired structure alone.
    */
-  await ensureDefaultOrgUnits(prisma, PROVIDER_ORGANIZATION_ID);
+  // (Item 1 half B is handled by `ensureDefaultOrgUnitsForEveryOrganization` below, which sweeps
+    //  every organization rather than naming two ids. See its header.)
 }
 
 /**
@@ -1182,6 +1219,9 @@ async function main() {
   // Every office, every environment: a business-day deadline counted against an
   // empty calendar lands earlier than the law requires, and the error runs against
   // the brokerage (IMPROVEMENTS § 1.57).
+  // BEFORE the holiday sweep and after every organization exists: the provider is created inside
+  // `SEED_SAMPLE_DATA` above, so a sweep placed earlier would miss it on a from-empty run.
+  await ensureDefaultOrgUnitsForEveryOrganization();
   await ensureJordanFixedHolidays();
 
   // Runs in EVERY environment: in dev it is an optional extra alongside the
@@ -1216,6 +1256,50 @@ async function main() {
  * Idempotent per (office, date) — the table carries a partial unique on an
  * all-calendars entry per date, so a re-run must skip rather than collide.
  */
+/**
+ * ITEM 1 HALF B — A DEFAULT BRANCH AND A DEFAULT DEPARTMENT FOR EVERY ORGANIZATION.
+ *
+ * ## WHY A SWEEP AND NOT TWO NAMED IDS
+ *
+ * It WAS two named ids, and measuring the first seed run is what showed that half of it could
+ * never fire: the default office's call sat inside `ensureDefaultOrganization`, which returns
+ * EARLY when the organization already exists, so on any database that has ever been seeded the
+ * line was unreachable. The provider's had been moved out of its own create-only branch
+ * deliberately; the sibling was not, and nothing failed — the office simply had no branch.
+ *
+ * Measured at that point: provider 1/1, default office 0/0, demo office B 0/0.
+ *
+ * A sweep cannot have that defect. It also covers the two cases named ids never could: the demo
+ * office `seed:demo` creates, and anything hand-created — which is what *every organization*
+ * means. `ensureJordanFixedHolidays` below sweeps the same way for the same reason.
+ *
+ * ## WHAT IT IS NOT
+ *
+ * It is NOT how a newly registered tenant gets its units. Both routes that create a tenant —
+ * `office-registration.service.ts` and `insurance-company-registration.service.ts` — call
+ * `ensureDefaultOrgUnits` inside the creating transaction, so a new office has a branch before
+ * anybody can open its provisioning form. This sweep is the backfill for organizations that
+ * predate that, and it is idempotent by COUNT, so an office that has retired its last branch does
+ * not get one invented on the next run.
+ */
+async function ensureDefaultOrgUnitsForEveryOrganization(): Promise<void> {
+  const organizations = await prisma.organization.findMany({
+    select: { id: true, legalName: true },
+  });
+  let branches = 0;
+  let departments = 0;
+  for (const org of organizations) {
+    const result = await ensureDefaultOrgUnits(prisma, org.id);
+    if (result.branchCreated) branches += 1;
+    if (result.departmentCreated) departments += 1;
+  }
+  console.log(
+    `Seeded ${branches} default branch(es) and ${departments} default department(s) across ` +
+      `${organizations.length} organization(s). Idempotent by count: an organization that already ` +
+      `has one of either is left alone.`,
+  );
+}
+
 async function ensureJordanFixedHolidays(): Promise<void> {
   // Month is 1-based here and 0-based in `Date.UTC`, which is exactly the kind of
   // off-by-one that silently moves a holiday; the conversion happens once, below.
