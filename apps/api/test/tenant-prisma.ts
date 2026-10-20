@@ -225,5 +225,72 @@ export async function deleteOrganizationCascade(
 ): Promise<void> {
   await rawPrisma.branch.deleteMany({ where: { organizationId } });
   await rawPrisma.department.deleteMany({ where: { organizationId } });
+  /*
+   * AND `SlaHoliday`, which the seed attaches to EVERY organization.
+   *
+   * MEASURED the hard way: the organizations my broken teardown leaked became UNDELETABLE after I
+   * re-ran `db:test:seed` for an unrelated change, because `ensureJordanFixedHolidays` sweeps
+   * `organization.findMany()` and wrote sixteen rows into each of them —
+   * `SlaHoliday_organizationId_fkey` is RESTRICT.
+   *
+   * The rule this adds: a PER-ORGANIZATION SEED SWEEP creates rows in fixture organizations too, so
+   * every such sweep belongs here. There are three today — branches, departments and holidays — and
+   * `ensureDefaultOrgUnitsForEveryOrganization` / `ensureJordanFixedHolidays` are the two to check
+   * against whenever this helper is read.
+   */
+  await rawPrisma.slaHoliday.deleteMany({ where: { organizationId } });
   await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
+}
+
+/**
+ * DELETE THE USERS OF A DISPOSABLE FIXTURE ORGANIZATION, DEPENDENTS FIRST.
+ *
+ * ## Why this exists, and it is a regression this helper is the cure for
+ *
+ * `rawPrisma.user.deleteMany({ where: { organizationId } })` was the whole teardown in two specs,
+ * and decision 25 broke both: the invitation now issues a `PasswordResetToken` for the invited
+ * administrator, `PasswordResetToken_userId_fkey` is NOT a cascade, so the user delete throws, the
+ * organization is never removed, and EVERY LATER SPEC IN THE RUN fails at `createTestApp` on the
+ * organization count — with a fault that looks like its own.
+ *
+ * That is exactly what happened: CI's `backend` job went red on `9da34f1` with ELEVEN leaked
+ * organizations, and db-test had accumulated a dozen locally. The failure was invisible to me
+ * because I read the run output through `grep -E "Tests |Test Files"` and an `afterAll` error is
+ * neither of those lines. Read the gate's own output.
+ *
+ * ## So the ORDER gets ONE home, like `deleteOrganizationCascade` above
+ *
+ * A spec that spells the order itself is a spec that will be missed the next time an invitation,
+ * a session or an enrolment gains a row that points at `User`. Every dependent that RESTRICTS and
+ * that a fixture can legitimately create goes here, and nothing else: a user who AUDITED is
+ * permanent by design, which is what the `auditRows` assertion in each caller is for.
+ */
+export async function deleteFixtureUsersInOrganization(
+  organizationId: string,
+): Promise<void> {
+  const users = await rawPrisma.user.findMany({
+    where: { organizationId },
+    select: { id: true },
+  });
+  const userIds = users.map((u) => u.id);
+  if (userIds.length === 0) return;
+
+  // The one decision 25 added. `invalidateAllForUser` marks tokens used; it does not remove them,
+  // deliberately — a consumed reset link is evidence — so a fixture has to clear them explicitly.
+  await rawPrisma.passwordResetToken.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.userRoleAssignment.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.userSession.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.mfaCredential.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.refreshToken.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

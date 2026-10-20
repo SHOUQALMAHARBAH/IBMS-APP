@@ -10,6 +10,7 @@ import {
 } from './utils/provider-user';
 import {
   TEST_ORGANIZATION_ID,
+  deleteFixtureUsersInOrganization,
   deleteOrganizationCascade,
   rawPrisma,
 } from './tenant-prisma';
@@ -96,8 +97,14 @@ async function deleteCompany(organizationId: string) {
     );
   }
 
-  await rawPrisma.userRoleAssignment.deleteMany({ where: { organizationId } });
-  await rawPrisma.user.deleteMany({ where: { organizationId } });
+  /*
+   * Through the SHARED helper: decision 25's invitation issues a `PasswordResetToken` for the
+   * invited administrator, and `PasswordResetToken_userId_fkey` is not a cascade. Spelled out here
+   * it threw inside `afterAll`, the company leaked, and db-test accumulated a dozen of them before
+   * CI said so — invisible locally because I read the run output through a grep that could not
+   * match an afterAll error.
+   */
+  await deleteFixtureUsersInOrganization(organizationId);
   await rawPrisma.rolePermission.deleteMany({ where: { organizationId } });
   await rawPrisma.role.deleteMany({ where: { organizationId } });
   await rawPrisma.insurerLicensedLine.deleteMany({

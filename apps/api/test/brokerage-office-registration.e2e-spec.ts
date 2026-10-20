@@ -8,7 +8,11 @@ import {
   createUserInOrganization,
   bearerHeader,
 } from './utils/provider-user';
-import { deleteOrganizationCascade, rawPrisma } from './tenant-prisma';
+import {
+  deleteFixtureUsersInOrganization,
+  deleteOrganizationCascade,
+  rawPrisma,
+} from './tenant-prisma';
 import { OFFICE_ADMINISTRATOR_GRANTS } from '../src/modules/provider/office-administrator-grants';
 import { OrgContextService } from '../src/common/org-context/org-context.service';
 import { UserAdminService } from '../src/modules/rbac/services/user-admin.service';
@@ -152,9 +156,13 @@ async function deleteOffice(organizationId: string) {
     `registered office ${organizationId} carries ${auditRows} audit row(s), so it can NEVER be deleted — the FK is ON DELETE RESTRICT and the table refuses DELETE by trigger. Every later spec in this run will then refuse at createTestApp with a fault that looks like its own. Nothing in this file may SIGN IN as a user inside an office it registered, and nothing may audit into one`,
   ).toBe(0);
 
-  // The users item (f) invites. Deletable precisely because nothing audited into this office.
-  await rawPrisma.userRoleAssignment.deleteMany({ where: { organizationId } });
-  await rawPrisma.user.deleteMany({ where: { organizationId } });
+  /*
+   * The users item (f) invites. Deletable precisely because nothing audited into this office — and
+   * through the SHARED helper, because decision 25's invitation now issues a `PasswordResetToken`
+   * whose FK is not a cascade. Spelled out here it threw, the office leaked, and every later spec
+   * in the run failed at `createTestApp` with a fault that was not its own.
+   */
+  await deleteFixtureUsersInOrganization(organizationId);
 
   const licenses = await rawPrisma.brokerLicense.findMany({
     where: { organizationId },
