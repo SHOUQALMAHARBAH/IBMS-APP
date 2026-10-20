@@ -28,6 +28,11 @@ export interface RetentionScheduleItem {
   legalBasis: string | null;
   confirmedByLegalCounselAt: string | null;
   isConfirmed: boolean;
+  /**
+   * THE SIXTEENTH PAIR'S ACT, ON THE RECORD. Null for every ordinary two-person confirmation,
+   * which is nearly all of them — `CombinedDutyOnRecord` renders nothing in that case.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
 }
 
 export interface LegalHold {

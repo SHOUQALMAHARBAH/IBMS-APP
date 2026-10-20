@@ -5,17 +5,21 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, type RetentionScheduleItem } from '@ibms/db';
+import { Prisma } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 import type { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
-import { RetentionScheduleRepository } from '../../repositories/retention-schedule.repository';
+import {
+  RetentionScheduleRepository,
+  type RetentionScheduleItemWithCombinedDuty,
+} from '../../repositories/retention-schedule.repository';
 import {
   deriveRetentionScheduleItemView,
   retentionScheduleItemAuditSnapshot,
   type RetentionScheduleItemView,
 } from './retention-schedule.config';
+import { assertMeetsStatutoryFloor } from './retention-floors.config';
 import type { CreateRetentionScheduleItemDto } from './dto/create-retention-schedule-item.dto';
 import type { UpdateRetentionScheduleItemDto } from './dto/update-retention-schedule-item.dto';
 
@@ -53,7 +57,21 @@ export class RetentionScheduleService {
     dto: CreateRetentionScheduleItemDto,
     actorUserId: string,
   ): Promise<RetentionScheduleItemView> {
-    let row: RetentionScheduleItem;
+    /*
+     * THE STATUTORY FLOOR — A REFUSAL, and it comes FIRST.
+     *
+     * Before the duplicate-category check and before the write: an officer whose figure is below
+     * the law should hear that rather than hearing about a row that already exists and discovering
+     * the real obstacle on the second attempt. The ordering correction item (h) made for the
+     * commission scope check, for the same reason — refuse first on the thing the caller cannot fix
+     * by editing the rest of the request.
+     *
+     * A category with no decided floor returns null and is accepted with no refusal and no invented
+     * number, which is the half of the instruction that is easiest to break by being helpful.
+     */
+    assertMeetsStatutoryFloor(dto.recordCategory, dto.retentionPeriodMonths);
+
+    let row: RetentionScheduleItemWithCombinedDuty;
     try {
       row = await this.repo.create({
         recordCategory: dto.recordCategory,
@@ -105,6 +123,19 @@ export class RetentionScheduleService {
       throw new UnprocessableEntityException(
         `Retention schedule item ${id} is already confirmed by Legal Counsel — it is no longer editable. Add a new item instead.`,
       );
+    }
+
+    /*
+     * THE STATUTORY FLOOR, on the EDIT path too — otherwise the create gate is a formality: set 60
+     * months for a KYC category, then patch it to 6.
+     *
+     * The category comes off the LOADED ROW rather than the DTO, which deliberately cannot carry
+     * one (renaming a category is a new row, not an edit of this row's identity). And it is skipped
+     * when the DTO carries no period at all, because an edit that only corrects `legalBasis` must
+     * not be refused over a figure it is not touching.
+     */
+    if (dto.retentionPeriodMonths !== undefined) {
+      assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);
     }
 
     /*

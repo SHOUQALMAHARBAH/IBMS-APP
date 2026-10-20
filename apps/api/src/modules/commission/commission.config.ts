@@ -225,7 +225,7 @@ export interface CommissionLedgerEntryRow {
   overrideRequestedByUserId: string | null;
   overrideApprovedByUserId: string | null;
   /** This pair's escape column relation. `combinedDutyAct` here, but the name is per CONSTRAINT and
-   *  not uniform across the fifteen — the DSR's is `closureCombinedDutyAct`. Read it off the schema. */
+   *  not uniform across the sixteen — the DSR's is `closureCombinedDutyAct`. Read it off the schema. */
   combinedDutyAct: CombinedDutyAct | null;
   paidAmount: Prisma.Decimal | null;
   paidAt: Date | null;
@@ -262,7 +262,7 @@ export interface CommissionLedgerEntryView {
    * Set when ONE person both requested and approved this manual override, in an office that declared
    * COMBINED duty segregation and stated why. Null on every ordinary override.
    *
-   * THE MOST URGENT OF THE FIFTEEN PROJECTIONS, because of what the screen already shows: the
+   * THE MOST URGENT OF THE SIXTEEN PROJECTIONS, because of what the screen already shows: the
    * override reason and the REQUESTER are rendered and the approver is not, so a self-approved
    * override reads as a two-person one to anybody who does not know the field is missing. Showing
    * half of a two-person control is worse than showing none of it.

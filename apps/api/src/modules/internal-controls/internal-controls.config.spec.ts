@@ -35,7 +35,7 @@ describe('MAKER_CHECKER_REGISTRY', () => {
      * `duty-segregation-schema.e2e-spec.ts` compares against `pg_constraint`. A silently wrong
      * entry would propagate into both.
      *
-     * ALL FIFTEEN carry a constraint name — measured, zero nulls — so every registered pair has a
+     * ALL SIXTEEN carry a constraint name — measured, zero nulls — so every registered pair has a
      * database backstop and not one is enforced in application code alone. That is worth pinning
      * as much as the names themselves: a future pair added with `dbCheckConstraint: null` would be
      * a maker/checker rule the database does not refuse, and it would fail here rather than slip in.

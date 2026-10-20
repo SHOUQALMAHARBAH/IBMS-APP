@@ -66,7 +66,7 @@ export class RetentionScheduleController {
     /*
      * The declaration is an OPTIONAL body field, so an ordinary two-person confirmation sends nothing
      * and behaves exactly as before. A DTO cannot see the office's declared mode, so whether a reason
-     * is REQUIRED is decided in the service — the shape all fifteen siblings use.
+     * is REQUIRED is decided in the service — the shape all sixteen siblings use.
      */
     return this.schedule.confirm(id, user.id, dto);
   }

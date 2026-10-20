@@ -31,7 +31,7 @@ export interface NeedsAssessment {
   reviewedByUserId: string | null;
   approvedByUserId: string | null;
   /**
-   * Part 4 step 5 — TWO acts, because this is the only one of the fifteen pairs' tables carrying two of
+   * Part 4 step 5 — TWO acts, because this is the only one of the sixteen pairs' tables carrying two of
    * them: `NeedsAssessment_reviewer_maker_checker_distinct` (the capturer is not the reviewer) and
    * `NeedsAssessment_approver_maker_checker_distinct` (the capturer is not the approver).
    *

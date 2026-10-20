@@ -36,7 +36,7 @@ export function combinedDutyTooShort(reason: string): boolean {
 /**
  * The reason a person gives for performing both halves of an approval themselves.
  *
- * ONE component for all fifteen pairs. The alternative — a textarea per approve control — is fifteen places
+ * ONE component for all sixteen pairs. The alternative — a textarea per approve control — is sixteen places
  * for the wording to drift, and the wording is the part that matters: it has to say that the person raised
  * this AND that the office allows them to approve it, because otherwise the field reads as an accusation.
  */

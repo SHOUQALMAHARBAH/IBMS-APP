@@ -13,6 +13,9 @@ const row = (
   retentionPeriodMonths: 120,
   legalBasis: 'DRAFT',
   confirmedByLegalCounselAt: null,
+  // Explicit, not omitted: under a `Partial<T>` spread an omitted field becomes `| undefined`,
+  // which is what the compiler complains about rather than the omission itself.
+  combinedDutyAct: null,
   ...over,
 });
 

@@ -63,6 +63,7 @@
     "check:absence": "python scripts/measurements/page-wide-absence-assertions.py --check",
     "check:labels": "python scripts/measurements/identifier-labels.py --check",
     "check:seed-sweeps": "python scripts/measurements/seed-sweeps-vs-cascade.py --check",
+    "check:maker-checker-pairs": "python scripts/measurements/combined-duty-projection.py",
     "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py"
   },
   "devDependencies": {

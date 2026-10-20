@@ -285,7 +285,7 @@ test("the questionnaire's first control is reachable via keyboard", async ({
 /*
  * THE TWO COMBINED-DUTY ACTS ON A NEEDS ASSESSMENT — Part 4 step 5, pairs fourteen and fifteen.
  *
- * `NeedsAssessment` is the ONLY table of the fifteen carrying two pairs:
+ * `NeedsAssessment` is the ONLY table of the sixteen carrying two pairs:
  * `NeedsAssessment_reviewer_maker_checker_distinct` (the capturer is not the reviewer) and
  * `NeedsAssessment_approver_maker_checker_distinct` (the capturer is not the approver). It therefore has
  * two escape columns, deliberately — one shared column would let a declared combined REVIEW excuse a

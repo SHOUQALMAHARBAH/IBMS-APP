@@ -243,6 +243,24 @@ jobs:
       - name: Every per-organization seed sweep is cleared by the fixture cascade
         run: python scripts/measurements/seed-sweeps-vs-cascade.py --check
 
+      # ITEM B — A MEASUREMENT NOBODY RUNS IS A MEASUREMENT THAT IS ALREADY WRONG, and this one
+      # proved it: it had been exiting 1 on `assert pairs == 15` against a registry holding sixteen,
+      # before measuring anything, and nothing was red because nothing ran it.
+      #
+      # The count is DERIVED now — the registry's `dbCheckConstraint` values against the
+      # `*_maker_checker_distinct` CHECK constraints the migrations create, by name and in both
+      # directions — so a seventeenth pair moves both sides together and this stays quiet, while a
+      # pair registered without its constraint, or a constraint no entry claims, fails by name.
+      #
+      # Running it does the ordinary report too, which is how the one pair WRITING the act and
+      # showing nobody was found the moment the script could run at all.
+      #
+      # Beside the sweep gate and for the same reason: it reads source, needs no database, and a
+      # cheap refusal belongs ahead of a twenty-minute suite.
+      - name: Every maker/checker pair is registered, constrained, and shows its act on the record
+        if: ${{ !cancelled() }}
+        run: npm run check:maker-checker-pairs
+
       - name: Database schema (prisma validate)
         if: ${{ !cancelled() }}
         run: npm run db:validate

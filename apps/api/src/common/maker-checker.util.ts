@@ -21,7 +21,7 @@ import {
  *
  * It used to say: "a bug that skips this guard still can't write a self-approval, and a caller that
  * bypasses application code entirely (raw SQL, a future integration) still can't either." The
- * duty-segregation MODE lifted exactly that. Every one of the fifteen CHECK constraints gained a
+ * duty-segregation MODE lifted exactly that. Every one of the sixteen CHECK constraints gained a
  * third disjunct, measured on the live database:
  *
  *     CHECK ("approvedByUserId" IS NULL

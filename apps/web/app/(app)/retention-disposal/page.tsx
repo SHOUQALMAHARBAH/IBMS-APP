@@ -300,7 +300,19 @@ export default function RetentionDisposalPage() {
                         )}
                       </td>
                       <td style={cell}>{s.legalBasis ?? '—'}</td>
-                      <td style={cell}>{s.isConfirmed ? 'Yes' : t('rdDraftPending')}</td>
+                      <td style={cell}>
+                        {/* `commonYes`, not a hardcoded 'Yes' — an Arabic reader was seeing the
+                            English word in this cell. The key already existed in both languages. */}
+                        {s.isConfirmed ? t('commonYes') : t('rdDraftPending')}
+                        {/* THE ACT, ON THE RECORD — in the CONFIRMED column, because the
+                            confirmation is the half it excuses and that is the cell a reader
+                            asking "who confirmed this" is already looking at. Renders nothing
+                            when there is no act, which is nearly every row. */}
+                        <CombinedDutyOnRecord
+                          act={s.combinedDutyAct}
+                          testId={`retention-schedule-combined-duty-${s.id}`}
+                        />
+                      </td>
                       <td style={cell}>
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
                           {canManageSchedule && !s.isConfirmed && editMonths[s.id] ? (

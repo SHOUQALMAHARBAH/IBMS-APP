@@ -4,7 +4,7 @@
  * ## This was MOVED, not written
  *
  * `MAKER_CHECKER_REGISTRY` already existed, complete and correct, in
- * `modules/internal-controls/internal-controls.config.ts` — 15 entries matching the 15 database CHECK
+ * `modules/internal-controls/internal-controls.config.ts` — 16 entries matching the 16 database CHECK
  * constraints one for one. It was moved here (verbatim, plus one field) for a layering reason:
  * `src/common/` must not import from `src/modules/`, and `maker-checker.util.ts` lives in common and now
  * needs the list to name a remedy. `internal-controls.config.ts` re-exports it, so its own consumers are
@@ -14,8 +14,19 @@
  *
  * Measured while planning Part 4:
  *
- *   this registry                15 pairs — matches the database exactly
- *   the database                 15 CHECK constraints across 14 tables
+ *   this registry                16 pairs — matches the database exactly
+ *   the database                 16 CHECK constraints across 15 tables
+ *
+ * THE PAIR COUNT AND THE TABLE COUNT DIFFER BY ONE ON PURPOSE: `NeedsAssessment` carries TWO
+ * pairs (reviewer and approver) with two escape columns, because one shared column would let a
+ * declared combined REVIEW excuse a self-APPROVAL. A pair's identity is its CONSTRAINT, never
+ * its table — which is also why `combined-duty-projection.py` keys on the constraint, and why
+ * keying it on the table once collapsed these two into one.
+ *
+ * AND THE COUNT IS DERIVED RATHER THAN WRITTEN DOWN NOW: `npm run check:maker-checker-pairs`
+ * compares this registry to the `*_maker_checker_distinct` constraints the migrations create, by
+ * name and in BOTH directions, as a CI step. The figures above were 15 for a day after the
+ * sixteenth pair landed, in the file that calls itself the canonical one.
  *   `checker-roles.config.ts`    13 checker permissions — both NeedsAssessment pairs missing
  *   `maker-checker.util.ts`      11 rows in a header comment — four pairs missing
  *
@@ -46,6 +57,35 @@ export interface MakerCheckerPair {
   modelProperty: string;
   makerField: string;
   checkerField: string;
+  /**
+   * DECISION 22 — the permission that gates the MAKER's half, or `null` where none exists.
+   *
+   * REQUIRED, not optional, and that is the point: an omitted field would make "nobody measured
+   * this one" and "there is no code" the same thing, and the single null below is the entry where
+   * that distinction carries the entire answer.
+   *
+   * ## MEASURED FROM THE ROUTE THAT WRITES THE MAKER FIELD, NEVER FROM THE FIELD'S NAME
+   *
+   * `scripts/measurements/maker-permissions.py` is the derivation, committed so the answer is
+   * re-derivable rather than remembered. Four readings taken from the field name were wrong, and
+   * every one of them is a code somebody would plausibly have written down:
+   *
+   *   * `DataProcessingAgreement`'s is `vendor.update` — a different permission FAMILY.
+   *   * `Complaint`'s is `complaint.log`, which gates EIGHT routes, so holding it says "may work
+   *     complaints" and not "may resolve this one".
+   *   * `AccessRecertificationItem`'s maker is the SUBJECT of the review, so no permission exists
+   *     and none CAN — a person does not need a grant to be the one whose access is reviewed.
+   *   * `Refund`'s is `endorsement.apply`, NOT `refund.raise`. `refund.raise` EXISTS in the
+   *     catalogue and gates NO ROUTE, which is why recording it would have put a code nothing
+   *     reads into the one place meant to answer "who may make this half".
+   *
+   * ## SO THE GUARD CHECKS ENFORCEMENT, NOT EXISTENCE
+   *
+   * `maker-permissions.inventory.spec.ts` refuses a code that gates no `@RequirePermissions`
+   * anywhere in the api. A catalogue code that reads no route is worse here than an empty field,
+   * because it reads as an answer.
+   */
+  makerPermission: string | null;
   /** The DB CHECK constraint name backing this pair, or null — see header comment. */
   dbCheckConstraint: string | null;
   /**
@@ -71,6 +111,8 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'createdByUserId',
     checkerField: 'approvedByUserId',
     dbCheckConstraint: 'KYCRecord_maker_checker_distinct',
+    // `kyc.service.ts#start` -> `POST /kyc`.
+    makerPermission: 'kyc.capture',
     checkerPermission: 'kyc.approve',
     dormant: false,
     source: 'Part 5.2, Part 3.1',
@@ -82,6 +124,9 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'placedByUserId',
     checkerField: 'checkedByUserId',
     dbCheckConstraint: 'PolicyChecking_maker_checker_distinct',
+    // `policy.service.ts#place` -> `POST /policies`. The maker is whoever PLACED the policy,
+    // so the gate is the placement one and not a checking code.
+    makerPermission: 'policy.create',
     checkerPermission: 'policy.check',
     dormant: false,
     source: 'Part 5.2, Part 3.4',
@@ -93,6 +138,11 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'raisedByUserId',
     checkerField: 'approvedByUserId',
     dbCheckConstraint: 'Refund_maker_checker_distinct',
+    // `endorsement.service.ts#calculateAdjustment` -> `POST
+    // /endorsements/:id/calculate-adjustment`. NOT `refund.raise`, which exists and gates NO
+    // route: a refund is created inside the endorsement because the refund and its commission
+    // reversal must move together.
+    makerPermission: 'endorsement.apply',
     checkerPermission: 'refund.approve',
     dormant: false,
     source: 'Part 5.2, Part 3.5',
@@ -104,6 +154,8 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'nominatedByUserId',
     checkerField: 'dpoApprovedByUserId',
     dbCheckConstraint: 'DisposalBatch_maker_checker_distinct',
+    // `disposal-batch.service.ts#nominate` -> `POST /disposal-batches`.
+    makerPermission: 'retention.dispose.nominate',
     checkerPermission: 'retention.dispose.approve',
     dormant: false,
     source: 'PRIV-SRS-01 M06',
@@ -127,6 +179,10 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'setByUserId',
     checkerField: 'confirmedByLegalCounselByUserId',
     dbCheckConstraint: 'RetentionScheduleItem_maker_checker_distinct',
+    // `retention-schedule.service.ts#create` AND `#update` -> `POST`/`PATCH
+    // /retention-schedule`. Both write the maker, because the person a confirmation must
+    // differ from is whoever LAST set the period — and both routes carry the same code.
+    makerPermission: 'retention-schedule.update',
     checkerPermission: 'retention-schedule.confirm',
     dormant: false,
     source: 'PRIV-SRS-01 M06',
@@ -138,6 +194,8 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'requestedByUserId',
     checkerField: 'approvedByUserId',
     dbCheckConstraint: 'DataSharingApproval_maker_checker_distinct',
+    // `data-sharing-approval.service.ts#create` -> `POST /data-sharing-approvals`.
+    makerPermission: 'data-sharing.request',
     checkerPermission: 'data-sharing.approve',
     dormant: false,
     source: 'PRIV-SRS-01 M08',
@@ -149,6 +207,10 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'assessedByUserId',
     checkerField: 'dpoApprovedByUserId',
     dbCheckConstraint: 'DataProcessingAgreement_maker_checker_distinct',
+    // `data-processing-agreement.service.ts#create` -> `POST /data-processing-agreements`. A
+    // DIFFERENT FAMILY from `dpa.approve`, which is the checker's — an assessment is recorded
+    // against a vendor, so the gate is the vendor one.
+    makerPermission: 'vendor.update',
     checkerPermission: 'dpa.approve',
     dormant: false,
     source: 'PRIV-SRS-01 M07',
@@ -160,6 +222,9 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'approvedByUserId',
     checkerField: 'secondApproverUserId',
     dbCheckConstraint: 'Settlement_maker_checker_distinct',
+    // `claim.service.ts#recordSettlement` -> `POST /claims/:id/settlement`. The FIRST approval
+    // is the maker here, which is why both halves are approval codes.
+    makerPermission: 'claim.settle.approve',
     checkerPermission: 'claim.settle.second-approve',
     dormant: false,
     source: 'Part 5.2 (large claims / broker-processed payments), Process 28',
@@ -171,6 +236,8 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'overrideRequestedByUserId',
     checkerField: 'overrideApprovedByUserId',
     dbCheckConstraint: 'CommissionLedgerEntry_maker_checker_distinct',
+    // `commission-ledger.service.ts#raiseOverride` -> `POST /commission/.../override`.
+    makerPermission: 'commission-override.raise',
     checkerPermission: 'commission-override.approve',
     dormant: false,
     source: 'Part 5.2, Process 35',
@@ -182,6 +249,8 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'draftedByUserId',
     checkerField: 'approvedByUserId',
     dbCheckConstraint: 'Recommendation_maker_checker_distinct',
+    // `recommendation.service.ts#draft` -> `POST /recommendations`.
+    makerPermission: 'recommendation.draft',
     checkerPermission: 'recommendation.approve',
     dormant: false,
     source: 'Part 5.2, Process 16',
@@ -193,6 +262,11 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'subjectUserId',
     checkerField: 'reviewerUserId',
     dbCheckConstraint: 'AccessRecertificationItem_maker_checker_distinct',
+    // NONE, AND NONE CAN EXIST. The maker field is `subjectUserId` — the SUBJECT of the
+    // review, written when the cycle opens. A person does not hold a permission in order to be
+    // the one whose access is reviewed, so there is no gate to name. An empty field with this
+    // reason is an answer; a guessed code would not be.
+    makerPermission: null,
     checkerPermission: 'access-recertification.review',
     dormant: false,
     source: 'backlog A.8',
@@ -204,6 +278,10 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'createdByUserId',
     checkerField: 'reviewedByUserId',
     dbCheckConstraint: 'NeedsAssessment_reviewer_maker_checker_distinct',
+    // `needs-assessment.service.ts#create` -> `POST /needs-assessments`. Both of this table's
+    // pairs share one maker field, so both name the same code — which is correct and is not
+    // the two pairs collapsing: their CHECKER halves and their escape columns stay separate.
+    makerPermission: 'needs-assessment.create',
     checkerPermission: 'needs-assessment.approve',
     dormant: false,
     source: 'Domain A #5',
@@ -215,6 +293,9 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'createdByUserId',
     checkerField: 'approvedByUserId',
     dbCheckConstraint: 'NeedsAssessment_approver_maker_checker_distinct',
+    // `needs-assessment.service.ts#create` -> `POST /needs-assessments`. See the reviewer pair
+    // above: one maker field, two pairs, two escape columns.
+    makerPermission: 'needs-assessment.create',
     checkerPermission: 'needs-assessment.approve',
     dormant: false,
     source: 'Domain A #5',
@@ -226,6 +307,10 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'resolvedByUserId',
     checkerField: 'closureApprovedByUserId',
     dbCheckConstraint: 'Complaint_closure_maker_checker_distinct',
+    // `complaint.service.ts#resolve` -> `POST /complaints/:id/resolve`. This code gates EIGHT
+    // routes, so holding it says 'may work complaints' rather than 'may resolve this one' — a
+    // coarseness worth knowing when reading the segregation answer off this field.
+    makerPermission: 'complaint.log',
     checkerPermission: 'complaint.close',
     dormant: false,
     source: 'Process 42',
@@ -268,6 +353,9 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'processedByUserId',
     checkerField: 'closedByUserId',
     dbCheckConstraint: 'DataSubjectRequest_closure_maker_checker_distinct',
+    // `dsr.service.ts#fulfil`, `#partiallyFulfil` and `#reject` all write it, and all three
+    // are gated on the same code.
+    makerPermission: 'dsr.handle',
     checkerPermission: 'dsr.close',
     dormant: false,
     source: 'Process #52/M04',
@@ -279,6 +367,8 @@ export const MAKER_CHECKER_REGISTRY = [
     makerField: 'classifiedByDpoUserId',
     checkerField: 'seniorManagementCoSignUserId',
     dbCheckConstraint: 'IncidentReport_classification_maker_checker_distinct',
+    // `incident.service.ts#classify` -> `POST /incidents/:id/classify`.
+    makerPermission: 'incident.classify',
     checkerPermission: 'incident.classification.co-sign',
     dormant: false,
     source: 'Process 55/M09',
@@ -286,7 +376,7 @@ export const MAKER_CHECKER_REGISTRY = [
 ] as const satisfies readonly MakerCheckerPair[];
 
 /**
- * The 15 constraint names, as a type.
+ * The 16 constraint names, as a type.
  *
  * `as const` above is what makes this possible, and it is the difference between a typo at a call site
  * being a compile error and being a refusal message that names a permission nobody holds. That was a real

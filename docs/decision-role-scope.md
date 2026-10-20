@@ -40,7 +40,7 @@ the guard has not loaded.
 So scope cannot be a thing the guard checks. It has to be decided where the resource's insurance
 line is known, which is the service.
 
-That is not a weakening. It is the same shape the fifteen maker/checker pairs already have: the
+That is not a weakening. It is the same shape the sixteen maker/checker pairs already have: the
 route guard answers "may you act at all", and the act itself answers "may you act on *this*".
 
 ## 3. Where scope is CARRIED

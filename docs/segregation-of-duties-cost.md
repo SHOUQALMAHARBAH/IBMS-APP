@@ -144,7 +144,15 @@ onto row 11.
 ### What the change costs, named
 
 1. One optional field on `MakerCheckerPair`, plus its reason-for-null on row 11.
-2. Sixteen values, fifteen of them from the table above.
+2. Sixteen values, fifteen of them from the table above. **DONE 2026-10-20 (item C):**
+   `makerPermission` is `string | null` and REQUIRED on every entry — not optional, because an
+   omitted field would make "nobody measured this one" and "there is no code" the same thing,
+   and the single null is the entry where that distinction carries the whole answer. Derived by
+   `scripts/measurements/maker-permissions.py`, committed, which confirmed all four of the
+   corrections recorded here. `maker-permissions.inventory.spec.ts` checks ENFORCEMENT rather
+   than existence — a `makerPermission` must appear inside a `@RequirePermissions` somewhere in
+   the api — and its non-vacuity case pins the exact condition using `refund.raise` itself, so
+   if that code ever gains a route the guard fails and the Refund pair is re-measured.
 3. One guard that the named code is a real catalogue code — the `refund.raise` lesson: a
    maker code that exists and is unenforced is worse than none, so the guard must check
    enforcement, not merely existence (`permission-enforcement.inventory.spec.ts` already
@@ -153,7 +161,30 @@ onto row 11.
    screen or report that asks it.
 5. The two names the register already requires: **checker concentration** (an observation)
    and **both halves of one pair** (the rule). Nothing may call the first the second.
-6. The stale `combined-duty-projection.py` pin, and the eleven "fifteen" claims.
+6. ~~The stale `combined-duty-projection.py` pin, and the eleven "fifteen" claims.~~ **DONE
+   2026-10-20 (batch 5 group 5, item B), and it produced a finding this report did not
+   predict.** The pin is a DERIVATION now — the registry against the
+   `*_maker_checker_distinct` CHECK constraints the migrations create, by name and in BOTH
+   directions — wired as `npm run check:maker-checker-pairs` and a `backend` CI step, with two
+   self-test plants on the cross-check itself. The literal was never bumped: a seventeenth
+   pair now moves both sides together and the gate stays quiet.
+
+   **AND THE FIRST SUCCESSFUL RUN REPORTED 16 PAIRS, 15 PROJECTING, 1 WRITING-AND-SHOWING-
+   NOBODY.** `RetentionScheduleItem` — the sixteenth pair, the one this module added. So a
+   retention period that one person both SET and CONFIRMED in a declared COMBINED office read
+   on the record as an ordinary two-person confirmation, which is exactly what Part 4 step 5
+   exists to prevent. It was invisible for as long as the script was dead. Closed in the same
+   commit to the checklist `CLAUDE.md` already carried for it: the include, the strict payload
+   type (which caught three read paths the moment it landed), the view field, the mapper line,
+   the web type, a `BY_CALL_SITE` row, and the act rendered in the CONFIRMED column of
+   `/retention-disposal`. 16 of 16 now.
+
+   The "fifteen" claims were **35 across 26 files**, not eleven — the report's own count was
+   low. `IMPROVEMENTS.md` and this file's sibling build narrative are deliberately NOT
+   rewritten (their stated convention is that corrections sit beside claims and nothing earlier
+   is edited), and every "fifteen" that is not about this count was left alone: the fifteen
+   PIPELINES, the fifteen QUERIES, process #58, and this document's own "fifteen ANSWERABLE
+   pairs", which is correct as written.
 
 Items 1–3 are small. Item 4 is the roles-and-permissions pass, which is why the register
 defers it there rather than here.

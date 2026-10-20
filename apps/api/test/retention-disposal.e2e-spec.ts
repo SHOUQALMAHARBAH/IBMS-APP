@@ -36,6 +36,8 @@ interface RetentionScheduleItemBody {
   legalBasis: string | null;
   confirmedByLegalCounselAt: string | null;
   isConfirmed: boolean;
+  /** The sixteenth pair's act, ON THE RECORD — null for every ordinary two-person confirmation. */
+  combinedDutyAct: unknown;
 }
 interface LegalHoldBody {
   id: string;
@@ -109,6 +111,28 @@ async function makeUser(
     }
   }
   return { accessToken, userId: user.id };
+}
+
+/**
+ * The two categories the statutory floors govern, and the sweep that makes those tests
+ * re-runnable against a CUMULATIVE db-test.
+ *
+ * Neither name can be made run-unique: the floor matches on EQUALITY of the normalised category,
+ * so a suffix removes the floor and the test proves nothing. So the rows are swept instead — and
+ * swept BY HAND through `prisma`, never through the route under test, because a spec that heals
+ * itself through the thing it is testing cannot heal the one run that needs it.
+ *
+ * WHY IT EXISTS AT ALL, found by planting rather than by reading: with the create gate bypassed
+ * the refusal test's POSTs SUCCEED and write rows nothing deletes, and the next run then fails on
+ * a 409 instead of the 422 it is about. Two plant results were contaminated that way before this
+ * was added.
+ */
+const FLOOR_CATEGORIES = ['KYCRecord', 'Invoice'];
+
+async function sweepFloorCategories(): Promise<void> {
+  await prisma.retentionScheduleItem.deleteMany({
+    where: { recordCategory: { in: FLOOR_CATEGORIES } },
+  });
 }
 
 describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52 / M06', () => {
@@ -670,4 +694,191 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     expect(still.dpoApprovedByUserId).toBeNull();
     expect(still.status).toBe('NOMINATED');
   });
+
+  it('MODULE 0 CLOSE — REFUSES a retention period below the statutory floor, carrying the ARTICLE and its own text', async () => {
+    /*
+     * One of the owner's three standing refusals, proven over real HTTP because the screen renders
+     * the SERVER's own sentence (decision 90) — so what this response body says is literally what a
+     * compliance officer reads.
+     *
+     * BOTH FLOORS, because they are two different statutes and a test of one says nothing about the
+     * other. And 60 months is the shared edge: it CLEARS the AML floor exactly and is still refused
+     * as a commercial record, which is the whole reason there are two floors rather than one.
+     */
+    const app = await boot();
+    await sweepFloorCategories();
+    const compliance = await makeUser(
+      app,
+      'retention-floor-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+
+    // ---------------------------------------------- AML art. 17/a — five years, CDD records
+    const aml = await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(compliance.accessToken))
+      .send({ recordCategory: 'KYCRecord', retentionPeriodMonths: 12 })
+      .expect(422);
+    const amlMessage = JSON.stringify(aml.body);
+    expect(amlMessage).toContain('art. 17/a');
+    expect(amlMessage).toContain(
+      'Anti-Money Laundering and Counter-Terrorism Financing Law No. 20 of 2021',
+    );
+    expect(amlMessage).toContain(
+      'customer due-diligence records and account files must be kept for at least five years',
+    );
+    expect(amlMessage).toContain('WHICHEVER IS LONGER');
+    expect(amlMessage).toContain('60 months');
+
+    // ---------------------------------------------- Commercial Law art. 19 — ten years
+    const commercial = await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(compliance.accessToken))
+      .send({ recordCategory: 'Invoice', retentionPeriodMonths: 60 })
+      .expect(422);
+    const commercialMessage = JSON.stringify(commercial.body);
+    expect(commercialMessage).toContain('art. 19');
+    expect(commercialMessage).toContain('Commercial Law No. 12 of 1966');
+    expect(commercialMessage).toContain(
+      'financial and commercial records must be kept for ten years',
+    );
+    expect(commercialMessage).toContain(
+      'CLOSING DATE OF THE FINANCIAL TRANSACTION',
+    );
+    expect(commercialMessage).toContain('120 months');
+
+    /*
+     * NON-VACUITY, and it is the half that matters: a refusal BEFORE the write means no row exists,
+     * so the next run is not a 409. Without this assertion the test would pass against a refusal
+     * raised AFTER the insert, which would leave the row behind and break its own second run.
+     */
+    try {
+      for (const category of FLOOR_CATEGORIES) {
+        expect(
+          await prisma.retentionScheduleItem.findFirst({
+            where: { recordCategory: category },
+          }),
+          `${category} was written before the refusal — the floor is being checked too late`,
+        ).toBeNull();
+      }
+    } finally {
+      // Swept on the way out TOO, because the one run where a row exists is the run where the
+      // refusal stopped refusing — and that is precisely when the next run must not fail on a 409
+      // about the leftover instead of on the regression.
+      await sweepFloorCategories();
+    }
+  }, 120_000);
+
+  it('MODULE 0 CLOSE — ACCEPTS a period AT the floor, and ACCEPTS any period for a category with NO decided floor', async () => {
+    const app = await boot();
+    await sweepFloorCategories();
+    const compliance = await makeUser(
+      app,
+      'retention-floor-accept',
+      'COMPLIANCE_OFFICER',
+    );
+
+    let atFloorId: string | undefined;
+    let unsourcedId: string | undefined;
+    try {
+      // ---------------------------------------------- AT the floor, accepted
+      const atFloor = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({ recordCategory: 'KYCRecord', retentionPeriodMonths: 60 })
+        .expect(201);
+      const atFloorBody = atFloor.body as RetentionScheduleItemBody;
+      atFloorId = atFloorBody.id;
+      expect(atFloorBody.retentionPeriodMonths).toBe(60);
+
+      // ABOVE it, freely — and on the EDIT path, which is where a create-only gate would be a
+      // formality: set 60, then patch to 6.
+      await request(app.getHttpServer())
+        .patch(`/retention-schedule/${atFloorId}`)
+        .set(bearer(compliance.accessToken))
+        .send({ retentionPeriodMonths: 240 })
+        .expect(200);
+      const belowOnEdit = await request(app.getHttpServer())
+        .patch(`/retention-schedule/${atFloorId}`)
+        .set(bearer(compliance.accessToken))
+        .send({ retentionPeriodMonths: 6 })
+        .expect(422);
+      expect(JSON.stringify(belowOnEdit.body)).toContain('art. 17/a');
+
+      // An edit that touches only `legalBasis` is NOT refused over a figure it is not touching.
+      await request(app.getHttpServer())
+        .patch(`/retention-schedule/${atFloorId}`)
+        .set(bearer(compliance.accessToken))
+        .send({ legalBasis: 'AML Law No. 20 of 2021, art. 17/a.' })
+        .expect(200);
+
+      /*
+       * ---------------------------------------------- NO DECIDED FLOOR, and NOTHING INVENTED
+       *
+       * The owner's constraint, which matters more than the refusal: a category whose statute we
+       * have not read gets the office's own period. One month for a category nobody sourced is
+       * accepted — and the response carries no floor, no article and no invented number.
+       */
+      const unsourced = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: `E2E-Unsourced-${Math.random().toString(36).slice(2, 8)}`,
+          retentionPeriodMonths: 1,
+        })
+        .expect(201);
+      const unsourcedBody = unsourced.body as RetentionScheduleItemBody;
+      unsourcedId = unsourcedBody.id;
+      expect(unsourcedBody.retentionPeriodMonths).toBe(1);
+      /*
+       * AN EXACT KEY SET, because an invented floor arrives as an ADDED FIELD and every
+       * `toHaveProperty` keeps passing while one appears. This is also what makes "no invented
+       * NUMBER" checkable without asserting on digits: if there is no floor field, there is no
+       * number presented as a floor.
+       *
+       * My first version asserted `not.toContain('60')` on the serialised body, which PASSED on
+       * its first run and failed on its second — the body carries a uuid, and whether the digits
+       * 60 appear in it is decided by Postgres. The recorded base64 trap, in numeric form.
+       */
+      expect(Object.keys(unsourcedBody).sort()).toEqual([
+        // `combinedDutyAct` is the SIXTEENTH PAIR'S projection, added in this same commit after
+        // `combined-duty-projection.py` reported this pair as the one writing the act and showing
+        // nobody. It is null here, which is the ordinary case. This assertion caught the shape
+        // change the moment it landed — which is the whole argument for an exact key set over a
+        // list of `toHaveProperty` calls, each of which keeps passing while a field appears.
+        'combinedDutyAct',
+        'confirmedByLegalCounselAt',
+        'id',
+        'isConfirmed',
+        'legalBasis',
+        'recordCategory',
+        'retentionPeriodMonths',
+      ]);
+      expect(unsourcedBody.combinedDutyAct).toBeNull();
+      // And no citation text — word-level needles, which a uuid cannot produce.
+      const unsourcedText = JSON.stringify(unsourcedBody);
+      for (const invented of [
+        'art.',
+        'statutory',
+        'Law No.',
+        'minimum',
+        'floor',
+      ]) {
+        expect(
+          unsourcedText.includes(invented),
+          `the response for an unsourced category mentions "${invented}" — nothing may be invented here`,
+        ).toBe(false);
+      }
+    } finally {
+      // The category name CANNOT be made run-unique — the floor matches on equality of the
+      // normalised name, so a suffix would remove the floor and the test would prove nothing. So
+      // the rows go. Neither carries a disposal batch or a legal hold, so the delete is clean.
+      for (const id of [atFloorId, unsourcedId]) {
+        if (id) await prisma.retentionScheduleItem.delete({ where: { id } });
+      }
+      // And by CATEGORY as well, not only by the ids this test captured: a row written by a
+      // request whose `.expect()` threw is a row this test never got an id for.
+      await sweepFloorCategories();
+    }
+  }, 120_000);
 });

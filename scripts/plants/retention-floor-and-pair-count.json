@@ -1,0 +1,38 @@
+{
+  "aml-floor-not-enforced-on-create": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "    assertMeetsStatutoryFloor(dto.recordCategory, dto.retentionPeriodMonths);",
+    "to": "    void assertMeetsStatutoryFloor;",
+    "why": "ITEM A — the statutory floor is one of the owner's three standing refusals. With the create gate gone, a KYC due-diligence period of 12 months is accepted and the office's own retention schedule records a period below AML Law No. 20 of 2021, art. 17/a. Kills BOTH statutory-floor e2e tests in `retention-disposal.e2e-spec.ts` and nothing else: the config spec still passes, because the pure function is untouched — which is the point of planting at the CALL SITE rather than in the rule."
+  },
+  "floor-not-enforced-on-edit": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "    if (dto.retentionPeriodMonths !== undefined) {\n      assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);\n    }",
+    "to": "    if (false && dto.retentionPeriodMonths !== undefined) {\n      assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);\n    }",
+    "why": "ITEM A — without the EDIT gate the create gate is a formality: set 60 months for a KYC category, then patch it to 6. Kills ONLY the acceptance test, which is the one that drives the patch — the refusal test never edits, so a plant that killed both would mean the two tests were not independently observing their own halves."
+  },
+  "floor-boundary-is-exclusive": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  if (floor && retentionPeriodMonths < floor.floorMonths) {",
+    "to": "  if (floor && retentionPeriodMonths <= floor.floorMonths) {",
+    "why": "ITEM A — the off-by-one in the direction that refuses a period which is EXACTLY what the statute requires. Five years is lawful; `<=` makes it unlawful. Kills the config spec's both-sides boundary case and the e2e acceptance test. This is the plant a mid-range test cannot catch, which is why the boundary is asserted on both sides of each floor."
+  },
+  "pair-count-pinned-to-a-literal-again": {
+    "file": "scripts/measurements/combined-duty-projection.py",
+    "from": "    derived = cross_check(sources)",
+    "to": "    derived = 15",
+    "why": "ITEM B — the defect itself, restored: a pair count pinned to a literal rather than derived. `npm run check:maker-checker-pairs` exits 1 with 'cross_check and measure disagree on the pair count (15 vs 16)'. The gate is now a CI step, so this is a red build rather than a script nobody runs — which is the whole change, since the original `assert pairs == 15` had been failing before it measured anything and CI never saw it."
+  },
+  "sixteenth-pair-shows-nobody-again": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.config.ts",
+    "from": "    combinedDutyAct: combinedDutyActView(row.combinedDutyAct),",
+    "to": "    combinedDutyAct: null,",
+    "why": "ITEM B's FINDING — the sixteenth pair writing the act and showing nobody, which is how the fixed measurement found it. `npm run check:maker-checker-pairs` reports 'writing it and showing nobody 1' naming `RetentionScheduleItem_maker_checker_distinct`. NOTE it does NOT fail the gate: the gate refuses an unregistered or unconstrained pair, and the projection figure is a REPORTED column. That division is deliberate and stated here rather than discovered — the e2e wire assertion is the half that fails."
+  },
+  "maker-permission-records-an-unenforced-code": {
+    "file": "apps/api/src/common/maker-checker-pairs.config.ts",
+    "from": "    makerPermission: 'endorsement.apply',",
+    "to": "    makerPermission: 'refund.raise',",
+    "why": "ITEM C — the exact wrong answer, and the one anybody would write from the field name. `refund.raise` IS in the catalogue, IS granted to roles and IS described on the Role matrix; it gates NO route. `maker-permissions.inventory.spec.ts` fails by name on 'Refund_maker_checker_distinct -> refund.raise' with the instruction to measure it from the route. An EXISTENCE check would have accepted it, which is why the guard reads @RequirePermissions instead."
+  }
+}
