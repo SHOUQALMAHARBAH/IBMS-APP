@@ -1705,6 +1705,25 @@ the provider can administer its own users and roles. The set is DECLARED as `PRO
 `packages/db/prisma/seed.ts` and the seed check fails if it changes — so the number moves only as a
 recorded decision, which is how it moved from one to nine.
 
+> **UPDATED 2026-10-20 — THIRTEEN, and this paragraph's "nine" is itself now stale.** It went to
+> eleven when module 0-ب added the two administrator-invitation codes
+> (`provider.office.administrator.invite`, `provider.insurance-company.administrator.invite`), and
+> to **thirteen** on 2026-10-20 with the authorised mailbox widening (decision 25):
+> `email.integration.read` and `email.integration.manage`, because the invitation that is the only
+> door into a brand-new organization leaves from the PROVIDER's own connected mailbox — and the
+> provider held neither code, so that channel was real in tests and unreachable in life.
+>
+> **The zero-rows half below is unchanged and the sentence stays true**: a mailbox the organization
+> OWNS is self-administration, the same family as `user.manage`, not a brokerage capability.
+>
+> **AND THE WIDENING BROKE A RECORDED INVARIANT, stated here because a reader of this section is
+> the person who would trip over it.** The company administrator's codes used to be a strict SUBSET
+> of the provider's, so any provider/office-shared code necessarily reached the company too. Not any
+> more: the two email codes reach the provider and four office roles and **not** the company
+> administrator. `route-role-reach.spec.ts` now asserts that asymmetry **by name in both
+> directions** — and item 1's `GET /admin/branches` choice survives, because it rested on
+> `provider.*` being PLATFORM-scoped and provider-only rather than on the subset.
+
 **The zero-rows half is unchanged and is the part that matters.** Every brokerage code is still
 deliberately absent: no policy, customer, commission, collection, claim or employee capability. The
 closure is at the GRANT level, not the schema level — no structural rule stops a provider

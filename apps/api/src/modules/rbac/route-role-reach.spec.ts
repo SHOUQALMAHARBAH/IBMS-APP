@@ -287,7 +287,17 @@ describe('a widened route is specified by the exact role set that reaches it', (
     // that resolved nothing makes every one of them compare empty to empty and pass.
     expect(routes.size).toBeGreaterThan(300);
     expect(roles.size).toBeGreaterThanOrEqual(13);
-    expect(roles.get('PLATFORM_OPERATOR')?.size).toBe(11);
+    /*
+     * THIRTEEN SINCE THE AUTHORISED MAILBOX WIDENING (decision 25, 2026-10-20) — re-stated
+     * deliberately, not relaxed. `PROVIDER_CODES` gained `email.integration.read` and
+     * `email.integration.manage` because the invitation that is the only door into a brand-new
+     * organization leaves from the PROVIDER's own connected mailbox, and the provider held neither
+     * code, so the channel was real in tests and unreachable in life.
+     *
+     * It is a PIN rather than a floor on purpose: a fourteenth code reaching the provider is a
+     * capability decision and must fail here until somebody records it.
+     */
+    expect(roles.get('PLATFORM_OPERATOR')?.size).toBe(13);
     /*
      * EIGHT SINCE OWNER DECISION 11, 2026-10-17 — re-stated deliberately, not relaxed.
      *
@@ -376,18 +386,38 @@ describe('a widened route is specified by the exact role set that reaches it', (
     }
   });
 
-  it('the shared-code set is still what it was, so a widening cannot reach a company by accident', () => {
+  it('the shared-code asymmetry is EXACTLY these codes, in both directions, by name', () => {
     /*
-     * THE FACT THAT DECIDED ITEM 1's CODE, asserted so a future widening does not rediscover it.
+     * THE SECOND BREAK OF ONE PROPERTY, RE-STATED RATHER THAN RELAXED — the same instruction the
+     * sibling test above carries, applied to the other direction.
      *
-     * The company administrator's codes are a strict SUBSET of the provider's. So any code held by
-     * the provider AND by some office role is necessarily held by the company administrator too, and
-     * an any-of naming such a code reaches all three. Only one of the five `provider.*` codes — held
-     * by `PLATFORM_OPERATOR` alone — can widen a route to the provider without the company
-     * administrator coming with it.
+     * ## What this used to assert, and why it was true
      *
-     * If this ever fails because the company administrator gained a code the provider lacks, then
-     * item 1's reasoning no longer holds and the `GET /admin/branches` decision needs re-taking.
+     * The company administrator's codes were a strict SUBSET of the provider's. So any code the
+     * provider shared with an office role was necessarily on the company administrator too, and an
+     * any-of naming such a code reached all three. Only a `provider.*` code — PLATFORM-scoped and
+     * held by `PLATFORM_OPERATOR` alone — could widen a route to the provider without the company
+     * administrator coming with it. That is the fact item 1's `GET /admin/branches` choice was
+     * made on.
+     *
+     * ## It is broken in BOTH directions now, and this test is the record of exactly how
+     *
+     *   * company-but-not-provider: `branch.read`, `department.read` — owner decision 11,
+     *     2026-10-17, asserted by name in the sibling test above.
+     *   * provider-and-offices-but-not-company: `email.integration.read`,
+     *     `email.integration.manage` — the authorised mailbox widening, decision 25, 2026-10-20.
+     *
+     * ## ITEM 1's CHOICE SURVIVES, and the reason is NOT this property
+     *
+     * It never rested on the subset. It rested on `provider.*` codes being PLATFORM-scoped and
+     * held by `PLATFORM_OPERATOR` alone — still true, and still asserted in the sibling test. What
+     * the widening adds is a SECOND class of code that reaches the provider and the offices but not
+     * the company. That is a new option nobody has chosen, not a contradiction of a choice already
+     * made.
+     *
+     * So the assertion is now the asymmetry ITSELF, by name and in both directions. A THIRD code
+     * appearing in either direction fails here, because that would be a capability change nobody
+     * recorded — which is the property this test was built to defend, unchanged in strength.
      */
     const prov = roles.get('PLATFORM_OPERATOR')!;
     const comp = roles.get('INSURANCE_COMPANY_ADMINISTRATOR')!;
@@ -403,12 +433,20 @@ describe('a widened route is specified by the exact role set that reaches it', (
       shared.length,
       'no code is shared at all — the parser drifted',
     ).toBeGreaterThan(0);
-    for (const code of shared) {
-      expect(
-        comp.has(code),
-        `${code} is shared with an office role but NOT held by the company administrator — the ` +
-          "subset property has changed, so item 1's code choice needs re-taking",
-      ).toBe(true);
-    }
+
+    // Direction one: shared with an office role, and NOT on the company administrator.
+    expect(
+      shared.filter((c) => !comp.has(c)).sort(),
+      'the provider/office-but-not-company set has changed. Two codes are expected and recorded ' +
+        '(the mailbox widening, decision 25); a third means a capability moved without a decision',
+    ).toEqual(['email.integration.manage', 'email.integration.read']);
+
+    // Direction two: on the company administrator and NOT on the provider. Asserted here as well
+    // as in the sibling test on purpose — this file is where a reader comes to ask "what is the
+    // relationship between these three role sets", and half an answer sends them to the wrong place.
+    expect(
+      [...comp].filter((c) => !prov.has(c)).sort(),
+      'the company-but-not-provider set has changed (owner decision 11)',
+    ).toEqual(['branch.read', 'department.read']);
   });
 });
