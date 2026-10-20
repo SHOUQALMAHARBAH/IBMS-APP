@@ -1,6 +1,14 @@
-import { IsInt, IsOptional, IsString, Length, Min } from 'class-validator';
-import { Transform } from 'class-transformer';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { emptyStringToUndefined } from '../../../common/dto.util';
+import { NoFloorDeclarationDto } from './no-floor-declaration.dto';
 
 /**
  * M06 — `POST /retention-schedule` (`retention-schedule.manage`). One row
@@ -24,4 +32,15 @@ export class CreateRetentionScheduleItemDto {
   @Transform(emptyStringToUndefined)
   @IsString()
   legalBasis?: string;
+
+  /**
+   * OPTIONAL HERE AND REQUIRED IN THE SERVICE, which is the same shape `CombinedDutyDeclarationDto`
+   * uses and for the same reason: a DTO cannot see whether this category has a known floor, and
+   * making it mandatory would demand a declaration on every save including the two families that
+   * already refuse or accept on their own. `resolveNoFloorDeclaration` decides.
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NoFloorDeclarationDto)
+  noFloorDeclaration?: NoFloorDeclarationDto;
 }

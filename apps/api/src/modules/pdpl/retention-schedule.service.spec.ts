@@ -27,8 +27,39 @@ const row = (over: Record<string, unknown> = {}) => ({
   retentionPeriodMonths: 120,
   legalBasis: 'DRAFT',
   confirmedByLegalCounselAt: null,
+  // Batch 5 group 6 — all five explicit rather than omitted: under a spread an omitted field becomes
+  // `| undefined`, which is what the compiler reports instead of the omission.
+  noFloorNoticeShown: null,
+  noFloorReason: null,
+  noFloorAcknowledgedAt: null,
+  noFloorAcknowledgedByUserId: null,
+  noFloorAcknowledgedMonths: null,
   ...over,
 });
+
+/**
+ * THE DECLARATION THESE TESTS SEND, batch 5 group 6.
+ *
+ * `AuditLogEntry` is a category this system knows no statutory minimum for — it is the one seeded
+ * row, and neither decided floor governs an audit log — so the owner's ruling asks the office to
+ * declare on the first save. Six tests here were asserting the route as it was before that, and a
+ * 422 without this is the mechanism working rather than a regression.
+ */
+const DECLARATION = {
+  noticeShown:
+    'This system does not know a statutory minimum for a record category with this name ' +
+    '— and that does not mean the law sets none for it.',
+  reason: 'Unit-test category; no statute identified for it.',
+  acknowledged: true as const,
+};
+
+/** The five columns a declaration writes, asserted TOGETHER — four of five is a 500 from the CHECK. */
+const DECLARED_COLUMNS = {
+  noFloorNoticeShown: DECLARATION.noticeShown,
+  noFloorReason: DECLARATION.reason,
+  noFloorAcknowledgedAt: expect.any(Date) as unknown as Date,
+  noFloorAcknowledgedByUserId: 'u-compliance',
+};
 
 function makeService(
   over: {
@@ -75,6 +106,7 @@ describe('RetentionScheduleService.create', () => {
         recordCategory: 'AuditLogEntry',
         retentionPeriodMonths: 120,
         legalBasis: 'DRAFT',
+        noFloorDeclaration: DECLARATION,
       },
       'u-compliance',
     );
@@ -83,6 +115,11 @@ describe('RetentionScheduleService.create', () => {
       recordCategory: 'AuditLogEntry',
       retentionPeriodMonths: 120,
       legalBasis: 'DRAFT',
+      // THE FIVE COLUMNS, TOGETHER. `noFloorAcknowledgedMonths` is the period the office was
+      // ACTUALLY acknowledging, which is what makes "asked once" work — a later save at this
+      // figure or longer is not re-asked.
+      ...DECLARED_COLUMNS,
+      noFloorAcknowledgedMonths: 120,
       // MODULE 0 CLOSE, DECISION 3 — the MAKER is stamped, and asserting it here is what makes the
       // pair enforceable at all: a row with no maker is a row the confirmation cannot be compared
       // against. `u-compliance` — the actor THIS test passes, not the confirm test's actor.
@@ -92,6 +129,12 @@ describe('RetentionScheduleService.create', () => {
       expect.objectContaining({
         action: 'CREATE',
         entityType: 'RetentionScheduleItem',
+        // THE SENTENCE AND THE REASON, VERBATIM — not the word "acknowledged". What the person was
+        // TOLD is part of the record, because a year from now the question is what they saw.
+        afterValue: expect.objectContaining({
+          noFloorNoticeShown: DECLARATION.noticeShown,
+          noFloorReason: DECLARATION.reason,
+        }) as unknown,
       }),
     );
   });
@@ -102,7 +145,11 @@ describe('RetentionScheduleService.create', () => {
     });
     await expect(
       service.create(
-        { recordCategory: 'AuditLogEntry', retentionPeriodMonths: 120 },
+        {
+          recordCategory: 'AuditLogEntry',
+          retentionPeriodMonths: 120,
+          noFloorDeclaration: DECLARATION,
+        },
         'u-compliance',
       ),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -114,12 +161,14 @@ describe('RetentionScheduleService.update', () => {
     const { service, repo } = makeService();
     await service.update(
       'rsi-1',
-      { retentionPeriodMonths: 84 },
+      { retentionPeriodMonths: 84, noFloorDeclaration: DECLARATION },
       'u-compliance',
     );
     expect(repo.update).toHaveBeenCalledWith('rsi-1', {
       retentionPeriodMonths: 84,
       legalBasis: undefined,
+      ...DECLARED_COLUMNS,
+      noFloorAcknowledgedMonths: 84,
       // RE-STAMPED ON EDIT, not carried forward. Otherwise A could create, B edit the figure, and B
       // confirm their own figure — a self-confirmation the constraint could not see, because it
       // would be comparing the checker against A.

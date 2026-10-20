@@ -38,6 +38,8 @@ interface RetentionScheduleItemBody {
   isConfirmed: boolean;
   /** The sixteenth pair's act, ON THE RECORD — null for every ordinary two-person confirmation. */
   combinedDutyAct: unknown;
+  /** Batch 5 group 6 — the no-floor declaration, or null where none was ever required. */
+  noFloorDeclaration: unknown;
 }
 interface LegalHoldBody {
   id: string;
@@ -129,6 +131,26 @@ async function makeUser(
  */
 const FLOOR_CATEGORIES = ['KYCRecord', 'Invoice'];
 
+/**
+ * The no-floor declaration these tests send, batch 5 group 6.
+ *
+ * Every category these specs create is one this system knows no statutory minimum for, so the
+ * owner's ruling asks the office to declare on the first save — which is why the creates below
+ * carry this. A 422 without it is the mechanism working, not a regression.
+ *
+ * ONE helper, not five inline copies: the sentence is the mechanism here, and five copies is five
+ * places for one of them to say less. Deliberately NOT read from the web dictionary — the api
+ * cannot see it, and the whole point of carrying `noticeShown` from the caller is that what was
+ * DISPLAYED is what gets recorded. A test is a caller.
+ */
+const NO_FLOOR_DECLARATION = {
+  noticeShown:
+    'This system does not know a statutory minimum for a record category with this name ' +
+    '— and that does not mean the law sets none for it.',
+  reason: 'Test fixture category; no statute applies to it.',
+  acknowledged: true as const,
+};
+
 async function sweepFloorCategories(): Promise<void> {
   await prisma.retentionScheduleItem.deleteMany({
     where: { recordCategory: { in: FLOOR_CATEGORIES } },
@@ -167,7 +189,11 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     await request(app.getHttpServer())
       .post('/retention-schedule')
       .set(bearer(outsider.accessToken))
-      .send({ recordCategory: category, retentionPeriodMonths: 60 })
+      .send({
+        recordCategory: category,
+        retentionPeriodMonths: 60,
+        noFloorDeclaration: NO_FLOOR_DECLARATION,
+      })
       .expect(403);
 
     // create a retention-schedule item (a documented, pending-confirmation
@@ -179,6 +205,7 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         recordCategory: category,
         retentionPeriodMonths: 60,
         legalBasis: 'DRAFT pending Legal Counsel citation.',
+        noFloorDeclaration: NO_FLOOR_DECLARATION,
       })
       .expect(201);
     const item = created.body as RetentionScheduleItemBody;
@@ -189,7 +216,11 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     await request(app.getHttpServer())
       .post('/retention-schedule')
       .set(bearer(compliance.accessToken))
-      .send({ recordCategory: category, retentionPeriodMonths: 12 })
+      .send({
+        recordCategory: category,
+        retentionPeriodMonths: 12,
+        noFloorDeclaration: NO_FLOOR_DECLARATION,
+      })
       .expect(409);
 
     // list includes it
@@ -428,7 +459,11 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       await request(app.getHttpServer())
         .post('/retention-schedule')
         .set(bearer(compliance.accessToken))
-        .send({ recordCategory: category, retentionPeriodMonths: 24 })
+        .send({
+          recordCategory: category,
+          retentionPeriodMonths: 24,
+          noFloorDeclaration: NO_FLOOR_DECLARATION,
+        })
         .expect(201)
     ).body as RetentionScheduleItemBody;
 
@@ -599,6 +634,7 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         recordCategory: `self-confirm-${Date.now()}`,
         retentionPeriodMonths: 36,
         legalBasis: 'PDPL Article 5',
+        noFloorDeclaration: NO_FLOOR_DECLARATION,
       })
       .expect(201);
     const itemId = (created.body as { id: string }).id;
@@ -644,6 +680,7 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         recordCategory: category,
         retentionPeriodMonths: 12,
         legalBasis: 'PDPL Article 5',
+        noFloorDeclaration: NO_FLOOR_DECLARATION,
       })
       .expect(201);
     const itemId = (item.body as { id: string }).id;
@@ -825,6 +862,10 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         .send({
           recordCategory: `E2E-Unsourced-${Math.random().toString(36).slice(2, 8)}`,
           retentionPeriodMonths: 1,
+          // This system knows no minimum for this name, so the office declares — the ask itself is
+          // proven in the silent-case test below; here the point is that ONE month is accepted and
+          // nothing is invented.
+          noFloorDeclaration: NO_FLOOR_DECLARATION,
         })
         .expect(201);
       const unsourcedBody = unsourced.body as RetentionScheduleItemBody;
@@ -851,24 +892,37 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         'id',
         'isConfirmed',
         'legalBasis',
+        // Batch 5 group 6's declaration — the SECOND field this assertion caught the moment it
+        // landed, one batch after the projection. That is the argument for an exact key set.
+        'noFloorDeclaration',
         'recordCategory',
         'retentionPeriodMonths',
       ]);
       expect(unsourcedBody.combinedDutyAct).toBeNull();
-      // And no citation text — word-level needles, which a uuid cannot produce.
-      const unsourcedText = JSON.stringify(unsourcedBody);
-      for (const invented of [
-        'art.',
-        'statutory',
-        'Law No.',
-        'minimum',
-        'floor',
-      ]) {
-        expect(
-          unsourcedText.includes(invented),
-          `the response for an unsourced category mentions "${invented}" — nothing may be invented here`,
-        ).toBe(false);
-      }
+      /*
+       * RE-POINTED WITH THE REVERSAL STATED, not relaxed.
+       *
+       * This block used to assert the response mentions no 'art.', 'statutory', 'Law No.',
+       * 'minimum' or 'floor' — "nothing invented". Batch 5 group 6 makes those words legitimately
+       * present, because the declaration carries the notice and THE NOTICE NAMES BOTH KNOWN FLOORS
+       * BY INSTRUMENT AND ARTICLE. That naming is the mechanism, not an invention: it is how
+       * somebody saving due-diligence records under a different name recognises what they are doing.
+       *
+       * What must still be absent is a floor ATTRIBUTED TO THIS CATEGORY, and the exact key set
+       * above is what proves it — the view carries no floor field at all. So the claim now sits
+       * where it can actually fail rather than being hunted for by word.
+       */
+      const declared = unsourcedBody.noFloorDeclaration as {
+        noticeShown: string;
+        acknowledgedMonths: number;
+      } | null;
+      expect(declared).not.toBeNull();
+      expect(
+        declared?.noticeShown,
+        'the stored notice is not what was sent — a sentence re-derived at submit answers a ' +
+          'different question from the one the record exists for',
+      ).toBe(NO_FLOOR_DECLARATION.noticeShown);
+      expect(declared?.acknowledgedMonths).toBe(1);
     } finally {
       // The category name CANNOT be made run-unique — the floor matches on equality of the
       // normalised name, so a suffix would remove the floor and the test would prove nothing. So
@@ -878,6 +932,251 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       }
       // And by CATEGORY as well, not only by the ids this test captured: a row written by a
       // request whose `.expect()` threw is a row this test never got an id for.
+      await sweepFloorCategories();
+    }
+  }, 120_000);
+
+  it('THE SILENT CASE — a category with no known floor is ACCEPTED with a declaration, and the audit row carries the SENTENCE and the REASON verbatim', async () => {
+    /*
+     * Batch 5 group 6, the owner's ruling. Before this, a period for a category this system knows
+     * no minimum for was accepted with no refusal AND NO WORD — so a hard refusal was escaped by a
+     * spelling, silently. `CustomerFile` takes the five-year floor; `Customer` takes nothing.
+     *
+     * It DECLARES rather than refusing, because the harm is the office's own regulatory exposure.
+     */
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'retention-nofloor',
+      'COMPLIANCE_OFFICER',
+    );
+    const category = `E2E-NoFloor-${Math.random().toString(36).slice(2, 8)}`;
+    // The sentence as a screen would render it. Carried from the client deliberately — the
+    // `DuplicateNameWarning` precedent: re-deriving it at submit rewrites what they were told.
+    const notice =
+      'This system does not know a statutory minimum for a record category with this name ' +
+      '— and that does not mean the law sets none for it.';
+    const reason =
+      'Vendor correspondence; no statute found, reviewed with counsel.';
+
+    // ---------------------------------------------- (1) ASKED, and the refusal says what it is
+    const asked = await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(compliance.accessToken))
+      // NO declaration, deliberately — this is the request that proves the office is ASKED. A
+      // sweep over these bodies added one here and the test failed with 201, which is the only
+      // reason I noticed: a blind rewrite can remove the very thing a test is about.
+      .send({ recordCategory: category, retentionPeriodMonths: 6 })
+      .expect(422);
+    const askedBody = asked.body as {
+      code?: string;
+      message?: string;
+      reasonMinLength?: number;
+    };
+    expect(askedBody.code).toBe('NO_FLOOR_DECLARATION_REQUIRED');
+    expect(askedBody.reasonMinLength).toBe(10);
+    // THE PERIOD IS NOT WHAT IS REFUSED, and the message says so.
+    expect(String(askedBody.message)).toContain('The period is accepted');
+    // The SYSTEM does not know a minimum — never that the LAW sets none. The distinction is the
+    // difference between an honest declaration and a legal claim with no source.
+    expect(String(askedBody.message)).toContain(
+      'does not know a statutory minimum',
+    );
+    expect(String(askedBody.message)).toContain(
+      'Nothing here says the LAW sets no minimum',
+    );
+    // Nothing was written — the ask comes before the row.
+    expect(
+      await prisma.retentionScheduleItem.findFirst({
+        where: { recordCategory: category },
+      }),
+    ).toBeNull();
+
+    // A tick that is not ticked is refused by the DTO, so the acknowledgement is an act.
+    await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(compliance.accessToken))
+      .send({
+        recordCategory: category,
+        retentionPeriodMonths: 6,
+        noFloorDeclaration: {
+          noticeShown: notice,
+          reason,
+          acknowledged: false,
+        },
+      })
+      .expect(400);
+
+    // ---------------------------------------------- (2) ACCEPTED with the declaration
+    const created = await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(compliance.accessToken))
+      .send({
+        recordCategory: category,
+        retentionPeriodMonths: 6,
+        noFloorDeclaration: { noticeShown: notice, reason, acknowledged: true },
+      })
+      .expect(201);
+    const body = created.body as RetentionScheduleItemBody & {
+      noFloorDeclaration: {
+        noticeShown: string;
+        reason: string;
+        acknowledgedMonths: number;
+        acknowledgedByUserId: string;
+      } | null;
+    };
+    const itemId = body.id;
+    try {
+      expect(body.retentionPeriodMonths).toBe(6);
+      // THE SENTENCE IS IN THE RESPONSE, verbatim.
+      expect(body.noFloorDeclaration?.noticeShown).toBe(notice);
+      expect(body.noFloorDeclaration?.reason).toBe(reason);
+      expect(body.noFloorDeclaration?.acknowledgedMonths).toBe(6);
+      expect(body.noFloorDeclaration?.acknowledgedByUserId).toBe(
+        compliance.userId,
+      );
+
+      // ---------------------------------------------- (3) THE AUDIT ROW, VERBATIM
+      /*
+       * The owner's rule: the row carries the SENTENCE SHOWN and the REASON, not the word
+       * "acknowledged" — because a year from now the question is what the person SAW.
+       */
+      const entries = await prisma.auditLogEntry.findMany({
+        where: { entityType: 'RetentionScheduleItem', entityId: itemId },
+        select: { action: true, afterValue: true },
+      });
+      expect(entries).toHaveLength(1);
+      const after = entries[0].afterValue as Record<string, unknown>;
+      expect(after.noFloorNoticeShown).toBe(notice);
+      expect(after.noFloorReason).toBe(reason);
+      // NOT a flag. Asserted as an absence, which is the only form that can fail.
+      expect(JSON.stringify(after)).not.toContain('acknowledged');
+
+      // ---------------------------------------------- (4) NOT RE-ASKED at the same or longer
+      for (const months of [6, 7, 240]) {
+        await request(app.getHttpServer())
+          .patch(`/retention-schedule/${itemId}`)
+          .set(bearer(compliance.accessToken))
+          .send({ retentionPeriodMonths: months })
+          .expect(200);
+      }
+
+      // ---------------------------------------------- (5) ASKED AGAIN on a SHORTENING
+      /*
+       * The acknowledged figure is still 6 — the longer saves above required no declaration and
+       * deliberately did not overwrite it, because a longer period does not undo what the office
+       * was told. So 5 is a shortening against 6 and asks again.
+       */
+      const row = await prisma.retentionScheduleItem.findUniqueOrThrow({
+        where: { id: itemId },
+        select: {
+          noFloorAcknowledgedMonths: true,
+          retentionPeriodMonths: true,
+        },
+      });
+      expect(row.noFloorAcknowledgedMonths).toBe(6);
+      expect(row.retentionPeriodMonths).toBe(240);
+
+      const reAsked = await request(app.getHttpServer())
+        .patch(`/retention-schedule/${itemId}`)
+        .set(bearer(compliance.accessToken))
+        .send({ retentionPeriodMonths: 5 })
+        .expect(422);
+      expect((reAsked.body as { code?: string }).code).toBe(
+        'NO_FLOOR_DECLARATION_REQUIRED',
+      );
+
+      // And it goes through with a fresh declaration, re-stamping the acknowledged figure.
+      const shortened = 'Shortened after counsel confirmed no statute applies.';
+      await request(app.getHttpServer())
+        .patch(`/retention-schedule/${itemId}`)
+        .set(bearer(compliance.accessToken))
+        .send({
+          retentionPeriodMonths: 5,
+          noFloorDeclaration: {
+            noticeShown: notice,
+            reason: shortened,
+            acknowledged: true,
+          },
+        })
+        .expect(200);
+      const after5 = await prisma.retentionScheduleItem.findUniqueOrThrow({
+        where: { id: itemId },
+        select: { noFloorAcknowledgedMonths: true, noFloorReason: true },
+      });
+      expect(after5.noFloorAcknowledgedMonths).toBe(5);
+      expect(after5.noFloorReason).toBe(shortened);
+
+      // An edit that touches only `legalBasis` is not a period decision and is never asked.
+      await request(app.getHttpServer())
+        .patch(`/retention-schedule/${itemId}`)
+        .set(bearer(compliance.accessToken))
+        .send({ legalBasis: 'No statute identified.' })
+        .expect(200);
+    } finally {
+      /*
+       * THE AUDIT ROWS ARE NOT CLEANED UP, and cannot be: `AuditLogEntry` carries an immutability
+       * trigger and Postgres refuses the DELETE by name — "AuditLogEntry rows are immutable (Part
+       * 10.3)". My first teardown tried, which is how I met that guarantee from the inside. They
+       * carry no FK to the item, so removing the row is unaffected.
+       */
+      await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
+    }
+  }, 120_000);
+
+  it('a category that HAS a floor is NEVER asked to declare — the refusal and the acceptance already answer there', async () => {
+    /*
+     * The fourth evidence case, and the one a reasonable implementation gets wrong. The notice says
+     * the SYSTEM does not know a minimum for that name; for `KYCRecord` it does, so showing it
+     * would be this product stating something untrue about its own knowledge.
+     */
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'retention-floor-nodecl',
+      'COMPLIANCE_OFFICER',
+    );
+    await sweepFloorCategories();
+
+    // BELOW the floor: refused on the ARTICLE, and the declaration code is absent.
+    const refused = await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(compliance.accessToken))
+      .send({ recordCategory: 'KYCRecord', retentionPeriodMonths: 12 })
+      .expect(422);
+    expect(JSON.stringify(refused.body)).toContain('art. 17/a');
+    expect(JSON.stringify(refused.body)).not.toContain(
+      'NO_FLOOR_DECLARATION_REQUIRED',
+    );
+
+    // AT the floor: accepted with NO declaration sent and none recorded.
+    let id: string | undefined;
+    try {
+      const ok = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({ recordCategory: 'KYCRecord', retentionPeriodMonths: 60 })
+        .expect(201);
+      const body = ok.body as RetentionScheduleItemBody & {
+        noFloorDeclaration: unknown;
+      };
+      id = body.id;
+      expect(body.noFloorDeclaration).toBeNull();
+
+      const row = await prisma.retentionScheduleItem.findUniqueOrThrow({
+        where: { id },
+        select: {
+          noFloorNoticeShown: true,
+          noFloorReason: true,
+          noFloorAcknowledgedAt: true,
+          noFloorAcknowledgedByUserId: true,
+          noFloorAcknowledgedMonths: true,
+        },
+      });
+      // ALL FIVE null — a declaration cannot be written where none was asked for.
+      expect(Object.values(row).every((v) => v === null)).toBe(true);
+    } finally {
+      if (id) await prisma.retentionScheduleItem.delete({ where: { id } });
       await sweepFloorCategories();
     }
   }, 120_000);

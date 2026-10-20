@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NO_FLOOR_DECLARATION_REQUIRED,
+  NO_FLOOR_REASON_MIN_LENGTH,
   STATUTORY_RETENTION_FLOORS,
   assertMeetsStatutoryFloor,
   floorForCategory,
+  noFloorDeclarationRequired,
   normaliseCategory,
+  resolveNoFloorDeclaration,
   statutoryFloorRefusal,
 } from './retention-floors.config';
+import { DECLARATION_REASON_MIN_LENGTH } from '../../common/declaration-reason';
 
 /**
  * MODULE 0 CLOSE — the statutory retention floor, and the guard that keeps "no invented floor"
@@ -216,5 +221,207 @@ describe('NO INVENTED FLOOR — the inventory guard', () => {
     const byKey = new Map(STATUTORY_RETENTION_FLOORS.map((f) => [f.key, f]));
     expect(byKey.get('AML_CDD_FIVE_YEARS')?.floorMonths).toBe(5 * 12);
     expect(byKey.get('COMMERCIAL_TEN_YEARS')?.floorMonths).toBe(10 * 12);
+  });
+});
+
+describe('THE SILENT CASE — a category with no known floor DECLARES', () => {
+  const GOOD = 'These are vendor invoices we keep for the audit trail.';
+
+  it('ASKS when the category has never been acknowledged', () => {
+    /*
+     * The case the whole item exists for. `Customer` takes no floor — `CustomerFile` does — so
+     * before this, a period for `Customer` was accepted with no refusal and NO WORD. A hard refusal
+     * escaped by a spelling, silently.
+     */
+    expect(
+      noFloorDeclarationRequired({
+        recordCategory: 'Customer',
+        requestedMonths: 6,
+        acknowledgedMonths: null,
+      }),
+    ).toBe(true);
+
+    // And the sibling spelling that DOES have a floor is the measurement that makes this concrete.
+    expect(floorForCategory('CustomerFile')?.key).toBe('AML_CDD_FIVE_YEARS');
+    expect(floorForCategory('Customer')).toBeNull();
+  });
+
+  it('does NOT ask again at the SAME or a LONGER period — the exposure did not grow', () => {
+    for (const requestedMonths of [24, 25, 1200]) {
+      expect(
+        noFloorDeclarationRequired({
+          recordCategory: 'Customer',
+          requestedMonths,
+          acknowledgedMonths: 24,
+        }),
+        `${requestedMonths} is not shorter than 24 and must not re-ask`,
+      ).toBe(false);
+    }
+  });
+
+  it('ASKS AGAIN on a SHORTENING, by one month', () => {
+    /*
+     * Asserted at the BOUNDARY rather than mid-range: 24 does not re-ask and 23 does, so a `<=`
+     * where `<` belongs would re-ask on an unchanged period and make the declaration wallpaper —
+     * which is the failure the owner named by name.
+     */
+    expect(
+      noFloorDeclarationRequired({
+        recordCategory: 'Customer',
+        requestedMonths: 23,
+        acknowledgedMonths: 24,
+      }),
+    ).toBe(true);
+  });
+
+  it('NEVER asks for a category that HAS a floor — the sentence would be false there', () => {
+    /*
+     * The fourth behaviour, and the one a reasonable implementation gets wrong: the notice says the
+     * SYSTEM does not know a minimum for that name. For `KYCRecord` it does, and showing the
+     * sentence would be this product stating something untrue about its own knowledge.
+     */
+    for (const category of [
+      'KYCRecord',
+      'kyc-record',
+      'Invoice',
+      'Settlement',
+    ]) {
+      for (const acknowledgedMonths of [null, 24]) {
+        expect(
+          noFloorDeclarationRequired({
+            recordCategory: category,
+            requestedMonths: 1,
+            acknowledgedMonths,
+          }),
+          `${category} has a floor and must never be asked to declare`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('REFUSES until the sentence, the reason AND the tick all arrive', () => {
+    const ask = {
+      recordCategory: 'Customer',
+      requestedMonths: 6,
+      acknowledgedMonths: null,
+    };
+
+    // Nothing at all.
+    expect(() => resolveNoFloorDeclaration(ask, undefined)).toThrow();
+
+    // THREE INCOMPLETE SHAPES, each refused on its own — a single test sending all three missing at
+    // once would pass while only one of them was still being checked.
+    for (const [label, declaration] of [
+      [
+        'no tick',
+        { noticeShown: 'x'.repeat(60), reason: GOOD, acknowledged: false },
+      ],
+      [
+        'no reason',
+        { noticeShown: 'x'.repeat(60), reason: '   ', acknowledged: true },
+      ],
+      ['no notice', { noticeShown: '   ', reason: GOOD, acknowledged: true }],
+    ] as const) {
+      expect(
+        () => resolveNoFloorDeclaration(ask, declaration),
+        label,
+      ).toThrow();
+    }
+
+    // The refusal carries the code the screen keys on, and SAYS the period is accepted.
+    let body: Record<string, unknown> = {};
+    try {
+      resolveNoFloorDeclaration(ask, undefined);
+    } catch (err) {
+      body = (
+        err as { getResponse: () => Record<string, unknown> }
+      ).getResponse();
+    }
+    expect(body.code).toBe(NO_FLOOR_DECLARATION_REQUIRED);
+    expect(body.reasonMinLength).toBe(NO_FLOOR_REASON_MIN_LENGTH);
+    expect(String(body.message)).toContain('The period is accepted');
+    // THE CLAUSE THAT CARRIES THE WHOLE POINT, asserted so a reword cannot drop it: the SYSTEM does
+    // not know a minimum. It must never say the LAW sets none.
+    expect(String(body.message)).toContain('does not know a statutory minimum');
+    expect(String(body.message)).toContain(
+      'Nothing here says the LAW sets no minimum',
+    );
+  });
+
+  it('REFUSES a reason under the floor, and ACCEPTS one at it — both sides', () => {
+    const ask = {
+      recordCategory: 'Customer',
+      requestedMonths: 6,
+      acknowledgedMonths: null,
+    };
+    const notice = 'x'.repeat(60);
+    const atFloor = 'a'.repeat(NO_FLOOR_REASON_MIN_LENGTH);
+    const under = 'a'.repeat(NO_FLOOR_REASON_MIN_LENGTH - 1);
+
+    expect(
+      resolveNoFloorDeclaration(ask, {
+        noticeShown: notice,
+        reason: atFloor,
+        acknowledged: true,
+      }),
+    ).toEqual({ noticeShown: notice, reason: atFloor, acknowledged: true });
+
+    expect(() =>
+      resolveNoFloorDeclaration(ask, {
+        noticeShown: notice,
+        reason: under,
+        acknowledged: true,
+      }),
+    ).toThrow();
+
+    // TRIMMED — the stored sentence and reason are the record, and whitespace is not part of what
+    // anybody wrote or read. A reason that is only whitespace padding is refused, not accepted.
+    expect(() =>
+      resolveNoFloorDeclaration(ask, {
+        noticeShown: notice,
+        reason: `  ${under}  `,
+        acknowledged: true,
+      }),
+    ).toThrow();
+    expect(
+      resolveNoFloorDeclaration(ask, {
+        noticeShown: `  ${notice}  `,
+        reason: `  ${atFloor}  `,
+        acknowledged: true,
+      })?.reason,
+    ).toBe(atFloor);
+  });
+
+  it('returns NULL where no declaration is required, so a caller cannot write one it was not asked for', () => {
+    expect(
+      resolveNoFloorDeclaration(
+        {
+          recordCategory: 'KYCRecord',
+          requestedMonths: 120,
+          acknowledgedMonths: null,
+        },
+        undefined,
+      ),
+    ).toBeNull();
+    expect(
+      resolveNoFloorDeclaration(
+        {
+          recordCategory: 'Customer',
+          requestedMonths: 36,
+          acknowledgedMonths: 24,
+        },
+        undefined,
+      ),
+    ).toBeNull();
+  });
+
+  it('uses the ESTABLISHED declaration minimum, not a second one', () => {
+    /*
+     * The owner's instruction: "two different minimums for one concept is the drift we keep paying
+     * for". Measured across the api, every declaration-shaped reason uses ten; the three-character
+     * minimums belong to notes. So this is pinned as an IDENTITY with the shared constant rather
+     * than as the literal 10, which is what would let the two drift apart.
+     */
+    expect(NO_FLOOR_REASON_MIN_LENGTH).toBe(DECLARATION_REASON_MIN_LENGTH);
   });
 });

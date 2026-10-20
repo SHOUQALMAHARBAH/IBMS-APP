@@ -65,6 +65,7 @@
  */
 
 import { UnprocessableEntityException } from '@nestjs/common';
+import { DECLARATION_REASON_MIN_LENGTH } from '../../common/declaration-reason';
 
 /** One year in months, so the two floors read as the statute states them rather than as 60 and 120. */
 const MONTHS_PER_YEAR = 12;
@@ -220,4 +221,151 @@ export function assertMeetsStatutoryFloor(
     );
   }
   return floor;
+}
+
+/* ===================================================================================================
+ * THE SILENT CASE — batch 5 group 6. THE OWNER HAS RULED: IT DECLARES.
+ *
+ * ## WHAT WAS SILENT, MEASURED RATHER THAN SUPPOSED
+ *
+ * The header above declares this file's own limit: `recordCategory` is free text, so a floor fires
+ * only on a name the list recognises. The consequence is concrete — `CustomerFile` takes the
+ * five-year floor and `Customer` takes NOTHING, no refusal and no word, and `Customer` is one of the
+ * fourteen names reported as unsourced. A refusal the owner made HARD is escaped by a spelling.
+ *
+ * ## HER RULING, AND WHY IT IS NOT A REFUSAL
+ *
+ * By her standing rule: the harm here is the OFFICE'S OWN regulatory exposure, not a third party's,
+ * so it DECLARES AND LOGS. The save is accepted. No invented number, no blocking.
+ *
+ * ## THE SENTENCE NAMES BOTH FLOORS, AND THAT IS THE MECHANISM
+ *
+ * Not decoration: naming both known floors with their instruments and articles is how somebody who
+ * is in fact saving due-diligence records under a different name RECOGNISES WHAT THEY ARE DOING.
+ * That is the entire purpose of the declaration, and it is why the sentence is unconditional about
+ * the two floors rather than tailored to the category.
+ *
+ * ## AND IT SAYS THE *SYSTEM* DOES NOT KNOW A MINIMUM — NEVER THAT THE LAW SETS NONE
+ *
+ * That distinction is the difference between an honest declaration and this product making a legal
+ * claim it has no source for. The text is the owner's own, lives in the web dictionary in both
+ * languages, and is stored VERBATIM AS RENDERED rather than paraphrased at any layer.
+ *
+ * ## ASKED ONCE PER CATEGORY PER OFFICE — THE ROW IS THE MECHANISM
+ *
+ * `RetentionScheduleItem` is already UNIQUE on (organizationId, recordCategory), so the row IS the
+ * per-office per-category record and no second table is needed. `noFloorAcknowledgedMonths` is the
+ * figure that decides re-asking:
+ *
+ *   * never acknowledged (null)        -> ASK. The office has not been shown the sentence.
+ *   * same or LONGER than acknowledged -> do not ask. The exposure did not grow.
+ *   * SHORTER than acknowledged        -> ASK AGAIN. The exposure changed.
+ *
+ * An unconditional line would appear on most saves — fourteen names have no floor and two families
+ * do — and be learned-past within a week, which is the lesson the company-invitation line already
+ * records: *a line shown on every invitation is noise a reader learns to skip.*
+ * =================================================================================================== */
+
+/**
+ * The written reason's floor, and there is ONE of this number in the codebase.
+ *
+ * Measured rather than chosen: every DECLARATION-shaped reason in this api uses ten
+ * (`COMBINED_DUTY_REASON_MIN_LENGTH`, the commission override's `reason`), while the
+ * three-character minimums belong to notes rather than declarations. Writing `10` here a third time
+ * would have satisfied the instruction's letter and broken its point, so both read
+ * `DECLARATION_REASON_MIN_LENGTH` from `common/`.
+ */
+export const NO_FLOOR_REASON_MIN_LENGTH = DECLARATION_REASON_MIN_LENGTH;
+
+/** The code the screen keys on to know it must show the sentence. */
+export const NO_FLOOR_DECLARATION_REQUIRED = 'NO_FLOOR_DECLARATION_REQUIRED';
+
+/** What the office sends back once it has read the sentence. */
+export interface NoFloorDeclaration {
+  /** The sentence AS RENDERED, carried from the client — see `noticeShown` below. */
+  noticeShown: string;
+  reason: string;
+  acknowledged: boolean;
+}
+
+export interface NoFloorAskInput {
+  recordCategory: string;
+  requestedMonths: number;
+  /** `null` means never acknowledged, which is not the same as acknowledged at zero. */
+  acknowledgedMonths: number | null;
+}
+
+/**
+ * Must the office be asked to declare, for this save?
+ *
+ * A PURE function taking the acknowledged figure rather than reading a row, so all three of the
+ * decided behaviours are provable without a database — the floor's own three states had to be
+ * proven that way for the same reason.
+ */
+export function noFloorDeclarationRequired({
+  recordCategory,
+  requestedMonths,
+  acknowledgedMonths,
+}: NoFloorAskInput): boolean {
+  // A category that HAS a floor is already answered, in both directions: below it refuses with the
+  // article, at or above it is accepted. A declaration there would be a third answer to a settled
+  // question, and the sentence would be false — the system DOES know a minimum for that name.
+  if (floorForCategory(recordCategory) !== null) return false;
+
+  // Never asked. Not "acknowledged at zero": a row written before this existed, or one whose period
+  // nobody has ever set through this gate, has not been shown the sentence. Comparing a request
+  // against an invented baseline is how a control silently stops applying.
+  if (acknowledgedMonths === null) return true;
+
+  // The exposure only grows when the period SHORTENS.
+  return requestedMonths < acknowledgedMonths;
+}
+
+/**
+ * REFUSES the save until the declaration arrives — and the refusal is about the DECLARATION, never
+ * about the period's value. The period is never rejected for being too short here; there is no known
+ * minimum to reject it against, which is the whole fact being declared.
+ *
+ * Returns the declaration to store when one is required and well-formed, and `null` when none is
+ * required — so a caller cannot write a declaration it was not asked for, and cannot forget one it
+ * was.
+ */
+export function resolveNoFloorDeclaration(
+  input: NoFloorAskInput,
+  declaration: NoFloorDeclaration | undefined,
+): NoFloorDeclaration | null {
+  if (!noFloorDeclarationRequired(input)) return null;
+
+  const notice = declaration?.noticeShown?.trim() ?? '';
+  const reason = declaration?.reason?.trim() ?? '';
+
+  if (!declaration || !declaration.acknowledged || !notice || !reason) {
+    throw new UnprocessableEntityException({
+      code: NO_FLOOR_DECLARATION_REQUIRED,
+      message:
+        `This system does not know a statutory minimum for a record category named ` +
+        `"${input.recordCategory}". The period is accepted, and the office is asked to record why ` +
+        `it chose it: read the notice shown on screen, write a reason of at least ` +
+        `${NO_FLOOR_REASON_MIN_LENGTH} characters, and acknowledge that you have read it. ` +
+        'Nothing here says the LAW sets no minimum for this category.',
+      recordCategory: input.recordCategory,
+      reasonMinLength: NO_FLOOR_REASON_MIN_LENGTH,
+    });
+  }
+
+  if (reason.length < NO_FLOOR_REASON_MIN_LENGTH) {
+    throw new UnprocessableEntityException({
+      code: NO_FLOOR_DECLARATION_REQUIRED,
+      message:
+        `The reason for the retention period of "${input.recordCategory}" must be at least ` +
+        `${NO_FLOOR_REASON_MIN_LENGTH} characters. A year from now the question is why this period ` +
+        'was chosen, and a word does not answer it.',
+      recordCategory: input.recordCategory,
+      reasonMinLength: NO_FLOOR_REASON_MIN_LENGTH,
+    });
+  }
+
+  // TRIMMED, because the stored sentence and reason are the record and leading whitespace is not
+  // part of what anybody wrote or read.
+  return { noticeShown: notice, reason, acknowledged: true };
 }

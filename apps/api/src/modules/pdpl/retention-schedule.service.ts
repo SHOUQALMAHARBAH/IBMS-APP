@@ -19,7 +19,11 @@ import {
   retentionScheduleItemAuditSnapshot,
   type RetentionScheduleItemView,
 } from './retention-schedule.config';
-import { assertMeetsStatutoryFloor } from './retention-floors.config';
+import {
+  assertMeetsStatutoryFloor,
+  resolveNoFloorDeclaration,
+  type NoFloorDeclaration,
+} from './retention-floors.config';
 import type { CreateRetentionScheduleItemDto } from './dto/create-retention-schedule-item.dto';
 import type { UpdateRetentionScheduleItemDto } from './dto/update-retention-schedule-item.dto';
 
@@ -29,6 +33,52 @@ function isUniqueViolation(err: unknown): boolean {
   return (
     err instanceof Prisma.PrismaClientKnownRequestError && err.code === P2002
   );
+}
+
+/**
+ * The five declaration columns, written TOGETHER or not at all.
+ *
+ * The database's `RetentionScheduleItem_no_floor_declaration_complete` CHECK refuses four of five,
+ * so a partial write is a 500 rather than a silent half-record. This helper is what makes that
+ * backstop unreachable from application code: there is one place the five are assembled, and it
+ * takes the period as an argument because `noFloorAcknowledgedMonths` must be the period the office
+ * was actually acknowledging rather than whatever is on the row.
+ */
+function declarationColumns(
+  declaration: NoFloorDeclaration | null,
+  months: number,
+  actorUserId: string,
+) {
+  if (!declaration) return {};
+  return {
+    noFloorNoticeShown: declaration.noticeShown,
+    noFloorReason: declaration.reason,
+    noFloorAcknowledgedAt: new Date(),
+    noFloorAcknowledgedByUserId: actorUserId,
+    noFloorAcknowledgedMonths: months,
+  };
+}
+
+/**
+ * THE AUDIT ROW CARRIES THE SENTENCE AND THE REASON VERBATIM — not the word "acknowledged".
+ *
+ * The owner's rule: what the person was TOLD is part of the record, because a year from now the
+ * question is what they saw. A row saying `acknowledged: true` answers whether a box was ticked,
+ * which is the thing she ruled out.
+ *
+ * ## WHY THIS IS NOT THE "never quote in a snapshot" RULE BEING BROKEN
+ *
+ * `CLAUDE.md` says never to put the COMBINED-DUTY ACT in an audit snapshot, and that still holds:
+ * the act is a row with its own id, so the snapshot references it and copying it would duplicate a
+ * record that already exists and can be read. The declaration is not a row anywhere else — the
+ * sentence and the reason ARE its content, and there is nothing to point at.
+ */
+function declarationAudit(declaration: NoFloorDeclaration | null) {
+  if (!declaration) return {};
+  return {
+    noFloorNoticeShown: declaration.noticeShown,
+    noFloorReason: declaration.reason,
+  };
 }
 
 /**
@@ -71,12 +121,37 @@ export class RetentionScheduleService {
      */
     assertMeetsStatutoryFloor(dto.recordCategory, dto.retentionPeriodMonths);
 
+    /*
+     * THE SILENT CASE — batch 5 group 6. A category this system knows no minimum for is ACCEPTED,
+     * and the office declares why.
+     *
+     * `acknowledgedMonths: null` because the row does not exist yet, so nobody has been shown the
+     * sentence for this category in this office. It is always asked on a create.
+     *
+     * AFTER the floor, because the two are different answers to different questions and only one of
+     * them can apply: a category WITH a floor is refused or accepted on the article, and
+     * `resolveNoFloorDeclaration` returns null for it rather than asking a third time.
+     */
+    const declaration = resolveNoFloorDeclaration(
+      {
+        recordCategory: dto.recordCategory,
+        requestedMonths: dto.retentionPeriodMonths,
+        acknowledgedMonths: null,
+      },
+      dto.noFloorDeclaration,
+    );
+
     let row: RetentionScheduleItemWithCombinedDuty;
     try {
       row = await this.repo.create({
         recordCategory: dto.recordCategory,
         retentionPeriodMonths: dto.retentionPeriodMonths,
         legalBasis: dto.legalBasis ?? null,
+        ...declarationColumns(
+          declaration,
+          dto.retentionPeriodMonths,
+          actorUserId,
+        ),
         // MODULE 0 CLOSE, DECISION 3 — the MAKER, stamped on the row that will later be compared
         // against whoever confirms it.
         setByUserId: actorUserId,
@@ -95,7 +170,10 @@ export class RetentionScheduleService {
       action: 'CREATE',
       entityType: 'RetentionScheduleItem',
       entityId: row.id,
-      afterValue: retentionScheduleItemAuditSnapshot(row),
+      afterValue: {
+        ...retentionScheduleItemAuditSnapshot(row),
+        ...declarationAudit(declaration),
+      },
     });
 
     return deriveRetentionScheduleItemView(row);
@@ -134,8 +212,27 @@ export class RetentionScheduleService {
      * when the DTO carries no period at all, because an edit that only corrects `legalBasis` must
      * not be refused over a figure it is not touching.
      */
+    let declaration: NoFloorDeclaration | null = null;
     if (dto.retentionPeriodMonths !== undefined) {
       assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);
+
+      /*
+       * ASKED ONCE PER CATEGORY PER OFFICE, and this is where that is decided: the row carries
+       * `noFloorAcknowledgedMonths`, so a save at the SAME or a LONGER period is not re-asked and a
+       * SHORTENING is. Both read off the row rather than off a request, so a client cannot opt out
+       * of being asked by omitting a field.
+       *
+       * Inside the `!== undefined` guard with the floor, for the same reason: an edit that only
+       * corrects `legalBasis` is not a period decision and must not demand a declaration about one.
+       */
+      declaration = resolveNoFloorDeclaration(
+        {
+          recordCategory: item.recordCategory,
+          requestedMonths: dto.retentionPeriodMonths,
+          acknowledgedMonths: item.noFloorAcknowledgedMonths,
+        },
+        dto.noFloorDeclaration,
+      );
     }
 
     /*
@@ -152,6 +249,18 @@ export class RetentionScheduleService {
       setByUserId: actorUserId,
       retentionPeriodMonths: dto.retentionPeriodMonths,
       legalBasis: dto.legalBasis,
+      /*
+       * Only when a declaration was actually required and given. An edit that needed none leaves the
+       * stored one ALONE rather than clearing it — the office's earlier acknowledgement is the
+       * record of what it was told, and a longer period does not undo it.
+       */
+      ...(declaration && dto.retentionPeriodMonths !== undefined
+        ? declarationColumns(
+            declaration,
+            dto.retentionPeriodMonths,
+            actorUserId,
+          )
+        : {}),
     });
 
     await this.safeAudit({
@@ -159,7 +268,10 @@ export class RetentionScheduleService {
       action: 'UPDATE',
       entityType: 'RetentionScheduleItem',
       entityId: row.id,
-      afterValue: retentionScheduleItemAuditSnapshot(row),
+      afterValue: {
+        ...retentionScheduleItemAuditSnapshot(row),
+        ...declarationAudit(declaration),
+      },
     });
 
     return deriveRetentionScheduleItemView(row);

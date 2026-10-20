@@ -169,6 +169,15 @@ export const PDPL = {
     rdCloseButton: 'إغلاق',
     rdAttached: 'مرفقة',
     rdDraftPending: 'مسودّة — قيد الانتظار',
+    rdNoFloorNotice:
+      'هذا النظامُ لا يعرف حدّاً أدنى قانونياً لفئةٍ بهذا الاسم — وهذا لا يعني أنّ القانونَ لا يضع لها حدّاً. فإن كانت هذه سجلّاتَ «اعرف عميلك» فحدُّها خمسُ سنواتٍ على الأقل بموجب قانون مكافحة غسل الأموال وتمويل الإرهاب رقم ٢٠ لسنة ٢٠٢١ (المادة ١٧/أ)، تُحسَب من إتمامِ المعاملة أو انتهاءِ العلاقة، أيُّهما أطول. وإن كانت سجلّاتٍ ماليةً أو تجاريةً فحدُّها عشرُ سنواتٍ من إغلاقِ المعاملة بموجب قانون التجارة رقم ١٢ لسنة ١٩٦٦ (المادة ١٩). اكتب سببَ المدّة التي اخترتَها، وأقِرَّ بأنّك قرأتَ ما سبق.',
+    rdNoFloorHeading: 'فئةٌ لا نعرف لها حدّاً أدنى',
+    rdNoFloorReasonLabel: 'سببُ المدّة التي اخترتَها',
+    rdNoFloorAcknowledgeLabel: 'أُقِرُّ بأنّي قرأتُ ما سبق',
+    rdNoFloorSaveButton: 'احفظ مع هذا الإقرار',
+    rdNoFloorReasonTooShort:
+      'اكتب سبباً لا يقلُّ عن عشرة أحرف — فالسؤالُ بعد سنةٍ هو لماذا اختيرت هذه المدّة.',
+    rdNoFloorDeclaredOn: 'أُقِرَّ بهذه المدّة',
     rdLoading: 'جارٍ التحميل…',
     rdLoadError: 'تعذّر تحميل سجل الاحتفاظ والإتلاف — حاول مرة أخرى.',
     rdListSchedule: 'جدول الاحتفاظ',
@@ -500,6 +509,15 @@ export const PDPL = {
     rdCloseButton: 'Close',
     rdAttached: 'Attached',
     rdDraftPending: 'DRAFT — pending',
+    rdNoFloorNotice:
+      'This system does not know a statutory minimum for a record category with this name — and that does not mean the law sets none for it. If these are know-your-customer records, their minimum is at least five years under the Anti-Money Laundering and Counter-Terrorism Financing Law No. 20 of 2021 (art. 17/a), counted from completing the transaction or ending the relationship, whichever is longer. If they are financial or commercial records, their minimum is ten years from the closing of the transaction under the Commercial Law No. 12 of 1966 (art. 19). Write the reason for the period you have chosen, and confirm that you have read the above.',
+    rdNoFloorHeading: 'A category we know no minimum for',
+    rdNoFloorReasonLabel: 'Why you chose this period',
+    rdNoFloorAcknowledgeLabel: 'I confirm I have read the above',
+    rdNoFloorSaveButton: 'Save with this declaration',
+    rdNoFloorReasonTooShort:
+      'Write a reason of at least ten characters — a year from now the question is why this period was chosen.',
+    rdNoFloorDeclaredOn: 'This period was declared',
     rdLoading: 'Loading…',
     rdLoadError: 'Could not load the retention/disposal register — try again.',
     rdListSchedule: 'the retention schedule',

@@ -101,17 +101,49 @@ describe('makerPermission (decision 22)', () => {
   const gated = routeGatedCodes();
   const catalogue = catalogueCodes();
 
-  it('is present on EVERY pair — a missing field and an absent code must not look alike', () => {
+  it('is declared ONCE PER PAIR in the registry file — the type cannot see a shared block', () => {
     /*
-     * `in` rather than a truthiness check, deliberately: `null` is a real, meaningful value here and
-     * a truthy test would treat the one honest "there is no code" as an omission.
+     * THE FIELD BEING PRESENT IS GUARANTEED BY THE TYPE, not by this test. `makerPermission` is
+     * `string | null` and REQUIRED on `MakerCheckerPair`, so a pair declared without it is a
+     * compile error — which is strictly stronger than an assertion.
+     *
+     * My first version of this test asserted it anyway, with `!('makerPermission' in p)`, and CI
+     * refused it: TypeScript narrows `p` to `never` there, because the property cannot be absent.
+     * The compiler was telling me the check was impossible, and the honest response is to point the
+     * test at something it CAN fail on rather than to cast the narrowing away.
+     *
+     * So: the FILE must declare the field once per pair. That catches what the type does not — two
+     * entries sharing one block, which is how a copy-paste silently hands one pair another pair's
+     * answer, with both halves type-checking perfectly.
      */
-    const missing = MAKER_CHECKER_REGISTRY.filter(
-      (p) => !('makerPermission' in p),
-    ).map((p) => p.dbCheckConstraint);
-    expect(missing).toEqual([]);
-    // Non-vacuity: the loop above proves nothing against an empty registry.
+    const text = readFileSync(REGISTRY_FILE, 'utf8');
+    /*
+     * Anchored on the VALUE, not just the key: a bare `/^\s*makerPermission:/` also matches the
+     * INTERFACE's own property declaration and came out 17 against 16. An entry's value is always a
+     * quoted code or a bare `null`, and the interface's is `string | null`, so neither interface
+     * line can be mistaken for an entry.
+     */
+    const declarations = [
+      ...text.matchAll(/^\s*makerPermission:\s*(?:'|null,)/gm),
+    ].length;
+    const constraints = [...text.matchAll(/^\s*dbCheckConstraint:\s*'/gm)]
+      .length;
+    expect(
+      declarations,
+      'the registry declares makerPermission a different number of times than it declares ' +
+        'dbCheckConstraint — two entries are sharing a block, or one is missing its field',
+    ).toBe(constraints);
+    // Non-vacuity: both counts being zero would satisfy the equality above.
+    expect(constraints).toBe(MAKER_CHECKER_REGISTRY.length);
     expect(MAKER_CHECKER_REGISTRY.length).toBeGreaterThan(10);
+  });
+
+  it('never records a BLANK code — present-but-meaningless must not pass for an answer', () => {
+    // The other thing the type cannot see: `''` satisfies `string | null` and reads as an answer.
+    const blank = MAKER_CHECKER_REGISTRY.filter(
+      (p) => p.makerPermission !== null && p.makerPermission.trim() === '',
+    ).map((p) => p.dbCheckConstraint);
+    expect(blank).toEqual([]);
   });
 
   it('REFUSES a code that gates no route — enforcement, not existence', () => {

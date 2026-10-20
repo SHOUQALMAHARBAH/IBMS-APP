@@ -37,6 +37,12 @@ export interface RetentionScheduleItemRow {
    * measurement that found this pair unprojected keys on the CALL SITE and not on a field name.
    */
   combinedDutyAct: CombinedDutyAct | null;
+  /** Batch 5 group 6 — the no-floor declaration, all five or none by CHECK. */
+  noFloorNoticeShown: string | null;
+  noFloorReason: string | null;
+  noFloorAcknowledgedAt: Date | null;
+  noFloorAcknowledgedByUserId: string | null;
+  noFloorAcknowledgedMonths: number | null;
 }
 
 export interface RetentionScheduleItemView {
@@ -59,6 +65,20 @@ export interface RetentionScheduleItemView {
    * killing that script before it measured anything.
    */
   combinedDutyAct: CombinedDutyActView | null;
+  /**
+   * THE DECLARATION, ON THE RECORD — the sentence the office was shown and the reason it wrote,
+   * verbatim. Not the word "acknowledged": the owner's rule is that what the person was TOLD is
+   * part of the record, because a year from now the question is what they saw.
+   *
+   * Null on every category that has a known floor, and on every row nobody has had to declare for.
+   */
+  noFloorDeclaration: {
+    noticeShown: string;
+    reason: string;
+    acknowledgedAt: string;
+    acknowledgedByUserId: string;
+    acknowledgedMonths: number;
+  } | null;
 }
 
 export function deriveRetentionScheduleItemView(
@@ -74,6 +94,26 @@ export function deriveRetentionScheduleItemView(
       : null,
     isConfirmed: row.confirmedByLegalCounselAt !== null,
     combinedDutyAct: combinedDutyActView(row.combinedDutyAct),
+    /*
+     * ALL FIVE OR NOTHING, mirroring the database CHECK rather than trusting it: a partial
+     * declaration cannot exist, so reading one field as present and another as missing would be a
+     * state the schema refuses — and a view that emitted a half-declaration would put a legal
+     * notice on screen with nobody's name against it.
+     */
+    noFloorDeclaration:
+      row.noFloorNoticeShown !== null &&
+      row.noFloorReason !== null &&
+      row.noFloorAcknowledgedAt !== null &&
+      row.noFloorAcknowledgedByUserId !== null &&
+      row.noFloorAcknowledgedMonths !== null
+        ? {
+            noticeShown: row.noFloorNoticeShown,
+            reason: row.noFloorReason,
+            acknowledgedAt: row.noFloorAcknowledgedAt.toISOString(),
+            acknowledgedByUserId: row.noFloorAcknowledgedByUserId,
+            acknowledgedMonths: row.noFloorAcknowledgedMonths,
+          }
+        : null,
   };
 }
 

@@ -356,3 +356,112 @@ test('shows DPO approved and declares nothing when two people agreed', async ({
   ).toBeVisible();
   await expect(page.getByTestId('combined-duty-disposal-db-1')).toHaveCount(0);
 });
+
+test('THE SILENT CASE — the office is shown the notice before the save, the tick is not pre-ticked, and the sentence it saw is what gets sent', async ({
+  page,
+}) => {
+  /*
+   * Batch 5 group 6. A category this system knows no statutory minimum for is ACCEPTED, and the
+   * office declares why. The screen holds no copy of the floor list, deliberately — it attempts the
+   * save, and the SERVER answers `NO_FLOOR_DECLARATION_REQUIRED`.
+   */
+  await mockAuth(page, ['DATA_PROTECTION_OFFICER']);
+  await mockRegister(page);
+
+  const bodies: Array<Record<string, unknown>> = [];
+  let asked = false;
+  await page.route('http://localhost:4000/retention-schedule', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    bodies.push(route.request().postDataJSON() as Record<string, unknown>);
+    if (!asked) {
+      asked = true;
+      return route.fulfill({
+        status: 422,
+        json: {
+          code: 'NO_FLOOR_DECLARATION_REQUIRED',
+          message:
+            'This system does not know a statutory minimum for a record category named "Customer".',
+          reasonMinLength: 10,
+        },
+      });
+    }
+    return route.fulfill({ status: 201, json: { id: 'rsi-new' } });
+  });
+
+  await page.goto('/retention-disposal');
+  // BY ROLE, not by label: these inputs carry BOTH a wrapping <label> and an `aria-label`, so
+  // `getByLabel` resolves two matches and Playwright refuses in strict mode. A role query dedupes
+  // them, where a `.first()` would weaken the locator to make the ambiguity go away.
+  // `exact: true`, because `getByRole(name)` matches case-insensitive SUBSTRINGS — recorded in
+  // CLAUDE.md — and "Record category" is a substring of this screen's "Legal hold record category
+  // ID". Two inputs, one query, strict-mode refusal.
+  await page
+    .getByRole('textbox', { name: 'Record category', exact: true })
+    .fill('Customer');
+  await page
+    .getByRole('spinbutton', { name: 'Retention period (months)' })
+    .fill('6');
+  await page.getByRole('button', { name: 'Add category' }).click();
+
+  // ---------------------------------------------- THE NOTICE IS SHOWN, before anything is saved
+  const block = page.getByTestId('retention-no-floor-declaration');
+  await expect(block).toBeVisible();
+  const notice = page.getByTestId('retention-no-floor-notice');
+  // The clause that carries the whole point: the SYSTEM does not know a minimum. It must never say
+  // the LAW sets none — and the sentence says both halves out loud.
+  await expect(notice).toContainText('does not know a statutory minimum');
+  await expect(notice).toContainText('does not mean the law sets none');
+  // BOTH known floors, by instrument and article. The naming IS the mechanism: it is how somebody
+  // saving due-diligence records under another name recognises what they are doing.
+  await expect(notice).toContainText('No. 20 of 2021');
+  await expect(notice).toContainText('art. 17/a');
+  await expect(notice).toContainText('No. 12 of 1966');
+  await expect(notice).toContainText('art. 19');
+
+  // ---------------------------------------------- THE TICK IS AN ACT, NOT A FIELD
+  const tick = block.getByRole('checkbox');
+  await expect(tick).not.toBeChecked();
+  const save = block.getByRole('button', {
+    name: 'Save with this declaration',
+  });
+  await expect(save).toBeDisabled();
+
+  // A ticked box with a SHORT reason is still refused by the screen, so it never sends a request it
+  // knows the server will refuse. Nine characters, not zero — zero cannot tell a ten-character
+  // floor from a non-empty check.
+  await tick.check();
+  const reasonBox = block.getByRole('textbox', {
+    name: 'Why you chose this period',
+  });
+  await reasonBox.fill('too short');
+  await expect(save).toBeDisabled();
+  await expect(block).toContainText('at least ten characters');
+
+  // ---------------------------------------------- AND THE SENTENCE IT SAW IS WHAT GETS SENT
+  const reason = 'No statute identified for this category; reviewed with counsel.';
+  await reasonBox.fill(reason);
+  await expect(save).toBeEnabled();
+  /*
+   * CAPTURED BEFORE THE CLICK. A successful save clears the ask and the block unmounts, so reading
+   * the notice afterwards times out — which is how I learned the screen tidies up properly. The
+   * comparison below is still against the RENDERED text, which is the point: it proves the sent
+   * sentence is the one the office actually saw.
+   */
+  const rendered = ((await notice.textContent()) ?? '').trim();
+  await save.click();
+
+  await expect.poll(() => bodies.length).toBe(2);
+  const declared = bodies[1].noFloorDeclaration as {
+    noticeShown: string;
+    reason: string;
+    acknowledged: boolean;
+  };
+  expect(declared.reason).toBe(reason);
+  expect(declared.acknowledged).toBe(true);
+  // VERBATIM AS RENDERED — read off the real request body against the real rendered text, because
+  // the record exists to say what the office SAW, and a sentence re-derived at submit answers a
+  // different question.
+  expect(declared.noticeShown).toBe(rendered);
+  // The first attempt carried none, which is what made the server ask.
+  expect(bodies[0].noFloorDeclaration).toBeUndefined();
+});

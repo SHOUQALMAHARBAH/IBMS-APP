@@ -30,6 +30,16 @@ export interface CreateRetentionScheduleItemInput {
   recordCategory: string;
   retentionPeriodMonths: number;
   legalBasis: string | null;
+  /**
+   * THE NO-FLOOR DECLARATION, all five or none — the database CHECK says so, because an
+   * acknowledgement missing its sentence, its reason, its actor or its period would let
+   * "acknowledged" mean "somebody ticked a box".
+   */
+  noFloorNoticeShown?: string | null;
+  noFloorReason?: string | null;
+  noFloorAcknowledgedAt?: Date | null;
+  noFloorAcknowledgedByUserId?: string | null;
+  noFloorAcknowledgedMonths?: number | null;
   /** MODULE 0 CLOSE, DECISION 3 — the MAKER. Required at the input boundary even though the column is
    *  nullable: the column is nullable for FOUR PRE-EXISTING ROWS nobody recorded an actor for, and
    *  every row written from here on has one. Optional here would make the maker half forgettable. */
@@ -39,6 +49,16 @@ export interface CreateRetentionScheduleItemInput {
 export interface UpdateRetentionScheduleItemInput {
   retentionPeriodMonths?: number;
   legalBasis?: string | null;
+  /**
+   * THE NO-FLOOR DECLARATION, all five or none — the database CHECK says so, because an
+   * acknowledgement missing its sentence, its reason, its actor or its period would let
+   * "acknowledged" mean "somebody ticked a box".
+   */
+  noFloorNoticeShown?: string | null;
+  noFloorReason?: string | null;
+  noFloorAcknowledgedAt?: Date | null;
+  noFloorAcknowledgedByUserId?: string | null;
+  noFloorAcknowledgedMonths?: number | null;
   /** RE-STAMPED ON EVERY EDIT, not only on create. The maker is whoever last SET the period, because
    *  that is the person the confirmation must differ from — carrying the original creator forward
    *  would let A create, B edit, and B confirm their own figure. */

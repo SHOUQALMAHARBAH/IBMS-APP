@@ -33,6 +33,10 @@ import {
   type RetentionScheduleItem,
 } from '../../../lib/pdpl/retention-disposal-api';
 import { ApiError } from '../../../lib/auth/api-client';
+// TEN, imported rather than written again. The api holds this figure in exactly one place
+// (`common/declaration-reason.ts`) and the owner's instruction was that two minimums for one
+// concept is the drift we keep paying for — which applies across the boundary too.
+import { NO_FLOOR_REASON_MIN_LENGTH } from '../../../lib/pdpl/retention-disposal-api';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
@@ -92,6 +96,22 @@ export default function RetentionDisposalPage() {
   const [months, setMonths] = useState('');
   const [legalBasis, setLegalBasis] = useState('');
   const [editMonths, setEditMonths] = useState<Record<string, string>>({});
+
+  /*
+   * BATCH 5 GROUP 6 — the no-floor declaration. `null` means the server has not asked; a value is
+   * the save it asked about, held so the re-submit sends the same period the notice was shown for.
+   *
+   * Keyed by the row id, or `'new'` for the create form, so the table's inline editor and the create
+   * form cannot share one box — the same reason the combined-duty reasons above are keyed by record.
+   */
+  const [noFloorAsk, setNoFloorAsk] = useState<{
+    key: string;
+    recordCategory: string;
+    months: number;
+  } | null>(null);
+  const [noFloorReason, setNoFloorReason] = useState('');
+  // NOT pre-ticked and no default: the acknowledgement is an act, not a field.
+  const [noFloorAcknowledged, setNoFloorAcknowledged] = useState(false);
 
   const [holdScope, setHoldScope] = useState('');
   const [holdReason, setHoldReason] = useState('');
@@ -165,18 +185,76 @@ export default function RetentionDisposalPage() {
     }
   }
 
+  /** The sentence this screen renders, and the exact text it sends back to be recorded. */
+  const noFloorNotice = t('rdNoFloorNotice');
+
+  function noFloorDeclarationPayload() {
+    return {
+      noticeShown: noFloorNotice,
+      reason: noFloorReason.trim(),
+      acknowledged: true as const,
+    };
+  }
+
+  function clearNoFloorAsk() {
+    setNoFloorAsk(null);
+    setNoFloorReason('');
+    setNoFloorAcknowledged(false);
+  }
+
+  /**
+   * Runs an action and, if the server asks for a declaration, opens the notice instead of reporting
+   * an error. A 422 here is not a failure the reader should see as one — the period is accepted and
+   * the office is being asked to record why.
+   */
+  async function runOrAsk(
+    ask: { key: string; recordCategory: string; months: number },
+    fn: () => Promise<unknown>,
+  ) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await fn();
+      clearNoFloorAsk();
+      await load();
+    } catch (err) {
+      if (
+        err instanceof ApiError &&
+        err.code === 'NO_FLOOR_DECLARATION_REQUIRED'
+      ) {
+        setNoFloorAsk(ask);
+        setNoFloorAcknowledged(false);
+      } else {
+        setActionError(
+          err instanceof ApiError ? err.message : t('rdActionError'),
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitSchedule(ev: React.FormEvent) {
     ev.preventDefault();
-    await run(async () => {
-      await createRetentionScheduleItem({
-        recordCategory: category.trim(),
-        retentionPeriodMonths: Number(months),
-        legalBasis: legalBasis.trim() || undefined,
-      });
-      setCategory('');
-      setMonths('');
-      setLegalBasis('');
-    });
+    const recordCategory = category.trim();
+    const requested = Number(months);
+    const declaring = noFloorAsk?.key === 'new';
+    await runOrAsk(
+      { key: 'new', recordCategory, months: requested },
+      async () => {
+        await createRetentionScheduleItem({
+          recordCategory,
+          retentionPeriodMonths: requested,
+          legalBasis: legalBasis.trim() || undefined,
+          ...(declaring
+            ? { noFloorDeclaration: noFloorDeclarationPayload() }
+            : {}),
+        });
+        setCategory('');
+        setMonths('');
+        setLegalBasis('');
+      },
+    );
   }
 
   async function submitHold(ev: React.FormEvent) {
@@ -266,6 +344,92 @@ export default function RetentionDisposalPage() {
             </button>
           </form>
         ) : null}
+        {/*
+          THE DECLARATION, batch 5 group 6. Shown only when the SERVER asked — this screen holds no
+          copy of the floor list, deliberately, because a copy is a second home for the rule and the
+          copy is the one that drifts.
+
+          `role="status"` and not `alert`: the period is ACCEPTED and the office is being asked to
+          record why it chose it. An alert would report an acceptance as a failure.
+        */}
+        {noFloorAsk ? (
+          <div
+            role="status"
+            data-testid="retention-no-floor-declaration"
+            style={{
+              margin: '0.75rem 0',
+              padding: '0.75rem',
+              border: '1px solid var(--border-default)',
+              borderRadius: '0.25rem',
+              background: 'var(--surface-raised)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 0.5rem' }}>{t('rdNoFloorHeading')}</h3>
+            {/* The owner's sentence, rendered verbatim and sent back verbatim to be recorded. */}
+            <p style={{ margin: '0 0 0.75rem' }} data-testid="retention-no-floor-notice">
+              {noFloorNotice}
+            </p>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              {t('rdNoFloorReasonLabel')}
+              <textarea
+                aria-label={t('rdNoFloorReasonLabel')}
+                rows={3}
+                style={{ width: '100%' }}
+                value={noFloorReason}
+                onChange={(e) => setNoFloorReason(e.target.value)}
+              />
+            </label>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                margin: '0.5rem 0',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={noFloorAcknowledged}
+                onChange={(e) => setNoFloorAcknowledged(e.target.checked)}
+              />
+              {t('rdNoFloorAcknowledgeLabel')}
+            </label>
+            {noFloorReason.trim().length > 0 &&
+            noFloorReason.trim().length < NO_FLOOR_REASON_MIN_LENGTH ? (
+              <p style={{ margin: '0 0 0.5rem', color: 'var(--ink-secondary)' }}>
+                {t('rdNoFloorReasonTooShort')}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              /*
+                Disabled until the tick AND the ten characters, so this screen never sends a request
+                it already knows the server will refuse — the rule `CombinedDutyReasonField` follows.
+              */
+              disabled={
+                busy ||
+                !noFloorAcknowledged ||
+                noFloorReason.trim().length < NO_FLOOR_REASON_MIN_LENGTH
+              }
+              onClick={() => {
+                if (noFloorAsk.key === 'new') {
+                  void submitSchedule({
+                    preventDefault: () => undefined,
+                  } as React.FormEvent);
+                } else {
+                  void runOrAsk(noFloorAsk, () =>
+                    updateRetentionScheduleItem(noFloorAsk.key, {
+                      retentionPeriodMonths: noFloorAsk.months,
+                      noFloorDeclaration: noFloorDeclarationPayload(),
+                    }),
+                  );
+                }
+              }}
+            >
+              {busy ? t('rdSavingButton') : t('rdNoFloorSaveButton')}
+            </button>
+          </div>
+        ) : null}
         {schedule ? (
           schedule.length === 0 ? (
             <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoScheduleItems')}</p>
@@ -320,10 +484,24 @@ export default function RetentionDisposalPage() {
                               type="button"
                               disabled={busy}
                               onClick={() =>
-                                void run(() =>
-                                  updateRetentionScheduleItem(s.id, {
-                                    retentionPeriodMonths: Number(editMonths[s.id]),
-                                  }),
+                                void runOrAsk(
+                                  {
+                                    key: s.id,
+                                    recordCategory: s.recordCategory,
+                                    months: Number(editMonths[s.id]),
+                                  },
+                                  () =>
+                                    updateRetentionScheduleItem(s.id, {
+                                      retentionPeriodMonths: Number(
+                                        editMonths[s.id],
+                                      ),
+                                      ...(noFloorAsk?.key === s.id
+                                        ? {
+                                            noFloorDeclaration:
+                                              noFloorDeclarationPayload(),
+                                          }
+                                        : {}),
+                                    }),
                                 )
                               }
                             >

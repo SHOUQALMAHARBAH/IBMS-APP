@@ -7,9 +7,9 @@
   },
   "floor-not-enforced-on-edit": {
     "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
-    "from": "    if (dto.retentionPeriodMonths !== undefined) {\n      assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);\n    }",
-    "to": "    if (false && dto.retentionPeriodMonths !== undefined) {\n      assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);\n    }",
-    "why": "ITEM A — without the EDIT gate the create gate is a formality: set 60 months for a KYC category, then patch it to 6. Kills ONLY the acceptance test, which is the one that drives the patch — the refusal test never edits, so a plant that killed both would mean the two tests were not independently observing their own halves."
+    "from": "      assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);",
+    "to": "      void assertMeetsStatutoryFloor;",
+    "why": "ITEM A — without the EDIT gate the create gate is a formality: set 60 months for a KYC category, then patch it to 6. REPOINTED 2026-10-20 (group 6) after `plant --self-test` caught it expired: the update path's floor check moved inside the declaration block, so the old two-line anchor no longer occurred. Same hazard, expressed against the new code — and anchored on the CALL rather than the enclosing `if`, because disabling the branch would also disable the no-floor declaration and the plant would then be testing two things at once. Kills the acceptance e2e, which is the one that drives the patch."
   },
   "floor-boundary-is-exclusive": {
     "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
@@ -34,5 +34,29 @@
     "from": "    makerPermission: 'endorsement.apply',",
     "to": "    makerPermission: 'refund.raise',",
     "why": "ITEM C — the exact wrong answer, and the one anybody would write from the field name. `refund.raise` IS in the catalogue, IS granted to roles and IS described on the Role matrix; it gates NO route. `maker-permissions.inventory.spec.ts` fails by name on 'Refund_maker_checker_distinct -> refund.raise' with the instruction to measure it from the route. An EXISTENCE check would have accepted it, which is why the guard reads @RequirePermissions instead."
+  },
+  "silent-case-stays-silent": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  if (acknowledgedMonths === null) return true;",
+    "to": "  if (acknowledgedMonths === null) return false;",
+    "why": "BATCH 5 GROUP 6 — the silent case restored. With the never-acknowledged branch answering false, a period for a category this system knows no minimum for is accepted with no refusal AND NO WORD, which is exactly the state the owner ruled on: a hard refusal escaped by a spelling. Kills the ASK unit test and BOTH declaration e2e tests (the ask returns 201 and the audit row carries no sentence). The floor tests all still pass, which is the point of planting the DECLARATION rather than the floor."
+  },
+  "declaration-asked-on-every-save": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  return requestedMonths < acknowledgedMonths;",
+    "to": "  return requestedMonths <= acknowledgedMonths;",
+    "why": "BATCH 5 GROUP 6 — WALLPAPER, by one character. `<=` re-asks on an UNCHANGED period, so an office editing a legal basis or re-saving the same figure meets the notice again and learns to click past it within a week — the failure the owner named by name, and the reason the boundary is asserted at 24-does-not-ask / 23-does. Kills the not-re-asked unit test and the e2e's same-or-longer loop."
+  },
+  "declaration-shows-a-floor-where-one-is-known": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  if (floorForCategory(recordCategory) !== null) return false;",
+    "to": "  if (false) return false;",
+    "why": "BATCH 5 GROUP 6 — the notice shown for a category that HAS a floor, where the sentence is FALSE: it says the system does not know a minimum for that name, and for `KYCRecord` it does. This product would be stating something untrue about its own knowledge. Kills the never-asks-where-a-floor-exists unit test, plus TWO e2e tests rather than one — the floored-category test AND the at-floor acceptance, because with every category treated as unfloored a `KYCRecord` save at exactly 60 months is asked to declare and answers 422 instead of 201. Measured by running it rather than predicted."
+  },
+  "audit-row-says-acknowledged-instead-of-the-sentence": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "    noFloorNoticeShown: declaration.noticeShown,\n    noFloorReason: declaration.reason,\n  };\n}",
+    "to": "    noFloorAcknowledged: true,\n  };\n}",
+    "why": "BATCH 5 GROUP 6 — the audit row reduced to the WORD, which is precisely what the owner ruled out: what the person was TOLD is part of the record, because a year from now the question is what they saw. Kills only the audit assertion in the silent-case e2e — and it dies on BOTH halves, the missing sentence and the `not.toContain('acknowledged')`, which is why that absence is asserted rather than described."
   }
 }

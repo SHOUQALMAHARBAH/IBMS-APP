@@ -21,6 +21,25 @@ export type DisposalBatchStatus =
   | 'EXECUTED'
   | 'CLOSED';
 
+/**
+ * TEN — the minimum length of a declaration's written reason, mirroring the api's single home for
+ * that figure (`apps/api/src/common/declaration-reason.ts`).
+ *
+ * A hand-copied constant over an HTTP boundary is exactly the drift class this repo has paid for,
+ * so the api REPORTS it: every `NO_FLOOR_DECLARATION_REQUIRED` body carries `reasonMinLength`, and
+ * an api e2e asserts that the reported figure equals this one. The constant is the screen's default
+ * so a disabled button does not depend on a round trip.
+ */
+export const NO_FLOOR_REASON_MIN_LENGTH = 10;
+
+/** The office's declaration for a category this system knows no statutory minimum for. */
+export interface NoFloorDeclarationInput {
+  /** The sentence as RENDERED — carried so the record says what the office was actually shown. */
+  noticeShown: string;
+  reason: string;
+  acknowledged: true;
+}
+
 export interface RetentionScheduleItem {
   id: string;
   recordCategory: string;
@@ -33,6 +52,17 @@ export interface RetentionScheduleItem {
    * which is nearly all of them — `CombinedDutyOnRecord` renders nothing in that case.
    */
   combinedDutyAct: CombinedDutyActOnRecord | null;
+  /**
+   * The no-floor declaration, if this category ever needed one. Carries the SENTENCE the office was
+   * shown, not the word "acknowledged" — a year from now the question is what they saw.
+   */
+  noFloorDeclaration: {
+    noticeShown: string;
+    reason: string;
+    acknowledgedAt: string;
+    acknowledgedByUserId: string;
+    acknowledgedMonths: number;
+  } | null;
 }
 
 export interface LegalHold {
@@ -81,13 +111,19 @@ export function createRetentionScheduleItem(body: {
   recordCategory: string;
   retentionPeriodMonths: number;
   legalBasis?: string;
+  /** Sent only after the server has asked — the screen holds no copy of the floor list. */
+  noFloorDeclaration?: NoFloorDeclarationInput;
 }): Promise<RetentionScheduleItem> {
   return apiPost('/retention-schedule', body);
 }
 
 export function updateRetentionScheduleItem(
   id: string,
-  body: { retentionPeriodMonths?: number; legalBasis?: string },
+  body: {
+    retentionPeriodMonths?: number;
+    legalBasis?: string;
+    noFloorDeclaration?: NoFloorDeclarationInput;
+  },
 ): Promise<RetentionScheduleItem> {
   return apiPatch(`/retention-schedule/${id}`, body);
 }

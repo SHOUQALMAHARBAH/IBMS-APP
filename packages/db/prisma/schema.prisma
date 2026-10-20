@@ -872,25 +872,27 @@ model User {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  roles                      UserRoleAssignment[]
-  auditLogEntries            AuditLogEntry[]             @relation("AuditLogUser")
-  accessAnomalyAlerts        AccessAnomalyAlert[]        @relation("AccessAnomalyAlertUser")
-  recertifications           AccessRecertificationItem[] @relation("RecertificationReviewer")
+  roles                        UserRoleAssignment[]
+  auditLogEntries              AuditLogEntry[]             @relation("AuditLogUser")
+  accessAnomalyAlerts          AccessAnomalyAlert[]        @relation("AccessAnomalyAlertUser")
+  recertifications             AccessRecertificationItem[] @relation("RecertificationReviewer")
   /// MODULE 0 CLOSE, DECISION 3 — the sixteenth maker/checker pair. Two NAMED relations because
   /// one person may appear as either half on different rows, and an unnamed pair would be ambiguous.
-  retentionPeriodsSet        RetentionScheduleItem[]     @relation("RetentionScheduleItemSetBy")
-  retentionPeriodsConfirmed  RetentionScheduleItem[]     @relation("RetentionScheduleItemConfirmedBy")
-  mfaCredentials             MfaCredential[]
-  refreshTokens              RefreshToken[]
-  sessions                   UserSession[]
-  passwordResetTokens        PasswordResetToken[]
+  retentionPeriodsSet          RetentionScheduleItem[]     @relation("RetentionScheduleItemSetBy")
+  retentionPeriodsConfirmed    RetentionScheduleItem[]     @relation("RetentionScheduleItemConfirmedBy")
+  /// Batch 5 group 6 — the no-floor declarations this person acknowledged.
+  retentionNoFloorAcknowledged RetentionScheduleItem[]     @relation("RetentionScheduleItemNoFloorAcknowledgedBy")
+  mfaCredentials               MfaCredential[]
+  refreshTokens                RefreshToken[]
+  sessions                     UserSession[]
+  passwordResetTokens          PasswordResetToken[]
   /// Spec §4.1.4 / §4.1.3 — populated by the Phase 4 auth rebuild. Declared
   /// here now because Phase 1 creates the tables they point at.
-  trustedDevices             TrustedDevice[]
-  passwordHistory            PasswordHistoryEntry[]
-  officeInsuranceLines       OfficeInsuranceLine[]
-  officeInsurerFormTemplates OfficeInsurerFormTemplate[]
-  combinedDutyActs           CombinedDutyAct[]
+  trustedDevices               TrustedDevice[]
+  passwordHistory              PasswordHistoryEntry[]
+  officeInsuranceLines         OfficeInsuranceLine[]
+  officeInsurerFormTemplates   OfficeInsurerFormTemplate[]
+  combinedDutyActs             CombinedDutyAct[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -4834,10 +4836,42 @@ model RetentionScheduleItem {
   combinedDutyActId               String?
   combinedDutyAct                 CombinedDutyAct? @relation("RetentionScheduleItemCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
+  /// MODULE 0 CLOSE, batch 5 group 6 — THE SILENT CASE DECLARES.
+  ///
+  /// The statutory floor is a hard refusal over two record-category families, and `recordCategory`
+  /// is FREE TEXT — so `CustomerFile` takes the five-year floor and `Customer` takes nothing. A
+  /// refusal the owner made hard was escaped by a spelling, silently.
+  ///
+  /// Her ruling: the harm is the office's OWN regulatory exposure, so it DECLARES AND LOGS rather
+  /// than refusing. The office is shown a sentence naming BOTH known floors with their instruments
+  /// and articles — the naming is the mechanism, since it is how somebody saving due-diligence
+  /// records under a different name recognises what they are doing — writes a reason, and ticks an
+  /// acknowledgement by hand.
+  ///
+  /// ALL FIVE OR NONE, by CHECK: an acknowledgement missing its sentence, its reason, its actor or
+  /// its period would let "acknowledged" mean "somebody ticked a box".
+  /// THE SENTENCE THE OFFICE WAS SHOWN, verbatim as rendered and carried from the client — the
+  /// `DuplicateNameWarning` precedent: re-deriving it at submit would rewrite what they were told.
+  noFloorNoticeShown          String?
+  /// The office's own written reason for the period it chose. Ten characters, the established
+  /// declaration minimum.
+  noFloorReason               String?
+  noFloorAcknowledgedAt       DateTime?
+  /// `onDelete: Restrict` EXPLICITLY — Prisma's default for an optional relation is `SetNull`, and a
+  /// nulled actor leaves a declaration nobody made.
+  noFloorAcknowledgedByUserId String?
+  noFloorAcknowledgedBy       User?     @relation("RetentionScheduleItemNoFloorAcknowledgedBy", fields: [noFloorAcknowledgedByUserId], references: [id], onDelete: Restrict)
+  /// THE PERIOD ACKNOWLEDGED, which is what makes "asked once" implementable with no second table:
+  /// this row is already unique per (organization, category). A later save at the SAME or a LONGER
+  /// period is not re-asked; SHORTENING asks again, because the exposure changed. NULL means never
+  /// asked, so the next period change asks rather than comparing against an invented baseline.
+  noFloorAcknowledgedMonths   Int?
+
   disposalBatches DisposalBatch[]
   legalHolds      LegalHold[]
 
   @@unique([organizationId, recordCategory])
+  @@index([noFloorAcknowledgedByUserId])
   @@index([organizationId])
   @@index([combinedDutyActId])
 }

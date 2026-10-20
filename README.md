@@ -4540,6 +4540,49 @@ email arrive masked, so prefilling would write the mask back as the customer's p
 the request reference that satisfies the gate. `IMPROVEMENTS.md` § 1.65 — including that the statutory flow
 needs two people, because the DPO who closes the request does not hold `customer.update`.
 
+**A retention period below the statutory floor is REFUSED with the article in it; a category we know
+no floor for is ACCEPTED and DECLARES (2026-10-20).** Two halves of one question, in
+`apps/api/src/modules/pdpl/retention-floors.config.ts`.
+
+**The floor.** One of the owner's three standing refusals, so it blocks rather than warns. Two
+floors, both decided and sourced by her: customer due-diligence / KYC records at **five years**
+counted from completing the transaction OR ending the relationship, **whichever is longer** (AML
+Law No. 20 of 2021, art. 17/أ); financial and commercial records at **ten years** from the closing
+of the transaction, which she has defined for this system as the **closing date of the financial
+transaction** (Commercial Law No. 12 of 1966, art. 19). A shorter period is a 422 carrying the
+instrument, the article, the article's own operative text and its trigger — a floor without its
+trigger is a number somebody counts from the wrong day. A longer one is free.
+
+**No invented floor.** A category whose statute nobody here has read gets NO floor and NO refusal,
+and the fourteen such names are listed in `docs/deferred-register.md` entry 84 rather than given a
+number. `retention-floors.config.spec.ts` refuses a third floor whose `source` is not an owner
+decision. Both citations stay marked PROVISIONAL pending the Official Gazette; nobody here has read
+it and the file does not claim to have.
+
+**The silent case, and why it declares.** `recordCategory` is free text, so the floor fires only on
+a name the list recognises — which meant `CustomerFile` took the five-year floor and `Customer`
+took nothing, no refusal and no word. A refusal the owner made hard, escaped by a spelling. Her
+ruling: the harm is the office's **own** regulatory exposure rather than a third party's, so it
+**declares and logs**. The save is accepted; the office is shown a sentence naming **both** known
+floors with their instruments and articles, writes a reason of at least ten characters, and ticks an
+acknowledgement by hand.
+
+Three things about that sentence are load-bearing. **The naming of both floors IS the mechanism** —
+it is how somebody who is in fact saving due-diligence records under a different name recognises
+what they are doing, which is why it is unconditional rather than tailored. **It says the SYSTEM
+does not know a minimum, never that the LAW sets none** — that distinction is the difference between
+an honest declaration and this product making a legal claim with no source, and both halves are
+asserted at three layers. And **the audit row carries the sentence and the reason verbatim**, not
+the word "acknowledged": what the person was told is part of the record, because a year from now the
+question is what they saw. The sentence is carried from the client on the `DuplicateNameWarning`
+precedent — re-deriving it at submit answers a different question.
+
+**Asked once per category per office.** `RetentionScheduleItem` is already unique on (organization,
+category), so no second table: `noFloorAcknowledgedMonths` decides. Never acknowledged asks; the
+same or a longer period does not; a **shortening** asks again, because the exposure changed. The
+boundary is asserted at 24-does-not-ask / 23-does, because `<=` where `<` belongs re-asks on an
+unchanged period and makes the notice wallpaper within a week.
+
 **An office can add and correct its own lines of business (2026-09-28).** `POST /insurance-lines` and
 `PATCH /insurance-lines/:id` had no web caller, so the vocabulary this product classifies all business by
 could be read and never extended — and a broker writing a line the standard 32 do not cover had no way to
