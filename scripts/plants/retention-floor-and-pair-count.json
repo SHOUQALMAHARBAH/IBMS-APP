@@ -70,5 +70,11 @@
     "from": "PLATFORM_OPERATOR role (\\([0-9]\\{1,\\}\\) permissions:",
     "to": "PLATFORM_OPERATOR_ROLE_THAT_DOES_NOT_EXIST (\\([0-9]\\{1,\\}\\) permissions:",
     "why": "THE NON-VACUITY GUARD on the derivation. If the seed's wording changes the pattern reads NOTHING, and without this guard an empty expected value would be compared against the database's count and the check would simply go quiet — a derivation that silently stops deriving is worse than the literal it replaced. Planted: the run exits 1 with 'could not read the provider role's grant count out of the seed's own output' and the explicit instruction NOT to replace it with a literal."
+  },
+  "from-empty-skips-silently-in-ci": {
+    "file": "scripts/from-empty.sh",
+    "from": "  if [ -n \"${CI:-}\" ]; then",
+    "to": "  if [ -n \"${CI_DISABLED:-}\" ]; then",
+    "why": "ITEM 1, batch 5 group 7 — THE HAZARD INSIDE THE FIX. `from-empty.sh` was added as a CI step because its pins ran nowhere; it SKIPS WITH exit 0 when the server is unreachable, and its own output says 'this is a skip, NOT a pass'. Without the CI-strict branch, the new step would print SKIPPED and PASS on every run forever — a green gate that never runs, which is the exact defect the step exists to fix, reproduced inside its own fix. Proven: with the branch disabled, `CI=1 FROM_EMPTY_ADMIN_URL=<unreachable> bash scripts/from-empty.sh` exits 0; with it, exit 1 naming the server and the variable."
   }
 }

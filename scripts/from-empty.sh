@@ -17,8 +17,9 @@
 #
 # ## What it does NOT do
 #
-# It does not touch the dev or db-test DATABASES. It creates a throwaway database on the db-test
-# CONTAINER, uses it, and drops it — in a trap, so an interrupted run does not leave it behind to
+# It does not touch the dev or db-test DATABASES. It creates a throwaway database on whichever
+# SERVER `FROM_EMPTY_ADMIN_URL` names (the local db-test service by default, CI's postgres service
+# when CI sets it), uses it, and drops it — in a trap, so an interrupted run does not leave it behind to
 # confuse the next one. It never runs `prisma migrate reset`, which refuses to run unattended and
 # needs the user's explicit consent for that run.
 #
@@ -32,26 +33,52 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-CONTAINER=ibms-app-db-test-1
 SCRATCH="ibms_fromempty_$$"
-ADMIN_URL="postgresql://ibms:ibms@localhost:5434/ibms_test?schema=public"
-SCRATCH_URL="postgresql://ibms:ibms@localhost:5434/${SCRATCH}?schema=public"
+
+# WHERE THE SERVER IS, resolved rather than hard-coded. The local db-test compose service publishes
+# 5434; CI's postgres SERVICE container answers on 5432 and has no container name to `docker exec`
+# into. `FROM_EMPTY_ADMIN_URL` lets CI say so without this script knowing anything about CI.
+ADMIN_URL="${FROM_EMPTY_ADMIN_URL:-postgresql://ibms:ibms@localhost:5434/ibms_test?schema=public}"
+SCRATCH_URL="${ADMIN_URL%%/ibms_test*}/${SCRATCH}?schema=public"
 
 say() { printf '\n== %s\n' "$*"; }
-psql_scratch() { docker exec -i "$CONTAINER" psql -U ibms -d "$SCRATCH" -tA -c "$1"; }
+
+# ACCESS GOES THROUGH PRISMA, NOT psql — measured: `psql` is on PATH on neither the development
+# machine (which is why this script used `docker exec`) nor in any CI step, while `PrismaClient`
+# plus a URL is what CI's three existing database gates already use. `scratch-sql.mjs` reproduces
+# `psql -tA`'s output shape exactly, because nineteen assertions below compare against it.
+sql() { node packages/db/scripts/scratch-sql.mjs "$1" "$2"; }
+psql_scratch() { sql "$SCRATCH_URL" "$1"; }
+psql_admin() { sql "$ADMIN_URL" "$1"; }
 
 cleanup() {
-  docker exec -i "$CONTAINER" psql -U ibms -d ibms_test -c \
-    "DROP DATABASE IF EXISTS \"${SCRATCH}\" WITH (FORCE)" >/dev/null 2>&1
+  sql "$ADMIN_URL" "DROP DATABASE IF EXISTS \"${SCRATCH}\" WITH (FORCE)" >/dev/null 2>&1
 }
 trap cleanup EXIT
 
-# SKIPS RATHER THAN FAILS WITHOUT DOCKER, and the distinction is load-bearing. This gate needs the
-# db-test container; a machine without it is not a tree with a defect, and a gate that goes red for an
-# environmental reason is one everybody learns to ignore — which is how a real failure gets dismissed
-# later. Same shape as `check-ci.sh`, which passes quietly when HEAD is unpushed.
-if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
-  echo "from-empty: SKIPPED — the ${CONTAINER} container is not running."
+# SKIPS ON A LAPTOP, REFUSES IN CI — and both halves are load-bearing.
+#
+# On a development machine a missing database server is not a tree with a defect, and a gate that
+# goes red for an environmental reason is one everybody learns to ignore, which is how a real failure
+# gets dismissed later. Same shape as `check-ci.sh`, which passes quietly when HEAD is unpushed.
+#
+# IN CI THAT REASONING INVERTS, and this is the half that was missing. The server is a guaranteed
+# service container, so an unreachable one is a real failure — and dropping this script into a CI step
+# while it could still skip would have produced a green step printing "SKIPPED" on every run forever:
+# a gate that never runs, which is exactly the defect that CI step was added to fix.
+#
+# The skip above is right on a laptop and a LIE in CI. Dropping this script into a CI step while it
+# could still skip would have produced a green step printing "SKIPPED" on every run forever: a gate
+# that never runs, which is exactly the defect that CI step was added to fix. In CI the server is a
+# guaranteed service container, so an unreachable one is a real failure.
+if ! psql_admin 'SELECT 1' >/dev/null 2>&1; then
+  if [ -n "${CI:-}" ]; then
+    echo "FROM-EMPTY: the database server at ADMIN_URL is unreachable, and this is CI."
+    echo "FROM-EMPTY: a skip here would be a green step that never runs the gate — the defect this"
+    echo "FROM-EMPTY: step exists to fix. Check the postgres service and FROM_EMPTY_ADMIN_URL."
+    exit 1
+  fi
+  echo "from-empty: SKIPPED — no reachable database server at ADMIN_URL."
   echo "from-empty: this is a skip, NOT a pass. Run \`docker compose up -d db-test\` and re-run"
   echo "from-empty: before claiming every migration applies from nothing."
   trap - EXIT
@@ -59,7 +86,7 @@ if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
 fi
 
 say "creating the throwaway database ${SCRATCH}"
-docker exec -i "$CONTAINER" psql -U ibms -d ibms_test -c "CREATE DATABASE \"${SCRATCH}\"" \
+psql_admin "CREATE DATABASE \"${SCRATCH}\"" \
   || { echo "FROM-EMPTY: could not create the throwaway database"; exit 1; }
 
 # `ibms_app` is the runtime role the privileges gate checks; the migrations grant to it by name, so
@@ -71,8 +98,13 @@ docker exec -i "$CONTAINER" psql -U ibms -d ibms_test -c "CREATE DATABASE \"${SC
 # no-op and nothing is created. On a cluster where it is genuinely absent it IS created and is left in
 # place deliberately — dropping a role every migration grants to would break the next run, and a
 # cleanup that breaks what it cleans up after is worse than the residue.
-docker exec -i "$CONTAINER" psql -U ibms -d "$SCRATCH" -c \
-  "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='ibms_app') THEN CREATE ROLE ibms_app LOGIN PASSWORD 'ibms_app'; END IF; END \$\$;" >/dev/null
+# Two plain statements instead of a `DO $$ … $$` block, deliberately: dollar-quoting would have to
+# survive bash, a shell argument and whatever the Prisma client does with `$`-prefixed tokens, and
+# betting on all three for a two-line conditional is a bet with no upside. A count and an `if` say
+# the same thing and cannot be mangled.
+if [ "$(psql_scratch "SELECT count(*) FROM pg_roles WHERE rolname = 'ibms_app'")" = "0" ]; then
+  psql_scratch "CREATE ROLE ibms_app LOGIN PASSWORD 'ibms_app'" >/dev/null
+fi
 
 say "applying every migration from nothing"
 DATABASE_URL="$SCRATCH_URL" npx prisma migrate deploy --schema packages/db/prisma/schema.prisma \

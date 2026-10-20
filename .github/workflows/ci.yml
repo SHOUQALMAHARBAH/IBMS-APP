@@ -316,6 +316,41 @@ jobs:
       # job for three commits — during which the api e2e suite did not run at all, and a real e2e
       # failure it had already caught twice (permission-only-gates, four wrong route gates) disappeared
       # behind the newer red. The job still FAILS; it just stops being a one-signal job.
+      # ITEM 1, batch 5 group 7 — THE PINS WERE NEVER THE DEFECT; NOTHING RUNNING THEM WAS.
+      #
+      # `from-empty.sh` proves every migration applies to an EMPTY database and that the seed still
+      # works from nothing, then asserts nineteen structural facts about the shape a database reaches
+      # from scratch. EIGHT of those are literals pinned to figures that grow — permission codes,
+      # PLATFORM-scoped codes, composite tenant FKs, the reference tables and their Arabic-description
+      # sibling, insurance lines, enum member descriptions, maker/checker CHECK constraints.
+      #
+      # THOSE PINS ARE DELIBERATE. A figure moving is a recorded decision, exactly as
+      # `PROVIDER_CODES` pinned at thirteen makes a fourteenth fail until somebody records it.
+      # Deriving them all would let growth pass silently, which is the opposite of what they are for.
+      #
+      # WHAT WAS WRONG was that this script ran nowhere but `verify.sh`. Its provider-grant pin said
+      # 11 against a seeded 13 for a WHOLE BATCH — and was reported green — because no CI step ran
+      # it. That is the same way `combined-duty-projection.py` sat dead on `assert pairs == 15`.
+      #
+      # UNCONDITIONAL, with no path filter: a gate that runs on some pushes is silent on the rest,
+      # which is the shape that cost those two batches. Measured at ~1m13s for 149 migrations plus
+      # the seed, against the postgres service this job already runs.
+      #
+      # TWO OF THOSE PINS WILL BREAK ON WORK ALREADY NAMED IN THIS REPO — the eight reference tables
+      # (module 1's legal-values table is described in `schema.prisma` and `reference-tables.ts` as
+      # "the ninth of the same family") and the sixteen maker/checker constraints (a seventeenth pair).
+      # When either fails, the figure MOVED: record the decision and move the pin. Do not bump it to
+      # make the build green.
+      - name: Database from empty — every migration from nothing, then the seed, then nineteen pins
+        if: ${{ !cancelled() }}
+        env:
+          # CI's postgres is a SERVICE container on 5432 with no name to `docker exec` into; the
+          # local db-test compose service publishes 5434, which is the script's default. And `CI` is
+          # set by GitHub, which is what makes the script REFUSE rather than skip when the server is
+          # unreachable — without that, this step would be a green no-op forever.
+          FROM_EMPTY_ADMIN_URL: postgresql://ibms:ibms@localhost:5432/ibms_test?schema=public
+        run: bash scripts/from-empty.sh
+
       - name: Seed database (roles + permission grid)
         if: ${{ !cancelled() }}
         run: npm run db:seed
