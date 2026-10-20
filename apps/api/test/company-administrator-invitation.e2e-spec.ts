@@ -344,12 +344,27 @@ describe('item (f) company half — the invite', () => {
     expect(providerAuditRows).toBe(1);
   });
 
-  it('refuses a second invite — this bootstraps an empty company once, it is not a standing capability', async () => {
+  it('ALLOWS a second invite while nobody has entered, to a CORRECTED address — this used to be a 409', async () => {
+    /*
+     * THE REVERSAL, STATED RATHER THAN QUIETLY REPOINTED. This test asserted a 409 until decision
+     * 26, and the refusal it pinned is not gone — it MOVED. `refusal 3 — the protection` below
+     * asserts it for an organization somebody has entered, which is the case the refusal was
+     * written for.
+     *
+     * What changed is the case it ALSO covered by accident: an organization nobody has ever
+     * entered. That is a registration that did not complete, and refusing there left the
+     * organization permanently unreachable — the invitation token expires in 120 minutes, the
+     * invited account cannot request its own reset (its organization has no mailbox), and the
+     * provider could not re-invite. A MISTYPED ADDRESS made it dead on arrival.
+     *
+     * The decision-90 assertion below is kept: a 201 still must not be reached by way of a
+     * database artefact leaking into a message somewhere else in the flow.
+     */
     const company = await registerCompany();
     const body = {
       email: `${unique('first')}@example.test`,
       fullName: 'First Administrator',
-      reason: 'The first account for this company.',
+      reason: 'The first account for this company, sent to a mistyped address.',
     };
     await request(app.getHttpServer())
       .post(`/provider/insurance-companies/${company.id}/administrator`)
@@ -357,17 +372,24 @@ describe('item (f) company half — the invite', () => {
       .send(body)
       .expect(201);
 
+    const corrected = `${unique('corrected')}@example.test`;
     const second = await request(app.getHttpServer())
       .post(`/provider/insurance-companies/${company.id}/administrator`)
       .set(...bearerHeader(operator.accessToken))
-      .send({ ...body, email: `${unique('second')}@example.test` })
-      .expect(409);
+      .send({
+        ...body,
+        email: corrected,
+        reason:
+          'The address was mistyped; the same person at the right address.',
+      })
+      .expect(201);
 
-    const message = JSON.stringify(second.body);
-    expect(message).toContain('FIRST administrator');
-    expect(message).toContain('POST /admin/users');
-    // DECISION 90 — no database artefact is ever the error message.
-    expect(message).not.toMatch(/violates|constraint|23505|P2002/);
+    // The CORRECTED address is what the account carries now — the whole point of allowing a second
+    // invitation rather than only re-sending to the address that was wrong.
+    expect((second.body as Invited).email).toBe(corrected);
+    expect(JSON.stringify(second.body)).not.toMatch(
+      /violates|constraint|23505|P2002/,
+    );
   });
 
   it('refuses a BROKERAGE OFFICE id — the two invites are separate routes with separate codes', async () => {
@@ -752,26 +774,178 @@ describe('decision 25 — the invitation channel', () => {
     expect(emailAfter).not.toContain('reset-password');
   });
 
-  it('(e) RE-INVITING IS NOT REACHABLE, and that is a recorded refusal rather than a gap in this test', async () => {
+  it('(e) RE-INVITING AN ORGANIZATION NOBODY HAS ENTERED leaves exactly one account, one role and one live token', async () => {
     /*
-     * MEASURED BEFORE BUILDING, and it is the one item of decision 25 that cannot be delivered as
-     * specified.
+     * DECISION 26 — THE LOCKOUT CURE, and the three counts the decision asks the state to be in
+     * afterwards. Asserted together because any one alone would pass against a re-invitation that
+     * quietly created a second account, a second grant, or left the earlier link working.
      *
-     * Refusal 3 on BOTH invite routes rejects a second invitation with a 409 the moment the
-     * organization has any account, and its own comment says why: "This route bootstraps an empty
-     * company once and is deliberately not a standing provider capability to add accounts to a live
-     * one." Making re-invitation work would mean relaxing that refusal — overturning a recorded
-     * decision — or adding a separate re-send act, which would need a gate, and no new permission
-     * code is in scope.
+     * The earlier token being DEAD is the one worth saying out loud: two live links to one account
+     * means the first one somebody forwards still works, which is a standing key nobody can
+     * withdraw.
      *
-     * THE CONSEQUENCE IS A REAL LOCKOUT AND IS RECORDED RATHER THAN SOFTENED: if an invitation
-     * expires unopened, the organization HAS an account (so this 409 fires) and that account cannot
-     * request its own reset either, because `forgotPassword` resolves the mailbox of the
-     * organization in context and a new organization has none. In production there is no route out.
-     * The dev gate returns the token locally, which is why the owner's walk is unaffected.
+     * This test REPLACES one that pinned the refusal as unreachable — written last commit so that
+     * whoever lifted it did so deliberately. This is that lift.
+     */
+    const company = await registerCompany();
+    const first = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('admin')}@example.test`,
+        fullName: 'First Attempt',
+        reason: 'The first invitation, which expired unopened.',
+      })
+      .expect(201);
+    const firstInvited = first.body as Invited;
+    const firstTokens = await rawPrisma.passwordResetToken.findMany({
+      where: { userId: firstInvited.userId },
+      select: { id: true },
+    });
+    expect(firstTokens).toHaveLength(1);
+
+    const again = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('corrected')}@example.test`,
+        fullName: 'Corrected Address',
+        reason: 'Re-inviting after the first link expired unopened.',
+      })
+      .expect(201);
+
+    // THE SAME ACCOUNT, not a new one — which is what makes the three counts below possible.
+    expect((again.body as Invited).userId).toBe(firstInvited.userId);
+
+    // (1) exactly ONE active account
+    const accounts = await rawPrisma.user.findMany({
+      where: { organizationId: company.id },
+      select: { id: true, isActive: true, mustChangePassword: true },
+    });
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0].isActive).toBe(true);
+    // Re-asserted rather than assumed: the first screen must still be the change-password step.
+    expect(accounts[0].mustChangePassword).toBe(true);
+
+    // (2) exactly ONE role assignment
+    expect(
+      await rawPrisma.userRoleAssignment.count({
+        where: { userId: firstInvited.userId },
+      }),
+    ).toBe(1);
+
+    // (3) exactly ONE LIVE token, and the earlier one is DEAD rather than merely outnumbered.
+    const tokens = await rawPrisma.passwordResetToken.findMany({
+      where: { userId: firstInvited.userId },
+      select: { id: true, usedAt: true, expiresAt: true },
+    });
+    const live = tokens.filter(
+      (t) => t.usedAt === null && t.expiresAt.getTime() > Date.now(),
+    );
+    expect(
+      live,
+      'more than one live link to the same account — the earlier one is a standing key nobody can withdraw',
+    ).toHaveLength(1);
+    expect(live[0].id).not.toBe(firstTokens[0].id);
+  });
+
+  it('(e5) REFUSES once the invited account has SET A PASSWORD, even having never signed in', async () => {
+    /*
+     * THE FIFTH ASSERTION, and it closes a window `lastLoginAt` alone leaves open.
      *
-     * This test pins the refusal so that whoever lifts it does so deliberately, and so that the
-     * lockout cannot be rediscovered as a surprise.
+     * Somebody opens the link and sets a password, then closes the browser. `lastLoginAt` is still
+     * null — `AuthService.resetPassword` returns `void` and issues no session — so on that fact
+     * alone the organization still reads as never-entered, and a re-invitation to a CORRECTED
+     * address would SILENTLY cost that person the password they had just chosen. Recoverable, and
+     * silent, and the provider would have no way to know they had done it.
+     *
+     * `User.passwordUpdatedAt` closes it at no cost: nullable with NO default (measured off the
+     * database, not the schema file), not written by either invitation service's `tx.user.create`,
+     * and written by `UserRepository.updatePassword` — which is exactly what `resetPassword` calls
+     * — at the moment the link is used.
+     */
+    const company = await registerCompany();
+    const first = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('admin')}@example.test`,
+        fullName: 'Set A Password',
+        reason: 'The first invitation, which this person opened.',
+      })
+      .expect(201);
+    const invited = first.body as Invited;
+
+    /*
+     * The state after using the link, written directly: `passwordUpdatedAt` set, `lastLoginAt`
+     * still null. The second half is the NON-VACUITY FLOOR — if `lastLoginAt` were set too, this
+     * would be the entered case again and would prove nothing about the new field.
+     */
+    await rawPrisma.user.update({
+      where: { id: invited.userId },
+      data: { passwordUpdatedAt: new Date() },
+    });
+    const row = await rawPrisma.user.findUniqueOrThrow({
+      where: { id: invited.userId },
+      select: { lastLoginAt: true, passwordUpdatedAt: true },
+    });
+    expect(
+      row.lastLoginAt,
+      'lastLoginAt is set, so this is the entered case and says nothing about passwordUpdatedAt',
+    ).toBeNull();
+    expect(row.passwordUpdatedAt).not.toBeNull();
+
+    const refused = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('corrected')}@example.test`,
+        fullName: 'Corrected Address',
+        reason:
+          'A re-invitation that would silently discard a password somebody chose.',
+      })
+      .expect(409);
+    expect(JSON.stringify(refused.body)).toContain('FIRST administrator');
+
+    // And the account keeps the address and the password moment it had.
+    const after = await rawPrisma.user.findUniqueOrThrow({
+      where: { id: invited.userId },
+      select: { email: true, passwordUpdatedAt: true },
+    });
+    expect(after.email).toBe(invited.email);
+    expect(after.passwordUpdatedAt).not.toBeNull();
+  });
+});
+
+/* =============================================================================================
+ * REFUSAL 3's PROTECTION, PINNED BEFORE THE LOCKOUT CURE WAS BUILT.
+ *
+ * The cure opens this route for an organization NO HUMAN HAS EVER ENTERED — a registration that
+ * did not complete. What must not move is the thing the refusal was written for: the provider does
+ * not become a standing capability to add accounts to a LIVE organization.
+ *
+ * This file's tests were written and run BEFORE that opening existed, against the blanket
+ * `existing > 0` refusal, so that the protection is judged on its own terms rather than shaped by
+ * the code that came next.
+ * ============================================================================================= */
+
+describe('refusal 3 — the protection, which the lockout cure must not touch', () => {
+  it('REFUSES once an account in the organization HAS BEEN ENTERED, with its own message', async () => {
+    /*
+     * "Entered" is a STORED FACT, not an inference from current state: `User.lastLoginAt`.
+     *
+     * MEASURED before keying anything on it — one write, one caller:
+     *   `UserRepository.recordSuccessfulLogin` (user.repository.ts:724)
+     *   called only from `AuthService.issueSession` (auth.service.ts:962).
+     * And `issueSession` is reached only after every gate: `mustChangePassword` returns
+     * MUST_CHANGE_PASSWORD with an onboarding token and NO session; an unskipped MFA challenge
+     * returns `mfaRequired` with NO session. So somebody who proved a password and then failed MFA
+     * reads as NOT entered, which is the failure direction the brief warned about and it does not
+     * occur.
+     *
+     * NOT `mustChangePassword`: `UserRepository.markOnboardingRequired` sets it on ANY existing
+     * account by id, so a condition keyed on that flag would open this route into a LIVE
+     * organization whose administrator happens to be re-enrolling a second factor.
      */
     const company = await registerCompany();
     const email = `${unique('admin')}@example.test`;
@@ -781,36 +955,115 @@ describe('decision 25 — the invitation channel', () => {
       .send({
         email,
         fullName: 'Company Administrator',
-        reason: 'The first invitation.',
+        reason: 'The first invitation, which this person then used.',
       })
       .expect(201);
+    const invited = first.body as Invited;
 
-    const again = await request(app.getHttpServer())
+    /*
+     * THE ACCOUNT IS MARKED AS HAVING SIGNED IN, written directly rather than by authenticating.
+     *
+     * Signing in for real inside a fixture organization writes an `AuditLogEntry` into that
+     * tenant, `AuditLogEntry_organizationId_fkey` is ON DELETE RESTRICT and the table refuses
+     * DELETE by trigger — ONE row makes the organization permanent. This file's header records two
+     * offices stranded in db-test learning that. So the STORED FACT is set directly; what is under
+     * test is the route's reading of it, not the login flow that writes it.
+     */
+    await rawPrisma.user.update({
+      where: { id: invited.userId },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const refused = await request(app.getHttpServer())
       .post(`/provider/insurance-companies/${company.id}/administrator`)
       .set(...bearerHeader(operator.accessToken))
       .send({
         email,
         fullName: 'Company Administrator',
-        reason: 'A second invitation, same person.',
+        reason:
+          'A second invitation into an organization somebody already runs.',
       })
       .expect(409);
-    expect(JSON.stringify(again.body)).toContain('FIRST administrator');
 
-    // No duplicate account and no second role assignment — the counts the brief asked for, proven
-    // by the refusal rather than by a re-send path.
-    const invited = first.body as Invited;
+    const message = JSON.stringify(refused.body);
+    // ITS OWN MESSAGE, unchanged: the sentence is what tells the provider this is not a capability
+    // they have, rather than a transient failure to retry.
+    expect(message).toContain('FIRST administrator');
+    expect(message).toContain('administers itself');
+    expect(message).toContain('POST /admin/users');
+
+    // And nothing was created by the refused request.
     expect(
       await rawPrisma.user.count({ where: { organizationId: company.id } }),
+      'the refused invitation created a second account',
     ).toBe(1);
+  }, 120_000);
+
+  it('REFUSES when ANY account has been entered, not only the invited one', async () => {
+    /*
+     * The condition is about the ORGANIZATION, not about one row. An organization where a second
+     * person has signed in is live even if the first administrator never did — and an opening keyed
+     * on the invited account alone would reach exactly that case.
+     */
+    const company = await registerCompany();
+    const first = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('admin')}@example.test`,
+        fullName: 'Company Administrator',
+        reason: 'The first invitation, never used by this person.',
+      })
+      .expect(201);
+    const invited = first.body as Invited;
+
+    // A SECOND account in the same organization, which HAS been entered. The invited one has not.
+    const role = await rawPrisma.role.findFirstOrThrow({
+      where: { organizationId: company.id },
+      select: { id: true },
+    });
+    const second = await rawPrisma.user.create({
+      data: {
+        organizationId: company.id,
+        email: `${unique('second')}@example.test`,
+        fullName: 'Somebody Else',
+        passwordHash: 'not-a-real-hash',
+        lastLoginAt: new Date(),
+      },
+      select: { id: true },
+    });
+    await rawPrisma.userRoleAssignment.create({
+      /*
+       * `organizationId` SPELLED OUT. It is `@default(dbgenerated())`, filled from
+       * `app.current_org_id` by the tenancy extension — and `rawPrisma` sets no tenancy, so Prisma
+       * sends no value and the NOT NULL column refuses. Measured, not guessed: the first version
+       * omitted it and failed with `Null constraint violation on the fields: (organizationId)`.
+       */
+      data: {
+        userId: second.id,
+        roleId: role.id,
+        organizationId: company.id,
+      },
+    });
+
+    const invitedRow = await rawPrisma.user.findUniqueOrThrow({
+      where: { id: invited.userId },
+      select: { lastLoginAt: true },
+    });
     expect(
-      await rawPrisma.userRoleAssignment.count({
-        where: { userId: invited.userId },
-      }),
-    ).toBe(1);
-    expect(
-      await rawPrisma.passwordResetToken.count({
-        where: { userId: invited.userId },
-      }),
-    ).toBe(1);
-  });
+      invitedRow.lastLoginAt,
+      'the invited account has been entered, so this test is about the wrong thing',
+    ).toBeNull();
+
+    await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('admin')}@example.test`,
+        fullName: 'Company Administrator',
+        reason:
+          'An invitation into an organization somebody else already runs.',
+      })
+      .expect(409);
+  }, 120_000);
 });

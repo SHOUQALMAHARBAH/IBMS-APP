@@ -794,20 +794,54 @@ describe('ITEM (f) — the office gets its FIRST administrator, which is what ma
     ).toBe(1);
   }, 180_000);
 
-  it('REFUSES a second invitation — this bootstraps an empty office ONCE', async () => {
+  it('ALLOWS a second invitation while nobody has entered, and REFUSES it once somebody has', async () => {
     /*
-     * The refusal that keeps this from becoming a standing provider capability to add accounts to a
-     * live office. Asserted on the MESSAGE as well as the status, because a bare 409 would read as a
-     * duplicate email rather than "this office administers itself now".
+     * DECISION 26 ON THE OFFICE HALF, and both directions in one test because the pair is the
+     * decision: the opening and the protection are one sentence, and a test that showed only the
+     * allowance would read as the refusal having been removed.
+     *
+     * THE REVERSAL IS STATED: this test asserted a flat 409 until decision 26. The refusal it
+     * pinned has not gone — it now keys on whether anybody has ever ENTERED the office rather than
+     * on whether an account exists. The old condition also caught an office nobody had entered,
+     * which is a registration that did not complete, and refusing there left the office
+     * PERMANENTLY unreachable: the invitation token expires in 120 minutes, the invited account
+     * cannot request its own reset because its office has no mailbox, and the provider could not
+     * re-invite. A mistyped address made it dead on arrival.
+     *
+     * The condition, the two stored facts and why neither is `mustChangePassword` live in
+     * `invitation-target.ts` — ONE home, shared with the company route.
      */
     const registered = await register(validOffice());
     const officeId = (registered.body as RegistrationBody).id;
-    expect((await invite(officeId)).status).toBe(201);
+    const first = await invite(officeId);
+    expect(first.status).toBe(201);
+    const firstUserId = (first.body as { userId: string }).userId;
 
+    // NOBODY HAS ENTERED: the second invitation is allowed, and it re-invites the SAME account.
     const second = await invite(officeId);
-    expect(second.status).toBe(409);
-    expect(JSON.stringify(second.body)).toContain('FIRST administrator');
-    expect(JSON.stringify(second.body)).toContain('POST /admin/users');
+    expect(second.status).toBe(201);
+    expect((second.body as { userId: string }).userId).toBe(firstUserId);
+    expect(
+      await rawPrisma.user.count({ where: { organizationId: officeId } }),
+      'the re-invitation created a second account in the office',
+    ).toBe(1);
+
+    /*
+     * NOW SOMEBODY HAS. Written directly rather than by signing in: a login writes an
+     * `AuditLogEntry` into the office's own tenant and `deleteOffice` asserts that count is zero,
+     * because one such row makes the office permanently undeletable — this file's own header.
+     */
+    await rawPrisma.user.update({
+      where: { id: firstUserId },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const third = await invite(officeId);
+    expect(third.status).toBe(409);
+    // Asserted on the MESSAGE as well as the status, because a bare 409 would read as a duplicate
+    // email rather than "this office administers itself now".
+    expect(JSON.stringify(third.body)).toContain('FIRST administrator');
+    expect(JSON.stringify(third.body)).toContain('POST /admin/users');
   }, 180_000);
 
   it('REFUSES an organization that is not a brokerage office, naming what it is', async () => {

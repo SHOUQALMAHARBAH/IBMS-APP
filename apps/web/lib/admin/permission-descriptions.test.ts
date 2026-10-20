@@ -64,7 +64,7 @@ const MISSING_DESCRIPTION_BUDGET = 0;
  * What must never happen is this number going up while the CODE COUNT stays the same. That would be
  * a reversion, and it is what the rule is about.
  */
-const CARRIED_ENGLISH_BUDGET = 217;
+const CARRIED_ENGLISH_BUDGET = 215;
 
 /**
  * CODES WHOSE ARABIC IS **NOT** THE OWNER'S, and the balance check that stops this list rotting.

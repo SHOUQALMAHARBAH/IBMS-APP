@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrgContextService } from '../../common/org-context/org-context.service';
 import { InvitationChannelService } from './invitation-channel.service';
+import { resolveInvitationTarget } from './invitation-target';
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/services/password.service';
 import { OFFICE_ADMINISTRATOR_ROLE_NAME } from './office-administrator-grants';
@@ -187,15 +188,22 @@ export class OfficeAdministratorInvitationService {
 
     const invited = await this.orgContext.runAs(officeId, async () => {
       const created = await this.prisma.client.$transaction(async (tx) => {
-        // ------------------------------------------------------------ REFUSAL 3
-        const existing = await tx.user.count({});
-        if (existing > 0) {
-          throw new ConflictException(
-            `Office ${officeId} already has ${existing} account(s), so it is not waiting for its FIRST administrator. ` +
-              'An office with an account administers itself: whoever holds `user.manage` there adds accounts through POST /admin/users. ' +
-              'This route bootstraps an empty office once and deliberately does not become a standing provider capability to add accounts to a live one.',
-          );
-        }
+        /*
+         * ------------------------------------------------------------ REFUSAL 3, AND ITS ONE OPENING
+         *
+         * Decision 26 — an organization NO HUMAN HAS EVER ENTERED may be invited again, to the same
+         * address or a corrected one, because that is a registration that did not complete rather
+         * than a live organization. Everything else refuses exactly as before, with this sentence.
+         *
+         * The condition, the two stored facts it reads, and why it is not `mustChangePassword`, are
+         * all in `invitation-target.ts` — ONE home for both routes, because a second copy of
+         * "is this organization live" is a second answer to the question the whole refusal is about.
+         */
+        const target = await resolveInvitationTarget(
+          tx,
+          `Office ${officeId}`,
+          'An office with an account administers itself: whoever holds `user.manage` there adds accounts through POST /admin/users.',
+        );
 
         const role = await tx.role.findFirst({
           where: { name: OFFICE_ADMINISTRATOR_ROLE_NAME, status: 'ACTIVE' },
@@ -221,6 +229,30 @@ export class OfficeAdministratorInvitationService {
         const passwordHash = await this.passwords.hash(
           randomBytes(32).toString('hex'),
         );
+
+        /*
+         * RE-INVITING UPDATES THE ACCOUNT THAT IS ALREADY THERE — it does not create a second one,
+         * and it does not touch the role assignment, which is why the counts afterwards are exactly
+         * one and one. The address may be CORRECTED here: a mistyped one is the likeliest cause of
+         * the lockout this opening cures.
+         *
+         * `mustChangePassword` is re-asserted rather than assumed: if a previous attempt reached
+         * the account at all, the first screen must still be the change-password step.
+         */
+        if (target.mode === 'REINVITE') {
+          const reinvited = await tx.user.update({
+            where: { id: target.userId },
+            data: {
+              fullName: dto.fullName,
+              email: dto.email,
+              passwordHash,
+              mustChangePassword: true,
+              isActive: true,
+            },
+            select: { id: true, email: true },
+          });
+          return { userId: reinvited.id, email: reinvited.email };
+        }
 
         const user = await tx.user.create({
           data: {

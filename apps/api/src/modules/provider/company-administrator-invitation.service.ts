@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrgContextService } from '../../common/org-context/org-context.service';
 import { InvitationChannelService } from './invitation-channel.service';
+import { resolveInvitationTarget } from './invitation-target';
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/services/password.service';
 import { INSURANCE_COMPANY_ADMINISTRATOR_ROLE_NAME } from './insurance-company-administrator-grants';
@@ -88,15 +89,19 @@ export class CompanyAdministratorInvitationService {
 
     const invited = await this.orgContext.runAs(companyId, async () => {
       const created = await this.prisma.client.$transaction(async (tx) => {
-        // ------------------------------------------------------------ REFUSAL 3
-        const existing = await tx.user.count({});
-        if (existing > 0) {
-          throw new ConflictException(
-            `Insurance company ${companyId} already has ${existing} account(s), so it is not waiting for its FIRST administrator. ` +
-              'A company with an account administers itself: whoever holds `user.manage` there adds accounts through POST /admin/users. ' +
-              'This route bootstraps an empty company once and is deliberately not a standing provider capability to add accounts to a live one.',
-          );
-        }
+        /*
+         * ------------------------------------------------------------ REFUSAL 3, AND ITS ONE OPENING
+         *
+         * Decision 26, same as the office half and through the SAME function — see
+         * `invitation-target.ts` for the condition, the two stored facts, and why
+         * `mustChangePassword` is the wrong one. Two copies of "is this organization live" would be
+         * two answers to the question this refusal is about.
+         */
+        const target = await resolveInvitationTarget(
+          tx,
+          `Insurance company ${companyId}`,
+          'A company with an account administers itself: whoever holds `user.manage` there adds accounts through POST /admin/users.',
+        );
 
         const role = await tx.role.findFirst({
           where: {
@@ -117,6 +122,26 @@ export class CompanyAdministratorInvitationService {
         const passwordHash = await this.passwords.hash(
           randomBytes(32).toString('hex'),
         );
+
+        /*
+         * RE-INVITING UPDATES THE ACCOUNT THAT IS ALREADY THERE — no second account, no second role
+         * assignment, which is why the counts afterwards are exactly one and one. The address may be
+         * CORRECTED here: a mistyped one is the likeliest cause of the lockout this opening cures.
+         */
+        if (target.mode === 'REINVITE') {
+          const reinvited = await tx.user.update({
+            where: { id: target.userId },
+            data: {
+              fullName: dto.fullName,
+              email: dto.email,
+              passwordHash,
+              mustChangePassword: true,
+              isActive: true,
+            },
+            select: { id: true, email: true },
+          });
+          return { userId: reinvited.id, email: reinvited.email };
+        }
 
         const user = await tx.user.create({
           data: {

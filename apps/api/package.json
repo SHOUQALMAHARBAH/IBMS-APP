@@ -23,7 +23,8 @@
     "test:smoke": "dotenv -e ../../.env.test -- bash scripts/smoke.sh",
     "seed:demo": "dotenv -e ../../.env -- vitest run --config ./scripts/seed-demo.vitest.config.ts",
     "demo:release": "dotenv -e ../../.env -- vitest run --config ./scripts/release-demo-logins.vitest.config.ts",
-    "sample:release": "dotenv -e ../../.env -- vitest run --config ./scripts/release-sample-logins.vitest.config.ts"
+    "sample:release": "dotenv -e ../../.env -- vitest run --config ./scripts/release-sample-logins.vitest.config.ts",
+    "provider:remove-custom-role": "dotenv -e ../../.env -- vitest run --config ./scripts/remove-custom-provider-role.vitest.config.ts"
   },
   "dependencies": {
     "@ibms/db": "0.0.0",

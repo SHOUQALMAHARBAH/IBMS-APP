@@ -1093,7 +1093,27 @@ const complianceRisk: PermissionSeed[] = [
   {
     code: "aml.monitor",
     module: "compliance-risk",
-    description: "Monitor AML/CFT transaction-monitoring alerts",
+    /*
+     * THE NAME STAYS, THE DESCRIPTION IS CORRECTED — 2026-10-20.
+     *
+     * It said "Monitor AML/CFT transaction-monitoring alerts". MEASURED: it
+     * gates FIVE routes on `transaction-monitoring.controller.ts` — log an
+     * alert, run the detection sweep, list alerts, read one, AND CLOSE ONE.
+     * Escalation and reporting to the authority are a different code
+     * (`aml.escalate`).
+     *
+     * "Monitor" understates it: closing an alert is a DISPOSAL DECISION about a
+     * suspicious-activity finding, and an administrator ticking this box is
+     * granting that.
+     *
+     * THE CODE STRING IS NOT CHANGED, deliberately twice over: the owner's walk
+     * settles the Arabic naming of permissions (decision 94) and that governs
+     * this one, so renaming now is work done twice in the wrong order; and this
+     * file's own note already records that a rename is the LAST option here,
+     * with a second code preferred.
+     */
+    description:
+      "Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code",
     roles: [COMPLIANCE],
   },
   {
@@ -1106,7 +1126,34 @@ const complianceRisk: PermissionSeed[] = [
   {
     code: "sanctions-pep.screen",
     module: "compliance-risk",
-    description: "Run recurring sanctions screening batches",
+    /*
+     * THE NAME STAYS, THE DESCRIPTION IS CORRECTED — 2026-10-20, and the
+     * measurement corrected the brief as well as the description.
+     *
+     * It said "Run recurring sanctions screening batches", which names ONE of
+     * SEVENTEEN routes. MEASURED across three controllers:
+     *
+     *   screening.controller.ts        11 — overview, the recurring batch, the
+     *                                      match queue, pending count, REVIEW a
+     *                                      match, reviewers, a case, assign,
+     *                                      start review, escalate, notes
+     *   watchlist-sync.controller.ts    4 — run a sync, status, the dataset
+     *                                      generations, and ROLL A GENERATION
+     *                                      BACK, which decides that screening
+     *                                      runs against an older list
+     *   screening-config.controller.ts  2 — the configuration and its health
+     *
+     * The brief for this correction said the code gates four routes on
+     * `watchlist-sync` and that a holder "refreshes the list from its sources;
+     * they do not screen a customer". That is NOT what it does: eleven of the
+     * seventeen are the screening surface itself, including deciding a potential
+     * match. Both halves — screening people, and maintaining the lists people
+     * are screened against — are one code.
+     *
+     * THE CODE STRING IS NOT CHANGED: same two reasons as `aml.monitor` above.
+     */
+    description:
+      "The whole sanctions/PEP screening surface: run screening and the recurring batch, work the match queue (assign, review, escalate, annotate), AND maintain the watchlists themselves — including rolling a dataset generation back, which decides that screening runs against an older list. 17 routes across three controllers",
     roles: [COMPLIANCE],
   },
   {

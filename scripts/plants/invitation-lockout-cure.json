@@ -1,0 +1,17 @@
+{
+  "the-opening-ignores-whether-anybody-entered": {
+    "file": "apps/api/src/modules/provider/invitation-target.ts",
+    "from": "  if (entered > 0) {",
+    "to": "  if (false) {"
+  },
+  "passwordUpdatedAt-dropped-from-the-condition": {
+    "file": "apps/api/src/modules/provider/invitation-target.ts",
+    "from": "      OR: [\n        { lastLoginAt: { not: null } },\n        { passwordUpdatedAt: { not: null } },\n      ],",
+    "to": "      OR: [{ lastLoginAt: { not: null } }],"
+  },
+  "reinviting-creates-a-second-account": {
+    "file": "apps/api/src/modules/provider/company-administrator-invitation.service.ts",
+    "from": "        if (target.mode === 'REINVITE') {",
+    "to": "        if (false) {"
+  }
+}

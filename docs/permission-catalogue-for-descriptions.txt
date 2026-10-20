@@ -323,7 +323,7 @@ MODULE: compliance-risk   —   الالتزام والمخاطر   (20 codes)
           ar: يرفع تنبيه نشاط مشتبه به إلى الجهة المختصة. فعل تُترتّب عليه مسؤولية قانونية — لأضيق عدد
   [toggle]  aml.monitor
       aml.monitor
-          en: Monitor AML/CFT transaction-monitoring alerts
+          en: Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code
           ar: يتابع تنبيهات مراقبة الحركات المالية المشتبه بها داخل النظام
   [toggle]  audit-log.read
       audit-log.read
@@ -391,7 +391,7 @@ MODULE: compliance-risk   —   الالتزام والمخاطر   (20 codes)
           ar: يدير سجل مخاطر المكتب: التشغيلية والسيبرانية والمالية والتنظيمية والسُّمعية
   [toggle]  sanctions-pep.screen
       sanctions-pep.screen
-          en: Run recurring sanctions screening batches
+          en: The whole sanctions/PEP screening surface: run screening and the recurring batch, work the match queue (assign, review, escalate, annotate), AND maintain the watchlists themselves — including rolling a dataset generation back, which decides that screening runs against an older list. 17 routes across three controllers
           ar: يشغّل دفعات فحص العقوبات المتكرّرة على قاعدة العملاء، لا فحص عميل واحد
   [toggle]  workflow-history.read
       workflow-history.read

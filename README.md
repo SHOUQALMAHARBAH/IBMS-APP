@@ -1643,10 +1643,26 @@ unreachable until the provider mailbox is connected, naming the screen that does
 console line standing in for a delivery and **no fallback to a shared or platform sender**. When the
 hosting decision lands this is configuration, not a rebuild.
 
-**Two live gaps, both in `docs/deferred-register.md` § DECISION 25:** an invitation that expires
-unopened is a **production lockout** (refusal 3 blocks a re-invite, and the invited account cannot
-reset its own password because its organization has no mailbox — the dev gate covers the local walk
-only); and `/settings/email` renders correctly for the provider but says "office" in six strings.
+**ONE live gap, in `docs/deferred-register.md`:** `/settings/email` renders correctly for the
+provider but says "office" in six strings — a wording item for the Arabic pass.
+
+> **THE LOCKOUT IS CURED — decision 26, 2026-10-20.** An invitation that expired unopened used to
+> leave an organization **permanently unreachable**: the token lives 120 minutes, refusal 3 blocked a
+> re-invite, and the invited account could not request its own reset because its organization has no
+> mailbox. A MISTYPED ADDRESS made it dead on arrival.
+>
+> An organization **nobody has ever entered** may now be invited again, to the same address or a
+> corrected one — that is a registration that did not complete, not a live organization. Everything
+> else refuses exactly as before: the provider does not become a standing capability to add accounts
+> to a live organization.
+>
+> "Never entered" is two STORED facts, in one home (`invitation-target.ts`): `lastLoginAt`, written
+> on session creation rather than password proof, and `passwordUpdatedAt`, written the instant the
+> link is used. **Never `mustChangePassword`** — `markOnboardingRequired` sets it on any account by
+> id, so a condition on that flag would open the route into a live organization whose administrator
+> is re-enrolling a second factor. The count is over the ORGANIZATION, never the invited row,
+> because an organization where a second person signed in is live even if the first administrator
+> never did.
 
 > **UPDATED 2026-10-19 (batch 5, item (و)).** That view now carries **registered insurance
 > companies as well as brokerage offices** — one line changed, the `WHERE`, in migration

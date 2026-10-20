@@ -17,27 +17,27 @@
 | `access-recertification.review.routine` | Be assigned access-recertification items routinely, ahead of fallback reviewers — the assignment preference, not the right to decide (that is access-recertification.review) | BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER |
 | `branch.create` | Create a branch in this office | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `branch.deactivate` | Retire a branch so it is no longer offered for new people (existing records keep it) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `branch.read` | View the office's branches | BRANCH_DEPARTMENT_MANAGER, INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `branch.read` | View the office's branches | BRANCH_DEPARTMENT_MANAGER, OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `branch.update` | Rename a branch | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `department.create` | Create a department in this office | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `department.deactivate` | Retire a department so it is no longer offered for new people (existing records keep it) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `department.read` | View the office's departments | BRANCH_DEPARTMENT_MANAGER, INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `department.read` | View the office's departments | BRANCH_DEPARTMENT_MANAGER, OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `department.update` | Rename a department | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `diagnostics.view` | See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence | SYSTEM_SECURITY_ADMINISTRATOR |
 | `encryption-key.read` | View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `permission.read` | View the global permission catalogue (the codes a role can be granted) | INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `permission.read` | View the global permission catalogue (the codes a role can be granted) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `provider.insurance-company.administrator.invite` | Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset | PLATFORM_OPERATOR |
 | `provider.insurer.register` | Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
 | `provider.office-state.read` | Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
 | `provider.office.administrator.invite` | Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password | PLATFORM_OPERATOR |
 | `provider.office.register` | Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform | PLATFORM_OPERATOR |
-| `role.create` | Define a new role in this office's catalogue | INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.deactivate` | Retire a role, reactivate a retired one, and delete one that was never used | INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.read` | View the office's role catalogue | INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `role.update` | Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge) | INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.create` | Define a new role in this office's catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.deactivate` | Retire a role, reactivate a retired one, and delete one that was never used | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.read` | View the office's role catalogue | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `role.update` | Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge) | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `security-config.manage` | Update the security configuration | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `security-config.read` | Read the security configuration (idle timeout, lockout policy, ...) | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
-| `user.manage` | Provision/deprovision user accounts and role assignments | INSURANCE_COMPANY_ADMINISTRATOR, OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
+| `user.manage` | Provision/deprovision user accounts and role assignments | OFFICE_ADMINISTRATOR, PLATFORM_OPERATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 
 ## claims — المطالبات  (13)
 
@@ -101,7 +101,7 @@
 | Code | English description (stored) | Held by |
 |---|---|---|
 | `aml.escalate` | Escalate a suspicious-activity alert to the competent authority | COMPLIANCE_OFFICER |
-| `aml.monitor` | Monitor AML/CFT transaction-monitoring alerts | COMPLIANCE_OFFICER |
+| `aml.monitor` | Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code | COMPLIANCE_OFFICER |
 | `audit-log.read` | Read the immutable audit log | COMPLIANCE_OFFICER, EXTERNAL_AUDITOR, OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `compliance-calendar.manage` | Manage the regulatory compliance calendar | COMPLIANCE_OFFICER |
 | `document-history.read` | Read document version/workflow history | COMPLIANCE_OFFICER, EXTERNAL_AUDITOR |
@@ -118,7 +118,7 @@
 | `license.manage` | Manage the broker's regulatory license record | COMPLIANCE_OFFICER |
 | `pi-policy.manage` | Manage the broker's own Professional Indemnity policy record | COMPLIANCE_OFFICER |
 | `risk-register.manage` | Manage the operational/cyber/financial/compliance/reputational risk register | BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER |
-| `sanctions-pep.screen` | Run recurring sanctions screening batches | COMPLIANCE_OFFICER |
+| `sanctions-pep.screen` | The whole sanctions/PEP screening surface: run screening and the recurring batch, work the match queue (assign, review, escalate, annotate), AND maintain the watchlists themselves — including rolling a dataset generation back, which decides that screening runs against an older list. 17 routes across three controllers | COMPLIANCE_OFFICER |
 | `workflow-history.read` | Read workflow-state transition history for a record | COMPLIANCE_OFFICER, EXTERNAL_AUDITOR |
 
 ## customer — العملاء  (3)

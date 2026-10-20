@@ -8,8 +8,8 @@
   "an-office-can-be-invited-into-twice": {
     "_": "Remove the no-account-yet refusal, so the provider gains a standing ability to add accounts to a LIVE office rather than the right to bootstrap an empty one once. Must kill the second-invitation test — and only that one, because every other test invites at most once.",
     "file": "apps/api/src/modules/provider/office-administrator-invitation.service.ts",
-    "from": "        if (existing > 0) {",
-    "to": "        if (false && existing > 0) {"
+    "from": "        if (target.mode === 'REINVITE') {",
+    "to": "        if (false) {"
   },
   "any-organization-type-can-be-invited-into": {
     "_": "Drop the target-type refusal, so the provider could invite an administrator into the provider organization itself or into an insurance company — whose administrator is a different role with a different code set that does not exist yet. Must kill the not-a-brokerage-office test.",
