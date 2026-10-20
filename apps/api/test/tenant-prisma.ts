@@ -239,6 +239,81 @@ export async function deleteOrganizationCascade(
    * against whenever this helper is read.
    */
   await rawPrisma.slaHoliday.deleteMany({ where: { organizationId } });
+
+  /*
+   * SWEEP THREE: `ensureBrokerLicenseTerms` — the one the first version of this comment MISSED
+   * while claiming to list them all.
+   *
+   * It listed "branches, departments and holidays", which is TWO sweeps counted as three models.
+   * `ensureBrokerLicenseTerms` walks every BROKERAGE_OFFICE and writes a licence term plus its
+   * certificate `Document`, in one transaction, both rows or neither. Measured OFF THE DATABASE
+   * rather than the schema file: `BrokerLicense_organizationId_fkey` is RESTRICT,
+   * `BrokerLicense_certificateDocumentId_fkey` is RESTRICT, and
+   * `BrokerLicenseScopeLine_brokerLicenseId_fkey` is RESTRICT too — a chain three deep.
+   *
+   * It had not fired yet only because eleven of the twelve organizations the broken teardown leaked
+   * were `INSURANCE_COMPANY`, and this sweep filters on `BROKERAGE_OFFICE`. The TYPE spared us, not
+   * the code — the same "opposite visibility" that hid the first defect locally, one sweep along.
+   *
+   * `scripts/measurements/seed-sweeps-vs-cascade.py --check` now DERIVES this requirement from
+   * `seed.ts` and fails in CI, because the comment that was supposed to carry it is exactly what
+   * failed.
+   */
+  const licences = await rawPrisma.brokerLicense.findMany({
+    where: { organizationId },
+    select: { id: true, certificateDocumentId: true },
+  });
+  if (licences.length > 0) {
+    await rawPrisma.brokerLicenseScopeLine.deleteMany({
+      where: { brokerLicenseId: { in: licences.map((l) => l.id) } },
+    });
+    await rawPrisma.brokerLicense.deleteMany({ where: { organizationId } });
+
+    /*
+     * THE CERTIFICATE DOCUMENTS, AND A SHARED ONE IS A STOP-AND-REPORT RATHER THAN A DELETE.
+     *
+     * Only what belongs to the organization being removed may go. A `Document` has six inbound FKs
+     * (measured: `ClaimDocument`, `BrokerLicense`, `Document.previousVersionId`, `RegulatoryAction`
+     * and three pointer columns on `Organization`), so "the licence pointed at it" is not on its own
+     * a licence to delete it.
+     *
+     * Two conditions, both checked: the row's own `organizationId` is this organization, and
+     * nothing outside this organization still points at it. If either fails this THROWS with the
+     * document named — a fixture helper that deleted somebody else's evidence to tidy up would be a
+     * far worse defect than the leak it is curing.
+     */
+    const certificateIds = licences.map((l) => l.certificateDocumentId);
+    const certificates = await rawPrisma.document.findMany({
+      where: { id: { in: certificateIds } },
+      select: { id: true, organizationId: true, fileName: true },
+    });
+    for (const certificate of certificates) {
+      if (certificate.organizationId !== organizationId) {
+        throw new Error(
+          `fixture teardown refused: the licence certificate ${certificate.id} ("${certificate.fileName}") belongs to organization ${certificate.organizationId}, not to ${organizationId}, so it is not this fixture's to delete. Report this rather than widening the helper — a shared document reached from a licence is a finding about the data, not a teardown problem.`,
+        );
+      }
+      const stillReferenced =
+        (await rawPrisma.claimDocument.count({
+          where: { documentId: certificate.id },
+        })) +
+        (await rawPrisma.brokerLicense.count({
+          where: { certificateDocumentId: certificate.id },
+        })) +
+        (await rawPrisma.regulatoryAction.count({
+          where: { documentId: certificate.id },
+        }));
+      if (stillReferenced > 0) {
+        throw new Error(
+          `fixture teardown refused: the licence certificate ${certificate.id} ("${certificate.fileName}") is still referenced by ${stillReferenced} row(s) outside the licences just removed. Report this — deleting it would destroy a reference somebody else holds.`,
+        );
+      }
+    }
+    await rawPrisma.document.deleteMany({
+      where: { id: { in: certificateIds } },
+    });
+  }
+
   await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
 }
 

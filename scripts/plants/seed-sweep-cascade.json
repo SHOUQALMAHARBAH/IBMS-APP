@@ -1,0 +1,17 @@
+{
+  "the-cascade-forgets-the-licence-sweep": {
+    "file": "apps/api/test/tenant-prisma.ts",
+    "from": "    await rawPrisma.brokerLicense.deleteMany({ where: { organizationId } });",
+    "to": "    // the forgot-a-sweep shape: the model is no longer cleared here at all"
+  },
+  "the-cascade-mentions-the-model-but-clears-nothing": {
+    "file": "apps/api/test/tenant-prisma.ts",
+    "from": "  const licences = await rawPrisma.brokerLicense.findMany({",
+    "to": "  const licences: { id: string; certificateDocumentId: string }[] = [];\n  const unusedLicences = await rawPrisma.brokerLicense.findMany({"
+  },
+  "a-fourth-sweep-in-a-shape-the-parser-cannot-read": {
+    "file": "packages/db/prisma/seed.ts",
+    "from": "async function ensureJordanFixedHolidays(): Promise<void> {",
+    "to": "const ensureSomethingElseForEveryOrganization = async (): Promise<void> => {\n  const organizations = await prisma.organization.findMany({ select: { id: true } });\n  for (const org of organizations) {\n    await prisma.slaPolicy.create({ data: { organizationId: org.id } as never });\n  }\n};\n\nasync function ensureJordanFixedHolidays(): Promise<void> {"
+  }
+}

@@ -225,6 +225,24 @@ jobs:
           SCHEDULED_JOBS=disabled
           EOF
 
+      # EVERY PER-ORGANIZATION SEED SWEEP MUST BE CLEARED BY THE FIXTURE CASCADE HELPER.
+      #
+      # The seed has functions that walk `organization.findMany()` and write a row into every
+      # organization. A disposable e2e fixture organization is one of those rows, and every FK
+      # involved is RESTRICT — so one seed run after a leak makes that fixture PERMANENTLY
+      # undeletable and takes down every later spec at `createTestApp` with a fault that looks like
+      # its own. This job went red exactly that way on `9da34f1`, with eleven leaked organizations.
+      #
+      # It is a DERIVATION, not a list: it reads the sweeps out of `seed.ts` and the cleared models
+      # out of `tenant-prisma.ts`. A hand-kept list would have passed the very commit that motivated
+      # it — that commit's own comment listed "branches, departments and holidays", which is two
+      # sweeps counted as three models, and missed the licence sweep entirely.
+      #
+      # Placed BEFORE the migrations and the e2e run deliberately: it reads source, needs no
+      # database, and a cheap refusal belongs ahead of a twenty-minute suite.
+      - name: Every per-organization seed sweep is cleared by the fixture cascade
+        run: python scripts/measurements/seed-sweeps-vs-cascade.py --check
+
       - name: Database schema (prisma validate)
         if: ${{ !cancelled() }}
         run: npm run db:validate
