@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrgContextService } from '../../common/org-context/org-context.service';
+import { InvitationChannelService } from './invitation-channel.service';
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/services/password.service';
 import { INSURANCE_COMPANY_ADMINISTRATOR_ROLE_NAME } from './insurance-company-administrator-grants';
@@ -53,6 +54,7 @@ export class CompanyAdministratorInvitationService {
     private readonly orgContext: OrgContextService,
     private readonly audit: AuditService,
     private readonly passwords: PasswordService,
+    private readonly invitationChannel: InvitationChannelService,
   ) {}
 
   async invite(
@@ -149,6 +151,28 @@ export class CompanyAdministratorInvitationService {
     });
 
     /*
+     * DECISION 25 — THE CHANNEL, and it sits here for the SAME reason the audit row below does.
+     *
+     * `runAs` has closed, so `resolve()` reads the PROVIDER's mailbox. A company that was registered
+     * minutes ago has connected none and cannot until somebody is inside it, so a send placed inside
+     * the block above would resolve nothing and deliver nothing.
+     *
+     * The company's administrator reaches `/company-record` and nothing more until the gateway is
+     * built — receiving requests, pricing and issuance are the gateway, which is a separate module.
+     * That limit belongs in what the provider is TOLD, not in what this message carries: the message
+     * is the door, and the rooms are furnished in their own modules.
+     */
+    const invitation = await this.invitationChannel.deliver({
+      organizationId: companyId,
+      organizationName: company.legalName,
+      userId: invited.userId,
+      email: invited.email,
+      fullName: dto.fullName,
+      language: 'AR',
+      actorUserId: actor.id,
+    });
+
+    /*
      * OUTSIDE `runAs`, IN THE PROVIDER'S OWN LOG — and both halves of that placement were learned the
      * hard way on the office half, which is why this one is written correctly the first time:
      *
@@ -178,10 +202,17 @@ export class CompanyAdministratorInvitationService {
         // crosses a tenancy boundary, and "who did it" without "why" is a row nobody can review.
         reason: dto.reason,
         howTheySignIn: invited.howTheySignIn,
+        /*
+         * DECISION 25 — the template kind and the OUTCOME, and neither the token nor the link. An
+         * append-only log is the one place a link must never land: it is the credential-equivalent
+         * and nothing can withdraw it afterwards. The absence is ASSERTED, not merely unwritten.
+         */
+        invitationTemplateKind: 'organization_administrator_invitation',
+        invitationOutcome: invitation.outcome,
       },
     });
 
-    return invited;
+    return { ...invited, invitation };
   }
 
   private async assertCallerIsTheProvider(organizationId: string) {

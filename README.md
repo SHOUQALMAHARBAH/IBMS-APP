@@ -1620,6 +1620,33 @@ Module 0 item (j)'s `/provider-offices` is a CROSS-OFFICE read, gated on
 other brokerage offices' licence state, their dormant licensed branches, their user counts and when
 they were last used — all of which is commercially meaningful between competitors.
 
+
+### The invitation channel is built and its transport is NOT configured (decision 25, 2026-10-20)
+
+The invitation that gives a newly registered organization its first account **is the only door into
+that organization**, and it must leave from the PROVIDER's own connected mailbox — the invited
+organization has none and cannot connect one until somebody is inside it. Measured: a freshly
+registered office resolves `NotConfiguredEmailProvider`, so the documented way in ("sign in by
+requesting a password reset") could not reach the first administrator of any new office.
+
+Built: one template kind in both languages carrying the link and the expiry and nothing else; the
+single-use, expiring, hashed-at-rest password-reset token store **reused rather than re-invented**;
+the send placed outside `runAs` so it resolves the provider's mailbox; the real outcome returned and
+rendered. **No password is created, generated, recorded or displayed anywhere, by anyone, at any
+point.**
+
+**NOT configured, and declared rather than simulated:** no OAuth application is registered for this
+deployment and no provider mailbox has been connected, so **no invitation can leave it today**. The
+route returns `NOT_CONFIGURED`, the account still exists, and the screen says the organization is
+unreachable until the provider mailbox is connected, naming the screen that does it. There is no
+console line standing in for a delivery and **no fallback to a shared or platform sender**. When the
+hosting decision lands this is configuration, not a rebuild.
+
+**Two live gaps, both in `docs/deferred-register.md` § DECISION 25:** an invitation that expires
+unopened is a **production lockout** (refusal 3 blocks a re-invite, and the invited account cannot
+reset its own password because its organization has no mailbox — the dev gate covers the local walk
+only); and `/settings/email` renders correctly for the provider but says "office" in six strings.
+
 > **UPDATED 2026-10-19 (batch 5, item (و)).** That view now carries **registered insurance
 > companies as well as brokerage offices** — one line changed, the `WHERE`, in migration
 > `20261201100000`. It had to: the invite surface for an organization's first administrator lives on

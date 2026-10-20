@@ -47,6 +47,12 @@ export interface InviteAdministratorInput {
   reason: string;
 }
 
+export type InvitationOutcome =
+  | 'SENT'
+  | 'NOT_CONFIGURED'
+  | 'CREDENTIAL_REJECTED'
+  | 'SEND_FAILED';
+
 export interface InvitedAdministrator {
   userId: string;
   email: string;
@@ -54,6 +60,25 @@ export interface InvitedAdministrator {
   roleName: string;
   /** Always `PASSWORD_RESET`. Nothing here chooses or sends a password. */
   howTheySignIn: 'PASSWORD_RESET';
+  /**
+   * DECISION 25 — THE REAL OUTCOME, and the screen may not say "sent" unless it reads `SENT`.
+   *
+   * The account is created either way. `NOT_CONFIGURED` means the PROVIDER has connected no
+   * mailbox, so nothing reached the person and the office cannot be entered until it does — which
+   * is a state a provider has to be told plainly, because the alternative is an account that looks
+   * delivered and is unreachable.
+   *
+   * `devInvitationToken` is present ONLY when the api was started with
+   * `ENABLE_DEV_RESET_TOKEN=true` and `NODE_ENV !== 'production'` — the same double gate
+   * `forgotPassword`'s `devResetToken` uses, with the production check as a hard override rather
+   * than the primary gate. It is a TOKEN, never a password: the invited person still chooses their
+   * own, and nobody ever holds one.
+   */
+  invitation: {
+    outcome: InvitationOutcome;
+    fromAddress: string | null;
+    devInvitationToken?: string;
+  };
 }
 
 /**

@@ -113,6 +113,15 @@ export default function ProviderOfficesPage() {
   const [sending, setSending] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteDone, setInviteDone] = useState<string | null>(null);
+  /*
+   * DECISION 25 (d) — AN UNSENT INVITATION IS NEVER REPORTED AS SENT. Kept in a SEPARATE state from
+   * `inviteDone` rather than as one string with a flag, so that the success wording is not reachable
+   * at all on a non-SENT outcome: the two render in different elements with different roles, and the
+   * `role="alert"` one is the honest-failure half.
+   */
+  const [inviteNotSent, setInviteNotSent] = useState<string | null>(null);
+  /* (i) — present only when the api was started under the dev gate. A TOKEN, never a password. */
+  const [devLink, setDevLink] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -158,17 +167,45 @@ export default function ProviderOfficesPage() {
       setSending(true);
       setInviteError(null);
       setInviteDone(null);
+      setInviteNotSent(null);
+      setDevLink(null);
       try {
         const result = await inviteOrganizationAdministrator(
           organization.organizationType as InvitableOrganizationType,
           organization.organizationId,
           { email: email.trim(), fullName: fullName.trim(), reason: reason.trim() },
         );
-        setInviteDone(
-          t('providerOfficesInviteDone', {
-            email: result.email,
-            roleName: result.roleName,
-          }),
+        /*
+         * THE OUTCOME DECIDES WHICH SENTENCE EXISTS, and `SENT` is the only branch that can produce
+         * the success wording. `OutboundEmailService`'s rule — a message that was not sent is never
+         * reported as sent — reaches the screen here, where a reader acts on it.
+         */
+        const params = { email: result.email, roleName: result.roleName };
+        if (result.invitation.outcome === 'SENT') {
+          setInviteDone(t('providerOfficesInviteDone', params));
+        } else {
+          setInviteNotSent(
+            t(
+              result.invitation.outcome === 'NOT_CONFIGURED'
+                ? 'providerOfficesInviteNotSentNoMailbox'
+                : result.invitation.outcome === 'CREDENTIAL_REJECTED'
+                  ? 'providerOfficesInviteNotSentRejected'
+                  : 'providerOfficesInviteNotSentFailed',
+              params,
+            ),
+          );
+        }
+        /*
+         * The walk has to be possible with no mailbox configured at all, so the api returns the raw
+         * token under `ENABLE_DEV_RESET_TOKEN` with `NODE_ENV !== 'production'` as a hard override —
+         * the SAME double gate `forgotPassword` uses, and the same thing the forgot-password screen
+         * does with `devResetToken`. In production the field is absent, so this is null and nothing
+         * renders.
+         */
+        setDevLink(
+          result.invitation.devInvitationToken
+            ? `/reset-password?token=${encodeURIComponent(result.invitation.devInvitationToken)}`
+            : null,
         );
         setInviteFor(null);
         // The row's own account count is what the reader came to change, so the table is re-read
@@ -372,6 +409,26 @@ export default function ProviderOfficesPage() {
         </p>
       ) : null}
 
+      {/* The honest-failure half. `role="alert"` because the organization is unreachable until
+          somebody acts, which is not a status a reader may scroll past. */}
+      {inviteNotSent ? (
+        <div style={bannerStyle} data-invite-not-sent="">
+          <strong>{t('providerOfficesInviteNotSentHeading')}</strong>
+          <p role="alert" style={errorStyle}>
+            {inviteNotSent}
+          </p>
+        </div>
+      ) : null}
+
+      {devLink ? (
+        <div style={bannerStyle} data-invite-dev-link="">
+          <p role="note">{t('providerOfficesInviteDevLinkNote')}</p>
+          <p>
+            <a href={devLink}>{t('providerOfficesInviteDevLinkLabel')}</a>
+          </p>
+        </div>
+      ) : null}
+
       {inviteFor ? (
         <section data-invite-form={inviteFor.subdomain} style={bannerStyle}>
           <h2>{t('providerOfficesInviteHeading')}</h2>
@@ -396,6 +453,17 @@ export default function ProviderOfficesPage() {
               {t('providerOfficesInviteCompanyLimitNote')}
             </p>
           ) : null}
+
+          {/*
+            DECISION 25 — THE CHANNEL, DECLARED BEFORE THE ACT RATHER THAN DISCOVERED AFTER IT.
+            Unconditional on purpose: "the invitation leaves from the provider's own mailbox, and
+            if none is connected the account is created and nothing is sent" is true whether or not
+            a mailbox happens to be connected right now, and a reader who learns it only from a
+            failure has already created an account they thought was reachable.
+          */}
+          <p role="note" style={warningStyle} data-invite-channel="">
+            {t('providerOfficesInviteChannelNote')}
+          </p>
 
           {/* Two guarantees the reader is entitled to see before typing a colleague's name into a
               form that creates an account in somebody else's organization. */}

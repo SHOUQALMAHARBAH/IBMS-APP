@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrgContextService } from '../../common/org-context/org-context.service';
+import { InvitationChannelService } from './invitation-channel.service';
 import { AuditService } from '../audit/audit.service';
 import { PasswordService } from '../auth/services/password.service';
 import { OFFICE_ADMINISTRATOR_ROLE_NAME } from './office-administrator-grants';
 import type { InviteOfficeAdministratorDto } from './dto/invite-office-administrator.dto';
+import type { EmailSendOutcome } from '../email/email-provider.types';
 
 /**
  * MODULE 0-ب ITEM (f), BROKERAGE HALF — the provider gives a registered office its first account.
@@ -48,10 +50,35 @@ import type { InviteOfficeAdministratorDto } from './dto/invite-office-administr
  * account is created with `mustChangePassword: true` so even a reset lands on the change-password
  * step rather than straight into a session.
  *
- * NO EMAIL IS SENT. There is no mail sender wired to anything in this product — `email.integration.*`
- * has no screen and is a recorded gap — and decision B2 put a temporary on-demand script in its place
- * rather than a half-built sender. So this route RETURNS the address it created and says how that
- * person gets in; telling the operator is the operator's job until the sender exists.
+ * ## CORRECTED 2026-10-19 (decision 25). THIS COMMENT SAID "NO EMAIL IS SENT. There is no mail
+ * sender wired to anything in this product — `email.integration.*` has no screen and is a recorded
+ * gap". BOTH HALVES WERE FALSE, and the claim was repeated upward as an architectural statement
+ * before anybody measured it.
+ *
+ * Measured: `apps/api/src/modules/email/` is fifteen files — a Microsoft 365 provider, a Google
+ * Workspace provider, `EmailProviderRegistry`, `OutboundEmailService`, a closed template set, a
+ * NotConfigured null object and four specs. The `/settings/email` screen exists, has an e2e spec,
+ * and `destinations.ts` links it on `email.integration.read`, which four seeded roles hold. And
+ * `AuthService.forgotPassword` already sends the `password_reset` template through
+ * `OutboundEmailService` today.
+ *
+ * A false claim in a comment is the same defect family as the phantom `insurer.relationship.manage`
+ * that `CLAUDE.md` and `README.md` both asserted as shipped: nothing fails, and the next reader
+ * believes it.
+ *
+ * ## WHAT WAS ACTUALLY TRUE IS NARROWER AND WORSE, AND IS WHY DECISION 25 EXISTS
+ *
+ * `EmailProviderRegistry.resolve()` reads the integration of the organization IN TENANT CONTEXT,
+ * and `forgotPassword` adopts the user's own organization before resolving. A freshly registered
+ * office has connected no mailbox, so it resolves `NotConfiguredEmailProvider` and sends nothing —
+ * so the documented way in, "sign in by requesting a password reset", COULD NOT REACH the first
+ * administrator of any new office. The account was unreachable by every route that existed.
+ *
+ * THE INVITATION NOW SENDS, from the PROVIDER's own connected mailbox, because the office has none
+ * and cannot get one until somebody is inside it. `InvitationChannelService` holds that, including
+ * why the send sits OUTSIDE the `runAs` block below. And an unsent invitation is never reported as
+ * sent: if the provider has connected no mailbox the account still exists, the route returns
+ * `invitation.outcome !== 'SENT'`, and the screen names the fix.
  */
 @Injectable()
 /**
@@ -104,6 +131,7 @@ export class OfficeAdministratorInvitationService {
      * Which is the better answer anyway: one hashing policy, one cost factor, changed in one place.
      */
     private readonly passwords: PasswordService,
+    private readonly invitationChannel: InvitationChannelService,
   ) {}
 
   async invite(
@@ -116,6 +144,17 @@ export class OfficeAdministratorInvitationService {
     email: string;
     roleName: string;
     howTheySignIn: 'PASSWORD_RESET';
+    /*
+     * DECISION 25. The REAL outcome, never a claim: `outcome !== 'SENT'` means the account exists
+     * and nothing reached the person, which is a state the screen must be able to say out loud.
+     * `devInvitationToken` appears only under `ENABLE_DEV_RESET_TOKEN` with `NODE_ENV !==
+     * 'production'` as a hard override — the same double gate `forgotPassword` already uses.
+     */
+    invitation: {
+      outcome: EmailSendOutcome;
+      fromAddress: string | null;
+      devInvitationToken?: string;
+    };
   }> {
     await this.assertCallerIsTheProvider(actor.organizationId);
 
@@ -261,6 +300,24 @@ export class OfficeAdministratorInvitationService {
      * it" without "why" is a row nobody can review. The password hash is never recorded — there is
      * nothing to record, which is the point of generating one nobody holds.
      */
+
+    /*
+     * DECISION 25 — THE CHANNEL, and it sits HERE rather than inside the block above.
+     *
+     * `runAs` has closed, so we are back in the PROVIDER's own context and `resolve()` reads the
+     * PROVIDER's mailbox. Placed inside, it would resolve the invited organization's — which it
+     * does not have and cannot get until somebody is inside it — and send nothing.
+     */
+    const invitation = await this.invitationChannel.deliver({
+      organizationId: officeId,
+      organizationName: office.legalName,
+      userId: invited.userId,
+      email: invited.email,
+      fullName: dto.fullName,
+      language: 'AR',
+      actorUserId: actor.id,
+    });
+
     await this.audit.record({
       userId: actor.id,
       action: 'CREATE',
@@ -273,10 +330,18 @@ export class OfficeAdministratorInvitationService {
         invitedByProviderUserId: actor.id,
         reason: dto.reason,
         howTheySignIn: 'PASSWORD_RESET',
+        /*
+         * THE TEMPLATE KIND AND THE OUTCOME, AND NEITHER THE TOKEN NOR THE LINK. Same rule
+         * `OutboundEmailService`'s own audit row follows, and the absence is ASSERTED by
+         * `invitation-channel.e2e-spec.ts` rather than merely not written here: a link in an
+         * append-only log is a credential nobody can withdraw.
+         */
+        invitationTemplateKind: 'organization_administrator_invitation',
+        invitationOutcome: invitation.outcome,
       },
     });
 
-    return invited;
+    return { ...invited, invitation };
   }
 
   /**

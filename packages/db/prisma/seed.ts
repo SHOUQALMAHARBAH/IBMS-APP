@@ -270,6 +270,26 @@ async function ensureProviderOrganization(): Promise<void> {
     // rather than a reuse: a code named for an office that also reached a company would promise
     // other than it does, which is the defect class this module measured in two existing codes.
     "provider.insurance-company.administrator.invite",
+    /*
+     * DECISION 25, BATCH 5 — THE PROVIDER'S OWN MAILBOX. Eleven codes became THIRTEEN, deliberately.
+     *
+     * MEASURED, and it is why this was authorised rather than convenient: the invitation that is the
+     * ONLY door into a brand-new organization leaves from the PROVIDER's own connected mailbox,
+     * because the invited organization has none and cannot connect one until somebody is inside it.
+     * And the provider held neither email code, so it could not connect a mailbox at all — making
+     * the channel real in tests (a seeded integration row) and unreachable in life.
+     *
+     * THE SENTENCE IN THE CHECK BELOW STAYS TRUE, which is the test of whether this went too far: a
+     * mailbox the organization OWNS is self-administration, the same family as `user.manage` and the
+     * three role codes item (b) already granted. It is not a brokerage capability — it reads and
+     * connects the provider's OWN integration row, which is organization-scoped and carries an RLS
+     * policy on top, so it cannot reach another organization's.
+     *
+     * NOTHING IS MINTED: both codes already exist in the catalogue, held by office roles. The
+     * catalogue total is unchanged at 227.
+     */
+    "email.integration.read",
+    "email.integration.manage",
     // Item (b) — self-administration. Its own users, its own roles, bounded by tenancy.
     "user.manage",
     "role.read",

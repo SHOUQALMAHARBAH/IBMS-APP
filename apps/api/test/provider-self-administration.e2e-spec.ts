@@ -164,3 +164,150 @@ describe('and reaches NO office, though it holds the codes that would', () => {
     expect(rows.some((u) => u.id === operator.userId)).toBe(true);
   }, 300_000);
 });
+
+/* =============================================================================================
+ * THE AUTHORISED MAILBOX WIDENING (batch 5, decision 25).
+ *
+ * ## WHY IT WAS AUTHORISED, MEASURED
+ *
+ * The invitation that is the only door into a brand-new organization leaves from the PROVIDER's own
+ * connected mailbox, because the invited organization has none and cannot connect one until
+ * somebody is inside it. And the provider held NEITHER email code — `PROVIDER_CODES` was eleven and
+ * both email codes are office-role grants — so it could not connect a mailbox at all. The channel
+ * was real in tests, where an integration row can be seeded, and unreachable in life.
+ *
+ * ## THE ACCEPTANCE CRITERION IS THE SETS, NOT "THE PROVIDER CAN SEE THE SCREEN"
+ *
+ * Asserted BY NAME and EXACTLY, in both directions, because a widening is specified by the set it
+ * produces. Two existing codes reach one more role; the catalogue total is unchanged.
+ *
+ * ## WHY `isSystem` IS THE FILTER, AND IT IS NOT A CONVENIENCE
+ *
+ * These are the SEEDED sets. An office — or the provider — defining its own role at
+ * `/settings/roles` and granting it a code is the Role screen working as designed, and such a role
+ * is DATA on one database rather than an outcome of the seed. Measured while writing this: dev
+ * carries a hand-created `GO_GLOBAL` role in the provider organization, `isSystem = false`, ACTIVE,
+ * **0 holders and 74 codes**, which already held both email codes before this change — so an
+ * unfiltered read of dev answers 6 and 4 while db-test answers 5 and 3. Filtering on `isSystem`
+ * asks the question the decision is about. The custom role is reported, not absorbed.
+ * ============================================================================================= */
+
+const SEEDED_EMAIL_READ_ROLES = [
+  'BRANCH_DEPARTMENT_MANAGER',
+  'EXECUTIVE_MANAGEMENT',
+  'OFFICE_ADMINISTRATOR',
+  'PLATFORM_OPERATOR',
+  'SYSTEM_SECURITY_ADMINISTRATOR',
+];
+
+const SEEDED_EMAIL_MANAGE_ROLES = [
+  'OFFICE_ADMINISTRATOR',
+  'PLATFORM_OPERATOR',
+  'SYSTEM_SECURITY_ADMINISTRATOR',
+];
+
+async function seededRolesHolding(code: string): Promise<string[]> {
+  const grants = await rawPrisma.rolePermission.findMany({
+    where: { permission: { code }, role: { isSystem: true } },
+    select: { role: { select: { name: true } } },
+  });
+  return [...new Set(grants.map((g) => g.role.name))].sort();
+}
+
+describe('the authorised mailbox widening — the sets, by name', () => {
+  it('email.integration.read reaches exactly FIVE seeded roles', async () => {
+    const roles = await seededRolesHolding('email.integration.read');
+    // Printed so the evidence is the set rather than a green tick.
+    console.log(
+      `email.integration.read  -> ${roles.length} seeded role(s): ${roles.join(', ')}`,
+    );
+    expect(roles).toEqual(SEEDED_EMAIL_READ_ROLES);
+  });
+
+  it('email.integration.manage reaches exactly THREE seeded roles', async () => {
+    const roles = await seededRolesHolding('email.integration.manage');
+    console.log(
+      `email.integration.manage -> ${roles.length} seeded role(s): ${roles.join(', ')}`,
+    );
+    expect(roles).toEqual(SEEDED_EMAIL_MANAGE_ROLES);
+  });
+
+  it('mints nothing — the catalogue total is unchanged at 227', async () => {
+    /*
+     * The widening grants two EXISTING codes to one more role. A total that moved would mean a code
+     * was added, which is the thing the brief said to stop on.
+     */
+    const total = await rawPrisma.permission.count();
+    console.log(`permission catalogue total: ${total}`);
+    expect(total).toBe(227);
+  });
+
+  it("adds no role — PLATFORM_OPERATOR is still the provider organization's only seeded role", async () => {
+    const provider = await rawPrisma.organization.findFirstOrThrow({
+      where: { type: 'PROVIDER' },
+      select: { id: true },
+    });
+    const roles = await rawPrisma.role.findMany({
+      where: { organizationId: provider.id, isSystem: true },
+      select: { name: true },
+    });
+    expect(roles.map((r) => r.name).sort()).toEqual(['PLATFORM_OPERATOR']);
+  });
+
+  it("(iv) the provider still cannot read or write ANY other organization's mailbox row", async () => {
+    /*
+     * BOTH DIRECTIONS, and the office's row has to EXIST or the "cannot read it" half passes
+     * because there was nothing there. `OrganizationEmailIntegration` is organization-scoped and
+     * carries an RLS policy on top of the tenancy extension; holding the two codes changes who may
+     * ASK, never whose row the answer comes from.
+     */
+    const office = await rawPrisma.organization.findFirstOrThrow({
+      where: { type: 'BROKERAGE_OFFICE' },
+      select: { id: true },
+    });
+    const planted = await rawPrisma.organizationEmailIntegration.create({
+      data: {
+        organizationId: office.id,
+        provider: 'GOOGLE_WORKSPACE',
+        connectedEmail: `office-mailbox-${Date.now()}@example.test`,
+        oauthRefreshTokenEnc: 'v1:not-a-real-credential',
+        status: 'ACTIVE',
+      },
+      select: { id: true, connectedEmail: true },
+    });
+    try {
+      // THE PROVIDER ASKS, holding both codes. It must be told it has no mailbox — not told about
+      // the office's.
+      const status = await request(app.getHttpServer())
+        .get('/admin/email-integration')
+        .set(...bearerHeader(operator.accessToken))
+        .expect(200);
+      const body = JSON.stringify(status.body);
+      expect(body).not.toContain(planted.connectedEmail);
+      expect(body).not.toContain(planted.id);
+
+      // And the WRITE direction: `POST revoke` is the only mutation reachable without an OAuth
+      // round trip, and it must not reach the office's row. The refusal is the route's own — from
+      // the provider's tenancy that row does not exist — and what matters is the row afterwards.
+      const revoked = await request(app.getHttpServer())
+        .post('/admin/email-integration/revoke')
+        .set(...bearerHeader(operator.accessToken));
+      expect([404, 409, 422]).toContain(revoked.status);
+      expect(JSON.stringify(revoked.body)).not.toContain(
+        planted.connectedEmail,
+      );
+
+      // The office's row is untouched: still there, still ACTIVE.
+      const after =
+        await rawPrisma.organizationEmailIntegration.findUniqueOrThrow({
+          where: { id: planted.id },
+          select: { status: true },
+        });
+      expect(after.status).toBe('ACTIVE');
+    } finally {
+      await rawPrisma.organizationEmailIntegration.deleteMany({
+        where: { id: planted.id },
+      });
+    }
+  });
+});

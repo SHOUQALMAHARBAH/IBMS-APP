@@ -3071,6 +3071,21 @@ capabilities the product gives them no way to exercise.** A granted permission w
 not harmless: it reads as "this is supported" to whoever audits the grid, and the access
 recertification reviewer confirming it is confirming access to nothing.
 
+> **CORRECTED 2026-10-20 (batch 5, decision 25).** The email half of that sentence is no longer
+> true and had become the load-bearing false claim in a comment: **`/settings/email` exists**, with
+> its own Playwright spec, linked from `destinations.ts` on `email.integration.read`. Both email
+> codes have a surface. Only `customer.bulk-import` remains of the three.
+>
+> The claim survived because it was repeated forward rather than re-measured —
+> `office-administrator-invitation.service.ts` asserted *"there is no mail sender wired to anything
+> in this product"* while `AuthService.forgotPassword` was already sending through
+> `OutboundEmailService`. Both are corrected in place.
+>
+> What IS still true is narrower: **no mailbox is connected and no OAuth application is registered
+> on this deployment**, so nothing can actually leave it. That is configuration, it is declared in
+> `docs/deferred-register.md` § DECISION 25, and the system reports `NOT_CONFIGURED` rather than
+> claiming a delivery.
+
 **Correctly absent, and not defects:**
 
 - `auth/sso` — `@Public() POST :provider/callback`. A callback is invoked by the identity PROVIDER,

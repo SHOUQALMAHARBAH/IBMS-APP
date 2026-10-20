@@ -68,6 +68,14 @@ interface Invited {
   email: string;
   roleName: string;
   howTheySignIn: string;
+  /* DECISION 25. Hand-copied over HTTP like every interface in these specs, which is why the
+   * decision-25 tests below assert the EXACT KEY SET on the response body rather than trusting
+   * this shape: a field this declaration lacks is not a type error, it is a silent drop. */
+  invitation: {
+    outcome: string;
+    fromAddress: string | null;
+    devInvitationToken?: string;
+  };
 }
 
 async function deleteCompany(organizationId: string) {
@@ -465,5 +473,337 @@ describe('item (f) company half — the company reads its own record', () => {
       .expect(403);
 
     expect(JSON.stringify(refusal.body)).toContain('PROVIDER');
+  });
+});
+
+/* =============================================================================================
+ * DECISION 25 — THE INVITATION CHANNEL.
+ *
+ * ## WHAT `SENT` COSTS, AND WHY IT IS NOT ASSERTED HERE
+ *
+ * The brief asked for a test in which the provider has an ACTIVE integration, the invited
+ * organization has none, and the invitation comes back SENT with the provider's address.
+ * MEASURED: `SENT` is not reachable in this suite, and the reason is structural rather than
+ * laziness. `EmailProviderRegistry.resolve()` returns `NotConfiguredEmailProvider` for an ACTIVE
+ * integration whenever the deployment has no OAuth application registered for that provider — and
+ * this deployment has none, which is why `email-integration.e2e-spec.ts` covers only the
+ * not-configured and no-OAuth-app paths and why no successful send has ever been e2e'd here.
+ * Setting `EMAIL_GOOGLE_*` would construct a real provider whose `send` makes a real HTTP call to
+ * Google, which would answer `SEND_FAILED`, not `SENT`.
+ *
+ * So the property is asserted in the form that IS reachable, and it is the property that matters:
+ * THE RESOLUTION CROSSED TO THE PROVIDER'S OWN INTEGRATION ROW. `OutboundEmailService` calls
+ * `recordOutcome(integration.id, …)` against whichever integration `resolve()` returned. If the
+ * send sat inside `runAs(companyId)` — the mistake this design exists to avoid — the company has no
+ * integration, `integration` would be `null`, and NO row would be touched at all.
+ *
+ * The row is identified BY ITS CONNECTED ADDRESS, which is what the brief asked for: assert the
+ * address, not the call site.
+ * ============================================================================================= */
+
+/** The provider's own mailbox row, created and removed by these tests alone. */
+async function connectProviderMailbox(connectedEmail: string): Promise<string> {
+  const row = await rawPrisma.organizationEmailIntegration.create({
+    data: {
+      organizationId: operator.organizationId,
+      provider: 'GOOGLE_WORKSPACE',
+      connectedEmail,
+      // Deliberately not a real credential. `resolve()` never reaches the decrypt for this
+      // deployment — it returns NotConfigured at the missing-OAuth-app branch first — and a test
+      // that needed a real refresh token would be a test that cannot run on a laptop.
+      oauthRefreshTokenEnc: 'v1:not-a-real-credential',
+      status: 'ACTIVE',
+      connectedByUserId: operator.userId,
+    },
+    select: { id: true },
+  });
+  return row.id;
+}
+
+async function removeProviderMailbox(id: string) {
+  await rawPrisma.organizationEmailIntegration.deleteMany({ where: { id } });
+}
+
+describe('decision 25 — the invitation channel', () => {
+  it("(c) resolves the PROVIDER's mailbox, identified by its connected address, not the invited company's", async () => {
+    const connectedEmail = `${unique('provider-mailbox')}@example.test`;
+    const integrationId = await connectProviderMailbox(connectedEmail);
+    try {
+      const company = await registerCompany();
+      const before =
+        await rawPrisma.organizationEmailIntegration.findUniqueOrThrow({
+          where: { id: integrationId },
+          select: {
+            lastSucceededAt: true,
+            lastFailedAt: true,
+            lastError: true,
+          },
+        });
+
+      // The company has none — the whole point. Asserted, or the test below proves nothing about
+      // WHICH mailbox resolved.
+      const companyIntegrations =
+        await rawPrisma.organizationEmailIntegration.count({
+          where: { organizationId: company.id },
+        });
+      expect(companyIntegrations).toBe(0);
+
+      const response = await request(app.getHttpServer())
+        .post(`/provider/insurance-companies/${company.id}/administrator`)
+        .set(...bearerHeader(operator.accessToken))
+        .send({
+          email: `${unique('admin')}@example.test`,
+          fullName: 'Company Administrator',
+          reason:
+            'Decision 25 — the send must leave from the provider mailbox.',
+        })
+        .expect(201);
+
+      // THE ADDRESS. The outcome was recorded against the row whose connectedEmail is the
+      // provider's, which is only reachable if `resolve()` ran in the PROVIDER's context.
+      const after =
+        await rawPrisma.organizationEmailIntegration.findUniqueOrThrow({
+          where: { id: integrationId },
+          select: {
+            connectedEmail: true,
+            lastSucceededAt: true,
+            lastFailedAt: true,
+            lastError: true,
+          },
+        });
+      expect(after.connectedEmail).toBe(connectedEmail);
+      expect(
+        after.lastSucceededAt?.getTime() !==
+          before.lastSucceededAt?.getTime() ||
+          after.lastFailedAt?.getTime() !== before.lastFailedAt?.getTime() ||
+          after.lastError !== before.lastError,
+        'the provider mailbox row recorded no send outcome, so the send resolved some other ' +
+          'integration — or none, which is what happens when it runs inside runAs(companyId)',
+      ).toBe(true);
+
+      // And the company still has no integration: nothing was created on its behalf.
+      expect(
+        await rawPrisma.organizationEmailIntegration.count({
+          where: { organizationId: company.id },
+        }),
+      ).toBe(0);
+
+      const invited = response.body as Invited;
+      expect(invited.invitation.outcome).not.toBe('SENT');
+    } finally {
+      await removeProviderMailbox(integrationId);
+    }
+  });
+
+  it('(d) with NO provider mailbox the account is created and the invitation is NOT reported as sent', async () => {
+    /*
+     * `OutboundEmailService`'s own rule with teeth. The account exists, the link was issued, and
+     * nothing reached the person — and the route says so rather than returning a bare 201 the
+     * screen would render as success.
+     */
+    const anyProviderMailbox =
+      await rawPrisma.organizationEmailIntegration.count({
+        where: { organizationId: operator.organizationId },
+      });
+    expect(
+      anyProviderMailbox,
+      'the provider has a mailbox row, so NOT_CONFIGURED would be proven for the wrong reason',
+    ).toBe(0);
+
+    const company = await registerCompany();
+    const response = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('admin')}@example.test`,
+        fullName: 'Company Administrator',
+        reason: 'Decision 25 — an unsent invitation must say so.',
+      })
+      .expect(201);
+
+    const invited = response.body as Invited;
+    expect(invited.invitation.outcome).toBe('NOT_CONFIGURED');
+    expect(invited.invitation.fromAddress).toBeNull();
+
+    // THE ACCOUNT EXISTS ANYWAY. Reporting a failure by not creating it would be worse: the
+    // provider would retry and the second attempt would collide.
+    const user = await rawPrisma.user.findUniqueOrThrow({
+      where: { id: invited.userId },
+      select: { organizationId: true, isActive: true },
+    });
+    expect(user.organizationId).toBe(company.id);
+    expect(user.isActive).toBe(true);
+
+    // The link WAS issued, so the dev gate can still open it and a later re-send has something to
+    // replace. One token, for this user, unused.
+    const tokens = await rawPrisma.passwordResetToken.findMany({
+      where: { userId: invited.userId },
+      select: { usedAt: true, expiresAt: true },
+    });
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0].usedAt).toBeNull();
+    expect(tokens[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('(f) no password value is returned by the route, in any spelling, and the account must change it', async () => {
+    const company = await registerCompany();
+    const response = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('admin')}@example.test`,
+        fullName: 'Company Administrator',
+        reason: 'Decision 25 — nobody handles a credential, including us.',
+      })
+      .expect(201);
+
+    const invited = response.body as Invited;
+    const body = JSON.stringify(response.body);
+
+    /*
+     * AN EXACT KEY SET at the top level, because a leak arrives as an ADDITION and every
+     * `not.toHaveProperty` keeps passing while one appears.
+     */
+    expect(Object.keys(response.body as object).sort()).toEqual(
+      [
+        'companyId',
+        'email',
+        'howTheySignIn',
+        'invitation',
+        'roleName',
+        'userId',
+      ].sort(),
+    );
+    expect(Object.keys(invited.invitation).sort()).toEqual(
+      ['devInvitationToken', 'fromAddress', 'outcome'].sort(),
+    );
+    for (const spelling of [
+      'password',
+      'Password',
+      'temporaryPassword',
+      'initialPassword',
+      'passwordHash',
+      'credential',
+      'secret',
+    ]) {
+      expect(body).not.toContain(spelling);
+    }
+
+    // The stored hash is unreachable AND unusable: the account must change it before any screen.
+    const user = await rawPrisma.user.findUniqueOrThrow({
+      where: { id: invited.userId },
+      select: { mustChangePassword: true },
+    });
+    expect(user.mustChangePassword).toBe(true);
+  });
+
+  it('(h) the invitation audit row carries the template kind and the outcome, and NEITHER the token nor the link', async () => {
+    const company = await registerCompany();
+    const response = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email: `${unique('admin')}@example.test`,
+        fullName: 'Company Administrator',
+        reason: 'Decision 25 — the log records the act, never the credential.',
+      })
+      .expect(201);
+
+    const invited = response.body as Invited;
+    const rows = await rawPrisma.auditLogEntry.findMany({
+      where: { entityType: 'User', entityId: invited.userId },
+      select: { afterValue: true, action: true },
+    });
+    expect(rows).toHaveLength(1);
+    const after = rows[0].afterValue as Record<string, unknown>;
+    expect(after.invitationTemplateKind).toBe(
+      'organization_administrator_invitation',
+    );
+    expect(after.invitationOutcome).toBe(invited.invitation.outcome);
+
+    /*
+     * THE ABSENCE IS ASSERTED, not merely unwritten. `AuditLogEntry` is append-only by trigger, so
+     * a link that lands there is a credential-equivalent nothing can withdraw — and the token is
+     * the whole of what the link is for.
+     */
+    const serialised = JSON.stringify(after);
+    expect(serialised).not.toContain('token');
+    expect(serialised).not.toContain('reset-password');
+    expect(serialised).not.toContain('setPasswordUrl');
+    expect(serialised).not.toContain('http');
+
+    // And the outbound-email row beside it follows the same rule it always did.
+    const emailRows = await rawPrisma.auditLogEntry.findMany({
+      where: { entityType: 'OutboundEmail' },
+      orderBy: { occurredAt: 'desc' },
+      take: 1,
+      select: { afterValue: true },
+    });
+    const emailAfter = JSON.stringify(emailRows[0].afterValue);
+    expect(emailAfter).toContain('organization_administrator_invitation');
+    expect(emailAfter).not.toContain('subject');
+    expect(emailAfter).not.toContain('reset-password');
+  });
+
+  it('(e) RE-INVITING IS NOT REACHABLE, and that is a recorded refusal rather than a gap in this test', async () => {
+    /*
+     * MEASURED BEFORE BUILDING, and it is the one item of decision 25 that cannot be delivered as
+     * specified.
+     *
+     * Refusal 3 on BOTH invite routes rejects a second invitation with a 409 the moment the
+     * organization has any account, and its own comment says why: "This route bootstraps an empty
+     * company once and is deliberately not a standing provider capability to add accounts to a live
+     * one." Making re-invitation work would mean relaxing that refusal — overturning a recorded
+     * decision — or adding a separate re-send act, which would need a gate, and no new permission
+     * code is in scope.
+     *
+     * THE CONSEQUENCE IS A REAL LOCKOUT AND IS RECORDED RATHER THAN SOFTENED: if an invitation
+     * expires unopened, the organization HAS an account (so this 409 fires) and that account cannot
+     * request its own reset either, because `forgotPassword` resolves the mailbox of the
+     * organization in context and a new organization has none. In production there is no route out.
+     * The dev gate returns the token locally, which is why the owner's walk is unaffected.
+     *
+     * This test pins the refusal so that whoever lifts it does so deliberately, and so that the
+     * lockout cannot be rediscovered as a surprise.
+     */
+    const company = await registerCompany();
+    const email = `${unique('admin')}@example.test`;
+    const first = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email,
+        fullName: 'Company Administrator',
+        reason: 'The first invitation.',
+      })
+      .expect(201);
+
+    const again = await request(app.getHttpServer())
+      .post(`/provider/insurance-companies/${company.id}/administrator`)
+      .set(...bearerHeader(operator.accessToken))
+      .send({
+        email,
+        fullName: 'Company Administrator',
+        reason: 'A second invitation, same person.',
+      })
+      .expect(409);
+    expect(JSON.stringify(again.body)).toContain('FIRST administrator');
+
+    // No duplicate account and no second role assignment — the counts the brief asked for, proven
+    // by the refusal rather than by a re-send path.
+    const invited = first.body as Invited;
+    expect(
+      await rawPrisma.user.count({ where: { organizationId: company.id } }),
+    ).toBe(1);
+    expect(
+      await rawPrisma.userRoleAssignment.count({
+        where: { userId: invited.userId },
+      }),
+    ).toBe(1);
+    expect(
+      await rawPrisma.passwordResetToken.count({
+        where: { userId: invited.userId },
+      }),
+    ).toBe(1);
   });
 });

@@ -9,9 +9,11 @@ import { CompanyAdministratorInvitationService } from './company-administrator-i
 import { InsuranceCompanyRegistrationService } from './insurance-company-registration.service';
 import { ReferenceDataController } from './reference-data.controller';
 import { ReferenceDataService } from './reference-data.service';
+import { InvitationChannelService } from './invitation-channel.service';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { SecurityModule } from '../security/security.module';
+import { EmailModule } from '../email/email.module';
 
 /**
  * MODULE 0-ب — the platform operator's own surface.
@@ -34,7 +36,13 @@ import { SecurityModule } from '../security/security.module';
    * The e2e that BOOTS THE APP is what proves this line, not the typecheck — the lesson item (e)
    * paid for when a missing `OrganizationRepository` provider compiled and 500'd.
    */
-  imports: [AuditModule, SecurityModule, AuthModule],
+  /*
+   * `EmailModule` for `OutboundEmailService` (decision 25). The same runtime-failure argument as
+   * `AuthModule` above: a missing module provider compiles cleanly and 500s on the first request,
+   * and the e2e that BOOTS THE APP is what proves this line. Not circular — `EmailModule` imports
+   * neither this module nor `AuthModule`.
+   */
+  imports: [AuditModule, SecurityModule, AuthModule, EmailModule],
   controllers: [
     ProviderOfficeRegistrationController,
     ProviderInsurerRegistrationController,
@@ -46,6 +54,7 @@ import { SecurityModule } from '../security/security.module';
     InsuranceCompanyRegistrationService,
     CompanyAdministratorInvitationService,
     ReferenceDataService,
+    InvitationChannelService,
   ],
 })
 export class ProviderModule {}

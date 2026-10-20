@@ -420,6 +420,24 @@ describe('every office has a route to user administration', () => {
          * does — the defect class this close measured in `aml.monitor` and `sanctions-pep.screen`.
          */
         'provider.insurance-company.administrator.invite',
+        /*
+         * DECISION 25, BATCH 5 — THE PROVIDER'S OWN MAILBOX, and this pin caught the change by name
+         * exactly as it caught item (f)'s omission.
+         *
+         * Authorised because the invitation that is the only door into a brand-new organization
+         * leaves from the PROVIDER's connected mailbox — the invited organization has none and
+         * cannot connect one until somebody is inside it — and the provider held neither code, so
+         * the channel was real in tests and unreachable in life.
+         *
+         * STILL NOT A BROKERAGE CAPABILITY, which is the sentence the whole list defends: a mailbox
+         * the organization OWNS is self-administration, the same family as `user.manage` and the
+         * three role codes below. It reads and connects the provider's OWN integration row, which is
+         * organization-scoped with an RLS policy on top — asserted in both directions by
+         * `provider-self-administration.e2e-spec.ts`. Nothing was minted: both codes already existed
+         * in the catalogue, and the total is unchanged at 227.
+         */
+        'email.integration.read',
+        'email.integration.manage',
         // Item (b) — self-administration, bounded by tenancy rather than by anything written for it.
         'role.create',
         'role.deactivate',

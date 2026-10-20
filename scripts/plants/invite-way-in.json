@@ -13,5 +13,10 @@
     "file": "apps/web/app/(app)/provider-offices/page.tsx",
     "from": "                  {!isOffice\n                    ? t('providerOfficesLicenceNotApplicable')\n                    : office.isCurrentlyLapsed === null",
     "to": "                  {false\n                    ? t('providerOfficesLicenceNotApplicable')\n                    : office.isCurrentlyLapsed === null"
+  },
+  "an-unsent-invitation-is-reported-as-sent": {
+    "file": "apps/web/app/(app)/provider-offices/page.tsx",
+    "from": "        if (result.invitation.outcome === 'SENT') {",
+    "to": "        if (true) {"
   }
 }

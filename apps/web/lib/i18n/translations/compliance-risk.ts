@@ -156,6 +156,8 @@ export const COMPLIANCE_RISK = {
       'السبب يحتاج ١٠ أحرف على الأقل — يُسجَّل في سجل التدقيق ويجعل هذا الإنشاء قابلاً للمساءلة.',
     providerOfficesInviteNoPasswordNote:
       'لا يُنشئ النظام كلمة مرور ولا يولّدها ولا يحفظها ولا يعرضها على أحد في أي مرحلة. يدخل المسؤول المدعو بطلب إعادة تعيين كلمة المرور على بريده.',
+    providerOfficesInviteChannelNote:
+      'تُرسل الدعوة من صندوق بريد المزوّد نفسه، لأن المنظمة الجديدة لا تملك صندوقاً ولا تستطيع ربطه قبل أن يدخلها أحد. وإن لم يكن بريد المزوّد مربوطاً فسيُنشأ الحساب ولن تُرسل الدعوة، وسيقول لك النظام ذلك صراحةً. ولا يُستخدم أي عنوان مشترك بديلاً.',
     providerOfficesInviteNotLicensingNote:
       'هذه دعوة أول حساب يفتح المنظمة على المنصّة، وليست استيفاءً لأي شرط ترخيص. الحد الأدنى للكوادر المعتمدة — مدير الأعمال التأمينية والقائم بأعمال الوساطة — شرطٌ من البنك المركزي يُسجَّل على الموظفين، وهو شيء آخر.',
     providerOfficesInviteCompanyLimitNote:
@@ -163,6 +165,16 @@ export const COMPLIANCE_RISK = {
     providerOfficesInviteDone:
       'أُرسلت الدعوة. أُنشئ الحساب {email} بدور {roleName}، ويدخل بطلب إعادة تعيين كلمة المرور.',
     providerOfficesInviteFailed: 'لم تُرسل الدعوة',
+    providerOfficesInviteNotSentHeading: 'أُنشئ الحساب ولم تُرسل الدعوة',
+    providerOfficesInviteNotSentNoMailbox:
+      'أُنشئ الحساب {email} بدور {roleName}، ولم تصل الدعوة إلى صاحبها: المزوّد لم يربط صندوق بريد، فلا يوجد عنوان تُرسل منه الرسالة. لا يستطيع أحد الدخول إلى هذه المنظمة حتى تُرسل الدعوة. اربط بريد المزوّد من الإعدادات ← تكامل البريد، ثم أعد الدعوة — تُصدر رابطاً جديداً ولا تُنشئ حساباً ثانياً.',
+    providerOfficesInviteNotSentRejected:
+      'أُنشئ الحساب {email} بدور {roleName}، ولم تصل الدعوة: صندوق بريد المزوّد مربوط ولكن المزوّد رفض بيانات الاعتماد. أعد الربط من الإعدادات ← تكامل البريد، ثم أعد الدعوة.',
+    providerOfficesInviteNotSentFailed:
+      'أُنشئ الحساب {email} بدور {roleName}، ولم تصل الدعوة: فشل الإرسال لدى المزوّد. أعد الدعوة — تُصدر رابطاً جديداً ولا تُنشئ حساباً ثانياً.',
+    providerOfficesInviteDevLinkNote:
+      'بريد الدعوة غير موصول على هذا الجهاز. هذا الرابط معروضٌ لأن الواجهة البرمجية مُشغَّلة بـ ENABLE_DEV_RESET_TOKEN للتطوير والاختبار فقط، ولا يظهر أبداً في بيئة الإنتاج. وهو رمزٌ لمرّة واحدة ينتهي بعد ساعتين، وليس كلمة مرور — من يفتحه يختار كلمة مروره بنفسه.',
+    providerOfficesInviteDevLinkLabel: 'افتح رابط تعيين كلمة المرور',
     providerOfficesLicenceNotApplicable: 'لا ينطبق — ليست مكتب وساطة',
     rcStaffingHeading: 'الحد الأدنى للكوادر المعتمدة',
     rcStaffingRequired: 'العدد المطلوب:',
@@ -581,6 +593,8 @@ export const COMPLIANCE_RISK = {
       'The reason needs at least 10 characters — it is recorded on the audit row and is what makes this creation answerable rather than merely recorded.',
     providerOfficesInviteNoPasswordNote:
       'No password is created, generated, recorded or displayed anywhere, by anyone, at any point. The invited administrator signs in by requesting a password reset on their own email.',
+    providerOfficesInviteChannelNote:
+      'The invitation is sent from the provider own connected mailbox, because a new organization has none and cannot connect one before somebody is inside it. If no provider mailbox is connected the account is created and the invitation is NOT sent, and the system says so plainly. No shared or platform address is ever used instead.',
     providerOfficesInviteNotLicensingNote:
       'This invites the first account that OPENS the organization on this platform. It satisfies no licensing requirement: the minimum approved staff — the insurance-business manager and the broker-in-charge — is a Central Bank requirement recorded against employees, and is a different thing.',
     providerOfficesInviteCompanyLimitNote:
@@ -588,6 +602,16 @@ export const COMPLIANCE_RISK = {
     providerOfficesInviteDone:
       'Invitation sent. The account {email} was created with the role {roleName}, and signs in by requesting a password reset.',
     providerOfficesInviteFailed: 'The invitation was not sent',
+    providerOfficesInviteNotSentHeading: 'The account was created and the invitation was NOT sent',
+    providerOfficesInviteNotSentNoMailbox:
+      'The account {email} was created with the role {roleName}, and the invitation did not reach them: the provider has connected no mailbox, so there is no address to send from. Nobody can enter this organization until an invitation arrives. Connect the provider mailbox at Settings → Email integration, then re-invite — that issues a fresh link and creates no second account.',
+    providerOfficesInviteNotSentRejected:
+      'The account {email} was created with the role {roleName}, and the invitation did not arrive: a provider mailbox is connected but the provider rejected the credential. Reconnect it at Settings → Email integration, then re-invite.',
+    providerOfficesInviteNotSentFailed:
+      'The account {email} was created with the role {roleName}, and the invitation did not arrive: the mail provider failed the send. Re-invite — that issues a fresh link and creates no second account.',
+    providerOfficesInviteDevLinkNote:
+      'Invitation mail is not wired on this machine. This link is shown only because the api was started with ENABLE_DEV_RESET_TOKEN for development and testing, and it never appears in production. It is a one-time token that expires in two hours, not a password — whoever opens it chooses their own.',
+    providerOfficesInviteDevLinkLabel: 'Open the set-password link',
     providerOfficesLicenceNotApplicable: 'not applicable — not a brokerage office',
     rcStaffingHeading: 'Minimum approved staff',
     rcStaffingRequired: 'Required:',

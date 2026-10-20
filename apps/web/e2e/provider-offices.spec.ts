@@ -404,6 +404,9 @@ test('a human can invite an office its first administrator by clicking', async (
           email: 'first.admin@aqaba.jo',
           roleName: 'OFFICE_ADMINISTRATOR',
           howTheySignIn: 'PASSWORD_RESET',
+          // DECISION 25 — the real outcome. Asserted in the api e2e against the real producer;
+          // carried here because the screen branches on it.
+          invitation: { outcome: 'SENT', fromAddress: 'provider@goglobal.jo' },
         },
       });
     },
@@ -486,6 +489,7 @@ test('inviting a COMPANY goes to the company path and says what that account can
           email: 'admin@manarah.jo',
           roleName: 'INSURANCE_COMPANY_ADMINISTRATOR',
           howTheySignIn: 'PASSWORD_RESET',
+          invitation: { outcome: 'SENT', fromAddress: 'provider@goglobal.jo' },
         },
       });
     },
@@ -655,4 +659,162 @@ test('@a11y the invitation form has no violations', async ({ page }) => {
     .withTags(['wcag2a', 'wcag2aa'])
     .analyze();
   expect(results.violations).toEqual([]);
+});
+
+/* ===========================================================================================
+ * DECISION 25 ON THE SCREEN — (d) an unsent invitation is never reported as sent, and (i) the
+ * walk is possible with no mailbox configured at all.
+ * =========================================================================================== */
+
+test('(d) an unsent invitation is never reported as sent, and the screen names the fix', async ({
+  page,
+}) => {
+  /*
+   * `OutboundEmailService`'s rule reaching the person who can act on it. The account EXISTS and
+   * nothing arrived, so the organization is unreachable until somebody connects the provider
+   * mailbox — and a screen that said "invitation sent" here would leave a provider waiting for a
+   * reply that cannot come.
+   *
+   * The success wording is asserted ABSENT, scoped, because that is the half a reader would act on
+   * wrongly. It is not merely that the failure appears.
+   */
+  await mockAuth(page, INVITE_CODES);
+  await mockOffices(page);
+  await page.route(
+    'http://localhost:4000/provider/brokerage-offices/*/administrator',
+    (route) =>
+      route.fulfill({
+        status: 201,
+        json: {
+          officeId: 'org-d',
+          userId: 'user-new',
+          email: 'first.admin@aqaba.jo',
+          roleName: 'OFFICE_ADMINISTRATOR',
+          howTheySignIn: 'PASSWORD_RESET',
+          invitation: { outcome: 'NOT_CONFIGURED', fromAddress: null },
+        },
+      }),
+  );
+
+  await page.goto('/provider-offices');
+  await page.locator('[data-invite-open="aqaba"]').click();
+  const form = page.locator('[data-invite-form="aqaba"]');
+  await form.locator('[data-invite-email]').fill('first.admin@aqaba.jo');
+  await form.locator('[data-invite-name]').fill('Ahmad Al-Aqaba');
+  await form
+    .locator('[data-invite-reason]')
+    .fill('First administrator for the office registered under CBJ-400.');
+  await form.locator('[data-invite-submit]').click();
+
+  const notSent = page.locator('[data-invite-not-sent]');
+  await expect(notSent).toBeVisible();
+  await expect(notSent).toContainText('was NOT sent');
+  // It says the account exists, so nobody retries into a collision.
+  await expect(notSent).toContainText('was created with the role');
+  // It names the fix, by screen.
+  await expect(notSent).toContainText('Settings → Email integration');
+  // And it says the organization is unreachable, which is the consequence a provider must know.
+  await expect(notSent).toContainText('Nobody can enter this organization');
+
+  // THE SUCCESS WORDING IS UNREACHABLE. Anchored on the failure element from the same render.
+  await expect(page.locator('[data-invite-done]')).toHaveCount(0);
+});
+
+test('(i) with no mailbox wired the walk still works: a one-time LINK, never a password', async ({
+  page,
+}) => {
+  /*
+   * The owner walks this locally with no OAuth application registered. The api returns the raw
+   * token under `ENABLE_DEV_RESET_TOKEN` with `NODE_ENV !== 'production'` as a hard override — the
+   * SAME double gate `forgotPassword`'s `devResetToken` already uses, and the same thing the
+   * forgot-password screen already does with it. `APP_BASE_URL` defaults to
+   * `http://localhost:3000`, so the link is valid on her machine with no hosting decision.
+   *
+   * It is a TOKEN. The invited person still chooses their own password, and the note says so —
+   * because a link that looks like a credential handed over by the provider is exactly what the
+   * owner's rule forbids.
+   */
+  await mockAuth(page, INVITE_CODES);
+  await mockOffices(page);
+  await page.route(
+    'http://localhost:4000/provider/brokerage-offices/*/administrator',
+    (route) =>
+      route.fulfill({
+        status: 201,
+        json: {
+          officeId: 'org-d',
+          userId: 'user-new',
+          email: 'first.admin@aqaba.jo',
+          roleName: 'OFFICE_ADMINISTRATOR',
+          howTheySignIn: 'PASSWORD_RESET',
+          invitation: {
+            outcome: 'NOT_CONFIGURED',
+            fromAddress: null,
+            devInvitationToken: 'dev-token-abc123',
+          },
+        },
+      }),
+  );
+
+  await page.goto('/provider-offices');
+  await page.locator('[data-invite-open="aqaba"]').click();
+  const form = page.locator('[data-invite-form="aqaba"]');
+  await form.locator('[data-invite-email]').fill('first.admin@aqaba.jo');
+  await form.locator('[data-invite-name]').fill('Ahmad Al-Aqaba');
+  await form
+    .locator('[data-invite-reason]')
+    .fill('First administrator for the office registered under CBJ-400.');
+  await form.locator('[data-invite-submit]').click();
+
+  const dev = page.locator('[data-invite-dev-link]');
+  await expect(dev).toBeVisible();
+  await expect(dev).toContainText('ENABLE_DEV_RESET_TOKEN');
+  await expect(dev).toContainText('never appears in production');
+  // The sentence that stops the link being read as a credential the provider now holds.
+  await expect(dev).toContainText('not a password');
+  await expect(dev).toContainText('chooses their own');
+  // It goes to the set-password screen with the token as a query parameter — the same screen a
+  // password reset lands on, because it is the same single-use token store.
+  await expect(dev.locator('a')).toHaveAttribute(
+    'href',
+    '/reset-password?token=dev-token-abc123',
+  );
+});
+
+test('(i) and with no dev token the link section does not exist at all', async ({
+  page,
+}) => {
+  // The paired negative: in production the api omits the field, so nothing must render. Anchored on
+  // the not-sent notice from the same render, or an absence asserted against an unhydrated page
+  // passes for the wrong reason.
+  await mockAuth(page, INVITE_CODES);
+  await mockOffices(page);
+  await page.route(
+    'http://localhost:4000/provider/brokerage-offices/*/administrator',
+    (route) =>
+      route.fulfill({
+        status: 201,
+        json: {
+          officeId: 'org-d',
+          userId: 'user-new',
+          email: 'first.admin@aqaba.jo',
+          roleName: 'OFFICE_ADMINISTRATOR',
+          howTheySignIn: 'PASSWORD_RESET',
+          invitation: { outcome: 'NOT_CONFIGURED', fromAddress: null },
+        },
+      }),
+  );
+
+  await page.goto('/provider-offices');
+  await page.locator('[data-invite-open="aqaba"]').click();
+  const form = page.locator('[data-invite-form="aqaba"]');
+  await form.locator('[data-invite-email]').fill('first.admin@aqaba.jo');
+  await form.locator('[data-invite-name]').fill('Ahmad Al-Aqaba');
+  await form
+    .locator('[data-invite-reason]')
+    .fill('First administrator for the office registered under CBJ-400.');
+  await form.locator('[data-invite-submit]').click();
+
+  await expect(page.locator('[data-invite-not-sent]')).toBeVisible();
+  await expect(page.locator('[data-invite-dev-link]')).toHaveCount(0);
 });

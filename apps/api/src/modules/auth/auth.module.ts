@@ -82,6 +82,17 @@ import { OrganizationModule } from '../organization/organization.module';
     // RbacModule's UserAdminService hashes the provisioned account's password
     // with the same Part 10.1 policy + bcrypt cost signup and reset use.
     PasswordService,
+    /*
+     * DECISION 25 — `ProviderModule`'s `InvitationChannelService` issues the invitation link
+     * through the SAME single-use, expiring, hashed-at-rest token store `resetPassword` consumes.
+     *
+     * Exported rather than re-provided: a second `PasswordResetTokenRepository` instance would be
+     * harmless (it is stateless over Prisma) but a second home for "is this link still good" is
+     * exactly the weaker sibling decision 25 refuses. One store, one `markUsed` status-conditional
+     * claim, one expiry rule, one rejection message.
+     */
+    PasswordResetTokenRepository,
+    TokenService,
   ],
 })
 export class AuthModule {}

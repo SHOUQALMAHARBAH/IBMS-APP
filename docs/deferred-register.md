@@ -593,3 +593,45 @@ exactly like a broken script.
 | **THE SEPARATION-OF-DUTIES GUARANTEE — `MAKER_CHECKER_REGISTRY` records no MAKER code** (owner's decision, 2026-10-15: **declared by name and deferred to the ROLES-AND-PERMISSIONS PASS**; the measurement was priced and *nothing further is owed on it now* — the price itself is `docs/segregation-of-duties-cost.md`, written 2026-10-19: **one optional field, sixteen values, one guard**, every code already existing, and the answer it would buy computed once by hand as **four of fifteen answerable pairs**, all four role concentration rather than a breach) | It holds the checker permission and the database constraint, so half the pair is not recorded anywhere and the system **cannot answer the real segregation question** — does one role hold both halves of the same pair. This surfaced only because a scan of mine rested on five maker codes that do not exist, and the retraction was worth more than the answer. The durable fix is to record the maker code beside the checker code, so a pair is a pair in data. **THE TRIGGER IS KEPT RATHER THAN THE TASK:** the work begins when the roles-and-permissions pass opens, and before then nothing may *claim* the guarantee — a screen, a report or a document asserting that this system enforces separation of duties is the thing this row forbids, because the registry cannot answer the question. | **the roles-and-permissions pass** |
 | **The readiness signal splits in two** | One name currently covers two different measurements. They must be named for what they measure: **checker concentration** (a control observation) and **both halves of one pair** (the hard rule). **Nothing may call concentration a segregation breach** — a screen reporting a violation it did not measure is a false claim to the user. | **the roles-and-permissions pass**, with the warned-act machine |
 | **Do not change the seeded role's permissions** | `BRANCH_DEPARTMENT_MANAGER` holds seven checker permissions. Whether that is a breach cannot be judged until the question above can be asked correctly. | — |
+
+---
+
+## DECISION 25 — THE INVITATION CHANNEL: WHAT IS BUILT, AND THE TWO THINGS DECLARED UNWIRED
+
+Added 2026-10-20, batch 5 group 3. The channel itself is built: one template kind in both
+languages, a single-use expiring token stored hashed, the send placed so it leaves the PROVIDER's
+own mailbox, the real outcome returned and rendered, and the existing `ENABLE_DEV_RESET_TOKEN`
+double gate as the only way a token value ever leaves the server.
+
+### (1) THE TRANSPORT IS CONFIGURATION, AND IT IS NOT CONFIGURED
+
+| What | State |
+|---|---|
+| The mail module | **BUILT** — 15 files: Microsoft 365 and Google Workspace providers, a registry, `OutboundEmailService`, a closed template set, a NotConfigured null object |
+| The screen to connect a mailbox | **BUILT** — `/settings/email`, linked on `email.integration.read` |
+| The provider's permission to use it | **BUILT this batch** — `PROVIDER_CODES` eleven to thirteen, authorised |
+| A connected provider mailbox on dev | **NOT CONNECTED** — nothing has been through the OAuth flow |
+| An OAuth application for this deployment | **NOT REGISTERED** — `EMAIL_MS_*` / `EMAIL_GOOGLE_*` are unset |
+| The sending domain and the hosting | **NOT DECIDED** — the owner's words: «ما عندي قرارٌ أو أدنى فكرةٍ وين رح ينعمل» |
+
+**So no invitation can leave this deployment today, and the system says so rather than pretending.**
+`outcome` reads `NOT_CONFIGURED`, the account is created, and the screen states that the
+organization is unreachable until the provider mailbox is connected — naming the screen that does
+it. There is **no console line standing in for a delivery** and **no fallback to a shared or
+platform sender**: sending from an address the recipient does not recognise is the specific failure
+Part I §6 exists to prevent, and `NotConfiguredEmailProvider`'s own comment gives the reason.
+
+**When the hosting decision lands this is configuration, not a rebuild**: an OAuth application
+registered, then one pass through `/settings/email` as the provider. Nothing in the code waits on it.
+
+`APP_BASE_URL` already defaults to `http://localhost:3000`, so **the owner's local walk needs no
+hosting decision at all** — the dev gate returns the token and the link is valid on her machine.
+
+### (2) RE-INVITING IS NOT REACHABLE, AND AN EXPIRED INVITATION IS A LOCKOUT
+
+| Item | Why it is owed | Not to be started before |
+|---|---|---|
+| **RE-INVITING AN ORGANIZATION'S FIRST ADMINISTRATOR** — decision 25 (e), **measured as unreachable rather than built** | Refusal 3 on BOTH invite routes rejects a second invitation with a 409 the moment the organization holds any account, and its own comment says why: *"This route bootstraps an empty company once and is deliberately not a standing provider capability to add accounts to a live one."* Delivering (e) would mean relaxing that refusal — overturning a recorded decision — or adding a separate re-send act, which needs a gate, and no new permission code was in scope. **THE CONSEQUENCE IS A REAL LOCKOUT:** if an invitation expires unopened, the organization HAS an account so the 409 fires, and that account cannot request its own reset either, because `forgotPassword` resolves the mailbox of the organization IN CONTEXT and a new organization has none. **In production there is no route out.** The dev gate returns the token locally, so the owner's walk is unaffected and this is not urgent — it is load-bearing the day a real office is invited. The refusal is PINNED by a test so that whoever lifts it does so deliberately. | **the owner's decision on whether a re-send act exists, and what gates it** |
+| **The channel is per-organization-in-context and the invitation is the only exception** | `EmailProviderRegistry.resolve()` reads `integrations.find()` — the organization in tenant context. Every other send in this product is from the office's own mailbox about the office's own business, which is correct. The invitation is the one message that must leave from somebody ELSE's mailbox, and it does that by SITTING OUTSIDE `runAs`. **Do not "tidy" that call inside the block**: it would resolve the invited organization's absent mailbox, send nothing, and report `NOT_CONFIGURED` forever while looking correct. | — |
+| **Six strings on `/settings/email` say "office"** | The screen and its service are entirely type-agnostic — measured: no `organizationType` branch anywhere in either — so it RENDERS correctly for the provider, unlike the roles screen whose `buildMatrix` structurally skips PLATFORM codes. What is imprecise is the WORDING: the nav label and heading read "Office mailbox", and two empty-state sentences say "your office". For a PROVIDER organization that is mildly false. Reported rather than patched: the wording pass is the owner's (decision 94). | **the Arabic/wording pass** |
+| **A custom `GO_GLOBAL` role on dev holds 74 codes in the provider organization** | Found while measuring the authorised widening's role sets. `isSystem = false`, ACTIVE, **0 holders**, 74 codes — far more than `PLATFORM_OPERATOR`'s 13, and it already held both email codes before this batch. It grants nobody anything today, and it is exactly the **declared gap** `seed.ts` describes: *"nothing structurally stops a provider administrator granting their own role an office-scoped code"*. It is DATA on one database, not a seed outcome, which is why the acceptance test filters on `isSystem`. | — (reported; withdrawing or keeping it is the owner's) |
