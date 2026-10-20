@@ -84,8 +84,34 @@ say "migrations: ${APPLIED} applied / ${ON_DISK} on disk"
 [ "$APPLIED" = "$ON_DISK" ] || { echo "FROM-EMPTY: applied count does not match the files"; exit 1; }
 
 say "seeding"
-DATABASE_URL="$SCRATCH_URL" NODE_ENV=development npx tsx packages/db/prisma/seed.ts \
+# TEE'D, because one assertion below is DERIVED from what the seed itself announces rather than
+# from a literal. The output still reaches the terminal unchanged.
+SEED_LOG="$(mktemp)"
+DATABASE_URL="$SCRATCH_URL" NODE_ENV=development npx tsx packages/db/prisma/seed.ts 2>&1 \
+  | tee "$SEED_LOG" \
   || { echo "FROM-EMPTY: the SEED failed on a freshly migrated database"; exit 1; }
+# `pipefail` is not assumed: with a pipe the `||` above sees tee's status, so the seed's own exit is
+# checked separately through PIPESTATUS.
+[ "${PIPESTATUS[0]:-0}" = "0" ] \
+  || { echo "FROM-EMPTY: the SEED failed on a freshly migrated database"; exit 1; }
+
+# THE PROVIDER'S GRANT COUNT, DERIVED FROM THE SEED'S OWN ANNOUNCEMENT.
+#
+# This assertion used to be a literal 11. `PROVIDER_CODES` went 11 -> 13 with the authorised
+# email-integration widening, the pin never moved, and this check has been FAILING since — reported
+# as green in that batch's own row, which was false. Nothing was red because this script is gated by
+# `verify.sh` and by no CI step: the same way `combined-duty-projection.py` sat dead on a literal.
+#
+# Bumping the number would restore the script and keep the defect. So the expected figure is read
+# from the line the seed already prints — `(13 permissions: …)` — and the database is asserted to
+# AGREE WITH WHAT THE SEED SAID IT DID. A fourteenth provider code moves both sides together.
+PROVIDER_GRANTS_ANNOUNCED="$(sed -n 's/.*PLATFORM_OPERATOR role (\([0-9]\{1,\}\) permissions:.*/\1/p' "$SEED_LOG" | head -1)"
+if [ -z "$PROVIDER_GRANTS_ANNOUNCED" ]; then
+  echo "FROM-EMPTY: could not read the provider role's grant count out of the seed's own output."
+  echo "  The seed's wording changed, or it stopped printing that line. Do NOT replace this with a"
+  echo "  literal — that is the defect this derivation replaced. Re-point the pattern at the new line."
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # The structural facts this module put in, asserted on a database built from
@@ -104,7 +130,7 @@ check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"
 check "exactly one PROVIDER organization" 1 \
   "$(psql_scratch $'SELECT count(*) FROM "Organization" WHERE type = \'PROVIDER\'')"
-check "the provider role's grants" 11 \
+check "the provider role's grants (derived from the seed's own output)" "$PROVIDER_GRANTS_ANNOUNCED" \
   "$(psql_scratch 'SELECT count(*) FROM "RolePermission" rp JOIN "Organization" o ON o.id = rp."organizationId" WHERE o.type = '"'"'PROVIDER'"'"'')"
 check "registration-pack columns are NULLABLE" 0 \
   "$(psql_scratch 'SELECT count(*) FROM pg_attribute WHERE attrelid = '"'"'"Organization"'"'"'::regclass AND attnotnull AND attname IN ('"'"'premisesTenureDocumentId'"'"','"'"'associationMembershipDocumentId'"'"')')"

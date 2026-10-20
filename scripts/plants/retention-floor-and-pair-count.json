@@ -58,5 +58,17 @@
     "from": "    noFloorNoticeShown: declaration.noticeShown,\n    noFloorReason: declaration.reason,\n  };\n}",
     "to": "    noFloorAcknowledged: true,\n  };\n}",
     "why": "BATCH 5 GROUP 6 — the audit row reduced to the WORD, which is precisely what the owner ruled out: what the person was TOLD is part of the record, because a year from now the question is what they saw. Kills only the audit assertion in the silent-case e2e — and it dies on BOTH halves, the missing sentence and the `not.toContain('acknowledged')`, which is why that absence is asserted rather than described."
+  },
+  "from-empty-provider-grants-pinned-to-a-literal": {
+    "file": "scripts/from-empty.sh",
+    "from": "check \"the provider role's grants (derived from the seed's own output)\" \"$PROVIDER_GRANTS_ANNOUNCED\" \\",
+    "to": "check \"the provider role's grants (derived from the seed's own output)\" 11 \\",
+    "why": "THE DEFECT ITSELF, restored. `from-empty.sh` carried a literal 11 while `PROVIDER_CODES` had gone to 13 with the authorised email-integration widening, so this check had been FAILING since that commit — and was reported as '19 assertions green' in that batch's own row, which was false. Nothing was red because this script is gated by `verify.sh` and by NO CI step, the same way `combined-duty-projection.py` sat dead. Planted: `FAIL the provider role's grants expected 11, got 13` and the run exits 1."
+  },
+  "from-empty-grant-derivation-reads-nothing": {
+    "file": "scripts/from-empty.sh",
+    "from": "PLATFORM_OPERATOR role (\\([0-9]\\{1,\\}\\) permissions:",
+    "to": "PLATFORM_OPERATOR_ROLE_THAT_DOES_NOT_EXIST (\\([0-9]\\{1,\\}\\) permissions:",
+    "why": "THE NON-VACUITY GUARD on the derivation. If the seed's wording changes the pattern reads NOTHING, and without this guard an empty expected value would be compared against the database's count and the check would simply go quiet — a derivation that silently stops deriving is worse than the literal it replaced. Planted: the run exits 1 with 'could not read the provider role's grant count out of the seed's own output' and the explicit instruction NOT to replace it with a literal."
   }
 }
