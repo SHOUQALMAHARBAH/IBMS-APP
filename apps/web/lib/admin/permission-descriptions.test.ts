@@ -136,6 +136,12 @@ const AWAITING_OWNER_REVIEW: string[] = [
    */
   'provider.insurance-company.administrator.invite',
   /*
+   * Batch 5 group 7b's one new code. Its Arabic was written by an agent for the same reason the two
+   * above were: the parity guard requires both languages, so a code cannot ship without a line.
+   * Decision 94's naming pass is hers; this is a line awaiting it rather than a pre-emption of it.
+   */
+  'retention.extend',
+  /*
    * The two halves of the split retention code. Their Arabic was written by an agent — the withdrawn
    * umbrella's line was HERS, and a split is not a translation, so neither successor inherits it.
    */

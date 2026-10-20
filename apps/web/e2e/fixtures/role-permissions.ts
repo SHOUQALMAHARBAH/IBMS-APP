@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 509 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 511 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -178,6 +178,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'recommendation.all-owners.read',
     'retention-schedule.confirm',
     'retention-schedule.update',
+    'retention.extend',
     'risk-register.manage',
     'sanctions-pep.screen',
     'screening.run',
@@ -218,6 +219,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'retention-schedule.confirm',
     'retention-schedule.update',
     'retention.dispose.approve',
+    'retention.extend',
     'ropa.manage',
     'sla.policy.read',
     'sla.policy.regulatory',
@@ -568,7 +570,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 227 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 228 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -651,7 +653,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'up-sell.detect', module: 'commercial-front-office', description: "Run an on-demand under-insurance scan for a customer", scope: 'OFFICE' },
   { code: 'up-sell.read', module: 'commercial-front-office', description: "List/read up-sell recommendations", scope: 'OFFICE' },
   { code: 'aml.escalate', module: 'compliance-risk', description: "Escalate a suspicious-activity alert to the competent authority", scope: 'OFFICE' },
-  { code: 'aml.monitor', module: 'compliance-risk', description: "Monitor AML/CFT transaction-monitoring alerts", scope: 'OFFICE' },
+  { code: 'aml.monitor', module: 'compliance-risk', description: "Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code", scope: 'OFFICE' },
   { code: 'audit-log.read', module: 'compliance-risk', description: "Read the immutable audit log", scope: 'OFFICE' },
   { code: 'compliance-calendar.manage', module: 'compliance-risk', description: "Manage the regulatory compliance calendar", scope: 'OFFICE' },
   { code: 'document-history.read', module: 'compliance-risk', description: "Read document version/workflow history", scope: 'OFFICE' },
@@ -668,7 +670,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'license.manage', module: 'compliance-risk', description: "Manage the broker's regulatory license record", scope: 'OFFICE' },
   { code: 'pi-policy.manage', module: 'compliance-risk', description: "Manage the broker's own Professional Indemnity policy record", scope: 'OFFICE' },
   { code: 'risk-register.manage', module: 'compliance-risk', description: "Manage the operational/cyber/financial/compliance/reputational risk register", scope: 'OFFICE' },
-  { code: 'sanctions-pep.screen', module: 'compliance-risk', description: "Run recurring sanctions screening batches", scope: 'OFFICE' },
+  { code: 'sanctions-pep.screen', module: 'compliance-risk', description: "The whole sanctions/PEP screening surface: run screening and the recurring batch, work the match queue (assign, review, escalate, annotate), AND maintain the watchlists themselves — including rolling a dataset generation back, which decides that screening runs against an older list. 17 routes across three controllers", scope: 'OFFICE' },
   { code: 'workflow-history.read', module: 'compliance-risk', description: "Read workflow-state transition history for a record", scope: 'OFFICE' },
   { code: 'customer.all-owners.read', module: 'customer', description: "See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design)", scope: 'OFFICE' },
   { code: 'customer.bulk-import', module: 'customer', description: "Load an office legacy customer file (Part III §7) — a bulk write path, distinct from creating one customer", scope: 'OFFICE' },
@@ -779,6 +781,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'retention-schedule.update', module: 'pdpl', description: "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded", scope: 'OFFICE' },
   { code: 'retention.dispose.approve', module: 'pdpl', description: "Give final DPO approval on a disposal batch (checker side of dual control)", scope: 'OFFICE' },
   { code: 'retention.dispose.nominate', module: 'pdpl', description: "Nominate a disposal batch (maker side of dual control)", scope: 'OFFICE' },
+  { code: 'retention.extend', module: 'pdpl', description: "Extend the retention of specific records past the period set for their category, on one of exactly three bases — a named legislative provision, a live legal hold or dispute, or the customer's explicit consent. Free text may accompany a basis; it may not BE one. Every extension is recorded in the register with which records, which basis, who, when and until when, so it can be justified from one place. Extending WITHOUT legislative cover and WITHOUT the customer's consent carries real liability under the PDPL, which is why the basis is a closed list rather than a field", scope: 'OFFICE' },
   { code: 'ropa.manage', module: 'pdpl', description: "Maintain the Records of Processing Activities register", scope: 'OFFICE' },
   { code: 'sla.holiday.create', module: 'sla', description: "Add a public holiday to the business-day calendar every SLA deadline is counted against", scope: 'OFFICE' },
   { code: 'sla.policy.create', module: 'sla', description: "Create an SLA policy — its duration, calendar and escalation stages", scope: 'OFFICE' },

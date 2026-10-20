@@ -76,5 +76,11 @@
     "from": "  if [ -n \"${CI:-}\" ]; then",
     "to": "  if [ -n \"${CI_DISABLED:-}\" ]; then",
     "why": "ITEM 1, batch 5 group 7 — THE HAZARD INSIDE THE FIX. `from-empty.sh` was added as a CI step because its pins ran nowhere; it SKIPS WITH exit 0 when the server is unreachable, and its own output says 'this is a skip, NOT a pass'. Without the CI-strict branch, the new step would print SKIPPED and PASS on every run forever — a green gate that never runs, which is the exact defect the step exists to fix, reproduced inside its own fix. Proven: with the branch disabled, `CI=1 FROM_EMPTY_ADMIN_URL=<unreachable> bash scripts/from-empty.sh` exits 0; with it, exit 1 naming the server and the variable."
+  },
+  "from-empty-message-invites-a-bump": {
+    "file": "scripts/from-empty.sh",
+    "from": "    printf '        ^ the figure MOVED. If that was a decision, come to scripts/from-empty.sh and\\n'",
+    "to": "    true",
+    "why": "BATCH 5 GROUP 7b — the pin's failure message reduced to 'expected 227, got 228', which is what it read before and what invites the exact edit the pin exists to prevent. Eight of these assertions are pinned to growing figures DELIBERATELY, so the message has to say that a mismatch means the figure MOVED and moving the pin is a recorded decision. Planted: the three explanatory lines vanish and the refusal reads as an off-by-one."
   }
 }

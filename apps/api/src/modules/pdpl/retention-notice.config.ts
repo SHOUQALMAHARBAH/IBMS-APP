@@ -1,0 +1,151 @@
+/**
+ * THE RETENTION NOTICE — what a category's elapsed clock says, and what it deliberately does not do.
+ *
+ * ## IT FILTERS. IT DESTROYS NOTHING.
+ *
+ * The notice is a READ. It has no write path to a disposal, to an anonymisation or to anything else,
+ * and `retention-notice.inventory.spec.ts` asserts that as an ABSENCE — which is the only form that
+ * can fail. The three choices are separate acts, each with its own permission, taken by a person who
+ * has read the notice.
+ *
+ * ## IT EXPLAINS ITSELF, AND THAT IS NOT DECORATION
+ *
+ * From the owner's policy paper: *"an employee who clicks accept on an alert that does not explain
+ * itself is an employee signing for the unknown."* So every notice carries, beside the count:
+ *
+ *   * WHICH ARTICLE set the floor for this category, with its instrument — the same article the
+ *     refusal cites, read through `retention-floors.config.ts` rather than re-derived, because two
+ *     paths to that answer is two chances for a screen to name a different statute from the one
+ *     that refused a shorter period an hour earlier;
+ *   * WHAT DATE THE COUNT RAN FROM, in words rather than as a column name — "the date the client
+ *     payment was received, which closes that transaction" answers the question an officer is
+ *     actually asking;
+ *   * AND THAT NO LEGAL HOLD STANDS on them, stated rather than implied, because the absence of a
+ *     hold is a fact the reader is relying on when they choose destruction.
+ *
+ * ## A CATEGORY IT CANNOT RESOLVE GETS A ROW THAT SAYS SO
+ *
+ * Decision 28's family. An office that sets a period for a category it named itself and is never
+ * alerted will believe the system is watching it, and silence there is the defect — so an
+ * unresolvable category appears with `resolvable: false` and its measured reason, and the screen
+ * renders that loudly on the category's own row rather than omitting it.
+ */
+
+import {
+  type StatutoryRetentionFloor,
+  floorForCategory,
+} from './retention-floors.config';
+import {
+  resolutionFor,
+  unresolvableReason,
+} from './retention-resolution.config';
+
+export interface RetentionNoticeView {
+  recordCategory: string;
+  retentionPeriodMonths: number;
+  /** False means no notice is possible for this category, ever — and `reason` says why. */
+  resolvable: boolean;
+  /** Present only when `resolvable` is false. */
+  unresolvableReason: string | null;
+  /** How many records have passed their period and are neither held nor extended. */
+  elapsedCount: number;
+  /**
+   * THE IDS, so an extension can NAME the records it covers.
+   *
+   * Added because the screen could not otherwise extend honestly: the register has to say WHICH
+   * records were extended, and a screen holding only a count would have to send a placeholder — a
+   * register row naming no record is a false entry in the one place that exists to be justifiable.
+   *
+   * Bounded at `ELAPSED_IDS_CAP`, and `elapsedCount` is the TRUE total either way, so a reader is
+   * never shown a smaller number than the one that is really elapsed.
+   */
+  elapsedRecordIds: string[];
+  /** How many were excluded because a legal hold stands — reported, not hidden. */
+  heldCount: number;
+  /** How many were excluded because an extension still covers them. */
+  extendedCount: number;
+  /** The statute that set the floor for this category, or null where none is decided. */
+  floor: {
+    instrument: string;
+    article: string;
+    operativeText: string;
+  } | null;
+  /** What the count ran from, in words. Null when the category is unresolvable. */
+  countedFrom: string | null;
+  /** Stated rather than implied — the reader relies on it when choosing destruction. */
+  noLegalHoldStatement: string;
+}
+
+/**
+ * The cap on ids returned per category. The extend DTO accepts at most 500 record ids, so sending
+ * more than that would be a request the server refuses — the two figures are the same number for
+ * that reason, and the count is unbounded so the cap never understates what is elapsed.
+ */
+export const ELAPSED_IDS_CAP = 500;
+
+export interface RetentionNoticeInput {
+  recordCategory: string;
+  retentionPeriodMonths: number;
+  elapsedCount: number;
+  elapsedRecordIds: string[];
+  heldCount: number;
+  extendedCount: number;
+}
+
+function floorView(floor: StatutoryRetentionFloor | null) {
+  if (!floor) return null;
+  return {
+    instrument: floor.instrument,
+    article: floor.article,
+    operativeText: floor.operativeText,
+  };
+}
+
+export function deriveRetentionNotice(
+  input: RetentionNoticeInput,
+): RetentionNoticeView {
+  const resolution = resolutionFor(input.recordCategory);
+  const floor = floorForCategory(input.recordCategory);
+
+  return {
+    recordCategory: input.recordCategory,
+    retentionPeriodMonths: input.retentionPeriodMonths,
+    resolvable: resolution !== null,
+    unresolvableReason: unresolvableReason(input.recordCategory),
+    elapsedCount: resolution === null ? 0 : input.elapsedCount,
+    elapsedRecordIds:
+      resolution === null
+        ? []
+        : input.elapsedRecordIds.slice(0, ELAPSED_IDS_CAP),
+    heldCount: resolution === null ? 0 : input.heldCount,
+    extendedCount: resolution === null ? 0 : input.extendedCount,
+    floor: floorView(floor),
+    countedFrom: resolution?.triggerDescription ?? null,
+    /*
+     * TWO DIFFERENT SENTENCES, because "no hold stands" and "some are held" are different facts and
+     * a reader choosing destruction is relying on which one it is. The held COUNT is reported
+     * alongside rather than quietly subtracted: records vanishing from a count with no explanation
+     * is how an officer concludes the system lost them.
+     */
+    noLegalHoldStatement:
+      resolution === null
+        ? 'No records are counted for this category, so no legal hold has been checked.'
+        : input.heldCount === 0
+          ? 'No legal hold stands on any of these records.'
+          : `${input.heldCount} record(s) in this category are under an active legal hold and are NOT in the count above — a hold refuses destruction and anonymisation even when a person picks them.`,
+  };
+}
+
+/** The elapsed cut-off for a period, as a date. Pure, so the boundary is provable without a clock. */
+export function elapsedBefore(now: Date, retentionPeriodMonths: number): Date {
+  /*
+   * Month arithmetic through `setUTCMonth`, not `now - months * 30 * DAY`. A 30-day month is wrong
+   * by up to five days a year, and the SLA work already paid for that: `renewalApplicationDueBy`
+   * records that month arithmetic across a leap-year February is off by a day in exactly the
+   * direction that reports an on-time filing as late. Here the direction is worse — a short month
+   * would make records eligible for destruction BEFORE their period had run.
+   */
+  const cutoff = new Date(now.getTime());
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - retentionPeriodMonths);
+  return cutoff;
+}

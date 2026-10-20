@@ -1180,4 +1180,271 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       await sweepFloorCategories();
     }
   }, 120_000);
+
+  it('BATCH 5 GROUP 7b — the notice fires on an elapsed period, carrying the article, the start date and the no-hold statement', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'retention-notice-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+
+    // Swept on ENTRY by hand: the category name cannot be made run-unique, because the resolution
+    // matches on equality of the normalised name and a suffix would remove it.
+    await prisma.retentionExtension.deleteMany({
+      where: { recordCategory: 'CommissionLedgerEntry' },
+    });
+    await prisma.retentionScheduleItem.deleteMany({
+      where: { recordCategory: 'CommissionLedgerEntry' },
+    });
+
+    let itemId: string | undefined;
+    let entryId: string | undefined;
+    try {
+      // The period: ten years, which is exactly the commercial floor, so it is accepted without a
+      // declaration and without an extension.
+      const created = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'CommissionLedgerEntry',
+          retentionPeriodMonths: 120,
+        })
+        .expect(201);
+      itemId = (created.body as RetentionScheduleItemBody).id;
+
+      // A REAL elapsed record: one commission entry paid eleven years ago, against a policy that
+      // has none. `@@unique([policyId])` is why it has to be a free policy.
+      const policy = await prisma.policy.findFirstOrThrow({
+        // `commissionLedgerEntries: { none: {} }`, not `null`: `@@unique([policyId])` makes it
+        // one-at-most but Prisma still types the relation as a LIST, so "has none" is a `none`
+        // filter. The compiler named the right field, which is the payload type doing its job.
+        where: { commissionLedgerEntries: { none: {} } },
+        select: { id: true },
+      });
+      const elevenYearsAgo = new Date();
+      elevenYearsAgo.setUTCFullYear(elevenYearsAgo.getUTCFullYear() - 11);
+      const entry = await prisma.commissionLedgerEntry.create({
+        data: {
+          policyId: policy.id,
+          amount: '100.000',
+          paidAt: elevenYearsAgo,
+        },
+        select: { id: true },
+      });
+      entryId = entry.id;
+
+      const notices = await request(app.getHttpServer())
+        .get('/retention-notices')
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const rows = notices.body as Array<Record<string, unknown>>;
+
+      // ---------------------------------------------- (1) THE NOTICE, FIRING
+      const row = rows.find(
+        (r) => r.recordCategory === 'CommissionLedgerEntry',
+      );
+      expect(
+        row,
+        'no notice row for a category with a period and an elapsed record',
+      ).toBeDefined();
+      expect(row?.resolvable).toBe(true);
+      expect(row?.elapsedCount).toBe(1);
+      // THE ARTICLE — the same one the refusal cites.
+      const floor = row?.floor as {
+        instrument: string;
+        article: string;
+      } | null;
+      expect(floor?.instrument).toContain('Commercial Law No. 12 of 1966');
+      expect(floor?.article).toContain('art. 19');
+      // THE START DATE, in words rather than as a column name.
+      expect(String(row?.countedFrom)).toContain('commission was paid');
+      // AND THE NO-HOLD STATEMENT, stated rather than implied.
+      expect(row?.noLegalHoldStatement).toBe(
+        'No legal hold stands on any of these records.',
+      );
+
+      // ---------------------------------------------- (2) A CATEGORY IT CANNOT RESOLVE SAYS SO
+      /*
+       * `AuditLogEntry` is seeded on every database and is one of the names this system cannot
+       * resolve. Decision 28's family: an office that set a period for a category it named itself
+       * and is never alerted will believe the system is watching it, so the row exists and carries
+       * the reason rather than being omitted.
+       */
+      const unresolvable = rows.find(
+        (r) => r.recordCategory === 'AuditLogEntry',
+      );
+      expect(
+        unresolvable,
+        'the seeded AuditLogEntry category has no notice row at all',
+      ).toBeDefined();
+      expect(unresolvable?.resolvable).toBe(false);
+      expect(unresolvable?.elapsedCount).toBe(0);
+      expect(String(unresolvable?.unresolvableReason)).toContain(
+        'has not been told',
+      );
+      expect(unresolvable?.countedFrom).toBeNull();
+
+      // ---------------------------------------------- (4) EXTEND, and the clock restarts
+      const extended = await request(app.getHttpServer())
+        .post('/retention-notices/extend')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'CommissionLedgerEntry',
+          recordIds: [entryId],
+          months: 24,
+          basis: 'LEGISLATIVE_PROVISION',
+          instrument: 'Commercial Law No. 12 of 1966',
+          article: 'art. 19',
+          note: 'Retained for the pending examination of the 2026 commission file.',
+        })
+        .expect(201);
+      expect((extended.body as { extended: number }).extended).toBe(1);
+
+      // THE CLOCK RESTARTED: the same notice no longer offers it.
+      const after = await request(app.getHttpServer())
+        .get('/retention-notices')
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const afterRow = (after.body as Array<Record<string, unknown>>).find(
+        (r) => r.recordCategory === 'CommissionLedgerEntry',
+      );
+      expect(afterRow?.elapsedCount).toBe(0);
+      expect(afterRow?.extendedCount).toBe(1);
+
+      // THE REGISTER ROW — which category, which record, which basis, who, when, until when.
+      const register = await request(app.getHttpServer())
+        .get('/retention-notices/register?recordCategory=CommissionLedgerEntry')
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const entries = register.body as Array<Record<string, unknown>>;
+      expect(entries).toHaveLength(1);
+      expect(entries[0].recordId).toBe(entryId);
+      expect(entries[0].basis).toBe('LEGISLATIVE_PROVISION');
+      expect(entries[0].legislativeArticle).toBe('art. 19');
+      expect(entries[0].extendedByUserId).toBe(compliance.userId);
+      expect(String(entries[0].note)).toContain('pending examination');
+
+      // ---------------------------------------------- (4b) THE SECOND NOTICE, after it elapses
+      /*
+       * Asserted, not assumed: the brief's point is that an extension is a DECISION rather than an
+       * exit, so the same notice comes again with the same three choices. The extension's own
+       * `extendedUntil` is moved into the past — the one fact the clock reads.
+       */
+      await prisma.retentionExtension.updateMany({
+        where: { recordCategory: 'CommissionLedgerEntry', recordId: entryId },
+        data: { extendedUntil: new Date('2026-01-01T00:00:00.000Z') },
+      });
+      const second = await request(app.getHttpServer())
+        .get('/retention-notices')
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const secondRow = (second.body as Array<Record<string, unknown>>).find(
+        (r) => r.recordCategory === 'CommissionLedgerEntry',
+      );
+      expect(
+        secondRow?.elapsedCount,
+        'the second notice did not come — an extension became an exit',
+      ).toBe(1);
+      expect(secondRow?.extendedCount).toBe(0);
+    } finally {
+      await prisma.retentionExtension.deleteMany({
+        where: { recordCategory: 'CommissionLedgerEntry' },
+      });
+      if (entryId)
+        await prisma.commissionLedgerEntry.delete({ where: { id: entryId } });
+      if (itemId)
+        await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
+    }
+  }, 120_000);
+
+  it('BATCH 5 GROUP 7b — the closed basis list refuses free text as a basis, and consent is unselectable with its reason', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'retention-basis-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+    await prisma.retentionScheduleItem.deleteMany({
+      where: { recordCategory: 'Receipt' },
+    });
+
+    let itemId: string | undefined;
+    try {
+      const created = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({ recordCategory: 'Receipt', retentionPeriodMonths: 120 })
+        .expect(201);
+      itemId = (created.body as RetentionScheduleItemBody).id;
+
+      const base = {
+        recordCategory: 'Receipt',
+        recordIds: ['any-record-id'],
+        months: 12,
+        note: 'Retained for the reason named beside this basis.',
+      };
+
+      // A FOURTH BASIS IS A 400 AT THE BOUNDARY — the enum, not a judgement in a service.
+      await request(app.getHttpServer())
+        .post('/retention-notices/extend')
+        .set(bearer(compliance.accessToken))
+        .send({ ...base, basis: 'BECAUSE_WE_WANT_TO' })
+        .expect(400);
+
+      // FREE TEXT CANNOT BE A BASIS: a legislative basis with no article names no law.
+      const noArticle = await request(app.getHttpServer())
+        .post('/retention-notices/extend')
+        .set(bearer(compliance.accessToken))
+        .send({
+          ...base,
+          basis: 'LEGISLATIVE_PROVISION',
+          instrument: 'Some Law',
+        })
+        .expect(422);
+      expect(JSON.stringify(noArticle.body)).toContain(
+        'EXTENSION_BASIS_INCOMPLETE',
+      );
+      expect(JSON.stringify(noArticle.body)).toContain('is not a basis');
+
+      // THE NOTE IS REQUIRED AT THE SHARED MINIMUM — nine characters, not zero, so the assertion
+      // isolates the floor rather than a non-empty check.
+      await request(app.getHttpServer())
+        .post('/retention-notices/extend')
+        .set(bearer(compliance.accessToken))
+        .send({
+          ...base,
+          note: 'too short',
+          basis: 'LEGISLATIVE_PROVISION',
+          instrument: 'Commercial Law No. 12 of 1966',
+          article: 'art. 19',
+        })
+        .expect(400);
+
+      // AND CONSENT IS UNSELECTABLE, with the measured reason — refused even with every field sent,
+      // because an option that cannot be substantiated must not be offerable.
+      const consent = await request(app.getHttpServer())
+        .post('/retention-notices/extend')
+        .set(bearer(compliance.accessToken))
+        .send({
+          ...base,
+          basis: 'CUSTOMER_EXPLICIT_CONSENT',
+          consentRecordId: '00000000-0000-4000-8000-000000000001',
+          consentDuration: '2 years',
+          consentPurpose: 'claims history',
+        })
+        .expect(422);
+      const body = JSON.stringify(consent.body);
+      expect(body).toContain('EXTENSION_BASIS_NOT_SELECTABLE');
+      expect(body).toContain('NO duration');
+      // The PRECISE reason: not "no consent exists", which would be false.
+      expect(body).toContain('not that no consent exists');
+    } finally {
+      await prisma.retentionExtension.deleteMany({
+        where: { recordCategory: 'Receipt' },
+      });
+      if (itemId)
+        await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
+    }
+  }, 120_000);
 });

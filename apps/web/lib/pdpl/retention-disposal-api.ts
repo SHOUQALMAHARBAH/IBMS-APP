@@ -65,6 +65,44 @@ export interface RetentionScheduleItem {
   } | null;
 }
 
+/** A retention notice — one row per category the office has set a period for. */
+export interface RetentionNotice {
+  recordCategory: string;
+  retentionPeriodMonths: number;
+  /** False means no notice is possible for this category, ever — `unresolvableReason` says why. */
+  resolvable: boolean;
+  unresolvableReason: string | null;
+  elapsedCount: number;
+  /** The ids, so an extension can NAME the records it covers. Capped at 500 by the api. */
+  elapsedRecordIds: string[];
+  heldCount: number;
+  extendedCount: number;
+  floor: { instrument: string; article: string; operativeText: string } | null;
+  countedFrom: string | null;
+  noLegalHoldStatement: string;
+}
+
+export interface ExtendRetentionInput {
+  recordCategory: string;
+  recordIds: string[];
+  months: number;
+  basis: 'LEGISLATIVE_PROVISION' | 'LEGAL_HOLD_OR_DISPUTE' | 'CUSTOMER_EXPLICIT_CONSENT';
+  note: string;
+  instrument?: string;
+  article?: string;
+  legalHoldId?: string;
+}
+
+export function listRetentionNotices(): Promise<RetentionNotice[]> {
+  return apiGet('/retention-notices');
+}
+
+export function extendRetention(
+  body: ExtendRetentionInput,
+): Promise<{ extended: number; extendedUntil: string }> {
+  return apiPost('/retention-notices/extend', body);
+}
+
 export interface LegalHold {
   id: string;
   scope: string;

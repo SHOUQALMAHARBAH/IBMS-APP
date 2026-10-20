@@ -152,11 +152,27 @@ fi
 fail=0
 check() { # name expected actual
   if [ "$2" = "$3" ]; then printf '  ok    %-56s %s\n' "$1" "$3"
-  else printf '  FAIL  %-56s expected %s, got %s\n' "$1" "$2" "$3"; fail=1; fi
+  else
+    printf '  FAIL  %-56s expected %s, got %s\n' "$1" "$2" "$3"
+    # THE FIGURE MOVED, AND MOVING THE PIN IS A RECORDED DECISION — NOT A NUMBER TO BUMP.
+    #
+    # Eight of these assertions are pinned to figures that grow with ordinary work, and that is
+    # deliberate: `PROVIDER_CODES` pinned at thirteen so a fourteenth fails until somebody records
+    # it is the same instrument. The message used to read "expected 227, got 228", which invites
+    # exactly the edit it exists to prevent, so it now says what a mismatch MEANS.
+    printf '        ^ the figure MOVED. If that was a decision, come to scripts/from-empty.sh and\n'
+    printf '          move the pin WITH THE REASON beside it. If it was not, something changed the\n'
+    printf '          shape a database reaches from nothing and the pin is the only thing that saw it.\n'
+    fail=1
+  fi
 }
 
 say "asserting the structure"
-check "permission codes seeded" 227 \
+# 227 -> 228, batch 5 group 7b: ONE code minted, `retention.extend`, granted to the template default
+# the owner measured (COMPLIANCE_OFFICER and DATA_PROTECTION_OFFICER — the pair that already holds
+# both retention-period codes). Moved here deliberately rather than derived, because a catalogue that
+# grows without anybody recording it is how a capability arrives unnoticed.
+check "permission codes seeded" 228 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
 check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"
@@ -175,7 +191,11 @@ check "RegulatoryAction RLS is ENABLEd and FORCEd" "true|true" \
   "$(psql_scratch 'SELECT relrowsecurity || '"'"'|'"'"' || relforcerowsecurity FROM pg_class WHERE oid = '"'"'"RegulatoryAction"'"'"'::regclass')"
 check "the one-provider partial unique still carries its WHERE" 1 \
   "$(psql_scratch 'SELECT count(*) FROM pg_indexes WHERE indexname = '"'"'Organization_one_provider'"'"' AND indexdef ILIKE '"'"'%WHERE%'"'"'')"
-check "composite tenant FKs" 13 \
+# 13 -> 14, batch 5 group 7b: `RetentionExtension_legalHold_same_org_fkey`, so an extension cannot
+# cite a legal hold belonging to a different office — which would make the retention of one office
+# depend on a fact it cannot see. Prisma cannot express the pair, so it is also a named entry in the
+# divergence gate's expected set.
+check "composite tenant FKs" 14 \
   "$(psql_scratch $'SELECT count(*) FROM pg_constraint WHERE contype = \'f\' AND conname LIKE \'%\\_same\\_org\\_fkey\'')"
 check "the eight reference tables are seeded" 8 \
   "$(psql_scratch 'SELECT count(*) FROM (SELECT 1 FROM "LegalForm" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "LicensingAuthority" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Country" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "City" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Bank" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Currency" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "BusinessModel" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "RatingAgency" HAVING count(*) > 0) t')"

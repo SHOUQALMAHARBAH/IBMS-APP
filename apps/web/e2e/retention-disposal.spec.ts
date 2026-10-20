@@ -38,6 +38,44 @@ const SCHEDULE = [
   },
 ];
 
+const NOTICES = [
+  {
+    recordCategory: 'CommissionLedgerEntry',
+    retentionPeriodMonths: 120,
+    resolvable: true,
+    unresolvableReason: null,
+    elapsedCount: 3,
+    elapsedRecordIds: ['cle-1', 'cle-2', 'cle-3'],
+    heldCount: 0,
+    extendedCount: 0,
+    floor: {
+      instrument: 'Commercial Law No. 12 of 1966',
+      article: 'art. 19 (المادة ١٩)',
+      operativeText: 'financial and commercial records must be kept for ten years',
+    },
+    countedFrom: 'the date the commission was paid, which closes that transaction',
+    noLegalHoldStatement: 'No legal hold stands on any of these records.',
+  },
+  {
+    // THE ROW THAT SAYS SO. An office that set a period for a category it named itself and is never
+    // alerted will believe the system is watching it — decision 28's family, and the reason this
+    // fixture carries an unresolvable row rather than only a happy one.
+    recordCategory: 'AuditLogEntry',
+    retentionPeriodMonths: 120,
+    resolvable: false,
+    unresolvableReason:
+      'This system has not been told which records this category name means, so it cannot count them and will never raise a notice for it. The period you set is recorded and the statutory floor still applies to it — but nothing here is watching the clock.',
+    elapsedCount: 0,
+    elapsedRecordIds: [],
+    heldCount: 0,
+    extendedCount: 0,
+    floor: null,
+    countedFrom: null,
+    noLegalHoldStatement:
+      'No records are counted for this category, so no legal hold has been checked.',
+  },
+];
+
 const HOLDS = [
   {
     id: 'lh-1',
@@ -92,6 +130,8 @@ async function mockRegister(
     holdsStatus?: number;
     batchesStatus?: number;
     batches?: unknown[];
+    noticesStatus?: number;
+    notices?: unknown[];
   } = {},
 ) {
   await page.route('http://localhost:4000/retention-schedule**', (route) => {
@@ -114,6 +154,11 @@ async function mockRegister(
       ? route.fulfill({ status: opts.holdsStatus, json: REFUSED })
       : route.fulfill({ status: 200, json: HOLDS }),
   );
+  await page.route('http://localhost:4000/retention-notices**', (route) =>
+    opts.noticesStatus && opts.noticesStatus !== 200
+      ? route.fulfill({ status: opts.noticesStatus, json: REFUSED })
+      : route.fulfill({ status: 200, json: opts.notices ?? NOTICES }),
+  );
   await page.route('http://localhost:4000/disposal-batches**', (route) =>
     opts.batchesStatus && opts.batchesStatus !== 200
       ? route.fulfill({ status: opts.batchesStatus, json: REFUSED })
@@ -132,7 +177,14 @@ test('lists the retention schedule, Legal Holds, and disposal batches with their
     page.getByRole('heading', { name: 'Retention & Disposal' }),
   ).toBeVisible();
 
-  await expect(page.getByRole('cell', { name: 'AuditLogEntry' })).toBeVisible();
+  // SCOPED to the schedule table: the notice table added by batch 5 group 7b also names this
+  // category, so a page-wide cell query is a strict-mode violation. Scoping is the fix; loosening
+  // the assertion would let it pass against the wrong element.
+  await expect(
+    page
+      .getByTestId('retention-schedule-table')
+      .getByRole('cell', { name: 'AuditLogEntry' }),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Confirm' })).toBeVisible();
 
   await expect(
@@ -237,6 +289,9 @@ test('a user holding NONE of the three permissions sees the translated 403 messa
     scheduleStatus: 403,
     holdsStatus: 403,
     batchesStatus: 403,
+    // FOUR panels now, so the all-of sentence needs the fourth refusal too — otherwise this test
+    // would assert a message the screen can no longer reach.
+    noticesStatus: 403,
   });
 
   await page.goto('/retention-disposal');
@@ -287,7 +342,14 @@ test('retention-disposal screen has no serious/critical accessibility violations
   await mockRegister(page);
 
   await page.goto('/retention-disposal');
-  await expect(page.getByRole('cell', { name: 'AuditLogEntry' })).toBeVisible();
+  // SCOPED to the schedule table: the notice table added by batch 5 group 7b also names this
+  // category, so a page-wide cell query is a strict-mode violation. Scoping is the fix; loosening
+  // the assertion would let it pass against the wrong element.
+  await expect(
+    page
+      .getByTestId('retention-schedule-table')
+      .getByRole('cell', { name: 'AuditLogEntry' }),
+  ).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter(
@@ -464,4 +526,73 @@ test('THE SILENT CASE — the office is shown the notice before the save, the ti
   expect(declared.noticeShown).toBe(rendered);
   // The first attempt carried none, which is what made the server ask.
   expect(bodies[0].noFloorDeclaration).toBeUndefined();
+});
+
+test('BATCH 5 GROUP 7b — the notice explains itself, an unwatched category says so, and consent is offered-but-disabled with its reason', async ({
+  page,
+}) => {
+  /*
+   * Three things only a browser can see, and each is a claim the brief makes explicitly.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegister(page);
+  await page.goto('/retention-disposal');
+
+  // ---------------------------------------------- IT EXPLAINS ITSELF
+  const resolved = page.locator('[data-notice-for="CommissionLedgerEntry"]');
+  await expect(resolved).toBeVisible();
+  // The article, the instrument and the operative text — the same ones the refusal cites.
+  await expect(resolved).toContainText('Commercial Law No. 12 of 1966');
+  await expect(resolved).toContainText('art. 19');
+  await expect(resolved).toContainText('ten years');
+  // What the count ran from, in words rather than as a column name.
+  await expect(resolved).toContainText('the date the commission was paid');
+  // And that no hold stands, stated rather than implied.
+  await expect(resolved).toContainText('No legal hold stands');
+  await expect(resolved).toContainText('3');
+
+  // ---------------------------------------------- THE UNWATCHED CATEGORY SAYS SO, ON ITS OWN ROW
+  /*
+   * Decision 28's family: silence here is the defect. Asserted on the ROW rather than page-wide,
+   * because a page-wide text assertion is the one shape that can match an unrelated element — the
+   * trap this repo has paid for four times.
+   */
+  const unwatched = page.getByTestId('retention-unwatched-AuditLogEntry');
+  await expect(unwatched).toBeVisible();
+  await expect(unwatched).toContainText('has not been told');
+  await expect(unwatched).toContainText('nothing here is watching the clock');
+
+  // ---------------------------------------------- THE BACKUP LIMIT, where destruction is offered
+  const backup = page.getByTestId('retention-backup-limit');
+  await expect(backup).toBeVisible();
+  await expect(backup).toContainText('not destruction while a backup holds');
+
+  // ---------------------------------------------- EXTEND: THE TICKLESS FORM AND THE DEAD OPTION
+  await resolved.getByRole('button', { name: 'Extend' }).click();
+  const form = page.getByTestId('retention-extend-form');
+  await expect(form).toBeVisible();
+
+  // CONSENT IS PRESENT AND DISABLED, with its reason. Removing it silently would leave a reader
+  // wondering whether consent is a basis at all — a worse confusion than being told why not.
+  const consentOption = form.locator('option[value="CUSTOMER_EXPLICIT_CONSENT"]');
+  // `toBeDisabled` does not apply to an <option>; the attribute is what the markup carries.
+  await expect(consentOption).toHaveAttribute('disabled', '');
+  await expect(page.getByTestId('retention-consent-unavailable')).toContainText(
+    'no duration',
+  );
+
+  // The submit stays disabled until the note reaches the shared ten-character minimum, so the
+  // screen never sends a request it already knows the server will refuse. Nine characters, not
+  // zero — zero cannot tell a floor from a non-empty check.
+  const submit = form.getByRole('button', { name: 'Record the extension' });
+  await expect(submit).toBeDisabled();
+  await form.getByRole('spinbutton', { name: 'Extend by (months)' }).fill('24');
+  await form
+    .getByRole('textbox', { name: 'What the office is actually relying on' })
+    .fill('too short');
+  await expect(submit).toBeDisabled();
+  await form
+    .getByRole('textbox', { name: 'What the office is actually relying on' })
+    .fill('Retained for the pending examination of the commission file.');
+  await expect(submit).toBeEnabled();
 });

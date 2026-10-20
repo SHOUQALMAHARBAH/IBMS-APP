@@ -4583,6 +4583,48 @@ same or a longer period does not; a **shortening** asks again, because the expos
 boundary is asserted at 24-does-not-ask / 23-does, because `<=` where `<` belongs re-asks on an
 unchanged period and makes the notice wallpaper within a week.
 
+**A retention period that has ended raises a NOTICE, and the notice explains itself (2026-10-21).**
+`apps/api/src/modules/pdpl/retention-resolution.config.ts` and its siblings.
+
+**It watches four categories and says so about the rest.** `recordCategory` is free text resolved to
+a model by nothing, so a notice saying "142 files" needs a declared answer to *which records* and
+*from what date*. Four are resolvable, all under the ten-year commercial floor: `Receipt.receivedAt`,
+`Remittance.remittedAt`, `CommissionLedgerEntry.paidAt`, `Settlement.clientPaymentConfirmedAt`.
+
+**The five-year AML floor has NONE, and that is measured.** Art. 17/أ counts from completing the
+transaction OR ending the relationship, whichever is longer — and `Customer` carries exactly three
+`DateTime` columns. Nine models have a `closedAt`; `Customer` is not one, and `CustomerStatus.CLOSED`
+is a state nothing stamps a date for. So the records that floor is about can never raise a notice,
+and the trigger must not be approximated: it would start a five-year clock from the wrong day.
+`Payment`, `Collection` and `BankReconciliation` name no model at all; `Invoice` is excluded because
+a due date is not a closing, and its closing is its `Receipt`.
+
+**Every category it cannot watch gets a row that says so, loudly.** An office that set a period for a
+category it named itself and is never alerted will believe the system is watching it, so silence is
+the defect rather than a tidy default.
+
+**The notice filters; it destroys nothing** — asserted as an absence over its own service and
+controller source, so a private helper reaching a disposal counts too. Nominating for destruction is
+`POST /disposal-batches`, unchanged, behind its existing dual control. The notice carries the article
+and instrument that set the floor (read through the floors config, never re-derived), what date the
+count ran from in words, and that no hold stands — with held records reported rather than quietly
+subtracted.
+
+**An extension is per RECORD and its basis is a closed list of three** — a named legislative
+provision, a live legal hold, or the customer's explicit consent. Free text may accompany a basis and
+may never be one. Consent is **unselectable**, and the reason is precise: `ConsentRecord` exists and
+carries a purpose, a grant date and a withdrawal date — and no duration — so the basis cannot be
+checked against what the customer agreed. The clock restarts, and the second notice is asserted: an
+extension is a decision, not an exit.
+
+**Nothing here may say "destroyed".** There is no backup-scoped destruction, and deleting from the
+primary database is not destruction while a backup holds the row — declared on the screen that
+offers destruction, in `disposal-batch.config.ts`, and in `docs/deferred-register.md` entry 90.
+
+**Anonymisation is NOT built, and its grain is an open decision** (register entry 89): none of the
+four resolvable records carries any identity, the identity lives on the shared `Customer`, and the
+surface is six models including the UBO register.
+
 **An office can add and correct its own lines of business (2026-09-28).** `POST /insurance-lines` and
 `PATCH /insurance-lines/:id` had no web caller, so the vocabulary this product classifies all business by
 could be read and never extended — and a broker writing a line the standard 32 do not cover had no way to

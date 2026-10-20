@@ -156,7 +156,14 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * (not one — "confirm" is not a point on the none/read/write/delete/full scale, the same reason
      * `link`, `unlink` and `discard` land in the toggle list). One verb is not a family.
      */
-    expect(PERMISSION_CATALOGUE.length).toBe(227);
+    /*
+     * BATCH 5 GROUP 7b — 227 -> 228, the first catalogue move in ten commits. `retention.extend` is
+     * ONE new code, and it lands in the TOGGLE list because "extend" is not one of the seven CRUD
+     * verbs — the same reason `confirm`, `link`, `unlink`, `nominate` and `discard` are toggles. So
+     * the FAMILY count and the family-code count do not move, and the toggle count moves by exactly
+     * one. It is OFFICE-scoped, so unlike `provider.office-state.read` it does reach this matrix.
+     */
+    expect(PERMISSION_CATALOGUE.length).toBe(228);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
@@ -168,7 +175,7 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
      * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
      */
-    expect(toggles.length).toBe(163);
+    expect(toggles.length).toBe(164);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

@@ -36,7 +36,13 @@ import { ApiError } from '../../../lib/auth/api-client';
 // TEN, imported rather than written again. The api holds this figure in exactly one place
 // (`common/declaration-reason.ts`) and the owner's instruction was that two minimums for one
 // concept is the drift we keep paying for — which applies across the boundary too.
-import { NO_FLOOR_REASON_MIN_LENGTH } from '../../../lib/pdpl/retention-disposal-api';
+import {
+  NO_FLOOR_REASON_MIN_LENGTH,
+  extendRetention,
+  listRetentionNotices,
+  type ExtendRetentionInput,
+  type RetentionNotice,
+} from '../../../lib/pdpl/retention-disposal-api';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
@@ -60,6 +66,19 @@ const LEGAL_HOLD_ROLES = [
 const DISPOSE_NOMINATE_ROLES = [
   'retention.dispose.nominate',
 ];
+/*
+ * THE NOTICE GOES TO HOLDERS OF ANY OF THE ACTS, never to a role name — the owner's standing rule,
+ * carried from the licence notice unchanged. A Branch/Department Manager who may nominate a disposal
+ * sees the same list as the Compliance Officer who may extend, and TWO DIFFERENT PEOPLE ACTING ON
+ * ONE LIST IS THE SEGREGATION WORKING rather than a defect to smooth over.
+ */
+const NOTICE_ROLES = [
+  'retention.extend',
+  'retention.dispose.nominate',
+  'retention.dispose.approve',
+];
+const EXTEND_ROLES = ['retention.extend'];
+
 const DISPOSE_APPROVE_ROLES = [
   'retention.dispose.approve',
 ];
@@ -82,6 +101,9 @@ export default function RetentionDisposalPage() {
   const canManageHolds = hasAnyPermission(user, LEGAL_HOLD_ROLES);
   const canNominate = hasAnyPermission(user, DISPOSE_NOMINATE_ROLES);
   const canApprove = hasAnyPermission(user, DISPOSE_APPROVE_ROLES);
+  // ANY of the acts — the notice is not routed to one of them.
+  const canSeeNotices = hasAnyPermission(user, NOTICE_ROLES);
+  const canExtend = hasAnyPermission(user, EXTEND_ROLES);
 
   const [schedule, setSchedule] = useState<RetentionScheduleItem[] | null>(null);
   const [holds, setHolds] = useState<LegalHold[] | null>(null);
@@ -119,6 +141,17 @@ export default function RetentionDisposalPage() {
   const [holdCustomerId, setHoldCustomerId] = useState('');
   const [holdInsuredPersonId, setHoldInsuredPersonId] = useState('');
 
+  const [notices, setNotices] = useState<RetentionNotice[] | null>(null);
+  // The extend form, keyed by category so two rows cannot share one box.
+  const [extendFor, setExtendFor] = useState<string | null>(null);
+  const [extendMonths, setExtendMonths] = useState('');
+  const [extendBasis, setExtendBasis] =
+    useState<ExtendRetentionInput['basis']>('LEGISLATIVE_PROVISION');
+  const [extendNote, setExtendNote] = useState('');
+  const [extendInstrument, setExtendInstrument] = useState('');
+  const [extendArticle, setExtendArticle] = useState('');
+  const [extendHoldId, setExtendHoldId] = useState('');
+
   const [nominateCategoryId, setNominateCategoryId] = useState('');
   const [method, setMethod] = useState<string>(DISPOSAL_METHODS[0]);
 
@@ -140,12 +173,18 @@ export default function RetentionDisposalPage() {
       },
       { key: 'holds', label: t('rdListHolds'), load: listLegalHolds },
       { key: 'batches', label: t('rdListBatches'), load: listDisposalBatches },
+      // A FOURTH INDEPENDENT PANEL, never added to a `Promise.all`: a reader refused the notice
+      // must still see the schedule, which is the defect this screen was named for.
+      { key: 'notices', label: t('rdNoticeHeading'), load: listRetentionNotices },
     ]);
     setSchedule((values.schedule as RetentionScheduleItem[] | undefined) ?? null);
     setHolds((values.holds as LegalHold[] | undefined) ?? null);
     setBatches((values.batches as DisposalBatch[] | undefined) ?? null);
+    setNotices((values.notices as RetentionNotice[] | undefined) ?? null);
     const allRefused =
-      failures.length === 3 &&
+      // 4, not 3: the threshold moves with the panel count or the all-of sentence becomes
+      // unreachable the moment a fourth refusal is possible.
+      failures.length === 4 &&
       failures.every((f) => f.error instanceof ApiError && f.error.status === 403);
     setLoadError(
       failures.length === 0
@@ -234,6 +273,37 @@ export default function RetentionDisposalPage() {
     }
   }
 
+  async function submitExtend() {
+    const category = extendFor;
+    if (!category) return;
+    await run(async () => {
+      await extendRetention({
+        recordCategory: category,
+        /*
+         * THE REAL IDS, from the notice itself. My first version sent `['*']` as a placeholder,
+         * which would have written a register row naming NO record — a false entry in the one place
+         * that exists to be justifiable. The notice returns the ids precisely so this cannot
+         * happen, and a per-file selector narrows this set rather than inventing one.
+         */
+        recordIds:
+          notices?.find((n) => n.recordCategory === category)
+            ?.elapsedRecordIds ?? [],
+        months: Number(extendMonths),
+        basis: extendBasis,
+        note: extendNote.trim(),
+        instrument: extendInstrument.trim() || undefined,
+        article: extendArticle.trim() || undefined,
+        legalHoldId: extendHoldId.trim() || undefined,
+      });
+      setExtendFor(null);
+      setExtendMonths('');
+      setExtendNote('');
+      setExtendInstrument('');
+      setExtendArticle('');
+      setExtendHoldId('');
+    });
+  }
+
   async function submitSchedule(ev: React.FormEvent) {
     ev.preventDefault();
     const recordCategory = category.trim();
@@ -304,6 +374,198 @@ export default function RetentionDisposalPage() {
       ) : null}
 
       {/* --- Retention schedule --- */}
+
+      {/*
+        THE RETENTION NOTICE — batch 5 group 7b. Placed FIRST because it is the thing that tells the
+        office there is something to decide, and B.7 rule 1 is that what a person came for is not
+        rendered last.
+
+        IT EXPLAINS ITSELF. The owner's policy paper: "an employee who clicks accept on an alert that
+        does not explain itself is an employee signing for the unknown." So every row carries which
+        article set the floor, what date the count ran from, and that no hold stands.
+      */}
+      {canSeeNotices ? (
+        <section style={sectionStyle}>
+          <h2>{t('rdNoticeHeading')}</h2>
+          {/*
+            THE BACKUP LIMITATION, on the screen that offers destruction. The owner's policy paper
+            records that deleting from the primary database is not destruction while a backup holds
+            the row, and this system has no backup-scoped destruction. A product that says
+            "destroyed" while a backup holds the row makes a false statement to a regulator.
+            `role="status"`, never `alert`: it is a standing limit, not a refusal.
+          */}
+          <p role="status" data-testid="retention-backup-limit" style={{ color: 'var(--ink-secondary)' }}>
+            {t('rdBackupLimit')}
+          </p>
+          {notices === null ? (
+            <p>{t('rdNoticeLoading')}</p>
+          ) : notices.length === 0 ? (
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoticeNone')}</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th style={head}>{t('rdNoticeColCategory')}</th>
+                    <th style={head}>{t('rdNoticeColElapsed')}</th>
+                    <th style={head}>{t('rdNoticeColBasis')}</th>
+                    <th style={head}>{t('rdNoticeColCountedFrom')}</th>
+                    <th style={head}>{t('rdNoticeColChoices')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notices.map((n) => (
+                    <tr key={n.recordCategory} data-notice-for={n.recordCategory}>
+                      <td style={cell}>{n.recordCategory}</td>
+                      <td style={cell}>
+                        {/*
+                          AN UNRESOLVABLE CATEGORY SAYS SO, LOUDLY, ON ITS OWN ROW — decision 28's
+                          family. An office that set a period for a category it named itself and is
+                          never alerted will believe the system is watching it, and silence there is
+                          the defect.
+                        */}
+                        {n.resolvable ? (
+                          n.elapsedCount
+                        ) : (
+                          <span data-testid={`retention-unwatched-${n.recordCategory}`}>
+                            {t('rdNoticeUnwatched')}
+                          </span>
+                        )}
+                      </td>
+                      <td style={cell}>
+                        {n.floor
+                          ? `${n.floor.instrument}, ${n.floor.article} — ${n.floor.operativeText}`
+                          : '—'}
+                      </td>
+                      <td style={cell}>{n.countedFrom ?? '—'}</td>
+                      <td style={cell}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span style={{ color: 'var(--ink-secondary)' }}>
+                            {n.noLegalHoldStatement}
+                          </span>
+                          {canExtend && n.resolvable && n.elapsedCount > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setExtendFor(n.recordCategory)}
+                            >
+                              {t('rdNoticeExtend')}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {extendFor ? (
+            <div
+              role="status"
+              data-testid="retention-extend-form"
+              style={{
+                margin: '0.75rem 0',
+                padding: '0.75rem',
+                border: '1px solid var(--border-default)',
+                borderRadius: '0.25rem',
+              }}
+            >
+              <h3 style={{ margin: '0 0 0.5rem' }}>
+                {t('rdNoticeExtendHeading')} — {extendFor}
+              </h3>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                {t('rdNoticeMonthsLabel')}
+                <input
+                  aria-label={t('rdNoticeMonthsLabel')}
+                  type="number"
+                  min={1}
+                  value={extendMonths}
+                  onChange={(e) => setExtendMonths(e.target.value)}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                {t('rdNoticeBasisLabel')}
+                <select
+                  aria-label={t('rdNoticeBasisLabel')}
+                  value={extendBasis}
+                  onChange={(e) =>
+                    setExtendBasis(e.target.value as ExtendRetentionInput['basis'])
+                  }
+                >
+                  <option value="LEGISLATIVE_PROVISION">
+                    {t('rdNoticeBasisLegislative')}
+                  </option>
+                  <option value="LEGAL_HOLD_OR_DISPUTE">{t('rdNoticeBasisHold')}</option>
+                  {/*
+                    CONSENT IS PRESENT AND DISABLED, with its reason beside it. An option that
+                    cannot be substantiated must not be OFFERABLE — and removing it silently would
+                    leave a reader wondering whether consent is a basis at all, which is a different
+                    and worse confusion than being told why it is unavailable.
+                  */}
+                  <option value="CUSTOMER_EXPLICIT_CONSENT" disabled>
+                    {t('rdNoticeBasisConsent')}
+                  </option>
+                </select>
+              </label>
+              <p data-testid="retention-consent-unavailable" style={{ color: 'var(--ink-secondary)' }}>
+                {t('rdNoticeConsentWhy')}
+              </p>
+              {extendBasis === 'LEGISLATIVE_PROVISION' ? (
+                <>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    {t('rdNoticeInstrumentLabel')}
+                    <input
+                      aria-label={t('rdNoticeInstrumentLabel')}
+                      value={extendInstrument}
+                      onChange={(e) => setExtendInstrument(e.target.value)}
+                    />
+                  </label>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    {t('rdNoticeArticleLabel')}
+                    <input
+                      aria-label={t('rdNoticeArticleLabel')}
+                      value={extendArticle}
+                      onChange={(e) => setExtendArticle(e.target.value)}
+                    />
+                  </label>
+                </>
+              ) : (
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  {t('rdNoticeHoldLabel')}
+                  <input
+                    aria-label={t('rdNoticeHoldLabel')}
+                    value={extendHoldId}
+                    onChange={(e) => setExtendHoldId(e.target.value)}
+                  />
+                </label>
+              )}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                {t('rdNoticeNoteLabel')}
+                <textarea
+                  aria-label={t('rdNoticeNoteLabel')}
+                  rows={3}
+                  value={extendNote}
+                  onChange={(e) => setExtendNote(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                /*
+                  Disabled until the note reaches the shared declaration minimum, so this screen
+                  never sends a request it already knows the server will refuse.
+                */
+                disabled={
+                  busy || extendNote.trim().length < NO_FLOOR_REASON_MIN_LENGTH || !extendMonths
+                }
+                onClick={() => void submitExtend()}
+              >
+                {busy ? t('rdSavingButton') : t('rdNoticeExtendSubmit')}
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <section style={sectionStyle}>
         <h2>{t('rdScheduleHeading')}</h2>
         {canManageSchedule ? (
@@ -435,7 +697,8 @@ export default function RetentionDisposalPage() {
             <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoScheduleItems')}</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+              <table
+                data-testid="retention-schedule-table" style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
                 <thead>
                   <tr>
                     <th style={head}>{t('rdColCategory')}</th>

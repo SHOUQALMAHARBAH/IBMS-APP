@@ -1603,6 +1603,13 @@ const pdpl: PermissionSeed[] = [
     roles: [COMPLIANCE, DPO],
   },
   {
+    code: "retention.extend",
+    module: "pdpl",
+    description:
+      "Extend the retention of specific records past the period set for their category, on one of exactly three bases — a named legislative provision, a live legal hold or dispute, or the customer's explicit consent. Free text may accompany a basis; it may not BE one. Every extension is recorded in the register with which records, which basis, who, when and until when, so it can be justified from one place. Extending WITHOUT legislative cover and WITHOUT the customer's consent carries real liability under the PDPL, which is why the basis is a closed list rather than a field",
+    roles: [COMPLIANCE, DPO],
+  },
+  {
     code: "retention.dispose.nominate",
     module: "pdpl",
     description: "Nominate a disposal batch (maker side of dual control)",

@@ -6,6 +6,9 @@ import { DsrController } from './dsr.controller';
 import { DsrService } from './dsr.service';
 import { DsrRepository } from '../../repositories/dsr.repository';
 import { RetentionScheduleController } from './retention-schedule.controller';
+import { RetentionNoticeController } from './retention-notice.controller';
+import { RetentionNoticeService } from './retention-notice.service';
+import { RetentionNoticeRepository } from '../../repositories/retention-notice.repository';
 import { RetentionScheduleService } from './retention-schedule.service';
 import { RetentionScheduleRepository } from '../../repositories/retention-schedule.repository';
 import { LegalHoldController } from './legal-hold.controller';
@@ -100,6 +103,8 @@ import { SlaModule } from '../sla/sla.module';
     ConsentController,
     DsrController,
     RetentionScheduleController,
+    // Batch 5 group 7b — the notice reads; it has no write path to a disposal.
+    RetentionNoticeController,
     LegalHoldController,
     DisposalBatchController,
     CrossBorderTransferController,
@@ -116,6 +121,8 @@ import { SlaModule } from '../sla/sla.module';
     DsrRepository,
     RetentionScheduleService,
     RetentionScheduleRepository,
+    RetentionNoticeService,
+    RetentionNoticeRepository,
     LegalHoldService,
     LegalHoldRepository,
     // The DSR closure gate reads one fact from it: whether a correction was recorded against a CORRECTION

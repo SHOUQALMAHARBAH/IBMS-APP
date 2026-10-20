@@ -71,6 +71,22 @@ export class LegalHoldRepository {
       .then((n) => n > 0);
   }
 
+  /**
+   * The active hold ITSELF, so a refusal can NAME it — batch 5 group 7b.
+   *
+   * `hasActiveHold` answers whether one exists, which is all the exclusion needed; the refusal that
+   * stops a person destroying records needs to say WHICH hold stands and WHY, or the reader is told
+   * only that something is in the way. Oldest-placed first, because when several stand the one that
+   * has been there longest is the one somebody is most likely to have forgotten about.
+   */
+  findActiveHold(retentionScheduleItemId: string) {
+    return this.prisma.client.legalHold.findFirst({
+      where: { retentionScheduleItemId, releasedAt: null },
+      orderBy: { placedAt: 'asc' },
+      select: { id: true, scope: true, reason: true, placedAt: true },
+    });
+  }
+
   /** Is there any currently-ACTIVE Legal Hold naming this exact data
    * subject (by `customerId` or `insuredPersonId`)? The live check behind
    * `DsrService.fulfil()`'s DELETION gate — `M04`'s "never closeable while

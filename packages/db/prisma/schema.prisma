@@ -556,6 +556,7 @@ model Organization {
   /// company. A NAMED relation, because `Organization` is already `Insurer`'s tenant through a
   /// different field and Prisma cannot tell two relations between one pair apart without a name.
   linkedInsurerRecords                Insurer[]                        @relation("InsurerRegisteredCompany")
+  retentionExtensions                 RetentionExtension[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -882,6 +883,8 @@ model User {
   retentionPeriodsConfirmed    RetentionScheduleItem[]     @relation("RetentionScheduleItemConfirmedBy")
   /// Batch 5 group 6 — the no-floor declarations this person acknowledged.
   retentionNoFloorAcknowledged RetentionScheduleItem[]     @relation("RetentionScheduleItemNoFloorAcknowledgedBy")
+  /// Batch 5 group 7b — the retention extensions this person recorded.
+  retentionExtensions          RetentionExtension[]        @relation("RetentionExtensionExtendedBy")
   mfaCredentials               MfaCredential[]
   refreshTokens                RefreshToken[]
   sessions                     UserSession[]
@@ -4797,6 +4800,64 @@ model DataSubjectRequest {
 /// documented legal-minimum retention table. `recordCategory` is unique —
 /// one schedule row per category, not a free-running log (Process #52
 /// widening: the original model had no constraint stopping a duplicate).
+/// Batch 5 group 7b — THE REGISTER OF EXTENDED RECORDS.
+///
+/// One row per RECORD extended, not a longer period on the category: the period on
+/// `RetentionScheduleItem` is one number for the whole category, so raising it would extend records
+/// nobody was asked about — and the register has to name WHICH records were extended.
+///
+/// The basis is a CLOSED LIST OF THREE and the database holds it to that, because
+/// `RetentionScheduleItem.legalBasis` is a free `String?` and the adviser's position is that
+/// extending without legislative cover or the customer's consent "carries high legal risk". Each
+/// basis carries what makes it substantiable, by CHECK.
+model RetentionExtension {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  /// The category as the office typed it, matched case- and separator-insensitively in code.
+  recordCategory String
+  /// NO foreign key, deliberately: the four resolvable categories are four different models, so a
+  /// real FK would need four nullable columns and a four-way CHECK. `Customer.ownerUserId` is the
+  /// precedent, and its cost is the same — Postgres will accept any string here.
+  recordId       String
+
+  /// When the EXTENDED clock elapses. The notice reads this, so the same notice comes again with
+  /// the same three choices once it passes — which makes an extension a decision, not an exit.
+  extendedUntil DateTime
+
+  basis RetentionExtensionBasis
+  /// Free text ACCOMPANIES a basis and may not BE one. NOT NULL: the basis says which KIND of cover
+  /// was claimed, the note says what the office was actually relying on.
+  note  String
+
+  legislativeInstrument String?
+  legislativeArticle    String?
+  /// `onDelete: Restrict` EXPLICITLY — a basis pointing at a hold nobody can find is an extension
+  /// that cannot be justified, which is the whole point of the register.
+  legalHoldId           String?
+  legalHold             LegalHold? @relation(fields: [legalHoldId], references: [id], onDelete: Restrict)
+  consentRecordId       String?
+  consentDuration       String?
+  consentPurpose        String?
+
+  extendedByUserId String   @default(dbgenerated())
+  extendedBy       User     @relation("RetentionExtensionExtendedBy", fields: [extendedByUserId], references: [id], onDelete: Restrict)
+  extendedAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, recordCategory, recordId, extendedUntil(sort: Desc)], map: "RetentionExtension_lookup_idx")
+  @@index([legalHoldId])
+  @@index([extendedByUserId])
+}
+
+enum RetentionExtensionBasis {
+  LEGISLATIVE_PROVISION
+  LEGAL_HOLD_OR_DISPUTE
+  CUSTOMER_EXPLICIT_CONSENT
+}
+
 model RetentionScheduleItem {
   id                        String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
@@ -4903,11 +4964,16 @@ model LegalHold {
   releasedAt              DateTime?
   retentionScheduleItemId String?
   retentionScheduleItem   RetentionScheduleItem? @relation(fields: [retentionScheduleItemId], references: [id])
+  /// Batch 5 group 7b — extensions citing this hold as their basis.
+  retentionExtensions     RetentionExtension[]
   customerId              String?
   customer                Customer?              @relation(fields: [customerId], references: [id])
   insuredPersonId         String?
   insuredPerson           InsuredPerson?         @relation(fields: [insuredPersonId], references: [id])
 
+  /// Batch 5 group 7b — the pair `RetentionExtension`'s composite tenant FK references, so an
+  /// extension cannot cite another office's hold. The `Insurer` / `Role` precedent.
+  @@unique([id, organizationId])
   @@index([retentionScheduleItemId])
   @@index([releasedAt])
   @@index([customerId])

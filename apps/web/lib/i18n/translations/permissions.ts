@@ -282,6 +282,8 @@ export const PERMISSIONS = {
     'perm:retention-case.manage': 'يدير حالة محافظة على عميل فُتحت لأن وثيقته قاربت الانتهاء أو خمد تعامله',
     'perm:retention-schedule.update':
       'يحدّد حاملُها مدّةَ الاحتفاظ لفئةِ سجلاتٍ وسندَها القانوني. وهو النصفُ الأوّلُ من زوجِ فصلِ المهام: من يحدّد المدّة لا يستطيع تأكيدَها بوصفه المستشارَ القانوني، إلّا إذا أعلن المكتبُ دمجَ المهام فيُسجَّل الفعل. ومن يملكها يحدّد متى يصير إتلافُ بيانات الناس مشروعاً — لأضيق عدد.',
+    'perm:retention.extend':
+      'تمديدُ مدّةِ الاحتفاظِ بسجلّاتٍ بعينِها بعد انتهاءِ المدّةِ المحدّدةِ لفئتِها، على أحدِ ثلاثةِ أسبابٍ حصراً: نصٌّ تشريعيٌّ مُسمّى، أو حجزٌ قانونيٌّ أو نزاعٌ قائم، أو موافقةٌ صريحةٌ من العميل. والنصُّ الحرُّ يُرافقُ السببَ ولا يكونُ هو السبب. وكلُّ تمديدٍ يُدوَّنُ في السجلِّ: أيُّ سجلّات، وبأيِّ سبب، ومن مدَّدَها، ومتى، وإلى متى.',
     'perm:retention-schedule.confirm':
       'يؤكّد حاملُها مدّةَ الاحتفاظ بوصفه المستشارَ القانوني، فيُثبَّت التاريخُ ومعه الفاعل. وهو النصفُ الثاني من الزوج: يُرفَض على من حدّد المدّة نفسَه، إلّا إذا أعلن المكتبُ دمجَ المهام فيُسجَّل الإعلانُ على السجلّ.',
     'perm:retention.dispose.approve': 'يعتمد دفعة إتلاف نهائياً. الطرف الثاني من رقابة مزدوجة، ولا يجوز أن يكون هو من رشّحها',
@@ -520,6 +522,8 @@ export const PERMISSIONS = {
     'perm:retention-case.manage': 'Manage a retention case opened on renewal inactivity/lapse risk',
     'perm:retention-schedule.update':
       "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded",
+    'perm:retention.extend':
+      'Extend the retention of specific records past the period set for their category, on one of exactly three bases: a named legislative provision, a live legal hold or dispute, or the explicit consent of the customer. Free text accompanies a basis and may not be one. Every extension is recorded in the register — which records, which basis, who extended it, when, and until when.',
     'perm:retention-schedule.confirm':
       'Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row',
     'perm:retention.dispose.approve': 'Give final DPO approval on a disposal batch (checker side of dual control)',
