@@ -31,6 +31,20 @@ export interface CompanyIdentity {
   commercialRegistrationNo: string | null;
   taxNumber: string | null;
   insurerLicenseNumber: string | null;
+  /**
+   * BATCH 5 GROUP 7d — the DERIVED licence standing. Hand-copied over HTTP like everything else in
+   * this file, so when the api view changes this type, the screen and every Playwright mock move in
+   * the SAME commit — the customer-import panel is why that rule exists.
+   */
+  licenseStanding: {
+    standing: 'NO_TERM_ON_RECORD' | 'CURRENT' | 'EXPIRED';
+    currentTerm: {
+      licenseNumber: string;
+      issuedAt: string | null;
+      expiresAt: string;
+    } | null;
+    termCount: number;
+  };
   legalForm: NamedRow | null;
   licensingAuthority: NamedRow | null;
   businessModel: NamedRow | null;

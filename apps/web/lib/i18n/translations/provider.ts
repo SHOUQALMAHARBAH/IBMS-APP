@@ -33,6 +33,8 @@ export const PROVIDER = {
     regInsCode: 'رمز الشركة',
     regInsShortName: 'الاسم المختصر',
     regInsLicenseNo: 'رقم الترخيص',
+    regInsLicenseExpiry: 'تاريخُ انتهاءِ الترخيصِ كما هو مطبوعٌ على الشهادة',
+    regInsLicenseIssued: 'تاريخُ إصدارِ الترخيص — إن كان مطبوعاً',
     regInsBusinessModel: 'نمط النشاط',
     regInsLicensedLines: 'فروع التأمين المرخَّص بها',
     regInsLicensedLinesHint:
@@ -188,6 +190,8 @@ export const PROVIDER = {
     regInsCode: 'Company code',
     regInsShortName: 'Short name',
     regInsLicenseNo: 'Licence number',
+    regInsLicenseExpiry: 'When the licence expires, as printed on the certificate',
+    regInsLicenseIssued: 'When it was issued — if the certificate prints one',
     regInsBusinessModel: 'Business model',
     regInsLicensedLines: 'Licensed lines of business',
     regInsLicensedLinesHint:

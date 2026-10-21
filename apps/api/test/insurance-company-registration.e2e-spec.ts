@@ -74,6 +74,10 @@ function validCompany(over: Record<string, unknown> = {}) {
     commercialRegistrationNo: unique('ICR'),
     taxNumber: unique('ITAX'),
     insurerLicenseNumber: unique('CBJ-INS'),
+    // BATCH 5 GROUP 7d — the licence EXPIRY is required now, because the standing is derived
+    // from it. Far in the future so this fixture reads CURRENT rather than depending on when
+    // the suite happens to run.
+    insurerLicenseExpiresAt: '2099-12-31',
     licensingAuthorityId,
     businessModelId,
     licensedLineIds: generalLineIds.slice(0, 2),
@@ -104,6 +108,15 @@ async function deleteCompany(organizationId: string) {
   ).toBe(0);
 
   await rawPrisma.insurerLicensedLine.deleteMany({
+    where: { insuranceCompanyId: organizationId },
+  });
+  /*
+   * BATCH 5 GROUP 7d — the licence terms. `ON DELETE RESTRICT` on `insuranceCompanyId`, so leaving
+   * these behind makes the organization UNDELETABLE and every later spec fails at `createTestApp`
+   * with a fault that looks like its own. That has happened twice in this repository, which is why
+   * `check:seed-sweeps` exists, and the lesson applies to a spec teardown identically.
+   */
+  await rawPrisma.insuranceCompanyLicenseTerm.deleteMany({
     where: { insuranceCompanyId: organizationId },
   });
   /*
@@ -538,4 +551,100 @@ describe('the boundary — who may register a company', () => {
     await rawPrisma.rolePermission.deleteMany({ where: { roleId: role.id } });
     await rawPrisma.role.deleteMany({ where: { id: role.id } });
   }, 300_000);
+
+  it('BATCH 5 GROUP 7d — the licence term is written at registration, and a renewal APPENDS rather than overwriting', async () => {
+    const expiresAt = '2099-12-31';
+    const issuedAt = '2024-01-15';
+    const licenseNumber = unique('CBJ-INS-7D');
+
+    const response = await register(
+      validCompany({
+        insurerLicenseNumber: licenseNumber,
+        insurerLicenseExpiresAt: expiresAt,
+        insurerLicenseIssuedAt: issuedAt,
+      }),
+    );
+    expect(response.status).toBe(201);
+    const companyId = (response.body as RegisteredCompany).id;
+
+    // ---------------------------------------------- THE TERM, read back off the DATABASE
+    // Not off the response: the response is this service's own claim about what it wrote.
+    const terms = await rawPrisma.insuranceCompanyLicenseTerm.findMany({
+      where: { insuranceCompanyId: companyId },
+      select: { licenseNumber: true, issuedAt: true, expiresAt: true },
+    });
+    expect(terms).toHaveLength(1);
+    expect(terms[0].licenseNumber).toBe(licenseNumber);
+    expect(terms[0].expiresAt.toISOString().slice(0, 10)).toBe(expiresAt);
+    expect(terms[0].issuedAt?.toISOString().slice(0, 10)).toBe(issuedAt);
+
+    // AND NO STATUS WAS STORED. The migration asserts the column cannot exist; this asserts against
+    // the real row, so the two halves of «حالة الترخيص لا تُخزَّن» are both covered.
+    const raw = await rawPrisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      `SELECT * FROM "InsuranceCompanyLicenseTerm" WHERE "insuranceCompanyId" = $1`,
+      companyId,
+    );
+    expect(raw).toHaveLength(1);
+    expect(
+      Object.keys(raw[0]).filter((k) => k.toLowerCase().includes('status')),
+    ).toEqual([]);
+
+    // ---------------------------------------------- A RENEWAL APPENDS
+    /*
+     * The series is the point, and the broker's licence learned it the hard way: its `renew` was an
+     * `updateMany` over one row, so the term being replaced was ERASED and the office could not show
+     * a regulator what it had been licensed for last period.
+     */
+    await rawPrisma.insuranceCompanyLicenseTerm.create({
+      data: {
+        insuranceCompanyId: companyId,
+        licenseNumber: `${licenseNumber}-R2`,
+        expiresAt: new Date('2100-12-31T00:00:00.000Z'),
+      },
+    });
+    const afterRenewal = await rawPrisma.insuranceCompanyLicenseTerm.findMany({
+      where: { insuranceCompanyId: companyId },
+    });
+    expect(
+      afterRenewal,
+      'a renewal APPENDS — the previous term must still be on record',
+    ).toHaveLength(2);
+  }, 180_000);
+
+  it('BATCH 5 GROUP 7d — the EXPIRY is required, an impossible date is refused, and the issue date is optional', async () => {
+    // ---------------------------------------------- no expiry -> 400 at the boundary
+    /*
+     * Required because it is the only date the derivation cannot do without: with no expiry there is
+     * no CURRENT and no EXPIRED, only "no term on record" — true and useless, since the provider
+     * typing the number is reading the certificate the expiry is printed on.
+     */
+    const noExpiry = validCompany() as Record<string, unknown>;
+    delete noExpiry.insurerLicenseExpiresAt;
+    const missing = await register(noExpiry);
+    expect(missing.status).toBe(400);
+
+    // ---------------------------------------------- a date that does not exist -> 400
+    // `@IsCalendarDate`, not a shape match: 30 February parses cleanly to 2 March, which would store
+    // a date nobody typed — the defect that class of validator exists for.
+    const impossible = await register(
+      validCompany({ insurerLicenseExpiresAt: '2027-02-30' }),
+    );
+    expect(impossible.status).toBe(400);
+
+    // ---------------------------------------------- and WITHOUT an issue date it succeeds
+    const ok = await register(
+      validCompany({ insurerLicenseExpiresAt: '2099-06-30' }),
+    );
+    expect(ok.status).toBe(201);
+    const terms = await rawPrisma.insuranceCompanyLicenseTerm.findMany({
+      where: {
+        insuranceCompanyId: (ok.body as RegisteredCompany).id,
+      },
+      select: { issuedAt: true },
+    });
+    expect(terms).toHaveLength(1);
+    // NULL, not refused: a certificate may not print an issue date, and losing the whole term over
+    // it would lose the expiry too.
+    expect(terms[0].issuedAt).toBeNull();
+  }, 180_000);
 });

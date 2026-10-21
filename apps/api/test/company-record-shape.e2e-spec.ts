@@ -185,6 +185,14 @@ describe("the company's own registry record — what the response carries", () =
       'legalForm',
       'legalName',
       'legalNameAr',
+      // BATCH 5 GROUP 7d — the DERIVED licence standing. This guard failing on it is the guard
+      // working: an exact key set is what catches a convenient key somebody added, so a deliberate
+      // one has to be recorded here. It carries no secret — three states, the term it was derived
+      // from so a reader can check the arithmetic, and a count.
+      //
+      // Between `legalNameAr` and `licensingAuthority`, because the assertion compares a SORTED
+      // list: 'licenseS' < 'licensi'.
+      'licenseStanding',
       'licensingAuthority',
       'nationalEstablishmentNo',
       'phone',
@@ -277,6 +285,100 @@ describe("the company's own registry record — what the response carries", () =
     // The null branch, which is the state a company is in the moment it is registered.
     expect(body.certificate).toBeNull();
   }, 300_000);
+
+  it('BATCH 5 GROUP 7d — derives the licence standing from the recorded terms, and stores it nowhere', async () => {
+    /*
+     * THREE STATES, walked in one test against the SAME company, because the distinction between
+     * them is the thing worth proving. "No term on record" is a missing fact about OUR records;
+     * "expired" is a statement about the company's licence. The broker side learned that the hard
+     * way — `isCurrentlyLapsed === null` collapsed into `true` reports an expiry nobody recorded.
+     */
+    // NO CAST: `ownRecord`'s return type already carries the standing, so the compiler checks every
+    // field name below. The first version cast it to `Record<string, unknown>` and `tsc` refused —
+    // correctly, because the cast was throwing away exactly the checking that makes this test useful.
+    const read = async () =>
+      (await readOwnRecord(companyId)).identity.licenseStanding;
+
+    // ---------------------------------------------- (1) NO TERM ON RECORD — the fixture has none
+    const none = await read();
+    expect(none.standing).toBe('NO_TERM_ON_RECORD');
+    expect(none.currentTerm).toBeNull();
+    expect(none.termCount).toBe(0);
+
+    const ids: string[] = [];
+    try {
+      // ---------------------------------------------- (2) CURRENT
+      const current = await rawPrisma.insuranceCompanyLicenseTerm.create({
+        data: {
+          insuranceCompanyId: companyId,
+          licenseNumber: 'SHAPE-7D-1',
+          issuedAt: new Date('2024-01-01T00:00:00.000Z'),
+          expiresAt: new Date('2099-12-31T00:00:00.000Z'),
+        },
+        select: { id: true },
+      });
+      ids.push(current.id);
+      const now = await read();
+      expect(now.standing).toBe('CURRENT');
+      // THE ARITHMETIC IS CHECKABLE from the response: a standing with no term behind it is an
+      // assertion the reader has to take on trust.
+      expect(now.currentTerm).toMatchObject({
+        licenseNumber: 'SHAPE-7D-1',
+        expiresAt: '2099-12-31T00:00:00.000Z',
+      });
+      expect(now.termCount).toBe(1);
+
+      // ---------------------------------------------- (3) A SERIES, and the LATEST expiry decides
+      /*
+       * An expired term is ADDED beside the current one. A reading that picked "the term covering
+       * today" would be indistinguishable from this one on a single term, which is why the series
+       * case is asserted rather than assumed: it must still read CURRENT.
+       */
+      const old = await rawPrisma.insuranceCompanyLicenseTerm.create({
+        data: {
+          insuranceCompanyId: companyId,
+          licenseNumber: 'SHAPE-7D-0',
+          expiresAt: new Date('2020-12-31T00:00:00.000Z'),
+        },
+        select: { id: true },
+      });
+      ids.push(old.id);
+      const series = await read();
+      expect(series.standing).toBe('CURRENT');
+      expect(series.termCount).toBe(2);
+      expect(series.currentTerm).toMatchObject({ licenseNumber: 'SHAPE-7D-1' });
+
+      // ---------------------------------------------- (4) EXPIRED once the newest has passed
+      await rawPrisma.insuranceCompanyLicenseTerm.delete({
+        where: { id: current.id },
+      });
+      ids.splice(ids.indexOf(current.id), 1);
+      const expired = await read();
+      expect(expired.standing).toBe('EXPIRED');
+      expect(expired.currentTerm).toMatchObject({
+        licenseNumber: 'SHAPE-7D-0',
+      });
+
+      // ---------------------------------------------- AND IT IS STORED NOWHERE
+      // The migration asserts no status COLUMN can exist; this asserts that nothing wrote the
+      // standing onto the organization either, which is where a convenient cache would land.
+      // No cast: `$queryRawUnsafe` already returns this shape, and lint refused the redundant one
+      // — an unnecessary assertion is what hides a real type change later.
+      const org = await rawPrisma.$queryRawUnsafe<Record<string, unknown>[]>(
+        `SELECT * FROM "Organization" WHERE id = $1`,
+        companyId,
+      );
+      expect(
+        Object.keys(org[0]).filter((k) =>
+          k.toLowerCase().includes('licensestanding'),
+        ),
+      ).toEqual([]);
+    } finally {
+      for (const id of ids) {
+        await rawPrisma.insuranceCompanyLicenseTerm.delete({ where: { id } });
+      }
+    }
+  }, 180_000);
 
   it('REFUSES a brokerage office with a sentence naming the type, never an empty body', async () => {
     /*

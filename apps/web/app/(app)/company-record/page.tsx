@@ -162,6 +162,65 @@ export default function CompanyRecordPage() {
               'companyInsurerLicenseNumber',
               record.identity.insurerLicenseNumber,
             )}
+            {/*
+              BATCH 5 GROUP 7d — THE DERIVED LICENCE STANDING, on the company's own record and
+              NOWHERE ELSE. It gates nothing: we hold no article gating an office's dealings with a
+              company whose recorded licence has run out, and
+              `insurance-company-license.inventory.spec.ts` asserts that no service refuses, warns or
+              branches on it.
+
+              THREE STATES, and the third is worded as a fact about OUR RECORDS rather than about the
+              company: "we hold no licence term on record" is not "expired". Telling a company its
+              licence has expired when what is true is that nobody wrote one down is a false
+              statement about its regulatory standing — the `isCurrentlyLapsed === null` lesson from
+              the broker side, where collapsing the two reported an expiry nobody had recorded.
+            */}
+            {field(
+              'companyLicenseStanding',
+              t(
+                record.identity.licenseStanding.standing === 'CURRENT'
+                  ? 'companyLicenseStandingCurrent'
+                  : record.identity.licenseStanding.standing === 'EXPIRED'
+                    ? 'companyLicenseStandingExpired'
+                    : 'companyLicenseStandingNone',
+              ),
+            )}
+            {/*
+              AND IT SAYS WHAT IT IS AND WHAT IT IS NOT. Two clauses, both load-bearing: the standing
+              is DERIVED from the recorded expiry rather than stored (so a reader does not hunt for a
+              field to correct), and NOTHING is refused or warned because of it (so a reader does not
+              assume a gate they cannot see). `role="status"`, never `alert` — it is a description of
+              a figure, not a finding about it.
+            */}
+            <p
+              role="status"
+              data-testid="company-license-standing-derived"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              {t('companyLicenseStandingDerived')}
+            </p>
+            {record.identity.licenseStanding.currentTerm ? (
+              <>
+                {field(
+                  'companyLicenseExpiresAt',
+                  record.identity.licenseStanding.currentTerm.expiresAt.slice(
+                    0,
+                    10,
+                  ),
+                )}
+                {field(
+                  'companyLicenseIssuedAt',
+                  record.identity.licenseStanding.currentTerm.issuedAt?.slice(
+                    0,
+                    10,
+                  ) ?? null,
+                )}
+                {field(
+                  'companyLicenseTermCount',
+                  String(record.identity.licenseStanding.termCount),
+                )}
+              </>
+            ) : null}
             {field('companyLegalForm', named(record.identity.legalForm))}
             {field(
               'companyLicensingAuthority',

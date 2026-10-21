@@ -4635,6 +4635,19 @@ extension is a decision, not an exit.
 primary database is not destruction while a backup holds the row — declared on the screen that
 offers destruction, in `disposal-batch.config.ts`, and in `docs/deferred-register.md` entry 90.
 
+**An insurance company's licence term is recorded and its standing is DERIVED (2026-10-21).**
+`InsuranceCompanyLicenseTerm` is a series — licence number, issue date, expiry — written at
+registration, and the standing (no term on record / current / expired) is computed from it and shown
+on the company's own record and nowhere else. **It gates nothing**: this product holds no article
+gating an office's dealings with a company whose recorded licence has run out, so a refusal would
+enforce a reading nobody has made, and `insurance-company-license.inventory.spec.ts` SWEEPS every
+non-spec api file to keep the standing out of every other module. It borrows no article from the
+broker's lapse rule either — art. 10/b, art. 11 and art. 21/a/9 are broker articles. There is no
+status column and the migration refuses one by name shape. When the gateway module exists, whether
+an expired recorded licence declares itself at a contract request is the owner's decision —
+`docs/deferred-register.md` entries 95-96, which also record that 7d supersedes two earlier notes
+saying the company had no term to model.
+
 **Anonymisation is NOT built, and its grain is an open decision** (register entry 89): none of the
 four resolvable records carries any identity, the identity lives on the shared `Customer`, and the
 surface is six models including the UBO register. **The consequence is accepted and said on the

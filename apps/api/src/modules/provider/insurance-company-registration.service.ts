@@ -220,6 +220,30 @@ export class InsuranceCompanyRegistrationService {
         });
 
         /*
+         * BATCH 5 GROUP 7d — THE FIRST LICENCE TERM, which opens the series.
+         *
+         * In the SAME transaction as the organization, deliberately: a company registered with a
+         * licence number and no term would read as "no term on record" on its own screen — true,
+         * and useless, because the provider typing the number was reading the certificate the
+         * expiry is printed on. The two cannot be allowed to come apart.
+         *
+         * The STANDING is not written. It is derived from these dates by
+         * `deriveCompanyLicenseStanding`, and there is no status column — the DTO's #12 records that
+         * decision and the migration asserts it by name shape.
+         */
+        await tx.insuranceCompanyLicenseTerm.create({
+          data: {
+            insuranceCompanyId: organizationId,
+            licenseNumber: dto.insurerLicenseNumber,
+            expiresAt: new Date(`${dto.insurerLicenseExpiresAt}T00:00:00.000Z`),
+            issuedAt:
+              dto.insurerLicenseIssuedAt === undefined
+                ? null
+                : new Date(`${dto.insurerLicenseIssuedAt}T00:00:00.000Z`),
+          },
+        });
+
+        /*
          * ITEM (f), THE COMPANY HALF — the role is created WITH the company, exactly as the office's
          * is, so the invite has something to grant and never has to create a role itself.
          *

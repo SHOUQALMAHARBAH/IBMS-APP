@@ -174,6 +174,13 @@ export interface RegisterInsuranceCompanyInput {
   commercialRegistrationNo: string;
   taxNumber: string;
   insurerLicenseNumber: string;
+  /**
+   * BATCH 5 GROUP 7d — the licence term's dates. The EXPIRY is required (it is the only date the
+   * standing derivation cannot do without) and the issue date is not, because a certificate may not
+   * print one. Hand-copied over HTTP, so this type and the DTO move together.
+   */
+  insurerLicenseExpiresAt: string;
+  insurerLicenseIssuedAt?: string;
   licensingAuthorityId: string;
   businessModelId: string;
   licensedLineIds: string[];

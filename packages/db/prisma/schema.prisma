@@ -351,10 +351,15 @@ model Organization {
   insurerLicenseNumber     String?
   /// MODULE 0-ب ITEM (e) — the INSURANCE COMPANY's licence certificate.
   ///
-  /// On the organization rather than on a term, because the v2 insurer sheet carries a licence
-  /// number and a licensing authority and NO issue or expiry date — unlike the broker sheet, whose
-  /// licence item (c) made a series of terms. Inventing a term series would be building a structure
-  /// for dates the form never collects.
+  /// On the organization rather than on a term — and the ORIGINAL REASON HAS BEEN SUPERSEDED, batch
+  /// 5 group 7d. It read: "the v2 insurer sheet carries a licence number and a licensing authority
+  /// and NO issue or expiry date … inventing a term series would be building a structure for dates
+  /// the form never collects". The sheet still carries no dates; the owner's 7d brief asks for them,
+  /// so the FORM now collects them and `InsuranceCompanyLicenseTerm` is that series.
+  ///
+  /// The certificate stays HERE rather than moving onto a term: one home for one fact, and moving it
+  /// is not in 7d's brief. A per-term certificate would also reinstate the circular foreign key the
+  /// note below describes.
   ///
   /// Its own `DocumentCategory` value (`INSURER_LICENSE_CERTIFICATE`), never the broker's: art. 82 of
   /// Law No. 12 of 2021 lists brokers and insurance companies as different kinds of service provider
@@ -558,6 +563,8 @@ model Organization {
   linkedInsurerRecords                Insurer[]                        @relation("InsurerRegisteredCompany")
   retentionExtensions                 RetentionExtension[]
   retentionArchiveRetrievals          RetentionArchiveRetrieval[]
+  /// Batch 5 group 7d — this company's own licence terms, when it is an INSURANCE_COMPANY.
+  insuranceCompanyLicenseTerms        InsuranceCompanyLicenseTerm[]    @relation("OrganizationInsuranceCompanyLicenseTerms")
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -6206,6 +6213,47 @@ model OfficeInsuranceLine {
 /// trade, so the licence would appear to change with no regulatory act behind it. The rule is recorded
 /// in `docs/deferred-register.md`: each screen names which it is showing, and neither is derived from
 /// the other.
+/// MODULE 0-ب CLOSE, batch 5 group 7d — THE INSURANCE COMPANY'S LICENCE TERM, as a SERIES.
+///
+/// The standing (no term on record / current / expired) is DERIVED from these rows and has NO
+/// column — the registration DTO's #12 records that decision and the migration asserts it by name
+/// shape, so `status`, `licenseStatus` and `licenseStatusId` are all refused.
+///
+/// NO `organizationId` and NO RLS, the `InsurerLicensedLine` shape below: a licence term is a fact
+/// ABOUT the company, and the provider that registered it and the company reading its own record are
+/// both legitimate readers. A tenant-scoped row would hide it from one of them — and with no
+/// `organizationId` the extension sets no `app.current_org_id` for this model, so a policy would
+/// match nothing and the table would read empty for everyone.
+///
+/// NO `renewalRequestedAt` and NO certificate column, each for a stated reason in the migration
+/// header: art. 11 is a BROKER article, and the company's certificate already has one home on
+/// `Organization.insurerLicenseCertificateDocumentId`.
+model InsuranceCompanyLicenseTerm {
+  id String @id @default(uuid())
+
+  /// The INSURANCE COMPANY this term belongs to. Supplied EXPLICITLY — no `@default(dbgenerated())`,
+  /// because nothing scopes this table and nothing should.
+  insuranceCompanyId String
+  insuranceCompany   Organization @relation("OrganizationInsuranceCompanyLicenseTerms", fields: [insuranceCompanyId], references: [id], onDelete: Restrict)
+
+  licenseNumber String
+  /// NULLABLE: a certificate may not print an issue date, and refusing the term over it would lose
+  /// the expiry too — the only date the derivation needs. `BrokerLicense.issuedAt` is nullable for
+  /// the same reason.
+  issuedAt      DateTime?
+  /// NOT NULL — a term with no expiry cannot produce CURRENT or EXPIRED, so it would be a row that
+  /// looks like a term and answers nothing.
+  expiresAt     DateTime
+
+  createdAt DateTime @default(now())
+
+  /// An ordinary compound unique, NOT the two-partial-index shape the broker sibling needs: all
+  /// three columns are NOT NULL, so there is nothing nullable for Postgres to treat as distinct and
+  /// the § 1.25 trap cannot apply.
+  @@unique([insuranceCompanyId, licenseNumber, expiresAt], map: "InsuranceCompanyLicenseTerm_one_term_per_number_and_expiry")
+  @@index([insuranceCompanyId])
+}
+
 model InsurerLicensedLine {
   id String @id @default(uuid())
 

@@ -78,6 +78,8 @@ const EMPTY: Form = {
   commercialRegistrationNo: '',
   taxNumber: '',
   insurerLicenseNumber: '',
+  insurerLicenseExpiresAt: '',
+  insurerLicenseIssuedAt: '',
   licensingAuthorityId: '',
   businessModelId: '',
   certificateFileName: '',
@@ -232,6 +234,13 @@ export default function RegisterInsuranceCompanyPage() {
         commercialRegistrationNo: form.commercialRegistrationNo.trim(),
         taxNumber: form.taxNumber.trim(),
         insurerLicenseNumber: form.insurerLicenseNumber.trim(),
+        insurerLicenseExpiresAt: form.insurerLicenseExpiresAt,
+        // OMITTED rather than sent empty when it is blank: the DTO treats it as optional through
+        // `emptyStringToUndefined`, and sending '' would reach `IsCalendarDate` as a value and be
+        // refused — which is how an optional field becomes mandatory by accident.
+        ...(form.insurerLicenseIssuedAt
+          ? { insurerLicenseIssuedAt: form.insurerLicenseIssuedAt }
+          : {}),
         licensingAuthorityId: form.licensingAuthorityId,
         businessModelId: form.businessModelId,
         licensedLineIds: selectedLines,
@@ -336,6 +345,22 @@ export default function RegisterInsuranceCompanyPage() {
           <div style={fieldRow}>
             {text('insurerLicenseNumber', t('regInsLicenseNo'), {
               required: true,
+            })}
+            {/*
+              BATCH 5 GROUP 7d — THE TWO DATES, which is what makes the licence standing derivable.
+              Without them the term columns would be unpopulatable by any path, which is the
+              capability-nobody-can-exercise class this module has measured twice.
+
+              THE EXPIRY IS REQUIRED and the issue date is not: the expiry is the only date the
+              derivation cannot do without, while a certificate may not print an issue date at all —
+              the same judgement `BrokerLicense.issuedAt` already makes.
+            */}
+            {text('insurerLicenseExpiresAt', t('regInsLicenseExpiry'), {
+              type: 'date',
+              required: true,
+            })}
+            {text('insurerLicenseIssuedAt', t('regInsLicenseIssued'), {
+              type: 'date',
             })}
             {picker(
               'licensingAuthorityId',

@@ -1,3 +1,4 @@
+import { IsCalendarDate } from '../../../common/is-calendar-date.validator';
 import {
   ArrayMinSize,
   ArrayUnique,
@@ -93,11 +94,42 @@ export class RegisterInsuranceCompanyDto {
 
   // ------------------------------------------------------------- licensing and activity (#10-#14)
 
-  /** #10 — `Organization.insurerLicenseNumber`. A SINGLE number, not a series of terms: the insurer
-   *  sheet carries no issue or expiry date, unlike the broker sheet, so there is no term to model. */
+  /**
+   * #10 — the licence number.
+   *
+   * CORRECTED, batch 5 group 7d. This comment used to read: *"A SINGLE number, not a series of
+   * terms: the insurer sheet carries no issue or expiry date, unlike the broker sheet, so there is
+   * no term to model."* That reason was sound and its premise has moved — the owner's 7d brief asks
+   * for the term, because without an expiry no licence STANDING can be derived at all.
+   *
+   * So the number now opens a SERIES: it is written both here, where the company's current number
+   * lives, and onto the company's first `InsuranceCompanyLicenseTerm` with the two dates below. A
+   * renewal appends a term; this column is not the series.
+   */
   @IsString()
   @Length(1, 40)
   insurerLicenseNumber!: string;
+
+  /**
+   * #10b — WHEN THE LICENCE EXPIRES. The one date the derivation cannot do without: with no expiry
+   * there is no CURRENT and no EXPIRED, only "no term on record".
+   *
+   * REQUIRED, unlike its issue date. The alternative is a company registered with a licence number
+   * and no term, whose record then says we hold no licence term for it — which is true and useless,
+   * since the provider typing the number is reading the certificate the expiry is printed on.
+   */
+  @IsCalendarDate()
+  insurerLicenseExpiresAt!: string;
+
+  /**
+   * #10c — when it was issued. OPTIONAL, and that is the same judgement
+   * `BrokerLicense.issuedAt` already makes: a certificate may not print one, and refusing the whole
+   * term over it would lose the expiry too.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsCalendarDate()
+  insurerLicenseIssuedAt?: string;
 
   /** #11 */
   @IsUUID()

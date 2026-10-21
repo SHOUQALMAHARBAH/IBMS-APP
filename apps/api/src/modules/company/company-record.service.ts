@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { deriveCompanyLicenseStanding } from './insurance-company-license.config';
 import { AuditService } from '../audit/audit.service';
 
 /**
@@ -126,6 +127,27 @@ export class CompanyRecordService {
       },
     );
 
+    /*
+     * BATCH 5 GROUP 7d — THE LICENCE TERMS, and the STANDING DERIVED FROM THEM.
+     *
+     * Read here and NOWHERE ELSE, which is the brief: the standing is shown on the company's own
+     * record and on no other surface. It gates nothing — we hold no article gating an office's
+     * dealings with a company whose licence has lapsed, and
+     * `insurance-company-license.inventory.spec.ts` asserts that no service refuses, warns or
+     * branches on it.
+     *
+     * `now` is passed explicitly so the boundary is provable in a unit test without a clock.
+     */
+    const licenseTerms =
+      await this.prisma.client.insuranceCompanyLicenseTerm.findMany({
+        where: { insuranceCompanyId: company.id },
+        select: { licenseNumber: true, issuedAt: true, expiresAt: true },
+      });
+    const licenseStanding = deriveCompanyLicenseStanding(
+      licenseTerms,
+      new Date(),
+    );
+
     const certificate = company.insurerLicenseCertificateDocumentId
       ? await this.prisma.client.document.findUnique({
           where: { id: company.insurerLicenseCertificateDocumentId },
@@ -161,6 +183,12 @@ export class CompanyRecordService {
         commercialRegistrationNo: company.commercialRegistrationNo,
         taxNumber: company.taxNumber,
         insurerLicenseNumber: company.insurerLicenseNumber,
+        /*
+         * THE DERIVED STANDING — three states, and the third is the one a careless version loses:
+         * "no term on record" is a missing fact about OUR records, while "expired" is a statement
+         * about the company's licence. The screen must not say the second when the first is true.
+         */
+        licenseStanding,
         legalForm: company.legalForm,
         licensingAuthority: company.licensingAuthority,
         businessModel: company.businessModel,

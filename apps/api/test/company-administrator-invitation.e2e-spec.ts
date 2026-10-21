@@ -214,6 +214,10 @@ async function registerCompany(): Promise<Registered> {
       taxNumber: unique('TX'),
       legalFormId,
       insurerLicenseNumber: unique('IL'),
+      // BATCH 5 GROUP 7d — the licence EXPIRY is required now, because the standing is derived
+      // from it. Far in the future so this fixture reads CURRENT rather than depending on when
+      // the suite happens to run.
+      insurerLicenseExpiresAt: '2099-12-31',
       licensingAuthorityId,
       businessModelId,
       countryId,

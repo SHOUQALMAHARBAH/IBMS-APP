@@ -79,6 +79,18 @@ const RECORD = {
     commercialRegistrationNo: 'CR-1',
     taxNumber: 'TX-1',
     insurerLicenseNumber: 'IL-1',
+    // BATCH 5 GROUP 7d — the DERIVED licence standing. A mock's SHAPE must match the endpoint's:
+    // an approximation crashes the component and the browser shows its own error page, which this
+    // project has mis-diagnosed three times.
+    licenseStanding: {
+      standing: 'CURRENT',
+      currentTerm: {
+        licenseNumber: 'IL-1',
+        issuedAt: '2024-01-15T00:00:00.000Z',
+        expiresAt: '2099-12-31T00:00:00.000Z',
+      },
+      termCount: 2,
+    },
     legalForm: {
       code: 'PUBLIC_SHAREHOLDING',
       nameEn: 'Public shareholding company',
@@ -307,4 +319,90 @@ test.describe('the company reads its own registry record', () => {
       .analyze();
     expect(results.violations).toEqual([]);
   });
+});
+
+test('BATCH 5 GROUP 7d — shows the DERIVED licence standing with the term it was derived from, and says it gates nothing', async ({
+  page,
+}) => {
+  await mockAuth(page, 'INSURANCE_COMPANY');
+  await mockRecord(page);
+
+  await page.goto('/company-record');
+
+  const main = page.locator('main');
+  await expect(main).toContainText('Licence standing');
+  await expect(main).toContainText('Current');
+  // THE TERM IT WAS DERIVED FROM, so a reader can check the arithmetic rather than trust a label.
+  await expect(main).toContainText('2099-12-31');
+  await expect(main).toContainText('2024-01-15');
+  await expect(main).toContainText('Licence terms on record');
+
+  // AND THE TWO CLAUSES THAT STOP A READER INFERRING A GATE THEY CANNOT SEE.
+  const note = page.getByTestId('company-license-standing-derived');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('derived from the recorded expiry date, not stored');
+  await expect(note).toContainText('Nothing in the system is refused or warned about because of it');
+});
+
+test('BATCH 5 GROUP 7d — NO TERM ON RECORD is worded as a fact about our records, never as an expiry', async ({
+  page,
+}) => {
+  /*
+   * The distinction the broker side learned the hard way: `isCurrentlyLapsed === null` collapsed
+   * into `true` reports an expiry nobody recorded. Telling a company its licence has EXPIRED when
+   * what is true is that nobody wrote one down is a false statement about its regulatory standing.
+   */
+  await mockAuth(page, 'INSURANCE_COMPANY');
+  await mockRecord(page, {
+    ...RECORD,
+    identity: {
+      ...RECORD.identity,
+      licenseStanding: {
+        standing: 'NO_TERM_ON_RECORD',
+        currentTerm: null,
+        termCount: 0,
+      },
+    },
+  });
+
+  await page.goto('/company-record');
+
+  const main = page.locator('main');
+  await expect(main).toContainText('We hold no licence term on record');
+  // THE ANCHOR FIRST, from the same render — without it the absence below is satisfied by a page
+  // that has not hydrated.
+  await expect(main).toContainText('Licence standing');
+  await expect(main).not.toContainText('Expired');
+  // And with no term there is nothing to show the arithmetic from, so those rows are absent.
+  await expect(main).not.toContainText('Licence terms on record');
+});
+
+test('BATCH 5 GROUP 7d — EXPIRED reads as expired, and still shows the term behind it', async ({
+  page,
+}) => {
+  await mockAuth(page, 'INSURANCE_COMPANY');
+  await mockRecord(page, {
+    ...RECORD,
+    identity: {
+      ...RECORD.identity,
+      licenseStanding: {
+        standing: 'EXPIRED',
+        currentTerm: {
+          licenseNumber: 'IL-OLD',
+          issuedAt: null,
+          expiresAt: '2020-12-31T00:00:00.000Z',
+        },
+        termCount: 1,
+      },
+    },
+  });
+
+  await page.goto('/company-record');
+
+  const main = page.locator('main');
+  await expect(main).toContainText('Expired');
+  await expect(main).toContainText('2020-12-31');
+  // A NULL issue date does not blank the whole block — the expiry is the only date the standing
+  // needs, which is why `issuedAt` is nullable.
+  await expect(main).toContainText('Licence terms on record');
 });

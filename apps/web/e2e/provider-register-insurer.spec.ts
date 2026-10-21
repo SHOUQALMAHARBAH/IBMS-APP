@@ -115,6 +115,13 @@ async function fillValidForm(page: Page) {
     commercialRegistrationNo: 'ICR-1',
     taxNumber: 'ITAX-1',
     insurerLicenseNumber: 'CBJ-INS-1',
+    // BATCH 5 GROUP 7d — the licence EXPIRY is REQUIRED, so without it the browser blocks
+    // submission and nothing posts. That is how both of this file's submit tests failed when the
+    // field landed: "element(s) not found" on the result panel, which reads like a broken selector
+    // and is not one. The issue date is optional and is filled anyway, so the happy path proves
+    // both reach the server.
+    insurerLicenseExpiresAt: '2099-12-31',
+    insurerLicenseIssuedAt: '2024-01-15',
     certificateFileName: 'cbj-insurer-licence.pdf',
     certificateStorageRef: 'store/cbj-insurer-licence.pdf',
     address: 'Amman',
