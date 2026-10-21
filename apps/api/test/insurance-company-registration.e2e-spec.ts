@@ -111,14 +111,12 @@ async function deleteCompany(organizationId: string) {
     where: { insuranceCompanyId: organizationId },
   });
   /*
-   * BATCH 5 GROUP 7d — the licence terms. `ON DELETE RESTRICT` on `insuranceCompanyId`, so leaving
-   * these behind makes the organization UNDELETABLE and every later spec fails at `createTestApp`
-   * with a fault that looks like its own. That has happened twice in this repository, which is why
-   * `check:seed-sweeps` exists, and the lesson applies to a spec teardown identically.
+   * BATCH 5 GROUP 7d's licence terms are NOT cleared here, deliberately — they are cleared by
+   * `deleteOrganizationCascade`, which this function calls below. The first version did it here by
+   * hand, and CI showed why that is wrong: two OTHER specs register companies and neither got the
+   * line, so twelve organizations leaked and three assertions about the SET of organizations failed.
+   * One home.
    */
-  await rawPrisma.insuranceCompanyLicenseTerm.deleteMany({
-    where: { insuranceCompanyId: organizationId },
-  });
   /*
    * The certificate is referenced BY the organization, so the pointer must be cleared before the
    * document can go — `onDelete: Restrict`, deliberately, because the document is the evidence.

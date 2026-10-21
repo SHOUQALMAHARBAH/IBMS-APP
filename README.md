@@ -4646,7 +4646,10 @@ broker's lapse rule either — art. 10/b, art. 11 and art. 21/a/9 are broker art
 status column and the migration refuses one by name shape. When the gateway module exists, whether
 an expired recorded licence declares itself at a contract request is the owner's decision —
 `docs/deferred-register.md` entries 95-96, which also record that 7d supersedes two earlier notes
-saying the company had no term to model.
+saying the company had no term to model. **The term's FK is `ON DELETE RESTRICT`, so
+`deleteOrganizationCascade` clears it** — a fixture teardown must never do that by hand: three specs
+register companies, only one got the by-hand line, and twelve organizations leaked with the failures
+landing in files the batch never touched.
 
 **Anonymisation is NOT built, and its grain is an open decision** (register entry 89): none of the
 four resolvable records carries any identity, the identity lives on the shared `Customer`, and the

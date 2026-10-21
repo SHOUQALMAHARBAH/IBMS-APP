@@ -7,8 +7,8 @@
   },
   "expired-on-the-last-day-of-its-own-licence": {
     "file": "apps/api/src/modules/company/insurance-company-license.config.ts",
-    "from": "    standing: current.expiresAt.getTime() >= now.getTime() ? 'CURRENT' : 'EXPIRED',",
-    "to": "    standing: current.expiresAt.getTime() > now.getTime() ? 'CURRENT' : 'EXPIRED',",
+    "from": "      current.expiresAt.getTime() >= now.getTime() ? 'CURRENT' : 'EXPIRED',",
+    "to": "      current.expiresAt.getTime() > now.getTime() ? 'CURRENT' : 'EXPIRED',",
     "kills": "insurance-company-license.config.spec.ts > BOTH SIDES of the boundary — only the ON-the-instant case, which is the off-by-one that makes a company expired on the last day of its own licence."
   },
   "covering-term-instead-of-latest-expiry": {
@@ -28,5 +28,11 @@
     "from": "  /** The two bases and what each means, for the screen to render rather than restate. */",
     "to": "  /** The two bases and what each means, for the screen to render rather than restate. */\n  private readonly licenseStanding: unknown = null;\n",
     "kills": "insurance-company-license.inventory.spec.ts > no file outside the company-record module mentions it — the absence 7d's brief requires be asserted. Planted in an unrelated module on purpose: the sweep must catch a mention ANYWHERE, not only in a plausible place."
+  },
+  "cascade-leaves-the-licence-terms": {
+    "file": "apps/api/test/tenant-prisma.ts",
+    "from": "  await rawPrisma.insuranceCompanyLicenseTerm.deleteMany({\n    where: { insuranceCompanyId: organizationId },\n  });",
+    "to": "  // plant: the cascade no longer clears them",
+    "kills": "organization-type.e2e-spec.ts + provider-office-state.e2e-spec.ts — three assertions about the SET of organizations, in files 7d never touched. `InsuranceCompanyLicenseTerm_insuranceCompanyId_fkey` is RESTRICT, so a company spec's teardown is REFUSED and the organization leaks; CI found exactly this with twelve leaked companies while every spec 7d touched passed."
   }
 }

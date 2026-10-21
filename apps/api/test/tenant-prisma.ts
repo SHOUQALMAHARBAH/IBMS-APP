@@ -259,6 +259,25 @@ export async function deleteOrganizationCascade(
    * `seed.ts` and fails in CI, because the comment that was supposed to carry it is exactly what
    * failed.
    */
+  /*
+   * AND THE INSURANCE COMPANY'S OWN LICENCE TERMS — batch 5 group 7d, added here after CI found the
+   * leak this comment's own sweep-three story predicted one model over.
+   *
+   * `InsuranceCompanyLicenseTerm_insuranceCompanyId_fkey` is RESTRICT, and 7d made the company
+   * registration write a term in the same transaction as the organization. So EVERY spec that
+   * registers a company now acquires a row that blocks its own teardown — and the one I fixed by
+   * hand was `insurance-company-registration`, while `company-administrator-invitation` and
+   * `company-record-shape` register companies too. Twelve organizations leaked on CI and three
+   * assertions about the SET of organizations failed, none of them in a file this batch touched.
+   *
+   * THE ORDER HAS ONE HOME, which is the standing rule this cascade exists to carry: fixing it in a
+   * spec's own `finally` is how it was missed in the other two. Keyed on `insuranceCompanyId`
+   * rather than `organizationId`, because a company-level fact carries no tenancy column.
+   */
+  await rawPrisma.insuranceCompanyLicenseTerm.deleteMany({
+    where: { insuranceCompanyId: organizationId },
+  });
+
   const licences = await rawPrisma.brokerLicense.findMany({
     where: { organizationId },
     select: { id: true, certificateDocumentId: true },
