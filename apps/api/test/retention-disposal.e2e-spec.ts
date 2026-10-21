@@ -232,6 +232,36 @@ const NO_FLOOR_DECLARATION = {
   acknowledged: true as const,
 };
 
+/**
+ * CONFIRM A PERIOD AS A SECOND ACTOR — module 0-ب's categories batch made this necessary.
+ *
+ * An unconfirmed period is INERT: never measured, never alerted on, never proposed. So a test that
+ * asserts the notice FIRES has to confirm the period first, and the confirmation cannot come from
+ * whoever set it — the sixteenth maker/checker CHECK refuses one person doing both halves, and it
+ * refused the first version of these fixtures by name.
+ *
+ * Written directly rather than through the confirm ROUTE on purpose: the route is the subject of its
+ * own tests elsewhere, and a fixture that sets up through the thing under test cannot fail
+ * independently of it.
+ */
+async function confirmPeriodAsSecondActor(
+  itemId: string,
+  setByUserId: string,
+): Promise<void> {
+  const other = await prisma.user.findFirstOrThrow({
+    where: { id: { not: setByUserId } },
+    select: { id: true },
+  });
+  await prisma.retentionScheduleItem.update({
+    where: { id: itemId },
+    data: {
+      setByUserId,
+      confirmedByLegalCounselAt: new Date(),
+      confirmedByLegalCounselByUserId: other.id,
+    },
+  });
+}
+
 async function sweepFloorCategories(): Promise<void> {
   await prisma.retentionScheduleItem.deleteMany({
     where: { recordCategory: { in: FLOOR_CATEGORIES } },
@@ -970,6 +1000,12 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         // list of `toHaveProperty` calls, each of which keeps passing while a field appears.
         'combinedDutyAct',
         'confirmedByLegalCounselAt',
+        // MODULE 0-ب: the floor this category is governed by, or null — so the screen can show the
+        // ARTICLE and the MINIMUM where the period would be when a floored category ships without
+        // one. Caught by this exact key set the moment it landed, which is what the set is for, and
+        // then caught AGAIN for being in the wrong SORTED position, which is the same guard working
+        // twice in one run.
+        'floor',
         'id',
         'isConfirmed',
         'legalBasis',
@@ -1285,6 +1321,20 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     let opportunityId: string | undefined;
     let customerId: string | undefined;
     try {
+      /*
+       * AND IT HAS TO BE CONFIRMED NOW, which is a real consequence of module 0-ب's categories
+       * batch rather than bookkeeping.
+       *
+       * An unconfirmed period is INERT: never measured, never alerted on. That rule is the brief's
+       * own, and it closes the half the disposal nomination had already closed since group 5 — so
+       * this test, which asserts the notice FIRES, needs the period to be actionable. Without the
+       * confirmation below it returns `elapsedCount: 0` and the assertion dies at `expected +0 to
+       * be 1`, which is exactly what it did.
+       *
+       * The confirmation is written by a SECOND actor, because the sixteenth maker/checker CHECK
+       * refuses one person doing both halves — and it refused this fixture by name on its first
+       * run.
+       */
       // The period: ten years, which is exactly the commercial floor, so it is accepted without a
       // declaration and without an extension.
       const created = await request(app.getHttpServer())
@@ -1296,6 +1346,10 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         })
         .expect(201);
       itemId = (created.body as RetentionScheduleItemBody).id;
+      // CONFIRMED, by a second actor — see `confirmPeriodAsSecondActor`. Without it the period is a
+      // draft, the category is inert, and this test dies at `expected +0 to be 1`, which is what it
+      // did on its first run after the categories batch.
+      await confirmPeriodAsSecondActor(itemId, compliance.userId);
 
       // A REAL elapsed record: one commission entry paid eleven years ago, against a policy this
       // test CREATES. `@@unique([policyId])` is why it needs a policy with no entry — and it used
@@ -1892,4 +1946,358 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
     }
   }, 180_000);
+
+  it('MODULE 0-ب THE CATEGORIES — a FLOORED category ships with NO period and its ARTICLE, an UNFLOORED one ships with its DEFAULT, and an empty period is NEVER alerted on', async () => {
+    /*
+     * Decisions 32 and 33, end to end.
+     *
+     * THE SHIPPED TEMPLATE is seeded per brokerage office, so this reads what the office actually
+     * holds rather than creating fixtures — which is the point: the assertion is about what the
+     * PRODUCT SHIPS, and a fixture would prove something about this test instead.
+     */
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'retention-template-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+
+    /*
+     * THE ROWS ARE CREATED HERE, NOT READ FROM THE SEED — and that is this repository's own rule
+     * applied to me.
+     *
+     * The first version asserted about the SHIPPED rows and failed with *the shipped template is
+     * missing KYCRecord*, because sibling tests in this file sweep the floor categories on entry
+     * (they have to: the floor matches on the normalised NAME, so a run-unique suffix would remove
+     * it). A fixture that depends on another test's leftovers passes or fails on run order.
+     *
+     * So the e2e proves the MECHANISM over HTTP — a floored row with no period carries its article
+     * and floor on the wire, an unfloored one carries its default, and neither is alerted on — and
+     * the SHIPPED SET is proven where it can be: `retention-template.config.spec.ts` reads the seed
+     * FILE and pins it against the api template name by name. Two halves, each where it belongs.
+     *
+     * Written with Prisma rather than the route because that is what the SEED does: the product
+     * shipping a template is not an office making a declaration, which is the one asymmetry in this
+     * design and is stated in the seed's own header.
+     */
+    const made: string[] = [];
+    for (const [category, months] of [
+      ['KYCRecord', null],
+      ['Receipt', null],
+      ['Quotation', 1],
+    ] as [string, number | null][]) {
+      await prisma.retentionScheduleItem.deleteMany({
+        where: { recordCategory: category },
+      });
+      const row = await prisma.retentionScheduleItem.create({
+        data: {
+          recordCategory: category,
+          retentionPeriodMonths: months,
+          legalBasis: 'Template fixture.',
+        },
+        select: { id: true },
+      });
+      made.push(row.id);
+    }
+
+    const schedule = (
+      await request(app.getHttpServer())
+        .get('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .expect(200)
+    ).body as {
+      recordCategory: string;
+      retentionPeriodMonths: number | null;
+      confirmedByLegalCounselAt: string | null;
+      floor: {
+        article: string;
+        floorMonths: number;
+        instrument: string;
+      } | null;
+    }[];
+
+    // (1) A FLOORED CATEGORY: no period, and the ARTICLE and FLOOR are on the wire so the screen
+    //     can show them where the number would be. `KYCRecord` is art. 17/أ's own first limb.
+    const kyc = schedule.find((s) => s.recordCategory === 'KYCRecord');
+    expect(kyc, 'KYCRecord is missing from the schedule read').toBeDefined();
+    expect(kyc?.retentionPeriodMonths).toBeNull();
+    expect(kyc?.floor).not.toBeNull();
+    expect(kyc?.floor?.floorMonths).toBe(60);
+    expect(kyc?.floor?.article).toContain('17');
+    expect(kyc?.floor?.instrument).toContain('Anti-Money Laundering');
+
+    // AND THE SAME FOR A COMMERCIAL-FLOOR CATEGORY, so the property is not passing on one row.
+    const receipt = schedule.find((s) => s.recordCategory === 'Receipt');
+    expect(receipt?.retentionPeriodMonths).toBeNull();
+    expect(receipt?.floor?.floorMonths).toBe(120);
+
+    // (2) AN UNFLOORED CATEGORY: a default, and NO floor — which is what makes shipping a number
+    //     honest there. One month, counted from the refusal.
+    const quote = schedule.find((s) => s.recordCategory === 'Quotation');
+    expect(quote, 'Quotation is missing from the schedule read').toBeDefined();
+    expect(quote?.retentionPeriodMonths).toBe(1);
+    expect(quote?.floor).toBeNull();
+
+    /*
+     * (3) NONE OF THE THREE IS CONFIRMED. A shipped period is a draft until a lawyer signs it off,
+     *     which is also what makes every shipped row inert on a fresh office.
+     *
+     * SCOPED TO THE THREE, not the whole schedule — the first version looped over everything and
+     * died on `E2E-Category-07vfoi`, a confirmed row a sibling test legitimately left behind. db-test
+     * is cumulative, and an assertion over every row in a shared table is an assertion about other
+     * tests.
+     */
+    for (const category of ['KYCRecord', 'Receipt', 'Quotation']) {
+      const row = schedule.find((s) => s.recordCategory === category);
+      expect(row?.confirmedByLegalCounselAt, category).toBeNull();
+    }
+
+    // (4) AND THE NOTICE IS SILENT ON EVERY ONE OF THEM — asserted as an ABSENCE of a count, which
+    //     is the brief's own rule: never proposed for disposal and never alerted on.
+    const notices = (
+      await request(app.getHttpServer())
+        // PLURAL. The controller is `@Controller('retention-notices')`; the first version of
+        // these two reads guessed the singular and got a bare 404, which names no request.
+        .get('/retention-notices')
+        .set(bearer(compliance.accessToken))
+        .expect(200)
+    ).body as {
+      recordCategory: string;
+      retentionPeriodMonths: number | null;
+      actionable: boolean;
+      inertReason: string | null;
+      elapsedCount: number;
+      elapsedRecordIds: string[];
+    }[];
+
+    /*
+     * SCOPED to the two rows this test created with NO period, for the reason above: db-test is
+     * cumulative, and "every inert row" is a claim about other tests' leftovers.
+     *
+     * A NON-VACUITY FLOOR FIRST: with no inert rows the loop asserts nothing, which is exactly the
+     * state a broken `periodIsActionable` would produce.
+     */
+    const inert = notices.filter(
+      (n) =>
+        !n.actionable &&
+        (n.recordCategory === 'KYCRecord' || n.recordCategory === 'Receipt'),
+    );
+    expect(inert.length).toBe(2);
+    for (const n of inert) {
+      expect(n.elapsedCount, n.recordCategory).toBe(0);
+      expect(n.elapsedRecordIds, n.recordCategory).toEqual([]);
+      // THE ROW STILL APPEARS, WITH ITS REASON — decision 28's family. A category an office can see
+      // and is never alerted about is one it will believe the system is watching.
+      expect(n.inertReason, n.recordCategory).not.toBeNull();
+    }
+
+    // AND THE FLOORED ROWS' REASON NAMES THE ARTICLE AND THE FLOOR, because "no period set" alone
+    // is not something an office can act on.
+    const kycNotice = notices.find((n) => n.recordCategory === 'KYCRecord');
+    expect(kycNotice?.actionable).toBe(false);
+    expect(kycNotice?.inertReason).toContain('60 months');
+    expect(kycNotice?.inertReason).toMatch(/art\. 17\/a/i);
+
+    // Swept on EXIT as well as entry: a leftover unconfirmed row is harmless to a later notice read
+    // (it is inert by definition) but a leftover `Quotation` row at one month is not — it would make
+    // the sibling quote test see a category it did not create.
+    for (const id of made) {
+      await prisma.retentionScheduleItem.delete({ where: { id } });
+    }
+  }, 300_000);
+
+  it('MODULE 0-ب THE CATEGORIES — the quote clock runs from the REFUSAL, and a live quote is never swept', async () => {
+    /*
+     * The owner's instruction and her reason, proven over real data: COUNTED FROM THE END OF THE
+     * PURPOSE, NOT FROM ARRIVAL — a month from arrival would delete a quote the customer is still
+     * considering.
+     *
+     * THREE QUOTES, one per case, all ARRIVING at the same old date so arrival cannot be what
+     * separates them:
+     *
+     *   * REFUSED long ago        → elapsed;
+     *   * ACCEPTED long ago       → NOT elapsed (the decision is not a REJECT);
+     *   * no decision at all      → NOT elapsed (still being considered).
+     *
+     * The second and third are the assertions that matter. A clock keyed on arrival would sweep all
+     * three, and a test with only the first would pass against exactly that defect.
+     */
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'retention-quote-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+
+    await prisma.retentionScheduleItem.deleteMany({
+      where: { recordCategory: 'Quotation' },
+    });
+
+    const insurer = await prisma.insurer.findFirstOrThrow({
+      select: { id: true },
+    });
+    const made: {
+      quoteId: string;
+      rfqId: string;
+      opportunityId: string;
+      customerId: string;
+      decisionId?: string;
+    }[] = [];
+
+    /** A customer, an opportunity, an RFQ and a quote — CREATED, never hunted. */
+    async function makeQuote(
+      tag: string,
+      decision: 'REJECT' | 'ACCEPT' | null,
+    ): Promise<string> {
+      const customer = await prisma.customer.create({
+        data: {
+          customerType: 'INDIVIDUAL',
+          legalName: `Quote Retention ${tag} ${Math.random().toString(36).slice(2, 10)}`,
+          ownerUserId: compliance.userId,
+        },
+        select: { id: true },
+      });
+      const opportunity = await prisma.opportunity.create({
+        data: { customerId: customer.id },
+        select: { id: true },
+      });
+      const rfq = await prisma.rFQ.create({
+        data: {
+          opportunityId: opportunity.id,
+          insuranceLine: 'Property All Risks',
+        },
+        select: { id: true },
+      });
+      const quote = await prisma.quotation.create({
+        data: {
+          rfqId: rfq.id,
+          insurerId: insurer.id,
+          premium: '1000.000',
+          // ARRIVAL, identical across all three. A clock keyed on this would sweep every one of
+          // them, which is the defect the owner named.
+          receivedAt: new Date('2020-01-01T00:00:00.000Z'),
+        },
+        select: { id: true },
+      });
+      let decisionId: string | undefined;
+      if (decision !== null) {
+        const row = await prisma.clientDecision.create({
+          data: {
+            opportunityId: opportunity.id,
+            decision,
+            evidenceType: 'e-signature',
+            evidenceRef: `env-${tag}`,
+            decidedAt: new Date('2020-02-01T00:00:00.000Z'),
+          },
+          select: { id: true },
+        });
+        decisionId = row.id;
+      }
+      made.push({
+        quoteId: quote.id,
+        rfqId: rfq.id,
+        opportunityId: opportunity.id,
+        customerId: customer.id,
+        decisionId,
+      });
+      return quote.id;
+    }
+
+    let itemId: string | undefined;
+    try {
+      const refused = await makeQuote('refused', 'REJECT');
+      const accepted = await makeQuote('accepted', 'ACCEPT');
+      const undecided = await makeQuote('undecided', null);
+
+      // The office's own period: one month, which is what the template ships. No floor governs this
+      // category, so no declaration is asked for.
+      const created = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'Quotation',
+          retentionPeriodMonths: 1,
+          legalBasis: 'The office own rule for a quote the client refused.',
+          /*
+           * THE DECLARATION IS REQUIRED HERE, and that is group 6's rule working rather than
+           * friction: this product knows no statutory minimum for a quote, so an office SETTING a
+           * period for it is shown a sentence naming both known floors, writes a reason and ticks
+           * an acknowledgement.
+           *
+           * The first version of this test omitted it and got a 422 — which is the correct refusal,
+           * and worth recording because it exposes the one asymmetry in the shipped template: the
+           * SEED writes the unfloored row directly and is asked for nothing, because the PRODUCT
+           * shipping a default is not an office declaring anything about a statute. The declaration
+           * belongs to the office's own act, not to ours.
+           */
+          noFloorDeclaration: NO_FLOOR_DECLARATION,
+        })
+        .expect(201);
+      itemId = (created.body as { id: string }).id;
+
+      // CONFIRMED BY A SECOND ACTOR, because an unconfirmed period is INERT by design and would
+      // make this test assert nothing about the clock — and because the sixteenth maker/checker
+      // CHECK refused the first version of this line by name, one user having set and confirmed it.
+      await confirmPeriodAsSecondActor(itemId, compliance.userId);
+
+      const notices = (
+        await request(app.getHttpServer())
+          // PLURAL. The controller is `@Controller('retention-notices')`; the first version of
+          // these two reads guessed the singular and got a bare 404, which names no request.
+          .get('/retention-notices')
+          .set(bearer(compliance.accessToken))
+          .expect(200)
+      ).body as {
+        recordCategory: string;
+        actionable: boolean;
+        elapsedRecordIds: string[];
+        countedFrom: string | null;
+      }[];
+      const quote = notices.find((n) => n.recordCategory === 'Quotation');
+      expect(quote, 'the quote category produced no notice row').toBeDefined();
+      expect(quote?.actionable).toBe(true);
+
+      const elapsed = new Set(quote?.elapsedRecordIds ?? []);
+      // THE REFUSED ONE IS ELAPSED — its purpose ended in 2020.
+      expect(elapsed.has(refused)).toBe(true);
+      // AND THE OTHER TWO ARE NOT. These are the assertions the owner's instruction is really
+      // about: identical arrival dates, different outcomes.
+      expect(elapsed.has(accepted)).toBe(false);
+      expect(elapsed.has(undecided)).toBe(false);
+
+      // The notice SAYS what it counted from, in words — and names the limb that is not recorded,
+      // so a reader is not left assuming the quote expiry was considered.
+      expect(quote?.countedFrom).toMatch(/refused/i);
+      expect(quote?.countedFrom).toMatch(/not recorded anywhere/i);
+    } finally {
+      /*
+       * THE QUOTE CHAIN IS LEFT IN PLACE, AND THE DATABASE IS WHY.
+       *
+       * The first version of this teardown deleted the quotes and was REFUSED BY NAME:
+       *
+       *     Quotation rows are never deleted (backlog Part C #15) —
+       *     a negotiation round is a new version, not a replacement
+       *
+       * That is a guarantee met from the inside, exactly as `AuditLogEntry`'s immutability trigger
+       * was met by a teardown one batch ago. A quote is versioned history, and a trigger enforces
+       * it; so the RFQ, the opportunity and the customer cannot go either, their FKs being RESTRICT
+       * behind a row nothing may remove.
+       *
+       * WHAT MAKES THAT SURVIVABLE rather than a leak somebody has to clean up: every assertion
+       * above is SET MEMBERSHIP on the three ids this run created. Rows another run left behind
+       * cannot make them pass or fail — a leftover refused quote is elapsed and uncounted, a
+       * leftover accepted one is not elapsed either way. The names carry the tag so they are
+       * recognisable in the table.
+       *
+       * The SCHEDULE ITEM is deleted, and that one matters: a confirmed one-month `Quotation`
+       * period left standing would make every later notice read in the run see a category this test
+       * invented.
+       */
+      if (itemId) {
+        await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
+      }
+      // Referenced so the chain is not an unused variable, and so a reader sees what was created.
+      expect(made.length).toBe(3);
+    }
+  }, 300_000);
 });

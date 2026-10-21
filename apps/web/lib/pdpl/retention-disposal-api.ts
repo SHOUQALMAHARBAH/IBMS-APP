@@ -43,7 +43,26 @@ export interface NoFloorDeclarationInput {
 export interface RetentionScheduleItem {
   id: string;
   recordCategory: string;
-  retentionPeriodMonths: number;
+  /**
+   * NULL where a statutory floor governs the category and the office has not set its own period —
+   * the shipped template's deliberate state (decisions 32 and 33). The screen shows the ARTICLE and
+   * the FLOOR in its place rather than an em dash: "no period yet, and here is the minimum the law
+   * sets" is actionable where a blank is not.
+   */
+  retentionPeriodMonths: number | null;
+  /**
+   * The statute setting a minimum for this category, or null.
+   *
+   * The screen shows this WHERE the period would be when none is set, which is the whole point of
+   * carrying it: "no period set" alone is not actionable, and "no period set, this article requires
+   * at least N months" is.
+   */
+  floor: {
+    instrument: string;
+    article: string;
+    operativeText: string;
+    floorMonths: number;
+  } | null;
   legalBasis: string | null;
   confirmedByLegalCounselAt: string | null;
   isConfirmed: boolean;
@@ -68,7 +87,18 @@ export interface RetentionScheduleItem {
 /** A retention notice — one row per category the office has set a period for. */
 export interface RetentionNotice {
   recordCategory: string;
-  retentionPeriodMonths: number;
+  retentionPeriodMonths: number | null;
+  /**
+   * CAN THE SYSTEM ACT ON THIS CATEGORY AT ALL — a period is set AND a lawyer has confirmed it.
+   *
+   * Distinct from `resolvable`, and the two answer different questions: `resolvable: false` means
+   * this category can NEVER produce a notice because no date marks the end of its purpose, and
+   * nothing the office does changes that; `actionable: false` means not YET, and the office knows
+   * what to do — set the period, or get it confirmed.
+   */
+  actionable: boolean;
+  /** Why it is not actionable, in the server's own words. Null when it is. */
+  inertReason: string | null;
   /** False means no notice is possible for this category, ever — `unresolvableReason` says why. */
   resolvable: boolean;
   unresolvableReason: string | null;

@@ -241,6 +241,28 @@ export async function deleteOrganizationCascade(
   await rawPrisma.slaHoliday.deleteMany({ where: { organizationId } });
 
   /*
+   * SWEEP FOUR: `ensureRetentionSchedule` — module 0-ب's shipped retention template.
+   *
+   * It walks every BROKERAGE_OFFICE and writes one `RetentionScheduleItem` per template category,
+   * and `RetentionScheduleItem_organizationId_fkey` is RESTRICT like the rest. So a leaked fixture
+   * office holds nine of them and is PERMANENTLY undeletable after one `db:test:seed` run — which
+   * takes down every later spec at `createTestApp` with a fault that looks like its own. That has
+   * happened twice in this repository, and the third time was caught here by the gate rather than by
+   * CI: `check:seed-sweeps` named this model the moment the sweep landed, in the same commit.
+   *
+   * The deletes are ORDERED, because rows hang off a schedule item and their own FKs are RESTRICT
+   * too: a legal hold, a disposal batch and a retention extension all reference it. Measured rather
+   * than assumed — the hold and the batch carry `retentionScheduleItemId`, and an extension is
+   * keyed by `recordCategory`.
+   */
+  await rawPrisma.legalHold.deleteMany({ where: { organizationId } });
+  await rawPrisma.disposalBatch.deleteMany({ where: { organizationId } });
+  await rawPrisma.retentionExtension.deleteMany({ where: { organizationId } });
+  await rawPrisma.retentionScheduleItem.deleteMany({
+    where: { organizationId },
+  });
+
+  /*
    * SWEEP THREE: `ensureBrokerLicenseTerms` — the one the first version of this comment MISSED
    * while claiming to list them all.
    *

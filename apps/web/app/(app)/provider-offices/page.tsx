@@ -334,6 +334,33 @@ export default function ProviderOfficesPage() {
                       : office.isCurrentlyLapsed
                         ? t('providerOfficesLapsed')
                         : t('providerOfficesInGoodStanding')}
+                  {/*
+                    THE ONE REGULATORY FACT — register entry 97, closed. *This office may not
+                    issue.*
+
+                    BESIDE the term states rather than folded into them, and that is the decision:
+                    `isCurrentlyLapsed` is the term ARITHMETIC and this is a REGULATOR'S ACT.
+                    Collapsing them would make a suspension on a perfectly current licence read as
+                    an expiry, which is a false statement about why the office is stopped.
+
+                    Nothing behind it is here, and nothing should be: not the decision reference,
+                    the basis, the dates, the letter or the kind. The provider neither corrects a
+                    sanction nor is bound by any deadline it carries (decision 92) — it needs to
+                    KNOW there is a bar, which is this one line.
+
+                    Rendered for a COMPANY too, deliberately, unlike the term states above: the view
+                    computes it from recorded regulatory acts rather than from a broker licence, so
+                    it carries no false implication about a company having one. It is simply false
+                    for every company today, because nothing records an act against one.
+                  */}
+                  {office.mayNotIssue ? (
+                    <strong
+                      style={{ display: 'block' }}
+                      data-may-not-issue={office.subdomain}
+                    >
+                      {t('providerOfficesMayNotIssue')}
+                    </strong>
+                  ) : null}
                 </td>
                 <td style={cell} data-branches={office.subdomain}>
                   {/* The dormant figure beside the total, never instead of it: "3 dormant" means

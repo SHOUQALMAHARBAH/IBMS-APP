@@ -44,6 +44,9 @@ export interface ProviderOfficeStateRow {
   licenseIssuedAt: Date | null;
   licenseExpiresAt: Date | null;
   renewalRequestedAt: Date | null;
+  /** The one regulatory fact — derived in the view, because `RegulatoryAction` is tenant-scoped and
+   *  unreachable from another office by RLS. See `PROVIDER_OFFICE_STATE_COLUMNS` below. */
+  mayNotIssue: boolean;
   licensedBranches: number;
   dormantLicensedBranches: number;
   users: number;
@@ -71,6 +74,24 @@ export const PROVIDER_OFFICE_STATE_COLUMNS = [
   'licenseIssuedAt',
   'licenseExpiresAt',
   'renewalRequestedAt',
+  /*
+   * THE ONE NEW FACT — register entry 97, closed by the owner's decision.
+   *
+   * *This office may not issue.* Nothing behind it: not the decision reference, not the basis, not
+   * the effective date, not the suspended-until date, not the letter, not the kind. A sanction's
+   * contents are the OFFICE'S, and the provider neither corrects them nor is bound by any deadline
+   * they carry (decision 92).
+   *
+   * The argument for growing this list at all is in the migration, because this list IS the privacy
+   * boundary: the provider registers organizations and may not put a live one in front of customers
+   * while it is barred, which is a fact about the platform's own duty rather than about the office's
+   * regulator file.
+   *
+   * It is derived inside the view — the one place this product otherwise refuses to put a licence
+   * rule — because `RegulatoryAction` is tenant-scoped and unreachable from another office by RLS.
+   * That is exactly the gap entry 97 declared, and it is why the fact can come from nowhere else.
+   */
+  'mayNotIssue',
   'licensedBranches',
   'dormantLicensedBranches',
   'users',
@@ -95,7 +116,7 @@ export class ProviderOfficeStateRepository {
         "organizationId", "legalName", "legalNameAr", "subdomain",
         "organizationType", "brokerKind", "organizationStatus", "onboardedAt",
         "licenseNumber", "licenseIssuedAt", "licenseExpiresAt",
-        "renewalRequestedAt", "licensedBranches", "dormantLicensedBranches",
+        "renewalRequestedAt", "mayNotIssue", "licensedBranches", "dormantLicensedBranches",
         "users", "activeUsers", "lastActivityAt"
       FROM "ProviderOfficeState"
       ORDER BY "legalName" ASC

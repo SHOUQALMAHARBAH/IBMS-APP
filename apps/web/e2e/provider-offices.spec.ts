@@ -68,6 +68,10 @@ const OFFICES = [
     licenseExpiresAt: '2028-12-31T00:00:00.000Z',
     renewalRequestedAt: null,
     isCurrentlyLapsed: false,
+    // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
+    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
+    // term arithmetic and this is a regulator's act.
+    mayNotIssue: false,
     renewalDueBy: '2028-11-16T00:00:00.000Z',
     renewalFiledOnTime: null,
     licensedBranches: 6,
@@ -90,6 +94,10 @@ const OFFICES = [
     licenseExpiresAt: '2025-12-31T00:00:00.000Z',
     renewalRequestedAt: null,
     isCurrentlyLapsed: true,
+    // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
+    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
+    // term arithmetic and this is a regulator's act.
+    mayNotIssue: false,
     renewalDueBy: '2025-11-16T00:00:00.000Z',
     renewalFiledOnTime: null,
     licensedBranches: 2,
@@ -114,6 +122,10 @@ const OFFICES = [
     licenseStatus: null,
     renewalRequestedAt: null,
     isCurrentlyLapsed: null,
+    // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
+    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
+    // term arithmetic and this is a regulator's act.
+    mayNotIssue: false,
     renewalDueBy: null,
     renewalFiledOnTime: null,
     licensedBranches: 0,
@@ -141,6 +153,10 @@ const OFFICES = [
     licenseExpiresAt: '2027-10-19T00:00:00.000Z',
     renewalRequestedAt: null,
     isCurrentlyLapsed: false,
+    // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
+    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
+    // term arithmetic and this is a regulator's act.
+    mayNotIssue: false,
     renewalDueBy: '2027-09-04T00:00:00.000Z',
     renewalFiledOnTime: null,
     licensedBranches: 4,
@@ -172,6 +188,10 @@ const OFFICES = [
     licenseStatus: null,
     renewalRequestedAt: null,
     isCurrentlyLapsed: null,
+    // MODULE 0-ب: the ONE regulatory fact — register entry 97. FALSE on every office in
+    // this fixture; one test below sets it true. NOT `isCurrentlyLapsed`'s sibling: that is the
+    // term arithmetic and this is a regulator's act.
+    mayNotIssue: false,
     renewalDueBy: null,
     renewalFiledOnTime: null,
     licensedBranches: 0,
@@ -814,4 +834,47 @@ test('(i) and with no dev token the link section does not exist at all', async (
 
   await expect(page.locator('[data-invite-not-sent]')).toBeVisible();
   await expect(page.locator('[data-invite-dev-link]')).toHaveCount(0);
+});
+
+test('the provider is told an office MAY NOT ISSUE, and is told nothing behind it', async ({
+  page,
+}) => {
+  /*
+   * MODULE 0-ب, ITEM B — register entry 97, closed. The owner's words: he should KNOW there is a
+   * bar; he does not need to read the detail.
+   *
+   * The payload here carries ONLY the fact, exactly as the api's exact-key-set e2e asserts, so this
+   * test proves the screen renders it — and the second half proves the screen does not go looking
+   * for anything else.
+   */
+  await mockAuth(page, ['provider.office-state.read']);
+  await mockOffices(page, [{ ...OFFICES[0], mayNotIssue: true }]);
+  await page.goto('/provider-offices');
+
+  const standing = page.locator(`[data-standing="${OFFICES[0].subdomain}"]`);
+  await expect(standing).toContainText('May not issue');
+
+  /*
+   * AND THE CONSEQUENCE THE OWNER ACCEPTED, asserted so nobody "fixes" it: the licence number and
+   * expiry are still shown, so a bar on a currently-valid licence IS distinguishable from an expiry.
+   * That is the intent — and this fixture's own licence runs to 2028, so the row reads "in force"
+   * for the TERM and "may not issue" for the ACT, which is exactly the pair the owner wants: the
+   * calendar is fine and something else stopped the office.
+   */
+  await expect(standing).toContainText('in force');
+});
+
+test('an office with NO bar shows no such line at all', async ({ page }) => {
+  // The absence, anchored on something positive from the SAME render — or an unhydrated page
+  // satisfies it and the test proves nothing.
+  await mockAuth(page, ['provider.office-state.read']);
+  await mockOffices(page, [OFFICES[0]]);
+  await page.goto('/provider-offices');
+
+  await expect(
+    page.locator(`[data-standing="${OFFICES[0].subdomain}"]`),
+  ).toContainText('in force');
+  await expect(
+    page.locator(`[data-may-not-issue="${OFFICES[0].subdomain}"]`),
+  ).toHaveCount(0);
 });

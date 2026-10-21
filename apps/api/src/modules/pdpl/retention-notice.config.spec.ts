@@ -29,12 +29,25 @@ import { DECLARATION_REASON_MIN_LENGTH } from '../../common/declaration-reason';
  */
 
 describe('the resolution table — only what this system can actually resolve', () => {
-  it('holds EXACTLY the four resolvable categories, so a fifth is a decision', () => {
+  it('holds EXACTLY the five resolvable categories, so a sixth is a decision', () => {
+    /*
+     * FOUR BECAME FIVE, and the pin is why that was deliberate.
+     *
+     * Its own sentence read "so a fifth is a decision" — and a fifth is what the owner decided in
+     * module 0-ب's categories batch: a quote requested and never bought. The pin did its job: it
+     * refused the addition until somebody came here, which is also what forced the two properties
+     * below to be looked at rather than inherited.
+     *
+     * RE-POINTED rather than relaxed to a floor (`toBeGreaterThan(4)`), for the reason the
+     * surrounding block already gives: a declaration getting this wrong is a money defect in a
+     * read, so the set is pinned per category and a sixth has to be argued for.
+     */
     expect(CATEGORY_RESOLUTIONS.map((r) => r.recordCategory)).toEqual([
       'Receipt',
       'Remittance',
       'CommissionLedgerEntry',
       'Settlement',
+      'Quotation',
     ]);
 
     /*
@@ -59,6 +72,27 @@ describe('the resolution table — only what this system can actually resolve', 
       ['remittedAt', true],
       ['paidAt', true],
       ['clientPaymentConfirmedAt', true],
+      ['rfq.opportunity.clientDecision.decidedAt', true],
+    ]);
+
+    /*
+     * AND WHICH TRIGGERS ARE RELATIONAL — the quote category is the first whose trigger is not a
+     * column on its own model, and the flag exists because the QUERY SHAPE differs: Prisma cannot
+     * be handed a dotted path, so a caller inferring the filter from `triggerColumn` would build it
+     * against a column that does not exist on `Quotation`.
+     *
+     * MEASURED, so nobody has to wonder whether the blocked-phase exclusion needs widening: EVERY
+     * existing read over `Quotation` is scoped — by `rfqId`, by `opportunityId`, by `customerId`,
+     * or by a list of rfq ids. Not one is unbounded, so there is no read for `notBlockedWhere` to
+     * guard here and the group 7c question does not arise for this category. That changes the day
+     * somebody writes an unbounded quote read, which is why it is written down.
+     */
+    expect(CATEGORY_RESOLUTIONS.map((r) => r.triggerIsRelational)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      true,
     ]);
   });
 
@@ -68,7 +102,22 @@ describe('the resolution table — only what this system can actually resolve', 
       // The notice shows this, not the column name — "what date did the count run from" is the
       // question an officer is asking, and `receivedAt` does not answer it.
       expect(r.triggerDescription.length, r.recordCategory).toBeGreaterThan(25);
-      expect(r.triggerDescription, r.recordCategory).toContain('clos');
+      /*
+       * THE WORDING ASSUMPTION, NARROWED RATHER THAN DROPPED.
+       *
+       * This required every description to contain "clos" — which held while all four categories
+       * were financial records whose clock starts at the CLOSING of a transaction. The quote
+       * category's clock starts at the END OF THE PURPOSE, which is a refusal rather than a
+       * closing, so the old assertion would have forced the wrong word into the one description it
+       * does not fit.
+       *
+       * What the assertion is really for is that the description says WHEN, not WHAT COLUMN. So it
+       * now requires one of the two things a trigger can be in this product, which keeps it a real
+       * check: a description reading "the receipt date" still fails.
+       */
+      expect(r.triggerDescription, r.recordCategory).toMatch(
+        /clos|end of the purpose/i,
+      );
     }
   });
 
@@ -129,6 +178,11 @@ describe('the notice explains itself', () => {
   const RESOLVED = {
     recordCategory: 'Receipt',
     retentionPeriodMonths: 120,
+    // CONFIRMED, and the field is REQUIRED on the input rather than optional — so a fixture cannot
+    // omit it and make "nobody confirmed this" indistinguishable from "the caller did not look".
+    // Every test in this block is about a category the office HAS set and confirmed; the inert
+    // cases have their own block below.
+    confirmedByLegalCounselAt: new Date('2026-01-01T00:00:00.000Z'),
     elapsedCount: 142,
     // The ids, so an extension can NAME what it covers — a register row naming no record is a false
     // entry in the one place that exists to be justifiable.
@@ -197,6 +251,7 @@ describe('the notice explains itself', () => {
     const notice = deriveRetentionNotice({
       recordCategory: 'KYCRecord',
       retentionPeriodMonths: 60,
+      confirmedByLegalCounselAt: new Date('2026-01-01T00:00:00.000Z'),
       elapsedRecordIds: ['r-1', 'r-2'],
       // Even if a caller passed counts, an unresolvable category reports none — there is nothing to
       // count, and a number here would be a claim the system cannot support.

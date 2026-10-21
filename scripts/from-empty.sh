@@ -259,6 +259,46 @@ check "enum member descriptions across the four new enums" 11 \
 check "every reference list requires an Arabic description" 8 \
   "$(psql_scratch "SELECT count(*) FROM pg_constraint WHERE conname LIKE '%_description_required'")"
 
+# MODULE 0-ب, THE CATEGORIES BATCH — the shipped retention template. Decisions 32 and 33.
+#
+# Four assertions, and three of them are ZEROES on purpose: a zero survives a fourth office and a
+# fourth template category, where a total goes stale the next time the template grows. The
+# branch/department assertions above are phrased the same way and for the same reason.
+check "brokerage offices with NO retention template at all" 0 \
+  "$(psql_scratch "SELECT count(*) FROM \"Organization\" o WHERE o.\"type\" = 'BROKERAGE_OFFICE' AND NOT EXISTS (SELECT 1 FROM \"RetentionScheduleItem\" r WHERE r.\"organizationId\" = o.\"id\")")"
+
+# THE DECISION ITSELF, as a zero in BOTH directions. A category governed by one of the two statutory
+# floors must ship with NO period — a period beside an article number reads as a legal opinion we do
+# not have — and a category with no floor must ship WITH one, or it would ship inert and never alert.
+#
+# The floor names are written out rather than read from the api config, which SQL cannot import. They
+# are pinned against the config by `retention-template.config.spec.ts`, so a change to either side
+# has two places to fail.
+check "floored template categories shipped WITH a period (must be none)" 0 \
+  "$(psql_scratch "SELECT count(*) FROM \"RetentionScheduleItem\" WHERE \"recordCategory\" IN ('KYCRecord','CustomerFile','Receipt','Remittance','CommissionLedgerEntry','Settlement','Invoice') AND \"retentionPeriodMonths\" IS NOT NULL")"
+check "unfloored template categories shipped WITHOUT a period (must be none)" 0 \
+  "$(psql_scratch "SELECT count(*) FROM \"RetentionScheduleItem\" WHERE \"recordCategory\" = 'Quotation' AND \"retentionPeriodMonths\" IS NULL")"
+
+# And the quote category's own figure, which is the owner's default rather than a minimum. Pinned
+# because it is the FIRST default this product ships and moving it is a decision about how long an
+# office keeps a quote the customer refused.
+check "the quote category ships at ONE month per office" 1 \
+  "$(psql_scratch "SELECT DISTINCT \"retentionPeriodMonths\" FROM \"RetentionScheduleItem\" WHERE \"recordCategory\" = 'Quotation'")"
+
+# NOTHING IS CONFIRMED BY A SEED. Every shipped row is a draft until a lawyer signs it off, so the
+# template must reach a from-nothing database with zero confirmations — which is also what makes
+# every row INERT on a fresh office: nothing measured, nothing proposed. A seed that confirmed its
+# own periods would authorise destruction on figures nobody read.
+check "retention periods a SEED confirmed (must be none)" 0 \
+  "$(psql_scratch "SELECT count(*) FROM \"RetentionScheduleItem\" WHERE \"confirmedByLegalCounselAt\" IS NOT NULL")"
+
+# AND THE PROVIDER VIEW'S ONE NEW FACT — register entry 97, closed. The column list IS the
+# cross-office privacy boundary, so the assertion is that it carries the fact AND nothing behind it.
+check "the provider view carries mayNotIssue" 1 \
+  "$(psql_scratch "SELECT count(*) FROM information_schema.columns WHERE table_name = 'ProviderOfficeState' AND column_name = 'mayNotIssue'")"
+check "regulatory DETAIL leaked into the provider view (must be none)" 0 \
+  "$(psql_scratch "SELECT count(*) FROM information_schema.columns WHERE table_name = 'ProviderOfficeState' AND column_name IN ('decisionRef','basis','effectiveFrom','suspendedUntil','documentId','kind','standingActDecisionRef','licenseStatus')")"
+
 if [ "$fail" != "0" ]; then
   echo
   echo "FROM-EMPTY: FAILED — the shape a database reaches from nothing is not the shape of dev."

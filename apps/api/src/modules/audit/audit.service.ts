@@ -170,6 +170,24 @@ export class AuditService {
       );
       return null;
     }
+    /*
+     * NO PERIOD, NO CUTOFF — and the null return is the SAFE answer, which is why it is the one
+     * chosen rather than a fallback.
+     *
+     * `retentionPeriodMonths` became nullable with the shipped template: a category a statutory
+     * floor governs ships with no period, because a period beside an article number reads as a
+     * legal opinion we do not have. This caller's `null` already means "no cutoff is known", and
+     * every consumer handles it — it is the same branch the missing-row case above takes.
+     *
+     * Both other readings are wrong in the dangerous direction: null as 0 makes the cutoff NOW and
+     * every audit row past its period, and ignoring the null gives a NaN cutoff.
+     */
+    if (schedule.retentionPeriodMonths === null) {
+      this.logger.warn(
+        'The RetentionScheduleItem for "AuditLogEntry" has no retention period set, so no retention cutoff can be computed — a statutory floor governs this category and the office sets its own period above it.',
+      );
+      return null;
+    }
     const cutoff = new Date();
     cutoff.setUTCMonth(cutoff.getUTCMonth() - schedule.retentionPeriodMonths);
     return cutoff;

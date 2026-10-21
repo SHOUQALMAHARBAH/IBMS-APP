@@ -102,6 +102,38 @@ export class RetentionNoticeRepository {
         });
         return rows.map((r) => r.id);
       }
+      case 'quotation': {
+        /*
+         * A QUOTE REQUESTED AND NEVER BOUGHT. The only resolution here whose trigger is not a
+         * column on its own model — it is two hops away, and the filter is a RELATION filter for
+         * that reason rather than a dotted column name Prisma could not take.
+         *
+         * `decision: 'REJECT'` is the END OF THE PURPOSE, which is the owner's instruction and the
+         * whole design: a month counted from arrival would delete a quote the customer is still
+         * considering. Three cases fall out of this one `where` and all three are intended —
+         *
+         *   * the client REFUSED: the clock ran from `decidedAt`, and `lte` is the elapsed test;
+         *   * the client ACCEPTED: `decision` is not REJECT, so the relation filter excludes it;
+         *   * the client has not answered: there is NO `clientDecision` row, so `is` excludes it.
+         *
+         * The last two need no null handling of their own precisely because the filter is a
+         * relation `is` — an absent related row does not match, where a null COLUMN would have been
+         * swept in by `lte`. That is the `remittedAt` trap avoided by shape rather than by a flag.
+         */
+        const rows = await this.prisma.client.quotation.findMany({
+          where: {
+            rfq: {
+              opportunity: {
+                clientDecision: {
+                  is: { decision: 'REJECT', decidedAt: { lte: cutoff } },
+                },
+              },
+            },
+          },
+          select,
+        });
+        return rows.map((r) => r.id);
+      }
     }
   }
 

@@ -50,9 +50,30 @@ export interface CategoryResolution {
   recordCategory: string;
   /** The Prisma model property the count runs against. */
   modelProperty:
-    'receipt' | 'remittance' | 'commissionLedgerEntry' | 'settlement';
-  /** The column the retention period is counted FROM. */
+    | 'receipt'
+    | 'remittance'
+    | 'commissionLedgerEntry'
+    | 'settlement'
+    | 'quotation';
+  /**
+   * The column the retention period is counted FROM, named for a reader.
+   *
+   * For the four financial categories it is a column on the model itself. For `Quotation` it is
+   * TWO HOPS AWAY — `rfq.opportunity.clientDecision.decidedAt` — which is the first resolution in
+   * this file whose trigger is not local, and is why `triggerIsRelational` exists below rather than
+   * the query being inferred from this string.
+   */
   triggerColumn: string;
+  /**
+   * TRUE when the trigger lives on a RELATED record rather than on this model.
+   *
+   * Declared rather than inferred for the same reason `triggerIsNullable` is: the query shape
+   * differs, Prisma cannot be handed a dotted path, and a caller guessing from the column string
+   * would build a filter against a column that does not exist on the model. `notBlockedWhere`
+   * refuses a relational resolution outright — see its own comment — because a blocked-phase
+   * exclusion over a nested relation is a different decision from the one group 7c took.
+   */
+  triggerIsRelational: boolean;
   /**
    * Whether that column is NULLABLE — declared, because a `where` that NEGATES an elapsed test has
    * to know.
@@ -77,6 +98,7 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
   {
     recordCategory: 'Receipt',
     modelProperty: 'receipt',
+    triggerIsRelational: false,
     triggerColumn: 'receivedAt',
     triggerIsNullable: false,
     triggerDescription:
@@ -85,6 +107,7 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
   {
     recordCategory: 'Remittance',
     modelProperty: 'remittance',
+    triggerIsRelational: false,
     triggerColumn: 'remittedAt',
     triggerIsNullable: true,
     triggerDescription:
@@ -93,6 +116,7 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
   {
     recordCategory: 'CommissionLedgerEntry',
     modelProperty: 'commissionLedgerEntry',
+    triggerIsRelational: false,
     triggerColumn: 'paidAt',
     triggerIsNullable: true,
     triggerDescription:
@@ -101,10 +125,47 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
   {
     recordCategory: 'Settlement',
     modelProperty: 'settlement',
+    triggerIsRelational: false,
     triggerColumn: 'clientPaymentConfirmedAt',
     triggerIsNullable: true,
     triggerDescription:
       'the date the client settlement payment was confirmed, which closes that transaction',
+  },
+  {
+    /*
+     * A QUOTE REQUESTED AND NEVER BOUGHT — the owner's own category, and the first UNFLOORED one
+     * the notice can count.
+     *
+     * COUNTED FROM THE END OF THE PURPOSE, NOT FROM ARRIVAL, which is her instruction and her
+     * reason: a month counted from arrival deletes a quote the customer is still considering.
+     *
+     * THE TRIGGER IS THE CLIENT'S REFUSAL, two hops away:
+     *
+     *     Quotation → rfq → opportunity → clientDecision { decision: REJECT, decidedAt }
+     *
+     * `ClientDecision.opportunityId` is `@unique`, so the last hop is one row. Three consequences,
+     * all of them the behaviour she asked for rather than side effects:
+     *
+     *   * a quote on an opportunity the client ACCEPTED is never counted — the decision is not a
+     *     REJECT, so there is no trigger;
+     *   * a quote still being considered is never counted — there is no decision row at all;
+     *   * a quote on a REJECTED opportunity starts its month on the refusal date.
+     *
+     * AND THE OTHER LIMB IS NOT REPRESENTABLE, declared here rather than approximated: `Quotation`
+     * carries no validity date of any kind, so "the expiry of the quote" cannot be computed. A
+     * quote the client never answered therefore has no trigger and is never swept. That is the safe
+     * direction, and it is the honest one — this product does not know when such a quote stopped
+     * being useful.
+     */
+    recordCategory: 'Quotation',
+    modelProperty: 'quotation',
+    triggerColumn: 'rfq.opportunity.clientDecision.decidedAt',
+    // The decision row may be absent, which is exactly the live-quote case. Nullable in the sense
+    // this flag means: a row without the trigger must never read as elapsed.
+    triggerIsNullable: true,
+    triggerIsRelational: true,
+    triggerDescription:
+      'the date the client REFUSED — the end of the purpose the quote was requested for. A quote the client accepted, or has not answered, has no trigger and is never counted; the quote’s own expiry is the other limb of this trigger and is not recorded anywhere',
   },
 ] as const;
 

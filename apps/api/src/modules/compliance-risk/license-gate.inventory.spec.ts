@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import {
@@ -36,6 +36,18 @@ import type { DerivedLicenseStanding } from './license-standing.config';
  * whose only mention of the standing is a comment EXPLAINING that it does not consult it was flagged
  * as a consumer, and a guard with a false positive is a guard people switch off.
  */
+
+/*
+ * FILE-SCOPED, NEVER GLOBAL — the established shape for a spec that reads the whole api source
+ * tree, and the comment on `float-money.inventory.spec.ts` carries the argument: raising this in
+ * `apps/api` would also raise it for 3,400 ordinary unit tests, where 5s IS a real signal.
+ *
+ * Nothing is hidden by it: the work is genuinely file I/O over 400+ files, and this spec does TWO
+ * full passes. It crossed the 5s default under full-suite load the moment this batch added five
+ * source files — and it took a PRE-EXISTING sibling sweep with it
+ * (`customer-file-anchor.inventory.spec.ts`), which is how the class announced itself.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 const API_SRC = join(__dirname, '..', '..');
 const THIS_MODULE = join(API_SRC, 'modules', 'compliance-risk');

@@ -35,6 +35,31 @@ const SCHEDULE = [
     legalBasis: 'DRAFT, unconfirmed.',
     confirmedByLegalCounselAt: null,
     isConfirmed: false,
+    // No decided floor governs this category, which is why it ships with the number it has.
+    floor: null,
+  },
+  /*
+   * MODULE 0-ب — A FLOORED CATEGORY AS THE TEMPLATE SHIPS IT: no period, and the floor on the wire
+   * so the screen can show the ARTICLE and the MINIMUM where the number would be.
+   *
+   * Shaped from the endpoint rather than approximated — these interfaces are hand-copied over HTTP
+   * and nothing checks them against the view, which is how a result panel once threw during render.
+   */
+  {
+    id: 'rsi-2',
+    recordCategory: 'KYCRecord',
+    retentionPeriodMonths: null,
+    legalBasis: 'A STATUTORY FLOOR GOVERNS THIS CATEGORY, so no period ships.',
+    confirmedByLegalCounselAt: null,
+    isConfirmed: false,
+    floor: {
+      instrument:
+        'Anti-Money Laundering and Counter-Terrorism Financing Law No. 20 of 2021',
+      article: 'art. 17/a (المادة ١٧/أ)',
+      operativeText:
+        'customer due-diligence records and account files must be kept for at least five years',
+      floorMonths: 60,
+    },
   },
 ];
 
@@ -42,6 +67,10 @@ const NOTICES = [
   {
     recordCategory: 'CommissionLedgerEntry',
     retentionPeriodMonths: 120,
+    // MODULE 0-ب: `actionable` is a DIFFERENT question from `resolvable` — this category can
+    // never produce a notice vs it cannot produce one YET. Both are on the wire.
+    actionable: true,
+    inertReason: null,
     resolvable: true,
     unresolvableReason: null,
     elapsedCount: 3,
@@ -62,6 +91,10 @@ const NOTICES = [
     // fixture carries an unresolvable row rather than only a happy one.
     recordCategory: 'AuditLogEntry',
     retentionPeriodMonths: 120,
+    // MODULE 0-ب: `actionable` is a DIFFERENT question from `resolvable` — this category can
+    // never produce a notice vs it cannot produce one YET. Both are on the wire.
+    actionable: true,
+    inertReason: null,
     resolvable: false,
     unresolvableReason:
       'This system has not been told which records this category name means, so it cannot count them and will never raise a notice for it. The period you set is recorded and the statutory floor still applies to it — but nothing here is watching the clock.',
@@ -206,7 +239,20 @@ test('lists the retention schedule, Legal Holds, and disposal batches with their
       .getByTestId('retention-schedule-table')
       .getByRole('cell', { name: 'AuditLogEntry' }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Confirm' })).toBeVisible();
+  /*
+   * SCOPED TO ITS OWN ROW, because module 0-ب's categories batch added a SECOND unconfirmed row to
+   * this fixture (a floored category shipping with no period) and `getByRole` then resolved to two
+   * buttons — a strict-mode violation.
+   *
+   * Scoped at the cause rather than weakened with `.first()`: a `.first()` here would keep passing
+   * if the row it is about lost its button and a different row kept one.
+   */
+  await expect(
+    page
+      .getByTestId('retention-schedule-table')
+      .getByRole('row', { name: /AuditLogEntry/ })
+      .getByRole('button', { name: 'Confirm' }),
+  ).toBeVisible();
 
   await expect(
     page.getByText('Customer XYZ file', { exact: false }),
@@ -745,4 +791,44 @@ test('BATCH 5 GROUP 7c — a reader who may nominate a disposal but may NOT retr
   // AND NO "could not load" NOISE: the retrievals list is not even requested for this reader, so
   // the partial-load branch must not tell them a list failed.
   await expect(page.locator('main')).not.toContainText('did not load');
+});
+
+test('MODULE 0-ب — a FLOORED category with no period shows its ARTICLE and its FLOOR, not a blank', async ({
+  page,
+}) => {
+  /*
+   * Decision 32 on screen. The row is not an error state: the product ships it that way, because a
+   * period shipped beside an article number would read as a legal opinion from us.
+   *
+   * What makes the empty field ACTIONABLE is the sentence beside it — "no period set, this article
+   * requires at least 60 months, set yours above it". A blank is not actionable; that is.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER', 'DATA_PROTECTION_OFFICER']);
+  await mockRegister(page);
+  await page.goto('/retention-disposal');
+
+  const row = page.locator('[data-no-period="KYCRecord"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('No period set');
+  // THE ARTICLE AND THE FLOOR — read through the floors config by the api, so the screen cannot
+  // name a different statute from the one that refused a shorter period an hour earlier.
+  await expect(row).toContainText('art. 17/a');
+  await expect(row).toContainText('60 months');
+  // AND THAT NOTHING IS MEASURED, because an office that sees a category listed and is never
+  // alerted about it will believe the system is watching.
+  await expect(row).toContainText('Nothing is measured');
+});
+
+test('MODULE 0-ب — a category WITH a period shows no such notice', async ({
+  page,
+}) => {
+  // The other half. Anchored on a positive read from the same render first.
+  await mockAuth(page, ['COMPLIANCE_OFFICER', 'DATA_PROTECTION_OFFICER']);
+  await mockRegister(page);
+  await page.goto('/retention-disposal');
+
+  await expect(page.locator('[data-no-period="KYCRecord"]')).toBeVisible();
+  await expect(
+    page.locator('[data-no-period="AuditLogEntry"]'),
+  ).toHaveCount(0);
 });

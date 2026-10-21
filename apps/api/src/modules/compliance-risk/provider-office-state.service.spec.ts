@@ -28,6 +28,9 @@ const BASE: ProviderOfficeStateRow = {
   organizationStatus: 'ACTIVE',
   onboardedAt: new Date('2024-01-01T00:00:00.000Z'),
   licenseNumber: 'CBJ-1',
+  // REQUIRED on the row type rather than optional, so a fixture cannot omit it and make "no
+  // regulator has barred this office" indistinguishable from "nobody looked".
+  mayNotIssue: false,
   licenseIssuedAt: new Date('2024-01-01T00:00:00.000Z'),
   licenseExpiresAt: new Date('2026-12-31T00:00:00.000Z'),
   renewalRequestedAt: null,

@@ -168,6 +168,12 @@ export const PDPL = {
     rdIssueCertificateButton: 'إصدار الشهادة',
     rdCloseButton: 'إغلاق',
     rdAttached: 'مرفقة',
+    rdNoPeriodSet:
+      'لم تُحدَّد مدّة',
+    rdFloorApplies:
+      'يسري حدٌّ أدنى نظاميٌّ: {article} — {months} شهرًا على الأقل. تضع الشركةُ مدّتَها عند هذا الحدِّ أو أعلى منه بناءً على استشارتِها القانونية.',
+    rdInertNothingMeasured:
+      'لا يُحتسَبُ شيءٌ على هذه الفئةِ ولا يُقترَحُ أيُّ سجلٍّ للتخلُّصِ منه، إلى أن تُحدَّدَ المدّةُ ويُصادِقَ عليها المستشارُ القانوني.',
     rdDraftPending: 'مسودّة — قيد الانتظار',
     rdNoFloorNotice:
       'هذا النظامُ لا يعرف حدّاً أدنى قانونياً لفئةٍ بهذا الاسم — وهذا لا يعني أنّ القانونَ لا يضع لها حدّاً. فإن كانت هذه سجلّاتَ «اعرف عميلك» فحدُّها خمسُ سنواتٍ على الأقل بموجب قانون مكافحة غسل الأموال وتمويل الإرهاب رقم ٢٠ لسنة ٢٠٢١ (المادة ١٧/أ)، تُحسَب من إتمامِ المعاملة أو انتهاءِ العلاقة، أيُّهما أطول. وإن كانت سجلّاتٍ ماليةً أو تجاريةً فحدُّها عشرُ سنواتٍ من إغلاقِ المعاملة بموجب قانون التجارة رقم ١٢ لسنة ١٩٦٦ (المادة ١٩). اكتب سببَ المدّة التي اخترتَها، وأقِرَّ بأنّك قرأتَ ما سبق.',
@@ -575,6 +581,12 @@ export const PDPL = {
     rdIssueCertificateButton: 'Issue certificate',
     rdCloseButton: 'Close',
     rdAttached: 'Attached',
+    rdNoPeriodSet:
+      'No period set',
+    rdFloorApplies:
+      'A statutory floor applies: {article} — at least {months} months. The office sets its own period at or above that, on its own legal advice.',
+    rdInertNothingMeasured:
+      'Nothing is measured against this category and no records are proposed for disposal until a period is set and legal counsel confirms it.',
     rdDraftPending: 'DRAFT — pending',
     rdNoFloorNotice:
       'This system does not know a statutory minimum for a record category with this name — and that does not mean the law sets none for it. If these are know-your-customer records, their minimum is at least five years under the Anti-Money Laundering and Counter-Terrorism Financing Law No. 20 of 2021 (art. 17/a), counted from completing the transaction or ending the relationship, whichever is longer. If they are financial or commercial records, their minimum is ten years from the closing of the transaction under the Commercial Law No. 12 of 1966 (art. 19). Write the reason for the period you have chosen, and confirm that you have read the above.',

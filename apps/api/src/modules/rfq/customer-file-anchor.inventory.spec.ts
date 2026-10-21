@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { DsrStatus, ScreeningCaseStatus } from '@ibms/db';
@@ -8,6 +8,17 @@ import {
   OPEN_DSR_STATUSES,
   OPEN_SCREENING_CASE_STATUSES,
 } from './customer-file-anchor.service';
+
+/*
+ * FILE-SCOPED, NEVER GLOBAL. This sweep reads every api source file, and it crossed the 5s default
+ * when module 0-ب's categories batch added five more — a PRE-EXISTING spec failing because the tree
+ * grew, which is the honest description rather than "flaky".
+ *
+ * The argument for the exception is `float-money.inventory.spec.ts`'s: nothing is hidden, the
+ * assertion is correct, and the work is genuinely file I/O. Raising it in `apps/api` would raise the
+ * budget for every ordinary unit test, where 5s is a real signal.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 /**
  * TWO PROPERTIES, AND NEITHER IS ABOUT WHETHER THE ANCHOR WORKS.

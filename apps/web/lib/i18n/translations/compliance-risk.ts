@@ -132,6 +132,10 @@ export const COMPLIANCE_RISK = {
     providerOfficesColUsers: 'المستخدمون',
     providerOfficesColLastUsed: 'آخر استخدام للمكتب',
     providerOfficesNoLicence: 'لا ترخيص مسجَّل',
+    providerOfficesMayNotIssue:
+      'ممنوعٌ من الإصدار',
+    providerOfficesMayNotIssueNote:
+      'يوجدُ قرارٌ رقابيٌّ قائمٌ يَمنعُ هذا المكتبَ من إصدارِ أعمالٍ جديدة. تفاصيلُ القرارِ تبقى لدى المكتبِ نفسِه ولا تَظهرُ هنا.',
     providerOfficesNoTermOnRecord:
       'لا مدة ترخيص مسجَّلة — يُمنع العمل الجديد (م. 21/أ/9)',
     providerOfficesLapsed: 'منتهٍ — يُمنع العمل الجديد',
@@ -638,6 +642,10 @@ export const COMPLIANCE_RISK = {
     providerOfficesColUsers: 'Users',
     providerOfficesColLastUsed: 'Office last used',
     providerOfficesNoLicence: 'no licence recorded',
+    providerOfficesMayNotIssue:
+      'May not issue',
+    providerOfficesMayNotIssueNote:
+      'A standing regulatory decision bars this office from issuing new business. The decision itself stays with the office and is not shown here.',
     providerOfficesNoTermOnRecord:
       'no licence term on record — new business blocked (art. 21/a/9)',
     providerOfficesLapsed: 'lapsed — new business blocked',

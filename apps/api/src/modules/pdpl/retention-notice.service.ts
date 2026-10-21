@@ -15,6 +15,7 @@ import {
   type RetentionNoticeView,
 } from './retention-notice.config';
 import { resolutionFor } from './retention-resolution.config';
+import { periodIsActionable } from './retention-template.config';
 import {
   assertExtensionBasis,
   type ExtensionBasisInput,
@@ -69,6 +70,41 @@ export class RetentionNoticeService {
     const out: RetentionNoticeView[] = [];
 
     for (const item of items) {
+      // The three fields every branch below passes through unchanged. Collected once so a branch
+      // cannot quietly omit `confirmedByLegalCounselAt` and make a draft period look confirmed.
+      const identity = {
+        recordCategory: item.recordCategory,
+        retentionPeriodMonths: item.retentionPeriodMonths,
+        confirmedByLegalCounselAt: item.confirmedByLegalCounselAt,
+      };
+
+      /*
+       * INERT FIRST — no period, or a period no lawyer has confirmed. The row is RENDERED and
+       * nothing is measured, which is the brief's own rule: never proposed for disposal and never
+       * alerted on.
+       *
+       * The return is BEFORE the queries rather than a suppression after them, and that is not
+       * tidiness: `elapsedBefore` takes a non-null period, so a null one here would produce a NaN
+       * cutoff and a `lte` filter against it. Narrowing that signature is what makes forgetting
+       * this guard a compile error.
+       *
+       * This is the state the SHIPPED TEMPLATE puts a floored category in deliberately — the office
+       * sets its period above the floor on its own legal advice — so it is the common case on a
+       * fresh office rather than an edge one.
+       */
+      if (!periodIsActionable(item)) {
+        out.push(
+          deriveRetentionNotice({
+            ...identity,
+            elapsedCount: 0,
+            elapsedRecordIds: [],
+            heldCount: 0,
+            extendedCount: 0,
+          }),
+        );
+        continue;
+      }
+
       const resolution = resolutionFor(item.recordCategory);
       if (!resolution) {
         // UNRESOLVABLE CATEGORIES STILL GET A ROW. Decision 28's family: an office that set a period
@@ -76,8 +112,7 @@ export class RetentionNoticeService {
         // it. The row carries the measured reason and the screen says it loudly.
         out.push(
           deriveRetentionNotice({
-            recordCategory: item.recordCategory,
-            retentionPeriodMonths: item.retentionPeriodMonths,
+            ...identity,
             elapsedCount: 0,
             elapsedRecordIds: [],
             heldCount: 0,
@@ -99,8 +134,7 @@ export class RetentionNoticeService {
 
       out.push(
         deriveRetentionNotice({
-          recordCategory: item.recordCategory,
-          retentionPeriodMonths: item.retentionPeriodMonths,
+          ...identity,
           // A hold covers the WHOLE category, so everything elapsed is held and nothing is offered.
           elapsedCount: held
             ? 0

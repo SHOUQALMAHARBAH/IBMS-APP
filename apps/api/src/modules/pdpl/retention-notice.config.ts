@@ -55,10 +55,30 @@ import {
   resolutionFor,
   unresolvableReason,
 } from './retention-resolution.config';
+import { inertReason, periodIsActionable } from './retention-template.config';
 
 export interface RetentionNoticeView {
   recordCategory: string;
-  retentionPeriodMonths: number;
+  /** NULL where the category ships floored and the office has not set a period — decisions 32 and
+   *  33. The row still appears; nothing is counted against it. */
+  retentionPeriodMonths: number | null;
+  /**
+   * CAN THE SYSTEM ACT ON THIS CATEGORY AT ALL?
+   *
+   * False when there is no period, or when no lawyer has confirmed the one there is. Distinct from
+   * `resolvable`, and the two answer different questions — which is why both exist:
+   *
+   *   * `resolvable: false` means this category can NEVER produce a notice, because no date in this
+   *     system marks the end of its purpose. Nothing the office does changes it.
+   *   * `actionable: false` means it cannot produce one YET, and the office knows what to do about
+   *     it: set the period, or get it confirmed.
+   *
+   * Collapsing them would tell an office that its KYC category can never be watched, when what is
+   * actually true of a shipped floored row is that nobody has set the period.
+   */
+  actionable: boolean;
+  /** Why it is not actionable, in words — null when it is. */
+  inertReason: string | null;
   /** False means no notice is possible for this category, ever — and `reason` says why. */
   resolvable: boolean;
   /** Present only when `resolvable` is false. */
@@ -101,7 +121,11 @@ export const ELAPSED_IDS_CAP = 500;
 
 export interface RetentionNoticeInput {
   recordCategory: string;
-  retentionPeriodMonths: number;
+  retentionPeriodMonths: number | null;
+  /** REQUIRED, not optional, and that is the point: a caller who omitted it would make "nobody
+   *  confirmed this" and "the caller did not look" the same thing, and the derivation would then
+   *  alert on a draft period. The shipped template puts rows in exactly that state on purpose. */
+  confirmedByLegalCounselAt: Date | null;
   elapsedCount: number;
   elapsedRecordIds: string[];
   heldCount: number;
@@ -122,19 +146,34 @@ export function deriveRetentionNotice(
 ): RetentionNoticeView {
   const resolution = resolutionFor(input.recordCategory);
   const floor = floorForCategory(input.recordCategory);
+  /*
+   * INERT — no period, or a period no lawyer has confirmed.
+   *
+   * `periodIsActionable` is the SAME predicate `disposal-batch.service.ts` refuses on, imported
+   * rather than restated, because "is this period real" having two answers is the defect this
+   * module has now paid for at the licence layer as well.
+   *
+   * The row still comes back, and that is decision 28's family: a category an office can see on its
+   * own screen and is never alerted about is one it will believe the system is watching. What the
+   * row carries instead of a count is the REASON.
+   */
+  const actionable = periodIsActionable(input);
+  const inert = inertReason(input);
+  const suppressed = resolution === null || !actionable;
 
   return {
     recordCategory: input.recordCategory,
     retentionPeriodMonths: input.retentionPeriodMonths,
+    actionable,
+    inertReason: inert,
     resolvable: resolution !== null,
     unresolvableReason: unresolvableReason(input.recordCategory),
-    elapsedCount: resolution === null ? 0 : input.elapsedCount,
-    elapsedRecordIds:
-      resolution === null
-        ? []
-        : input.elapsedRecordIds.slice(0, ELAPSED_IDS_CAP),
-    heldCount: resolution === null ? 0 : input.heldCount,
-    extendedCount: resolution === null ? 0 : input.extendedCount,
+    elapsedCount: suppressed ? 0 : input.elapsedCount,
+    elapsedRecordIds: suppressed
+      ? []
+      : input.elapsedRecordIds.slice(0, ELAPSED_IDS_CAP),
+    heldCount: suppressed ? 0 : input.heldCount,
+    extendedCount: suppressed ? 0 : input.extendedCount,
     floor: floorView(floor),
     countedFrom: resolution?.triggerDescription ?? null,
     /*
@@ -154,6 +193,9 @@ export function deriveRetentionNotice(
 
 /** The elapsed cut-off for a period, as a date. Pure, so the boundary is provable without a clock. */
 export function elapsedBefore(now: Date, retentionPeriodMonths: number): Date {
+  /* Takes a NON-NULL period deliberately: a caller holding a null one has nothing to measure and
+   * must not reach here at all. `periodIsActionable` is the guard, and keeping this signature
+   * narrow is what makes forgetting it a compile error rather than a NaN cutoff. */
   /*
    * Month arithmetic through `setUTCMonth`, not `now - months * 30 * DAY`. A 30-day month is wrong
    * by up to five days a year, and the SLA work already paid for that: `renewalApplicationDueBy`

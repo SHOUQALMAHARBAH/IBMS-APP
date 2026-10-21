@@ -213,6 +213,26 @@ describe('MODULE 0-ب, THE LICENCE — the gate over HTTP', () => {
       'lg-placement',
       'PLACEMENT_TECHNICAL_OFFICER',
     );
+    /*
+     * A SECOND ACTOR FOR ز.٢'s READS, and the reason is a measurement rather than convenience.
+     *
+     * Those two items must be asserted POSITIVELY — the act WORKS under a suspension, not merely
+     * "was not refused by the licence gate". A flat 200 is the only form that says that, and a flat
+     * 200 needs an actor holding the read code.
+     *
+     * MEASURED off the seeded grid: NO seeded role holds `license.manage` together with either
+     * read. `client-accounting.read` is FINANCE/MANAGER/EXEC/AUDITOR; `claim.read` is
+     * SALES/CLAIMS/MANAGER/EXEC; `license.manage` is COMPLIANCE_OFFICER alone. So the compliance
+     * actor above cannot produce a 200 on either, and two actors in one test is the honest shape.
+     *
+     * BRANCH_DEPARTMENT_MANAGER holds BOTH reads, so one extra actor covers both items rather than
+     * two.
+     */
+    const manager = await makeUser(
+      app,
+      'lg-manager',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
 
     // ---------------------------------------------------------------- the office must start clean
     // A NON-VACUITY FLOOR, and it is not decoration: if a previous spec left this office suspended,
@@ -331,25 +351,51 @@ describe('MODULE 0-ب, THE LICENCE — the gate over HTTP', () => {
       // worse defect, and nothing about a missing refusal shows up in a test that only looks for
       // refusals.
 
-      // (1) COLLECTION AND REMITTANCE on existing business — reading the office's receivables while
-      //     suspended must answer, not refuse.
-      await request(app.getHttpServer())
+      /*
+       * (1) COLLECTION AND REMITTANCE on existing business — the office's receivables.
+       *
+       * A FLAT 200, which is the whole point of the owner's correction: the earlier
+       * `expect([200, 403])` asserted only that the licence gate had not reached this route, and
+       * said nothing about the act working. An office whose licence is suspended keeps the right to
+       * finish what it already has — «في عندو حسابات مفتوحة ومصاري لسا مش مسدَّدة بده يكمّلها وهذا
+       * حقّه» — so "it answers" is the claim, not "it was not refused for this particular reason".
+       */
+      /*
+       * SCOPED, because `GET /invoices` 400s without a scope BY DESIGN — its own DTO says so: *a
+       * book-wide invoice dump is Process 33's ageing report, not this endpoint*. The first version
+       * of this read was unscoped and got a 400, which would have been the wrong kind of green had
+       * the earlier `[200, 403]` accept still been in place: a 400 is neither.
+       *
+       * And scoping it is closer to the claim anyway — the office finishing what it already has, on
+       * a customer it already has.
+       */
+      const invoices = await request(app.getHttpServer())
         .get('/invoices')
-        .set(bearer(compliance.accessToken))
-        .expect((res) => {
-          // 200 or 403 on the permission — never 422, which would be the licence gate reaching a
-          // place it must not. A 403 would mean this actor lacks the code, which is a different
-          // fact and is asserted as such.
-          expect([200, 403]).toContain(res.status);
-        });
+        .query({ customerId: chain.customerId })
+        .set(bearer(manager.accessToken))
+        .expect(200);
+      /*
+       * AND IT RETURNED A BODY, not merely a status — a 200 carrying nothing would satisfy the line
+       * above while the read had in fact been emptied.
+       *
+       * The shape is asserted as "an object or an array, not null", rather than as an array: the
+       * first version assumed an array and failed, because this endpoint is SCOPED and returns a
+       * paginated envelope. Asserting the exact shape here would be asserting something about the
+       * invoice module rather than about the licence gate, which is what this test is for.
+       */
+      expect(invoices.body).not.toBeNull();
+      expect(typeof invoices.body).toBe('object');
 
-      // (2) CLAIMS IN FULL.
-      await request(app.getHttpServer())
+      // (2) CLAIMS IN FULL — same actor, same shape, same reason.
+      const claims = await request(app.getHttpServer())
         .get('/claims')
-        .set(bearer(compliance.accessToken))
-        .expect((res) => {
-          expect([200, 403]).toContain(res.status);
-        });
+        .set(bearer(manager.accessToken))
+        .expect(200);
+      // Same shape assertion as the invoice read above and for the same reason: this endpoint
+      // returns a paginated envelope, and pinning its exact shape here would be asserting something
+      // about the claims module rather than about the licence gate.
+      expect(claims.body).not.toBeNull();
+      expect(typeof claims.body).toBe('object');
 
       // (3) A CANCELLATION — the endorsement direction that REDUCES exposure. The same controller
       //     and the same policy as refusal (3) above, which is what makes this pair meaningful: one

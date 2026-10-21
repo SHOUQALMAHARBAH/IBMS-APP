@@ -45,7 +45,7 @@ const REFERENCE_TABLES: [
   ["legalForm", LEGAL_FORMS],
   ["businessModel", BUSINESS_MODELS],
 ];
-import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
+import { RETENTION_TEMPLATE_SEED } from "./seed-data/retention-template";
 import {
   BROKERAGE_KIND_DESCRIPTIONS,
   INTEGRATION_METHOD_DESCRIPTIONS,
@@ -678,34 +678,77 @@ async function ensureBootstrapAdmin(
 }
 
 /**
- * Part 6.2 (M06) — seeds the retention-schedule row(s). `recordCategory` is
- * now a real unique constraint (backlog Part D §5.1's Retention & Disposal
- * build) — a genuine Prisma `upsert`, not the hand-rolled findFirst/
- * create-or-update this used before that constraint existed.
+ * MODULE 0-ب — THE SHIPPED RETENTION TEMPLATE, across EVERY brokerage office.
+ *
+ * ## IT IS A SWEEP NOW, AND THAT IS A RECORDED RULE RATHER THAN A PREFERENCE
+ *
+ * This wrote to `DEFAULT_ORGANIZATION_ID` alone. That is the defect class this repository has paid
+ * for twice: *the seed grants to the DEFAULT office only, so anything added after an office was
+ * created never reaches that office* — which is how office B's administrator role sat four grants
+ * behind with nothing warning about it. The template SHIPS, so it reaches every office, and the
+ * shape is `organization.findMany()` the way `ensureDefaultOrgUnitsForEveryOrganization` and
+ * `ensureJordanFixedHolidays` already do it.
+ *
+ * NOT inside an `if (!existing)` branch, for the same recorded reason: that is exactly why item 1
+ * half (b) produced zero branches and zero departments for days while nothing failed.
+ *
+ * ## WHAT IT WILL AND WILL NOT OVERWRITE — the half that matters
+ *
+ * The CREATE writes the template. The UPDATE writes **nothing at all**.
+ *
+ * An office's retention period is its own compliance decision, often confirmed by its own lawyer.
+ * Upserting the template over it on the next seed run would silently replace a confirmed period
+ * with our blank — destroying a legal decision and leaving the category inert, which is the worst
+ * available outcome for a control whose whole purpose is to be trustworthy. The template is a
+ * STARTING POINT (decision 80: the office grants, edits and revokes freely), not a thing we keep
+ * re-asserting.
+ *
+ * The consequence is stated rather than left implicit: a category added to the template later does
+ * reach existing offices (the create fires for a name they do not have), and a WORDING change to an
+ * existing row's `legalBasis` does NOT. That is the right trade — the first is a new capability, the
+ * second would be us editing the office's own record.
  */
 async function ensureRetentionSchedule(): Promise<void> {
-  for (const item of RETENTION_SCHEDULE) {
-    await prisma.retentionScheduleItem.upsert({
-      where: {
-        organizationId_recordCategory: {
-          organizationId: DEFAULT_ORGANIZATION_ID,
-          recordCategory: item.recordCategory,
+  const offices = await prisma.organization.findMany({
+    where: { type: "BROKERAGE_OFFICE" },
+    select: { id: true, subdomain: true },
+  });
+  let created = 0;
+  let kept = 0;
+  for (const office of offices) {
+    for (const item of RETENTION_TEMPLATE_SEED) {
+      const existing = await prisma.retentionScheduleItem.findUnique({
+        where: {
+          organizationId_recordCategory: {
+            organizationId: office.id,
+            recordCategory: item.recordCategory,
+          },
         },
-      },
-      update: {
-        retentionPeriodMonths: item.retentionPeriodMonths,
-        legalBasis: item.legalBasis,
-      },
-      create: {
-        organizationId: DEFAULT_ORGANIZATION_ID,
-        recordCategory: item.recordCategory,
-        retentionPeriodMonths: item.retentionPeriodMonths,
-        legalBasis: item.legalBasis,
-      },
-    });
+        select: { id: true },
+      });
+      if (existing) {
+        kept += 1;
+        continue;
+      }
+      await prisma.retentionScheduleItem.create({
+        data: {
+          organizationId: office.id,
+          recordCategory: item.recordCategory,
+          retentionPeriodMonths: item.retentionPeriodMonths,
+          legalBasis: item.legalBasis,
+        },
+      });
+      created += 1;
+    }
   }
+  const floored = RETENTION_TEMPLATE_SEED.filter(
+    (i) => i.retentionPeriodMonths === null,
+  ).length;
   console.log(
-    `Seeded ${RETENTION_SCHEDULE.length} retention schedule item(s).`,
+    `Seeded ${created} retention schedule item(s) across ${offices.length} brokerage office(s) ` +
+      `(${kept} already present and LEFT UNTOUCHED — an office's period is its own decision). ` +
+      `${floored} of ${RETENTION_TEMPLATE_SEED.length} template categories ship with NO period ` +
+      `because a statutory floor governs them: the office sets its own above the floor.`,
   );
 }
 

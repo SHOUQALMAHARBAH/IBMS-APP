@@ -4930,7 +4930,22 @@ model RetentionScheduleItem {
   /// its own — a uniqueness-violation error confirms the value already exists
   /// for SOMEONE, with no row ever returned. See @@unique below.
   recordCategory            String
-  retentionPeriodMonths     Int
+  /// NULLABLE since module 0-ب's categories batch (decisions 32 and 33), and the null is a STATE.
+  ///
+  /// A category governed by one of the two statutory floors SHIPS WITH NO PERIOD: the screen shows
+  /// the article and the floor, and the office sets its own above it on its own lawyer's advice. The
+  /// owner's reason is the whole of it — a period shipped beside an article number reads as a legal
+  /// opinion from us, and we do not have one. A category with NO floor ships with a default, because
+  /// there a number claims nothing.
+  ///
+  /// A row with no period is INERT: never measured, never alerted on, never proposed for disposal.
+  /// That is `periodIsActionable()` in `retention-template.config.ts`, read by the notice AND by the
+  /// disposal nomination — one predicate, so the two cannot disagree. No parallel flag was added;
+  /// `confirmedByLegalCounselAt` already carries the sibling condition.
+  ///
+  /// NO DATABASE DEFAULT, deliberately: `DEFAULT 0` would make an unset period mean "destroy
+  /// immediately".
+  retentionPeriodMonths     Int?
   legalBasis                String?
   confirmedByLegalCounselAt DateTime?
 

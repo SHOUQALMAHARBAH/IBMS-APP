@@ -965,7 +965,12 @@ export default function RetentionDisposalPage() {
                           <input
                             aria-label={t('rdMonthsAria', { name: s.recordCategory })}
                             style={{ width: '5rem' }}
-                            value={editMonths[s.id] ?? String(s.retentionPeriodMonths)}
+                            value={
+                              editMonths[s.id] ??
+                              (s.retentionPeriodMonths === null
+                                ? ''
+                                : String(s.retentionPeriodMonths))
+                            }
                             onChange={(e) =>
                               setEditMonths((m) => ({ ...m, [s.id]: e.target.value }))
                             }
@@ -973,6 +978,35 @@ export default function RetentionDisposalPage() {
                         ) : (
                           s.retentionPeriodMonths
                         )}
+                        {/*
+                          NO PERIOD SET — and this is the shipped state for a floored category, not
+                          an error. The office is shown the ARTICLE and the FLOOR where the number
+                          would be, which is what makes it actionable: "no period yet, and here is
+                          the minimum the law requires" is something to act on where a blank is not.
+
+                          Decision 32's reason is why the number is absent in the first place: a
+                          period shipped beside an article number would read as a legal opinion from
+                          us, and we do not have one.
+                        */}
+                        {s.retentionPeriodMonths === null ? (
+                          <span
+                            style={{ display: 'block', color: 'var(--ink-muted)' }}
+                            data-no-period={s.recordCategory}
+                          >
+                            {t('rdNoPeriodSet')}
+                            {s.floor === null ? null : (
+                              <>
+                                {' — '}
+                                {t('rdFloorApplies', {
+                                  article: `${s.floor.instrument}, ${s.floor.article}`,
+                                  months: String(s.floor.floorMonths),
+                                })}
+                              </>
+                            )}
+                            {' '}
+                            {t('rdInertNothingMeasured')}
+                          </span>
+                        ) : null}
                       </td>
                       <td style={cell}>{s.legalBasis ?? '—'}</td>
                       <td style={cell}>

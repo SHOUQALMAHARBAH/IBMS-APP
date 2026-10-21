@@ -62,6 +62,23 @@ export interface ProviderOfficeStateView {
   licenseExpiresAt: string | null;
   renewalRequestedAt: string | null;
   /**
+   * THE ONE REGULATORY FACT THE PROVIDER SEES: this office may not issue.
+   *
+   * TRUE when a suspension or a cancellation is standing today, by the recorded act series. FALSE —
+   * never null — when none is, because "no regulator has barred this office" is a definite answer
+   * and a null would make a reader guess whether it meant unknown.
+   *
+   * NOTHING BEHIND IT, and the omission is the decision: the reference, the basis, the dates, the
+   * letter and the kind all stay with the office. `provider-office-state.e2e-spec.ts` asserts their
+   * absence by an EXACT KEY SET.
+   *
+   * It is NOT `isCurrentlyLapsed`'s sibling and must not be folded into it. That field is the term
+   * ARITHMETIC — is the latest recorded term past its expiry — and this is a REGULATOR'S ACT. A bar
+   * on a licence whose dates are still valid is therefore distinguishable from an expiry here, which
+   * the owner has accepted: awareness of a bar is the point.
+   */
+  mayNotIssue: boolean;
+  /**
    * DERIVED, never read from SQL. True when the office may not place new business.
    *
    * `null` when the office holds NO licence term, which is a third state rather than a missing
@@ -122,6 +139,16 @@ export function toProviderOfficeStateView(
     licenseIssuedAt: iso(row.licenseIssuedAt),
     licenseExpiresAt: iso(row.licenseExpiresAt),
     renewalRequestedAt: iso(row.renewalRequestedAt),
+    /*
+     * PASSED THROUGH, never re-derived. The view computed it because this service CANNOT: the acts
+     * are tenant-scoped and this read crosses offices, which is register entry 97 in one sentence.
+     *
+     * And it is NOT merged into `isCurrentlyLapsed` below. Those answer different questions — a
+     * regulator's act versus the term arithmetic — and collapsing them would make a suspension on a
+     * perfectly current licence read as an expiry, which is a false statement about why the office
+     * is stopped.
+     */
+    mayNotIssue: row.mayNotIssue,
     // THE SHARED TERM ARITHMETIC, never a comparison written here — and this is now a DECLARED
     // LIMIT rather than the whole answer.
     //

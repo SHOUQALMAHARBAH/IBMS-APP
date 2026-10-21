@@ -27,6 +27,18 @@ export interface ProviderOfficeState {
   /** DERIVED by the api from the regulatory rule, never by SQL. `null` = the office holds NO licence
    *  term, which is a THIRD state: it blocks new business (art. 21/a/9) and is not "lapsed". */
   isCurrentlyLapsed: boolean | null;
+  /**
+   * THE ONE REGULATORY FACT — register entry 97, closed. *This office may not issue.*
+   *
+   * TRUE when a suspension or a cancellation is standing today. Nothing behind it reaches this
+   * client and nothing should: not the decision reference, the basis, the dates, the letter or the
+   * kind. A sanction's contents are the office's own.
+   *
+   * NOT the same question as `isCurrentlyLapsed`, which is the term ARITHMETIC. A bar on a licence
+   * whose dates are still valid therefore reads as `mayNotIssue` beside a future expiry, which is
+   * the intent: the provider should KNOW there is a bar.
+   */
+  mayNotIssue: boolean;
   renewalDueBy: string | null;
   renewalFiledOnTime: boolean | null;
   licensedBranches: number;

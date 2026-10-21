@@ -66,6 +66,20 @@ export class RetentionArchiveRepository {
       select: { id: true, retentionPeriodMonths: true },
     });
     if (item === null) return null;
+    /*
+     * NO PERIOD, NO BLOCKED PHASE — and the direction of this guard is what matters.
+     *
+     * The template now SHIPS floored categories with `retentionPeriodMonths` NULL on purpose
+     * (decisions 32 and 33: a period beside an article number reads as a legal opinion we do not
+     * have). Returning an exclusion here with a null period would mean computing a cutoff from
+     * nothing; treating null as 0 would put EVERY record of that category into the blocked phase
+     * the instant the template was seeded — every receipt, every remittance, every commission
+     * entry, silently dropped from the AML sweep and the financial roll-up.
+     *
+     * So a category with no period is simply not blockable, which is the same answer
+     * `periodIsActionable` gives the notice and the disposal nomination.
+     */
+    if (item.retentionPeriodMonths === null) return null;
 
     const held = await this.prisma.client.legalHold.count({
       where: { retentionScheduleItemId: item.id, releasedAt: null },
@@ -164,6 +178,36 @@ export class RetentionArchiveRepository {
           where: {
             id: { in: recordIds },
             clientPaymentConfirmedAt: { lte: exclusion.cutoff },
+            ...notExtended,
+          },
+          select,
+        });
+        return rows.map((r) => r.id);
+      }
+      case 'quotation': {
+        /*
+         * A QUOTE PAST ITS PERIOD. The relation filter again, for the reason the sibling switch
+         * gives: the trigger is two hops away and an absent `clientDecision` must not match, which
+         * a relation `is` gives for free where a null column would have been swept in by `lte`.
+         *
+         * CONDITION 4 REACHES THIS ONE DIFFERENTLY from the four financial categories, and it is
+         * worth knowing: a quote reaches a data subject through `rfq.opportunity.customerId`, so a
+         * DSR naming a customer CAN see their blocked quotes. The four financial models carry no
+         * identity at all (register entry 92), which is what made that condition thin for them.
+         */
+        const rows = await this.prisma.client.quotation.findMany({
+          where: {
+            id: { in: recordIds },
+            rfq: {
+              opportunity: {
+                clientDecision: {
+                  is: {
+                    decision: 'REJECT',
+                    decidedAt: { lte: exclusion.cutoff },
+                  },
+                },
+              },
+            },
             ...notExtended,
           },
           select,

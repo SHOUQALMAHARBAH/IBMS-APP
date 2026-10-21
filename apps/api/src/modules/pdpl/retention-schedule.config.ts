@@ -1,4 +1,5 @@
 import { Prisma } from '@ibms/db';
+import { floorForCategory } from './retention-floors.config';
 import type { CombinedDutyAct } from '@ibms/db';
 import {
   combinedDutyActView,
@@ -28,7 +29,13 @@ import {
 export interface RetentionScheduleItemRow {
   id: string;
   recordCategory: string;
-  retentionPeriodMonths: number;
+  /**
+   * NULL where a statutory floor governs the category and the office has not yet set its own
+   * period — the shipped template's deliberate state (decisions 32 and 33: a period beside an
+   * article number reads as a legal opinion we do not have). Never a sentinel: 0 would read as
+   * "destroy immediately". A row with no period is INERT — see `periodIsActionable`.
+   */
+  retentionPeriodMonths: number | null;
   legalBasis: string | null;
   confirmedByLegalCounselAt: Date | null;
   /**
@@ -48,7 +55,30 @@ export interface RetentionScheduleItemRow {
 export interface RetentionScheduleItemView {
   id: string;
   recordCategory: string;
-  retentionPeriodMonths: number;
+  /** NULL where the category ships floored and unset — see the row type above. The screen renders
+   *  the ARTICLE and the FLOOR in its place rather than an em dash, because "no period yet, and
+   *  here is the minimum the law sets" is actionable where a blank is not. */
+  retentionPeriodMonths: number | null;
+  /**
+   * THE FLOOR GOVERNING THIS CATEGORY, or null — and the screen NEEDS it rather than merely
+   * liking it.
+   *
+   * A floored category ships with no period on purpose, so without this the row would read "no
+   * period set" and stop, which tells an office nothing it can act on. With it the row reads "no
+   * period set; this article sets a minimum of N months; set yours above it" — the difference
+   * between a blank and an instruction.
+   *
+   * READ THROUGH `floorForCategory`, never restated, so a screen cannot name a different statute
+   * from the one that refused a shorter period an hour earlier. `floorMonths` is carried here where
+   * the NOTICE's own `floor` field omits it: the notice explains a count that already happened, and
+   * this explains a number the office still has to choose.
+   */
+  floor: {
+    instrument: string;
+    article: string;
+    operativeText: string;
+    floorMonths: number;
+  } | null;
   legalBasis: string | null;
   confirmedByLegalCounselAt: string | null;
   /** `confirmedByLegalCounselAt !== null` — a plain convenience flag so a
@@ -81,6 +111,21 @@ export interface RetentionScheduleItemView {
   } | null;
 }
 
+/** The floor as the screen needs it, or null. A thin projection so the view never hands a screen
+ *  the config object itself — the `categories` list on it is internal and has no business on a
+ *  wire. */
+function floorView(recordCategory: string) {
+  const f = floorForCategory(recordCategory);
+  return f === null
+    ? null
+    : {
+        instrument: f.instrument,
+        article: f.article,
+        operativeText: f.operativeText,
+        floorMonths: f.floorMonths,
+      };
+}
+
 export function deriveRetentionScheduleItemView(
   row: RetentionScheduleItemRow,
 ): RetentionScheduleItemView {
@@ -93,6 +138,7 @@ export function deriveRetentionScheduleItemView(
       ? row.confirmedByLegalCounselAt.toISOString()
       : null,
     isConfirmed: row.confirmedByLegalCounselAt !== null,
+    floor: floorView(row.recordCategory),
     combinedDutyAct: combinedDutyActView(row.combinedDutyAct),
     /*
      * ALL FIVE OR NOTHING, mirroring the database CHECK rather than trusting it: a partial
