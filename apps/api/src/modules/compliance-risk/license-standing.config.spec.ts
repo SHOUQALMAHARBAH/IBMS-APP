@@ -26,19 +26,25 @@ function term(over: Partial<LicenseTermRow> = {}): LicenseTermRow {
   return {
     issuedAt: d('2024-01-15'),
     expiresAt: d('2026-12-31'),
-    status: 'active',
     renewalRequestedAt: null,
     ...over,
   };
 }
 
+let actSeq = 0;
 function act(over: Partial<RegulatoryActRow> = {}): RegulatoryActRow {
+  // `recordedAt` and `id` ADVANCE PER CALL, so acts built in source order fold in source order.
+  // A fixture that gave every act one instant would make the tie-break untestable AND would leave
+  // the fold's answer depending on `Array.prototype.sort` — which is the defect being fixed.
+  actSeq += 1;
   return {
     kind: 'SUSPENSION',
     basis: 'BROKER_REQUEST',
     effectiveFrom: d('2026-01-01'),
     suspendedUntil: null,
     decisionRef: 'CBJ-2026-77',
+    recordedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, actSeq)),
+    id: `act-${String(actSeq).padStart(4, '0')}`,
     ...over,
   };
 }
@@ -283,23 +289,40 @@ describe("a sanction's own period runs out without anything sweeping it", () => 
   });
 });
 
-describe('the manual lapse marker, which predates all of this', () => {
-  it('reports SUSPENDED with NO decision to cite, rather than claiming an expiry', () => {
-    /*
-     * `BrokerLicense.status = 'lapsed'` is the unstructured predecessor of `RegulatoryAction`, and
-     * it is in live use — measured: 0 rows on dev, 19 on db-test, with `markLapsed` reachable from
-     * the service.
-     *
-     * Its own documentation says what it means ("a CBJ suspension ahead of the calendar expiry"), so
-     * SUSPENDED is the marker's stated meaning rather than an inference — and EXPIRED would be the
-     * false reading, because the term here has not run out at all. The null reference IS the finding:
-     * a suspension nobody can cite is the state the act table exists to end.
-     */
-    const s = standing(term({ status: 'lapsed' }), [], d('2026-06-01'));
+describe('the manual lapse marker is GONE, and the rule it carried moved', () => {
+  /*
+   * This block asserted `standing(term({ status: 'lapsed' }), [], …)` reporting SUSPENDED with a
+   * NULL decision reference — the marker's stated meaning, and its own comment called that null
+   * "the finding" because *"a suspension nobody can cite is exactly the state `RegulatoryAction`
+   * exists to end"*.
+   *
+   * The table has a writer now (`POST /broker-license/regulatory-actions`), so the marker was
+   * REPLACED before the column was dropped — `docs/deferred-register.md` entry 12's order exactly.
+   * What follows asserts the rule the marker carried, over a real act: a regulator's intervention
+   * outranks the term arithmetic, and a timely renewal filing does not cure it.
+   */
+  it('a recorded SUSPENSION outranks a perfectly current term — and a timely renewal does not cure it', () => {
+    const s = standing(
+      term({
+        expiresAt: d('2028-12-31'),
+        // FILED ON TIME, which is what the old marker test was really about: the ordering must not
+        // let a renewal application paper over a regulator's own decision.
+        renewalRequestedAt: d('2026-05-01'),
+      }),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-05-15'),
+          decisionRef: 'CBJ/2026/77',
+        }),
+      ],
+      d('2026-06-01'),
+    );
     expect(s.status).toBe('SUSPENDED');
     expect(s.mayPractise).toBe(false);
-    expect(s.standingActDecisionRef).toBeNull();
-    expect(s.deemedCancelledUnderArticle14C).toBe(false);
+    // AND IT IS CITABLE, which is the whole difference from the flag it replaced.
+    expect(s.standingActDecisionRef).toBe('CBJ/2026/77');
   });
 });
 
@@ -315,5 +338,108 @@ describe('the cases above are not vacuous', () => {
       missing,
       'these derived statuses are never produced by any case in this file, so nothing observes them',
     ).toEqual([]);
+  });
+});
+
+describe('the fold is a TOTAL order, because two acts can bear one date', () => {
+  /*
+   * FOUND BY AN E2E FAILING IN A SPEC ABOUT RECOMMENDATIONS.
+   *
+   * `effectiveFrom` is `@db.Date`, so a suspension and the reinstatement that lifts it the same day
+   * are EQUAL to a comparator that reads only that column — and `Array.prototype.sort` is then free
+   * to return either first. The office's standing, which decides whether it may lawfully trade, was
+   * being settled by the query plan.
+   *
+   * That is the recorded `findActiveUserIdsWithPermission` class: it passed at 46,153 rows and
+   * failed at 23. Here it passed on dev and failed the moment two e2e specs recorded acts on one
+   * day.
+   *
+   * The tie-break is `recordedAt` — never for whether an act is IN FORCE, which is `effectiveFrom`
+   * alone, but for two letters bearing one date the later-RECORDED one is the later decision.
+   */
+  const SAME_DAY = d('2026-06-01');
+
+  it('a same-day REINSTATEMENT recorded after a suspension lifts it', () => {
+    const suspension = act({
+      kind: 'SUSPENSION',
+      basis: 'SANCTION',
+      effectiveFrom: SAME_DAY,
+      decisionRef: 'CBJ/2026/90',
+      recordedAt: new Date('2026-06-01T09:00:00.000Z'),
+      id: 'a',
+    });
+    const reinstatement = act({
+      kind: 'REINSTATEMENT',
+      basis: 'SANCTION',
+      effectiveFrom: SAME_DAY,
+      decisionRef: 'CBJ/2026/91',
+      recordedAt: new Date('2026-06-01T14:00:00.000Z'),
+      id: 'b',
+    });
+    // BOTH INPUT ORDERS, which is the whole point: the answer must not depend on how the rows came
+    // back. Passing only one order is how the original defect looked correct on one database.
+    for (const acts of [
+      [suspension, reinstatement],
+      [reinstatement, suspension],
+    ]) {
+      const s = standing(term(), acts, d('2026-07-01'));
+      expect(s.status).toBe('ACTIVE');
+      expect(s.mayPractise).toBe(true);
+    }
+  });
+
+  it('and a same-day SUSPENSION recorded after a reinstatement suspends — the order decides, not the kind', () => {
+    // The mirror, so the test is not passing because REINSTATEMENT happens to win. An office
+    // reinstated in the morning and suspended again that afternoon is suspended.
+    const reinstatement = act({
+      kind: 'REINSTATEMENT',
+      basis: 'SANCTION',
+      effectiveFrom: SAME_DAY,
+      decisionRef: 'CBJ/2026/92',
+      recordedAt: new Date('2026-06-01T09:00:00.000Z'),
+      id: 'a',
+    });
+    const suspension = act({
+      kind: 'SUSPENSION',
+      basis: 'SANCTION',
+      effectiveFrom: SAME_DAY,
+      decisionRef: 'CBJ/2026/93',
+      recordedAt: new Date('2026-06-01T14:00:00.000Z'),
+      id: 'b',
+    });
+    for (const acts of [
+      [reinstatement, suspension],
+      [suspension, reinstatement],
+    ]) {
+      const s = standing(term(), acts, d('2026-07-01'));
+      expect(s.status).toBe('SUSPENDED');
+      expect(s.standingActDecisionRef).toBe('CBJ/2026/93');
+    }
+  });
+
+  it('is TOTAL — two acts sharing a date AND an instant still fold deterministically, by id', () => {
+    // Pathological, and the reason it is asserted rather than left: a comparator that can return 0
+    // is a comparator whose answer depends on input order, which is exactly the property being
+    // fixed. The id tie-break is arbitrary but it is STABLE.
+    const instant = new Date('2026-06-01T09:00:00.000Z');
+    const a = act({
+      kind: 'SUSPENSION',
+      basis: 'SANCTION',
+      effectiveFrom: SAME_DAY,
+      decisionRef: 'CBJ/A',
+      recordedAt: instant,
+      id: 'aaa',
+    });
+    const b = act({
+      kind: 'REINSTATEMENT',
+      basis: 'SANCTION',
+      effectiveFrom: SAME_DAY,
+      decisionRef: 'CBJ/B',
+      recordedAt: instant,
+      id: 'bbb',
+    });
+    const first = standing(term(), [a, b], d('2026-07-01'));
+    const second = standing(term(), [b, a], d('2026-07-01'));
+    expect(first).toEqual(second);
   });
 });

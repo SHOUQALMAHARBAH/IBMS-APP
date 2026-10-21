@@ -23,7 +23,6 @@ export interface ProviderOfficeState {
   licenseNumber: string | null;
   licenseIssuedAt: string | null;
   licenseExpiresAt: string | null;
-  licenseStatus: string | null;
   renewalRequestedAt: string | null;
   /** DERIVED by the api from the regulatory rule, never by SQL. `null` = the office holds NO licence
    *  term, which is a THIRD state: it blocks new business (art. 21/a/9) and is not "lapsed". */

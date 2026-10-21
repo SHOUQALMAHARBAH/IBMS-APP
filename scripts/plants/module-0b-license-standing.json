@@ -29,10 +29,10 @@
     "from": "  if (\n    suspension?.suspendedUntil &&\n    suspension.suspendedUntil.getTime() < now.getTime()\n  ) {\n    suspension = null;\n  }",
     "to": "  if (false) {\n    suspension = null;\n  }"
   },
-  "manual-marker-read-as-an-expiry": {
-    "_": "Remove the manual-lapse branch, so `status: 'lapsed'` falls through to the term arithmetic. Must kill the marker test — and the failure is the point: it reports a licence that never ran out as having run out.",
+  "a-recorded-suspension-read-as-an-expiry": {
     "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
-    "from": "  if (term.status === 'lapsed') {\n    return {\n      status: 'SUSPENDED',",
-    "to": "  if (false) {\n    return {\n      status: 'SUSPENDED',"
+    "from": "  if (suspension) {",
+    "to": "  if (false) {",
+    "why": "REPOINTED by `--self-test`, which is what that gate is for. This plant pinned `if (term.status === 'lapsed')` — the MANUAL MARKER branch — and module 0-ب's licence batch deleted it with the column, so the anchor matched 0 times and the evidence had quietly expired. THE HAZARD SURVIVES IN A CHANGED FORM, which is why this is repointed rather than dropped: the thing that must outrank the term arithmetic is now a RECORDED SUSPENSION rather than a flag. Disabled, a suspended office falls through to the dates and an office the CBJ has suspended inside a current term reports ACTIVE and may practise — the system contradicting a regulator's own decision. `license-standing.config.spec.ts` dies on the recorded-suspension test, and `policy.service.spec.ts` dies twice at the placement layer."
   }
 }

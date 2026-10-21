@@ -63,10 +63,11 @@ export const ENUM_LABEL = {
     STEP_UP_VERIFIED: 'auditActionStepUpVerified',
     ACCESS_WINDOW_EXPIRED: 'auditActionAccessWindowExpired',
   } satisfies Labels<string>,
-  BrokerLicenseStatus: {
-    active: 'licStatusActive',
-    lapsed: 'licStatusLapsed',
-  } satisfies Labels<string>,
+  // `BrokerLicenseStatus` IS GONE from here, with its column. It mapped `active | lapsed` — the
+  // two-value marker that was the third of three answers to "is this office licensed". The office
+  // standing is derived in six states now (`deriveLicenseStanding`), and the regulatory-compliance
+  // screen labels them through its own `STANDING_LABEL`, which is a TOTAL map over the union rather
+  // than a loose index, so a seventh state is a compile error instead of a raw word on screen.
   ClaimStatus: {
     APPROVED: 'claimStatusApproved',
     NOTIFIED: 'claimStatusNotified',

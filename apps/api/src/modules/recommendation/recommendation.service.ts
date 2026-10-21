@@ -46,6 +46,7 @@ import type { DiscloseConflictOfInterestDto } from './dto/disclose-conflict-of-i
 import type { ListRecommendationsQueryDto } from './dto/list-recommendations-query.dto';
 import { insurerIdentity } from '../../repositories/insurer-identity';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
 /** The recommendation as the API returns it. `blockedFromSend` lists the
  * gates that still stand between the current state and `send` — empty means
@@ -149,6 +150,7 @@ export class RecommendationService {
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly dutySegregation: DutySegregationService,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   /** Placement / Manager / Executive work the whole commercial book
@@ -753,6 +755,15 @@ export class RecommendationService {
     id: string,
     actor: AuthenticatedUser,
   ): Promise<RecommendationView> {
+    /*
+     * ز.١ — ISSUING a recommendation to the customer.
+     *
+     * ON `send`, NOT ON `draft`, and that is measured rather than cautious: this module has a
+     * separate send step, so drafting is internal preparation and sending is what reaches the
+     * customer. An office whose renewal is with the regulator may prepare its advice and may not
+     * issue it — which is the narrowest reading that still blocks the act the owner named.
+     */
+    await this.licenseGate.assertMayPractise('ISSUE_RECOMMENDATION');
     const rec = await this.loadVisible(id, actor);
     this.assertNotDiscarded(id, rec);
 

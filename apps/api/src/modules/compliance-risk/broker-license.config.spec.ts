@@ -25,7 +25,6 @@ function row(overrides: Partial<BrokerLicenseRow> = {}): BrokerLicenseRow {
     scopeOfAuthorization: 'General insurance brokerage',
     issuedAt: new Date('2026-01-01T00:00:00.000Z'),
     expiresAt: new Date('2027-01-01T00:00:00.000Z'),
-    status: 'active',
     certificateDocumentId: 'doc-certificate-1',
     renewalRequestedAt: null,
     ...overrides,
@@ -52,10 +51,19 @@ describe('isBrokerLicenseCurrentlyLapsed (Process 51)', () => {
     );
   });
 
-  it('is lapsed when manually marked lapsed, even with a future expiry', () => {
-    expect(isBrokerLicenseCurrentlyLapsed(row({ status: 'lapsed' }), NOW)).toBe(
-      true,
-    );
+  /*
+   * RE-POINTED, not deleted. This asserted `isBrokerLicenseCurrentlyLapsed(row({ status: 'lapsed' }))`
+   * — the manual marker outranking a future expiry. The column is dropped (the third of three
+   * answers to "is this office licensed"), and the RULE moved rather than being lost: a regulator's
+   * act now outranks the term arithmetic inside `deriveLicenseStanding`, which is where a CBJ
+   * suspension is modelled with its basis, date, reference and letter.
+   *
+   * The replacement assertion lives in `license-standing.config.spec.ts`, over a real
+   * `RegulatoryAction`. What is asserted HERE is the half that stayed: with no act in play, a future
+   * expiry means not lapsed — so the function has stopped consulting anything but the dates.
+   */
+  it('consults only the DATES now — a future expiry is not lapsed, and there is no marker to override it', () => {
+    expect(isBrokerLicenseCurrentlyLapsed(row(), NOW)).toBe(false);
   });
 });
 
@@ -63,12 +71,10 @@ describe('deriveBrokerLicenseView (Process 51)', () => {
   it('carries the live-derived isCurrentlyLapsed alongside the raw stored status', () => {
     const view = deriveBrokerLicenseView(
       row({
-        status: 'active',
         expiresAt: new Date('2026-01-01T00:00:00.000Z'),
       }),
       NOW,
     );
-    expect(view.status).toBe('active');
     expect(view.isCurrentlyLapsed).toBe(true);
   });
 
@@ -87,7 +93,6 @@ describe('brokerLicenseAuditSnapshot (Process 51)', () => {
     const snapshot = brokerLicenseAuditSnapshot(row());
     expect(snapshot.scopeOfAuthorization).toBe('General insurance brokerage');
     expect(snapshot.licenseNumber).toBe('CBJ-2026-001');
-    expect(snapshot.status).toBe('active');
   });
 });
 
@@ -283,7 +288,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
     it('lapses after expiry when NOTHING was filed', () => {
       expect(
         isBrokerLicenseCurrentlyLapsed(
-          { status: 'active', expiresAt: EXPIRES, renewalRequestedAt: null },
+          { expiresAt: EXPIRES, renewalRequestedAt: null },
           past,
         ),
       ).toBe(true);
@@ -293,7 +298,6 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       expect(
         isBrokerLicenseCurrentlyLapsed(
           {
-            status: 'active',
             expiresAt: EXPIRES,
             renewalRequestedAt: new Date('2028-12-20T00:00:00.000Z'),
           },
@@ -309,7 +313,6 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       expect(
         isBrokerLicenseCurrentlyLapsed(
           {
-            status: 'active',
             expiresAt: EXPIRES,
             renewalRequestedAt: DEADLINE,
           },
@@ -318,19 +321,32 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       ).toBe(false);
     });
 
-    it('a MANUAL lapse outranks a timely filing — a suspension is not cured by applying', () => {
-      // Ordering, asserted rather than assumed: checking the extension first would let a filed
-      // application paper over a CBJ intervention.
+    /*
+     * RE-POINTED. This asserted that a term carrying `status: 'lapsed'` was lapsed even with a
+     * timely renewal filing — the ordering that stops a filed application papering over a CBJ
+     * intervention.
+     *
+     * The COLUMN is gone; THE RULE MOVED. A regulator's act now outranks the term arithmetic inside
+     * `deriveLicenseStanding`, and the replacement assertion is in
+     * `license-standing.config.spec.ts` over a real `RegulatoryAction` — with a timely filing in
+     * play, so it is the same ordering being proven and not a weaker version of it. It is also
+     * asserted at the PLACEMENT layer in `policy.service.spec.ts`, which is where the consequence
+     * lands.
+     *
+     * What is asserted here is the half that stayed: with no act, a timely filing past expiry means
+     * NOT lapsed. So this function has genuinely stopped consulting anything but the dates — which
+     * a missing assertion could not show.
+     */
+    it('with no act in play, a timely filing past expiry is NOT lapsed — the dates are all this reads now', () => {
       expect(
         isBrokerLicenseCurrentlyLapsed(
           {
-            status: 'lapsed',
             expiresAt: EXPIRES,
             renewalRequestedAt: DEADLINE,
           },
           past,
         ),
-      ).toBe(true);
+      ).toBe(false);
     });
   });
 
@@ -342,7 +358,6 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       expect(
         isValidPendingRenewalDecision(
           {
-            status: 'active',
             expiresAt: EXPIRES,
             renewalRequestedAt: DEADLINE,
           },
@@ -355,7 +370,6 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       expect(
         isValidPendingRenewalDecision(
           {
-            status: 'active',
             expiresAt: EXPIRES,
             renewalRequestedAt: DEADLINE,
           },
@@ -364,23 +378,17 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       ).toBe(false);
     });
 
-    it('is false when the term was manually lapsed', () => {
-      expect(
-        isValidPendingRenewalDecision(
-          {
-            status: 'lapsed',
-            expiresAt: EXPIRES,
-            renewalRequestedAt: DEADLINE,
-          },
-          past,
-        ),
-      ).toBe(false);
-    });
+    /*
+     * RE-POINTED for the same reason as the sibling above: this asserted that a manually lapsed term
+     * could not be in a valid pending-renewal state. The column is gone and a standing ACT is what
+     * stops that branch now — `deriveLicenseStanding` folds the acts before it ever asks about a
+     * pending renewal, so the guard is one level up and is asserted there.
+     */
 
     it('is false when nothing was filed', () => {
       expect(
         isValidPendingRenewalDecision(
-          { status: 'active', expiresAt: EXPIRES, renewalRequestedAt: null },
+          { expiresAt: EXPIRES, renewalRequestedAt: null },
           past,
         ),
       ).toBe(false);

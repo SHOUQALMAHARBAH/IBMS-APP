@@ -34,6 +34,7 @@ import {
   CustomerFileAnchorService,
   type CustomerFileAnchor,
 } from './customer-file-anchor.service';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
 /** Result of one follow-up sweep run — logged by the scheduler. Only
  * `candidates` and `due` are row counts; the tallies below are per-step and
@@ -135,6 +136,7 @@ export class RfqService {
      * `common/` the next service wanting cross-owner reach would import it, and the widening
      * this design refused would arrive one import at a time. */
     private readonly anchors: CustomerFileAnchorService,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
@@ -529,6 +531,12 @@ export class RfqService {
     dto: CreateRfqDto,
     actor: AuthenticatedUser,
   ): Promise<RfqWithSubmissions> {
+    /*
+     * ز.١ — A NEW QUOTE REQUEST TO INSURERS. Blocked FIRST, before the visibility read, because the
+     * licence is the thing the caller cannot change by editing the request — art. 3/a's own
+     * ordering argument, reused.
+     */
+    await this.licenseGate.assertMayPractise('REQUEST_QUOTES');
     const opportunity = await this.assertOpportunityVisible(
       dto.opportunityId,
       actor,
@@ -610,6 +618,16 @@ export class RfqService {
     dto: AddRfqInsurersDto,
     actor: AuthenticatedUser,
   ): Promise<RfqWithSubmissions> {
+    /*
+     * AND ADDING AN INSURER IS THE SAME ACT, which is why it is gated too rather than left to the
+     * creation check. The owner's words name the act as "a new quote request TO INSURERS" — an RFQ
+     * carrying no insurers has gone nowhere, so the moment a request reaches the market is the
+     * moment an insurer is added. Without this, an office could create the RFQ while licensed and
+     * then solicit the market after its licence ended.
+     *
+     * Two call sites, ONE gate — which is what the gate is for. It is not two answers.
+     */
+    await this.licenseGate.assertMayPractise('REQUEST_QUOTES');
     const { opportunityStatus } = await this.findVisibleRfq(rfqId, actor);
     this.assertOpportunityInMarketPhase(opportunityStatus);
 

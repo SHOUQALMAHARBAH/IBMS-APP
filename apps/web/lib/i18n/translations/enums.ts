@@ -44,9 +44,6 @@ export const ENUMS = {
     auditActionMfaFailed: 'فشل المصادقة الثنائية',
     auditActionStepUpVerified: 'تحقق إضافي ناجح',
     auditActionAccessWindowExpired: 'انتهاء نافذة الوصول',
-    // BrokerLicenseStatus
-    licStatusActive: 'سارية',
-    licStatusLapsed: 'منتهية',
     // ClaimStatus
     claimStatusNotified: 'مُبلَّغ عنها',
     claimStatusRegistered: 'مسجّلة',
@@ -353,9 +350,6 @@ export const ENUMS = {
     auditActionMfaFailed: 'MFA failed',
     auditActionStepUpVerified: 'Step-up verified',
     auditActionAccessWindowExpired: 'Access window expired',
-    // BrokerLicenseStatus
-    licStatusActive: 'Active',
-    licStatusLapsed: 'Lapsed',
     // ClaimStatus
     claimStatusNotified: 'Notified',
     claimStatusRegistered: 'Registered',

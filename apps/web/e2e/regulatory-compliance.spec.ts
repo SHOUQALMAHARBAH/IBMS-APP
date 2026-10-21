@@ -35,7 +35,9 @@ const LICENSE = {
   scopeOfAuthorization: 'General insurance brokerage',
   issuedAt: '2026-01-01T00:00:00.000Z',
   expiresAt: '2027-01-01T00:00:00.000Z',
-  status: 'active',
+  // `status` IS GONE from the api view — module 0-ب's licence batch dropped the column. It was the
+  // third of three answers to whether the office may practise, and this screen rendered it BESIDE
+  // the live-derived `isCurrentlyLapsed` in one cell.
   isCurrentlyLapsed: false,
   certificateDocumentId: 'doc-certificate-1',
   renewalRequestedAt: null,
@@ -60,7 +62,35 @@ const LICENSE = {
  * rather than a React error — which this project has been bitten by three times — and the screen
  * reads `series.current`, so a flat body would leave it `undefined`.
  */
-const LICENSE_SERIES = { current: LICENSE, terms: [LICENSE] };
+/**
+ * THE DERIVED STANDING — the ONE answer, which `LicenseGateService` also refuses on.
+ *
+ * ACTIVE here, because every test below but one is about a licensed office. `mayPractise` is read
+ * by the screen rather than the label, exactly as the gate does, so the two cannot disagree.
+ */
+const STANDING_ACTIVE = {
+  status: 'ACTIVE',
+  mayPractise: true,
+  standingActDecisionRef: null,
+  deemedCancelledUnderArticle14C: false,
+};
+
+/** Far from the expiry, so the renewal series is silent — `NONE` renders nothing at all, which is
+ *  deliberate: a panel that says "nothing due" every day is one a reader stops looking at. */
+const NOTICE_NONE = {
+  stage: 'NONE',
+  daysToExpiry: 400,
+  expiresAt: '2027-01-01T00:00:00.000Z',
+  applicationDueBy: '2026-11-17T00:00:00.000Z',
+  renewalFiled: false,
+};
+
+const LICENSE_SERIES = {
+  current: LICENSE,
+  terms: [LICENSE],
+  standing: STANDING_ACTIVE,
+  renewalNotice: NOTICE_NONE,
+};
 
 /** Module 0 item (e). `code` is null for an office's own line; `isStandard` decides which id the
  *  screen sends, because the two catalogues are addressed by different fields. */
@@ -190,7 +220,26 @@ test('shows the broker license status and the compliance calendar with the creat
     page.getByRole('heading', { name: 'Regulatory compliance' }),
   ).toBeVisible();
   await expect(page.getByText('CBJ-2026-001')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mark lapsed' })).toBeVisible();
+  /*
+   * RE-POINTED, not relaxed. This asserted a **Mark lapsed** button — one click, no body, which
+   * flipped a two-value `BrokerLicense.status` column. The office's record of a CBJ suspension
+   * therefore carried no basis, no effective date, no decision reference and no letter, and the
+   * derivation read it as SUSPENDED with a NULL reference.
+   *
+   * What the control IS now is a form that records the DECISION, so what is asserted is the form
+   * and the fields that make the row answerable a year later.
+   */
+  const actForm = page.locator('[data-regulatory-action-form]');
+  await expect(actForm).toBeVisible();
+  await expect(
+    actForm.getByRole('button', { name: 'Record the decision' }),
+  ).toBeVisible();
+  await expect(actForm.getByLabel('Decision reference')).toBeVisible();
+  // AND IT REFUSES RATHER THAN SENDING A REQUEST IT KNOWS WILL 400 — the reference is NOT NULL in
+  // the database and required by the DTO, so the button is disabled on an empty form.
+  await expect(
+    actForm.getByRole('button', { name: 'Record the decision' }),
+  ).toBeDisabled();
   await expect(
     page.getByRole('cell', { name: 'Annual AML training attestation' }),
   ).toBeVisible();
@@ -254,7 +303,28 @@ test('an office with NO licence term is told so, and told that new business is b
    */
   await mockAuth(page, ['COMPLIANCE_OFFICER']);
   await mockRegulatoryCompliance(page, {
-    licenseSeries: { current: null, terms: [] },
+    licenseSeries: {
+      current: null,
+      terms: [],
+      // NO_TERM_ON_RECORD is a real standing and the one that BLOCKS under art. 21/a/9 — and there
+      // is no term to hang it on, which is why the standing is a fact about the OFFICE rather than
+      // a column on a term.
+      standing: {
+        status: 'NO_TERM_ON_RECORD',
+        mayPractise: false,
+        standingActDecisionRef: null,
+        deemedCancelledUnderArticle14C: false,
+      },
+      // Silent: there is no date to count down to, and inventing one would give a reader a
+      // countdown to an expiry nobody recorded.
+      renewalNotice: {
+        stage: 'NONE',
+        daysToExpiry: null,
+        expiresAt: null,
+        applicationDueBy: null,
+        renewalFiled: false,
+      },
+    },
   });
   await page.goto('/regulatory-compliance');
 
@@ -280,12 +350,20 @@ test('the licence is a SERIES: earlier terms stay visible, with the current one 
     id: 'b1f0c0de-0000-4000-8000-000000000000',
     licenseNumber: 'CBJ-2023-OLD',
     expiresAt: '2025-12-31T00:00:00.000Z',
-    status: 'lapsed',
+    // NO `status` — the column is gone, and A TERM HAS NO STATUS OF ITS OWN. `pickCurrentTerm`
+    // decides which term governs by LATEST EXPIRY, so a superseded term needs no flag to stop
+    // governing, and the office's STANDING is one answer about the office rather than a column per
+    // row.
     isCurrentlyLapsed: true,
   };
   await mockAuth(page, ['COMPLIANCE_OFFICER']);
   await mockRegulatoryCompliance(page, {
-    licenseSeries: { current: LICENSE, terms: [LICENSE, previous] },
+    licenseSeries: {
+      current: LICENSE,
+      terms: [LICENSE, previous],
+      standing: STANDING_ACTIVE,
+      renewalNotice: NOTICE_NONE,
+    },
   });
   await page.goto('/regulatory-compliance');
 
@@ -356,6 +434,8 @@ test('NO three-year warning when the issue date was never recorded — a blank f
   await mockAuth(page, ['COMPLIANCE_OFFICER']);
   await mockRegulatoryCompliance(page, {
     licenseSeries: {
+      standing: STANDING_ACTIVE,
+      renewalNotice: NOTICE_NONE,
       current: {
         ...LICENSE,
         issuedAt: null,
@@ -388,7 +468,28 @@ test('an expired term with a timely application says it is still valid, and does
     isCurrentlyLapsed: false,
   };
   await mockRegulatoryCompliance(page, {
-    licenseSeries: { current: extended, terms: [extended] },
+    licenseSeries: {
+      current: extended,
+      terms: [extended],
+      // RENEWAL_PENDING — and `mayPractise` is TRUE, which is the whole reason that state exists
+      // separately from EXPIRED: both are past the printed expiry and only one may trade.
+      standing: {
+        status: 'RENEWAL_PENDING',
+        mayPractise: true,
+        standingActDecisionRef: null,
+        deemedCancelledUnderArticle14C: false,
+      },
+      // AND THE SERIES IS STILL RUNNING even though the application is filed, which is the
+      // brief's own instruction: a filing is not a decision, so `renewalFiled` is reported BESIDE
+      // the stage rather than suppressing it.
+      renewalNotice: {
+        stage: 'CONTINUING',
+        daysToExpiry: 5,
+        expiresAt: '2026-12-31T00:00:00.000Z',
+        applicationDueBy: '2026-11-16T00:00:00.000Z',
+        renewalFiled: true,
+      },
+    },
   });
   await page.goto('/regulatory-compliance');
 
@@ -420,7 +521,21 @@ test('an application filed AFTER the deadline is called out while there is still
     validPendingRenewalDecision: false,
   };
   await mockRegulatoryCompliance(page, {
-    licenseSeries: { current: late, terms: [late] },
+    licenseSeries: {
+      current: late,
+      terms: [late],
+      standing: STANDING_ACTIVE,
+      // The series IS running here — this term expires inside 30 days — and the filing is on
+      // record but LATE, which is the thing the test is about. The notice carries the filing as a
+      // fact; `[data-renewal-filed-late]` is the separate art. 11 consequence.
+      renewalNotice: {
+        stage: 'CONTINUING',
+        daysToExpiry: 20,
+        expiresAt: late.expiresAt,
+        applicationDueBy: '2026-11-16T00:00:00.000Z',
+        renewalFiled: true,
+      },
+    },
   });
   await page.goto('/regulatory-compliance');
 
@@ -621,4 +736,102 @@ test('a staffed office is told so, and gets no warning', async ({ page }) => {
     'meets the minimum approved staff',
   );
   await expect(page.locator('[data-staffing-short]')).toHaveCount(0);
+});
+
+/*
+ * MODULE 0-ب, THE LICENCE — the screen shows the DERIVED standing and the renewal series.
+ *
+ * Both are hand-copied over HTTP, so a dropped field is invisible to `tsc` and to every unit test;
+ * these two tests plus the api e2e's response-body assertion are the only layers that can see it.
+ */
+
+test('the licence panel shows the DERIVED six-state standing, and names the CBJ decision behind it', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      current: LICENSE,
+      terms: [LICENSE],
+      // A recorded CBJ suspension against an otherwise perfectly current term — the case that used
+      // to be invisible, because the derivation knew about it and the gate never asked.
+      standing: {
+        status: 'SUSPENDED',
+        mayPractise: false,
+        standingActDecisionRef: 'CBJ/2026/77',
+        deemedCancelledUnderArticle14C: false,
+      },
+      renewalNotice: NOTICE_NONE,
+    },
+  });
+  await page.goto('/regulatory-compliance');
+
+  const standing = page.getByTestId('rc-standing');
+  await expect(standing).toContainText('Suspended');
+  // CITABLE — the whole difference from the two-value flag this replaced, whose suspension carried
+  // no reference at all and which the derivation's own comment called "the finding".
+  await expect(standing).toContainText('CBJ/2026/77');
+
+  // AND THE BLOCK NAMES WHAT IS AND IS NOT AFFECTED. The second half is not decoration: an office
+  // told only that it is blocked has no way to know whether it may still collect a premium, and an
+  // over-wide reading of the block is a worse defect than the block missing.
+  const block = page.locator('[data-standing-may-not-practise]');
+  await expect(block).toContainText('may not place new business');
+  await expect(block).toContainText('Collection');
+  await expect(block).toContainText('claims');
+
+  // The standing is DERIVED, and the screen says so rather than letting a reader take it for a
+  // stored field somebody can correct.
+  await expect(page.locator('main')).toContainText('not stored as a field');
+});
+
+test('the renewal notice fires 45 days out, and a FILED application does not quieten it', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      current: { ...LICENSE, renewalRequestedAt: '2026-11-16T00:00:00.000Z' },
+      terms: [LICENSE],
+      standing: STANDING_ACTIVE,
+      renewalNotice: {
+        stage: 'FIRST',
+        daysToExpiry: 45,
+        expiresAt: '2027-01-01T00:00:00.000Z',
+        applicationDueBy: '2026-11-17T00:00:00.000Z',
+        // FILED. The brief forbids this suppressing the series, and the direction of the error is
+        // the reason: a filing is not a decision, so the office that applied on time and heard
+        // nothing is the one that most needs to keep being told.
+        renewalFiled: true,
+      },
+    },
+  });
+  await page.goto('/regulatory-compliance');
+
+  const notice = page.locator('[data-renewal-notice]');
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('45 days');
+  await expect(notice).toContainText('art. 11');
+  // The filing is reported BESIDE the stage, saying plainly that it does not lift the block.
+  await expect(page.locator('[data-renewal-notice-filing]')).toContainText(
+    'does NOT lift the block',
+  );
+  // AND THE 30-DAY POINT DECLARES THAT IT RESTS ON NO PROVISION. A number shown beside a citation
+  // it does not have is this product telling a broker the law says something it does not.
+  await expect(notice).toContainText('rests on no provision');
+});
+
+test('the renewal notice is SILENT while the expiry is far off', async ({
+  page,
+}) => {
+  // NONE renders nothing at all, deliberately: a panel that says "nothing due" every day is one a
+  // reader learns to skip, and this one has to be believed on the day it changes.
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegulatoryCompliance(page, { licenseSeries: LICENSE_SERIES });
+  await page.goto('/regulatory-compliance');
+
+  // Anchored on something positive from the SAME render, or an unhydrated page satisfies the
+  // absence and the test passes proving nothing.
+  await expect(page.getByTestId('rc-standing')).toContainText('Current');
+  await expect(page.locator('[data-renewal-notice]')).toHaveCount(0);
 });

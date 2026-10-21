@@ -16,6 +16,7 @@ import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
+import { licensedOffice } from '../compliance-risk/license-gate.double';
 
 const DAY = 86_400_000;
 const INCEPTION = new Date('2026-01-01T00:00:00.000Z');
@@ -339,6 +340,7 @@ function makeDeps(opts: DepsOpts = {}) {
       workflow,
       commissionLedger,
       dutySegregation,
+      licensedOffice(),
     ),
     endo,
     policyState,

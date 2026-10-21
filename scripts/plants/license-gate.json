@@ -1,0 +1,62 @@
+{
+  "quote-request-skips-the-gate": {
+    "file": "apps/api/src/modules/rfq/rfq.service.ts",
+    "from": "     * ordering argument, reused.\n     */\n    await this.licenseGate.assertMayPractise('REQUEST_QUOTES');",
+    "to": "     * ordering argument, reused.\n     */\n    await Promise.resolve();",
+    "why": "A new quote request to insurers goes out on a licence the CBJ has suspended. One of the FIVE acts ز.١ named that were not blocked at all before this batch — measured, `assertLicenseNotLapsed` had a single caller and it was the policy-creation path. `license-gate.e2e-spec.ts` dies at `expected 422, got 201` on the quote request, and `license-gate.inventory.spec.ts`'s unwired-act sweep dies naming REQUEST_QUOTES. THE ANCHOR CARRIES ITS OWN PRECEDING COMMENT because the call appears TWICE in that service (create, and adding insurers to an existing RFQ) — one gate, two sites — and the plant tool refuses an ambiguous `from`, correctly: a plant hitting several sites cannot say which guard it is testing."
+  },
+  "cover-increase-skips-the-gate": {
+    "file": "apps/api/src/modules/endorsement/endorsement.service.ts",
+    "from": "    if (dto.type === 'POSITIVE') {\n      await this.licenseGate.assertMayPractise('INCREASE_COVER');",
+    "to": "    if (dto.type === 'POSITIVE') {\n      await Promise.resolve();",
+    "why": "An endorsement that INCREASES cover is requested while the office may not practise — new exposure written under a licence that has ended, which is the harm ٨٢/و was reversed for: it reaches THE CUSTOMER and is irreversible. The e2e dies on the increase-cover refusal. The anchor includes `dto.type` because the APPLY path reads `e.type` and is otherwise byte-identical, so the bare call is ambiguous — and the two sites are deliberate: a request and an application are both chances to stop it."
+  },
+  "certificate-issued-unlicensed": {
+    "file": "apps/api/src/modules/policy/certificate-of-insurance-document.service.ts",
+    "from": "    await this.licenseGate.assertMayPractise('ISSUE_CERTIFICATE');",
+    "to": "    await Promise.resolve();",
+    "why": "An insurance certificate is issued on a suspended licence. This is the worst of the five to leave open, because the certificate exists to be handed to a third party — a landlord, a lender, a regulator — to rely on. The e2e dies on the certificate refusal."
+  },
+  "notice-starts-a-day-late": {
+    "file": "apps/api/src/modules/compliance-risk/license-renewal-notice.config.ts",
+    "from": "  if (daysToExpiry <= FIRST_NOTICE_DAYS_BEFORE_EXPIRY) {",
+    "to": "  if (daysToExpiry < FIRST_NOTICE_DAYS_BEFORE_EXPIRY) {",
+    "why": "`<` instead of `<=` starts the renewal series a day late, which on THIS figure means the office is first told about its renewal application on the day AFTER the application fell due — art. 11's own deadline. `license-renewal-notice.config.spec.ts` dies on the 45/46 boundary test, which asserts both sides for exactly this reason."
+  },
+  "a-filing-quietens-the-notice": {
+    "file": "apps/api/src/modules/compliance-risk/license-renewal-notice.config.ts",
+    "from": "  if (daysToExpiry < 0) return { ...base, stage: 'EXPIRED' };",
+    "to": "  if (renewalFiled) return { ...base, stage: 'NONE' };\n  if (daysToExpiry < 0) return { ...base, stage: 'EXPIRED' };",
+    "why": "A recorded renewal application silences the series — the exact thing the owner's brief forbids, and the direction of the error is why: a filing is not a decision, so the office that applied on time and has heard nothing is the one that most needs to keep being told. What lifts the block is the NEW TERM recorded with its certificate. The notice spec's `A RECORDED FILING DOES NOT QUIETEN IT` test dies."
+  },
+  "an-expiring-today-term-reads-expired": {
+    "file": "apps/api/src/modules/compliance-risk/license-renewal-notice.config.ts",
+    "from": "  if (daysToExpiry < 0) return { ...base, stage: 'EXPIRED' };",
+    "to": "  if (daysToExpiry <= 0) return { ...base, stage: 'EXPIRED' };",
+    "why": "A term expiring TODAY is announced as expired. Art. 10/b's term ends ON 31 December, so this reports the licence as run out while the office may still lawfully trade — and the gate disagrees with the screen on the one day it matters most. The notice spec's `a term expiring TODAY is still running` test dies."
+  },
+  "the-gate-caches-its-answer": {
+    "file": "apps/api/src/modules/compliance-risk/license-gate.service.ts",
+    "from": "  async standing(now: Date = new Date()): Promise<DerivedLicenseStanding> {",
+    "to": "  private cached: DerivedLicenseStanding | null = null;\n\n  async standing(now: Date = new Date()): Promise<DerivedLicenseStanding> {\n    if (this.cached) return this.cached;",
+    "why": "The standing is cached, so it is a FOURTH answer with a staleness window — and the window is exactly the period in which an office whose licence ended yesterday can still place business. `license-gate.inventory.spec.ts`'s LIVE-recompute test dies by name. That test is also why the cache regex is word-bounded: its first version matched `ttl` inside the word **settling** and reported a cache in a file that had none."
+  },
+  "the-refusal-stops-at-blocked": {
+    "file": "apps/api/src/modules/compliance-risk/license-gate.service.ts",
+    "from": "    `${capitalise(what)} is blocked — ${because}. Practising without a current licence is a ground ` +",
+    "to": "    `This is blocked. ` +",
+    "why": "The refusal stops naming the act, the standing, the article and what is NOT affected. Four of `license-gate.inventory.spec.ts`'s wording tests die — including the per-state one, which proves the six causes are distinct, and the one asserting the sentence names collection and claims. That last half is not decoration: an over-wide reading of the block is a worse defect than the block missing, and a bare 'blocked' invites it."
+  },
+  "the-dashboard-exemption-withdrawn": {
+    "file": "apps/api/src/modules/compliance-risk/license-gate.inventory.spec.ts",
+    "from": "      if (path === DECLARED_SECOND_DERIVATION) continue;",
+    "to": "      void DECLARED_SECOND_DERIVATION;",
+    "why": "NOT a defect plant — it proves the exemption is LOAD-BEARING rather than decorative, which a reader cannot tell from the list alone. With it withdrawn the one-answer sweep fails naming `provider-office-state.service.ts`, which is the real second derivation register entry 97 declares: that screen reads other offices through a `security_invoker = false` view and cannot see their `RegulatoryAction` rows at all. If this plant ever stops failing, somebody has either fixed the cross-office read or quietly deleted the sweep."
+  },
+  "the-fold-is-not-a-total-order": {
+    "file": "apps/api/src/modules/compliance-risk/license-standing.config.ts",
+    "from": "        a.effectiveFrom.getTime() - b.effectiveFrom.getTime() ||\n        a.recordedAt.getTime() - b.recordedAt.getTime() ||\n        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),",
+    "to": "        a.effectiveFrom.getTime() - b.effectiveFrom.getTime(),",
+    "why": "THE DEFECT AS SHIPPED, before an e2e found it. `effectiveFrom` is `@db.Date`, so a suspension and the reinstatement that lifts it the SAME DAY are equal to this comparator and `Array.prototype.sort` returns either first — the office's standing, which decides whether it may lawfully trade, settled by the query plan. It surfaced as `expected 201, got 422` on a RECOMMENDATION SEND in `policy.e2e-spec.ts`, a request with nothing to do with the licence, because the office stayed suspended after its own reinstatement was recorded. Same class as `findActiveUserIdsWithPermission`, which passed at 46,153 rows and failed at 23. `license-standing.config.spec.ts`'s three order tests die — and they assert BOTH input orders, which is what a single-order test could not catch."
+  }
+}

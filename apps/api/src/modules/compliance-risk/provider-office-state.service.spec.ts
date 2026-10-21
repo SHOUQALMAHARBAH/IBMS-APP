@@ -30,7 +30,6 @@ const BASE: ProviderOfficeStateRow = {
   licenseNumber: 'CBJ-1',
   licenseIssuedAt: new Date('2024-01-01T00:00:00.000Z'),
   licenseExpiresAt: new Date('2026-12-31T00:00:00.000Z'),
-  licenseStatus: 'active',
   renewalRequestedAt: null,
   licensedBranches: 4,
   dormantLicensedBranches: 1,
@@ -55,7 +54,6 @@ describe('item (j): the three licence states', () => {
         licenseNumber: null,
         licenseIssuedAt: null,
         licenseExpiresAt: null,
-        licenseStatus: null,
       },
       NOW,
     );
@@ -112,20 +110,21 @@ describe('item (j): the three licence states', () => {
     expect(view.renewalFiledOnTime).toBe(false);
   });
 
-  it('A MANUAL LAPSE OUTRANKS A TIMELY FILING, even inside the term', () => {
-    // A CBJ suspension is not cured by having applied for renewal, and the check ORDER in
-    // `isBrokerLicenseCurrentlyLapsed` is what holds that. Asserted here as well, because this
-    // dashboard is where a provider would first see it.
-    const view = toProviderOfficeStateView(
-      {
-        ...BASE,
-        licenseStatus: 'lapsed',
-        renewalRequestedAt: new Date('2026-10-01T00:00:00.000Z'),
-      },
-      NOW,
-    );
-    expect(view.isCurrentlyLapsed).toBe(true);
-  });
+  /*
+   * RE-POINTED, not deleted. This asserted that a MANUAL LAPSE outranked a timely renewal filing —
+   * `licenseStatus: 'lapsed'` with a filed renewal still reading `isCurrentlyLapsed: true` — and
+   * its comment was right about why: *"a CBJ suspension is not cured by having applied for
+   * renewal."*
+   *
+   * The column is gone (the third of three answers), so the view no longer carries it and this
+   * dashboard no longer rebuilds a term object from it. The RULE moved to where a regulator's act
+   * is modelled properly: `deriveLicenseStanding` folds `RegulatoryAction` before the term
+   * arithmetic, and `license-standing.config.spec.ts` asserts exactly that ordering with a timely
+   * filing in play.
+   *
+   * What this dashboard still owes is the half it can answer from a term alone, asserted above: a
+   * term past its expiry with nothing filed reads lapsed.
+   */
 
   it("art. 11's deadline is 45 days before expiry, derived not stored", () => {
     expect(toProviderOfficeStateView(BASE, NOW).renewalDueBy).toBe(

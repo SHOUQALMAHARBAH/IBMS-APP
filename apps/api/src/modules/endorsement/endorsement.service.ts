@@ -59,6 +59,7 @@ import type {
   AdvanceEndorsementDto,
   CalculateAdjustmentDto,
 } from './dto/endorsement-step.dto';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
 export interface EndorsementView {
   id: string;
@@ -135,6 +136,7 @@ export class EndorsementService {
     private readonly workflow: WorkflowTransitionService,
     private readonly commissionLedger: CommissionLedgerService,
     private readonly dutySegregation: DutySegregationService,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   private canReachAnyPolicy(actor: AuthenticatedUser): boolean {
@@ -309,6 +311,21 @@ export class EndorsementService {
     dto: CreateEndorsementDto,
     actor: AuthenticatedUser,
   ): Promise<EndorsementView> {
+    /*
+     * ز.١ — AN ENDORSEMENT THAT INCREASES COVER, and only that one.
+     *
+     * `EndorsementType` is POSITIVE | NEGATIVE, so the distinction the owner drew is already
+     * modelled: POSITIVE adds cover and additional premium, NEGATIVE reduces it. ز.٢ protects the
+     * reducing one explicitly — «بده يكمّلها وهذا حقّه» — and a cancellation has its own route,
+     * `requestCancellation`, which is deliberately NOT gated.
+     *
+     * Refused at CREATION rather than only at apply, so an office is not led through a flow that
+     * cannot complete; `apply` is gated too, because a POSITIVE endorsement raised while licensed
+     * must not increase cover after the licence ends.
+     */
+    if (dto.type === 'POSITIVE') {
+      await this.licenseGate.assertMayPractise('INCREASE_COVER');
+    }
     const policy = await this.loadVisiblePolicy(policyId, actor);
     if (policy.status !== 'ACTIVE') {
       throw new UnprocessableEntityException(
@@ -748,6 +765,14 @@ export class EndorsementService {
 
   async apply(id: string, actor: AuthenticatedUser): Promise<EndorsementView> {
     const e = await this.loadVisibleEndorsement(id, actor);
+    /*
+     * The second half of ز.١'s cover-increase act: applying a POSITIVE endorsement is when cover
+     * actually increases. A NEGATIVE one is untouched, because reducing cover and refunding is work
+     * on existing business.
+     */
+    if (e.type === 'POSITIVE') {
+      await this.licenseGate.assertMayPractise('INCREASE_COVER');
+    }
     if (e.status === 'REFUND_APPROVAL_PENDING') {
       throw new UnprocessableEntityException(
         `Endorsement ${id} is pending refund approval — apply it via \`POST /refunds/:id/approve\`.`,

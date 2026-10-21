@@ -7,6 +7,7 @@ import type { DocumentLanguage } from '../document-generation/document-html.util
 import { buildCertificateOfInsuranceHtml } from './certificate-of-insurance.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { insurerName } from '../../repositories/insurer-identity';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
 const CERTIFICATE_OF_INSURANCE_TEMPLATE_TYPE = 'certificate_of_insurance';
 
@@ -37,6 +38,7 @@ export class CertificateOfInsuranceDocumentService {
     private readonly policies: PolicyService,
     private readonly templates: DocumentTemplateRepository,
     private readonly pdfRenderer: PdfRendererService,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   async generate(
@@ -44,6 +46,24 @@ export class CertificateOfInsuranceDocumentService {
     requestedLanguage: DocumentLanguage | undefined,
     actor: AuthenticatedUser,
   ): Promise<GeneratedDocument> {
+    /*
+     * ز.١ — ISSUING AN INSURANCE CERTIFICATE, blocked when the office may not practise.
+     *
+     * Gated even though this is a GET, because the ACT is what the owner named and the harm is
+     * specific: this document exists to be handed to a third party — a landlord, a lender, a
+     * regulator — who relies on it as proof of cover. An unlicensed broker certifying cover to
+     * somebody outside the relationship is the harm, and it is irreversible once the certificate
+     * is in their hands.
+     *
+     * It is the FIRST thing checked, before the visibility read, because the licence is the one
+     * thing the caller cannot change by editing the request.
+     *
+     * The SCHEDULE SUMMARY beside it is deliberately NOT gated: that is the office's own record of
+     * what it placed, which ز.٢ protects as work on existing business. The certificate is an
+     * assertion to a third party; the summary is a statement to the customer about their own file.
+     */
+    await this.licenseGate.assertMayPractise('ISSUE_CERTIFICATE');
+
     // The SAME visibility read + data-availability gate the
     // policy-schedule-summary slice already established — see that
     // service's own comments for why. A certificate has nothing to

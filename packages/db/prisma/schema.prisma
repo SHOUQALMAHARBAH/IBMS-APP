@@ -3527,6 +3527,7 @@ model PaymentChannel {
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
   organizationId String       @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
+  status         String       @default("active") // active | disabled
   ownerType      String // customer | insurer
   customerId     String?
   // onDelete: Restrict — SET NULL (Prisma's default for an optional relation)
@@ -3539,7 +3540,6 @@ model PaymentChannel {
   bankName       String?
   accountLast4   String? // masked — at most 4 digits; NEVER the full number
   currency       String       @default("JOD")
-  status         String       @default("active") // active | disabled
   disabledAt     DateTime?
   createdAt      DateTime     @default(now())
 
@@ -4112,7 +4112,6 @@ model BrokerLicense {
   scopeOfAuthorization  String?
   issuedAt              DateTime?
   expiresAt             DateTime
-  status                String       @default("active") // active | lapsed
   /// The licence certificate as issued by the CBJ — MANDATORY, and NOT NULL is what makes it so.
   /// A term is the broker's evidence that it may practise; recording one with no certificate
   /// behind it is recording a claim rather than a fact. `onDelete: Restrict` because the document
@@ -6591,6 +6590,14 @@ enum DocumentCategory {
   RECEIPT
   CLAIM
   CORRESPONDENCE
+  /// MODULE 0-ب, THE LICENCE — a regulator's own DECISION LETTER, which `RegulatoryAction.documentId`
+  /// points at: a suspension, a cancellation, a reinstatement, or any future decision the office
+  /// receives. `CORRESPONDENCE` would bury a suspension decision among delivery emails, and `OTHER`
+  /// is where a document goes to be lost.
+  ///
+  /// NOT the licence CERTIFICATE, which already has `BROKER_LICENSE_CERTIFICATE` and already hangs
+  /// off the TERM — so three renewals are three certificates, each known by the period it covers.
+  REGULATORY_DECISION
   OTHER
 }
 

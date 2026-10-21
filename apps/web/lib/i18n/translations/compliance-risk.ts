@@ -97,7 +97,6 @@ export const COMPLIANCE_RISK = {
     rcLicenseNumberLabel: 'رقم الترخيص',
     rcColStatus: 'الحالة',
     rcExpires: 'ينتهي في',
-    rcMarkLapsedButton: 'تسجيل انتهاء الترخيص',
     rcScopeLabel: 'نطاق التفويض',
     rcIssuedAtLabel: 'تاريخ الإصدار',
     rcExpiresAtLabel: 'تاريخ الانتهاء',
@@ -233,6 +232,76 @@ export const COMPLIANCE_RISK = {
     rcLoading: 'جارٍ التحميل…',
     rcLicenseLoadError: 'تعذّر تحميل ترخيص الوسيط — حاول مرة أخرى.',
     rcCalendarLoadError: 'تعذّر تحميل تقويم الالتزامات — حاول مرة أخرى.',
+    rcStandingHeading:
+      'حالةُ الترخيص',
+    rcStandingNoTerm:
+      'لا توجدُ مدّةُ ترخيصٍ مسجّلة',
+    rcStandingActive:
+      'ساري',
+    rcStandingRenewalPending:
+      'قيدَ التجديد',
+    rcStandingExpired:
+      'منتهي',
+    rcStandingSuspended:
+      'موقوف',
+    rcStandingCancelled:
+      'ملغى',
+    rcStandingDerived:
+      'هذه الحالةُ مُستنبَطةٌ من مدَدِ الترخيصِ المسجّلةِ ومن قراراتِ الجهةِ الرقابيةِ المدوَّنة، وليست محفوظةً كحقل. وهي نفسُ الحالةِ التي يَمنعُ النظامُ على أساسِها الأعمالَ الجديدة.',
+    rcStandingMayNotPractise:
+      'لا يجوزُ للمكتبِ مباشرةُ أعمالٍ جديدةٍ في هذه الحالة: إصدارُ وثيقةٍ جديدةٍ، أو تجديدُها، أو طلبُ عروضٍ من الشركات، أو إصدارُ توصيةٍ للعميل، أو ملحقٌ يزيدُ التغطية، أو إصدارُ شهادةِ تأمين. أمّا التحصيلُ والتوريدُ والمطالباتُ والإلغاءُ والتقاريرُ وأعمالُ الامتثالِ فتستمرُّ.',
+    rcStandingDecisionRef:
+      'رقمُ قرارِ الجهةِ الرقابية',
+    rcStandingDeemedCancelled:
+      'عُدَّ الترخيصُ ملغىً بحكمِ المادة ١٤/ج: مضى على الإيقافِ بناءً على طلبِ الوسيطِ أكثرُ من سنتين. لم يَصدُر بذلك قرارٌ من الجهةِ الرقابية، وهذا ما استنبطَه النظامُ من التواريخِ المسجّلة.',
+    rcActionsHeading:
+      'قراراتُ الجهةِ الرقابيةِ المدوَّنة',
+    rcActionKind:
+      'نوعُ القرار',
+    rcActionKindSuspension:
+      'إيقاف',
+    rcActionKindCancellation:
+      'إلغاء',
+    rcActionKindReinstatement:
+      'إعادةُ تفعيل',
+    rcActionBasis:
+      'سندُ القرار',
+    rcActionBasisBrokerRequest:
+      'بناءً على طلبِ المكتب',
+    rcActionBasisSanction:
+      'عقوبةٌ مفروضة',
+    rcActionEffectiveFrom:
+      'تاريخُ نفاذِ القرار',
+    rcActionDecisionRef:
+      'رقمُ القرار',
+    rcActionSuspendedUntil:
+      'ينتهي الإيقافُ في (إن كان محدَّدًا)',
+    rcRecordActionButton:
+      'تدوينُ القرار',
+    rcActionReplacesMarker:
+      'هنا يُدوَّنُ القرارُ كما وردَ في الكتاب: نوعُه وسندُه وتاريخُ نفاذِه ورقمُه. وقد حلَّ هذا محلَّ زرٍّ واحدٍ كان يُعلِّمُ الترخيصَ منتهيًا دونَ أن يَحفظَ شيئًا من ذلك، فكان الإيقافُ مدوَّنًا بلا ما يُستندُ إليه.',
+    rcNoticeHeading:
+      'تنبيهُ تجديدِ الترخيص',
+    rcNoticeFirst:
+      'بقي على انتهاءِ مدّةِ الترخيصِ خمسةٌ وأربعون يومًا، وهو الموعدُ الذي يَجبُ أن يُقدَّمَ فيه طلبُ التجديد (المادة ١١).',
+    rcNoticeSecond:
+      'بقي على انتهاءِ مدّةِ الترخيصِ ثلاثون يومًا.',
+    rcNoticeContinuing:
+      'مدّةُ الترخيصِ على وشكِ الانتهاء، وسيَظهرُ هذا التنبيهُ في كلِّ مرّةٍ حتى يَمضيَ التاريخ.',
+    rcNoticeExpired:
+      'مضى تاريخُ انتهاءِ مدّةِ الترخيص.',
+    rcNoticeDays:
+      'الأيّامُ المتبقّية',
+    rcNoticeDaysSince:
+      'الأيّامُ المنقضيةُ على الانتهاء',
+    rcNoticeApplicationDueBy:
+      'آخرُ موعدٍ لتقديمِ طلبِ التجديد (المادة ١١)',
+    rcNoticeFiled:
+      'طلبُ التجديدِ مدوَّنٌ لدينا. وهذا لا يَرفعُ المنعَ ولا يُوقِفُ التنبيه: تقديمُ الطلبِ ليس قرارًا، والذي يَرفعُ المنعَ هو تدوينُ مدّةِ الترخيصِ الجديدةِ مع شهادتِها.',
+    rcNoticeNotFiled:
+      'لا يوجدُ طلبُ تجديدٍ مدوَّنٌ لدينا.',
+    rcNoticeNoSource:
+      'موعدُ الخمسةِ والأربعين يومًا مأخوذٌ من المادة ١١. أمّا موعدُ الثلاثين يومًا فهو تنبيهٌ داخليٌّ إضافيٌّ لا يَستندُ إلى نصٍّ.',
     rcActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     rcRefusalAct: 'عرض شاشة الالتزام التنظيمي',
     rcCalendarRefusalAct: 'عرض تقويم الالتزام',
@@ -532,7 +601,6 @@ export const COMPLIANCE_RISK = {
     rcLicenseNumberLabel: 'License number',
     rcColStatus: 'Status',
     rcExpires: 'Expires',
-    rcMarkLapsedButton: 'Mark lapsed',
     rcScopeLabel: 'Scope of authorization',
     rcIssuedAtLabel: 'Issued at',
     rcExpiresAtLabel: 'Expires at',
@@ -671,6 +739,76 @@ export const COMPLIANCE_RISK = {
     rcLoading: 'Loading…',
     rcLicenseLoadError: 'Could not load the broker license — try again.',
     rcCalendarLoadError: 'Could not load the compliance calendar — try again.',
+    rcStandingHeading:
+      'Licence standing',
+    rcStandingNoTerm:
+      'No licence term on record',
+    rcStandingActive:
+      'Current',
+    rcStandingRenewalPending:
+      'Renewal pending',
+    rcStandingExpired:
+      'Expired',
+    rcStandingSuspended:
+      'Suspended',
+    rcStandingCancelled:
+      'Cancelled',
+    rcStandingDerived:
+      'This standing is derived from the recorded licence terms and any recorded regulator decision, not stored as a field. It is the same answer the system blocks new business on.',
+    rcStandingMayNotPractise:
+      'In this state the office may not place new business: issuing a policy, renewing one, requesting quotes from insurers, issuing a recommendation to the customer, an endorsement that increases cover, or issuing an insurance certificate. Collection and remittance, claims, cancellations, reporting and compliance work all continue.',
+    rcStandingDecisionRef:
+      'Regulator decision reference',
+    rcStandingDeemedCancelled:
+      'Deemed cancelled under art. 14/c: a suspension made at the office own request has stood for more than two years. No regulator decision says so — the system derived it from the recorded dates.',
+    rcActionsHeading:
+      'Recorded regulator decisions',
+    rcActionKind:
+      'Decision',
+    rcActionKindSuspension:
+      'Suspension',
+    rcActionKindCancellation:
+      'Cancellation',
+    rcActionKindReinstatement:
+      'Reinstatement',
+    rcActionBasis:
+      'Basis',
+    rcActionBasisBrokerRequest:
+      'At the office own request',
+    rcActionBasisSanction:
+      'Imposed as a sanction',
+    rcActionEffectiveFrom:
+      'Takes effect from',
+    rcActionDecisionRef:
+      'Decision reference',
+    rcActionSuspendedUntil:
+      'Suspension ends on (if it is dated)',
+    rcRecordActionButton:
+      'Record the decision',
+    rcActionReplacesMarker:
+      'Record the decision as the letter states it: its kind, its basis, the date it takes effect and its reference. This replaces a single button that marked the licence lapsed and stored none of that, so a suspension was recorded with nothing to cite.',
+    rcNoticeHeading:
+      'Licence renewal notice',
+    rcNoticeFirst:
+      'The licence term expires in 45 days, which is the day the renewal application falls due (art. 11).',
+    rcNoticeSecond:
+      'The licence term expires in 30 days.',
+    rcNoticeContinuing:
+      'The licence term is running out. This notice appears on every reading until the date passes.',
+    rcNoticeExpired:
+      'The licence term expiry date has passed.',
+    rcNoticeDays:
+      'Days remaining',
+    rcNoticeDaysSince:
+      'Days since expiry',
+    rcNoticeApplicationDueBy:
+      'Renewal application due by (art. 11)',
+    rcNoticeFiled:
+      'A renewal application is on record. It does NOT lift the block and it does not stop this notice: filing is not a decision, and what lifts the block is recording the new licence term together with its certificate.',
+    rcNoticeNotFiled:
+      'No renewal application is on record.',
+    rcNoticeNoSource:
+      'The 45-day point is art. 11s own deadline. The 30-day point is an additional internal reminder and rests on no provision.',
     rcActionError: 'That action failed — try again.',
     rcRefusalAct: 'view the regulatory compliance screen',
     rcCalendarRefusalAct: 'view the compliance calendar',

@@ -14,9 +14,14 @@ import type { Prisma } from '@ibms/db';
  *
  * `ibms-brain/meta/context/regulatory-compliance.md`.
  */
-
-export const BROKER_LICENSE_STATUSES = ['active', 'lapsed'] as const;
-export type BrokerLicenseStatus = (typeof BROKER_LICENSE_STATUSES)[number];
+/*
+ * `BROKER_LICENSE_STATUSES` AND `BrokerLicenseStatus` ARE GONE, with the column they described.
+ *
+ * They were `['active', 'lapsed']` — two values against `deriveLicenseStanding`'s six, written by
+ * one route that took no body at all, so a CBJ suspension was recorded as a flag with no basis, no
+ * date, no reference and no letter. The standing is derived now and a regulator decision is a
+ * `RegulatoryAction` row.
+ */
 
 /**
  * THE SINGLETON IS GONE — Module 0 item (c). Kept as a note rather than silently deleted, because
@@ -186,16 +191,26 @@ export function expiryMatchesThreeYearTerm(term: {
  */
 export function isBrokerLicenseCurrentlyLapsed(
   license: {
-    status: string;
     expiresAt: Date;
     renewalRequestedAt: Date | null;
   },
   now: Date,
 ): boolean {
-  // A MANUAL lapse outranks everything. Module 0 item (d) kept this first deliberately: a CBJ
-  // suspension is not cured by having filed a renewal application, and ordering the checks the
-  // other way would let a timely filing paper over a regulator's own intervention.
-  if (license.status === 'lapsed') return true;
+  /*
+   * THE MANUAL-LAPSE BRANCH IS GONE, AND ITS RULE MOVED RATHER THAN BEING LOST.
+   *
+   * It read `if (license.status === 'lapsed') return true;` and its comment said why it came first:
+   * *"a CBJ suspension is not cured by having filed a renewal application, and ordering the checks
+   * the other way would let a timely filing paper over a regulator's own intervention."* That
+   * reasoning is right and is now enforced one level up, where a regulator's act is modelled
+   * properly: `deriveLicenseStanding` folds `RegulatoryAction` BEFORE it reaches the term
+   * arithmetic, and its own header states the precedence.
+   *
+   * The column it read is dropped. It was a two-value flag with no basis, no effective date, no
+   * decision reference and no document — the third of three answers to "is this office licensed",
+   * and the one `docs/deferred-register.md` entry 12 said to collapse once the acts had a writer.
+   * They do now (`POST /broker-license/regulatory-actions`).
+   */
 
   // Still inside the term.
   if (license.expiresAt.getTime() > now.getTime()) return false;
@@ -229,13 +244,14 @@ export function isBrokerLicenseCurrentlyLapsed(
  */
 export function isValidPendingRenewalDecision(
   license: {
-    status: string;
     expiresAt: Date;
     renewalRequestedAt: Date | null;
   },
   now: Date,
 ): boolean {
-  if (license.status === 'lapsed') return false;
+  // The manual-lapse guard moved with the column — see `isBrokerLicenseCurrentlyLapsed` above. A
+  // standing act is now what stops this branch, in `deriveLicenseStanding`, which checks the acts
+  // before it ever asks about a pending renewal.
   if (license.expiresAt.getTime() > now.getTime()) return false;
   return renewalFiledOnTime(license);
 }
@@ -247,7 +263,6 @@ export interface BrokerLicenseRow {
   scopeOfAuthorization: string | null;
   issuedAt: Date | null;
   expiresAt: Date;
-  status: string;
   /** Mandatory — see the model. A term with no certificate is unrepresentable. */
   certificateDocumentId: string;
   /** When the renewal application for the NEXT term was filed, or null. Item (d) reads this. */
@@ -284,10 +299,9 @@ export interface BrokerLicenseView {
   scopeOfAuthorization: string | null;
   issuedAt: string | null;
   expiresAt: string;
-  status: string;
-  /** Live-derived — see `isBrokerLicenseCurrentlyLapsed`. May be `true` even
-   * when `status` still reads `"active"`, if nothing has renewed/marked it
-   * since `expiresAt` passed. */
+  /** Live-derived — see `isBrokerLicenseCurrentlyLapsed`. There is no stored status to disagree
+   * with it any more: that column was the third of three answers to "is this office licensed" and
+   * was dropped once `RegulatoryAction` gained a writer. */
   isCurrentlyLapsed: boolean;
   certificateDocumentId: string;
   renewalRequestedAt: string | null;
@@ -318,7 +332,6 @@ export function deriveBrokerLicenseView(
     scopeOfAuthorization: row.scopeOfAuthorization,
     issuedAt: row.issuedAt ? row.issuedAt.toISOString() : null,
     expiresAt: row.expiresAt.toISOString(),
-    status: row.status,
     isCurrentlyLapsed: isBrokerLicenseCurrentlyLapsed(row, now),
     certificateDocumentId: row.certificateDocumentId,
     renewalRequestedAt: row.renewalRequestedAt
@@ -349,7 +362,6 @@ export function brokerLicenseAuditSnapshot(
     scopeOfAuthorization: input.scopeOfAuthorization,
     issuedAt: input.issuedAt ? input.issuedAt.toISOString() : null,
     expiresAt: input.expiresAt.toISOString(),
-    status: input.status,
     certificateDocumentId: input.certificateDocumentId,
     renewalRequestedAt: input.renewalRequestedAt
       ? input.renewalRequestedAt.toISOString()

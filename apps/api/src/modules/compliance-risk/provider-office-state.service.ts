@@ -60,7 +60,6 @@ export interface ProviderOfficeStateView {
   licenseNumber: string | null;
   licenseIssuedAt: string | null;
   licenseExpiresAt: string | null;
-  licenseStatus: string | null;
   renewalRequestedAt: string | null;
   /**
    * DERIVED, never read from SQL. True when the office may not place new business.
@@ -106,7 +105,6 @@ export function toProviderOfficeStateView(
     row.licenseExpiresAt === null
       ? null
       : {
-          status: row.licenseStatus ?? 'active',
           expiresAt: row.licenseExpiresAt,
           renewalRequestedAt: row.renewalRequestedAt,
         };
@@ -123,11 +121,25 @@ export function toProviderOfficeStateView(
     licenseNumber: row.licenseNumber,
     licenseIssuedAt: iso(row.licenseIssuedAt),
     licenseExpiresAt: iso(row.licenseExpiresAt),
-    licenseStatus: row.licenseStatus,
     renewalRequestedAt: iso(row.renewalRequestedAt),
-    // THE SHARED REGULATORY RULE, never a comparison written here. Its check ORDER is load-bearing
-    // — manual lapse, then inside the term, then the renewal-pending rule — and a
-    // copy would drift from the one `PolicyService.place()` enforces.
+    // THE SHARED TERM ARITHMETIC, never a comparison written here — and this is now a DECLARED
+    // LIMIT rather than the whole answer.
+    //
+    // `LicenseGateService` is the one answer to "may this office practise", and it folds the
+    // office's recorded `RegulatoryAction` rows over the term arithmetic: a CBJ suspension outranks
+    // a perfectly current term. This screen CANNOT ask it. It reads other offices through
+    // `ProviderOfficeState`, a `security_invoker = false` view that exists because those rows are
+    // unreachable by RLS, and `RegulatoryAction` is tenant-scoped like everything else.
+    //
+    // SO WHAT THIS FIELD MEANS IS NARROWER THAN ITS NAME: is this office's latest recorded term
+    // past its expiry, renewal rule applied. An office the CBJ has suspended reads here as holding
+    // a current term.
+    //
+    // It is left as it is on purpose. Putting a regulator decision into that view would disclose to
+    // every holder of `provider.office-state.read` that a competitor has been sanctioned, and the
+    // view's own migration requires that argument to be made again before any column is added. The
+    // gap is in `docs/deferred-register.md`; the dashboard gates nothing, so nothing is decided on
+    // this value.
     isCurrentlyLapsed:
       term === null ? null : isBrokerLicenseCurrentlyLapsed(term, now),
     renewalDueBy:

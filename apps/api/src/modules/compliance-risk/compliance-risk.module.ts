@@ -13,6 +13,7 @@ import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.rep
 import { BrokerLicenseController } from './broker-license.controller';
 import { BrokerLicenseService } from './broker-license.service';
 import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
+import { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
 import { BrokerLicenseScopeService } from './broker-license-scope.service';
 import { BrokerLicenseScopeRepository } from '../../repositories/broker-license-scope.repository';
 import { OrganizationRepository } from '../../repositories/organization.repository';
@@ -157,6 +158,11 @@ import { ProviderOfficeStateController } from './provider-office-state.controlle
     UnConsolidatedFetcher,
     BrokerLicenseService,
     BrokerLicenseRepository,
+    // MODULE 0-ب, THE LICENCE. `BrokerLicenseService.recordRegulatoryAction` writes the office's own
+    // record of a CBJ decision, and the derivation reads the acts back. A MISSING PROVIDER IS
+    // INVISIBLE TO `tsc` and only a booting app can see it — this one was caught by the licence-gate
+    // e2e failing at `createTestApp`, which is the second time this module has paid for that.
+    RegulatoryActionRepository,
     // Module 0 item (e). `OrganizationRepository` is provided HERE rather than imported from
     // another module: it is a stateless wrapper over `PrismaService`, safe to instantiate per
     // module, and five other modules already provide their own copy for the same reason (the

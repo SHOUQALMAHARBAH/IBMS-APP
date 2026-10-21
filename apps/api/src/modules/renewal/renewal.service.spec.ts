@@ -10,6 +10,7 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { LossRatioService } from '../loss-ratio/loss-ratio.service';
 import type { AuditService } from '../audit/audit.service';
+import { licensedOffice } from '../compliance-risk/license-gate.double';
 
 const ACTOR = 'user-1';
 
@@ -81,6 +82,7 @@ function makeDeps(over: Record<string, unknown> = {}) {
     sla as unknown as SlaTimerService,
     lossRatio as unknown as LossRatioService,
     audit as unknown as AuditService,
+    licensedOffice(),
   );
   return { service, cases, workflow, sla, lossRatio, audit };
 }

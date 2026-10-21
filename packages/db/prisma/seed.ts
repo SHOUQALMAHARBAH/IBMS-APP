@@ -1469,7 +1469,10 @@ async function ensureBrokerLicenseTerms(): Promise<void> {
             "Seeded placeholder — general insurance brokerage",
           issuedAt,
           expiresAt,
-          status: "active",
+          // NO `status` — module 0-ب's licence batch DROPPED that column. It was a two-value
+          // marker against the derivation's six states, and the seed writing "active" was asserting
+          // a standing that is now derived from the dates plus any recorded `RegulatoryAction`.
+          // A seeded placeholder term with no act against it derives as ACTIVE on its own.
           certificateDocumentId: certificate.id,
         },
       });

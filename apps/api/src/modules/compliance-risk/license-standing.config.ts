@@ -78,6 +78,22 @@ export interface RegulatoryActRow {
   effectiveFrom: Date;
   suspendedUntil: Date | null;
   decisionRef: string;
+  /**
+   * WHEN THE ROW WAS WRITTEN — the TIE-BREAK, and only the tie-break.
+   *
+   * Whether an act is in force is decided by `effectiveFrom` and must never consult this: a
+   * suspension dated last month entered today WAS in force for that month, which is what that
+   * column's own comment says.
+   *
+   * But `effectiveFrom` is `@db.Date`, so two acts on one day are EQUAL to it — and a suspension
+   * and the reinstatement that lifts it can genuinely bear one date. Without this the fold order
+   * was whatever the query plan returned, and the office's standing was decided by it. Found by an
+   * e2e failing in a spec about recommendations.
+   */
+  recordedAt: Date;
+  /** The final tie-break, so the comparator is TOTAL. Two acts sharing a date AND an instant is
+   *  pathological; a comparator that can return 0 is one whose answer depends on input order. */
+  id: string;
 }
 
 /** The term, as the derivation needs it. A subset of `BrokerLicenseRow` on purpose: this function
@@ -85,7 +101,6 @@ export interface RegulatoryActRow {
 export interface LicenseTermRow {
   issuedAt: Date | null;
   expiresAt: Date;
-  status: string;
   renewalRequestedAt: Date | null;
 }
 
@@ -152,7 +167,25 @@ function foldActs(
         a.effectiveFrom.getTime() >= termIssuedAt.getTime(),
     )
     .slice()
-    .sort((a, b) => a.effectiveFrom.getTime() - b.effectiveFrom.getTime());
+    /*
+     * A TOTAL ORDER — `effectiveFrom`, then `recordedAt`, then `id`.
+     *
+     * It was `effectiveFrom` alone, and `effectiveFrom` is a DATE. So a suspension and its
+     * reinstatement bearing one date folded in whatever order the query returned, and WHETHER THE
+     * OFFICE MAY TRADE was decided by the query plan. The e2e caught it as a 422 on a recommendation
+     * send — a request with nothing to do with the licence — after the office's own reinstatement
+     * had been recorded.
+     *
+     * Same class as `findActiveUserIdsWithPermission`, which had no `orderBy` while its consumer
+     * took `[0]`: it passed at 46,153 rows and failed at 23. A fold imposes an ordering requirement
+     * that nothing type-checks, so the order belongs in the comparator with the reason beside it.
+     */
+    .sort(
+      (a, b) =>
+        a.effectiveFrom.getTime() - b.effectiveFrom.getTime() ||
+        a.recordedAt.getTime() - b.recordedAt.getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
 
   let suspension: RegulatoryActRow | null = null;
   let cancellation: RegulatoryActRow | null = null;
@@ -249,33 +282,21 @@ export function deriveLicenseStanding(
   }
 
   /*
-   * THE MANUAL MARKER — `BrokerLicense.status = 'lapsed'`, the UNSTRUCTURED PREDECESSOR of this
-   * whole table, and it has to be read before the term arithmetic or it is reported as an expiry.
+   * THE MANUAL MARKER IS GONE, AND THAT IS THE COLLAPSE `docs/deferred-register.md` ENTRY 12 ASKED
+   * FOR, IN ITS ORDER.
    *
-   * MEASURED rather than assumed dead: dev holds 0 such rows and db-test holds 19 (all e2e
-   * artefacts), and `BrokerLicenseRepository.markLapsed` is a live write path reachable from the
-   * service. So it is a capability in use, not a legacy column nobody touches.
+   * A branch stood here reading `BrokerLicense.status === 'lapsed'` and reporting SUSPENDED with a
+   * NULL decision reference. Its own comment called that null "the finding", because *"a suspension
+   * nobody can cite is exactly the state `RegulatoryAction` exists to end"* — and nothing could
+   * write that table, so the marker was the only live way to record one.
    *
-   * Its own documentation says what it means — *"Manual override to 'lapsed' ahead of the calendar
-   * expiry (e.g. a CBJ suspension)"* — so SUSPENDED is the marker's stated meaning and not an
-   * inference. Reporting it EXPIRED would be the false one: the term may not have run out at all,
-   * and "your licence expired" sends Compliance to look at a date instead of at a regulator.
-   *
-   * `standingActDecisionRef` stays NULL, and the null IS the finding. A suspension nobody can cite
-   * is exactly the state `RegulatoryAction` exists to end, and a screen rendering "suspended — no
-   * CBJ decision on record" tells somebody what to do about it. Inventing a reference would not.
-   *
-   * That this column and `RegulatoryAction` are two homes for one fact is recorded in
-   * `docs/deferred-register.md`, with the order the collapse has to happen in.
+   * It has a writer now: `POST /broker-license/regulatory-actions`, the office's own record of the
+   * letter it received, carrying the basis, the effective date, the CBJ reference and the document.
+   * So the marker was replaced before it was removed — entry 12's rule was "record acts for whatever
+   * the marker was standing in for, THEN drop the column, never the reverse". MEASURED first: dev
+   * held 3 terms, all `active`; db-test 4 active and 3 lapsed, every one an e2e artefact. Nothing
+   * real was standing in for it.
    */
-  if (term.status === 'lapsed') {
-    return {
-      status: 'SUSPENDED',
-      mayPractise: false,
-      standingActDecisionRef: null,
-      deemedCancelledUnderArticle14C: false,
-    };
-  }
 
   /*
    * NO ACT STANDING — the term decides, through the functions that already decide it for

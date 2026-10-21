@@ -19,6 +19,7 @@ import {
   renewalDueAt,
   type RenewalCaseView,
 } from './renewal.config';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
 export interface RenewalSweepResult {
   scanned: number;
@@ -67,6 +68,7 @@ export class RenewalService {
     private readonly sla: SlaTimerService,
     private readonly lossRatio: LossRatioService,
     private readonly audit: AuditService,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   // --- 1. detection sweep ------------------------------------------------
@@ -239,6 +241,23 @@ export class RenewalService {
     const row = await this.cases.findById(id);
     if (!row) throw new NotFoundException(`Renewal case ${id} not found.`);
     if (row.status === toStatus) return deriveRenewalCaseView(row); // idempotent
+
+    /*
+     * ز.١ — RENEWING a policy is new business and is blocked when the office may not practise.
+     *
+     * ONLY ON THE MOVE TO `RENEWED`, and the narrowness is the point. The other two terminal
+     * outcomes are `LAPSED` and `CANCELLED`, and an office whose own licence has ended must still be
+     * able to record that a customer's policy lapsed — that is housekeeping on existing business,
+     * which ز.٢ protects. Gating the ROUTE would stop it, and an over-wide block is the worse defect
+     * because it stops lawful work and looks like compliance.
+     *
+     * After the idempotent short-circuit above, so a re-post of an already-RENEWED case does not
+     * start refusing once the licence lapses — the state is already recorded and refusing it would
+     * be refusing a fact.
+     */
+    if (toStatus === 'RENEWED') {
+      await this.licenseGate.assertMayPractise('RENEW_POLICY');
+    }
 
     // The engine validates the move against WORKFLOW_TRANSITIONS.RenewalCase
     // and writes the TRANSITION audit row; its status-conditional updateMany

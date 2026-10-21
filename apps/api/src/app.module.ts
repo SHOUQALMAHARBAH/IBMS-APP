@@ -14,6 +14,7 @@ import { SecurityModule } from './modules/security/security.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { ScreeningProvidersModule } from './modules/screening-providers/screening-providers.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
+import { LicenseGateModule } from './modules/compliance-risk/license-gate.module';
 import { DutySegregationModule } from './modules/duty-segregation/duty-segregation.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { ProspectModule } from './modules/prospect/prospect.module';
@@ -97,6 +98,9 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // Depends on AuditModule's global AuditService for the TRANSITION audit
     // row every transition() call writes.
     WorkflowModule,
+    // `@Global()` beside WorkflowModule and for the same reason — six acts in five modules must
+    // refuse an office that may not practise, and one answer is the whole point.
+    LicenseGateModule,
     // Part 4 — the one place an office's declared duty-segregation mode is applied. `@Global()` for the
     // same reason WorkflowModule is: nineteen call sites in fourteen modules pass through it.
     DutySegregationModule,

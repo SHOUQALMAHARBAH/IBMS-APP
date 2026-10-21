@@ -43,7 +43,6 @@ export interface ProviderOfficeStateRow {
   licenseNumber: string | null;
   licenseIssuedAt: Date | null;
   licenseExpiresAt: Date | null;
-  licenseStatus: string | null;
   renewalRequestedAt: Date | null;
   licensedBranches: number;
   dormantLicensedBranches: number;
@@ -71,7 +70,6 @@ export const PROVIDER_OFFICE_STATE_COLUMNS = [
   'licenseNumber',
   'licenseIssuedAt',
   'licenseExpiresAt',
-  'licenseStatus',
   'renewalRequestedAt',
   'licensedBranches',
   'dormantLicensedBranches',
@@ -96,7 +94,7 @@ export class ProviderOfficeStateRepository {
       SELECT
         "organizationId", "legalName", "legalNameAr", "subdomain",
         "organizationType", "brokerKind", "organizationStatus", "onboardedAt",
-        "licenseNumber", "licenseIssuedAt", "licenseExpiresAt", "licenseStatus",
+        "licenseNumber", "licenseIssuedAt", "licenseExpiresAt",
         "renewalRequestedAt", "licensedBranches", "dormantLicensedBranches",
         "users", "activeUsers", "lastActivityAt"
       FROM "ProviderOfficeState"

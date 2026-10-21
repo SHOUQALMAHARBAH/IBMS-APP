@@ -74,7 +74,6 @@ async function attachWhatTheSweepsAttach(organizationId: string) {
       licenseNumber: `CBJ-FIXTURE-${RUN}`,
       issuedAt: new Date(Date.UTC(2030, 0, 1)),
       expiresAt: new Date(Date.UTC(2032, 11, 31)),
-      status: 'active',
       certificateDocumentId: certificate.id,
     },
     select: { id: true },

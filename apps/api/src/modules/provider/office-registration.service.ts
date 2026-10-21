@@ -325,7 +325,6 @@ export class OfficeRegistrationService {
             licenseNumber: dto.licenseNumber,
             issuedAt: licenseIssuedAt,
             expiresAt: licenseExpiresAt,
-            status: 'active',
             certificateDocumentId: certificate.id,
             renewalRequestedAt: dto.renewalRequestedAt
               ? parseCalendarDate(dto.renewalRequestedAt, 'renewalRequestedAt')

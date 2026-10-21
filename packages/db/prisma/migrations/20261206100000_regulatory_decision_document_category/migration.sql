@@ -1,0 +1,28 @@
+-- MODULE 0-ب, THE LICENCE — the document category a regulator's DECISION LETTER is filed under.
+--
+-- Its own migration rather than a column on the next one, because `ALTER TYPE ... ADD VALUE` cannot
+-- be used in the transaction that adds it, and the next migration's own assertions read a table
+-- whose rows carry this value. The `20261027110000_discard_audit_action` precedent.
+--
+-- ## AND THE BRIEF'S PREMISE HAS MOVED, WHICH IS WHY THIS IS NARROWER THAN IT ASKED FOR
+--
+-- و.١٣ measured that "the thirteen document categories contain no regulatory one, so the licence
+-- certificate's nearest home is OTHER and it is lost there". MEASURED TODAY, that is no longer
+-- true: `BROKER_LICENSE_CERTIFICATE` and `INSURER_LICENSE_CERTIFICATE` both exist — module 0 item
+-- (c) added the first for exactly the reason و.١٣ gives, that a certificate's absence is a
+-- compliance defect rather than a gap and so has to be findable — and the broker's certificate
+-- already hangs off the TERM, not the office: `BrokerLicense.certificateDocumentId` is NOT NULL,
+-- so three renewals are three terms and three certificates, each known by the period it covers.
+-- Both halves of و.١٣ were therefore already satisfied.
+--
+-- WHAT HAS NO HOME is the OTHER regulatory document: the CBJ's own decision letter, which
+-- `RegulatoryAction.documentId` points at. That table has had no writer at all until now — measured:
+-- `RegulatoryAction` appears in exactly one non-spec file, the derivation that READS it — so the
+-- question never arose. Giving it a write path is what makes the gap real, and `CORRESPONDENCE` or
+-- `OTHER` would bury a suspension decision among delivery emails.
+--
+-- NOT named for the licence. A suspension, a cancellation and a reinstatement are all filed here,
+-- and so is any future decision this office receives; naming it after one of them would send the
+-- next reader to invent a second value.
+
+ALTER TYPE "DocumentCategory" ADD VALUE 'REGULATORY_DECISION';

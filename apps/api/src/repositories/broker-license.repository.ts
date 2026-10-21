@@ -30,9 +30,13 @@ export interface CreateBrokerLicenseTermInput {
  * caller's Organization, because `BrokerLicense` carries `organizationId` — so `findTerms()` below
  * returns this office's terms and cannot return another's.
  *
- * Provided by BOTH `ComplianceRiskModule` (create/renew/mark-lapsed/read) and `PolicyModule`
- * (`PolicyService.place()` reads it for the new-business gate) — a stateless wrapper, safe to
- * instantiate twice, the `WatchlistEntryRepository` shape, avoiding a module cycle for one read.
+ * Provided by `ComplianceRiskModule` (create/renew/record-a-regulatory-action/read) and by
+ * `LicenseGateModule`, which is `@Global()` — the gate reads the terms for every office act that
+ * needs a licence, so the six call sites inject the GATE rather than this repository. A stateless
+ * wrapper, safe to instantiate twice, the `WatchlistEntryRepository` shape.
+ *
+ * `PolicyModule` no longer provides it: `PolicyService` used to read the terms itself and derive
+ * its own answer, which was the second of three answers this batch collapsed into one.
  */
 @Injectable()
 export class BrokerLicenseRepository {
@@ -83,7 +87,6 @@ export class BrokerLicenseRepository {
           scopeOfAuthorization: input.scopeOfAuthorization,
           issuedAt: input.issuedAt,
           expiresAt: input.expiresAt,
-          status: 'active',
           certificateDocumentId: certificate.id,
         },
       });
@@ -107,12 +110,10 @@ export class BrokerLicenseRepository {
     });
   }
 
-  /** Manual override to `'lapsed'` ahead of the calendar expiry (e.g. a CBJ suspension) —
-   *  status-conditional so a concurrent call or an already-lapsed term is a harmless 0-row match. */
-  markLapsed(id: string): Promise<Prisma.BatchPayload> {
-    return this.prisma.client.brokerLicense.updateMany({
-      where: { id, status: 'active' },
-      data: { status: 'lapsed' },
-    });
-  }
+  /*
+   * `markLapsed` IS GONE. It flipped `BrokerLicense.status` to `'lapsed'` — a two-value marker with
+   * no basis, no date, no decision reference and no letter — and that column is dropped. The office
+   * records a regulator's decision through `RegulatoryActionRepository.create` now, which is the one
+   * home for "has the regulator stopped this office".
+   */
 }

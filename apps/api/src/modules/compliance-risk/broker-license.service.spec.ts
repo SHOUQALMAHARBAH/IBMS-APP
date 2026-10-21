@@ -6,6 +6,8 @@ import { BrokerLicenseService } from './broker-license.service';
 import type { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { CreateBrokerLicenseDto } from './dto/create-broker-license.dto';
+import type { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
+import { LicenseGateService } from './license-gate.service';
 
 /**
  * Module 0 item (c) rewrote this spec rather than patching it, because the repository it mocks
@@ -27,7 +29,6 @@ function term(overrides: Partial<BrokerLicense> = {}): BrokerLicense {
     scopeOfAuthorization: 'General insurance brokerage',
     issuedAt: new Date('2026-01-01T00:00:00.000Z'),
     expiresAt: new Date('2028-12-31T00:00:00.000Z'),
-    status: 'active',
     certificateDocumentId: CERT,
     renewalRequestedAt: null,
     ...overrides,
@@ -80,7 +81,6 @@ function makeDeps(initial: BrokerLicense[] = []) {
         scopeOfAuthorization: input.scopeOfAuthorization,
         issuedAt: input.issuedAt,
         expiresAt: input.expiresAt,
-        status: 'active',
         certificateDocumentId: `doc-${created}`,
       });
       terms.push(row);
@@ -93,27 +93,46 @@ function makeDeps(initial: BrokerLicense[] = []) {
     t.renewalRequestedAt = at;
     return Promise.resolve({ count: 1 });
   });
-  const markLapsed = vi.fn((id: string) => {
-    const t = terms.find((x) => x.id === id && x.status === 'active');
-    if (!t) return Promise.resolve({ count: 0 });
-    t.status = 'lapsed';
-    return Promise.resolve({ count: 1 });
-  });
 
   const repo = {
     findTerms,
     findTermById,
     createTerm,
     recordRenewalRequest,
-    markLapsed,
   } as unknown as BrokerLicenseRepository;
 
   const record = vi.fn().mockResolvedValue(undefined);
   const audit = { record } as unknown as AuditService;
 
+  /*
+   * THE ACT STORE, and the acts it holds are fed back to the REAL gate below — so the standing a
+   * test asserts is derived from the row the service just wrote, not from a mock that was told the
+   * answer. A `{ standing: () => 'SUSPENDED' }` double would make every assertion here pass on the
+   * double rather than on `deriveLicenseStanding`.
+   */
+  const storedActs: Record<string, unknown>[] = [];
+  const createAct = vi.fn((data: Record<string, unknown>) => {
+    const row = { id: `act-${storedActs.length + 1}`, ...data };
+    storedActs.push(row);
+    return Promise.resolve(row);
+  });
+  const acts = {
+    create: createAct,
+    findAll: vi.fn(() => Promise.resolve(storedActs)),
+  } as unknown as RegulatoryActionRepository;
+
+  // The REAL gate over this file's own two mocks — same reasoning as `policy.service.spec.ts`.
+  const licenseGate = new LicenseGateService(repo, acts);
+
   return {
-    service: new BrokerLicenseService(repo, audit),
-    mocks: { findTerms, createTerm, recordRenewalRequest, markLapsed, record },
+    service: new BrokerLicenseService(repo, audit, acts, licenseGate),
+    mocks: {
+      findTerms,
+      createTerm,
+      recordRenewalRequest,
+      record,
+      createAct,
+    },
     terms,
   };
 }
@@ -187,7 +206,6 @@ describe('BrokerLicenseService — a series of terms (Module 0 item c)', () => {
       const previous = term({
         id: 'term-old',
         expiresAt: new Date('2025-12-31T00:00:00.000Z'),
-        status: 'lapsed',
       });
       const { service, terms } = makeDeps([previous]);
 
@@ -198,7 +216,12 @@ describe('BrokerLicenseService — a series of terms (Module 0 item c)', () => {
       expect(terms).toHaveLength(2);
       const old = terms.find((t) => t.id === 'term-old');
       expect(old?.expiresAt.toISOString()).toBe('2025-12-31T00:00:00.000Z');
-      expect(old?.status).toBe('lapsed');
+      /*
+       * THE OLD TERM IS NO LONGER FLIPPED TO `lapsed`, because that column is gone — and nothing is
+       * lost: `pickCurrentTerm` already decides which term governs by LATEST EXPIRY, so a superseded
+       * term needs no flag to stop governing. The flag was a second answer to a question the series
+       * already answers, which is why it went.
+       */
 
       const { current, terms: series } = await service.get();
       expect(series).toHaveLength(2);
@@ -258,29 +281,123 @@ describe('BrokerLicenseService — a series of terms (Module 0 item c)', () => {
     });
   });
 
-  describe('markLapsed', () => {
-    it('404s when the office holds no term yet', async () => {
-      const { service } = makeDeps();
-      await expect(service.markLapsed('compliance-1')).rejects.toThrow(
-        NotFoundException,
+  describe('recordRegulatoryAction — which REPLACED markLapsed', () => {
+    /*
+     * REPOINTED, with the reversal stated rather than deleted. The three tests here asserted
+     * `markLapsed`: that it 404s with no term, that it flips `BrokerLicense.status` to `'lapsed'`
+     * and audits an UPDATE, and that it is idempotent on an already-lapsed term.
+     *
+     * All three encoded the old mechanism as intended, and the mechanism is gone: a bare two-value
+     * marker with no basis, no effective date, no decision reference and no letter was the state
+     * `RegulatoryAction` exists to end — `license-standing.config.ts` said so in a comment while
+     * reading the marker, because nothing could write the table it preferred.
+     *
+     * The 404-with-no-term case does NOT carry over, and that is the one real behaviour change:
+     * a CBJ decision is about the office, not about a term, so an office that has never recorded a
+     * licence can still record the letter suspending it. Refusing there would make the office
+     * unable to record a fact it has received.
+     */
+    it('records the act with its basis, date and decision reference — and returns the STANDING it produced', async () => {
+      const { service, mocks } = makeDeps([term()]);
+      const standing = await service.recordRegulatoryAction(
+        {
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: '2026-10-01',
+          decisionRef: 'CBJ/2026/441',
+        },
+        { id: 'compliance-1', organizationId: 'org-1' },
       );
-    });
 
-    it('flips the current term to lapsed and audits UPDATE', async () => {
-      const { service, mocks, terms } = makeDeps([term()]);
-      const view = await service.markLapsed('compliance-1');
-      expect(view.status).toBe('lapsed');
-      expect(terms[0]?.status).toBe('lapsed');
+      // THE STANDING, not a bare "recorded": a caller told only that the row was written has to go
+      // and look to find out what it changed to.
+      expect(standing.status).toBe('SUSPENDED');
+      expect(standing.mayPractise).toBe(false);
+      // AND THE DECISION IS CITABLE, which is the whole difference from the marker it replaced.
+      expect(standing.standingActDecisionRef).toBe('CBJ/2026/441');
+
+      expect(mocks.createAct).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: 'org-1',
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          decisionRef: 'CBJ/2026/441',
+          recordedByUserId: 'compliance-1',
+        }),
+      );
       expect(mocks.record).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'UPDATE' }),
+        expect.objectContaining({
+          action: 'CREATE',
+          entityType: 'RegulatoryAction',
+        }),
       );
     });
 
-    it('is idempotent on an already-lapsed term (no duplicate audit row)', async () => {
-      const { service, mocks } = makeDeps([term({ status: 'lapsed' })]);
-      const view = await service.markLapsed('compliance-1');
-      expect(view.status).toBe('lapsed');
-      expect(mocks.record).not.toHaveBeenCalled();
+    it('a SANCTION suspension is NOT deemed cancelled by art. 14/c, however old — only a broker-request one is', async () => {
+      /*
+       * The distinction decision 71 drew and refused to infer past: art. 14/c converts a
+       * long-standing art. 14/a suspension into a cancellation, and whether it reaches an art. 21/b
+       * SANCTION is unsettled in the text. Asserted here because a reader could reasonably assume
+       * "two years is two years".
+       *
+       * THE TERM IS ISSUED IN 2015 ON PURPOSE. My first version dated the act 2020 against the
+       * default term's 2026 issue date, and it read ACTIVE — correctly: `foldActs` ignores an act
+       * that PREDATES the current term, because a later term means the office was re-licensed and a
+       * suspension lifted by that re-licensing must not keep blocking. The derivation was right and
+       * the fixture was careless, so the fixture moved.
+       */
+      const { service } = makeDeps([
+        term({ issuedAt: new Date('2015-01-01T00:00:00.000Z') }),
+      ]);
+      const standing = await service.recordRegulatoryAction(
+        {
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: '2020-01-01',
+          decisionRef: 'CBJ/2020/7',
+        },
+        { id: 'compliance-1', organizationId: 'org-1' },
+      );
+      expect(standing.status).toBe('SUSPENDED');
+      expect(standing.deemedCancelledUnderArticle14C).toBe(false);
+
+      // AND THE OTHER BASIS IS the one art. 14/c reaches — asserted beside it, because a test that
+      // only shows SANCTION is not deemed cancelled cannot tell "the basis decides" from "nothing
+      // is ever deemed cancelled".
+      const { service: s2 } = makeDeps([
+        term({ issuedAt: new Date('2015-01-01T00:00:00.000Z') }),
+      ]);
+      const own = await s2.recordRegulatoryAction(
+        {
+          kind: 'SUSPENSION',
+          basis: 'BROKER_REQUEST',
+          effectiveFrom: '2020-01-01',
+          decisionRef: 'CBJ/2020/8',
+        },
+        { id: 'compliance-1', organizationId: 'org-1' },
+      );
+      expect(own.status).toBe('CANCELLED');
+      expect(own.deemedCancelledUnderArticle14C).toBe(true);
+    });
+
+    it('records the letter for an office that holds NO term — which the marker it replaced refused', async () => {
+      // The one behaviour change, asserted so it is a decision rather than a side effect: a CBJ
+      // decision is about the OFFICE, and an office with no term on record is exactly the one most
+      // likely to have received one.
+      const { service, mocks } = makeDeps();
+      const standing = await service.recordRegulatoryAction(
+        {
+          kind: 'CANCELLATION',
+          basis: 'SANCTION',
+          effectiveFrom: '2026-09-01',
+          decisionRef: 'CBJ/2026/500',
+        },
+        { id: 'compliance-1', organizationId: 'org-1' },
+      );
+      // NO_TERM_ON_RECORD still wins, because the derivation checks the term first — the act is
+      // recorded and the standing reports the more fundamental gap.
+      expect(standing.status).toBe('NO_TERM_ON_RECORD');
+      expect(mocks.createAct).toHaveBeenCalled();
     });
   });
 
@@ -300,7 +417,7 @@ describe('BrokerLicenseService — a series of terms (Module 0 item c)', () => {
 
     it('returns the live-derived view of the current term', async () => {
       const { service } = makeDeps([
-        term({ expiresAt: new Date('2020-01-01'), status: 'active' }),
+        term({ expiresAt: new Date('2020-01-01') }),
       ]);
       const view = await service.get();
       expect(view.current?.isCurrentlyLapsed).toBe(true);

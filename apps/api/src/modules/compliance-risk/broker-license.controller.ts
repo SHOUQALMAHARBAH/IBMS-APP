@@ -17,6 +17,7 @@ import { BrokerLicenseScopeService } from './broker-license-scope.service';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { RecordRegulatoryActionDto } from './dto/record-regulatory-action.dto';
 
 /**
  * Process 51/Part 7.1, restructured by Module 0 item (c) — this OFFICE's CBJ licence, as a SERIES
@@ -100,12 +101,27 @@ export class BrokerLicenseController {
     return this.licenses.recordRenewalRequest(dto, user.id);
   }
 
-  /** Manual lapse ahead of the calendar `expiresAt` (e.g. a CBJ suspension).
-   * No body — the model has no reason field to hold one. */
+  /**
+   * THE OFFICE RECORDS A DECISION THE REGULATOR TOOK — and this REPLACES `POST mark-lapsed`.
+   *
+   * That route took no body and flipped a two-value column, so a CBJ suspension was recorded as a
+   * flag with no basis, no date, no decision reference and no letter. It is gone: a bare marker is
+   * precisely the state `RegulatoryAction` exists to end, and keeping both would be two homes for
+   * "has the regulator stopped this office".
+   *
+   * SAME PERMISSION, deliberately — `license.manage`, held by COMPLIANCE_OFFICER. Recording a CBJ
+   * letter about the licence is the same act the lapse marker was standing in for, so no code is
+   * minted and the catalogue does not move.
+   *
+   * Returns the STANDING after the act, so the caller sees what it changed to.
+   */
   @RequirePermissions('license.manage')
-  @Post('mark-lapsed')
-  markLapsed(@CurrentUser() user: AuthenticatedUser) {
-    return this.licenses.markLapsed(user.id);
+  @Post('regulatory-actions')
+  recordRegulatoryAction(
+    @Body() dto: RecordRegulatoryActionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.licenses.recordRegulatoryAction(dto, user);
   }
 
   /** The current term AND the series. Does not 404 on an office with no licence: that is a real
