@@ -1,0 +1,56 @@
+{
+  "aml-sweep-stops-excluding-blocked-receipts": {
+    "file": "apps/api/src/repositories/transaction-monitoring-alert.repository.ts",
+    "from": "      where: notBlockedWhere('receivedAt', blocked),",
+    "to": "      where: {},",
+    "kills": "retention-archive.inventory.spec.ts > findReceiptsForSweep consults notBlockedWhere on receivedAt"
+  },
+  "commission-rollup-stops-excluding-blocked-entries": {
+    "file": "apps/api/src/repositories/financial-report.repository.ts",
+    "from": "        ...notBlockedWhere('paidAt', blocked),",
+    "to": "",
+    "kills": "retention-disposal.e2e-spec.ts > CONDITION 1 (the blocked entry stays in the roll-up)"
+  },
+  "prisma-not-list-semantics": {
+    "file": "apps/api/src/modules/pdpl/retention-archive.config.ts",
+    "from": "    NOT: {\n      AND:\n        exclusion.extendedRecordIds.length === 0\n          ? [elapsed]\n          : [elapsed, { id: { notIn: exclusion.extendedRecordIds } }],\n    },",
+    "to": "    NOT:\n      exclusion.extendedRecordIds.length === 0\n        ? [elapsed]\n        : [elapsed, { id: { notIn: exclusion.extendedRecordIds } }],",
+    "kills": "retention-disposal.e2e-spec.ts > CONDITION 1 — only the EXTENDED assertion (expected 0 to be 2)"
+  },
+  "gt-instead-of-lte-drops-unpaid-rows": {
+    "file": "apps/api/src/modules/pdpl/retention-archive.config.ts",
+    "from": "  const elapsed = { [trigger]: { lte: exclusion.cutoff } } as Record<",
+    "to": "  const elapsed = { [trigger]: { gte: exclusion.cutoff } } as Record<",
+    "kills": "retention-disposal.e2e-spec.ts > CONDITION 1 (the blocked entry is no longer the one excluded)"
+  },
+  "settlement-second-approval-stops-refusing-a-blocked-record": {
+    "file": "apps/api/src/modules/claim/claim.service.ts",
+    "from": "    if (\n      settlementBlocked !== null &&",
+    "to": "    if (\n      false &&\n      settlementBlocked !== null &&",
+    "kills": "retention-archive.inventory.spec.ts > the one reachable user-facing write IS refused"
+  },
+  "retrieval-stops-refusing-an-unblocked-record": {
+    "file": "apps/api/src/modules/pdpl/retention-archive.service.ts",
+    "from": "    if (notBlocked.length > 0) {",
+    "to": "    if (false && notBlocked.length > 0) {",
+    "kills": "retention-disposal.e2e-spec.ts > CONDITION 3 (the 422 naming the unblocked record)"
+  },
+  "dsr-stops-refusing-erasure-of-blocked-records": {
+    "file": "apps/api/src/modules/pdpl/dsr.service.ts",
+    "from": "      if (blocked.length > 0) {",
+    "to": "      if (false && blocked.length > 0) {",
+    "kills": "dsr.service.spec.ts > CONDITION 4 (both the refusal and the ordering tests)"
+  },
+  "dsr-blocked-check-no-longer-precedes-the-attestation": {
+    "file": "apps/api/src/modules/pdpl/dsr.service.ts",
+    "from": "      if (blocked.length > 0) {\n        throw new UnprocessableEntityException(\n          erasureRefusedWhileBlocked({ dsrId: id, blocked }),\n        );\n      }\n",
+    "to": "      if (blocked.length > 0 && dto.confirmNoOpenRetentionHold === true) {\n        throw new UnprocessableEntityException(\n          erasureRefusedWhileBlocked({ dsrId: id, blocked }),\n        );\n      }\n",
+    "kills": "dsr.service.spec.ts > the blocked check runs BEFORE the attestation"
+  },
+  "screen-offers-retrieval-to-everybody": {
+    "file": "apps/web/app/(app)/retention-disposal/page.tsx",
+    "from": "  const canRetrieve = hasAnyPermission(user, ARCHIVE_RETRIEVE_ROLES);",
+    "to": "  const canRetrieve = true;",
+    "kills": "retention-disposal.spec.ts > TWO tests, and the second was not aimed at: (1) 'a reader who may nominate but may NOT retrieve' sees the section; and (2) the all-of refusal test, because the panel count becomes 5 while only 4 lists are refused — so the `canRetrieve ? 5 : 4` threshold is observed as well as the gate."
+  }
+}

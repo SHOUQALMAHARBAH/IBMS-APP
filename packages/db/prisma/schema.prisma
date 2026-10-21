@@ -557,6 +557,7 @@ model Organization {
   /// different field and Prisma cannot tell two relations between one pair apart without a name.
   linkedInsurerRecords                Insurer[]                        @relation("InsurerRegisteredCompany")
   retentionExtensions                 RetentionExtension[]
+  retentionArchiveRetrievals          RetentionArchiveRetrieval[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -885,6 +886,8 @@ model User {
   retentionNoFloorAcknowledged RetentionScheduleItem[]     @relation("RetentionScheduleItemNoFloorAcknowledgedBy")
   /// Batch 5 group 7b — the retention extensions this person recorded.
   retentionExtensions          RetentionExtension[]        @relation("RetentionExtensionExtendedBy")
+  /// Batch 5 group 7c — the blocked-record retrievals this person recorded.
+  retentionArchiveRetrievals   RetentionArchiveRetrieval[] @relation("RetentionArchiveRetrievalRetrievedBy")
   mfaCredentials               MfaCredential[]
   refreshTokens                RefreshToken[]
   sessions                     UserSession[]
@@ -4810,6 +4813,45 @@ model DataSubjectRequest {
 /// `RetentionScheduleItem.legalBasis` is a free `String?` and the adviser's position is that
 /// extending without legislative cover or the customer's consent "carries high legal risk". Each
 /// basis carries what makes it substantiable, by CHECK.
+/// MODULE 0 CLOSE, batch 5 group 7c — THE ARCHIVED (BLOCKED) STATE'S RETRIEVAL REGISTER.
+///
+/// The blocked state itself has NO column and NO table: a record is blocked when its retention
+/// period has elapsed and it is neither held nor extended, which the notice already computes. The
+/// state is DERIVED (decision 71's precedent), so there is no second answer to "is this past its
+/// period". What needs a row is condition 3 — retrieval takes a recorded basis and its own
+/// permission — because a basis nobody wrote down is not a basis.
+///
+/// APPEND-ONLY AT THE GRANT: `ibms_app` holds SELECT and INSERT and nothing else, asserted in the
+/// migration. UPDATE would let somebody rewrite the basis they claimed; DELETE would let them
+/// remove the record of having looked.
+model RetentionArchiveRetrieval {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  /// The category as the office typed it, matched case- and separator-insensitively in code.
+  recordCategory String
+  /// NO foreign key, for the same reason as `RetentionExtension.recordId`: the four resolvable
+  /// categories are four different models, so a real FK would need four nullable columns and a
+  /// four-way CHECK. `Customer.ownerUserId` is the precedent, and its cost is the same.
+  recordId       String
+
+  basis RetentionArchiveRetrievalBasis
+  /// WHO ASKED, AND FOR WHAT. NOT NULL: the basis says which KIND of compulsion was claimed, the
+  /// note says which court or which audit. Its floor is `common/declaration-reason.ts`.
+  note  String
+
+  /// No `@default(dbgenerated())` — see the note on `RetentionExtension.extendedByUserId`.
+  retrievedByUserId String
+  retrievedBy       User     @relation("RetentionArchiveRetrievalRetrievedBy", fields: [retrievedByUserId], references: [id], onDelete: Restrict)
+  retrievedAt       DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, recordCategory, recordId, retrievedAt(sort: Desc)], map: "RetentionArchiveRetrieval_lookup_idx")
+  @@index([retrievedByUserId])
+}
+
 model RetentionExtension {
   id             String       @id @default(uuid())
   /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
@@ -4842,7 +4884,11 @@ model RetentionExtension {
   consentDuration       String?
   consentPurpose        String?
 
-  extendedByUserId String   @default(dbgenerated())
+  /// NO `@default(dbgenerated())` here, unlike `organizationId` above — measured off `pg_attrdef`,
+  /// that column carries the tenancy default and this one carries none. Declaring one would make
+  /// the field OPTIONAL in Prisma's create input, so a caller omitting the actor would compile and
+  /// then fail at the database as a 500 instead of as a type error.
+  extendedByUserId String
   extendedBy       User     @relation("RetentionExtensionExtendedBy", fields: [extendedByUserId], references: [id], onDelete: Restrict)
   extendedAt       DateTime @default(now())
 
@@ -4850,6 +4896,14 @@ model RetentionExtension {
   @@index([organizationId, recordCategory, recordId, extendedUntil(sort: Desc)], map: "RetentionExtension_lookup_idx")
   @@index([legalHoldId])
   @@index([extendedByUserId])
+}
+
+/// Batch 5 group 7c — the two bases on which a blocked record may be retrieved. A closed TWO: both
+/// are external compulsion, and an office retrieving a blocked record for its own purposes is not
+/// retrieving it on a basis at all — it is processing it, which condition 1 refuses.
+enum RetentionArchiveRetrievalBasis {
+  JUDICIAL_REQUEST
+  CBJ_AUDIT
 }
 
 enum RetentionExtensionBasis {

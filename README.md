@@ -1321,7 +1321,21 @@ build actually is today:
   Legal-Hold exclusion re-checked live at every step, no `CertificateOfDestruction`
   means no `CLOSED`) — see § Known gaps, Part D M06, for the full detail, including the
   scope boundary that `execute()` is a staff attestation, never a live delete against the
-  records the schedule item describes. **The remaining six items (#4-9) are built** —
+  records the schedule item describes. **And the BLOCKED (archived) phase is built on top of
+  it** — batch 5 group 7c: a record whose period has elapsed and which is neither held nor
+  extended is DERIVED as blocked (never stored, decision 71's precedent), leaves the three
+  UNBOUNDED reads that would otherwise process it forever (the AML receipt sweep, the
+  commission roll-up, insurer payables), cannot be second-approved on a settlement, is
+  retrievable only on a judicial request or an official CBJ audit through an APPEND-ONLY
+  register (`retention.archive.retrieve`, triggers rather than a grant — this schema's
+  default privileges hand out all four), and cannot be erased even at the data subject's
+  request, which the DSR path refuses citing PDPL art 10/b and art 6/a. **Two limits are
+  declared rather than discovered**: the phase covers only the four categories whose clock
+  this system can compute — all financial, none carrying personal identity, and the customer
+  file is NOT among them because no date records a relationship ending — and a
+  period-bounded historical report still includes a blocked record, which is a collision
+  between two obligations rather than an oversight (`docs/deferred-register.md` entries
+  91-94). **The remaining six items (#4-9) are built** —
   Cross-Border Transfer (blocks any transfer outside Jordan unless exactly one of three
   legal bases is recorded; the schema cites "Part 6.2," not an M-number — no single
   M01-M12 module names this checklist item, M05 is a different, already-built system, a

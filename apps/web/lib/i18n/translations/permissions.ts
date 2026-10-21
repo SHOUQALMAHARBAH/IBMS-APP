@@ -282,6 +282,8 @@ export const PERMISSIONS = {
     'perm:retention-case.manage': 'يدير حالة محافظة على عميل فُتحت لأن وثيقته قاربت الانتهاء أو خمد تعامله',
     'perm:retention-schedule.update':
       'يحدّد حاملُها مدّةَ الاحتفاظ لفئةِ سجلاتٍ وسندَها القانوني. وهو النصفُ الأوّلُ من زوجِ فصلِ المهام: من يحدّد المدّة لا يستطيع تأكيدَها بوصفه المستشارَ القانوني، إلّا إذا أعلن المكتبُ دمجَ المهام فيُسجَّل الفعل. ومن يملكها يحدّد متى يصير إتلافُ بيانات الناس مشروعاً — لأضيق عدد.',
+    'perm:retention.archive.retrieve':
+      'قراءةُ سجلٍّ يقعُ في مرحلةِ الحجب — أي انتهت مدّةُ الاحتفاظِ المحدّدةُ لفئتِه، فيُحفَظُ وحدَه لاستيفاءِ حدٍّ قانونيٍّ أدنى، ويخرجُ من كلِّ تقريرٍ ومسحٍ جارٍ. والاستخراجُ مباحٌ على سببينِ حصراً، وكلاهما إلزامٌ خارجي: طلبٌ قضائي، أو تدقيقٌ رسميٌّ من البنكِ المركزيِّ الأردني. وكلُّ استخراجٍ يُدوَّنُ في سجلٍّ لا يُعدَّلُ ولا يُحذَفُ: السببُ، ومن طلبَ، ولأيِّ غرض. وحملُها لا يُبيحُ الاستخراجَ لأغراضِ المكتبِ نفسِه — فذلكَ هو المعالجةُ التي وُجِدَ الحجبُ لمنعِها.',
     'perm:retention.extend':
       'تمديدُ مدّةِ الاحتفاظِ بسجلّاتٍ بعينِها بعد انتهاءِ المدّةِ المحدّدةِ لفئتِها، على أحدِ ثلاثةِ أسبابٍ حصراً: نصٌّ تشريعيٌّ مُسمّى، أو حجزٌ قانونيٌّ أو نزاعٌ قائم، أو موافقةٌ صريحةٌ من العميل. والنصُّ الحرُّ يُرافقُ السببَ ولا يكونُ هو السبب. وكلُّ تمديدٍ يُدوَّنُ في السجلِّ: أيُّ سجلّات، وبأيِّ سبب، ومن مدَّدَها، ومتى، وإلى متى.',
     'perm:retention-schedule.confirm':
@@ -522,6 +524,8 @@ export const PERMISSIONS = {
     'perm:retention-case.manage': 'Manage a retention case opened on renewal inactivity/lapse risk',
     'perm:retention-schedule.update':
       "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded",
+    'perm:retention.archive.retrieve':
+      "Read a record in the blocked phase — its category's retention period has ended, so it is kept only to satisfy a statutory minimum and leaves every ongoing report and sweep. Retrieval is allowed on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each one is written into an append-only register with the basis, who asked and for what. Holding this does not allow retrieval for the office's own purposes — that is the processing the block exists to prevent.",
     'perm:retention.extend':
       'Extend the retention of specific records past the period set for their category, on one of exactly three bases: a named legislative provision, a live legal hold or dispute, or the explicit consent of the customer. Free text accompanies a basis and may not be one. Every extension is recorded in the register — which records, which basis, who extended it, when, and until when.',
     'perm:retention-schedule.confirm':

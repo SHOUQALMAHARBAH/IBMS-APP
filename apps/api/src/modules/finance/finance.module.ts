@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import { InvoiceController } from './invoice.controller';
 import { InvoiceService } from './invoice.service';
 import { CollectionService } from './collection.service';
@@ -129,6 +130,7 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     FinancialReportService,
     RefundService,
     InvoiceRepository,
+    RetentionArchiveRepository,
     // RefundService reads the Refund + its Endorsement/Policy context and
     // books the disbursement; the repository is provided (not the whole
     // EndorsementModule imported) to keep this a one-way, cycle-free

@@ -1447,4 +1447,310 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
     }
   }, 120_000);
+
+  /*
+   * ================================================================================================
+   * BATCH 5 GROUP 7c — THE ARCHIVED (BLOCKED) STATE AND ITS FOUR CONDITIONS
+   * ================================================================================================
+   *
+   * The fixture is 7b's, unchanged: a `CommissionLedgerEntry` paid eleven years ago on a policy that
+   * has none, under a 120-month period — exactly the commercial floor, so it is accepted without a
+   * declaration. Swept on ENTRY BY HAND rather than through anything under test, because a spec that
+   * heals itself through the thing it is testing cannot heal the one run that needs it.
+   */
+  it('BATCH 5 GROUP 7c — CONDITION 1: a blocked record LEAVES the unbounded commission read, and an EXTENSION brings it back', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'archive-read-compliance',
+      'COMPLIANCE_OFFICER',
+      // `financial-report.view` is held by FINANCE_COLLECTIONS_OFFICER, MANAGER, EXEC and the
+      // auditor — measured, not guessed, and `FINANCE_OFFICER` is not a role name this product has.
+      // The compiler said so, which is the `RoleName` enum doing its one job.
+      'FINANCE_COLLECTIONS_OFFICER',
+    );
+
+    await prisma.retentionExtension.deleteMany({
+      where: { recordCategory: 'CommissionLedgerEntry' },
+    });
+    await prisma.retentionScheduleItem.deleteMany({
+      where: { recordCategory: 'CommissionLedgerEntry' },
+    });
+
+    let itemId: string | undefined;
+    let entryId: string | undefined;
+    try {
+      const policy = await prisma.policy.findFirstOrThrow({
+        where: { commissionLedgerEntries: { none: {} } },
+        select: { id: true },
+      });
+      const elevenYearsAgo = new Date();
+      elevenYearsAgo.setUTCFullYear(elevenYearsAgo.getUTCFullYear() - 11);
+      const entry = await prisma.commissionLedgerEntry.create({
+        data: {
+          policyId: policy.id,
+          amount: '100.000',
+          paidAt: elevenYearsAgo,
+        },
+        select: { id: true },
+      });
+      entryId = entry.id;
+
+      const countEntries = async (): Promise<number> => {
+        const res = await request(app.getHttpServer())
+          .get('/financial-report/summary')
+          .set(bearer(compliance.accessToken))
+          .expect(200);
+        // `commission.entryCount`, NOT a top-level `commissionEntries`: that name exists only in
+        // the service's own audit payload, not in the response. The non-vacuity floor below is what
+        // caught the wrong shape — it read `undefined` rather than quietly comparing two undefineds
+        // and passing, which is the whole reason the floor is there.
+        return (res.body as { commission: { entryCount: number } }).commission
+          .entryCount;
+      };
+
+      // ------------------------------------------------ (1) NOT BLOCKED YET, so it is counted
+      // NON-VACUITY, and it is the half that matters: with no retention period set there is no
+      // clock, so the entry is an ordinary eleven-year-old record and the report includes it.
+      // Without this reading, the drop below would be indistinguishable from the entry never having
+      // been in the report at all.
+      const withEntry = await countEntries();
+      expect(withEntry).toBeGreaterThan(0);
+
+      // ------------------------------------------------ (2) BLOCKED, so it leaves
+      const created = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'CommissionLedgerEntry',
+          retentionPeriodMonths: 120,
+        })
+        .expect(201);
+      itemId = (created.body as RetentionScheduleItemBody).id;
+
+      const whileBlocked = await countEntries();
+      expect(
+        whileBlocked,
+        'a blocked entry must leave the unbounded commission roll-up',
+      ).toBe(withEntry - 1);
+
+      // ------------------------------------------------ (3) EXTENDED, so it comes back
+      // An extension means the record is NOT blocked — it is in ordinary retention for longer — and
+      // the exclusion has to honour that. This is the branch that proves `notBlockedWhere` reads its
+      // extension list rather than only its cutoff.
+      await request(app.getHttpServer())
+        .post('/retention-notices/extend')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'CommissionLedgerEntry',
+          recordIds: [entry.id],
+          months: 24,
+          basis: 'LEGISLATIVE_PROVISION',
+          instrument: 'Commercial Law No. 12 of 1966',
+          article: 'art 19',
+          note: 'Kept for an open commercial dispute over this policy.',
+        })
+        .expect(201);
+
+      const whileExtended = await countEntries();
+      expect(
+        whileExtended,
+        'an EXTENDED record is not blocked and must be back in the roll-up',
+      ).toBe(withEntry);
+    } finally {
+      await prisma.retentionExtension.deleteMany({
+        where: { recordCategory: 'CommissionLedgerEntry' },
+      });
+      if (entryId)
+        await prisma.commissionLedgerEntry.delete({ where: { id: entryId } });
+      if (itemId)
+        await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
+    }
+  }, 180_000);
+
+  it('BATCH 5 GROUP 7c — CONDITION 3: retrieval needs the code, a closed basis and a note; an UNBLOCKED record is refused by name; and the register cannot be edited or deleted', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'archive-retrieve-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+    const outsider = await makeUser(
+      app,
+      'archive-retrieve-outsider',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    await prisma.retentionExtension.deleteMany({
+      where: { recordCategory: 'CommissionLedgerEntry' },
+    });
+    await prisma.retentionScheduleItem.deleteMany({
+      where: { recordCategory: 'CommissionLedgerEntry' },
+    });
+
+    let itemId: string | undefined;
+    let blockedId: string | undefined;
+    let freshId: string | undefined;
+    try {
+      const policies = await prisma.policy.findMany({
+        where: { commissionLedgerEntries: { none: {} } },
+        select: { id: true },
+        take: 2,
+      });
+      expect(policies.length, 'need two commission-free policies').toBe(2);
+
+      const elevenYearsAgo = new Date();
+      elevenYearsAgo.setUTCFullYear(elevenYearsAgo.getUTCFullYear() - 11);
+      const blocked = await prisma.commissionLedgerEntry.create({
+        data: {
+          policyId: policies[0].id,
+          amount: '100.000',
+          paidAt: elevenYearsAgo,
+        },
+        select: { id: true },
+      });
+      blockedId = blocked.id;
+      // Paid YESTERDAY, so inside the period and NOT blocked. This is the record the refusal is
+      // about, and having both in one run is what makes the refusal specific rather than universal.
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const fresh = await prisma.commissionLedgerEntry.create({
+        data: {
+          policyId: policies[1].id,
+          amount: '100.000',
+          paidAt: yesterday,
+        },
+        select: { id: true },
+      });
+      freshId = fresh.id;
+
+      const created = await request(app.getHttpServer())
+        .post('/retention-schedule')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'CommissionLedgerEntry',
+          retentionPeriodMonths: 120,
+        })
+        .expect(201);
+      itemId = (created.body as RetentionScheduleItemBody).id;
+
+      const JUDICIAL = {
+        recordCategory: 'CommissionLedgerEntry',
+        basis: 'JUDICIAL_REQUEST',
+        note: 'Amman Court of First Instance, case 123 of 2026.',
+      };
+
+      // ------------------------------------------------ gated on the CODE, never a role name
+      await request(app.getHttpServer())
+        .post('/retention-archive/retrievals')
+        .set(bearer(outsider.accessToken))
+        .send({ ...JUDICIAL, recordIds: [blocked.id] })
+        .expect(403);
+
+      // ------------------------------------------------ a THIRD basis is refused at the boundary
+      await request(app.getHttpServer())
+        .post('/retention-archive/retrievals')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'CommissionLedgerEntry',
+          recordIds: [blocked.id],
+          basis: 'INTERNAL_REVIEW',
+          note: 'The office wanted another look at it.',
+        })
+        .expect(400);
+
+      // ------------------------------------------------ a short note is refused at the SHARED floor
+      await request(app.getHttpServer())
+        .post('/retention-archive/retrievals')
+        .set(bearer(compliance.accessToken))
+        .send({
+          recordCategory: 'CommissionLedgerEntry',
+          recordIds: [blocked.id],
+          basis: 'CBJ_AUDIT',
+          note: 'audit',
+        })
+        .expect(400);
+
+      // ------------------------------------------------ AN UNBLOCKED RECORD IS REFUSED, BY NAME
+      const notBlocked = await request(app.getHttpServer())
+        .post('/retention-archive/retrievals')
+        .set(bearer(compliance.accessToken))
+        .send({ ...JUDICIAL, recordIds: [fresh.id] })
+        .expect(422);
+      const refusal = JSON.stringify(notBlocked.body);
+      expect(refusal).toContain(fresh.id);
+      expect(refusal).toContain('append-only');
+
+      // ------------------------------------------------ the real retrieval
+      const ok = await request(app.getHttpServer())
+        .post('/retention-archive/retrievals')
+        .set(bearer(compliance.accessToken))
+        .send({ ...JUDICIAL, recordIds: [blocked.id] })
+        .expect(201);
+      const retrievals = (
+        ok.body as { retrievals: { id: string; basis: string }[] }
+      ).retrievals;
+      expect(retrievals).toHaveLength(1);
+      expect(retrievals[0].basis).toBe('JUDICIAL_REQUEST');
+
+      // THE REGISTER CARRIES THE BASIS AND THE NOTE VERBATIM — read back off the DATABASE rather
+      // than off the response, which is only this service's own claim about what it wrote.
+      const row = await prisma.retentionArchiveRetrieval.findUniqueOrThrow({
+        where: { id: retrievals[0].id },
+        select: {
+          basis: true,
+          note: true,
+          recordId: true,
+          retrievedByUserId: true,
+        },
+      });
+      expect(row.basis).toBe('JUDICIAL_REQUEST');
+      expect(row.note).toBe(JUDICIAL.note);
+      expect(row.recordId).toBe(blocked.id);
+      expect(row.retrievedByUserId).toBe(compliance.userId);
+
+      // ------------------------------------------------ APPEND-ONLY, PROVEN BY THE DATABASE
+      // Not by the grant — MEASURED: `pg_default_acl` hands `ibms_app` all four privileges on every
+      // new table in this schema, so a narrower GRANT is a no-op and the triggers are the mechanism.
+      // BOTH directions, because a trigger covering one event only is the likelier mistake.
+      await expect(
+        prisma.retentionArchiveRetrieval.update({
+          where: { id: retrievals[0].id },
+          data: { note: 'something else entirely' },
+        }),
+      ).rejects.toThrow(/immutable/i);
+      await expect(
+        prisma.retentionArchiveRetrieval.delete({
+          where: { id: retrievals[0].id },
+        }),
+      ).rejects.toThrow(/immutable/i);
+
+      // ------------------------------------------------ the register reads back, and is gated too
+      const list = await request(app.getHttpServer())
+        .get(
+          '/retention-archive/retrievals?recordCategory=CommissionLedgerEntry',
+        )
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const rows = list.body as { id: string }[];
+      expect(rows.some((r) => r.id === retrievals[0].id)).toBe(true);
+
+      await request(app.getHttpServer())
+        .get('/retention-archive/retrievals')
+        .set(bearer(outsider.accessToken))
+        .expect(403);
+    } finally {
+      // THE REGISTER ROWS CANNOT BE DELETED — that is the condition working, so they are left
+      // behind deliberately and the records they name are swept instead. A teardown that tried to
+      // remove them would fail on the trigger, which is the right outcome met in the wrong place.
+      await prisma.retentionExtension.deleteMany({
+        where: { recordCategory: 'CommissionLedgerEntry' },
+      });
+      if (blockedId)
+        await prisma.commissionLedgerEntry.delete({ where: { id: blockedId } });
+      if (freshId)
+        await prisma.commissionLedgerEntry.delete({ where: { id: freshId } });
+      if (itemId)
+        await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
+    }
+  }, 180_000);
 });

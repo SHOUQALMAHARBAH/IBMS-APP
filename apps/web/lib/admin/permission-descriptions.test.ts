@@ -142,6 +142,12 @@ const AWAITING_OWNER_REVIEW: string[] = [
    */
   'retention.extend',
   /*
+   * Batch 5 group 7c's one new code, the same situation as the line above it: written by an agent
+   * because the parity guard requires both languages, and awaiting decision 94's pass rather than
+   * pre-empting it.
+   */
+  'retention.archive.retrieve',
+  /*
    * The two halves of the split retention code. Their Arabic was written by an agent — the withdrawn
    * umbrella's line was HERS, and a split is not a translation, so neither successor inherits it.
    */

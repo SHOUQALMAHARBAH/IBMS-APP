@@ -1610,6 +1610,13 @@ const pdpl: PermissionSeed[] = [
     roles: [COMPLIANCE, DPO],
   },
   {
+    code: "retention.archive.retrieve",
+    module: "pdpl",
+    description:
+      "Read a record that is in the BLOCKED retention phase — past the period its category was given, kept only to satisfy a statutory minimum, and otherwise out of every ongoing report and sweep. Retrieval is permitted on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each retrieval is recorded in an append-only register with the basis, who asked and for what, which cannot afterwards be edited or deleted. Holding this does NOT permit retrieval for the office's own purposes — that is the processing the block exists to prevent",
+    roles: [COMPLIANCE, DPO],
+  },
+  {
     code: "retention.dispose.nominate",
     module: "pdpl",
     description: "Nominate a disposal batch (maker side of dual control)",

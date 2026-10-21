@@ -203,6 +203,44 @@ export const PDPL = {
     rdNoticeBasisConsent: 'موافقةٌ صريحةٌ من العميل — غيرُ متاحة',
     rdNoticeConsentWhy:
       'هذا الأساسُ يحتاجُ أن تَنُصَّ الموافقةُ المسجّلةُ على مدّتِها، حتى يُمكنَ رفضُ تمديدٍ يتجاوزُ ما وافقَ عليه العميل. والموافقاتُ في هذا النظامِ تحملُ غرضاً وتاريخَ منحٍ وتاريخَ سحبٍ، ولا تحملُ مدّة. فلا يُعرَضُ هذا الأساسُ حتى تُسجَّلَ المدّة.',
+    rdBlockedHeading:
+      'مرحلةُ الحجب',
+    rdBlockedWhat:
+      'السجلُّ الذي انتهت مدّةُ احتفاظِه يدخلُ مرحلةَ الحجب: يُحفَظُ لاستيفاءِ الحدِّ القانونيِّ الأدنى، ولا يُعالَج. أربعةُ شروطٍ تجعلُ هذا حجباً قانونياً وليس وصفاً: (١) لا يدخلُ أيَّ معالجةٍ جارية — فقد خرجَ من مسحِ مكافحةِ غسلِ الأموال، ومن تجميعِ العمولات، ومن صورةِ مستحقّاتِ الشركات؛ (٢) لا يظهرُ للموظّفِ العادي؛ (٣) لا يُستخرَجُ إلّا بطلبٍ قضائيٍّ أو بتدقيقٍ رسميٍّ من البنكِ المركزيِّ الأردني، بسببٍ مُدوَّنٍ وبصلاحيةٍ خاصة؛ (٤) ولا يُمحى في هذه المرحلةِ ولو طلبَ العميلُ ذلك.',
+    rdBlockedScopeLimit:
+      'وهذه المرحلةُ تسري على الفئاتِ التي يستطيعُ النظامُ قياسَ مدّتِها فقط. أمّا ملفُّ العميلِ وسجلّاتُ العنايةِ الواجبةِ فلا تدخلُها: المادةُ ١٧/أ تَحسُبُ المدّةَ من إتمامِ العمليةِ أو من انتهاءِ العلاقةِ، أيُّهما أطول، ولا يُسجِّلُ هذا النظامُ تاريخاً لانتهاءِ العلاقة. فلا تُقاسُ مدّتُها، ولا يُقالُ إنّها محجوبة.',
+    rdRetrieveCategoryLabel:
+      'الفئةُ التي تنتمي إليها هذه السجلّات',
+    rdRetrieveHeading:
+      'استخراجُ سجلٍّ محجوب',
+    rdRetrieveBasisLabel:
+      'على أيِّ أساسٍ يُستخرَجُ',
+    rdRetrieveBasisJudicial:
+      'طلبٌ قضائي',
+    rdRetrieveBasisCbj:
+      'تدقيقٌ رسميٌّ من البنكِ المركزيِّ الأردني',
+    rdRetrieveRecordsLabel:
+      'السجلّاتُ التي طلبَها القضاءُ أو التدقيق',
+    rdRetrieveNoteLabel:
+      'مَن طلبَ، ولأيِّ غرض',
+    rdRetrieveSubmit:
+      'سجّلِ الاستخراج',
+    rdRetrieveAppendOnly:
+      'السجلُّ أدناه لا يُعدَّلُ ولا يُحذَفُ بعد كتابتِه.',
+    rdRetrieveRegisterHeading:
+      'سجلُّ الاستخراجات',
+    rdRetrieveNone:
+      'لم يُستخرَج أيُّ سجلٍّ محجوبٍ بعد.',
+    rdRetrieveColBasis:
+      'الأساس',
+    rdRetrieveColNote:
+      'البيان',
+    rdRetrieveColWho:
+      'مَن استخرجَه',
+    rdRetrieveColWhen:
+      'متى',
+    rdRetrieveDone:
+      'تمّ تدوينُ الاستخراج.',
     rdBackupLimit:
       'تنبيه: حذفُ السجلِّ من قاعدةِ البياناتِ الأساسيةِ ليس إتلافاً ما دامت نسخةٌ احتياطيةٌ تحملُه. لا يملكُ هذا النظامُ إتلافاً يشملُ النسخَ الاحتياطية، فلا تُوصَفُ أيُّ عمليةٍ هنا بأنها إتلافٌ كامل.',
     rdLoading: 'جارٍ التحميل…',
@@ -571,6 +609,44 @@ export const PDPL = {
       'Explicit consent from the customer — not available',
     rdNoticeConsentWhy:
       'This basis needs the recorded consent to state its own duration, so an extension beyond what the customer agreed can be refused. Consent records in this system carry a purpose, a grant date and a withdrawal date — and no duration. It is not offered until a duration is recorded.',
+    rdBlockedHeading:
+      'The blocked phase',
+    rdBlockedWhat:
+      'A record whose retention period has ended enters the blocked phase: it is kept to satisfy the statutory minimum, and it is not processed. Four conditions are what make that a legal block rather than a label. (1) It enters no ongoing processing — it has left the anti-money-laundering receipt sweep, the commission roll-up and the insurer payables picture. (2) It is not visible to ordinary employees. (3) It is retrievable only on a judicial request or an official audit by the Central Bank of Jordan, on a recorded basis and behind its own permission. (4) And erasure is refused in this phase even if the customer asks.',
+    rdBlockedScopeLimit:
+      'This phase applies only to the categories whose period this system can measure. The customer file and the due-diligence records are NOT among them: art. 17/a counts from completing the transaction or ending the relationship, whichever is longer, and this system records no date for a relationship ending. So their clock is not measured, and they are never described as blocked.',
+    rdRetrieveCategoryLabel:
+      'Which category the records belong to',
+    rdRetrieveHeading:
+      'Retrieve a blocked record',
+    rdRetrieveBasisLabel:
+      'On what basis it is being retrieved',
+    rdRetrieveBasisJudicial:
+      'A judicial request',
+    rdRetrieveBasisCbj:
+      'An official audit by the Central Bank of Jordan',
+    rdRetrieveRecordsLabel:
+      'The records the court or the audit asked for',
+    rdRetrieveNoteLabel:
+      'Who asked, and for what',
+    rdRetrieveSubmit:
+      'Record the retrieval',
+    rdRetrieveAppendOnly:
+      'The register below cannot be edited or deleted once written.',
+    rdRetrieveRegisterHeading:
+      'Register of retrievals',
+    rdRetrieveNone:
+      'No blocked record has been retrieved yet.',
+    rdRetrieveColBasis:
+      'Basis',
+    rdRetrieveColNote:
+      'Statement',
+    rdRetrieveColWho:
+      'Retrieved by',
+    rdRetrieveColWhen:
+      'When',
+    rdRetrieveDone:
+      'The retrieval has been recorded.',
     rdBackupLimit:
       'Note: deleting a record from the primary database is not destruction while a backup holds the row. This system has no backup-scoped destruction, so nothing here may be described as complete destruction.',
     rdLoading: 'Loading…',

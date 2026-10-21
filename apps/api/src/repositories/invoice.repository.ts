@@ -7,6 +7,8 @@ import type {
   Remittance,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { RetentionArchiveRepository } from './retention-archive.repository';
+import { notBlockedWhere } from '../modules/pdpl/retention-archive.config';
 import {
   addMoney,
   compareMoney,
@@ -69,7 +71,10 @@ export type InvoiceWithCycle = Prisma.InvoiceGetPayload<{
  */
 @Injectable()
 export class InvoiceRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archive: RetentionArchiveRepository,
+  ) {}
 
   create(input: CreateInvoiceRow): Promise<Invoice> {
     return this.prisma.client.invoice.create({ data: input });
@@ -367,12 +372,23 @@ export class InvoiceRepository {
    * `Policy` relation of its own to narrow by. `insurerId` already covers the
    * only dimension a remittance genuinely has.
    */
-  async loadInsurerRemittances(scope: {
-    insurerId?: string;
-    asOfExclusiveUpper: Date;
-  }): Promise<InsurerRemittanceRow[]> {
+  async loadInsurerRemittances(
+    scope: {
+      insurerId?: string;
+      asOfExclusiveUpper: Date;
+    },
+    now: Date = new Date(),
+  ): Promise<InsurerRemittanceRow[]> {
+    // EXCEPT THE BLOCKED ONES (batch 5 group 7c, condition 1). `asOfExclusiveUpper` bounds this read
+    // from ABOVE and nothing bounds it from below, so a remittance made eleven years ago stays in
+    // the insurer payables picture for good.
+    const blocked = await this.archive.blockedExclusionForModel(
+      'remittance',
+      now,
+    );
     const rows = await this.prisma.client.remittance.findMany({
       where: {
+        ...notBlockedWhere('remittedAt', blocked),
         remittedAt: { lt: scope.asOfExclusiveUpper },
         ...(scope.insurerId ? { insurerId: scope.insurerId } : {}),
       },

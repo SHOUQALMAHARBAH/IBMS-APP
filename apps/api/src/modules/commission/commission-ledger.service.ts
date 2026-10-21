@@ -556,6 +556,21 @@ export class CommissionLedgerService {
     const reversalReason =
       entry.reversalReason ??
       `Commission reversed by a Process 22 negative / cancellation endorsement on the policy.`;
+    // NOT REFUSED FOR A BLOCKED RECORD, AND THAT IS A DECISION (batch 5 group 7c, condition 1).
+    //
+    // `status: { in: ['outstanding', 'paid'] }` is the one commission write a blocked entry can
+    // satisfy — the other three re-assert `status: 'outstanding'`, which `paidAt` being set rules
+    // out. So this is structurally reachable, and it is still allowed.
+    //
+    // WHY: this path is driven by a Process 22 endorsement, not by a person. It returns `void` and
+    // has several silent early returns, so a throw would fail the ENDORSEMENT with a message about
+    // retention that nobody can act on, AND leave a legally-owed commission clawback unrecorded.
+    // Refusing a money correction in order to protect a record that carries no personal data at all
+    // — measured: this model has no name, no national id and no customer key — is the worse failure
+    // in both directions.
+    //
+    // The user-facing sibling IS refused: `ClaimService` second-approval, where the state is
+    // reachable, the actor is a person, and the retrieval path gives them somewhere to go.
     const res = await this.commission.recordEntryReversal(entry.id, {
       reversedAmount,
       // Stamped once, at the FIRST reflection — "when the clawback started",

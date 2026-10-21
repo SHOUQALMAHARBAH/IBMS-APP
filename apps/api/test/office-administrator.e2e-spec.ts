@@ -434,8 +434,10 @@ describe('every office has a route to user administration', () => {
          * three role codes below. It reads and connects the provider's OWN integration row, which is
          * organization-scoped with an RLS policy on top — asserted in both directions by
          * `provider-self-administration.e2e-spec.ts`. Nothing was minted BY THAT WIDENING: both codes
-         * already existed in the catalogue. The total is 228 now — batch 5 group 7b minted
-         * `retention.extend`, which reaches neither this role nor the provider.
+         * already existed in the catalogue. The TOTAL has moved since, by later batches minting
+         * codes that reach neither this role nor the provider — it is pinned in
+         * `provider-self-administration.e2e-spec.ts` and deliberately not repeated here, because a
+         * figure copied into a comment is a figure that goes stale and is then read as current.
          */
         'email.integration.read',
         'email.integration.manage',

@@ -163,7 +163,15 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * the FAMILY count and the family-code count do not move, and the toggle count moves by exactly
      * one. It is OFFICE-scoped, so unlike `provider.office-state.read` it does reach this matrix.
      */
-    expect(PERMISSION_CATALOGUE.length).toBe(228);
+    /*
+     * BATCH 5 GROUP 7c — 228 -> 229. `retention.archive.retrieve` is ONE new code and it lands in
+     * the TOGGLE list for the same reason `extend` did: "retrieve" is not one of the seven CRUD
+     * verbs. So families and family codes do not move, and the toggle count moves by exactly one.
+     * OFFICE-scoped, so it does reach this matrix — a blocked record belongs to the office whose
+     * records they are, and the two bases for retrieving one are both external compulsion on THAT
+     * office, not a platform capability.
+     */
+    expect(PERMISSION_CATALOGUE.length).toBe(229);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
@@ -175,7 +183,7 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
      * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
      */
-    expect(toggles.length).toBe(164);
+    expect(toggles.length).toBe(165);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

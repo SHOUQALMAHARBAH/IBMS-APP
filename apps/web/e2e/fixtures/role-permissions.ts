@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 511 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 513 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -178,6 +178,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'recommendation.all-owners.read',
     'retention-schedule.confirm',
     'retention-schedule.update',
+    'retention.archive.retrieve',
     'retention.extend',
     'risk-register.manage',
     'sanctions-pep.screen',
@@ -218,6 +219,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'privacy-notice.read',
     'retention-schedule.confirm',
     'retention-schedule.update',
+    'retention.archive.retrieve',
     'retention.dispose.approve',
     'retention.extend',
     'ropa.manage',
@@ -570,7 +572,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 228 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 229 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -779,6 +781,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'privacy-notice.read', module: 'pdpl', description: "Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)", scope: 'OFFICE' },
   { code: 'retention-schedule.confirm', module: 'pdpl', description: "Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row", scope: 'OFFICE' },
   { code: 'retention-schedule.update', module: 'pdpl', description: "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded", scope: 'OFFICE' },
+  { code: 'retention.archive.retrieve', module: 'pdpl', description: "Read a record that is in the BLOCKED retention phase — past the period its category was given, kept only to satisfy a statutory minimum, and otherwise out of every ongoing report and sweep. Retrieval is permitted on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each retrieval is recorded in an append-only register with the basis, who asked and for what, which cannot afterwards be edited or deleted. Holding this does NOT permit retrieval for the office's own purposes — that is the processing the block exists to prevent", scope: 'OFFICE' },
   { code: 'retention.dispose.approve', module: 'pdpl', description: "Give final DPO approval on a disposal batch (checker side of dual control)", scope: 'OFFICE' },
   { code: 'retention.dispose.nominate', module: 'pdpl', description: "Nominate a disposal batch (maker side of dual control)", scope: 'OFFICE' },
   { code: 'retention.extend', module: 'pdpl', description: "Extend the retention of specific records past the period set for their category, on one of exactly three bases — a named legislative provision, a live legal hold or dispute, or the customer's explicit consent. Free text may accompany a basis; it may not BE one. Every extension is recorded in the register with which records, which basis, who, when and until when, so it can be justified from one place. Extending WITHOUT legislative cover and WITHOUT the customer's consent carries real liability under the PDPL, which is why the basis is a closed list rather than a field", scope: 'OFFICE' },

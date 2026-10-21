@@ -40,6 +40,10 @@ import {
   NO_FLOOR_REASON_MIN_LENGTH,
   extendRetention,
   listRetentionNotices,
+  listArchiveRetrievals,
+  retrieveBlockedRecords,
+  type ArchiveRetrieval,
+  type ArchiveRetrievalBasis,
   type ExtendRetentionInput,
   type RetentionNotice,
 } from '../../../lib/pdpl/retention-disposal-api';
@@ -79,6 +83,15 @@ const NOTICE_ROLES = [
 ];
 const EXTEND_ROLES = ['retention.extend'];
 
+/*
+ * BATCH 5 GROUP 7c — retrieval from the blocked phase, and this one is NOT an any-of.
+ *
+ * The notice above goes to holders of ANY act because they must all see the same list. Retrieving a
+ * blocked record is a capability a holder of `retention.dispose.nominate` does not have, so this
+ * names one code: an any-of here would make the narrower code decorative.
+ */
+const ARCHIVE_RETRIEVE_ROLES = ['retention.archive.retrieve'];
+
 const DISPOSE_APPROVE_ROLES = [
   'retention.dispose.approve',
 ];
@@ -104,7 +117,15 @@ export default function RetentionDisposalPage() {
   // ANY of the acts — the notice is not routed to one of them.
   const canSeeNotices = hasAnyPermission(user, NOTICE_ROLES);
   const canExtend = hasAnyPermission(user, EXTEND_ROLES);
+  const canRetrieve = hasAnyPermission(user, ARCHIVE_RETRIEVE_ROLES);
 
+  const [retrievals, setRetrievals] = useState<ArchiveRetrieval[] | null>(null);
+  const [retrieveCategory, setRetrieveCategory] = useState('');
+  const [retrieveIds, setRetrieveIds] = useState('');
+  const [retrieveBasis, setRetrieveBasis] =
+    useState<ArchiveRetrievalBasis>('JUDICIAL_REQUEST');
+  const [retrieveNote, setRetrieveNote] = useState('');
+  const [retrieveDone, setRetrieveDone] = useState(false);
   const [schedule, setSchedule] = useState<RetentionScheduleItem[] | null>(null);
   const [holds, setHolds] = useState<LegalHold[] | null>(null);
   const [batches, setBatches] = useState<DisposalBatch[] | null>(null);
@@ -176,15 +197,34 @@ export default function RetentionDisposalPage() {
       // A FOURTH INDEPENDENT PANEL, never added to a `Promise.all`: a reader refused the notice
       // must still see the schedule, which is the defect this screen was named for.
       { key: 'notices', label: t('rdNoticeHeading'), load: listRetentionNotices },
+      /*
+       * CONDITIONAL, unlike the four above — and deliberately so. This route is gated on a code most
+       * readers of this screen do not hold, so an unconditional entry would 403 for them and the
+       * partial-load branch would tell them a list "did not load" every single time. That is both
+       * noise and a wrong claim: the list did not fail, they are not permitted it. The frontend
+       * directive's own rule — a control a role cannot use does not exist on their screen.
+       */
+      ...(canRetrieve
+        ? [
+            {
+              key: 'retrievals',
+              label: t('rdRetrieveRegisterHeading'),
+              load: listArchiveRetrievals,
+            },
+          ]
+        : []),
     ]);
     setSchedule((values.schedule as RetentionScheduleItem[] | undefined) ?? null);
     setHolds((values.holds as LegalHold[] | undefined) ?? null);
     setBatches((values.batches as DisposalBatch[] | undefined) ?? null);
     setNotices((values.notices as RetentionNotice[] | undefined) ?? null);
+    setRetrievals((values.retrievals as ArchiveRetrieval[] | undefined) ?? null);
     const allRefused =
-      // 4, not 3: the threshold moves with the panel count or the all-of sentence becomes
-      // unreachable the moment a fourth refusal is possible.
-      failures.length === 4 &&
+      // THE THRESHOLD MOVES WITH THE PANEL COUNT, which is what this comment demanded when it read
+      // "4, not 3". It is now computed rather than written, because 7c made the panel count depend
+      // on a permission: a reader who may retrieve loads five lists, everybody else loads four, and
+      // a literal would make the all-of sentence unreachable for exactly one of those two readers.
+      failures.length === (canRetrieve ? 5 : 4) &&
       failures.every((f) => f.error instanceof ApiError && f.error.status === 403);
     setLoadError(
       failures.length === 0
@@ -197,7 +237,7 @@ export default function RetentionDisposalPage() {
             ])
           : `${t('commonListsMissing')} ${namedFailures(failures)}`,
     );
-  }, [t]);
+  }, [t, canRetrieve]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -397,6 +437,28 @@ export default function RetentionDisposalPage() {
           <p role="status" data-testid="retention-backup-limit" style={{ color: 'var(--ink-secondary)' }}>
             {t('rdBackupLimit')}
           </p>
+          {/*
+            THE BLOCKED PHASE, EXPLAINED WHERE THE NOTICE IS READ — batch 5 group 7c.
+            It sits here rather than in the retrieval section below, because every holder of an act
+            needs to know what an elapsed record's state IS; only a holder of
+            `retention.archive.retrieve` needs the control. `role="status"`, never `alert`: this is
+            what the system does, not a refusal.
+
+            AND THE SCOPING LIMIT IS ITS OWN PARAGRAPH, which is the brief's own instruction — "for
+            the rest, say so rather than implying a protection that is not running". The customer
+            file cannot enter this phase, because art. 17/a counts from the END of the relationship
+            and this system records no such date.
+          */}
+          <p data-testid="retention-blocked-what" style={{ color: 'var(--ink-secondary)' }}>
+            <strong>{t('rdBlockedHeading')}</strong> — {t('rdBlockedWhat')}
+          </p>
+          <p
+            role="status"
+            data-testid="retention-blocked-scope-limit"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            {t('rdBlockedScopeLimit')}
+          </p>
           {notices === null ? (
             <p>{t('rdNoticeLoading')}</p>
           ) : notices.length === 0 ? (
@@ -563,6 +625,177 @@ export default function RetentionDisposalPage() {
               </button>
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {/*
+        BATCH 5 GROUP 7c — CONDITION 3: RETRIEVAL FROM THE BLOCKED PHASE.
+
+        Gated on `retention.archive.retrieve` ALONE, not on the any-of above: this is a capability a
+        holder of `retention.dispose.nominate` does not have, and admitting either would make the
+        narrower code decorative. A reader without it sees no section at all rather than a refusal —
+        they came to this screen for the schedule or the batches, and a sentence about a capability
+        they were never offered is noise. The notice section above still tells them what the blocked
+        phase IS.
+      */}
+      {canRetrieve ? (
+        <section style={sectionStyle} data-testid="retention-retrieve-section">
+          <h2>{t('rdRetrieveHeading')}</h2>
+          <p role="status" style={{ color: 'var(--ink-secondary)' }}>
+            {t('rdRetrieveAppendOnly')}
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setRetrieveDone(false);
+              void run(async () => {
+                await retrieveBlockedRecords({
+                  recordCategory: retrieveCategory.trim(),
+                  // Split on commas and whitespace, blanks dropped: an officer pastes a list out of
+                  // a court letter, and a trailing comma must not become an empty record id the
+                  // server then refuses by name for a reason nobody can see.
+                  recordIds: retrieveIds
+                    .split(/[\s,]+/)
+                    .map((s) => s.trim())
+                    .filter((s) => s.length > 0),
+                  basis: retrieveBasis,
+                  note: retrieveNote.trim(),
+                });
+                setRetrieveIds('');
+                setRetrieveNote('');
+                setRetrieveDone(true);
+              });
+            }}
+            style={{ display: 'grid', gap: '0.75rem', maxWidth: '40rem' }}
+          >
+            <label>
+              {/*
+                ITS OWN LABEL, not the notice table's COLUMN HEADING — which is what the first
+                version used, and it was wrong twice over. Decision 21: a label says what the field
+                is FOR, and "Record category" is the name of a column. And it made an EXISTING
+                locator ambiguous — the schedule form above has a field with that accessible name,
+                so a sibling test resolved to two elements. Fixed at the cause rather than by
+                scoping the other test around it.
+              */}
+              {t('rdRetrieveCategoryLabel')}
+              <input
+                data-testid="retrieve-category"
+                value={retrieveCategory}
+                onChange={(e) => setRetrieveCategory(e.target.value)}
+                required
+                style={{ width: '100%' }}
+              />
+            </label>
+            <label>
+              {t('rdRetrieveRecordsLabel')}
+              <textarea
+                data-testid="retrieve-records"
+                value={retrieveIds}
+                onChange={(e) => setRetrieveIds(e.target.value)}
+                required
+                rows={2}
+                style={{ width: '100%' }}
+              />
+            </label>
+            <label>
+              {t('rdRetrieveBasisLabel')}
+              <select
+                data-testid="retrieve-basis"
+                aria-label={t('rdRetrieveBasisLabel')}
+                value={retrieveBasis}
+                onChange={(e) =>
+                  setRetrieveBasis(e.target.value as ArchiveRetrievalBasis)
+                }
+                style={{ width: '100%' }}
+              >
+                {/*
+                  A CLOSED TWO, and there is deliberately no "internal review" option: an office
+                  retrieving a blocked record for its own purposes is not retrieving it on a basis,
+                  it is processing it — which is what condition 1 refuses.
+                */}
+                <option value="JUDICIAL_REQUEST">
+                  {t('rdRetrieveBasisJudicial')}
+                </option>
+                <option value="CBJ_AUDIT">{t('rdRetrieveBasisCbj')}</option>
+              </select>
+            </label>
+            <label>
+              {t('rdRetrieveNoteLabel')}
+              <textarea
+                data-testid="retrieve-note"
+                value={retrieveNote}
+                onChange={(e) => setRetrieveNote(e.target.value)}
+                required
+                rows={2}
+                style={{ width: '100%' }}
+              />
+            </label>
+            <button type="submit" disabled={busy} data-testid="retrieve-submit">
+              {busy ? t('rdSavingButton') : t('rdRetrieveSubmit')}
+            </button>
+          </form>
+          {retrieveDone ? (
+            <p role="status" data-testid="retrieve-done">
+              {t('rdRetrieveDone')}
+            </p>
+          ) : null}
+
+          <h3>{t('rdRetrieveRegisterHeading')}</h3>
+          {retrievals === null ? (
+            <p>{t('rdLoading')}</p>
+          ) : retrievals.length === 0 ? (
+            <p style={{ color: 'var(--ink-secondary)' }}>
+              {t('rdRetrieveNone')}
+            </p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                data-testid="retrieve-register-table"
+                style={{ borderCollapse: 'collapse', width: '100%' }}
+              >
+                <thead>
+                  <tr>
+                    <th style={head}>{t('rdNoticeColCategory')}</th>
+                    <th style={head}>{t('rdRetrieveColBasis')}</th>
+                    <th style={head}>{t('rdRetrieveColNote')}</th>
+                    <th style={head}>{t('rdRetrieveColWho')}</th>
+                    <th style={head}>{t('rdRetrieveColWhen')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {retrievals.map((r) => (
+                    <tr key={r.id} data-retrieval-for={r.recordId}>
+                      <td style={cell}>{r.recordCategory}</td>
+                      {/*
+                        THE RECORD'S OWN ID IS NOT RENDERED, and that is rule 2 rather than an
+                        omission. The identifier-budget guard fired on the first version (29 -> 30)
+                        and its own message names the right move: a uuid identifies nothing to a
+                        person, so give the record something readable — and where the payload has
+                        none, that is an API change and a decision rather than a display fix.
+                        MEASURED: of the four blockable models only `Receipt.reference` and
+                        `CommissionLedgerEntry.paymentReference` carry anything readable at all;
+                        `Remittance` and `Settlement` carry nothing. So what identifies a RETRIEVED
+                        record to a person joins rule 2's deferred family (register entry 94).
+                        The id is still in the register row and in the api response, so the
+                        accountability the register exists for is intact; what is missing is a
+                        readable handle for the person reading it, and inventing one would be the
+                        display fix the rule refuses. The row keeps it as a test hook, which is an
+                        attribute and not text a reader sees.
+                      */}
+                      <td style={cell}>
+                        {r.basis === 'JUDICIAL_REQUEST'
+                          ? t('rdRetrieveBasisJudicial')
+                          : t('rdRetrieveBasisCbj')}
+                      </td>
+                      <td style={cell}>{r.note}</td>
+                      <td style={cell}>{r.retrievedByName ?? '—'}</td>
+                      <td style={cell}>{r.retrievedAt.slice(0, 10)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       ) : null}
 

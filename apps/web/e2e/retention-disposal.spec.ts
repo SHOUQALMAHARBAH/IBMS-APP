@@ -132,6 +132,8 @@ async function mockRegister(
     batches?: unknown[];
     noticesStatus?: number;
     notices?: unknown[];
+    retrievalsStatus?: number;
+    retrievals?: unknown[];
   } = {},
 ) {
   await page.route('http://localhost:4000/retention-schedule**', (route) => {
@@ -146,6 +148,18 @@ async function mockRegister(
     }
     return route.fulfill({ status: 200, json: SCHEDULE });
   });
+  const RETRIEVALS = [
+    {
+      id: 'retrieval-1',
+      recordCategory: 'CommissionLedgerEntry',
+      recordId: 'entry-1',
+      basis: 'JUDICIAL_REQUEST',
+      note: 'Amman Court of First Instance, case 123 of 2026.',
+      retrievedAt: '2026-10-21T08:00:00.000Z',
+      retrievedByUserId: 'u-1',
+      retrievedByName: 'Compliance Officer',
+    },
+  ];
   const REFUSED = {
     message: 'You do not hold a permission required to perform this action',
   };
@@ -158,6 +172,13 @@ async function mockRegister(
     opts.noticesStatus && opts.noticesStatus !== 200
       ? route.fulfill({ status: opts.noticesStatus, json: REFUSED })
       : route.fulfill({ status: 200, json: opts.notices ?? NOTICES }),
+  );
+  await page.route(
+    'http://localhost:4000/retention-archive/retrievals**',
+    (route) =>
+      opts.retrievalsStatus && opts.retrievalsStatus !== 200
+        ? route.fulfill({ status: opts.retrievalsStatus, json: REFUSED })
+        : route.fulfill({ status: 200, json: opts.retrievals ?? RETRIEVALS }),
   );
   await page.route('http://localhost:4000/disposal-batches**', (route) =>
     opts.batchesStatus && opts.batchesStatus !== 200
@@ -595,4 +616,119 @@ test('BATCH 5 GROUP 7b — the notice explains itself, an unwatched category say
     .getByRole('textbox', { name: 'What the office is actually relying on' })
     .fill('Retained for the pending examination of the commission file.');
   await expect(submit).toBeEnabled();
+});
+
+test('BATCH 5 GROUP 7c — the blocked phase is explained where the notice is read, and the scoping limit says the customer file cannot enter it', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegister(page);
+
+  await page.goto('/retention-disposal');
+
+  // ---------------------------------------------- THE FOUR CONDITIONS, ON THE SCREEN
+  // Scoped to the paragraph's own hook, never page-wide: a page-wide text assertion is the one
+  // shape that can match an unrelated element, which this repository has paid for four times.
+  const what = page.getByTestId('retention-blocked-what');
+  await expect(what).toBeVisible();
+  await expect(what).toContainText('no ongoing processing');
+  await expect(what).toContainText('not visible to ordinary employees');
+  await expect(what).toContainText('judicial request');
+  await expect(what).toContainText('Central Bank of Jordan');
+  await expect(what).toContainText('erasure is refused in this phase even if the customer asks');
+
+  // ---------------------------------------------- THE SCOPING LIMIT, STATED NOT IMPLIED
+  /*
+   * The brief's own instruction: "This state applies only to categories in the resolution table.
+   * For the rest, say so rather than implying a protection that is not running." The customer file
+   * is the one that matters, because the adviser's conditions read as being about personal data and
+   * it is exactly the category whose clock this system cannot measure.
+   */
+  const limit = page.getByTestId('retention-blocked-scope-limit');
+  await expect(limit).toBeVisible();
+  await expect(limit).toContainText('customer file');
+  await expect(limit).toContainText('no date for a relationship ending');
+  // AND IT MUST NOT CLAIM THE PROTECTION IS RUNNING FOR THEM.
+  await expect(limit).toContainText('never described as blocked');
+});
+
+test('BATCH 5 GROUP 7c — the retrieval section is offered on its own code, takes a closed basis and a note, and shows the append-only register', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegister(page);
+
+  await page.goto('/retention-disposal');
+
+  const section = page.getByTestId('retention-retrieve-section');
+  await expect(section).toBeVisible();
+  await expect(section).toContainText('cannot be edited or deleted once written');
+
+  // ---------------------------------------------- A CLOSED TWO, AND NO "INTERNAL" OPTION
+  const basis = page.getByTestId('retrieve-basis');
+  await expect(basis.locator('option')).toHaveCount(2);
+  await expect(basis.locator('option[value="JUDICIAL_REQUEST"]')).toHaveCount(1);
+  await expect(basis.locator('option[value="CBJ_AUDIT"]')).toHaveCount(1);
+
+  // ---------------------------------------------- THE REGISTER RENDERS WHAT IT RECORDED
+  const row = page.locator('[data-retrieval-for="entry-1"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('A judicial request');
+  await expect(row).toContainText('Amman Court of First Instance');
+  await expect(row).toContainText('Compliance Officer');
+
+  // ---------------------------------------------- AND IT POSTS WHAT THE OFFICER TYPED
+  let posted: Record<string, unknown> | null = null;
+  await page.route(
+    'http://localhost:4000/retention-archive/retrievals',
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        posted = route.request().postDataJSON() as Record<string, unknown>;
+        return route.fulfill({ status: 201, json: { retrievals: [] } });
+      }
+      return route.fulfill({ status: 200, json: [] });
+    },
+  );
+  await page.getByTestId('retrieve-category').fill('CommissionLedgerEntry');
+  // Pasted out of a court letter, with a trailing comma — the shape an officer actually produces.
+  await page.getByTestId('retrieve-records').fill('entry-1, entry-2,');
+  await page
+    .getByTestId('retrieve-note')
+    .fill('Amman Court of First Instance, case 123 of 2026.');
+  await page.getByTestId('retrieve-submit').click();
+
+  await expect(page.getByTestId('retrieve-done')).toBeVisible();
+  // THE TRAILING COMMA DID NOT BECOME AN EMPTY RECORD ID — which the server would refuse by name
+  // for a reason the officer could not see on screen.
+  expect(posted).toMatchObject({
+    recordCategory: 'CommissionLedgerEntry',
+    recordIds: ['entry-1', 'entry-2'],
+    basis: 'JUDICIAL_REQUEST',
+  });
+});
+
+test('BATCH 5 GROUP 7c — a reader who may nominate a disposal but may NOT retrieve sees the explanation and no retrieval section', async ({
+  page,
+}) => {
+  /*
+   * The distinction the any-of/one-code split exists for. A Branch/Department Manager holds
+   * `retention.dispose.nominate` and not `retention.archive.retrieve`, so they read the same notice
+   * list and are offered no retrieval control — and they are NOT shown a refusal, because they came
+   * to this screen for the schedule and the batches.
+   */
+  await mockAuth(page, ['BRANCH_DEPARTMENT_MANAGER']);
+  await mockRegister(page);
+
+  await page.goto('/retention-disposal');
+
+  // The ANCHOR first, from the same render: without it the absence below is satisfied by a page
+  // that has not hydrated, and `toHaveCount(0)` passes on its first poll.
+  await expect(page.getByTestId('retention-blocked-what')).toBeVisible();
+  await expect(
+    page.getByTestId('retention-retrieve-section'),
+  ).toHaveCount(0);
+
+  // AND NO "could not load" NOISE: the retrievals list is not even requested for this reader, so
+  // the partial-load branch must not tell them a list failed.
+  await expect(page.locator('main')).not.toContainText('did not load');
 });

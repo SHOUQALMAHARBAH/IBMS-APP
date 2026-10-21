@@ -103,6 +103,43 @@ export function extendRetention(
   return apiPost('/retention-notices/extend', body);
 }
 
+/**
+ * BATCH 5 GROUP 7c — a retrieval from the blocked phase.
+ *
+ * These interfaces are HAND-COPIED over HTTP and TypeScript cannot check them against the api's own
+ * view, which is how the customer-import result panel once broke. When this shape changes, the
+ * client, the screen and every Playwright mock move in the SAME commit.
+ */
+export type ArchiveRetrievalBasis = 'JUDICIAL_REQUEST' | 'CBJ_AUDIT';
+
+export interface ArchiveRetrieval {
+  id: string;
+  recordCategory: string;
+  recordId: string;
+  basis: ArchiveRetrievalBasis;
+  note: string;
+  retrievedAt: string;
+  retrievedByUserId: string;
+  retrievedByName: string | null;
+}
+
+export interface RetrieveBlockedRecordsInput {
+  recordCategory: string;
+  recordIds: string[];
+  basis: ArchiveRetrievalBasis;
+  note: string;
+}
+
+export function listArchiveRetrievals(): Promise<ArchiveRetrieval[]> {
+  return apiGet('/retention-archive/retrievals');
+}
+
+export function retrieveBlockedRecords(
+  body: RetrieveBlockedRecordsInput,
+): Promise<{ retrievals: ArchiveRetrieval[] }> {
+  return apiPost('/retention-archive/retrievals', body);
+}
+
 export interface LegalHold {
   id: string;
   scope: string;

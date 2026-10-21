@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import { TransactionMonitoringController } from './transaction-monitoring.controller';
 import { TransactionMonitoringService } from './transaction-monitoring.service';
 import { TransactionMonitoringAlertRepository } from '../../repositories/transaction-monitoring-alert.repository';
@@ -146,6 +147,7 @@ import { ProviderOfficeStateController } from './provider-office-state.controlle
     ProviderOfficeStateRepository,
     TransactionMonitoringService,
     TransactionMonitoringAlertRepository,
+    RetentionArchiveRepository,
     TransactionMonitoringSweepScheduler,
     WatchlistSyncService,
     WatchlistDatasetVersionRepository,

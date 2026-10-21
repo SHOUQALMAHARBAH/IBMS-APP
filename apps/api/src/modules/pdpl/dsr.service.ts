@@ -18,6 +18,8 @@ import {
 } from '../../repositories/dsr.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
+import { erasureRefusedWhileBlocked } from './retention-archive.config';
 import {
   applyDsrExtension,
   canApplyDsrExtension,
@@ -88,6 +90,7 @@ export class DsrService {
   constructor(
     private readonly repo: DsrRepository,
     private readonly legalHolds: LegalHoldRepository,
+    private readonly archive: RetentionArchiveRepository,
     private readonly workflow: WorkflowTransitionService,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
@@ -394,6 +397,28 @@ export class DsrService {
           `Data Subject Request ${id} cannot be marked fully fulfilled — an active Legal Hold names this data subject. Use partially-fulfil, referencing the hold, until it is released.`,
         );
       }
+      // CONDITION 4 OF THE ARCHIVED STATE (batch 5 group 7c) — ERASURE IS REFUSED IN THE BLOCKED
+      // PHASE EVEN IF THE CUSTOMER ASKS, and the refusal carries its articles.
+      //
+      // A LIVE check and not a confirmation flag, for the same reason the CORRECTION branch below
+      // uses one: whether a record is blocked is derived from dates the system holds, so there is
+      // nothing for an officer to attest to. Asking them to confirm it would turn a computable fact
+      // into an opinion.
+      //
+      // IT RUNS BEFORE THE ATTESTATION, deliberately. Order matters here the way art. 3/a's order
+      // mattered: refuse on the thing the caller cannot change by editing the request. An officer
+      // who ticks `confirmNoOpenRetentionHold` and is then told about a statutory block has been
+      // asked to affirm something the system was about to contradict.
+      const blocked = await this.archive.blockedCountsForSubject({
+        customerId: dsr.customerId,
+        insuredPersonId: dsr.insuredPersonId,
+      });
+      if (blocked.length > 0) {
+        throw new UnprocessableEntityException(
+          erasureRefusedWhileBlocked({ dsrId: id, blocked }),
+        );
+      }
+
       if (dto.confirmNoOpenRetentionHold !== true) {
         throw new UnprocessableEntityException(
           `Data Subject Request ${id} is a DELETION request — it cannot be marked fully fulfilled without confirming no retention hold applies (confirmNoOpenRetentionHold: true). Use partially-fulfil if one does.`,

@@ -172,7 +172,14 @@ say "asserting the structure"
 # the owner measured (COMPLIANCE_OFFICER and DATA_PROTECTION_OFFICER — the pair that already holds
 # both retention-period codes). Moved here deliberately rather than derived, because a catalogue that
 # grows without anybody recording it is how a capability arrives unnoticed.
-check "permission codes seeded" 228 \
+#
+# 228 -> 229, batch 5 group 7c: ONE more, `retention.archive.retrieve`, to the same pair — measured
+# rather than preferred, and the argument is that the two retrieval bases map to the two roles: a CBJ
+# audit is Compliance's domain (`license.manage` and `internal-audit.record` are COMPLIANCE alone)
+# and a judicial request is the DPO's (`legal-hold.manage` is DPO alone). The owner reserved this
+# grant set as her own decision when the code was deferred out of 7b; this is the measured template
+# awaiting it, and changing it costs one seed line plus a revoking migration.
+check "permission codes seeded" 229 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
 check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"

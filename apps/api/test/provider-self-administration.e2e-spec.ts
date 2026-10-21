@@ -232,7 +232,7 @@ describe('the authorised mailbox widening — the sets, by name', () => {
     expect(roles).toEqual(SEEDED_EMAIL_MANAGE_ROLES);
   });
 
-  it('THE WIDENING mints nothing — and the catalogue total is 228 because a LATER batch minted one, deliberately', async () => {
+  it('THE WIDENING mints nothing — and the catalogue total moves only when a batch deliberately mints', async () => {
     /*
      * THE CLAIM THIS TEST IS ACTUALLY ABOUT IS UNCHANGED: the authorised mailbox widening granted
      * two EXISTING codes to one more role and added nothing to the catalogue. That is still asserted
@@ -241,7 +241,10 @@ describe('the authorised mailbox widening — the sets, by name', () => {
      * WHAT MOVED IS THE TOTAL, AND IT MOVED BY DECISION. Batch 5 group 7b minted exactly one code,
      * `retention.extend`, granted to the template default the owner measured (COMPLIANCE_OFFICER
      * and DATA_PROTECTION_OFFICER — the pair that already holds both retention-period codes). The
-     * catalogue went 227 -> 228 for the first time in eleven commits.
+     * catalogue went 227 -> 228 for the first time in eleven commits, and 7c minted one more
+     * (`retention.archive.retrieve`), so it reads 229. The SIXTH place a new permission touches,
+     * which is now recorded in `CLAUDE.md` — it was found by CI rather than by the five
+     * regenerations, because none of those asks which specs assert the TOTAL.
      *
      * SO THE PIN IS RE-POINTED RATHER THAN RELAXED. It still fails on an unexplained move, which is
      * the whole reason it exists; what it no longer does is fail on a recorded one. A floor
@@ -257,7 +260,7 @@ describe('the authorised mailbox widening — the sets, by name', () => {
      */
     const total = await rawPrisma.permission.count();
     console.log(`permission catalogue total: ${total}`);
-    expect(total).toBe(228);
+    expect(total).toBe(229);
   });
 
   it("adds no role — PLATFORM_OPERATOR is still the provider organization's only seeded role", async () => {

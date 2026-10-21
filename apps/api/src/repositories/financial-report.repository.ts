@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RetentionArchiveRepository } from './retention-archive.repository';
+import { notBlockedWhere } from '../modules/pdpl/retention-archive.config';
 import {
   FINANCIAL_REPORT_ROW_LIMIT,
   type CommissionRollupEntryRow,
@@ -19,7 +21,10 @@ import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
  */
 @Injectable()
 export class FinancialReportRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly archive: RetentionArchiveRepository,
+  ) {}
 
   /** Every `CommissionLedgerEntry` with its policy's insurer id + name — the
    * input to `buildCommissionRollup`. `amount` is the effective commission at
@@ -35,9 +40,22 @@ export class FinancialReportRepository {
       insurerId?: string;
       ownerUserIds?: string[];
     } = {},
+    now: Date = new Date(),
   ): Promise<CommissionRollupEntryRow[]> {
+    // EXCEPT THE BLOCKED ONES (batch 5 group 7c, condition 1). This read carries no date bound at
+    // all — it is the office's whole commission book — so without this an entry paid eleven years
+    // ago would sit in today's commission position forever, which is the "ongoing processing" a
+    // legal block forbids. A NULL `paidAt` — an UNPAID entry, whose clock never started — is KEPT,
+    // because `notBlockedWhere` is written as a negation over `lte`; the obvious `gt: cutoff`
+    // spelling would have dropped every unpaid commission here and understated what the office is
+    // owed, with nothing failing.
+    const blocked = await this.archive.blockedExclusionForModel(
+      'commissionLedgerEntry',
+      now,
+    );
     const rows = await this.prisma.client.commissionLedgerEntry.findMany({
       where: {
+        ...notBlockedWhere('paidAt', blocked),
         ...(scope.insuranceLine || scope.insurerId || scope.ownerUserIds
           ? {
               policy: {
