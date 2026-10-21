@@ -629,6 +629,20 @@ test('BATCH 5 GROUP 7c — the blocked phase is explained where the notice is re
   // ---------------------------------------------- THE FOUR CONDITIONS, ON THE SCREEN
   // Scoped to the paragraph's own hook, never page-wide: a page-wide text assertion is the one
   // shape that can match an unrelated element, which this repository has paid for four times.
+  // ---------------------------------------------- TWO CHOICES, NOT THREE, SAID OUT LOUD
+  /*
+   * The owner's accepted consequence of anonymisation being held. Asserted because the quiet
+   * failure mode is a reader who sees only an Extend button and assumes the third choice lives
+   * somewhere else on the screen — and because a product that lists an act it cannot perform is
+   * the claim family this module spent a week removing.
+   */
+  const two = page.getByTestId('retention-two-choices');
+  await expect(two).toBeVisible();
+  await expect(two).toContainText('TWO choices here, not three');
+  await expect(two).toContainText('NOT available in this system');
+  // AND IT SAYS WHAT IS LEFT, rather than only what is missing.
+  await expect(two).toContainText('the only route after a period elapses is destruction');
+
   const what = page.getByTestId('retention-blocked-what');
   await expect(what).toBeVisible();
   await expect(what).toContainText('no ongoing processing');

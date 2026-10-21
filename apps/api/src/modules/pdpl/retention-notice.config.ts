@@ -5,7 +5,23 @@
  *
  * The notice is a READ. It has no write path to a disposal, to an anonymisation or to anything else,
  * and `retention-notice.inventory.spec.ts` asserts that as an ABSENCE — which is the only form that
- * can fail. The three choices are separate acts, each with its own permission, taken by a person who
+ * can fail.
+ *
+ * ## TWO CHOICES, NOT THREE — AND ONE PLACE STILL SAYS THREE AND CANNOT BE CORRECTED
+ *
+ * EXTEND and NOMINATE-FOR-DESTRUCTION are built. ANONYMISATION IS HELD (register entry 89): none of
+ * the four resolvable categories carries any identity, the identity sits on the SHARED `Customer`,
+ * and the surface is six models including the UBO register — so anonymising one of a customer's
+ * receipts is not an operation that exists. The owner has accepted the consequence: until the
+ * identity surface is handled, the only route after a period elapses is destruction. The screen says
+ * so in both languages (`rdNoticeTwoChoices`).
+ *
+ * `migrations/20261203100000_retention_extension_register/migration.sql` says "the same three
+ * choices" in a comment. It is an APPLIED migration, so editing it would drift its stored checksum
+ * and fail `db:checksums` — the one class of stale text in this repository that cannot be corrected
+ * where it sits. This file is the authority; that comment is history.
+ *
+ * The choices are separate acts, each with its own permission, taken by a person who
  * has read the notice.
  *
  * ## IT EXPLAINS ITSELF, AND THAT IS NOT DECORATION

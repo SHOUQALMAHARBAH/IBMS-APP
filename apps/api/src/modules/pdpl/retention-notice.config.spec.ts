@@ -36,6 +36,30 @@ describe('the resolution table — only what this system can actually resolve', 
       'CommissionLedgerEntry',
       'Settlement',
     ]);
+
+    /*
+     * AND WHICH TRIGGERS ARE NULLABLE, pinned — batch 5 group 7c.
+     *
+     * This is not bookkeeping: `notBlockedWhere` NEGATES an elapsed test, and `NOT (trigger <= x)`
+     * is NULL for a NULL trigger, so a WHERE clause keeps only TRUE and the row is DROPPED. An
+     * UNPAID commission entry therefore left the financial report — what the office is owed,
+     * quietly smaller. The flag is what adds `trigger IS NOT NULL` to the conjunction and makes it
+     * FALSE rather than NULL.
+     *
+     * `Receipt.receivedAt` alone is NOT NULL, which is also why the flag could not be inferred at
+     * the call site: Prisma's filter for a non-nullable column refuses `not: null` outright.
+     *
+     * A fifth category declaring this wrongly is a money defect in a read, so it is pinned per
+     * category rather than counted.
+     */
+    expect(
+      CATEGORY_RESOLUTIONS.map((r) => [r.triggerColumn, r.triggerIsNullable]),
+    ).toEqual([
+      ['receivedAt', false],
+      ['remittedAt', true],
+      ['paidAt', true],
+      ['clientPaymentConfirmedAt', true],
+    ]);
   });
 
   it('every resolution names a trigger column AND what that date MEANS', () => {

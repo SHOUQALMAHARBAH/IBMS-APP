@@ -4637,7 +4637,14 @@ offers destruction, in `disposal-batch.config.ts`, and in `docs/deferred-registe
 
 **Anonymisation is NOT built, and its grain is an open decision** (register entry 89): none of the
 four resolvable records carries any identity, the identity lives on the shared `Customer`, and the
-surface is six models including the UBO register.
+surface is six models including the UBO register. **The consequence is accepted and said on the
+screen, in both languages**: the notice offers TWO choices rather than three — extend, or nominate
+for destruction — and until the identity surface is handled the only route after a period elapses is
+destruction. A product that lists an act it cannot perform is the claim family this module spent a
+week removing, so the sentence names what is LEFT rather than only what is missing. One place still
+says "three choices": the comment in applied migration `20261203100000`, which cannot be corrected
+where it sits because editing an applied migration drifts its stored checksum —
+`retention-notice.config.ts` is the authority and records that.
 
 **An office can add and correct its own lines of business (2026-09-28).** `POST /insurance-lines` and
 `PATCH /insurance-lines/:id` had no web caller, so the vocabulary this product classifies all business by

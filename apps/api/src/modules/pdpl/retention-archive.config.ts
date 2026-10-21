@@ -170,6 +170,12 @@ export interface BlockedExclusion {
   /** A record whose trigger date is at or before this has elapsed. */
   cutoff: Date;
   /**
+   * Whether the trigger column is nullable, carried from the resolution so the `where` does not
+   * have to ask. See `CategoryResolution.triggerIsNullable` — a negated elapsed test drops NULL
+   * rows unless the conjunction is made FALSE rather than NULL, and that shipped once.
+   */
+  triggerIsNullable: boolean;
+  /**
    * Elapsed but NOT blocked, because an extension still covers them.
    *
    * MUTABLE `string[]`, not `readonly` — Prisma's `in` filter is typed `string[]` and refuses a
@@ -201,9 +207,21 @@ export interface BlockedExclusion {
  *     `clientPaymentConfirmedAt` are nullable. Prisma refuses `null` as a filter on a non-nullable
  *     column, so that shape needed two functions and a per-model fact to choose between them.
  *
- * `lte` has neither problem: `NULL <= x` is NULL, so a row whose clock never started is simply NOT
- * ELAPSED — which is the same reading `RetentionNoticeRepository.idsElapsedBefore` uses for its
- * count. The two now agree BY CONSTRUCTION rather than because both were reasoned about correctly.
+ * ## AND `lte` ALONE WAS NOT ENOUGH EITHER — THE SAME BUG, TWICE, AND THE SECOND ONE SHIPPED
+ *
+ * The first version of this comment claimed `lte` had neither problem, because `NULL <= x` is NULL
+ * and a row whose clock never started is therefore not elapsed. That is true of the POSITIVE form —
+ * `idsElapsedBefore` relies on it correctly — and FALSE under negation: `NOT NULL` is NULL, and a
+ * WHERE clause keeps only TRUE, so NULL-trigger rows were dropped for exactly the reason `gt` would
+ * have dropped them. MEASURED by an e2e: 9 commission entries, 5 with a NULL `paidAt`, and the
+ * blocked read returned 3.
+ *
+ * So the conjunction is made FALSE rather than NULL by adding `trigger IS NOT NULL` to it:
+ * `FALSE AND NULL` is FALSE, and `NOT FALSE` is TRUE. The clause is added only for a nullable
+ * trigger, because Prisma's non-nullable `DateTimeFilter` refuses `not: null` — which is why
+ * `CategoryResolution.triggerIsNullable` is declared data rather than something inferred here.
+ *
+ * With that, this and `idsElapsedBefore` agree BY CONSTRUCTION on all four categories.
  */
 export function notBlockedWhere<K extends string>(
   trigger: K,
@@ -234,16 +252,29 @@ export function notBlockedWhere<K extends string>(
   // The extension clause is OMITTED when there are no extensions rather than relying on Prisma's
   // empty-array semantics for `notIn`: a filter whose meaning depends on how a client special-cases
   // an empty list is a filter nobody can re-derive from the code.
-  const elapsed = { [trigger]: { lte: exclusion.cutoff } } as Record<
-    K,
-    { lte: Date }
-  >;
-  return {
-    NOT: {
-      AND:
-        exclusion.extendedRecordIds.length === 0
-          ? [elapsed]
-          : [elapsed, { id: { notIn: exclusion.extendedRecordIds } }],
-    },
-  };
+  const elapsed: (Record<K, { lte: Date }> | { id: { notIn: string[] } })[] = [
+    { [trigger]: { lte: exclusion.cutoff } } as Record<K, { lte: Date }>,
+  ];
+  if (exclusion.triggerIsNullable) {
+    /*
+     * THE CLAUSE THAT KEEPS AN UNSTARTED CLOCK IN THE READ. Without it the conjunction is NULL for
+     * a NULL trigger, the negation is NULL, and a WHERE clause keeps only TRUE — so every unpaid
+     * commission entry would leave the financial report. That shipped once and an e2e caught it.
+     *
+     * THE CAST IS THE ONE THING THE TYPE SYSTEM CANNOT EXPRESS HERE, and it is confined to this
+     * clause. `triggerIsNullable` is a runtime boolean, so the return type cannot discriminate on
+     * it — and Prisma's filter for a NON-nullable column (`Receipt.receivedAt`) refuses `not: null`
+     * outright, which is how the declared flag earned its place rather than being inferred. This
+     * branch only ever runs for a nullable trigger, and `retention-resolution.config.spec.ts` pins
+     * which of the four those are.
+     */
+    elapsed.push({ [trigger]: { not: null } } as unknown as Record<
+      K,
+      { lte: Date }
+    >);
+  }
+  if (exclusion.extendedRecordIds.length > 0) {
+    elapsed.push({ id: { notIn: exclusion.extendedRecordIds } });
+  }
+  return { NOT: { AND: elapsed } };
 }

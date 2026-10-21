@@ -54,6 +54,18 @@ export interface CategoryResolution {
   /** The column the retention period is counted FROM. */
   triggerColumn: string;
   /**
+   * Whether that column is NULLABLE — declared, because a `where` that NEGATES an elapsed test has
+   * to know.
+   *
+   * `NOT (trigger <= cutoff)` is NULL for a NULL trigger, and a WHERE clause keeps only TRUE, so
+   * every row whose clock never started would be dropped from the read — an unpaid commission entry
+   * vanishing from what the office is owed. `notBlockedWhere` adds `trigger IS NOT NULL` to the
+   * conjunction when this is true, which makes the conjunction FALSE rather than NULL. Prisma's
+   * non-nullable `DateTimeFilter` refuses `not: null`, so the flag cannot be inferred at the call
+   * site and is declared here instead, beside the column it is about.
+   */
+  triggerIsNullable: boolean;
+  /**
    * What that column MEANS, in the words the notice shows a reader. The notice carries this rather
    * than the column name, because "what date did the count run from" is the question an officer is
    * actually asking and a column name does not answer it.
@@ -66,6 +78,7 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     recordCategory: 'Receipt',
     modelProperty: 'receipt',
     triggerColumn: 'receivedAt',
+    triggerIsNullable: false,
     triggerDescription:
       'the date the client payment was received, which closes that transaction',
   },
@@ -73,6 +86,7 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     recordCategory: 'Remittance',
     modelProperty: 'remittance',
     triggerColumn: 'remittedAt',
+    triggerIsNullable: true,
     triggerDescription:
       'the date the premium was remitted to the insurer, which closes that transaction',
   },
@@ -80,6 +94,7 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     recordCategory: 'CommissionLedgerEntry',
     modelProperty: 'commissionLedgerEntry',
     triggerColumn: 'paidAt',
+    triggerIsNullable: true,
     triggerDescription:
       'the date the commission was paid, which closes that transaction',
   },
@@ -87,6 +102,7 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     recordCategory: 'Settlement',
     modelProperty: 'settlement',
     triggerColumn: 'clientPaymentConfirmedAt',
+    triggerIsNullable: true,
     triggerDescription:
       'the date the client settlement payment was confirmed, which closes that transaction',
   },

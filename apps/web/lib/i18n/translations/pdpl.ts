@@ -241,6 +241,8 @@ export const PDPL = {
       'متى',
     rdRetrieveDone:
       'تمّ تدوينُ الاستخراج.',
+    rdNoticeTwoChoices:
+      'وأمامَ المكتبِ خيارانِ لا ثلاثة: تمديدُ المدّةِ على أحدِ الأسبابِ الثلاثة، أو ترشيحُ السجلّاتِ للإتلاف. وفصلُ المعرّفاتِ عن القيمِ الماليةِ غيرُ متاحٍ في هذا النظام — فالسجلّاتُ التي يقيسُ النظامُ مدّتَها لا تحملُ هويةً أصلاً، والهويةُ على سجلِّ العميلِ نفسِه وهي مشتركةٌ بين كلِّ سجلّاتِه، فلا يُمكنُ فصلُها عن بعضِها. فحتى تُعالَجَ الهوية، الطريقُ الوحيدُ بعد انتهاءِ المدّةِ هو الإتلاف.',
     rdBackupLimit:
       'تنبيه: حذفُ السجلِّ من قاعدةِ البياناتِ الأساسيةِ ليس إتلافاً ما دامت نسخةٌ احتياطيةٌ تحملُه. لا يملكُ هذا النظامُ إتلافاً يشملُ النسخَ الاحتياطية، فلا تُوصَفُ أيُّ عمليةٍ هنا بأنها إتلافٌ كامل.',
     rdLoading: 'جارٍ التحميل…',
@@ -647,6 +649,8 @@ export const PDPL = {
       'When',
     rdRetrieveDone:
       'The retrieval has been recorded.',
+    rdNoticeTwoChoices:
+      "The office has TWO choices here, not three: extend the period on one of the three bases, or nominate the records for destruction. Separating the identifiers from the financial values is NOT available in this system — the records whose period it can measure carry no identity at all, and the identity sits on the customer record and is shared across every one of that customer's records, so it cannot be separated for some of them. Until that is handled, the only route after a period elapses is destruction.",
     rdBackupLimit:
       'Note: deleting a record from the primary database is not destruction while a backup holds the row. This system has no backup-scoped destruction, so nothing here may be described as complete destruction.',
     rdLoading: 'Loading…',

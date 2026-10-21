@@ -449,6 +449,21 @@ export default function RetentionDisposalPage() {
             file cannot enter this phase, because art. 17/a counts from the END of the relationship
             and this system records no such date.
           */}
+          {/*
+            TWO CHOICES, NOT THREE — the owner's accepted consequence of anonymisation being held
+            (register entry 89). Said here rather than left to be inferred from a missing button: a
+            product that lists an act it cannot perform is the claim family this module spent a week
+            removing, and the quieter version of that failure is a reader who assumes the third
+            choice exists somewhere else on the screen. `role="status"`, not `alert`: it is what the
+            system offers, not a refusal.
+          */}
+          <p
+            role="status"
+            data-testid="retention-two-choices"
+            style={{ color: 'var(--ink-secondary)' }}
+          >
+            {t('rdNoticeTwoChoices')}
+          </p>
           <p data-testid="retention-blocked-what" style={{ color: 'var(--ink-secondary)' }}>
             <strong>{t('rdBlockedHeading')}</strong> — {t('rdBlockedWhat')}
           </p>

@@ -67,6 +67,87 @@ async function boot(): Promise<INestApplication<App>> {
   return sharedApp;
 }
 
+/**
+ * A COMMISSION-FREE POLICY, CREATED RATHER THAN HUNTED — and the hunt is why this exists.
+ *
+ * `CommissionLedgerEntry` carries `@@unique([policyId])`, so a fixture needs a policy with no entry
+ * yet. Three tests used to FIND one. MEASURED: db-test holds 145 such policies and a database built
+ * from nothing holds **ZERO**, because every seeded policy already has its commission entry — so
+ * the hunt passed locally, 935 of 935, and CI failed all three at once with
+ * `findFirstOrThrow() — No record was found`.
+ *
+ * `Opportunity` needs only a `customerId`, so the chain is cheap: customer, opportunity, policy,
+ * entry.
+ *
+ * ## THE CUSTOMER IS CREATED, AND ONLY THE INSURER IS FOUND — MEASURED, NOT ASSUMED
+ *
+ * The first version of this helper FOUND a customer, on the reasoning that nothing consumes one
+ * exclusively. That reasoning was fine and the premise was false: **the seed creates no `Customer`
+ * at all** — `prisma.customer.*` does not appear in `seed.ts` — so on a database built from nothing
+ * `findFirstOrThrow` would have thrown, failing in exactly the way the hunt it replaced did. Caught
+ * by checking the seed rather than by a second CI round.
+ *
+ * The INSURER is found, and that one IS seeded: `seed.ts` creates one per catalogue master inside
+ * `SEED_SAMPLE_DATA`, which is on wherever `NODE_ENV !== 'production'` — true in CI.
+ */
+async function makeCommissionFreePolicy(ownerUserId: string): Promise<{
+  policyId: string;
+  opportunityId: string;
+  customerId: string;
+}> {
+  const insurer = await prisma.insurer.findFirstOrThrow({
+    select: { id: true },
+  });
+  const customer = await prisma.customer.create({
+    data: {
+      customerType: 'INDIVIDUAL',
+      legalName: `Retention Fixture ${Math.random().toString(36).slice(2, 10)}`,
+      ownerUserId,
+    },
+    select: { id: true },
+  });
+  const opportunity = await prisma.opportunity.create({
+    data: { customerId: customer.id },
+    select: { id: true },
+  });
+  const policy = await prisma.policy.create({
+    data: {
+      opportunityId: opportunity.id,
+      customerId: customer.id,
+      insurerId: insurer.id,
+      insuranceLine: 'Property All Risks',
+      requestedPremium: '1000.000',
+    },
+    select: { id: true },
+  });
+  return {
+    policyId: policy.id,
+    opportunityId: opportunity.id,
+    customerId: customer.id,
+  };
+}
+
+/** Removes the chain in FK order. Safe to call with undefined, so a `finally` needs no branch. */
+async function dropCommissionFixture(chain: {
+  entryIds?: (string | undefined)[];
+  policyIds?: (string | undefined)[];
+  opportunityIds?: (string | undefined)[];
+  customerIds?: (string | undefined)[];
+}): Promise<void> {
+  for (const id of chain.entryIds ?? []) {
+    if (id) await prisma.commissionLedgerEntry.delete({ where: { id } });
+  }
+  for (const id of chain.policyIds ?? []) {
+    if (id) await prisma.policy.delete({ where: { id } });
+  }
+  for (const id of chain.opportunityIds ?? []) {
+    if (id) await prisma.opportunity.delete({ where: { id } });
+  }
+  for (const id of chain.customerIds ?? []) {
+    if (id) await prisma.customer.delete({ where: { id } });
+  }
+}
+
 async function makeUser(
   app: INestApplication<App>,
   label: string,
@@ -1200,6 +1281,9 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
 
     let itemId: string | undefined;
     let entryId: string | undefined;
+    let policyId: string | undefined;
+    let opportunityId: string | undefined;
+    let customerId: string | undefined;
     try {
       // The period: ten years, which is exactly the commercial floor, so it is accepted without a
       // declaration and without an extension.
@@ -1213,15 +1297,15 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         .expect(201);
       itemId = (created.body as RetentionScheduleItemBody).id;
 
-      // A REAL elapsed record: one commission entry paid eleven years ago, against a policy that
-      // has none. `@@unique([policyId])` is why it has to be a free policy.
-      const policy = await prisma.policy.findFirstOrThrow({
-        // `commissionLedgerEntries: { none: {} }`, not `null`: `@@unique([policyId])` makes it
-        // one-at-most but Prisma still types the relation as a LIST, so "has none" is a `none`
-        // filter. The compiler named the right field, which is the payload type doing its job.
-        where: { commissionLedgerEntries: { none: {} } },
-        select: { id: true },
-      });
+      // A REAL elapsed record: one commission entry paid eleven years ago, against a policy this
+      // test CREATES. `@@unique([policyId])` is why it needs a policy with no entry — and it used
+      // to FIND one, which CI proved was environment-dependent: a database built from nothing has
+      // zero of them. See `makeCommissionFreePolicy`.
+      const chain = await makeCommissionFreePolicy(compliance.userId);
+      policyId = chain.policyId;
+      opportunityId = chain.opportunityId;
+      customerId = chain.customerId;
+      const policy = { id: chain.policyId };
       const elevenYearsAgo = new Date();
       elevenYearsAgo.setUTCFullYear(elevenYearsAgo.getUTCFullYear() - 11);
       const entry = await prisma.commissionLedgerEntry.create({
@@ -1328,7 +1412,8 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       // ---------------------------------------------- (4b) THE SECOND NOTICE, after it elapses
       /*
        * Asserted, not assumed: the brief's point is that an extension is a DECISION rather than an
-       * exit, so the same notice comes again with the same three choices. The extension's own
+       * exit, so the same notice comes again with the same choices — TWO of them, extend or nominate
+       * for destruction, because anonymisation is held (register entry 89). The extension's own
        * `extendedUntil` is moved into the past — the one fact the clock reads.
        */
       await prisma.retentionExtension.updateMany({
@@ -1351,8 +1436,12 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       await prisma.retentionExtension.deleteMany({
         where: { recordCategory: 'CommissionLedgerEntry' },
       });
-      if (entryId)
-        await prisma.commissionLedgerEntry.delete({ where: { id: entryId } });
+      await dropCommissionFixture({
+        entryIds: [entryId],
+        policyIds: [policyId],
+        opportunityIds: [opportunityId],
+        customerIds: [customerId],
+      });
       if (itemId)
         await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
     }
@@ -1479,11 +1568,20 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
 
     let itemId: string | undefined;
     let entryId: string | undefined;
+    let policyId: string | undefined;
+    let opportunityId: string | undefined;
+    let customerId: string | undefined;
+    let unpaidEntryId: string | undefined;
+    let policyIdUnpaid: string | undefined;
+    let opportunityIdUnpaid: string | undefined;
+    let customerIdUnpaid: string | undefined;
     try {
-      const policy = await prisma.policy.findFirstOrThrow({
-        where: { commissionLedgerEntries: { none: {} } },
-        select: { id: true },
-      });
+      // CREATED, never hunted — see `makeCommissionFreePolicy` and CI's own finding.
+      const chain = await makeCommissionFreePolicy(compliance.userId);
+      policyId = chain.policyId;
+      opportunityId = chain.opportunityId;
+      customerId = chain.customerId;
+      const policy = { id: chain.policyId };
       const elevenYearsAgo = new Date();
       elevenYearsAgo.setUTCFullYear(elevenYearsAgo.getUTCFullYear() - 11);
       const entry = await prisma.commissionLedgerEntry.create({
@@ -1495,6 +1593,25 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         select: { id: true },
       });
       entryId = entry.id;
+
+      /*
+       * AND A SECOND ENTRY WHOSE CLOCK NEVER STARTED — `paidAt: null`, an UNPAID commission.
+       *
+       * This is the row the first version of the exclusion silently dropped: `NOT (paidAt <= x)` is
+       * NULL for a NULL `paidAt`, and a WHERE clause keeps only TRUE. The money consequence is that
+       * what the office is OWED would quietly shrink. It was invisible to this test until CI forced
+       * a rewrite, and then only surfaced because db-test happened to hold five such rows — luck,
+       * not method. So the fixture creates one, and the assertions below prove it is KEPT.
+       */
+      const unpaidChain = await makeCommissionFreePolicy(compliance.userId);
+      policyIdUnpaid = unpaidChain.policyId;
+      opportunityIdUnpaid = unpaidChain.opportunityId;
+      customerIdUnpaid = unpaidChain.customerId;
+      const unpaid = await prisma.commissionLedgerEntry.create({
+        data: { policyId: unpaidChain.policyId, amount: '100.000' },
+        select: { id: true },
+      });
+      unpaidEntryId = unpaid.id;
 
       const countEntries = async (): Promise<number> => {
         const res = await request(app.getHttpServer())
@@ -1509,13 +1626,12 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
           .entryCount;
       };
 
-      // ------------------------------------------------ (1) NOT BLOCKED YET, so it is counted
+      // ------------------------------------------------ (1) NOT BLOCKED YET, so both are counted
       // NON-VACUITY, and it is the half that matters: with no retention period set there is no
-      // clock, so the entry is an ordinary eleven-year-old record and the report includes it.
-      // Without this reading, the drop below would be indistinguishable from the entry never having
-      // been in the report at all.
+      // clock, so both entries are ordinary records and the report includes them. Without this
+      // reading, the drop below would be indistinguishable from them never having been there.
       const withEntry = await countEntries();
-      expect(withEntry).toBeGreaterThan(0);
+      expect(withEntry).toBeGreaterThan(1);
 
       // ------------------------------------------------ (2) BLOCKED, so it leaves
       const created = await request(app.getHttpServer())
@@ -1529,9 +1645,20 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       itemId = (created.body as RetentionScheduleItemBody).id;
 
       const whileBlocked = await countEntries();
+      /*
+       * EXACTLY ONE FEWER — AND THAT NUMBER CARRIES BOTH HALVES.
+       *
+       * The elapsed entry left (the control working) AND the UNPAID one stayed (the NULL-trigger
+       * bug absent). A drop of two would mean the unstarted clock was treated as elapsed, which is
+       * the defect that shipped; a drop of none would mean the exclusion is not running at all.
+       *
+       * It is a DIFFERENCE between two readings in the same run, never an absolute count: db-test
+       * is cumulative, and the first version of this assertion compared against the whole book and
+       * failed at `expected 3 to be 8` for reasons that had nothing to do with what it was testing.
+       */
       expect(
         whileBlocked,
-        'a blocked entry must leave the unbounded commission roll-up',
+        'exactly one fewer: the elapsed entry leaves and the UNPAID one stays',
       ).toBe(withEntry - 1);
 
       // ------------------------------------------------ (3) EXTENDED, so it comes back
@@ -1561,8 +1688,12 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       await prisma.retentionExtension.deleteMany({
         where: { recordCategory: 'CommissionLedgerEntry' },
       });
-      if (entryId)
-        await prisma.commissionLedgerEntry.delete({ where: { id: entryId } });
+      await dropCommissionFixture({
+        entryIds: [entryId, unpaidEntryId],
+        policyIds: [policyId, policyIdUnpaid],
+        opportunityIds: [opportunityId, opportunityIdUnpaid],
+        customerIds: [customerId, customerIdUnpaid],
+      });
       if (itemId)
         await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
     }
@@ -1591,13 +1722,19 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     let itemId: string | undefined;
     let blockedId: string | undefined;
     let freshId: string | undefined;
+    const policyIds: string[] = [];
+    const opportunityIds: string[] = [];
+    const customerIds: string[] = [];
     try {
-      const policies = await prisma.policy.findMany({
-        where: { commissionLedgerEntries: { none: {} } },
-        select: { id: true },
-        take: 2,
-      });
-      expect(policies.length, 'need two commission-free policies').toBe(2);
+      // TWO, both created. The first version of this test FOUND them and asserted
+      // `expect(policies.length).toBe(2)` — which is the line CI failed on at `expected +0 to be 2`,
+      // because a database built from nothing has no commission-free policy at all.
+      const first = await makeCommissionFreePolicy(compliance.userId);
+      const second = await makeCommissionFreePolicy(compliance.userId);
+      const policies = [{ id: first.policyId }, { id: second.policyId }];
+      policyIds.push(first.policyId, second.policyId);
+      opportunityIds.push(first.opportunityId, second.opportunityId);
+      customerIds.push(first.customerId, second.customerId);
 
       const elevenYearsAgo = new Date();
       elevenYearsAgo.setUTCFullYear(elevenYearsAgo.getUTCFullYear() - 11);
@@ -1745,10 +1882,12 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       await prisma.retentionExtension.deleteMany({
         where: { recordCategory: 'CommissionLedgerEntry' },
       });
-      if (blockedId)
-        await prisma.commissionLedgerEntry.delete({ where: { id: blockedId } });
-      if (freshId)
-        await prisma.commissionLedgerEntry.delete({ where: { id: freshId } });
+      await dropCommissionFixture({
+        entryIds: [blockedId, freshId],
+        policyIds: policyIds,
+        opportunityIds: opportunityIds,
+        customerIds: customerIds,
+      });
       if (itemId)
         await prisma.retentionScheduleItem.delete({ where: { id: itemId } });
     }

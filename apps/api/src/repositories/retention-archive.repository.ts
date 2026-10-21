@@ -79,6 +79,7 @@ export class RetentionArchiveRepository {
 
     return {
       cutoff: elapsedBefore(now, item.retentionPeriodMonths),
+      triggerIsNullable: resolution.triggerIsNullable,
       extendedRecordIds: extensions.map((e) => e.recordId),
     };
   }
