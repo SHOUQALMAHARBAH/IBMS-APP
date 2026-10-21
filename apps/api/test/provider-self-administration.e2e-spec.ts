@@ -232,14 +232,32 @@ describe('the authorised mailbox widening — the sets, by name', () => {
     expect(roles).toEqual(SEEDED_EMAIL_MANAGE_ROLES);
   });
 
-  it('mints nothing — the catalogue total is unchanged at 227', async () => {
+  it('THE WIDENING mints nothing — and the catalogue total is 228 because a LATER batch minted one, deliberately', async () => {
     /*
-     * The widening grants two EXISTING codes to one more role. A total that moved would mean a code
-     * was added, which is the thing the brief said to stop on.
+     * THE CLAIM THIS TEST IS ACTUALLY ABOUT IS UNCHANGED: the authorised mailbox widening granted
+     * two EXISTING codes to one more role and added nothing to the catalogue. That is still asserted
+     * — by the two role-set assertions above, which name both codes and every holder.
+     *
+     * WHAT MOVED IS THE TOTAL, AND IT MOVED BY DECISION. Batch 5 group 7b minted exactly one code,
+     * `retention.extend`, granted to the template default the owner measured (COMPLIANCE_OFFICER
+     * and DATA_PROTECTION_OFFICER — the pair that already holds both retention-period codes). The
+     * catalogue went 227 -> 228 for the first time in eleven commits.
+     *
+     * SO THE PIN IS RE-POINTED RATHER THAN RELAXED. It still fails on an unexplained move, which is
+     * the whole reason it exists; what it no longer does is fail on a recorded one. A floor
+     * (`toBeGreaterThanOrEqual`) would have been the easy edit and the wrong one: it would stop
+     * catching the thing the brief said to stop on.
+     *
+     * AND CI IS HOW THIS WAS FOUND, not a local run: the catalogue total is pinned in an api E2E,
+     * and I had run one e2e FILE plus the full unit suite. `CLAUDE.md`'s five regenerations for a
+     * new permission are all done — the office-administrator counts did not move, because this code
+     * goes to Compliance and the DPO — but "which specs assert the catalogue TOTAL" is a different
+     * question from "which specs assert the office administrator's count", and it is the one that
+     * mattered.
      */
     const total = await rawPrisma.permission.count();
     console.log(`permission catalogue total: ${total}`);
-    expect(total).toBe(227);
+    expect(total).toBe(228);
   });
 
   it("adds no role — PLATFORM_OPERATOR is still the provider organization's only seeded role", async () => {
