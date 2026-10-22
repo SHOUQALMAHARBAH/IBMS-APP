@@ -36,6 +36,22 @@ WAY_AR = re.compile('حاول|المحاولة|أعد|تحديث|راجع|اتص
 ARABIC = re.compile('[؀-ۿ]')
 
 
+# ---------------------------------------------------------------------------- the ratchet
+#
+# THE THREE DEFECT CLASSES ARE ALREADY AT ZERO, so this gate is a FLAT BAN rather than a budget,
+# and the both-directions property other ratchets need is degenerate here: nothing can fall below
+# zero, so a rise is the only move and it fails. Writing a second direction for it would be
+# ceremony — an `elif actual < 0` branch that can never run.
+#
+# What is NOT a budget is the KEY COUNT. More load-error keys is more screens handling a failed
+# read, which is the thing being asked for — so it has a floor and no ceiling, and the floor below
+# already carries its own argument.
+#
+# Measured 2026-10-22: 114 keys, 114 with a way forward in both languages, 0 in one language only,
+# 0 in neither, 0 missing a language half. Matched the screen-pass measurement document.
+BILINGUAL_DEFECT_BUDGET = 0
+
+
 def main():
     verbose = '--verbose' in sys.argv
     rows = {}
@@ -90,6 +106,34 @@ def main():
         out.write('\nBOTH (%d)\n' % len(both))
         for key, f, _e, _a, en in both:
             out.write('  %-32s %s\n' % (key, en[:70]))
+
+    if '--check' not in sys.argv:
+        out.flush()
+        return 0
+
+    defects = len(one) + len(neither) + len(incomplete)
+    if defects > BILINGUAL_DEFECT_BUDGET:
+        out.write(
+            '\nload-error-way-forward: FAILED — %d load-error key(s) do not tell BOTH readers what '
+            'to do: %d in one language only, %d in neither, %d missing a language half. The budget '
+            'is %d and this class is a FLAT BAN.\n'
+            % (defects, len(one), len(neither), len(incomplete), BILINGUAL_DEFECT_BUDGET)
+        )
+        out.write(
+            'An error message that does not say what to fix is a dead end, and one that says it in '
+            'only one language is a dead end for the reader this product is built for first.\n'
+        )
+        out.write(
+            'The house form is the sentence plus a way forward — 114 keys already carry "— try '
+            'again." / "— حاول مرة أخرى." in both halves. Copy a sibling; do not raise the budget.\n'
+        )
+        out.flush()
+        return 1
+
+    out.write(
+        '\nload-error-way-forward: all %d key(s) carry a way forward in BOTH languages. The three '
+        'defect classes are at their flat ban of %d.\n' % (len(rows), BILINGUAL_DEFECT_BUDGET)
+    )
     out.flush()
     return 0
 

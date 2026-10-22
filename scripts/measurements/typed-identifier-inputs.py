@@ -61,6 +61,27 @@ HAND_VERIFIED_CORRECT = {
 }
 
 
+# ---------------------------------------------------------------------------- the ratchet
+#
+# TWO budgets, not one, because the two numbers mean different things and the smaller one is the
+# serious one. An OPTIONAL typed identifier is awkward: the screen works, the filter is unusable.
+# A REQUIRED one means a person CANNOT COMPLETE THE FORM without pasting a machine code by hand —
+# the screen is unusable, which is the owner's rule 90 in its sharpest form.
+#
+# So `REQUIRED_TYPED_IDENTIFIER_BUDGET` is gated separately and must reach 0. Folding it into the
+# total would let a required field be traded for an optional one and keep the gate green, which is
+# the one move that must not be silent.
+#
+# Both fail in BOTH directions. Measured 2026-10-22 across 106 screens; both figures matched the
+# screen-pass measurement document's own.
+TYPED_IDENTIFIER_BUDGET = 26
+REQUIRED_TYPED_IDENTIFIER_BUDGET = 2
+
+# A count floor rather than `if not screens`. Zero screens is the obvious drift; 40 screens is the
+# one that reads like progress. Blank is not zero.
+MINIMUM_SCREENS_SCANNED = 90
+
+
 def main() -> int:
     rows: list[tuple[str, int, str, bool]] = []
     screens = sorted(SCREENS.rglob('page.tsx'))
@@ -97,8 +118,12 @@ def main() -> int:
                 )
             )
 
-    if not screens:
-        print('NOTHING SCANNED — the screen root moved. This is not a clean result.', file=sys.stderr)
+    if len(screens) < MINIMUM_SCREENS_SCANNED:
+        print(
+            'NOTHING SCANNED — only %d screen(s) against a floor of %d. The screen root moved. '
+            'This is not a clean result.' % (len(screens), MINIMUM_SCREENS_SCANNED),
+            file=sys.stderr,
+        )
         return 1
 
     by_screen: dict[str, list[tuple[int, str, bool]]] = {}
@@ -116,6 +141,67 @@ def main() -> int:
     print(f'{"screens asking for a typed identifier":<38} {len(by_screen)}')
     print(f'{"typed identifier inputs":<38} {len(rows)}')
     print(f'{"of those, REQUIRED":<38} {sum(1 for r in rows if r[3])}')
+
+    if '--check' not in sys.argv:
+        return 0
+
+    total = len(rows)
+    required = sum(1 for r in rows if r[3])
+    failed = False
+
+    # THE REQUIRED CLASS FIRST — it is the one that stops the work, so it is reported first and on
+    # its own terms. A reader who sees only the total would read "26 against 26" as steady state and
+    # miss that two screens cannot be used at all.
+    if required > REQUIRED_TYPED_IDENTIFIER_BUDGET:
+        print(
+            f'\ntyped-identifier-inputs: FAILED — {required} REQUIRED typed identifier(s) against a '
+            f'budget of {REQUIRED_TYPED_IDENTIFIER_BUDGET}.'
+        )
+        print(
+            'A required identifier input means the form cannot be submitted without pasting a uuid, '
+            'so the screen is not usable by anybody who does not already have another screen open.'
+        )
+        print(
+            'Give it a chooser: add a SOURCE to `ENTITY_SOURCES` and gate its search route on ANY OF '
+            'the permissions of the screens that use it (`common/picker-search.config.ts`). Run '
+            '`picker-route-permissions.py` and `picker-route-reachability.mjs` after — a chooser '
+            'calling a route the role cannot reach turns this fault into an unreachable route.'
+        )
+        failed = True
+    elif required < REQUIRED_TYPED_IDENTIFIER_BUDGET:
+        print(
+            f'\ntyped-identifier-inputs: FAILED — only {required} REQUIRED remain, so lower '
+            f'REQUIRED_TYPED_IDENTIFIER_BUDGET to {required}.'
+        )
+        print('At 0 it is a flat ban: no screen may ship unusable without a pasted identifier.')
+        failed = True
+
+    if total > TYPED_IDENTIFIER_BUDGET:
+        print(
+            f'\ntyped-identifier-inputs: FAILED — {total} typed identifier input(s) against a budget '
+            f'of {TYPED_IDENTIFIER_BUDGET}.'
+        )
+        print(
+            'Nobody knows a uuid. An optional one makes a filter unusable rather than the screen, '
+            'which is why it is the larger budget and not the urgent one — but it only falls.'
+        )
+        print('Do NOT raise the budget: the owner struck attrition.')
+        failed = True
+    elif total < TYPED_IDENTIFIER_BUDGET:
+        print(
+            f'\ntyped-identifier-inputs: FAILED — only {total} remain, so lower '
+            f'TYPED_IDENTIFIER_BUDGET to {total}.'
+        )
+        print('This half is what stops the ratchet becoming a ceiling.')
+        failed = True
+
+    if failed:
+        return 1
+
+    print(
+        f'\ntyped-identifier-inputs: at its declared budgets — {TYPED_IDENTIFIER_BUDGET} typed, '
+        f'{REQUIRED_TYPED_IDENTIFIER_BUDGET} of them REQUIRED.'
+    )
     return 0
 
 

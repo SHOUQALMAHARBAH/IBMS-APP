@@ -64,6 +64,13 @@
     "check:labels": "python scripts/measurements/identifier-labels.py --check",
     "check:seed-sweeps": "python scripts/measurements/seed-sweeps-vs-cascade.py --check",
     "check:maker-checker-pairs": "python scripts/measurements/combined-duty-projection.py",
+    "check:rendered-identifiers": "python scripts/measurements/rendered-identifiers.py --check",
+    "check:typed-identifiers": "python scripts/measurements/typed-identifier-inputs.py --check",
+    "check:four-states": "python scripts/measurements/four-states.py --check",
+    "check:load-error-way-forward": "python scripts/measurements/load-error-way-forward.py --check",
+    "check:unreachable-routes": "python scripts/measurements/unreachable-routes.py --check",
+    "check:unreachable-routes-by-verb": "python scripts/measurements/unreachable-routes-by-verb.py --check",
+    "check:screen-pass": "npm run check:labels && npm run check:rendered-identifiers && npm run check:typed-identifiers && npm run check:four-states && npm run check:load-error-way-forward && npm run check:unreachable-routes && npm run check:unreachable-routes-by-verb",
     "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py"
   },
   "devDependencies": {

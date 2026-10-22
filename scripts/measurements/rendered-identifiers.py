@@ -219,6 +219,28 @@ def self_test():
     return 0
 
 
+# ---------------------------------------------------------------------------- the ratchet
+#
+# Decision 34's third part: THE COUNT NEVER RISES. A screen delivered carrying an identifier where
+# the record has a human name is NOT DELIVERED, and does not become a deferred row — so this is a
+# budget that comes DOWN as screens are fixed and may never go up.
+#
+# It fails in BOTH directions, which is the half that stops a ratchet becoming a ceiling: at 0 it is
+# a flat ban on the class with no switch to throw, exactly as `MISSING_DESCRIPTION_BUDGET` reached 0
+# and stayed there.
+#
+# Measured 2026-10-22 across 106 screens. The figure matched the screen-pass measurement document's
+# own, which is why this was wired rather than stopped on — a document and a script that disagree
+# mean one of them is wrong and we do not yet know which.
+RENDERED_IDENTIFIER_BUDGET = 29
+
+# The floor is the smaller of the two guards and the one that has fired for real. Four separate
+# measurements in this repository have reported a clean nothing because their matcher stopped
+# matching: a screen root that moves takes the count to zero and the report then reads exactly like
+# a fixed codebase. Blank is not zero.
+MINIMUM_SCREENS_SCANNED = 90
+
+
 def main():
     if '--self-test' in sys.argv:
         return self_test()
@@ -246,6 +268,58 @@ def main():
 
     print('\nscreens scanned                     %4d' % len(screens))
     print('identifiers reaching a reader       %4d' % total)
+
+    if '--check' not in sys.argv:
+        return 0
+
+    if args:
+        print(
+            '\nrendered-identifiers: REFUSED — --check measures the whole app and was given a '
+            'screen filter (%s). A budget compared against a subset is not a budget.' % ', '.join(args)
+        )
+        return 1
+
+    if len(screens) < MINIMUM_SCREENS_SCANNED:
+        print(
+            '\nrendered-identifiers: REFUSED — only %d screen(s) scanned, against a floor of %d. '
+            'The screen root has moved and every number above is meaningless. Blank is not zero.'
+            % (len(screens), MINIMUM_SCREENS_SCANNED)
+        )
+        return 1
+
+    if total > RENDERED_IDENTIFIER_BUDGET:
+        print(
+            '\nrendered-identifiers: FAILED — %d identifier(s) reach a reader against a budget of '
+            '%d.' % (total, RENDERED_IDENTIFIER_BUDGET)
+        )
+        print(
+            'A uuid or a raw enum rendered where the record has a name or an Arabic label is this '
+            'product failing at the one thing it exists for: the broker cannot read it, cannot act '
+            'on it, and cannot tell you which record it names.'
+        )
+        print(
+            'Render the name the record already carries. Where the view does not send one, include '
+            'it — one include rather than N lookups, which is what `ConflictOfInterestRegisterEntry` '
+            'does and why.'
+        )
+        print('Do NOT raise the budget: the owner struck attrition, so this number only falls.')
+        return 1
+
+    if total < RENDERED_IDENTIFIER_BUDGET:
+        print(
+            '\nrendered-identifiers: FAILED — only %d remain, so lower RENDERED_IDENTIFIER_BUDGET '
+            'to %d.' % (total, total)
+        )
+        print(
+            'This half is what stops the ratchet becoming a ceiling. An improvement recorded is an '
+            'improvement that cannot be silently given back.'
+        )
+        return 1
+
+    print(
+        '\nrendered-identifiers: the class is at its declared budget of %d.'
+        % RENDERED_IDENTIFIER_BUDGET
+    )
     return 0
 
 

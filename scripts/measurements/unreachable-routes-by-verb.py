@@ -62,6 +62,22 @@ HELPER_METHOD = {
 }
 OPAQUE = {'apiFetch', 'authFetch', 'request'}
 
+# ---------------------------------------------------------------------------- the ratchet
+#
+# Decision 34's fault (3), the half the by-path pass is structurally blind to. Gated SEPARATELY from
+# its sibling's 20 rather than summed, because the two are found by different matchers: one total
+# would let this matcher break (reporting 0) while the other rose by the same amount, and the gate
+# would stay green across a real regression.
+#
+# Measured 2026-10-22: 530 api routes against 388 verb-aware web paths, 9 addressed by path but not
+# by method, 0 reached only through an opaque helper. Matched the screen-pass measurement document.
+MISSING_METHOD_BUDGET = 9
+
+# Blank is not zero, on both sides — see the sibling's floors for the argument, which applies
+# identically here and for the same two failure shapes.
+MINIMUM_API_ROUTES = 400
+MINIMUM_VERB_AWARE_PATHS = 300
+
 
 def web_calls_by_verb():
     """{normalised path -> set of methods}, plus the set of paths reached opaquely."""
@@ -145,6 +161,44 @@ def main():
     for method, path, controller in sorted(unknown_method, key=lambda r: (r[2], r[1], r[0])):
         print('    %-6s /%s   (%s)' % (method, path, controller))
 
+    if '--check' not in sys.argv:
+        return 0
+
+    if len(routes) < MINIMUM_API_ROUTES:
+        print()
+        print('unreachable-routes-by-verb: REFUSED — only %d api route(s) parsed against a floor '
+              'of %d. The controller matcher has drifted.' % (len(routes), MINIMUM_API_ROUTES))
+        return 1
+    if len(by_path) < MINIMUM_VERB_AWARE_PATHS:
+        print()
+        print('unreachable-routes-by-verb: REFUSED — only %d verb-aware web path(s) against a '
+              'floor of %d. With the web side empty every route reads as method-unreachable, which '
+              'is a broken parser wearing the costume of a catastrophe.'
+              % (len(by_path), MINIMUM_VERB_AWARE_PATHS))
+        return 1
+
+    actual = len(missing_method)
+    if actual > MISSING_METHOD_BUDGET:
+        print()
+        print('unreachable-routes-by-verb: FAILED — %d route(s) addressed by path but NOT by '
+              'method, against a budget of %d.' % (actual, MISSING_METHOD_BUDGET))
+        print('These are INVISIBLE to the by-path pass, which counts them as reachable because a '
+              'sibling verb on the same path is called. That is how `PATCH /customers/:id` shipped '
+              'with no caller the day after the by-path measurement was taken — and it made a '
+              'statutory correction request impossible to close.')
+        print('Do NOT raise the budget.')
+        return 1
+    if actual < MISSING_METHOD_BUDGET:
+        print()
+        print('unreachable-routes-by-verb: FAILED — only %d remain, so lower '
+              'MISSING_METHOD_BUDGET to %d.' % (actual, actual))
+        print('This half is what stops the ratchet becoming a ceiling.')
+        return 1
+
+    print()
+    print('unreachable-routes-by-verb: at its declared budget of %d.' % MISSING_METHOD_BUDGET)
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

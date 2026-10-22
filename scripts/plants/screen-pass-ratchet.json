@@ -1,0 +1,74 @@
+{
+  "rendered-identifier-shipped": {
+    "file": "apps/web/app/(app)/settings/users/page.tsx",
+    "from": "<td style={cell}>{u.fullName}</td>",
+    "to": "<td style={cell}>{u.id}</td>",
+    "why": "FAULT (1b) SHIPPED — a uuid rendered in the one cell where the record's own human name was already available, which is the whole fault class in one line. `check:rendered-identifiers` fails at 30 against its budget of 29. This is the UP direction: the owner struck attrition precisely so a new instance cannot be absorbed into a count that shrinks later."
+  },
+  "rendered-identifier-budget-raised": {
+    "file": "scripts/measurements/rendered-identifiers.py",
+    "from": "RENDERED_IDENTIFIER_BUDGET = 29",
+    "to": "RENDERED_IDENTIFIER_BUDGET = 30",
+    "why": "THE DOWN DIRECTION, and it is the realistic regression rather than a contrived one: somebody raises the budget to make a red build green. The gate fails naming the number to lower it to, which is what stops a ratchet becoming a ceiling — the `MISSING_DESCRIPTION_BUDGET` precedent, which reached 0 and stayed there."
+  },
+  "required-typed-identifier-shipped": {
+    "file": "apps/web/app/(app)/complaints/page.tsx",
+    "from": "              value={claimId}",
+    "to": "              value={claimId}\n              required",
+    "why": "A THIRD REQUIRED TYPED IDENTIFIER — one word added to an existing optional filter, which is how this fault really arrives. The screen stops being usable by anybody who does not already have a claim's uuid, and `check:typed-identifiers` fails at 3 against its budget of 2. The required class is gated APART from the total for exactly this: the total does not move at all here, so a single summed budget would have stayed green."
+  },
+  "typed-identifier-budget-raised": {
+    "file": "scripts/measurements/typed-identifier-inputs.py",
+    "from": "TYPED_IDENTIFIER_BUDGET = 26",
+    "to": "TYPED_IDENTIFIER_BUDGET = 27",
+    "why": "THE DOWN DIRECTION on the total. Fails naming 26 as the number to lower to."
+  },
+  "empty-state-removed": {
+    "file": "apps/web/app/(app)/screening-matches/page.tsx",
+    "from": "rows.length === 0 ? (",
+    "to": "false ? (",
+    "why": "FAULT (5) — the empty-state branch made unreachable, so a sanctions review queue with no matches renders nothing where the honest answer is 'no matches to review'. On THIS screen that is the worst available direction: a screening queue that silently shows nothing is indistinguishable from a screening run that cleared everybody. `check:four-states` fails at 3 against its empty-state budget of 2, while the load-error and refusal counts do not move — the argument for gating the three classes separately rather than summing them. TARGET CHOSEN BY MEASUREMENT, AND IT TOOK TWO CORRECTIONS. First I aimed at `watchlist-sync`, whose page carries TWO signals on adjacent lines (`runs.length === 0` AND the `wsNone` key name), so removing the condition left the key behind. Then I aimed at `dashboards/claims` off a list of 18 'single-signal' screens — and that list was measured over the PAGE ALONE while `probe()` reads the page PLUS its locally-imported children, so it was answering a different question from the gate. Re-measured with the script's OWN functions: only THREE screens carry exactly one signal page-and-children, and this is the clean one. A measurement that does not use the checker's own code is not a measurement about the checker."
+  },
+  "empty-state-budget-raised": {
+    "file": "scripts/measurements/four-states.py",
+    "from": "NO_EMPTY_STATE_BUDGET = 2",
+    "to": "NO_EMPTY_STATE_BUDGET = 3",
+    "why": "THE DOWN DIRECTION on the empty-state class, proving the branch fires per class rather than only on a combined total."
+  },
+  "load-error-loses-its-arabic-way-forward": {
+    "file": "apps/web/lib/i18n/translations/common.ts",
+    "from": "    dutyModeLoadError: 'تعذّر تحميل وضع الفصل بين المهام. حاول مرة أخرى.',",
+    "to": "    dutyModeLoadError: 'تعذّر تحميل وضع الفصل بين المهام.',",
+    "why": "FAULT (6), IN THE DIRECTION THAT MATTERS ON THIS PLATFORM — the English keeps its way forward and the Arabic loses it, so the reader this product is built for first is the one left at a dead end. `check:load-error-way-forward` fails with 1 key in ONE LANGUAGE ONLY against a flat ban of 0. An assertion on the English half alone would never have seen it, which is why the script compares both halves of each key rather than counting keys."
+  },
+  "a-route-loses-its-only-caller": {
+    "file": "apps/web/lib/compliance-risk/provider-offices-api.ts",
+    "from": "return apiGet<ProviderOfficeState[]>('/provider/offices');",
+    "to": "return apiGet<ProviderOfficeState[]>('/provider/office');",
+    "why": "FAULT (3) BY PATH, from a one-character typo — the provider dashboard's only read becomes addressed by nothing, so the one screen the platform operator has loses its source. `check:unreachable-routes` fails at 21 against its budget of 20. This is the class that shipped here for weeks with every other gate green: the insurer screens, the mailbox, the customer import. TARGET CHOSEN BY MEASUREMENT, and the first attempt is the finding: I aimed it at `/conflict-of-interest/disclosures`, which has TWO web literals — the GET and the POST — and the by-path pass is VERB-AGNOSTIC, so the surviving POST literal kept the path addressed and the gate stayed green. `/provider/offices` has exactly one literal. That accident is precisely what the next plant exists to cover, and it is why the two route gates are separate rather than summed."
+  },
+  "unreachable-by-path-budget-raised": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "UNREACHED_BY_PATH_BUDGET = 20",
+    "to": "UNREACHED_BY_PATH_BUDGET = 21",
+    "why": "THE DOWN DIRECTION on the by-path count. Fails naming 20."
+  },
+  "a-route-keeps-its-path-and-loses-its-method": {
+    "file": "apps/web/lib/compliance-risk/conflict-of-interest-api.ts",
+    "from": "return apiGet<ConflictOfInterestEntry[]>('/conflict-of-interest/disclosures');",
+    "to": "return apiPatch<ConflictOfInterestEntry[]>('/conflict-of-interest/disclosures', {});",
+    "why": "THE WHOLE REASON THE BY-VERB GATE EXISTS, demonstrated rather than argued. The PATH is still addressed — the POST in this same file reaches it — so `check:unreachable-routes` stays green at 20 and counts the GET as reachable. Only `check:unreachable-routes-by-verb` moves, failing at 10 against 9. That is precisely how `PATCH /customers/:id` shipped with no caller the day after the by-path measurement was taken, which left a statutory correction request impossible to close. Two gates, two matchers, two budgets: summing them would let this one break reporting 0 while the other rose by the same amount."
+  },
+  "unreachable-by-verb-budget-raised": {
+    "file": "scripts/measurements/unreachable-routes-by-verb.py",
+    "from": "MISSING_METHOD_BUDGET = 9",
+    "to": "MISSING_METHOD_BUDGET = 10",
+    "why": "THE DOWN DIRECTION on the by-method count. Fails naming 9."
+  },
+  "the-web-side-of-the-route-scan-goes-blind": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "WEB = ['apps/web/lib', 'apps/web/app', 'apps/web/components']",
+    "to": "WEB = ['apps/web/lib-moved', 'apps/web/app', 'apps/web/components']",
+    "why": "THE NON-VACUITY FLOOR, and the failure shape it exists for. With one web root moved the scan loses most of its callers and a large block of perfectly reachable routes reads as unreachable — a BROKEN PARSER WEARING THE COSTUME OF A CATASTROPHE, which is the one direction a budget gate alone would misread as a real emergency rather than as its own instrument failing. The floor refuses by name on the path count instead of reporting a number. Its mirror — a matcher that stops matching and reports a clean nothing — is the shape that has already cost this repository four wrong measurements, and is why every one of the six carries a floor."
+  }
+}

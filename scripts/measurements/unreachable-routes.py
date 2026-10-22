@@ -211,5 +211,90 @@ for f in sorted(by_file):
     for r in sorted(by_file[f]):
         print('    ', r)
 
-io.open(sys.argv[1], 'w', encoding='utf-8').write(
-    json.dumps({'routes': len(routes), 'unreached': by_file}, indent=1, ensure_ascii=False))
+_positional = [a for a in sys.argv[1:] if not a.startswith('--')]
+if _positional:
+    io.open(_positional[0], 'w', encoding='utf-8').write(
+        json.dumps({'routes': len(routes), 'unreached': by_file}, indent=1, ensure_ascii=False))
+
+# ---------------------------------------------------------------------------- the ratchet
+#
+# Decision 34's fault (3): every capability a role holds must have a route to it. This is the
+# BY-PATH half; `unreachable-routes-by-verb.py` carries the other nine, and the two numbers are
+# gated separately because they are found by different matchers and a single total would hide one
+# matcher breaking.
+#
+# ## A COUPLING THAT HAS TO BE SAID OUT LOUD
+#
+# This file has no `if __name__ == '__main__'` guard: `unreachable-routes-by-verb.py` IMPORTS it to
+# borrow `api_routes()` and `segments_match()`, which runs this whole body. That sibling fakes
+# `sys.argv` to `[origin, os.devnull]`, so `--check` is absent there and the branch below cannot
+# fire inside it. If that ever changes, a `sys.exit(1)` here would kill the sibling's process and
+# the sibling would report nothing while exiting non-zero — which reads like its own failure.
+#
+# ## WHAT A MOVE MEANS, IN BOTH DIRECTIONS
+#
+# UP means a new route nothing calls: a capability nobody can exercise. That class shipped here for
+# weeks with every gate green — the insurer screens, the email mailbox, the customer import — which
+# is why it is gated rather than surveyed.
+#
+# DOWN means one was closed or correctly reclassified, and the budget follows it so the improvement
+# cannot be silently given back.
+#
+# Measured 2026-10-22: 530 api routes against 399 web path shapes, 20 unreached across 11
+# controllers. Matched the screen-pass measurement document.
+UNREACHED_BY_PATH_BUDGET = 20
+UNREACHED_CONTROLLER_BUDGET = 11
+
+# Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
+# compare) and a web parser that breaks reports every route unreached — so the floor is on both
+# sides, and the second failure is the one that looks like a catastrophe rather than a clean run.
+_MINIMUM_API_ROUTES = 400
+_MINIMUM_WEB_PATHS = 300
+
+if '--check' in sys.argv:
+    _fail = False
+    if len(routes) < _MINIMUM_API_ROUTES:
+        print('')
+        print('unreachable-routes: REFUSED — only %d api route(s) parsed against a floor of %d. '
+              'The controller matcher has drifted and "0 unreached" would be meaningless.'
+              % (len(routes), _MINIMUM_API_ROUTES))
+        _fail = True
+    if len(paths) < _MINIMUM_WEB_PATHS:
+        print('')
+        print('unreachable-routes: REFUSED — only %d web path shape(s) parsed against a floor of '
+              '%d. With the web side empty EVERY route reads as unreachable, which is a broken '
+              'parser wearing the costume of a catastrophe.' % (len(paths), _MINIMUM_WEB_PATHS))
+        _fail = True
+
+    if not _fail:
+        if len(unreached) > UNREACHED_BY_PATH_BUDGET:
+            print('')
+            print('unreachable-routes: FAILED — %d route(s) addressed by no web code, against a '
+                  'budget of %d.' % (len(unreached), UNREACHED_BY_PATH_BUDGET))
+            print('A route nothing calls is a capability nobody can exercise. Build the way in, or '
+                  'record the route as redundant surface — but do not leave a role holding a code '
+                  'whose act it cannot reach.')
+            print('Do NOT raise the budget.')
+            _fail = True
+        elif len(unreached) < UNREACHED_BY_PATH_BUDGET:
+            print('')
+            print('unreachable-routes: FAILED — only %d remain, so lower UNREACHED_BY_PATH_BUDGET '
+                  'to %d.' % (len(unreached), len(unreached)))
+            print('This half is what stops the ratchet becoming a ceiling.')
+            _fail = True
+
+        if len(by_file) != UNREACHED_CONTROLLER_BUDGET:
+            print('')
+            print('unreachable-routes: FAILED — %d controller(s) carry an unreached route, against '
+                  'a declared %d. Set UNREACHED_CONTROLLER_BUDGET to %d if that is the intent.'
+                  % (len(by_file), UNREACHED_CONTROLLER_BUDGET, len(by_file)))
+            print('The controller count is gated beside the route count because the two can move '
+                  'in opposite directions: closing two routes in one controller and opening two in '
+                  'a fresh one leaves the total unchanged and is not the same codebase.')
+            _fail = True
+
+    if _fail:
+        sys.exit(1)
+    print('')
+    print('unreachable-routes: at its declared budget — %d route(s) across %d controller(s).'
+          % (UNREACHED_BY_PATH_BUDGET, UNREACHED_CONTROLLER_BUDGET))

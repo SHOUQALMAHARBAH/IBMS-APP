@@ -98,6 +98,55 @@ jobs:
       - name: No label names a column instead of its purpose
         run: python scripts/measurements/identifier-labels.py --check
 
+      # ------------------------------------------------------------------ DECISION 34, THE SCREEN PASS
+      #
+      # THE COUNT NEVER RISES. The owner struck the attrition rule she had been given in batch 4 —
+      # "the existing count shrinks by attrition" — knowing the cost: the broken count is small NOW
+      # and will never be smaller, and a screen that shows a person something they cannot read is
+      # not cosmetic, it is this product failing at the one thing it exists for. So a screen
+      # delivered carrying any of these faults is NOT DELIVERED and does not become a deferred row.
+      #
+      # These six scripts ALL EXISTED and were wired to NOTHING. That is why they are wired BEFORE
+      # any screen is fixed: an unwired measurement is a number nobody can trust, and three of this
+      # week's defects came from exactly that — a dead `assert pairs == 15`, a provider-grant pin
+      # that sat red for a whole batch, and a stale description mirror, each gated by `verify.sh`
+      # and by no CI step.
+      #
+      # Every one FAILS IN BOTH DIRECTIONS: above its budget (a regression shipped) and below it
+      # (the budget must follow, or a ratchet becomes a ceiling). Each carries a non-vacuity floor,
+      # because a parser that stops matching reports a clean nothing — and on the two route scripts
+      # a broken WEB side reports every route unreachable, which is a broken parser wearing the
+      # costume of a catastrophe. Blank is not zero.
+      #
+      # The figures live in the scripts and are not restated here: a count in a workflow file is a
+      # second home for one fact, and the copy is the one that drifts.
+      - name: Screen pass — no identifier rendered where a name exists
+        run: python scripts/measurements/rendered-identifiers.py --check
+
+      # TWO budgets, and the smaller one is the serious one: a REQUIRED typed identifier means the
+      # form cannot be submitted without pasting a uuid, so the screen is unusable. Gated apart from
+      # the total so a required field cannot be traded for an optional one behind a green gate.
+      - name: Screen pass — no new typed identifier, and none required
+        run: python scripts/measurements/typed-identifier-inputs.py --check
+
+      - name: Screen pass — every screen has its four states
+        run: python scripts/measurements/four-states.py --check
+
+      # A FLAT BAN at zero rather than a budget, so the both-directions property is degenerate here
+      # and the script says so instead of carrying a branch that can never run.
+      - name: Screen pass — every load error says what to fix, in both languages
+        run: python scripts/measurements/load-error-way-forward.py --check
+
+      # The two route gates are SEPARATE on purpose. One total would let this matcher break
+      # (reporting 0) while the other rose by the same amount, leaving the gate green across a real
+      # regression — and the by-verb half is structurally invisible to the by-path half, which is
+      # how `PATCH /customers/:id` shipped with no caller the day after the by-path pass was taken.
+      - name: Screen pass — no route unreachable by path
+        run: python scripts/measurements/unreachable-routes.py --check
+
+      - name: Screen pass — no route unreachable by method
+        run: python scripts/measurements/unreachable-routes-by-verb.py --check
+
       - name: Unit/component tests
         run: npx turbo run test --filter=web
 
