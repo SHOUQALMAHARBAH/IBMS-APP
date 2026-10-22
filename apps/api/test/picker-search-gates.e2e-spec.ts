@@ -316,6 +316,39 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
   });
 
   /**
+   * A4 — BOTH READERS OF `/audit-trail` CAN ALREADY REACH THE CUSTOMER SEARCH, WHICH IS WHY OWNER
+   * DECISION 41 NEEDED NO NEW ROUTE FOR IT.
+   *
+   * The sibling test above names the DATA_PROTECTION_OFFICER, because that is the role the customer
+   * picker's widening was built for. It says nothing about the two roles that stand on `/audit-trail`,
+   * and A4 rests entirely on them: `customer.read` is in `CUSTOMER_SEARCH_CODES` and is held by
+   * COMPLIANCE_OFFICER and EXTERNAL_AUDITOR alike (measured off the seeded grid), so the chooser that
+   * fills `wfEntityId` when the chosen type is `Customer` needed wiring and not a route.
+   *
+   * Asserted BY ROLE rather than by code, for the same reason the whole file is: the decision was
+   * "which of the eighteen entities can both these roles already search", and only the grid answers it.
+   * If this ever goes red, the chooser on that screen is dead for the role it went red for — and
+   * nothing on the screen would say so, because an unreachable search just returns no matches.
+   */
+  it('A4 — COMPLIANCE_OFFICER and EXTERNAL_AUDITOR can both reach the customer search', async () => {
+    const app = await boot();
+    for (const role of ['COMPLIANCE_OFFICER', 'EXTERNAL_AUDITOR'] as const) {
+      const actor = await makeUser(`picker-cust-${role.toLowerCase()}`, role);
+      await request(app.getHttpServer())
+        .get('/customers/search')
+        .query({ q: 'ahm' })
+        .set(bearer(actor.accessToken))
+        .expect(200);
+      // The floor is not relaxed for either of them.
+      await request(app.getHttpServer())
+        .get('/customers/search')
+        .query({ q: 'ah' })
+        .set(bearer(actor.accessToken))
+        .expect(400);
+    }
+  });
+
+  /**
    * THE DOCUMENT PICKER, AND ITS ABSENCE FOR THE EXTERNAL AUDITOR IS HALF THE ASSERTION.
    *
    * Owner decision 41 gates `GET /documents/search` on `document.read` ALONE, which is a DELIBERATE

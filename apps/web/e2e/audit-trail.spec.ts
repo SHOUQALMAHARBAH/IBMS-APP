@@ -250,6 +250,42 @@ test("every entity the engine knows is offered, and the three with no word show 
   await expect(select).toHaveValue("CrossSellOpportunity");
 });
 
+test("the customer chooser appears for the Customer type ALONE", async ({
+  page,
+}) => {
+  /*
+   * A4. One chooser, on Customer, and it is one rather than eighteen for a measured reason: thirteen of
+   * the eighteen entities carry no human-readable field at all, and of the five that do, the read codes
+   * for Policy, Claim and Lead reach neither role that stands on this screen while `IncidentReport` has
+   * no read code at all. Customer is the one entity whose search route BOTH readers already reach.
+   *
+   * THE ABSENCE FOR EVERY OTHER TYPE IS THE HALF WORTH ASSERTING. Without it this test would pass
+   * against a chooser rendered unconditionally, which would offer a customer search on a screen asking
+   * about a disposal batch — a control that cannot fill the field it sits beside.
+   */
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto("/audit-trail");
+  const select = page.getByLabel("Workflow entity type");
+  await expect(select).toBeVisible();
+
+  // Anchored on the id field, which renders for every type — so the absence is not satisfied by an
+  // unhydrated page.
+  await expectNone(
+    page.getByLabel("Find a customer"),
+    page.getByLabel("Workflow entity id"),
+  );
+
+  await select.selectOption("Customer");
+  await expect(page.getByLabel("Find a customer")).toBeVisible();
+
+  // And it goes away again, so the condition is on the live value rather than on having ever chosen.
+  await select.selectOption("DisposalBatch");
+  await expectNone(
+    page.getByLabel("Find a customer"),
+    page.getByLabel("Workflow entity id"),
+  );
+});
+
 test("the document chooser is ABSENT for the external auditor and PRESENT for compliance", async ({
   page,
 }) => {
