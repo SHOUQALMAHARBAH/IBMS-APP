@@ -444,12 +444,15 @@ function AuditTrailScreen() {
                 return (
                   <option key={type} value={type}>
                     {/*
-                      `null` means nobody has written a word for this type yet, and it renders the
-                      MEMBER NAME rather than a guess. Three of the eighteen are null — Endorsement and
-                      Invoice have no screen to take a heading from, and `/opportunities`' own heading
-                      names the RFQ rather than the Opportunity. An English member name in an Arabic
-                      list is obviously unfinished; a plausible invented word is indistinguishable from
-                      a decided one and would never be corrected.
+                      `null` means nobody has written a word for this type, and it renders the MEMBER
+                      NAME rather than a guess. NONE of the eighteen is null as of 2026-10-23 — three
+                      were for a day, and all three turned out to have plurals already rendering
+                      elsewhere in the product, so the branch below is now unreachable. It stays
+                      because a nineteenth member can arrive unworded, and because an English member
+                      name in an Arabic list is obviously unfinished where a plausible invented word is
+                      indistinguishable from a decided one and would never be corrected.
+                      `audit-trail.spec.ts` asserts that no option renders its own member name, which
+                      is this branch's visible signature.
                     */}
                     {label === null ? type : t(label)}
                   </option>

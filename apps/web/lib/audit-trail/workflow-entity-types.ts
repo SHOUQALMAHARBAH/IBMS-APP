@@ -51,12 +51,13 @@ export type WorkflowEntityType =
   | 'UpSellRecommendation';
 
 /**
- * THE WORD FOR EACH TYPE, OR `null` MEANING "NOBODY HAS WRITTEN ONE".
+ * THE WORD FOR EACH TYPE. ALL EIGHTEEN HAVE ONE; `null` WOULD MEAN "NOBODY HAS WRITTEN ONE".
  *
  * ## Every label is DERIVED, never invented
  *
- * The owner's instruction: take the Arabic from the EXISTING heading of that entity's own screen under
- * `app/(app)/`, and invent nothing. There was no Arabic for this vocabulary anywhere in the i18n tree —
+ * The owner's instruction: take the Arabic from a string ALREADY RENDERING in the product, and invent
+ * nothing. Fifteen come from the heading of that entity's own screen under `app/(app)/`; three come
+ * from elsewhere, because their entity has no screen or its heading names something else. There was no Arabic for this vocabulary anywhere in the i18n tree —
  * checked `enums.ts` and `compliance-risk.ts` — and writing eighteen Arabic words would have been
  * eighteen inventions in a legal-compliance screen. So each value below is the translation KEY of a
  * heading that already renders on the screen where that entity lives, which means the word a reader
@@ -65,23 +66,44 @@ export type WorkflowEntityType =
  * Deriving rather than hand-writing is also the cure for a measured hazard: a column hand-written
  * earlier in this module had four of six spot-checked rows wrong.
  *
- * ## THE THREE `null`s, AND WHY A `null` IS HONEST HERE
+ * ## ALL EIGHTEEN HAVE A WORD. THE THREE THAT DID NOT, AND WHAT DISSOLVED THEM
  *
- * A `null` renders the MEMBER NAME verbatim — `Endorsement` — rather than a guessed Arabic word. That
- * is deliberately visible: an English member name in an Arabic dropdown is obviously unfinished, where
- * a plausible invented word is indistinguishable from a decided one and would never be corrected.
+ * This map carried three `null`s for one day — `Opportunity`, `Endorsement`, `Invoice` — and the note
+ * here said those three words were the owner's to write. **THAT WAS WRONG, AND THE SCOPE OF THE SEARCH
+ * IS WHY**: derivation had been limited to screen `<h1>`s, and all three plurals were already rendering
+ * elsewhere in the product the whole time. They were filled on 2026-10-23 from those strings, so the
+ * owner wrote nothing and `null` is now reachable by no member.
  *
- *   1. `Endorsement` — there is NO screen for endorsements under `app/(app)/`, so there is no heading
- *      to derive from. (`Endorsement` rows are reached through a policy today.)
- *   2. `Invoice` — the same: no `/invoices` screen exists.
- *   3. `Opportunity` — a screen exists (`/opportunities`) and its heading is UNUSABLE for this purpose:
- *      `oppListHeading` reads «طلب عروض الأسعار / السوق» / "RFQ / market", which names the RFQ and not
- *      the Opportunity. The NAV label for that screen was already corrected for exactly this reason
- *      (CLAUDE.md, 2026-10-19: *the old label stopped lying*) and the `<h1>` was not. Deriving from it
- *      would put a label meaning "RFQ" next to `RFQInsurer`'s own «مشاركات شركات التأمين», giving two
- *      confusable options of which one is wrong — so it is reported instead.
+ *   * `Opportunity` → «الفرص» / "Opportunities", the FIRST HALF of `navOpportunitiesMarket`
+ *     («الفرص / السوق»); the `/ السوق` belongs to the combined screen. **That nav label is the un-stale
+ *     twin of this screen's own `<h1>`**, which reads «طلب عروض الأسعار / السوق» / "RFQ / market" and
+ *     names the RFQ rather than the Opportunity — the nav entry was corrected for exactly that reason
+ *     on 2026-10-19 and the `<h1>` was not. Deriving from the `<h1>` would have put a label meaning
+ *     "RFQ" beside `RFQInsurer`'s own «مشاركات شركات التأمين».
+ *   * `Endorsement` → «الملحقات» from `policyRequestedExtensionsLabel`, and "Endorsements" from
+ *     `endorsementSectionHeading` — TWO SOURCES, because that extensions key's English says
+ *     *extensions* rather than endorsements. There is still no `/endorsements` screen; an endorsement
+ *     is reached through a policy.
+ *   * `Invoice` → «الفواتير» / "Invoices" from `caColInvoices`. There is still no `/invoices` screen.
  *
- * Those three words are the OWNER'S to write, on her walk. Do not fill them in from this file.
+ * **THE THREE ARE THEIR OWN KEYS, NOT POINTERS AT THOSE SOURCES.** A pointer would make an entity's
+ * label hostage to a table column's wording or to a nav entry's second noun. And the values were
+ * SLICED OUT by script rather than retyped: the recorded failure mode for Arabic here is shadda/vowel
+ * ORDER, which renders identically and compares unequal, and an extraction cannot make that mistake.
+ *
+ * **IF A NINETEENTH MEMBER ARRIVES WITH NO WORD**, `null` is still the honest value — it renders the
+ * MEMBER NAME verbatim, which is deliberately visible, because an English member name in an Arabic
+ * dropdown is obviously unfinished where a plausible invented word is indistinguishable from a decided
+ * one and would never be corrected. Declare it in `MAY_HAVE_NO_LABEL` in the parity spec, which is
+ * EMPTY now and is what makes a null a flat ban.
+ *
+ * ## A VOCABULARY DIVERGENCE, RECORDED RATHER THAN RECONCILED
+ *
+ * This product uses TWO Arabic words for an endorsement. `endorsementSectionHeading` on the policy
+ * screen says «التعديلات»; the document-category vocabulary says «ملحق»/«الملحقات», and that is the
+ * family the owner chose for this map. So a reader who picks «الملحقات» here and then opens a policy
+ * sees «التعديلات» over the same records. Not reconciled here — choosing between two live words is the
+ * Arabic pass's call, not this file's.
  *
  * ## Two labels that are broader than their member, recorded rather than silently accepted
  *
@@ -91,17 +113,18 @@ export type WorkflowEntityType =
  * would mean writing a word — which is the one thing this map does not do.
  */
 export const WORKFLOW_ENTITY_LABEL = {
-  // No usable heading — see `null` note 3. Its screen's own `<h1>` names the RFQ, not this.
+  // Its own screen's `<h1>` names the RFQ, not this — so the word comes from the corrected NAV
+  // label instead, first half only. See the note above.
   Opportunity: 'workflowEntityOpportunity',
   // `/rfqs/[id]` — the submissions table IS the `RFQInsurer` rows.
   RFQInsurer: 'rfqSubmissionsHeading',
   Policy: 'policiesListHeading',
-  // No screen — see `null` note 1.
+  // No `/endorsements` screen; «الملحقات» and "Endorsements" come from two different keys.
   Endorsement: 'workflowEntityEndorsement',
   Claim: 'claimsQueueHeading',
   Complaint: 'complaintsHeading',
   RenewalCase: 'renRenewalCases',
-  // No screen — see `null` note 2.
+  // No `/invoices` screen; from `caColInvoices`.
   Invoice: 'workflowEntityInvoice',
   DataSubjectRequest: 'dsrHeading',
   IncidentReport: 'incHeading',
