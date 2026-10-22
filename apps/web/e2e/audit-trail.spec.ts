@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
-import { expectNone } from "./support/anchored";
+import { anchoredTexts, expectNone } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -219,12 +219,31 @@ test("every entity the engine knows is offered, and the three with no word show 
   await expect(select).toBeVisible();
   await expect(select.locator("option")).toHaveCount(19);
 
+  // A DERIVED label, asserted by its words: `DisposalBatch` takes its screen's own heading.
   await expect(
     select.locator("option", { hasText: "Retention & Disposal" }),
   ).toHaveCount(1);
-  await expect(
-    select.locator("option", { hasText: "Endorsement" }),
-  ).toHaveCount(1);
+
+  /*
+   * AND NO OPTION IS EVER BLANK except the deliberate empty one.
+   *
+   * This replaces an assertion on the literal text "Endorsement", which was the wrong shape: that
+   * member has no Arabic word yet, so it renders its member name — and the day the owner writes the
+   * word, that assertion would have gone RED. A gate failing because somebody did the work it exists
+   * to support is a cost this repository has already paid once, in the permission-description harvest,
+   * and `MAY_HAVE_NO_LABEL` in the parity spec is a subset check for exactly that reason.
+   *
+   * What this asserts instead is the real failure mode and survives either state: a label map that
+   * stopped being total renders `t(undefined)`, which is NOTHING — an option a reader cannot read,
+   * the notification-bell defect on a dropdown. Eighteen non-empty labels plus one empty placeholder.
+   */
+  // `anchoredTexts`, not a raw read — `npm run lint` refuses the raw one by name, because it does not
+  // auto-wait and returns `[]` before render, which would make the emptiness assertion below pass
+  // against an unrendered page. The anchor is the select itself, asserted visible first.
+  const texts = await anchoredTexts(select.locator("option"), select);
+  expect(texts[0]).toBe("Choose a type…");
+  expect(texts.slice(1).filter((t) => t.trim() === "")).toEqual([]);
+  expect(texts.slice(1)).toHaveLength(18);
 
   // Selecting by VALUE works for every member, which is what the links send.
   await select.selectOption("CrossSellOpportunity");
