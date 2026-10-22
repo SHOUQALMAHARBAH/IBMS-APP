@@ -29,6 +29,7 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate } from '../../../../lib/i18n/format';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 
 const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
@@ -178,6 +179,9 @@ export default function OpportunityDetailPage() {
       {opportunity ? (
         <>
           <h1>{t('oppDetailHeading', { id: opportunity.id.slice(0, 8) })}</h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='Opportunity' entityId={opportunity.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             {t('oppDetailStatusLine', { status: t(OPPORTUNITY_STATUS_LABEL_KEY[opportunity.status]) })}
           </p>

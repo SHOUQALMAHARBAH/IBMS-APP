@@ -514,6 +514,11 @@ export const COMPLIANCE_RISK = {
     atFromLabel: 'من تاريخ',
     atToLabel: 'إلى تاريخ',
     atWorkflowEntityTypeLabel: 'نوع كيان سير العمل',
+    // Owner decision 41 — the empty option on a select that used to be a free-text box. The eighteen
+    // option words are NOT here: each one is the translation key of the heading of that entity's own
+    // screen, resolved in `lib/audit-trail/workflow-entity-types.ts`, so the word a reader sees in this
+    // list is the word at the top of the screen they came from.
+    atWorkflowEntityTypeChoose: 'اختر نوع الكيان…',
     atWorkflowEntityIdLabel: 'معرّف كيان سير العمل',
     atDocumentIdLabel: 'معرّف المستند',
     atLookUpButton: 'بحث',
@@ -1015,6 +1020,7 @@ export const COMPLIANCE_RISK = {
     atFromLabel: 'From',
     atToLabel: 'To',
     atWorkflowEntityTypeLabel: 'Workflow entity type',
+    atWorkflowEntityTypeChoose: 'Choose a type…',
     atWorkflowEntityIdLabel: 'Workflow entity id',
     atDocumentIdLabel: 'Document id',
     atLookUpButton: 'Look up',

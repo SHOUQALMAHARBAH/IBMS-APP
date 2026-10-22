@@ -314,4 +314,138 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
       expect(row).not.toHaveProperty(withheld);
     }
   });
+
+  /**
+   * THE DOCUMENT PICKER, AND ITS ABSENCE FOR THE EXTERNAL AUDITOR IS HALF THE ASSERTION.
+   *
+   * Owner decision 41 gates `GET /documents/search` on `document.read` ALONE, which is a DELIBERATE
+   * departure from the rule this whole file exists to enforce: the screen that types a `documentId` is
+   * `/audit-trail`, whose document-history section is gated on `document-history.read`, so the rule as
+   * written would add that code here.
+   *
+   * It is overruled because the remedy is worse than the fault. Measured on the seeded grid,
+   * `document-history.read` is held by COMPLIANCE_OFFICER and EXTERNAL_AUDITOR; adding it would hand a
+   * READ-ONLY AUDITOR a name search over every document in the office — every KYC pack, every incident
+   * report, every disposal batch's evidence — when what that role is entitled to is the history of a
+   * document it already has the id of. A chooser is a directory; an id lookup is not.
+   *
+   * So BOTH halves are asserted, and the second is what makes the absence a decision rather than a
+   * capability regression: the auditor is refused the chooser AND still reaches document history by id.
+   * Without that second half this test would be indistinguishable from having broken the auditor's own
+   * screen.
+   */
+  it('the document picker admits COMPLIANCE_OFFICER and refuses the EXTERNAL_AUDITOR, who keeps document history by id', async () => {
+    const app = await boot();
+
+    // COMPLIANCE_OFFICER holds `document.read` AND `document-history.read`, so this is the role the
+    // chooser exists for — the one reader of `/audit-trail` who can use it.
+    const compliance = await makeUser('picker-doc-co', 'COMPLIANCE_OFFICER');
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: 'pol' })
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+
+    const auditor = await makeUser('picker-doc-auditor', 'EXTERNAL_AUDITOR');
+
+    // THE ABSENCE, ASSERTED. A 403 here is the decision, not a defect to be widened away.
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: 'pol' })
+      .set(bearer(auditor.accessToken))
+      .expect(403);
+
+    // AND THE OTHER HALF — the capability the auditor keeps. 404 rather than 403 on an id that does
+    // not exist is exactly the discriminator: it proves the permission gate ADMITTED this role and the
+    // route then failed to find the record, so nothing was taken away by the refusal above. A fixture
+    // document is not needed for that, and would only weaken what the status code already says.
+    const unknownDocumentId = '00000000-0000-4000-8000-000000000000';
+    await request(app.getHttpServer())
+      .get(`/audit-trail/documents/${unknownDocumentId}/history`)
+      .set(bearer(auditor.accessToken))
+      .expect(404);
+
+    // THE FLOOR. Three characters for a document, the largest of the seven registers, and whitespace
+    // trims to empty rather than matching everything.
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: 'po' })
+      .set(bearer(compliance.accessToken))
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: '   ' })
+      .set(bearer(compliance.accessToken))
+      .expect(400);
+  });
+
+  it('the document picker returns a name and what tells two files apart, and nothing else', async () => {
+    // `storageRef` is an internal object-storage key and the uploader is a person; neither belongs in a
+    // dropdown. `fileName` DOES cross, and that is consistent with `documentAuditSnapshot` deliberately
+    // withholding it: that snapshot's reason is that a filename can name an insured person or describe a
+    // medical event, so it must not be copied into the append-only audit table — while this view goes
+    // only to a holder of `document.read`, which is the permission that already returns every filename
+    // through `GET /documents`.
+    const app = await boot();
+    const compliance = await makeUser('picker-doc-shape', 'COMPLIANCE_OFFICER');
+
+    /**
+     * THE FIXTURE CREATES WHAT IT NEEDS — it does not hunt for it.
+     *
+     * The first version searched for `'pol'` on the assumption that a cumulative db-test holds a
+     * "policy.pdf", and the non-vacuity guard below caught it: nothing matched, so every shape
+     * assertion would have been skipped while the test reported green. That is the recorded
+     * `makeCommissionFreePolicy` lesson — a fixture that FINDS is a fixture whose result depends on
+     * what earlier specs happened to leave behind, and a from-nothing database holds none of it.
+     *
+     * The name is run-unique, so the term cannot match anything but this row and the assertion is
+     * about the SHAPE rather than about a count. `policyId` and `customerId` are both left null —
+     * nullable by design, and attaching the document to either would add FK teardown for nothing.
+     */
+    const marker = `zzpickerdoc${runId()}`;
+    const doc = await prisma.document.create({
+      data: {
+        category: 'OTHER',
+        classification: 'INTERNAL',
+        fileName: `${marker}.pdf`,
+        storageRef: `s3://ibms/picker-gate-e2e/${marker}.pdf`,
+        uploadedByUserId: compliance.userId,
+      },
+    });
+
+    let rows: Record<string, unknown>[];
+    try {
+      const res = await request(app.getHttpServer())
+        .get('/documents/search')
+        .query({ q: marker })
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      rows = res.body as Record<string, unknown>[];
+    } finally {
+      await prisma.document.delete({ where: { id: doc.id } });
+    }
+
+    const row = rows[0];
+    if (!row)
+      throw new Error(
+        'the document this test just created was not found by its own unique name — the matcher stopped matching, and the shape assertions below would be vacuous',
+      );
+    // An EXACT key set, because a disclosure leak arrives as an ADDITION and every `not.toHaveProperty`
+    // keeps passing while a new field appears beside it.
+    expect(Object.keys(row).sort()).toEqual([
+      'category',
+      'fileName',
+      'id',
+      'versionNumber',
+    ]);
+    for (const withheld of [
+      'storageRef',
+      'uploadedByUserId',
+      'classification',
+      'customerId',
+      'policyId',
+    ]) {
+      expect(row).not.toHaveProperty(withheld);
+    }
+  });
 });

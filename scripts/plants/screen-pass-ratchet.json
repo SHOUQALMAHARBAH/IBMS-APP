@@ -15,7 +15,7 @@
     "file": "apps/web/app/(app)/complaints/page.tsx",
     "from": "              value={claimId}",
     "to": "              value={claimId}\n              required",
-    "why": "A THIRD REQUIRED TYPED IDENTIFIER — one word added to an existing optional filter, which is how this fault really arrives. The screen stops being usable by anybody who does not already have a claim's uuid, and `check:typed-identifiers` fails at 3 against its budget of 2. The required class is gated APART from the total for exactly this: the total does not move at all here, so a single summed budget would have stayed green."
+    "why": "A REQUIRED TYPED IDENTIFIER — one word added to an existing optional filter, which is how this fault really arrives. The screen stops being usable by anybody who does not already have a claim's uuid. The required class is gated APART from the total for exactly this: the total does not move at all here, so a single summed budget would have stayed green. **UPDATED 2026-10-23 (owner decision 41): `REQUIRED_TYPED_IDENTIFIER_BUDGET` fell 2 -> 0 when `/audit-trail`'s two required fields were un-required, so this plant now fails at 1 against a FLAT BAN of 0 rather than at 3 against 2. The plant is unchanged and its target is unchanged; only the number it reports moved — which is exactly the stale-figure-in-a-why class this file has already paid for, caught by re-reading the plants a budget change touches rather than by a run.**"
   },
   "typed-identifier-budget-raised": {
     "file": "scripts/measurements/typed-identifier-inputs.py",

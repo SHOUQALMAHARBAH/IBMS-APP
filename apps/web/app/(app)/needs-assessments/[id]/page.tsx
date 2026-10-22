@@ -37,6 +37,7 @@ import {
   loadIndependently,
   namedFailures,
 } from '../../../../lib/load-independently';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 export default function NeedsAssessmentDetailPage() {
   const { t } = useLanguage();
@@ -149,6 +150,9 @@ export default function NeedsAssessmentDetailPage() {
       {assessment ? (
         <>
           <h1>{t('nadHeading')}</h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='NeedsAssessment' entityId={assessment.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             {t('commonStatusLabel')}{' '}
             {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}

@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+import { WorkflowHistoryLink } from '../../../components/ui/WorkflowHistoryLink';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -231,6 +232,16 @@ export default function DsrPage() {
                       {d.isOverdue ? ' (overdue)' : ''}
                     </td>
                     <td style={cell}>
+                      {/* Owner decision 41 — carries this request's id into `/audit-trail`'s
+                          workflow-history fields. Renders nothing without `workflow-history.read`,
+                          which the DPO does not hold, so on this screen it is for the compliance
+                          officer and the external auditor. */}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="DataSubjectRequest"
+                          entityId={d.id}
+                        />
+                      </div>
                       {d.status === 'CLOSED' ? (
                         /* A closed request has no actions left, so this cell held a bare em-dash.
                            Part 4 step 5 — if ONE person both logged and closed it, that is the one

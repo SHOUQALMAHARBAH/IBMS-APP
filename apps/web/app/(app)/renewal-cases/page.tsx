@@ -18,6 +18,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { WorkflowHistoryLink } from '../../../components/ui/WorkflowHistoryLink';
 
 
 const cell: CSSProperties = {
@@ -175,6 +176,14 @@ export default function RenewalCasesPage() {
                         : '—'}
                     </td>
                     <td style={cell}>
+                      {/* Owner decision 41 — this case's state history, without a pasted uuid.
+                          Renders nothing without `workflow-history.read`. */}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="RenewalCase"
+                          entityId={r.id}
+                        />
+                      </div>
                       {canManage && r.open ? (
                         <div
                           style={{

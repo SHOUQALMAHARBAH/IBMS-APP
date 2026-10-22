@@ -1,4 +1,5 @@
 import { apiGet } from '../auth/api-client';
+import type { DocumentCategory } from '../audit-trail/audit-trail-api';
 
 /**
  * THE FOUR PICKER SEARCHES added 2026-10-02 — insurer, policy, user, branch.
@@ -85,4 +86,29 @@ export interface BranchPickerResult {
 
 export function searchBranches(term: string): Promise<BranchPickerResult[]> {
   return apiGet(`/admin/branches/search?q=${encodeURIComponent(term)}`);
+}
+
+/**
+ * `GET /documents/search` — owner decision 41, the fifth picker.
+ *
+ * Gated on `document.read` ALONE, which is a DELIBERATE departure from the rule above and is argued in
+ * the api's `common/picker-search.config.ts`. The consequence is visible on the screen rather than
+ * hidden: the EXTERNAL_AUDITOR holds `document-history.read` and NOT `document.read`, so that role gets
+ * no chooser and keeps the typed field plus the inbound link. Widening this would hand a read-only
+ * auditor a name search over every document in the office.
+ *
+ * `category` and `versionNumber` are the disambiguation line and are not decoration: file names repeat
+ * heavily by nature, so a list of names alone cannot tell two matches apart.
+ */
+export interface DocumentPickerResult {
+  id: string;
+  fileName: string;
+  /** The web's single declaration of that vocabulary, reused rather than copied a second time —
+   *  `ENUM_LABEL.DocumentCategory` is total over it, so a category with no label is a type error. */
+  category: DocumentCategory;
+  versionNumber: number;
+}
+
+export function searchDocuments(term: string): Promise<DocumentPickerResult[]> {
+  return apiGet(`/documents/search?q=${encodeURIComponent(term)}`);
 }

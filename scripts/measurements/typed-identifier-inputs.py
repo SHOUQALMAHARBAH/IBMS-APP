@@ -75,7 +75,21 @@ HAND_VERIFIED_CORRECT = {
 # Both fail in BOTH directions. Measured 2026-10-22 across 106 screens; both figures matched the
 # screen-pass measurement document's own.
 TYPED_IDENTIFIER_BUDGET = 26
-REQUIRED_TYPED_IDENTIFIER_BUDGET = 2
+#
+# 2 -> 0 on 2026-10-23, owner decision 41, and it is now a FLAT BAN with no switch to throw.
+#
+# Both required typed identifiers sat on `/audit-trail`: `wfEntityId` on the workflow-history section and
+# `documentId` on the document-history one. Each is still an input and still appears in the TOTAL below,
+# because manual typing stays possible — what changed is that the screen no longer DEMANDS it. The normal
+# way they get filled is navigation: every screen whose rows carry a workflow state links to
+# `/audit-trail?entityType=&entityId=`, and `/documents` links with `?documentId=`, so the field arrives
+# filled by where the reader came from. A chooser fills it too, on the two entities whose search route the
+# readers of that screen can actually reach.
+#
+# THE TOTAL DID NOT MOVE AND THAT IS THE HONEST RESULT: 26 before, 26 after. A screen a person cannot
+# complete and a screen that offers an optional id filter are different faults, which is the whole reason
+# this count is gated apart from that one. Do not raise this number.
+REQUIRED_TYPED_IDENTIFIER_BUDGET = 0
 
 # A count floor rather than `if not screens`. Zero screens is the obvious drift; 40 screens is the
 # one that reads like progress. Blank is not zero.

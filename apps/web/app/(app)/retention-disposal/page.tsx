@@ -3,6 +3,7 @@
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+import { WorkflowHistoryLink } from '../../../components/ui/WorkflowHistoryLink';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -1250,6 +1251,16 @@ export default function RetentionDisposalPage() {
                       <td style={cell}>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</td>
                       <td style={cell}>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</td>
                       <td style={cell}>
+                        {/* Owner decision 41 — this batch's state history, without a pasted uuid.
+                            Outside the CLOSED ternary deliberately: a CLOSED batch is exactly the one
+                            whose history somebody comes to read, and the branch below renders an
+                            em-dash for it. Renders nothing without `workflow-history.read`. */}
+                        <div style={{ marginBottom: '0.4rem' }}>
+                          <WorkflowHistoryLink
+                            entityType="DisposalBatch"
+                            entityId={b.id}
+                          />
+                        </div>
                         {b.status === 'CLOSED' ? (
                           '—'
                         ) : (

@@ -37,6 +37,7 @@ import {
   KYC_AWAITING_DECISION,
   KYC_STATUS_LABEL_KEY,
 } from '../../../../lib/kyc/kyc-status-labels';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -214,6 +215,9 @@ export default function CustomerProfilePage() {
           <h1>
             <bdi>{customer.legalName}</bdi>
           </h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='Customer' entityId={customer.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             {t('customerProfileTypeStatusLine', {
               type: t(TYPE_LABEL_KEY[customer.customerType]),

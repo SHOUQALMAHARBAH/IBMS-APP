@@ -120,6 +120,36 @@ export const BRANCH_SEARCH_CODES = [
 ] as const;
 
 /**
+ * `GET /documents/search` — `document.read` ALONE, and that is a DELIBERATE DEPARTURE from the rule at
+ * the top of this file. Read this before "fixing" it.
+ *
+ * ## What the house rule would say, and why it is overruled here
+ *
+ * The screen that types a `documentId` is `/audit-trail`, whose document-history section is gated on
+ * `document-history.read`. So the rule as written would produce
+ * `['document.read', 'document-history.read']` — and `picker-route-reachability.mjs` will report this
+ * route as unreachable for the EXTERNAL_AUDITOR, which is the shape of the exact defect that rule
+ * exists to catch.
+ *
+ * **It is not that defect. It is owner decision 41, and the absence is the decision.** Measured off the
+ * seeded grid: `document-history.read` is held by COMPLIANCE_OFFICER and EXTERNAL_AUDITOR; `document.read`
+ * by SALES, PLACEMENT, CLAIMS, FINANCE and COMPLIANCE_OFFICER. Adding the history code here would hand a
+ * read-only auditor a NAME SEARCH over every document in the office — every KYC pack, every incident
+ * report, every disposal batch's evidence — when what that role is entitled to is the history of a
+ * document it already has the id of. A chooser is a directory; an id lookup is not.
+ *
+ * So the EXTERNAL_AUDITOR gets no chooser and keeps the typed field and the inbound link, and
+ * `document-search-role-reach.e2e-spec.ts` asserts BOTH halves by name: refused the chooser, still able
+ * to read a document's history by id. **The absence is asserted, not worked around.**
+ *
+ * ## The one thing not to do
+ *
+ * Do not widen this list to make a reachability report go quiet. The report is correct about the fact
+ * and wrong about the remedy, and that is why this paragraph is longer than the array.
+ */
+export const DOCUMENT_SEARCH_CODES = ['document.read'] as const;
+
+/**
  * The floors, per picker, because the floor is a judgement about how much of THAT set one keystroke may
  * return and not a constant to be shared.
  *
@@ -128,6 +158,10 @@ export const BRANCH_SEARCH_CODES = [
  * handful of rows, an insurer list is the market the office already works with, and a floor on a set
  * that small refuses a short name for no gain. The POLICY floor is three — a policy book is the one set
  * among these that is as large as the customer book, and for the same reason.
+ *
+ * DOCUMENT is three, for the same reason as the policy book and more so: the register holds every
+ * version of every file this office has ever attached to a customer, a policy or a claim, so it is the
+ * largest set of the seven.
  */
 export const PICKER_MIN_CHARS = {
   customer: 3,
@@ -136,6 +170,7 @@ export const PICKER_MIN_CHARS = {
   policy: 3,
   user: 1,
   branch: 1,
+  document: 3,
 } as const;
 
 /**
@@ -145,6 +180,11 @@ export const PICKER_MIN_CHARS = {
  * Twenty-five for the four small sets, where the bound is a backstop rather than the control: an office
  * has tens of branches and tens of insurers, so a search that matched most of them is still a short
  * list and the number exists to stop a pathological term returning everything.
+ *
+ * TWENTY-FIVE for a document, where the bound is doing real work rather than backstopping: file names
+ * repeat heavily by nature ("policy.pdf" against forty policies), so the thing that tells two matches
+ * apart is the category and the version beside the name, and a list cut to ten would often cut inside
+ * one customer's own file.
  */
 export const PICKER_MAX_RESULTS = {
   customer: 10,
@@ -153,4 +193,5 @@ export const PICKER_MAX_RESULTS = {
   policy: 25,
   user: 25,
   branch: 25,
+  document: 25,
 } as const;

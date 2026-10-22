@@ -37,6 +37,7 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate, formatDateTime } from '../../../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../../../lib/i18n/translations';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 
 // The medium of a broker<->insurer exchange. The API accepts the full
@@ -289,6 +290,20 @@ export default function RfqDetailPage() {
                     </td>
                     <td style={rfqCellStyle}>
                       <span style={rfqBadgeStyle}>{t(RFQ_INSURER_STATUS_LABEL_KEY[submission.status])}</span>
+                      {/*
+                        Owner decision 41 — `RFQInsurer` is the workflow entity, and these rows are it.
+                        In the STATUS cell rather than a column of its own: the last column here is
+                        conditional on `isPlacement`, so a link placed there would be invisible to the
+                        compliance officer and the external auditor, who are the only holders of
+                        `workflow-history.read`. A new always-present column would instead change this
+                        table's shape for every reader to serve two.
+                      */}
+                      <div style={{ marginTop: '0.3rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="RFQInsurer"
+                          entityId={submission.id}
+                        />
+                      </div>
                     </td>
                     <td style={rfqCellStyle}>{fmt(submission.sentAt, language)}</td>
                     <td style={rfqCellStyle}>{fmt(submission.respondedAt, language)}</td>

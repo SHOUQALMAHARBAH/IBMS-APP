@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectNone } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -85,7 +86,11 @@ test("browses the audit log, looks up workflow history, and looks up document hi
   await page.getByRole("button", { name: "Browse" }).click();
   await expect(page.getByRole("cell", { name: "Status change" }).first()).toBeVisible();
 
-  await page.getByLabel("Workflow entity type").fill("Lead");
+  // `selectOption`, not `fill` — owner decision 41 made this a `<select>` over the eighteen entity
+  // types the transition engine knows. It was a free-text box validated server-side against
+  // `@Length(1, 100)` and against nothing else, so a person had to guess the exact string the writers
+  // store and a wrong guess returned an empty history that reads as "nothing ever happened here".
+  await page.getByLabel("Workflow entity type").selectOption("Lead");
   await page.getByLabel("Workflow entity id").fill("lead-1");
   await page.getByRole("button", { name: "Look up" }).first().click();
   await expect(page.getByText("lead-1").first()).toBeVisible();
@@ -163,6 +168,95 @@ test("a user without any of the three permissions sees a friendly message per se
   await expect(
     page.getByText("(audit-log.read)", { exact: false }),
   ).toBeVisible();
+});
+
+test("the two fields a person could not fill arrive FILLED from the URL", async ({
+  page,
+}) => {
+  /*
+   * OWNER DECISION 41's WHOLE MECHANISM. Both fields were `required` and both took a uuid, so this
+   * screen's workflow- and document-history sections could not be used at all by anybody who did not
+   * already have the id. They are no longer required, and the normal way they get filled is NAVIGATION:
+   * sixteen screens whose rows carry a workflow state link here with `?entityType=&entityId=`, and the
+   * document register links with `?documentId=`.
+   *
+   * Asserting the VALUES rather than that a lookup succeeded: a test that only clicked Look up would
+   * pass against a screen that ignored the URL and sent an empty id, because the mock answers anything.
+   */
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto(
+    "/audit-trail?entityType=DisposalBatch&entityId=batch-7&documentId=doc-9",
+  );
+  await expect(page.getByRole("heading", { name: "Audit Trail" })).toBeVisible();
+
+  await expect(page.getByLabel("Workflow entity type")).toHaveValue(
+    "DisposalBatch",
+  );
+  await expect(page.getByLabel("Workflow entity id")).toHaveValue("batch-7");
+  await expect(page.getByLabel("Document id")).toHaveValue("doc-9");
+
+  // And the button is reachable, which is the other half of dropping `required`: the server needs BOTH
+  // halves, so the submit is gated on them rather than by HTML5 validation.
+  await expect(
+    page.getByRole("button", { name: "Look up" }).first(),
+  ).toBeEnabled();
+});
+
+test("every entity the engine knows is offered, and the three with no word show their member name", async ({
+  page,
+}) => {
+  // The select is built from a map that is total over the union, so this asserts the COUNT against the
+  // eighteen the api declares (kept honest by `workflow-entity-type-parity.spec.ts`) plus the empty
+  // option. Two of the options are checked by label for opposite reasons: `DisposalBatch` carries a
+  // derived Arabic/English heading, and `Endorsement` carries NO word at all — there is no screen under
+  // `app/(app)` to take one from — so it renders its member name rather than a guessed word. That
+  // fallback being visible is deliberate: an unfinished label should look unfinished.
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto("/audit-trail");
+  const select = page.getByLabel("Workflow entity type");
+  await expect(select).toBeVisible();
+  await expect(select.locator("option")).toHaveCount(19);
+
+  await expect(
+    select.locator("option", { hasText: "Retention & Disposal" }),
+  ).toHaveCount(1);
+  await expect(
+    select.locator("option", { hasText: "Endorsement" }),
+  ).toHaveCount(1);
+
+  // Selecting by VALUE works for every member, which is what the links send.
+  await select.selectOption("CrossSellOpportunity");
+  await expect(select).toHaveValue("CrossSellOpportunity");
+});
+
+test("the document chooser is ABSENT for the external auditor and PRESENT for compliance", async ({
+  page,
+}) => {
+  /*
+   * THE ABSENCE IS THE DECISION, NOT A GAP — owner decision 41.
+   *
+   * `GET /documents/search` is gated on `document.read` ALONE, a deliberate departure from the picker
+   * rule argued in the api's `common/picker-search.config.ts`. Measured on the seeded grid, that code
+   * reaches COMPLIANCE_OFFICER and NOT the EXTERNAL_AUDITOR — so the auditor keeps the typed field and
+   * the inbound link, and is shown no chooser. Widening the route would hand a read-only auditor a name
+   * search over every document in the office.
+   *
+   * BOTH halves in one test, because either alone is weak: the absence alone would pass against a
+   * chooser nobody ever gets, and the presence alone would pass against one everybody gets.
+   */
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto("/audit-trail");
+  // The anchor is the field the auditor DOES keep, from the same render — without it the absence below
+  // is satisfied by a page that has not hydrated.
+  await expectNone(
+    page.getByLabel("Find a document"),
+    page.getByLabel("Document id"),
+  );
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.goto("/audit-trail");
+  await expect(page.getByLabel("Find a document")).toBeVisible();
 });
 
 test("audit trail screen has no serious/critical accessibility violations @a11y", async ({

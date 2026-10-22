@@ -108,6 +108,16 @@ export const COMMON = {
     entitySearchBranchPlaceholder: 'اسم الفرع',
     entitySearchBranchNoMatches: 'لا يوجد فرع مطابق لما أدخلته.',
     entitySearchBranchError: 'تعذّر تنفيذ البحث عن الفروع. حاول مرة أخرى.',
+    // The document chooser (owner decision 41). «مستند», NEVER «وثيقة»: in this product «وثيقة» is the
+    // POLICY — `entitySearchPolicyLabel` above is «ابحث عن وثيقة» and `/policies` is «الوثائق» — so
+    // reusing it here would make "find a document" read as "find a policy". The word is taken from the
+    // documents screen's own heading («المستندات») rather than written, which is also why «الملف» is
+    // the file name: the same screen's own column header. Same class of noun collision the discard
+    // control's «سحب» note below guards against.
+    entitySearchDocumentLabel: 'ابحث عن مستند',
+    entitySearchDocumentPlaceholder: 'اسم الملف — ثلاثة أحرف على الأقل',
+    entitySearchDocumentNoMatches: 'لا يوجد مستند مطابق لما أدخلته.',
+    entitySearchDocumentError: 'تعذّر تنفيذ البحث عن المستندات. حاول مرة أخرى.',
     // DiscardControl.tsx — withdrawing a record raised in error, shared by policy / claim / endorsement /
     // recommendation. NOT «إلغاء» anywhere: that word is this product's CANCELLATION (a cancellation
     // endorsement on a live policy), and reusing it here would make a withdrawal read as cancelling the
@@ -311,6 +321,12 @@ export const COMMON = {
     entitySearchBranchPlaceholder: 'The branch name',
     entitySearchBranchNoMatches: 'No branch matches what you entered.',
     entitySearchBranchError: 'The branch search could not run. Try again.',
+    // See the Arabic block above on why this is «مستند» and not «وثيقة».
+    entitySearchDocumentLabel: 'Find a document',
+    entitySearchDocumentPlaceholder:
+      'The file name — at least three characters',
+    entitySearchDocumentNoMatches: 'No document matches what you entered.',
+    entitySearchDocumentError: 'The document search could not run. Try again.',
     // DiscardControl.tsx — see the note in the Arabic block above on why «إلغاء» is not used there.
     discardButton: 'Withdraw as raised in error',
     discardHeading: 'Withdraw a record raised in error',
