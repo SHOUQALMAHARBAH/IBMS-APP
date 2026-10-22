@@ -94,7 +94,9 @@ export function searchBranches(term: string): Promise<BranchPickerResult[]> {
  * Gated on `document.read` ALONE, which is a DELIBERATE departure from the rule above and is argued in
  * the api's `common/picker-search.config.ts`. The consequence is visible on the screen rather than
  * hidden: the EXTERNAL_AUDITOR holds `document-history.read` and NOT `document.read`, so that role gets
- * no chooser and keeps the typed field plus the inbound link. Widening this would hand a read-only
+ * no chooser and keeps the typed field — not an inbound link, since `/documents` needs
+ * `document.read` too; the ids reach that role through the audit-log table on the same screen.
+ * Widening this would hand a read-only
  * auditor a name search over every document in the office. That narrowness is held by
  * `picker-search-gates.e2e-spec.ts` and by `audit-trail.spec.ts`, and NOT by
  * `picker-route-reachability.mjs`, which does not see this picker at all (its screen-side map has no

@@ -523,7 +523,9 @@ function AuditTrailScreen() {
             `GET /documents/search` is gated on `document.read` ALONE — owner decision 41, argued in the
             api's `common/picker-search.config.ts`. Measured off the seeded grid, that code reaches
             COMPLIANCE_OFFICER and NOT the EXTERNAL_AUDITOR, so that role sees no chooser here and keeps
-            the typed field and the inbound link from `/documents`. That is correct rather than a gap:
+            the typed field. NOT an inbound link — `/documents` is gated on `document.read`, so that
+            role cannot open the register one would come from; what it has instead is the audit-log
+            table above, whose Entity column renders the document ids. That is correct rather than a gap:
             widening the route would hand a read-only auditor a name search over every document in the
             office — every KYC pack, every incident report — when what the role is entitled to is the
             history of a document it already has the id of.

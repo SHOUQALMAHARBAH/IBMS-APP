@@ -153,7 +153,11 @@ export const BRANCH_SEARCH_CODES = [
  * report, every disposal batch's evidence — when what that role is entitled to is the history of a
  * document it already has the id of. A chooser is a directory; an id lookup is not.
  *
- * So the EXTERNAL_AUDITOR gets no chooser and keeps the typed field and the inbound link, and
+ * So the EXTERNAL_AUDITOR gets no chooser and keeps the TYPED FIELD — and not an inbound link,
+ * which is a correction to what this comment first said: `/documents` is gated on `document.read`,
+ * so that role cannot open the register a link would come from. What it does have is the audit-log
+ * table on the SAME screen, whose Entity column renders `Document <id>` rows an auditor can carry
+ * into the field below. And
  * `document-search-role-reach.e2e-spec.ts` asserts BOTH halves by name: refused the chooser, still able
  * to read a document's history by id. **The absence is asserted, not worked around.**
  *

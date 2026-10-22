@@ -177,8 +177,10 @@ test("the two fields a person could not fill arrive FILLED from the URL", async 
    * OWNER DECISION 41's WHOLE MECHANISM. Both fields were `required` and both took a uuid, so this
    * screen's workflow- and document-history sections could not be used at all by anybody who did not
    * already have the id. They are no longer required, and the normal way they get filled is NAVIGATION:
-   * sixteen screens whose rows carry a workflow state link here with `?entityType=&entityId=`, and the
-   * document register links with `?documentId=`.
+   * sixteen screens whose rows carry a workflow state link here with `?entityType=&entityId=`. The
+   * `documentId` half is prefilled the same way and has NO inbound link yet — `Document` is not one of
+   * the eighteen workflow types, so A3's link instruction did not cover it — which is why this test
+   * supplies all three in one URL rather than clicking through.
    *
    * Asserting the VALUES rather than that a lookup succeeded: a test that only clicked Look up would
    * pass against a screen that ignored the URL and sent an empty id, because the mock answers anything.
@@ -237,9 +239,11 @@ test("the document chooser is ABSENT for the external auditor and PRESENT for co
    *
    * `GET /documents/search` is gated on `document.read` ALONE, a deliberate departure from the picker
    * rule argued in the api's `common/picker-search.config.ts`. Measured on the seeded grid, that code
-   * reaches COMPLIANCE_OFFICER and NOT the EXTERNAL_AUDITOR — so the auditor keeps the typed field and
-   * the inbound link, and is shown no chooser. Widening the route would hand a read-only auditor a name
-   * search over every document in the office.
+   * reaches COMPLIANCE_OFFICER and NOT the EXTERNAL_AUDITOR — so the auditor keeps the TYPED FIELD and
+   * is shown no chooser. NOT an inbound link, which is a correction: `/documents` is gated on
+   * `document.read` too, so that role cannot open the register a link would come from. What reaches it
+   * is the audit-log table on this same screen, whose Entity column renders `Document <id>` rows.
+   * Widening the route would hand a read-only auditor a name search over every document in the office.
    *
    * BOTH halves in one test, because either alone is weak: the absence alone would pass against a
    * chooser nobody ever gets, and the presence alone would pass against one everybody gets.

@@ -82,9 +82,12 @@ TYPED_IDENTIFIER_BUDGET = 26
 # `documentId` on the document-history one. Each is still an input and still appears in the TOTAL below,
 # because manual typing stays possible — what changed is that the screen no longer DEMANDS it. The normal
 # way they get filled is navigation: every screen whose rows carry a workflow state links to
-# `/audit-trail?entityType=&entityId=`, and `/documents` links with `?documentId=`, so the field arrives
-# filled by where the reader came from. A chooser fills it too, on the two entities whose search route the
-# readers of that screen can actually reach.
+# `/audit-trail?entityType=&entityId=`, so that field arrives filled by where the reader came from. A
+# chooser fills either field, on the two entities whose search route the readers of that screen can
+# actually reach. **`documentId` HAS NO INBOUND LINK — corrected, because this comment first claimed
+# `/documents` provides one.** No screen links to `?documentId=`: A3 scoped the links to the eighteen
+# WORKFLOW entity types and `Document` is not one. For a `document.read` holder the chooser fills it; for
+# the EXTERNAL_AUDITOR it is typed, with the ids visible in the audit-log table on the same screen.
 #
 # THE TOTAL DID NOT MOVE AND THAT IS THE HONEST RESULT: 26 before, 26 after. A screen a person cannot
 # complete and a screen that offers an optional id filter are different faults, which is the whole reason
