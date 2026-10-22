@@ -65,6 +65,12 @@
     "to": "MISSING_METHOD_BUDGET = 10",
     "why": "THE DOWN DIRECTION on the by-method count. Fails naming 9."
   },
+  "one-controller-prefix-per-file": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "                    if at < vm.start():",
+    "to": "                    if at < 10 ** 9:",
+    "why": "THE MULTI-CONTROLLER DEFECT RESTORED — positional attribution replaced by 'take the LAST prefix in the file', which is the same class of error as the original 'take the FIRST'. `provider/provider.controller.ts` declares two (`provider/brokerage-offices` then `provider/insurance-companies`), so all four of its routes collapse onto one prefix and the findings list prints `/provider/insurance-companies/*/administrator` TWICE while the brokerage one disappears — the mirror image of the bug this fixed, where the brokerage one printed twice. **IT DOES NOT MOVE EITHER BUDGET**, which is the point and the reason this plant exists: 20 routes across 11 controllers before and after, so no gate goes red and nothing fails. The only visible difference is that a reader chasing one of the two rows is sent to a route that is not there. That is a plant whose whole value is the LABEL, and the gate cannot catch it — stated here rather than discovered, because the honest limit of a count-based ratchet is that it cannot see a correctly-counted row pointing at the wrong thing."
+  },
   "the-web-side-of-the-route-scan-goes-blind": {
     "file": "scripts/measurements/unreachable-routes.py",
     "from": "WEB = ['apps/web/lib', 'apps/web/app', 'apps/web/components']",

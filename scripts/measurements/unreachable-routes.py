@@ -75,10 +75,30 @@ def api_routes():
                 continue
             p = os.path.join(root, f)
             src = io.open(p, encoding='utf-8', errors='replace').read()
-            m = re.search(r"@Controller\(\s*'([^']*)'", src)
-            prefix = m.group(1) if m else ''
+            # FAILURE MODE 6, found 2026-10-22 while triaging the 20: this took the FIRST
+            # `@Controller` in the file, so a file declaring TWO gave every route the first
+            # prefix. `provider/provider.controller.ts` is such a file — `provider/brokerage-offices`
+            # at the top and `provider/insurance-companies` below it — and the symptom was the
+            # BROKERAGE administrator route printed TWICE in the findings while the COMPANY one
+            # never appeared under its own name. A reader chasing the second row would have gone to
+            # the wrong controller for a route that is not there.
+            #
+            # Measured before fixing: exactly ONE file in the api declares more than one
+            # `@Controller`, so this corrects two labels and moves no count — both rows stay
+            # unreached by this matcher, for a reason recorded in the triage rather than here.
+            #
+            # Attribution is POSITIONAL: each route takes the nearest preceding prefix. The
+            # alternative — one prefix per file — is what was wrong.
+            prefixes = [(m.start(), m.group(1)) for m in
+                        re.finditer(r"@Controller\(\s*'([^']*)'", src)]
             for vm in verb_re.finditer(src):
                 verb, sub = vm.group(1), vm.group(2) or ''
+                prefix = ''
+                for at, value in prefixes:
+                    if at < vm.start():
+                        prefix = value
+                    else:
+                        break
                 full = '/'.join(x for x in (prefix, sub) if x)
                 out.append((verb.upper(), norm(full), p.replace('\\', '/')))
     return out
