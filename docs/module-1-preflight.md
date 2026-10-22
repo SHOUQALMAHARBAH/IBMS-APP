@@ -57,6 +57,34 @@ measurement is stated.
 | **`MAKER_CHECKER_REGISTRY` records no MAKER code** | It holds the checker permission and the database constraint, so half of every pair is recorded nowhere and the system **cannot answer the real segregation question** — does one role hold both halves. Surfaced only because a scan of mine rested on five maker codes that do not exist. | Record the maker code beside the checker code, so a pair is a pair in data. |
 | **The readiness signal splits in two** | One name covers two different measurements. They must be named for what they measure: **checker concentration** (a control observation) and **both halves of one pair** (the hard rule). | **Nothing may call concentration a segregation breach** — a screen reporting a violation it did not measure is a false claim. Lands with the warned-act machine. |
 
+### 3.1 — DECISION 69's ACKNOWLEDGEMENT BOX HAS NINE ELEMENTS, NOT EIGHT
+
+**Recorded here because it lives nowhere else.** MEASURED: the string `decision 69` appears in no
+file in this repository — the window it describes is module 1's work (decision 87/ج, reconfirmed by
+the owner), so there was no home for its elements and this section is it. Module 1 builds the window
+complete or not at all; an eight-element box shipped and corrected later is a legal document that
+was wrong in production.
+
+**THE NINTH ELEMENT, in the legal adviser's own wording as the owner relayed it:** besides the user's
+knowledge of the violation and the office bearing responsibility, the acknowledgement must include
+**an explicit release of the developing company's liability**.
+
+**AND THE LIMIT THE SAME ADVISER STATED BESIDE IT, which is not optional to record.** An
+acknowledgement **DOES NOT CURE CRIMINAL LIABILITY** — *"an agreement to violate the law and public
+order is void"* — so the release protects the company **against the office, civilly**, and **not**
+before the Central Bank or a court.
+
+Those two sentences ship together or neither ships. A note recording only the release is the kind of
+half-true comment this module spent a week removing: it would read as "we are covered", and the
+adviser said the opposite about the half that matters most.
+
+**DECISION 69 HAS ONE CALLER — art. 15/d.** The second fell with ٨٢/و, which the owner struck in the
+licence batch (register entry 100). Searched before writing this: nothing in the tree claimed two, so
+there was nothing to correct — the count is recorded here so the next reader does not have to
+re-derive it from a struck decision. Note that the warned-act row above cites THREE articles
+(15/d, 19/a/3, 16/y/8); those are callers of the warned-act **mechanism**, which is a larger thing
+than this acknowledgement box, and the two counts are not the same question.
+
 ---
 
 ## 4 — WHAT MODULE 1 MUST NOT DO
