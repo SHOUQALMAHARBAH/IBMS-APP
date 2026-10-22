@@ -150,8 +150,6 @@ export const COMMON = {
     dutyModeSaveError: 'تعذّر إعلان الوضع. حاول مرة أخرى.',
     dutyModeReadOnly:
       'لديك صلاحية الاطلاع على هذا الوضع دون تغييره. من يعلن الوضع ليس من يراجع الأعمال التي يسمح بها.',
-    dutyModeCombinedBlocked:
-      'لا يمكن إعلان الوضع المدمج بعد: تقرير الاعتمادات الذاتية الذي يعتمد عليه غير موجود حتى الآن.',
     dutyModeSaved: 'تم إعلان الوضع وتسجيله في سجل التدقيق.',
     // The act ON the record (step 5). «الشخص نفسه» — names what happened, not a euphemism for it.
     combinedDutyOnRecord: 'نفّذ الشخص نفسه طرفي هذه العملية بصفته ({roles})، والسبب المسجّل:',
@@ -160,6 +158,71 @@ export const COMMON = {
     combinedDutyOnRecordAmbiguous:
       'نفّذ الشخص نفسه طرفي هذه العملية، وكانت أكثر من صفة من صفاته تمنح هذه الصلاحية ' +
       '({roles})، فلا يمكن تحديد أيها استُند إليه. والسبب المسجّل:',
+    // MODULE 0-ب — the DPO designation and its declaration (/settings/duty-segregation), and the
+    // conflict-of-interest disclosure register (/settings/security). Prefixed `dpoAssign*` and
+    // `coiReg*`: `dutyMode*` and `dutySeg*` are both taken by adjacent features and the i18n guard
+    // refuses a collision.
+    //
+    // `dpoAssignNotice` AND `dpoAssignAcknowledge` ARE THE OWNER'S OWN TEXT, authorised the same way
+    // the `sanctions-pep.screen` description and decision 28's notice were. Their concatenation is
+    // pinned BY HASH against the file she supplied — decision 94 still governs every other Arabic
+    // string here, and a byte-level pin is what makes this one provably hers rather than retyped.
+    coiRegDeclareButton:
+      'تسجيل الإفصاح',
+    coiRegDisclosureHint:
+      '{min} أحرف على الأقل. اذكر ما هي المصلحة وبمن تتصل — فهذا ما يُجيب عن السؤال لاحقاً.',
+    coiRegDisclosureLabel:
+      'ما تريد الإفصاح عنه',
+    coiRegEmpty:
+      'لا يوجد إفصاح مسجّل في هذا المكتب بعد.',
+    coiRegHeading:
+      'الإفصاح عن تضارب المصالح',
+    coiRegIntro:
+      'إذا كان لديك مصلحة قد تتعارض مع عملك في المكتب — صلة بعميل أو بشركة تأمين أو بوسيط، أو عمل آخر، أو منفعة — فأفصح عنها هنا. الإفصاح عن نفسك لا يحتاج صلاحية: أنت صاحب الشأن، ومن عليه تضارب يجب أن يستطيع قوله. ولا يُعدَّل الإفصاح ولا يُحذَف بعد تسجيله؛ والتصحيح إفصاح جديد.',
+    coiRegLoadError:
+      'تعذّر تحميل سجل الإفصاح. حاول مرة أخرى.',
+    coiRegSaveError:
+      'تعذّر تسجيل الإفصاح. حاول مرة أخرى.',
+    coiRegSaved:
+      'تم تسجيل إفصاحك.',
+    coiRegTableHeading:
+      'سجل الإفصاح في المكتب',
+    coiRegWhatHeading:
+      'الإفصاح',
+    coiRegWhenHeading:
+      'متى',
+    coiRegWhoHeading:
+      'من أفصح',
+    coiRegWorkingButton:
+      'جارٍ التسجيل…',
+    dpoAssignAcknowledge:
+      'أقِرَّ بأنّك قرأتَ ما سبق.',
+    dpoAssignAcknowledgedOn:
+      'أقرّ به {who} في {when}',
+    dpoAssignHeading:
+      'إسناد مسؤول حماية البيانات',
+    dpoAssignIntro:
+      'قانون حماية البيانات الشخصية يوجب على المكتب أن يُسنِد وظيفة مسؤول حماية البيانات. سجّل هنا من أُسنِدت إليه — بالاسم. ويقدر المكتب أن يُسنِدها إلى شخص ثانٍ فيه، أو إلى مسؤول من خارجه، أو إلى مدير المكتب نفسه؛ ولا يمنع النظام أيّاً من ذلك.',
+    dpoAssignLoadError:
+      'تعذّر تحميل بيانات الإسناد. حاول مرة أخرى.',
+    dpoAssignManagerLabel:
+      'مدير المكتب المسجّل',
+    dpoAssignManagerUnset:
+      'لا يوجد اسم مسجّل لمدير المكتب. يُسجَّل عند التسجيل لدى مزوّد المنصّة، ولا يُعدَّل من هنا.',
+    dpoAssignNameHint:
+      'الاسم كما تريد أن يظهر. اتركه فارغاً إذا لم تُسنَد الوظيفة إلى أحد بعد.',
+    dpoAssignNameLabel:
+      'من أُسنِدت إليه وظيفة مسؤول حماية البيانات',
+    dpoAssignNotice:
+      'الإسنادان على شخصٍ واحد. وظيفةُ مديرِ المكتب ووظيفةُ مسؤولِ حماية البيانات مُسنَدتان إلى الشخصِ نفسِه.\n\nوقانونُ حماية البيانات الشخصية رقم (٢٤) لسنة ٢٠٢٣، المادة ١١/أ، يشترط في مسؤولِ حماية البيانات استقلالاً عن قراراتِ الإدارةِ التنفيذية — فمن مهامِه مراقبةُ الإدارةِ والتحقيقُ في الخروقاتِ ورفعُ التقارير. وعدمُ استيفاءِ ذلك يُعرِّض المكتبَ، بموجب المادتَين ٢١ و٢٢، لإنذارٍ ثمّ غراماتٍ تصاعدية، ولإيقافِ الترخيصِ أو تعليقِ معالجةِ البيانات، ولحقِّ المتضرِّرِ في التعويض.\n\nويقدر المكتبُ أن يُسنِدها إلى أيِّ شخصٍ ثانٍ فيه — ولا يُشترَط اعتمادٌ تأمينيّ، بل معرفةٌ وسرّيةٌ واستقلالٌ عن قراراتِ الإدارة — أو إلى مسؤولٍ من خارج المكتب. وإن لم يكن في المكتبِ ثانٍ، فالإسنادُ على شخصٍ واحدٍ قرارُ المكتب، والنظامُ يسجّله ولا يمنعه.',
+    dpoAssignSaveButton:
+      'حفظ الإسناد',
+    dpoAssignSaveError:
+      'تعذّر حفظ الإسناد. حاول مرة أخرى.',
+    dpoAssignSaved:
+      'تم تسجيل الإسناد.',
+    dpoAssignWorkingButton:
+      'جارٍ الحفظ…',
     combinedDutyReasonLabel: 'سبب تنفيذك لطرفي العملية',
     combinedDutyReasonHint:
       'أنت من سجّل هذا الطلب، ومكتبك أعلن السماح لك باعتماده أيضاً. اذكر السبب — يُحفَظ بشكل دائم ويظهر في تقرير الاعتمادات الذاتية.',
@@ -284,8 +347,6 @@ export const COMMON = {
     dutyModeSaveError: 'Could not declare the setting. Try again.',
     dutyModeReadOnly:
       'You can see this setting but not change it. Whoever declares it is not whoever reviews the acts it permits.',
-    dutyModeCombinedBlocked:
-      'Combined cannot be declared yet: the self-approval report it depends on does not exist.',
     dutyModeSaved: 'Declared, and recorded in the audit trail.',
     combinedDutyOnRecord:
       'One person performed both halves of this, acting as {roles}. Recorded reason:',
@@ -294,6 +355,62 @@ export const COMMON = {
     combinedDutyOnRecordAmbiguous:
       'One person performed both halves of this. More than one of their roles grants that ' +
       'permission ({roles}), so which one authorised it cannot be determined. Recorded reason:',
+    coiRegDeclareButton:
+      'Record the disclosure',
+    coiRegDisclosureHint:
+      'At least {min} characters. Say what the interest is and who it connects to — that is what answers the question later.',
+    coiRegDisclosureLabel:
+      'What you are declaring',
+    coiRegEmpty:
+      'Nobody in this office has recorded a disclosure yet.',
+    coiRegHeading:
+      'Conflict of interest disclosure',
+    coiRegIntro:
+      'If you hold an interest that could conflict with your work for this office — a connection to a customer, an insurer or a broker, other employment, or a benefit — declare it here. Declaring about yourself needs no permission: you are the subject, and somebody who has a conflict must be able to say so. A disclosure cannot be edited or deleted once recorded; a correction is a new disclosure.',
+    coiRegLoadError:
+      'Could not load the disclosure register — try again.',
+    coiRegSaveError:
+      'Could not record the disclosure — try again.',
+    coiRegSaved:
+      'Your disclosure has been recorded.',
+    coiRegTableHeading:
+      'This office disclosure register',
+    coiRegWhatHeading:
+      'The disclosure',
+    coiRegWhenHeading:
+      'When',
+    coiRegWhoHeading:
+      'Who declared it',
+    coiRegWorkingButton:
+      'Recording…',
+    dpoAssignAcknowledge:
+      'Acknowledge that you have read the above.',
+    dpoAssignAcknowledgedOn:
+      'Acknowledged by {who} on {when}',
+    dpoAssignHeading:
+      'Data protection officer assignment',
+    dpoAssignIntro:
+      'The Personal Data Protection Law requires this office to assign a data protection officer. Record here who holds it, by name. The office may assign it to a second person inside it, to an officer outside it, or to the office manager themselves, and the system prevents none of those.',
+    dpoAssignLoadError:
+      'Could not load the assignment — try again.',
+    dpoAssignManagerLabel:
+      'The office manager on record',
+    dpoAssignManagerUnset:
+      'No name is on record for the office manager. It is recorded when the platform provider registers the office and is not editable here.',
+    dpoAssignNameHint:
+      'The name as you want it to appear. Leave it empty if nobody holds it yet.',
+    dpoAssignNameLabel:
+      'Who holds the data protection officer assignment',
+    dpoAssignNotice:
+      'The two assignments are on one person. The office manager function and the data protection officer function are assigned to the same person.\n\nAnd the Personal Data Protection Law No. 24 of 2023, article 11/a, requires a data protection officer to be independent of executive management decisions — their duties include monitoring management, investigating breaches and reporting. Not meeting that exposes the office, under articles 21 and 22, to a warning and then escalating fines, to suspension of the licence or of data processing, and to the injured party right to compensation.\n\nThe office may assign it to any second person in it — no insurance accreditation is required, but knowledge, confidentiality and independence from management decisions — or to an officer outside the office. And if there is no second person in the office, assigning it to one person is the office decision, and the system records it and does not prevent it.',
+    dpoAssignSaveButton:
+      'Save the assignment',
+    dpoAssignSaveError:
+      'Could not save the assignment — try again.',
+    dpoAssignSaved:
+      'The assignment has been recorded.',
+    dpoAssignWorkingButton:
+      'Saving…',
     combinedDutyReasonLabel: 'Why you are doing both halves',
     combinedDutyReasonHint:
       'You raised this, and your office has declared that you may also approve it. Say why — it is kept permanently and appears in the self-approval report.',

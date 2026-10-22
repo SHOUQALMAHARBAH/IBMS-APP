@@ -22,6 +22,7 @@ import {
   successStyle,
 } from '../../../../components/auth/auth-form.styles';
 import { formatDateTime } from '../../../../lib/i18n/format';
+import { DpoAssignmentSection } from '../../../../components/admin/DpoAssignmentSection';
 
 /**
  * Does this office separate the two halves of an approval?
@@ -189,13 +190,14 @@ export default function DutySegregationPage() {
               />{' '}
               {t('dutyModeCombined')}
             </label>
-            {/* Stated, not hidden: the option exists and cannot be used yet, and the sentence says why. */}
-            <p
-              data-testid="duty-mode-combined-blocked"
-              style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', margin: '0.2rem 0 0 1.4rem' }}
-            >
-              {t('dutyModeCombinedBlocked')}
-            </p>
+            {/*
+              THE "CANNOT BE DECLARED YET" SENTENCE IS GONE, AND ITS REMOVAL IS THE FIX RATHER THAN A
+              TIDY-UP. It said COMBINED could not be declared because the self-approval report did
+              not exist. That gate was LIFTED on 2026-09-26 in the commit that shipped
+              `GET /internal-controls/combined-duty-acts`, so the sentence had been a FALSE statement
+              on this screen ever since — telling an administrator they could not do something the
+              API accepts. Found while adding the designation section below it.
+            */}
           </fieldset>
 
           <label htmlFor="duty-mode-reason" style={{ ...labelStyle, marginTop: '1rem' }}>
@@ -234,6 +236,19 @@ export default function DutySegregationPage() {
           </button>
         </form>
       ) : null}
+
+      {/*
+        MODULE 0-ب — the DPO designation, on THIS screen rather than a new one.
+        
+        The page's subject is already *may one person perform both halves of a thing, and what must be
+        recorded when they do*. Who holds the DPO assignment beside who manages the office is that
+        question one level up: not two halves of one approval, but two assignments in one office. A
+        separate screen would be a second place somebody reads the office's posture from.
+        
+        It takes `canDeclare` rather than reading the permission again, so the two controls on this
+        page cannot disagree about who may write.
+      */}
+      <DpoAssignmentSection canDeclare={canDeclare} />
     </main>
   );
 }

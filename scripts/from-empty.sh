@@ -179,7 +179,13 @@ say "asserting the structure"
 # and a judicial request is the DPO's (`legal-hold.manage` is DPO alone). The owner reserved this
 # grant set as her own decision when the code was deferred out of 7b; this is the measured template
 # awaiting it, and changing it costs one seed line plus a revoking migration.
-check "permission codes seeded" 229 \
+#
+# 229 -> 230, module 0-ب decision 36: ONE code minted, `conflict-of-interest.register.read`, to
+# BRANCH_DEPARTMENT_MANAGER — the manager role in this product, since MEASURED against the seeded
+# grid there is no role named OFFICE_MANAGER. It is a TEMPLATE DEFAULT and not a lock (decision 80).
+# Nothing was minted for DECLARING a conflict: the discloser is the subject, so no permission exists
+# for it or can, which is why this moves by one rather than two.
+check "permission codes seeded" 230 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
 check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"

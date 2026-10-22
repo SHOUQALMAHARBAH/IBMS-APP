@@ -1,0 +1,62 @@
+{
+  "both-designations-unset-reads-as-combined": {
+    "file": "apps/api/src/modules/duty-segregation/dpo-designation.config.ts",
+    "from": "  if (manager === '' || dpo === '') return null;",
+    "to": "  if (false) return null;",
+    "why": "THE EMPTY-KEY GUARD REMOVED, which is the branch a bare `===` gets wrong and the COMMON state on every office that predates the column: both designations unset, both folding to the empty string, and the two therefore 'equal'. Every office on the platform would be shown a legal notice about a combination nobody has made — and then asked to acknowledge it before a designation could be saved at all. `dpo-designation.config.spec.ts` dies on the both-unset case AND on the punctuation-only case, which is why both exist rather than one."
+  },
+  "acknowledged-once-means-acknowledged-for-ever": {
+    "file": "apps/api/src/modules/duty-segregation/dpo-designation.config.ts",
+    "from": "  return input.acknowledgedPerson !== person;",
+    "to": "  return input.acknowledgedPerson === null;",
+    "why": "THE ACKNOWLEDGEMENT AS A BOOLEAN — the shape this column was given a canonical key to avoid. An office acknowledges the combination for person A, later assigns both functions to person B, and is shown NOTHING, because an acknowledgement exists. Nobody at that office is ever told about B's combination. It kills the unit test for a different person AND the e2e that moves both assignments, and the `noFloorAcknowledgedMonths` precedent is the same argument: the exposure changed, so it asks again."
+  },
+  "the-tick-is-not-required": {
+    "file": "apps/api/src/modules/duty-segregation/dpo-designation.config.ts",
+    "from": "  if (!declaration || !declaration.acknowledged || notice === '') {",
+    "to": "  if (false) {",
+    "why": "THE ACKNOWLEDGEMENT MADE OPTIONAL — so 'the system records that it was known' becomes a claim with nothing behind it. The save goes through with no sentence and no tick, and the all-four-or-none CHECK then refuses the write as a 500, which is the database backstop EXISTING rather than being described. Three unit refusal tests and the e2e 422 die; the arrangement was never what was being refused."
+  },
+  "the-audit-row-carries-the-word-not-the-sentence": {
+    "file": "apps/api/src/modules/duty-segregation/dpo-designation.service.ts",
+    "from": "        ...(toStore ? { combinedAssignmentNotice: toStore.noticeShown } : {}),",
+    "to": "        ...(toStore ? { combinedAssignmentNotice: 'acknowledged' } : {}),",
+    "why": "DECISION 28's RULE INVERTED. A row saying `acknowledged` records that a box was ticked; a row carrying the sentence records what the office was TOLD, which is the question a year from now. The e2e asserts BOTH directions on the same snapshot — the sentence present and the word absent — so this plant kills it twice over, and an absence is the only form of that half which can fail."
+  },
+  "the-screen-never-asks": {
+    "file": "apps/web/components/admin/DpoAssignmentSection.tsx",
+    "from": "  const looksCombined = typed !== '' && manager !== '' && typed === manager;",
+    "to": "  const looksCombined = false;",
+    "why": "THE OPTIMISTIC PATH REMOVED, so the notice never appears before a save. The office types the manager's own name, presses Save, and gets a 422 it was given no way to satisfy in the same request — which turns an acknowledgement into a second step and is the 'no extra step' half of the owner's decision. The Playwright test that renders the notice and compares the SENT body against the RENDERED element dies; the server-path test still passes, which is what proves the two paths are independently observed."
+  },
+  "declaring-your-own-conflict-needs-a-permission": {
+    "file": "apps/api/src/modules/compliance-risk/conflict-of-interest.controller.ts",
+    "from": "  @Post('disclosures')\n  declare(",
+    "to": "  @RequirePermissions('conflict-of-interest.register.read')\n  @Post('disclosures')\n  declare(",
+    "why": "THE WHOLE POINT OF 1b, REVERSED. The discloser is the SUBJECT, so there is no code for declaring and there cannot be one — this plant makes it a capability an office can withhold, and withholding it leaves the person who HAS the conflict as the one person unable to say so. MEASURED: FOUR of the eleven e2e tests die, not one. The test whose actor holds an EMPTY code list dies with `expected 201, got 403` — which is why its actor holds nothing rather than something harmless — and three more go with it, because they need an entry to exist before they can assert anything about it. That cascade is reported rather than trimmed away: the POST is the register's only way in, so a gate on it takes the whole of 1b down, which is the honest size of the regression."
+  },
+  "reading-the-register-needs-nothing": {
+    "file": "apps/api/src/modules/compliance-risk/conflict-of-interest.controller.ts",
+    "from": "  @RequirePermissions('conflict-of-interest.register.read')\n  @Get('disclosures')",
+    "to": "  @Get('disclosures')",
+    "why": "THE OTHER HALF, and the direction that discloses. Every authenticated person in the office reads what every colleague declared about themselves — which is the half that IS a real capability and the reason decision 36 gives it a code at all. The e2e's 403-for-a-blind-actor assertion dies."
+  },
+  "the-read-audit-copies-what-was-read": {
+    "file": "apps/api/src/modules/compliance-risk/conflict-of-interest-register.service.ts",
+    "from": "      afterValue: { entryCount: rows.length },",
+    "to": "      afterValue: { entries: rows.map((r) => r.disclosure) },",
+    "why": "THE LOG POLLUTED BY THE THING IT IS A LOG OF — the `combined-duty-acts` precedent. Every read copies every disclosure into `AuditLogEntry`, which is append-only, so the register's contents accumulate permanently in the one place a later search is over. The e2e asserts the count IS there and the disclosure is NOT, so this kills it on the absence, which is the half that can fail."
+  },
+  "the-register-shows-a-uuid": {
+    "file": "apps/web/components/security/ConflictOfInterestRegister.tsx",
+    "from": "                      <bdi>{row.declaredByName}</bdi>",
+    "to": "                      <bdi>{row.declaredByUserId}</bdi>",
+    "why": "AN IDENTIFIER WHERE A NAME EXISTS, in front of the one reader this register is for. The api includes the name for exactly this reason — one include rather than N lookups — and the Playwright test asserts the name is present AND the uuid is absent. It is the fault class the screen pass is about to measure across the whole product, so a new instance of it must not be the thing the pass finds."
+  },
+  "the-owners-notice-is-reworded": {
+    "file": "apps/web/lib/i18n/translations/common.ts",
+    "from": "والنظامُ يسجّله ولا يمنعه.",
+    "to": "والنظامُ يسجله ولا يمنعه.",
+    "why": "ONE SHADDA REMOVED FROM A LEGAL NOTICE THE OWNER WROTE — a change no reader would see and no ordinary assertion would catch, which is precisely why the pin is a HASH of the NFC form rather than a `toContain`. MEASURED RATHER THAN PREDICTED, and my first `why` here was wrong: I wrote that only the hash would die and the clause assertions would all pass. TWO die — the hash AND the clause assertion, because the clause it names happens to be the one carrying this shadda. That is a better result than predicted and the hash still earns its place: it catches the same edit in any word NO assertion names, which is most of her 754 characters. If this ever fails for real: her text is the authority and the hash is not to be edited."
+  }
+}

@@ -1264,6 +1264,31 @@ const complianceRisk: PermissionSeed[] = [
     roles: [OFFICE_ADMIN],
   },
   {
+    // MODULE 0-ب, DECISION 36 — READING the conflict-of-interest disclosure register.
+    //
+    // THERE IS NO CODE FOR DECLARING, and that is structural rather than an omission: the discloser
+    // is the SUBJECT. The same reasoning leaves `AccessRecertificationItem`'s maker permission
+    // empty, where no permission exists or can — and it bites harder here, because a code an office
+    // could withhold would leave the person who HAS the conflict unable to say so.
+    //
+    // THE HOLDER IS A TEMPLATE DEFAULT AND NOT A LOCK (decision 80). The owner's words were "the
+    // OFFICE MANAGER", and MEASURED against the seeded grid there is no role of that name: the
+    // twelve are SALES_RELATIONSHIP_OFFICER, PLACEMENT_TECHNICAL_OFFICER, POLICY_CHECKING_OFFICER,
+    // CLAIMS_OFFICER, FINANCE_COLLECTIONS_OFFICER, COMPLIANCE_OFFICER, BRANCH_DEPARTMENT_MANAGER,
+    // DATA_PROTECTION_OFFICER, SYSTEM_SECURITY_ADMINISTRATOR, EXECUTIVE_MANAGEMENT,
+    // EXTERNAL_AUDITOR and OFFICE_ADMINISTRATOR. `BRANCH_DEPARTMENT_MANAGER` is the manager role in
+    // this product — the one the concentration measurement itself reports as "the MANAGER" — so it
+    // is the one shipped, and an office may grant it elsewhere.
+    //
+    // COMPLIANCE_OFFICER IS THE OBVIOUS SECOND HOLDER and is deliberately NOT shipped: the owner
+    // named one role, and widening a grant she named precisely is not a tidy-up. Reported instead.
+    code: "conflict-of-interest.register.read",
+    module: "compliance-risk",
+    description:
+      "Read the conflict-of-interest disclosure register — the conflicts this office's people have declared about themselves",
+    roles: [MANAGER],
+  },
+  {
     code: "internal-controls.view",
     module: "compliance-risk",
     description: "View the periodic self-approval (maker/checker) audit report",

@@ -33,6 +33,9 @@ import { PiRiskEventRepository } from '../../repositories/pi-risk-event.reposito
 import { IncidentController } from './incident.controller';
 import { IncidentService } from './incident.service';
 import { IncidentRepository } from '../../repositories/incident.repository';
+import { ConflictOfInterestController } from './conflict-of-interest.controller';
+import { ConflictOfInterestRegisterService } from './conflict-of-interest-register.service';
+import { ConflictOfInterestRegisterRepository } from '../../repositories/conflict-of-interest-register.repository';
 import { InternalAuditFindingController } from './internal-audit-finding.controller';
 import { InternalAuditFindingService } from './internal-audit-finding.service';
 import { InternalAuditFindingRepository } from '../../repositories/internal-audit-finding.repository';
@@ -140,8 +143,14 @@ import { ProviderOfficeStateController } from './provider-office-state.controlle
     PiRiskEventController,
     IncidentController,
     InternalAuditFindingController,
+    ConflictOfInterestController,
   ],
   providers: [
+    // MODULE 0-ب, decision 36 — the conflict-of-interest disclosure register. The repository is
+    // provided HERE beside its service, in the same edit, because a missing provider compiles
+    // perfectly and fails at app boot: this module has paid for that twice.
+    ConflictOfInterestRegisterService,
+    ConflictOfInterestRegisterRepository,
     // Module 0 item (j). The repository reads a `security_invoker = false` VIEW, so it is
     // deliberately NOT tenant-scoped — see its own header and migration 20261116100000.
     ProviderOfficeStateService,

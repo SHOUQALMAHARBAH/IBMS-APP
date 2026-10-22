@@ -154,6 +154,18 @@ const AWAITING_OWNER_REVIEW: string[] = [
   'retention-schedule.update',
   'retention-schedule.confirm',
   /*
+   * MODULE 0-ب, decision 36 — the disclosure register's READ code. Its Arabic was written by an
+   * agent for the same reason every entry above it was: the parity guard requires both languages, so
+   * a code cannot ship without a line.
+   *
+   * AND THIS ONE CARRIES AN EXTRA REASON TO BE READ: a code named
+   * `conflict-of-interest.disclose` ALREADY EXISTS, and it is about the OTHER object — the flagged
+   * disclosure on a recommendation, detected by a commission heuristic and acknowledged by a second
+   * person. Both dictionary lines for the new code state that distinction, because two codes sharing
+   * a prefix and meaning different things is exactly where a grant gets made on the wrong one.
+   */
+  'conflict-of-interest.register.read',
+  /*
    * The owner wrote all four of the previous entries, and that remains the goal state rather than a
    * disabled guard. The balance check below still holds (224 = 224 + 0) and still fails by name the
    * moment a code ships without being declared here, which is the only thing this list was for.

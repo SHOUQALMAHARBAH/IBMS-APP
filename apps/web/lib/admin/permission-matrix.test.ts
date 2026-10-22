@@ -171,7 +171,23 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * records they are, and the two bases for retrieving one are both external compulsion on THAT
      * office, not a platform capability.
      */
-    expect(PERMISSION_CATALOGUE.length).toBe(229);
+    /*
+     * MODULE 0-ب, DECISION 36 — 229 -> 230. `conflict-of-interest.register.read` is ONE new code,
+     * and unlike `extend` and `retrieve` above it DOES carry a CRUD verb (`read`). It still lands in
+     * the TOGGLE list, for the reason `payment-channel.manage` once did: `familyOf` gives it the
+     * family `conflict-of-interest.register`, which has exactly ONE member, and one CRUD verb is not
+     * a family. So families stay 21, family codes stay 59, and the toggle count moves by one.
+     *
+     * The sibling `conflict-of-interest.disclose` does NOT join it: its family is
+     * `conflict-of-interest` and `disclose` is not a CRUD verb, so the two sit in different families
+     * and neither pulls the other into a five-state row. That is worth stating because the two codes
+     * share a prefix and are about DIFFERENT objects — one is the flagged disclosure on a
+     * recommendation, the other is the self-declaration register.
+     *
+     * OFFICE-scoped, so it reaches this matrix: a register of this office's own people is the
+     * office's, not a platform capability.
+     */
+    expect(PERMISSION_CATALOGUE.length).toBe(230);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
@@ -183,7 +199,7 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
      * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
      */
-    expect(toggles.length).toBe(165);
+    expect(toggles.length).toBe(166);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

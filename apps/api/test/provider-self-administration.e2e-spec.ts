@@ -251,6 +251,20 @@ describe('the authorised mailbox widening — the sets, by name', () => {
      * (`toBeGreaterThanOrEqual`) would have been the easy edit and the wrong one: it would stop
      * catching the thing the brief said to stop on.
      *
+     * MODULE 0-ب, DECISION 36 — 229 -> 230. ONE code minted,
+     * `conflict-of-interest.register.read`, and it reaches BRANCH_DEPARTMENT_MANAGER alone: the
+     * owner's words were "the OFFICE MANAGER as the shipped TEMPLATE DEFAULT", and MEASURED against
+     * the seeded grid there is no role of that name, so the manager role in this product is what
+     * ships and the office may grant it elsewhere (decision 80 — the template is not a lock).
+     *
+     * THE OFFICE-ADMINISTRATOR COUNTS BELOW DID NOT MOVE, because the code does not reach that role
+     * — the same situation the two entries above describe, and checked rather than assumed.
+     *
+     * AND NO CODE WAS MINTED FOR DECLARING a conflict. The discloser is the SUBJECT, which is the
+     * reasoning that leaves `AccessRecertificationItem`'s maker permission empty; a code an office
+     * could withhold would leave the person who HAS the conflict unable to say so. So decision 36
+     * moves this total by exactly one and not by two.
+     *
      * AND CI IS HOW THIS WAS FOUND, not a local run: the catalogue total is pinned in an api E2E,
      * and I had run one e2e FILE plus the full unit suite. `CLAUDE.md`'s five regenerations for a
      * new permission are all done — the office-administrator counts did not move, because this code
@@ -260,7 +274,7 @@ describe('the authorised mailbox widening — the sets, by name', () => {
      */
     const total = await rawPrisma.permission.count();
     console.log(`permission catalogue total: ${total}`);
-    expect(total).toBe(229);
+    expect(total).toBe(230);
   });
 
   it("adds no role — PLATFORM_OPERATOR is still the provider organization's only seeded role", async () => {

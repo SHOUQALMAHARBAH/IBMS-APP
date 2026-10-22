@@ -150,4 +150,49 @@ export class OrganizationRepository {
       },
     });
   }
+
+  /**
+   * MODULE 0-ب — record who this office has assigned as its data protection officer, and the
+   * acknowledgement when that is the same person as the office manager.
+   *
+   * ## THE FOUR DECLARATION COLUMNS MOVE TOGETHER OR NOT AT ALL
+   *
+   * `declaration` is what `resolveCombinedDeclaration` returned: an object when one was owed and
+   * well-formed, `null` when none was owed. So this method cannot write a partial declaration and
+   * cannot omit one that was required — the database's all-four-or-none CHECK is the backstop, and
+   * the return type is what makes the mistake unexpressible one layer up.
+   *
+   * ## IT NEVER CLEARS AN ACKNOWLEDGEMENT
+   *
+   * When the office moves the DPO to a second person the combination ends, and the stored
+   * acknowledgement becomes inert on its own — `combinedDeclarationRequired` returns false because
+   * the designations no longer name one person. Clearing it would destroy the record of a decision
+   * somebody took on a date, which is the one thing it exists to hold.
+   *
+   * The consequence is recorded rather than discovered: an office that un-combines and later
+   * re-combines WITH THE SAME PERSON is not asked again. That is deliberate and matches the no-floor
+   * precedent, where a period at or above the one already acknowledged does not re-ask — the person
+   * acknowledged is the same person, so the exposure is the one they read about.
+   */
+  recordDpoDesignation(
+    id: string,
+    dataProtectionOfficerName: string | null,
+    declaration: { noticeShown: string; person: string } | null,
+    acknowledgedByUserId: string,
+  ): Promise<Organization> {
+    return this.prisma.client.organization.update({
+      where: { id },
+      data: {
+        dataProtectionOfficerName,
+        ...(declaration
+          ? {
+              dpoManagerCombinedNoticeShown: declaration.noticeShown,
+              dpoManagerCombinedAcknowledgedPerson: declaration.person,
+              dpoManagerCombinedAcknowledgedAt: new Date(),
+              dpoManagerCombinedAcknowledgedByUserId: acknowledgedByUserId,
+            }
+          : {}),
+      },
+    });
+  }
 }

@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 513 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 514 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -36,6 +36,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'complaint.close',
     'complaint.escalate',
     'complaint.log',
+    'conflict-of-interest.register.read',
     'cross-sell.detect',
     'cross-sell.read',
     'customer-file.all-owners.read',
@@ -572,7 +573,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 229 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 230 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -658,6 +659,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'aml.monitor', module: 'compliance-risk', description: "Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code", scope: 'OFFICE' },
   { code: 'audit-log.read', module: 'compliance-risk', description: "Read the immutable audit log", scope: 'OFFICE' },
   { code: 'compliance-calendar.manage', module: 'compliance-risk', description: "Manage the regulatory compliance calendar", scope: 'OFFICE' },
+  { code: 'conflict-of-interest.register.read', module: 'compliance-risk', description: "Read the conflict-of-interest disclosure register — the conflicts this office's people have declared about themselves", scope: 'OFFICE' },
   { code: 'document-history.read', module: 'compliance-risk', description: "Read document version/workflow history", scope: 'OFFICE' },
   { code: 'duty-segregation.mode.declare', module: 'compliance-risk', description: "Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason", scope: 'OFFICE' },
   { code: 'incident.classification.co-sign', module: 'compliance-risk', description: "Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it", scope: 'OFFICE' },

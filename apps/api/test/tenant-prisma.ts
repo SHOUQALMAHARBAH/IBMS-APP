@@ -408,5 +408,24 @@ export async function deleteFixtureUsersInOrganization(
   await rawPrisma.refreshToken.deleteMany({
     where: { userId: { in: userIds } },
   });
+  /*
+   * `ConflictOfInterestRegisterEntry` IS DELIBERATELY NOT CLEARED HERE, and the first version of
+   * this helper tried to.
+   *
+   * The standing rule is that a new RESTRICT FK on a fixture-owned row belongs in the shared
+   * teardown — and this is the exception that rule already names. The table is IMMUTABLE BY A
+   * TRIGGER PAIR, so the DELETE is refused by the database, `rawPrisma` included: a BEFORE DELETE
+   * trigger does not care who the caller is. The `AuditLogEntry` lesson met in a third table, after
+   * `Quotation`.
+   *
+   * WHAT FOLLOWS, so nobody rediscovers it: a fixture user who has declared a conflict can never be
+   * deleted, and neither can the organization holding them. That is the same state `AuditLogEntry`
+   * already creates for any organization anybody has SIGNED INTO — see `deleteOrganizationCascade`'s
+   * own header, which is where that rule is recorded.
+   *
+   * SO A SPEC THAT DECLARES A CONFLICT MUST DO IT AS A USER IN THE DEFAULT TEST ORGANIZATION, which
+   * is never torn down, and must assert SET MEMBERSHIP on the ids its own run created — leftover
+   * rows then cannot make an assertion pass or fail.
+   */
   await rawPrisma.user.deleteMany({ where: { id: { in: userIds } } });
 }

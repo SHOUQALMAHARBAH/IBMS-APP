@@ -80,6 +80,18 @@ function org(id: string, legalName = `Office ${id}`): Organization {
     createdByUserId: null,
     updatedByUserId: null,
     dpoAlternateApproverUserId: null,
+    // MODULE 0-ب — the DPO designation and its declaration. ALL FIVE NULL, and each is the honest
+    // value rather than a shortcut: these three offices were never registered through a form that
+    // collects a designation, and an acknowledgement is a fact about a person reading a sentence, so
+    // a fixture that invented one would assert that somebody read something they have never seen.
+    //
+    // The pair reads as NOT COMBINED — `generalManagerName` above is null too — which is what every
+    // office that predates the column reads as, and is why the notice is shown to none of them.
+    dataProtectionOfficerName: null,
+    dpoManagerCombinedNoticeShown: null,
+    dpoManagerCombinedAcknowledgedAt: null,
+    dpoManagerCombinedAcknowledgedByUserId: null,
+    dpoManagerCombinedAcknowledgedPerson: null,
     // Part 4 — every office reads SEGREGATED unless it has declared otherwise, which is what the migration
     // left every existing one at. A fixture that omitted these would not compile, deliberately: the type is
     // the reminder that a new office-level setting has to be decided here rather than defaulted silently.

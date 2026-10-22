@@ -130,6 +130,8 @@ export const PERMISSIONS = {
     'perm:complaint.log': 'يسجّل شكوى عميل. تُمنح لمن يلتقي العميل، حتى لا تضيع شكوى لأن مستلمها لا يملك تسجيلها',
     'perm:compliance-calendar.manage': 'يدير تقويم الالتزام التنظيمي ومواعيد ما يجب تقديمه للجهات',
     'perm:conflict-of-interest.disclose': 'يسجّل إفصاح تضارب المصالح الإلزامي على توصية مُعلَّمة، قبل أن تُرسَل للعميل. ولا يجوز أن يكون المُفصِح هو كاتب التوصية — والنظام يمنعه',
+    'perm:conflict-of-interest.register.read':
+      'قراءة سجل الإفصاح عن تضارب المصالح: ما أفصح به العاملون في المكتب عن أنفسهم. وهو غير الإفصاح المُعلَّم على توصية — ذاك يرصده النظام ويُقرّه شخص آخر، وهذا يسجّله الشخص عن نفسه بلا رصد ولا تحفيز. والإفصاح نفسه لا يحتاج صلاحية، لأن المُفصِح هو صاحب الشأن، ومنعه يعني أن من عليه تضارب هو الوحيد الذي لا يستطيع قوله.',
     'perm:consent.manage': 'يسجّل موافقة العميل أو سحبها عند نقطة تواصل محدَّدة. والموافقة أساس قانوني لا خانة — بلا تسجيلها لا يجوز الاستعمال الذي بُنيت عليه',
     'perm:cross-border-transfer.approve': 'يعتمد نقل بيانات شخصية خارج المملكة. ولا يُعتمد النقل إلا بعد التحقّق من مستوى الحماية عند الجهة المستقبِلة — مسؤولية قانونية مباشرة',
     'perm:cross-sell.convert': 'يحوّل فرصة بيع متقاطع رشّحها النظام إلى فرصة حقيقية، أو يستبعدها. الاستبعاد قرار مسجَّل لا إخفاء',
@@ -372,6 +374,8 @@ export const PERMISSIONS = {
     'perm:complaint.log': 'Log a complaint',
     'perm:compliance-calendar.manage': 'Manage the regulatory compliance calendar',
     'perm:conflict-of-interest.disclose': 'Record the mandatory conflict-of-interest disclosure for a flagged recommendation before it can be sent (Process 16). The acknowledger must differ from the drafter (assertDifferentActors).',
+    'perm:conflict-of-interest.register.read':
+      'See what the people in this office have declared about their own conflicts of interest. This is not the flagged disclosure on a recommendation, which the system detects and a second person acknowledges: here the person records it about themselves, with nothing detecting and nothing prompting. Declaring one needs no permission at all, because the person declaring is the person it is about.',
     'perm:consent.manage': 'Capture/withdraw consent at a defined touchpoint',
     'perm:cross-border-transfer.approve': 'Approve a cross-border personal-data transfer',
     'perm:cross-sell.convert': 'Convert or dismiss a system-flagged cross-sell opportunity',

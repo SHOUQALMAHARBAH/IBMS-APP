@@ -315,6 +315,51 @@ model Organization {
   complianceOfficerEmail String?
   complianceOfficerPhone String?
 
+  /// MODULE 0-ب — THE DATA PROTECTION OFFICER DESIGNATION.
+  ///
+  /// A NAME, because decision 80 makes an assignment a name and a reference rather than an account
+  /// or a code bundle. `DATA_PROTECTION_OFFICER` is a ROLE — a code bundle — and is a different
+  /// thing from this; so are the four per-record `dpo*` columns elsewhere in this file
+  /// (`dpoHandlerUserId` per data-subject request, `classifiedByDpoUserId` per incident,
+  /// `dpoApprovedByUserId` per batch, `dpoAlternateApproverUserId` for the disposal edge case).
+  /// Measured before this column existed: not one of them is a designation.
+  ///
+  /// TEXT, NOT AN FK TO `Employee`, for the reason already recorded on the three key people above —
+  /// at registration the office has no employee records at all. And it may legitimately name
+  /// somebody OUTSIDE the office (PDPL art. 11/a is satisfied either way), which an FK to this
+  /// office's staff could not express. The external route's own three conditions — a written
+  /// services contract, a notification to the Data Protection Unit, and that one external officer
+  /// may serve several offices — are RECORDED AND NOT BUILT; see `dpo-designation.config.ts`.
+  dataProtectionOfficerName String?
+
+  /// THE DECLARATION WHEN ONE PERSON HOLDS BOTH ASSIGNMENTS — and it DECLARES, it does not refuse.
+  ///
+  /// One person MAY be both the office manager and the data protection officer. An office of one
+  /// person does not contain two people, and the system will not demand what the office does not
+  /// have. This REVERSES a hard block the repository previously recorded, knowingly, and the
+  /// departure from the legal adviser's own written answer is recorded in
+  /// `docs/deferred-register.md` rather than left for a reader to infer that we think it compliant.
+  ///
+  /// ALL FOUR OR NONE, by CHECK. `dpoManagerCombinedNoticeShown` is THE SENTENCE THE OFFICE WAS
+  /// SHOWN, carried from the client verbatim — decision 28's rule, because re-deriving it at submit
+  /// answers a different question from the one the record exists for.
+  ///
+  /// `dpoManagerCombinedAcknowledgedPerson` is the CANONICAL KEY of the person it was about, so a
+  /// later assignment of both functions to a DIFFERENT person asks again. Without it an
+  /// acknowledgement for person A would silence the notice for person B for ever — the
+  /// `noFloorAcknowledgedMonths` precedent.
+  ///
+  /// NO WRITTEN REASON, deliberately lighter than decision 28: the reason here is the same every
+  /// time ("I am one person"), so a reason box would be answered identically and become wallpaper.
+  ///
+  /// PLAIN ID for the actor, like `createdByUserId` and `dpoAlternateApproverUserId` above — a
+  /// second `Organization`<->`User` relation would force every other relation in this file to be
+  /// explicitly named.
+  dpoManagerCombinedNoticeShown          String?
+  dpoManagerCombinedAcknowledgedAt       DateTime?
+  dpoManagerCombinedAcknowledgedByUserId String?
+  dpoManagerCombinedAcknowledgedPerson   String?
+
   /// THE BANK GUARANTEE HAS NO BASIS IN INSTRUCTIONS NO. 9 OF 2026 — verified by reading arts. 3,
   /// 4, 10, 11, 13, 15 and 18. The field dictionary marked these "conditionally mandatory"; its v2
   /// corrections tab reclassifies all four as OPTIONAL for exactly this reason.
@@ -445,6 +490,7 @@ model Organization {
   complaintActions                    ComplaintAction[]
   complianceCalendarItems             ComplianceCalendarItem[]
   conflictOfInterestDisclosures       ConflictOfInterestDisclosure[]
+  conflictOfInterestRegisterEntries   ConflictOfInterestRegisterEntry[]
   consentRecords                      ConsentRecord[]
   coverNotes                          CoverNote[]
   crossBorderTransferRecords          CrossBorderTransferRecord[]
@@ -543,7 +589,7 @@ model Organization {
   insurerOfferedLines                 InsurerOfferedLine[]
   /// Part 4 — SEGREGATED (the default, and what every office read at migration time) or COMBINED. The
   /// trigger on `CombinedDutyAct` is the only place this is read by the database.
-  dutySegregationMode                 DutySegregationMode              @default(SEGREGATED)
+  dutySegregationMode                 DutySegregationMode               @default(SEGREGATED)
   /// When the office declared its CURRENT mode, and who declared it. NULL means never declared — segregated
   /// because that is the default, not because anybody chose it.
   dutySegregationModeDeclaredAt       DateTime?
@@ -560,11 +606,11 @@ model Organization {
   /// MODULE 0-ب ITEM (e) — the office-side counterparty records LINKED to this registered insurance
   /// company. A NAMED relation, because `Organization` is already `Insurer`'s tenant through a
   /// different field and Prisma cannot tell two relations between one pair apart without a name.
-  linkedInsurerRecords                Insurer[]                        @relation("InsurerRegisteredCompany")
+  linkedInsurerRecords                Insurer[]                         @relation("InsurerRegisteredCompany")
   retentionExtensions                 RetentionExtension[]
   retentionArchiveRetrievals          RetentionArchiveRetrieval[]
   /// Batch 5 group 7d — this company's own licence terms, when it is an INSURANCE_COMPANY.
-  insuranceCompanyLicenseTerms        InsuranceCompanyLicenseTerm[]    @relation("OrganizationInsuranceCompanyLicenseTerms")
+  insuranceCompanyLicenseTerms        InsuranceCompanyLicenseTerm[]     @relation("OrganizationInsuranceCompanyLicenseTerms")
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -906,6 +952,8 @@ model User {
   officeInsuranceLines         OfficeInsuranceLine[]
   officeInsurerFormTemplates   OfficeInsurerFormTemplate[]
   combinedDutyActs             CombinedDutyAct[]
+
+  conflictOfInterestRegisterEntries ConflictOfInterestRegisterEntry[] @relation("ConflictOfInterestDeclaredBy")
 
   @@unique([organizationId, email])
   @@index([email])
@@ -2745,6 +2793,56 @@ model ConflictOfInterestDisclosure {
 
   @@index([competingQuotationId])
   @@index([organizationId])
+}
+
+/// THE CONFLICT-OF-INTEREST DISCLOSURE REGISTER — decision 36. A PERSON RECORDS THEIR OWN CONFLICT.
+///
+/// ## THIS IS NOT `ConflictOfInterestDisclosure`, WHICH SITS DIRECTLY ABOVE IT
+///
+/// That model is one row per RECOMMENDATION, written when a commission heuristic FLAGS a
+/// recommendation, and acknowledged by somebody who must DIFFER from the officer who drafted it.
+/// This one is the opposite on all three axes: its subject is a PERSON, there is no detection and no
+/// trigger, and the discloser IS the subject. The two names are deliberately distinct so that
+/// neither can be reached for by mistake.
+///
+/// ## NO PERMISSION TO DECLARE, AND THAT IS STRUCTURAL
+///
+/// The discloser is the subject — the same reasoning that leaves `AccessRecertificationItem`'s maker
+/// permission empty, where no permission exists or can. A permission to declare your own conflict
+/// would be one an office could withhold, and withholding it would leave the person who has the
+/// conflict as the one person unable to say so. READING is the permission:
+/// `conflict-of-interest.register.read`, whose seeded holder is a TEMPLATE DEFAULT and not a lock.
+///
+/// ## IMMUTABLE, BY A TRIGGER PAIR
+///
+/// `pg_default_acl` hands `ibms_app` all four privileges on every new table here, so a narrower
+/// GRANT would restrict nothing. UPDATE would let somebody rewrite what they declared and DELETE
+/// would let them un-declare; a correction is a NEW entry, as with `RegulatoryAction` and
+/// `Quotation`. Asserted by EVENT in the migration, because a pair covering only UPDATE leaves the
+/// half that matters open.
+model ConflictOfInterestRegisterEntry {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this row belongs to. Supplied
+  /// by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  /// THE SUBJECT AND THE AUTHOR, one person. There is no second actor column: nothing here is
+  /// approved, countersigned or cleared, and adding a reviewer would make this the per-recommendation
+  /// model above rather than a register.
+  declaredByUserId String
+  declaredBy       User   @relation("ConflictOfInterestDeclaredBy", fields: [declaredByUserId], references: [id], onDelete: Restrict)
+
+  /// FREE TEXT, with no `nature` enum beside it. What kinds of conflict an office recognises is not
+  /// decided anywhere in this product, and a closed list would refuse the conflict nobody
+  /// anticipated. The floor is `DECLARATION_REASON_MIN_LENGTH`; the database refuses only a blank.
+  disclosure String
+  declaredAt DateTime @default(now())
+
+  @@index([organizationId])
+  /// Declared because the migration CREATES it — the register's own read, newest first.
+  @@index([organizationId, declaredAt(sort: Desc)], map: "ConflictOfInterestRegisterEntry_register_idx")
+  @@index([declaredByUserId])
 }
 
 enum ClientDecisionType {

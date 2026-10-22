@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { EncryptionKeyInventory } from '../../../../components/security/EncryptionKeyInventory';
+import { ConflictOfInterestRegister } from '../../../../components/security/ConflictOfInterestRegister';
 import {
   changePassword,
   enrollTotp,
@@ -459,6 +460,14 @@ export default function SecuritySettingsPage() {
        * gating the PAGE would lock ten of eleven roles out of pairing an
        * authenticator. */}
       <EncryptionKeyInventory />
+
+      {/* MODULE 0-ب, decision 36 — the conflict-of-interest disclosure register. The DECLARING half
+       * renders for everybody (the discloser is the subject, so there is no code for it and there
+       * cannot be one); the REGISTER half renders only for a holder of
+       * `conflict-of-interest.register.read`. Here for the same reason the inventory above is: this
+       * is the only universally reachable page in the application, and the declaring half has to be
+       * reachable by every role. */}
+      <ConflictOfInterestRegister />
 
       <button
         type="button"
