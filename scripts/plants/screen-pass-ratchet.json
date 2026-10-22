@@ -49,9 +49,21 @@
   },
   "unreachable-by-path-budget-raised": {
     "file": "scripts/measurements/unreachable-routes.py",
-    "from": "UNREACHED_BY_PATH_BUDGET = 20",
-    "to": "UNREACHED_BY_PATH_BUDGET = 21",
-    "why": "THE DOWN DIRECTION on the by-path count. Fails naming 20."
+    "from": "UNREACHED_BY_PATH_BUDGET = 18",
+    "to": "UNREACHED_BY_PATH_BUDGET = 19",
+    "why": "THE DOWN DIRECTION on the by-path count. Fails naming 18. **REPOINTED 2026-10-23 from 20 to 18** — `plant --self-test` refused it (`its anchor occurs 0 time(s)`) the moment failure mode 7 was fixed and the budget followed the instrument down, which is exactly what that self-test exists to catch: a committed plant whose anchor has moved is evidence that has quietly expired."
+  },
+  "unreachable-controller-budget-raised": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "UNREACHED_CONTROLLER_BUDGET = 10",
+    "to": "UNREACHED_CONTROLLER_BUDGET = 11",
+    "why": "THE SECOND BUDGET ON THIS GATE, PLANTED SEPARATELY BECAUSE IT IS A SEPARATE FACT. The controller count is gated beside the route count because closing two routes in one controller and opening two in a fresh one leaves the route total unchanged and is not the same codebase. This plant moves only the controller number, so it proves the branch fires on it alone — `unreachable-routes` fails naming 10 while the route count stays exactly at its own budget of 18 and reports nothing."
+  },
+  "helper-built-paths-go-unseen-again": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "                    found, resolved = resolve_first_arg_paths(src, src[m.end():])",
+    "to": "                    found, resolved = first_arg_paths(src[m.end():]), True",
+    "why": "FAILURE MODE 7 RESTORED — the instrument going blind to a path built in a helper. `invitePathFor()` RETURNS `/provider/brokerage-offices/${id}/administrator` and `apiPost` receives a FUNCTION CALL, so the first argument holds no string literal and both administrator invitations read as addressed by nothing. `check:unreachable-routes` fails at 20 across 11 against 18 across 10 — which is the figure this gate was deliberately HELD at for a day (register entry 113) rather than lowered onto an uncorrected matcher. **THE `, True` IS THE POINT OF THE PLANT**: it restores the blindness while also suppressing the `unreadable calls` count, which is what makes the old behaviour a SILENT under-measurement rather than a declared gap. A matcher that cannot read a call must say so; this plant removes both the sight and the admission, which is how the false positive was reported as a finding in the first place."
   },
   "a-route-keeps-its-path-and-loses-its-method": {
     "file": "apps/web/lib/compliance-risk/conflict-of-interest-api.ts",

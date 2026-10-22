@@ -102,7 +102,17 @@ def web_calls_by_verb():
                     # through a ternary read as "GET unreachable". Two false positives came
                     # from that, one of them recorded as a hand-checked finding. See FAILURE
                     # MODE 5 in unreachable-routes.py.
-                    for raw in base.first_arg_paths(src[m.end():]):
+                    #
+                    # AND ONE LEVEL OF HELPER INDIRECTION — `base.resolve_first_arg_paths` rather
+                    # than `base.first_arg_paths`, so both passes share ONE resolver. They did not
+                    # before: failure mode 5 was fixed here and left in the by-path pass, and
+                    # failure mode 7 (a path returned by a same-file helper, `invitePathFor`) was
+                    # then fixed there and would have been left here. Two passes with two different
+                    # resolvers can disagree about whether a path is addressed at all, which is the
+                    # one thing that must not vary between them: their whole division of labour is
+                    # that this one separates GET from POST over the SAME set of addressed paths.
+                    found, _resolved = base.resolve_first_arg_paths(src, src[m.end():])
+                    for raw in found:
                         path = base.norm(raw)
                         if not path:
                             continue

@@ -154,6 +154,88 @@ def first_arg_paths(text):
     return [m.group(2) for m in _STRLIT.finditer(text[:end]) if m.group(2).startswith('/')]
 
 
+# FAILURE MODE 7, found 2026-10-22 and fixed 2026-10-23: A PATH BUILT IN A HELPER.
+#
+#     export function invitePathFor(organizationType, organizationId) {
+#       switch (organizationType) {
+#         case 'BROKERAGE_OFFICE':
+#           return `/provider/brokerage-offices/${organizationId}/administrator`;
+#         case 'INSURANCE_COMPANY':
+#           return `/provider/insurance-companies/${organizationId}/administrator`;
+#       }
+#     }
+#     export function inviteOrganizationAdministrator(...) {
+#       return apiPost<InvitedAdministrator>(invitePathFor(organizationType, organizationId), input);
+#     }
+#
+# The first argument is a FUNCTION CALL, so it contains no string literal at all and
+# `first_arg_paths` returns nothing — both administrator routes read as addressed by nothing. That
+# was reported as a finding and then disproved by hand, which is what register entry 113 records,
+# and it is the same family as failure mode 5 (a ternary) one step further out: the path is in the
+# file, just not in the argument.
+#
+# ONE LEVEL, DELIBERATELY. If the first argument is a bare call to a function DECLARED IN THE SAME
+# FILE, that function's own body is scanned for path literals. Two levels is not attempted and
+# cross-file resolution is not attempted, because each would need a real import graph and a matcher
+# that has been wrong in BOTH directions does not get to grow a new way to be confidently right.
+#
+# AND WHAT IS STILL INVISIBLE IS COUNTED RATHER THAN IGNORED — see `UNRESOLVED_FIRST_ARGS`. A
+# matcher that cannot see something must say so: silent blindness is the shape that produced four
+# wrong measurements in this repository, and a declared gap is a different thing from a hidden one.
+_HELPER_CALL = re.compile(r'^\s*([A-Za-z_$][\w$]*)\s*\(')
+
+_HELPER_DECL = (
+    r'(?:export\s+)?(?:async\s+)?function\s+%s\s*[(<]'
+    r'|(?:export\s+)?const\s+%s\s*(?::[^=]*)?=\s*(?:async\s*)?[(<]'
+)
+
+
+def _balanced_body(src, start):
+    """The text from the first `{` at or after `start` to its matching `}`."""
+    opened = src.find('{', start)
+    if opened == -1:
+        return ''
+    depth = 0
+    for i in range(opened, len(src)):
+        if src[i] == '{':
+            depth += 1
+        elif src[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return src[opened:i + 1]
+    return ''
+
+
+def helper_paths(src, name):
+    """Path literals returned by a function of this name declared in this same file."""
+    pattern = _HELPER_DECL % (re.escape(name), re.escape(name))
+    decl = re.search(pattern, src)
+    if not decl:
+        return []
+    body = _balanced_body(src, decl.end())
+    if not body:
+        return []
+    return [m.group(2) for m in _STRLIT.finditer(body) if m.group(2).startswith('/')]
+
+
+def resolve_first_arg_paths(src, after_paren):
+    """Path literals for one client call: in the argument, else in a same-file helper it names.
+
+    Returns `(paths, resolved)`. `resolved` is False only when NOTHING could be read — which is
+    what `UNRESOLVED_FIRST_ARGS` reports, so the matcher's remaining blindness is a number on the
+    report rather than an absence nobody can see.
+    """
+    direct = first_arg_paths(after_paren)
+    if direct:
+        return direct, True
+    call = _HELPER_CALL.match(after_paren)
+    if call:
+        borrowed = helper_paths(src, call.group(1))
+        if borrowed:
+            return borrowed, True
+    return [], False
+
+
 
 def web_calls():
     """Verb-agnostic: every path STRING passed as the first argument of a client call.
@@ -163,6 +245,7 @@ def web_calls():
     is "does any web code address this path at all", which is 1.44's own question.
     """
     paths = set()
+    unresolved = 0
     for base in WEB:
         for root, _, files in os.walk(base):
             if 'node_modules' in root or '.next' in root:
@@ -172,27 +255,41 @@ def web_calls():
                     continue
                 src = io.open(os.path.join(root, f), encoding='utf-8', errors='replace').read()
                 for m in CALL.finditer(src):
-                    arg = PATHARG.match(src[m.end():])
-                    if not arg:
+                    # WAS `PATHARG.match(...)`, WHICH IS ANCHORED AT `^` AND READ ONLY AN ARGUMENT
+                    # BEGINNING WITH A QUOTE. Failure mode 5 was fixed for the VERB-AWARE pass and
+                    # left here, so this pass still could not see a ternary or a helper — it
+                    # survived on being verb-agnostic (some sibling call POSTs the same path with a
+                    # bare literal, so the path read as reached), which is luck rather than
+                    # correctness. Both passes share one resolver now.
+                    found, resolved = resolve_first_arg_paths(src, src[m.end():])
+                    if not resolved:
+                        unresolved += 1
                         continue
-                    p = norm(arg.group(2))
-                    if not p:
-                        continue
-                    paths.add(p)
-                    # Also record every wildcard-free stem, so a concatenated querystring or a
-                    # sub-resource does not hide the parent route.
-                    stem = p
-                    while stem.endswith('*'):
-                        stem = stem[:-1].strip('/')
-                        if stem:
-                            paths.add(stem)
-    return paths
+                    for raw in found:
+                        p = norm(raw)
+                        if not p:
+                            continue
+                        paths.add(p)
+                        # Also record every wildcard-free stem, so a concatenated querystring or a
+                        # sub-resource does not hide the parent route.
+                        stem = p
+                        while stem.endswith('*'):
+                            stem = stem[:-1].strip('/')
+                            if stem:
+                                paths.add(stem)
+    return paths, unresolved
 
 
 routes = api_routes()
-paths = web_calls()
+paths, UNRESOLVED_FIRST_ARGS = web_calls()
 print('api routes       :', len(routes))
 print('web path shapes  :', len(paths))
+# DECLARED BLINDNESS. Every client call whose first argument yielded no path even after one level of
+# helper resolution. These are calls this matcher CANNOT read, so any route only they address will be
+# reported as unreachable and will be a false positive. Printed rather than suppressed: the brief's
+# own instruction is that silent blindness is worse than a declared gap, and this repository has paid
+# four times for a matcher that reported a clean nothing.
+print('unreadable calls :', UNRESOLVED_FIRST_ARGS)
 
 def segments_match(web, api):
     """Segment-by-segment, where a wildcard on EITHER side matches anything.
@@ -262,8 +359,27 @@ if _positional:
 #
 # Measured 2026-10-22: 530 api routes against 399 web path shapes, 20 unreached across 11
 # controllers. Matched the screen-pass measurement document.
-UNREACHED_BY_PATH_BUDGET = 20
-UNREACHED_CONTROLLER_BUDGET = 11
+#
+# ## 20 -> 18 AND 11 -> 10 ON 2026-10-23, AND THE INSTRUMENT MOVED, NOT THE CODEBASE
+#
+# Re-measured after FAILURE MODE 7 was fixed: 531 api routes (the one new route this batch added)
+# against 402 web path shapes, **18 unreached across 10 controllers**. Both rows that left were the
+# administrator invitations, whose path `invitePathFor()` returns and `apiPost` receives as a
+# function call — reported as a finding on 2026-10-22, disproved by hand the same day, and recorded
+# in `docs/deferred-register.md` entry 113 as **"the true by-path figure is 18 across 10"**. That
+# entry also says the budgets were LEFT at 20 and 11 deliberately, because lowering a ratchet onto
+# an uncorrected instrument is worse than holding it at a number whose error is written down. The
+# instrument is corrected now, so the number follows — which is the whole reason the DOWN direction
+# fails too.
+#
+# NOTHING WAS CLOSED TO EARN THIS. Two false positives were removed. That distinction matters to
+# whoever reads these two numbers next: a drop here can mean a capability was connected OR that the
+# matcher stopped being wrong, and only one of those is progress on decision 34's fault (3).
+UNREACHED_BY_PATH_BUDGET = 18
+# 11 -> 10 in the same move. `provider.controller.ts` leaves the list entirely, which is also the
+# controller whose TWO `@Controller` prefixes failure mode 6 collapsed into one — so the file that
+# produced both of this measurement's known defects is the file both fixes remove from the findings.
+UNREACHED_CONTROLLER_BUDGET = 10
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both
