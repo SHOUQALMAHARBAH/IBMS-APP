@@ -92,17 +92,17 @@ export type WorkflowEntityType =
  */
 export const WORKFLOW_ENTITY_LABEL = {
   // No usable heading — see `null` note 3. Its screen's own `<h1>` names the RFQ, not this.
-  Opportunity: null,
+  Opportunity: 'workflowEntityOpportunity',
   // `/rfqs/[id]` — the submissions table IS the `RFQInsurer` rows.
   RFQInsurer: 'rfqSubmissionsHeading',
   Policy: 'policiesListHeading',
   // No screen — see `null` note 1.
-  Endorsement: null,
+  Endorsement: 'workflowEntityEndorsement',
   Claim: 'claimsQueueHeading',
   Complaint: 'complaintsHeading',
   RenewalCase: 'renRenewalCases',
   // No screen — see `null` note 2.
-  Invoice: null,
+  Invoice: 'workflowEntityInvoice',
   DataSubjectRequest: 'dsrHeading',
   IncidentReport: 'incHeading',
   DisposalBatch: 'rdHeading',

@@ -519,6 +519,20 @@ export const COMPLIANCE_RISK = {
     // screen, resolved in `lib/audit-trail/workflow-entity-types.ts`, so the word a reader sees in this
     // list is the word at the top of the screen they came from.
     atWorkflowEntityTypeChoose: 'اختر نوع الكيان…',
+    // The three workflow-entity words that had no label, owner decision of 2026-10-23.
+    // DERIVED, never typed: each is sliced out of a string already rendering in the product —
+    // «الفرص» from the corrected `/opportunities` NAV label (its `/ السوق` half belongs to the
+    // combined screen), «الملحقات» from `policyRequestedExtensionsLabel`, «الفواتير» from
+    // `caColInvoices`. Their own keys rather than pointers at those three, so an entity label is
+    // not hostage to a table column's wording or a nav entry's second noun.
+    //
+    // NOTE FOR THE ARABIC PASS: this product carries TWO words for an endorsement.
+    // `endorsementSectionHeading` on the policy screen says «التعديلات»; the document-category
+    // vocabulary says «ملحق»/«الملحقات», which is the family the owner chose. A reader who picks
+    // «الملحقات» here and then opens a policy sees «التعديلات» over the same records.
+    workflowEntityOpportunity: 'الفرص',
+    workflowEntityEndorsement: 'الملحقات',
+    workflowEntityInvoice: 'الفواتير',
     atWorkflowEntityIdLabel: 'معرّف كيان سير العمل',
     atDocumentIdLabel: 'معرّف المستند',
     atLookUpButton: 'بحث',
@@ -1021,6 +1035,9 @@ export const COMPLIANCE_RISK = {
     atToLabel: 'To',
     atWorkflowEntityTypeLabel: 'Workflow entity type',
     atWorkflowEntityTypeChoose: 'Choose a type…',
+    workflowEntityOpportunity: 'Opportunities',
+    workflowEntityEndorsement: 'Endorsements',
+    workflowEntityInvoice: 'Invoices',
     atWorkflowEntityIdLabel: 'Workflow entity id',
     atDocumentIdLabel: 'Document id',
     atLookUpButton: 'Look up',

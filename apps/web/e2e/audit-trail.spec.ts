@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
-import { anchoredTexts, expectNone } from "./support/anchored";
+import { anchoredAttributes, anchoredTexts, expectNone } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -204,15 +204,24 @@ test("the two fields a person could not fill arrive FILLED from the URL", async 
   ).toBeEnabled();
 });
 
-test("every entity the engine knows is offered, and the three with no word show their member name", async ({
+test("every entity the engine knows is offered, and every one of the eighteen has a WORD", async ({
   page,
 }) => {
   // The select is built from a map that is total over the union, so this asserts the COUNT against the
   // eighteen the api declares (kept honest by `workflow-entity-type-parity.spec.ts`) plus the empty
-  // option. Two of the options are checked by label for opposite reasons: `DisposalBatch` carries a
-  // derived Arabic/English heading, and `Endorsement` carries NO word at all — there is no screen under
-  // `app/(app)` to take one from — so it renders its member name rather than a guessed word. That
-  // fallback being visible is deliberate: an unfinished label should look unfinished.
+  // option.
+  //
+  // THE NAME AND THE ASSERTION BOTH CHANGED ON 2026-10-23, and the old ones are worth knowing. This
+  // test used to be called "...and the three with no word show their member name", and it checked that
+  // `Endorsement` rendered as its own member name because nothing had worded it. All three were worded
+  // that day from strings already in the product, so the fallback is now reachable by nothing — and a
+  // test whose NAME counts something is a test whose name goes stale, which is a class this repository
+  // has paid for in a test name, a register row and a CLAUDE.md figure.
+  //
+  // So the assertion is INVERTED into the one that is now meaningful: no option may render its own
+  // member name, because that is what a `null` label looks like on screen. Measured — not one of the
+  // eighteen English labels equals its member name ("Policies" against `Policy`, "Claims" against
+  // `Claim`, "Opportunities" against `Opportunity`), so this cannot fire on a correct label.
   await mockAuth(page, ["EXTERNAL_AUDITOR"]);
   await page.goto("/audit-trail");
   const select = page.getByLabel("Workflow entity type");
@@ -244,6 +253,13 @@ test("every entity the engine knows is offered, and the three with no word show 
   expect(texts[0]).toBe("Choose a type…");
   expect(texts.slice(1).filter((t) => t.trim() === "")).toEqual([]);
   expect(texts.slice(1)).toHaveLength(18);
+
+  // AND NO OPTION RENDERS ITS OWN MEMBER NAME — the visible signature of a `null` label.
+  const values = await anchoredAttributes(select.locator("option"), "value", select);
+  const unworded = values
+    .map((v, i) => ({ value: v, text: texts[i] }))
+    .filter((o) => o.value !== "" && o.value === o.text);
+  expect(unworded).toEqual([]);
 
   // Selecting by VALUE works for every member, which is what the links send.
   await select.selectOption("CrossSellOpportunity");

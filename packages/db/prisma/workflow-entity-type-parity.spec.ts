@@ -59,21 +59,36 @@ const WEB_UNION = path.join(
 );
 
 /**
- * THE THREE MEMBERS THAT MAY CARRY NO WORD — an UPPER BOUND, never an equality.
+ * EMPTY — EVERY MEMBER HAS A WORD NOW, SO A `null` LABEL IS A FLAT BAN.
  *
- * A `null` label renders the member name verbatim rather than a guessed Arabic word, and three members
- * are in that state: `Endorsement` and `Invoice` have no screen under `app/(app)` to take a heading
- * from, and `/opportunities`' own `<h1>` names the RFQ rather than the Opportunity.
+ * This held `["Opportunity", "Endorsement", "Invoice"]` for one day. All three were filled on
+ * 2026-10-23 from strings already rendering in the product, so the subset check below has become
+ * "no member may carry a null label" without a line of it changing — which is what a subset bound is
+ * for, and why it was written as one.
  *
- * Asserted as a SUBSET so that filling one in PASSES. An equality here would go red the day the owner
- * writes one of the three words — a gate failing because somebody did the work it exists to support,
- * which this repository has already paid for once in the permission-description harvest.
+ * **IT IS EMPTIED IN THE SAME COMMIT AS THE THREE WORDS, deliberately.** A list still naming three
+ * members after they have labels tells the next reader three words are owed, and nothing would have
+ * gone red to correct them: a subset check passes when the subset shrinks. That is the cost of the
+ * shape that protected the owner from a gate going red for doing the work, and it is paid here rather
+ * than left.
+ *
+ * Re-populating this is how a NEW member ships without a word, and it needs a reason beside the name.
  */
-const MAY_HAVE_NO_LABEL = ["Opportunity", "Endorsement", "Invoice"];
+const MAY_HAVE_NO_LABEL: string[] = [];
 
-/** Below today's eighteen, so deliberately removing a member does not fail THIS assertion instead of
- *  the real one. Its job is to catch a regex that stopped matching, which is the failure mode that
- *  lets drift back in through a refactor of a file this guard reads. */
+/**
+ * Below today's eighteen, so deliberately removing a member does not fail THIS assertion instead of
+ * the real one. Its job is to catch a regex that stopped matching, which is the failure mode that
+ * lets drift back in through a refactor of a file this guard reads.
+ *
+ * **HELD AT 15 WHILE THE LABELLED FLOOR ROSE TO EIGHTEEN, and the two are not the same number doing
+ * the same job.** The owner's instruction was that "the parity FLOOR of 15 rises with the labelled
+ * count", and the labelled floor HAS risen — from 15 of 18 worded to all 18 required, enforced by the
+ * empty list above, which is a strictly stronger bound than any integer here. This constant is the
+ * LIST-LENGTH non-vacuity floor and does a different job: raising it to 18 would make a legitimate
+ * member removal fail "all three lists are substantial" at 17 instead of failing the parity assertion
+ * that names the member, which is the confusing message this floor was set below 18 to avoid.
+ */
 const FLOOR = 15;
 
 /**
@@ -111,8 +126,12 @@ function unionIn(file: string, label: string): string[] {
   );
 }
 
-/** The keys of `WORKFLOW_ENTITY_LABEL`, and which of them carry `null`. */
-function labelMap(): { keys: string[]; nulls: string[] } {
+/** The keys of `WORKFLOW_ENTITY_LABEL`, which of them carry `null`, and each raw value. */
+function labelMap(): {
+  keys: string[];
+  nulls: string[];
+  values: Record<string, string | null>;
+} {
   const source = fs.readFileSync(WEB_UNION, "utf8");
   const start = source.indexOf("export const WORKFLOW_ENTITY_LABEL = {");
   expect(
@@ -129,13 +148,17 @@ function labelMap(): { keys: string[]; nulls: string[] } {
   return {
     keys: entries.map((m) => m[1]!),
     nulls: entries.filter((m) => m[2] === "null").map((m) => m[1]!),
+    // member -> its raw value, so a literal word written inline instead of a key can be refused.
+    values: Object.fromEntries(
+      entries.map((m) => [m[1]!, m[2] === "null" ? null : m[2]!.slice(1, -1)]),
+    ) as Record<string, string | null>,
   };
 }
 
 describe("WorkflowEntityType — the api's union and the web's copy agree", () => {
   const api = unionIn(API_UNION, "apps/api");
   const web = unionIn(WEB_UNION, "apps/web");
-  const { keys: labelled, nulls } = labelMap();
+  const { keys: labelled, nulls, values: labelValues } = labelMap();
 
   it("is not vacuous — all three lists are substantial", () => {
     expect(api.length).toBeGreaterThanOrEqual(FLOOR);
@@ -164,11 +187,23 @@ describe("WorkflowEntityType — the api's union and the web's copy agree", () =
     expect(labelled.filter((k) => !api.includes(k))).toEqual([]);
   });
 
-  it("only the three declared members carry no label", () => {
-    // A SUBSET check: filling one in passes, adding a fourth unworded member fails by name. The point
-    // is that a `null` renders an English member name into an Arabic dropdown, which is acceptable for
-    // three declared cases awaiting the owner's own words and is not a thing to acquire quietly.
+  it("no member carries a null label — all eighteen have a word", () => {
+    // The same SUBSET check against a now-EMPTY list, so it reads as a flat ban. A `null` renders an
+    // English member name into an Arabic dropdown; that was acceptable for three declared cases
+    // awaiting the owner's words and is not a thing to acquire quietly now that none are owed.
     expect(nulls.filter((k) => !MAY_HAVE_NO_LABEL.includes(k))).toEqual([]);
+  });
+
+  it("every label is a DERIVED key, not a literal word", () => {
+    // The three labels added on 2026-10-23 are the only ones whose string was written for this map
+    // rather than taken from a screen's own heading, and even those were SLICED from strings already
+    // rendering in the product. What this asserts is the shape that keeps it honest: a label is a
+    // translation KEY, so the Arabic lives in the dictionary where the i18n parity and collision
+    // guards can see it. A literal Arabic word inline here would be invisible to both.
+    const literals = Object.entries(labelValues).filter(
+      ([, v]) => v !== null && !/^[a-z][A-Za-z0-9]*$/.test(v),
+    );
+    expect(literals).toEqual([]);
   });
 
   it("the api's declaration order is preserved, because the select renders in it", () => {
