@@ -51,7 +51,9 @@ export class DocumentController {
    * Gated on `DOCUMENT_SEARCH_CODES`, which is `document.read` ALONE and is a DELIBERATE departure from
    * the picker rule. The argument is in `common/picker-search.config.ts` and the short form is that the
    * alternative hands a read-only auditor a name search over every document in the office. Do not widen
-   * it to quieten a reachability report.
+   * it. What defends the narrowness is `picker-search-gates.e2e-spec.ts`, NOT a measurement:
+   * `picker-route-reachability.mjs` is blind to this picker because its screen-side map has no entry
+   * for the `documentId` field — measured, and the opposite of what this comment first claimed.
    *
    * Declared BEFORE `GET /documents/:id` — Nest matches in declaration order, so `search` would
    * otherwise be parsed as a document id and answer 404. The same reason `classification-summary` is

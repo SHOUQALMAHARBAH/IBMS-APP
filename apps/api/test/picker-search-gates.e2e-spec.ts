@@ -323,6 +323,12 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
    * `/audit-trail`, whose document-history section is gated on `document-history.read`, so the rule as
    * written would add that code here.
    *
+   * `picker-route-reachability.mjs` will NOT flag it, and I asserted the opposite before measuring:
+   * run today that script prints SIX picker sections and no DOCUMENT one, reporting `0 stuck`,
+   * because its SCREEN side (`picker-route-permissions.py`) carries no `documentId` field for
+   * `/audit-trail` — so the pair that would be reported does not exist. **THIS TEST IS THEREFORE
+   * WHAT DEFENDS THE NARROWNESS. There is no measurement standing behind it.**
+   *
    * It is overruled because the remedy is worse than the fault. Measured on the seeded grid,
    * `document-history.read` is held by COMPLIANCE_OFFICER and EXTERNAL_AUDITOR; adding it would hand a
    * READ-ONLY AUDITOR a name search over every document in the office — every KYC pack, every incident

@@ -127,9 +127,24 @@ export const BRANCH_SEARCH_CODES = [
  *
  * The screen that types a `documentId` is `/audit-trail`, whose document-history section is gated on
  * `document-history.read`. So the rule as written would produce
- * `['document.read', 'document-history.read']` — and `picker-route-reachability.mjs` will report this
- * route as unreachable for the EXTERNAL_AUDITOR, which is the shape of the exact defect that rule
- * exists to catch.
+ * `['document.read', 'document-history.read']`, and the EXTERNAL_AUDITOR — who holds the history
+ * code and not `document.read` — is therefore refused this route. That is the shape of the exact
+ * defect the rule exists to catch, and here it is the decision.
+ *
+ * **AND `picker-route-reachability.mjs` DOES NOT SEE IT, which I asserted the opposite of before
+ * measuring.** Run today it prints SIX picker sections — customer, employee, insurer, policy, user,
+ * branch — no DOCUMENT section at all, and `33 (picker, screen) pairs checked, 0 stuck`. The reason
+ * is its SCREEN side: `picker-route-permissions.py` lists `documents -> policyId, summaryPolicyId`
+ * and has no entry for a `documentId` typed on `/audit-trail`, so the pair that would be reported
+ * does not exist. (The `ok documents` line in that output belongs to the POLICY picker.)
+ *
+ * **SO THIS DEPARTURE IS DEFENDED BY TESTS AND NOT BY THAT MEASUREMENT**, which is weaker than I
+ * first wrote and is the honest state: `picker-search-gates.e2e-spec.ts` asserts the 403 and the
+ * auditor's surviving id lookup, and `audit-trail.spec.ts` asserts the chooser's absence on screen.
+ * **DO NOT ADD THE SCREEN-SIDE ENTRY WITHOUT AN EXEMPTION MECHANISM FIRST** — neither script has
+ * one (measured: no `DECLARED`, `exempt` or allow-list in either), so the entry would print a
+ * permanent stuck row with nowhere to say it is decided, and a permanent finding is how a correct
+ * refusal gets 'fixed' by widening. Register entry 115.
  *
  * **It is not that defect. It is owner decision 41, and the absence is the decision.** Measured off the
  * seeded grid: `document-history.read` is held by COMPLIANCE_OFFICER and EXTERNAL_AUDITOR; `document.read`
