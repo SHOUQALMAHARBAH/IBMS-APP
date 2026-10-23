@@ -300,6 +300,28 @@ export async function deleteOrganizationCascade(
     where: { insuranceCompanyId: organizationId },
   });
 
+  /*
+   * AND THE COMMUNICATION LOG — batch six item 4, added in the SAME COMMIT as the foreign key that
+   * makes it matter, which is the standing rule this helper exists to carry.
+   *
+   * Two separate RESTRICTs reach this table and only one of them is new.
+   *
+   *   `CommunicationLog_organizationId_fkey` has ALWAYS been RESTRICT (a required relation, and
+   *   this repository has already measured that the database says RESTRICT where Prisma's own
+   *   default for an optional one is SET NULL). So an organization holding any communication row
+   *   was ALREADY undeletable — a latent gap that had not fired only because nothing seeds this
+   *   table and no fixture had yet written one. Measured: dev 0 rows, db-test 12, seed none.
+   *
+   *   `CommunicationLog_customerId_fkey` is NEW and is SET NULL, so it blocks nothing — a customer
+   *   with send history still deletes, and the log keeps its row.
+   *
+   * It is cleared here rather than left to fire later, because the failure mode is the one that has
+   * cost this repository two days already: a leaked fixture organization becomes PERMANENTLY
+   * undeletable and takes down every later spec at `createTestApp` with a fault that looks like its
+   * own. The cheap line now beats the diagnosis then.
+   */
+  await rawPrisma.communicationLog.deleteMany({ where: { organizationId } });
+
   const licences = await rawPrisma.brokerLicense.findMany({
     where: { organizationId },
     select: { id: true, certificateDocumentId: true },

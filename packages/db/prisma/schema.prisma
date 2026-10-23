@@ -1755,6 +1755,12 @@ model Customer {
   policies                    Policy[]
   claims                      Claim[]                        @relation("ClaimCustomer")
   complaints                  Complaint[]
+  /// Batch six item 4 (register entry 125) — this back-relation did not exist, so
+  /// `CommunicationLog.customerId` was a bare `String?` naming a customer with
+  /// nothing enforcing that the customer was real. ON DELETE SET NULL: a
+  /// communication log is the record that a message WAS SENT and must outlive the
+  /// people it names, the same call `consentRecordId` on that model already made.
+  communicationLogs           CommunicationLog[]
   interactions                Interaction[]
   insuredPersons              InsuredPerson[]
   consentRecords              ConsentRecord[]
@@ -4051,6 +4057,15 @@ model CommunicationLog {
   organizationId   String                 @default(dbgenerated())
   organization     Organization           @relation(fields: [organizationId], references: [id])
   customerId       String?
+  /// Batch six item 4 — register entry 125. This relation did NOT exist: the column
+  /// was a bare `String?`, so a row could name a customer that does not exist and
+  /// the database had nothing to refuse it with. It became urgent when batch five
+  /// made this column the source of a NAME ON SCREEN.
+  ///
+  /// ON DELETE SET NULL, matching `consentRecordId` below and for its stated reason
+  /// — the log row outlives what it referenced. CASCADE would destroy PDPL send
+  /// evidence; RESTRICT would block a DSR erasure. See the migration header.
+  customer         Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
   channel          InteractionChannel
   templateId       String?
   languageUsed     LanguagePreference?
