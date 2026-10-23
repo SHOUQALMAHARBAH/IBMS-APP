@@ -56,6 +56,8 @@ is stated.
 | **REDUNDANT** — superseded; the data is already reachable | 14 | — |
 | **CORRECTLY ABSENT** — called from outside the web by design | 0 (see below) | — |
 | **UNCLASSIFIED** | 0 | — |
+| *(second source)* **MISSING** | 4 + 1 the owner's | read 2026-10-23; `getSecurityConfig` WIRED, `updateSecurityConfig` deferred-by-decision |
+| *(second source)* **REDUNDANT** | 6 | two carry a qualifier — the obligation is met by machinery, the MANUAL act is what is missing |
 
 **CORRECTLY ABSENT is 0 because that class was excluded before the triage began, not because nobody
 looked.** `NOT_WEB_CALLABLE` in the by-path script already holds the five: `GET /`, `GET /health`,
@@ -311,7 +313,7 @@ rooted at `app/(app)` reads 15 of 16 and makes that type look unlinked. `Endorse
 owe one because neither has a screen; the module that builds either adds the link in the same commit.
 Register entries 114 and 121.
 
-## THE SECOND SOURCE — 17 ROUTES ADDRESSED ONLY BY A HELPER NOTHING CALLS
+## THE SECOND SOURCE — 16 ROUTES ADDRESSED ONLY BY A HELPER NOTHING CALLS
 
 **Batch five item 4. REPORTED, NOT BUILT** — including the insurer edit, because a capability is the
 owner's decision and she takes them off ONE list, not two.
@@ -321,7 +323,7 @@ Every route below is counted **REACHED** by both reachability passes, so none of
 not a caller — measured in batch four, when the by-path count fell the instant a helper was written
 with no screen behind it. So the findings above are a FLOOR and this section is the rest of the floor.
 
-**THE COUNT IS 18 REPORTED, ONE FALSE POSITIVE, 17 TO CLASSIFY — AND MY OWN FIGURE OF 19 WAS WRONG.**
+**THE COUNT IS 17 REPORTED NOW, ONE FALSE POSITIVE, 16 CLASSIFIED — AND MY OWN FIGURE OF 19 WAS WRONG.** Batch six wired `getSecurityConfig` (owner decision 47), so the report fell 18 → 17 and that is the figure the move shows up in: **neither route budget could move for it**, because `GET /auth/security-config` was already counted REACHED by both passes — measured before and after, 13 across 7 and 9 by method on both sides. That is this whole section's thesis applied to a route the owner expected to come off the OTHER list.
 Batch four's report, this document and `CLAUDE.md` all said 19. `scripts/measurements/dead-client-helpers.py`
 is byte-identical since then (`git diff 785e0fe` is empty) and reports **18** at batch four's own tip.
 So 19 was never measured; it is corrected here and in both other places rather than carried forward.
@@ -348,8 +350,8 @@ declares. Owed to whoever is next in that script.
 
 | helper | route | the capability a person loses |
 |---|---|---|
-| `getSecurityConfig` | `GET /auth/security-config` | **an office cannot see its own security configuration.** `/settings/security` imports `changePassword`, `enrollTotp`, `listTrustedDevices`, `logout`, `revokeTrustedDevice` and `verifyTotpEnrollment`, and neither of these two. The codes exist (`security-config.read`, `security-config.manage`) and gate nothing a person can reach. |
-| `updateSecurityConfig` | `PUT /auth/security-config` | and cannot change it. The pair is one capability and is counted as two rows because they are two routes. |
+| `getSecurityConfig` | `GET /auth/security-config` | **WIRED 2026-10-23 (owner decision 47, the READ half).** It was: *an office cannot see its own security configuration* — `/settings/security` imported six helpers and neither of these, while `security-config.read` gated nothing a person could reach. A read-only block on that existing screen now renders all seven numbers with their units. **AND THE ROUTE BUDGET DID NOT MOVE FOR IT, WHICH IS THE POINT OF THIS SECTION**: `GET /auth/security-config` is counted REACHED by BOTH passes already, because `getSecurityConfig()` ADDRESSES it and a declaration is not a caller. Measured before and after — `UNREACHED_BY_PATH_BUDGET` is 13 across 7 controllers on both sides, and the figure that moved is the dead-helper count, 18 → 17. |
+| `updateSecurityConfig` | `PUT /auth/security-config` | **DEFERRED-BY-DECISION (owner decision 47), owed to the employees-and-permissions module.** Changing any of the seven is a POLICY decision whose home is beside the other sign-in policies, and the owner's walk may change the numbers themselves. No edit affordance ships, **not even a disabled one** — a disabled control is a promise with a date on it. This is not open work and must not be read as one. |
 | `updateInsurer` | `PATCH /insurers/*` | **an office cannot edit an insurer record at all** — batch four's proven case, unchanged. Its consequence is also why batch five's rating CLEAR has no SET beside it: the control that would set a financial strength rating is this route. |
 
 ### Unclassified — 11, each with the question that decides it
@@ -359,19 +361,25 @@ reported 0 unclassified honestly. These eleven were NOT read to the same depth, 
 point: a classification asserted from a derived signal is the hand-written ACTS column that had four
 of six spot-checked rows wrong. Each row names what has to be read.
 
-| helper | route | what decides it |
-|---|---|---|
-| `assignServiceRequest` | `POST /service-requests/*/assign` | does anything else make a person responsible for a service request? `fulfilServiceRequest` is live; if assignment has no other path this is MISSING, and it is the `Claim` handler gap one entity over (register entry 68). |
-| `rerunScreening` | `POST /kyc-records/*/rerun-screening` | shares `screening.run` with the LIVE `runScreening` and returns a different shape (`ScreeningRunResult`). REDUNDANT only if `runScreening` can be called a second time on the same record — read `KycService.runScreening`'s own refusals. |
-| `scheduleReview` | `POST /kyc-records/*/schedule-review` | **the one to read first.** Periodic re-KYC cadence is `meta/lex/kyc-aml-sla-timers.md`'s own subject — a tracked deadline, not documentation — so if nothing can schedule a review this is a compliance capability with no door, not a tidy-up. |
-| `getCurrentPiPolicy` | `GET /pi-policy/current` | no live sibling and NO `operational-risk` screen exists. Probably MISSING, and probably a whole screen rather than a button. |
-| `getScreeningConfig` | `GET /screening/providers/config` | `/screening-health` exists; does it render the provider configuration, or only the sync state? |
-| `listInteractions` | `GET /customers/*/interactions` | the 360° timeline aggregates interactions, so REDUNDANT if the timeline's own read returns them — check whether `crm-api`'s live helper carries the same rows. |
-| `updateAsset` | `PATCH /risk-profiles/*/assets/*` | `addAsset` and `deleteAsset` are live, so an asset can be added and removed but perhaps not CORRECTED. Whether delete-then-add is an acceptable path is a decision, not a reading. |
-| `getRenewalCase` | `GET /renewal-cases/*` | `listRenewalCases` is live and there is NO `renewals` screen; the detail GET's reader would be that screen. |
-| `getSlaPolicy` | `GET /sla/policies/*` | `listSlaPolicies` is live and `/sla-policies` exists — almost certainly the batch-three REDUNDANT pattern (a detail GET whose list returns the same view), but unread. |
-| `getLatestEmployeePerformance` | `GET /employee-performance/*/latest` | `listEmployeePerformance` and `computeEmployeePerformance` are live; no `dashboards/employee-performance` screen exists. |
-| `getLatestInsurerPerformance` | `GET /insurer-performance/*/latest` | same shape as the row above, same two live siblings. |
+**READ 2026-10-23 (batch six item 5) — 4 MISSING, 6 REDUNDANT, 1 THE OWNER'S. NOTHING BUILT.**
+
+Batch five reported these eleven as UNCLASSIFIED and said so deliberately, because they had not been read to the depth batch three read its 27 to. They have now. Each row below states WHAT WAS READ, not what a derived signal suggested — the *does a live helper reach the same resource stem* column batch five recorded is a question, and it is not promoted to an answer anywhere here.
+
+**TWO OF THE SIX REDUNDANT CARRY A QUALIFIER, AND THE QUALIFIER IS THE FINDING.** `scheduleReview` and `rerunScreening` both looked like compliance capabilities with no door. Measured, the OBLIGATION is met in both cases by machinery nobody has to drive (an automatic cadence write plus a daily sweep; a 4-hourly re-screen of every active customer), and what is missing is the MANUAL act on one record. That distinction is the whole reason they are read rather than counted.
+
+| class | helper | route | what the reading found |
+|---|---|---|---|
+| **REDUNDANT** | `listInteractions` | `GET /customers/*/interactions` | the 360° timeline carries them. `crm.config.ts` takes `interactions` as an input and flattens them into `TimelineEvent`s, so the rows the standalone list would return are already on the customer's own screen. |
+| **REDUNDANT** | `getRenewalCase` | `GET /renewal-cases/*` | the batch-three detail-GET pattern exactly, and the screen DOES exist — `/renewal-cases/page.tsx` calls `listRenewalCases`. `renewal.service.ts` maps the list with `rows.map(deriveRenewalCaseView)` and the detail with `deriveRenewalCaseView(row)`: the same view, so the detail handler adds no field. |
+| **REDUNDANT** | `getSlaPolicy` | `GET /sla/policies/*` | same pattern, confirmed rather than assumed: `sla-policy.service.ts`'s `list` is `(await findMany()).map(toView)` and its `get` is `toView(policy)`. `/sla-policies` calls the list. |
+| **REDUNDANT** | `getLatestEmployeePerformance` | `GET /employee-performance/*/latest` | `list` ACCEPTS `employeeId` and maps through the same `deriveEmployeePerformanceRecordView` as `latest`, and the web's `listEmployeePerformance` already takes that filter — so one employee's records are reachable through the live helper. One qualifier, recorded: `latest` 404s when nothing has been computed where the list returns `[]`. That is a different SHAPE for the same absence, not a capability. |
+| **REDUNDANT** | `getLatestInsurerPerformance` | `GET /insurer-performance/*/latest` | the same measurement one module over: `list` takes `insurerId`, `latest` takes the same view, and `listInsurerPerformance` already passes that filter. |
+| **REDUNDANT** | `scheduleReview` | `POST /kyc-records/*/schedule-review` | **THE ONE BATCH FIVE SAID TO READ FIRST, AND THE ANSWER IS THAT THE OBLIGATION IS NOT AT RISK.** `meta/lex/kyc-aml-sla-timers.md` makes periodic re-KYC a tracked deadline, and that deadline is written WITHOUT anybody scheduling it: `KycService.finalizeApproval` sets `nextReviewDueAt` from `REVIEW_CADENCE_MONTHS[riskRating.level]` on every approval, and `KycPeriodicReviewScheduler` sweeps daily, moving an APPROVED record past its date to `PERIODIC_REVIEW_DUE`. So the cadence is maintained by the system. What this route adds is a MANUAL OVERRIDE of that date — bringing a review forward, or pushing it out — which is a real capability and NOT the compliance one. Qualified REDUNDANT, the `GET /client-decisions/:id` shape. |
+| **MISSING** | `assignServiceRequest` | `POST /service-requests/*/assign` | **nothing in this product can make a person responsible for a service request.** Measured both ways: `POST /assign` has no caller, AND the create path cannot stand in for it — `ServiceRequestService.create` accepts `dto.assignedToUserId`, but `/service-requests` never sends one (the field appears in the client's FILTER and in the row type, never in the create body). So an office can raise and fulfil a request and never record who is handling it. This is register entry 68's `Claim` handler gap one entity over, confirmed rather than suspected. |
+| **MISSING** | `rerunScreening` | `POST /kyc-records/*/rerun-screening` | **the only way to re-screen an APPROVED file, and the api says so itself.** `KycService.runScreening` refuses unless the record is `SUBMITTED`, with the message *“Use rerun-screening for an APPROVED file”* — so the live sibling is not an alternative, it is a pointer at this route. QUALIFIED: the AMLU obligation is met by the 4-hourly re-screen sweep over every ACTIVE customer, so what is missing is the ON-DEMAND re-screen a Compliance Officer would run after a list update or a name correction, not the periodic one. |
+| **MISSING** | `getCurrentPiPolicy` | `GET /pi-policy/current` | no live sibling and no screen: `apps/web/app/(app)/operational-risk/` does not exist. So the office's own professional-indemnity cover — the policy that answers *are we insured for a mistake we make* — is unreadable from the product. A WHOLE SCREEN rather than a button, which is why it is the most expensive row here. |
+| **MISSING** | `getScreeningConfig` | `GET /screening/providers/config` | `/screening-health` exists and calls `getScreeningHealth` + `getScreeningOverview` from the SAME client file — never this one. And the two do not overlap: health answers *can I reach the provider*, while config carries the MATCH THRESHOLDS (`high`/`review`/`low`), `sendIdentifiers`, `datasetStaleAfterHours`, and two self-diagnoses the office cannot otherwise see — `missing[]` and `thresholdProblems[]`. An office cannot see at what score its sanctions screening calls something a match, nor that its own configuration is incomplete. Gated on `sanctions-pep.screen`, the same code the health route already uses on that screen, so this one is a caller away. |
+| **THE OWNER'S** | `updateAsset` | `PATCH /risk-profiles/*/assets/*` | `addAsset` and `deleteAsset` are both live, so an asset can be added and removed but not CORRECTED. Whether delete-then-add is an acceptable path for correcting a risk-profile asset is a DECISION rather than a reading — it loses the asset's own history and its id, which may or may not matter here. Surfaced, not classified. |
 
 **SOURCE PER ROW**: every row in this section comes from
 `python scripts/measurements/dead-client-helpers.py`, which is a REPORT and not a gate and must stay
