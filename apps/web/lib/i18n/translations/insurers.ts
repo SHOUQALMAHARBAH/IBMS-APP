@@ -126,6 +126,13 @@ export const INSURERS = {
     insDetailCreditTermsLabel: 'مدة السداد',
     insDetailCreditTermsDays: '{days} يوماً',
     insDetailRatingLabel: 'التصنيف المالي',
+
+    // DECISION 93's OTHER HALF, RENDERED. The api has always sent
+    // `financialStrengthRatingAsOf` and the screen dropped it, so a solvency judgement showed with
+    // no date on it — and the whole reason the clear control removes BOTH fields together is that a
+    // rating attributed to a month that has passed is the defect. DERIVED, not written: the
+    // parentheses-and-placeholder shape from `dcmpScanAsOf`, the words from `dashAsOf`.
+    insDetailRatingAsOf: '(كما في {at})',
     insDetailRfqContactLabel: 'جهة اتصال طلبات الأسعار',
     insDetailClaimsContactLabel: 'جهة اتصال المطالبات',
     insDetailUnderwriterLabel: 'جهة الاكتتاب',
@@ -292,6 +299,7 @@ export const INSURERS = {
     insDetailCreditTermsLabel: 'Credit terms',
     insDetailCreditTermsDays: '{days} days',
     insDetailRatingLabel: 'Financial strength',
+    insDetailRatingAsOf: '(as of {at})',
     insDetailRfqContactLabel: 'RFQ contact',
     insDetailClaimsContactLabel: 'Claims contact',
     insDetailUnderwriterLabel: 'Underwriter contact',

@@ -49,8 +49,8 @@
   },
   "unreachable-by-path-budget-raised": {
     "file": "scripts/measurements/unreachable-routes.py",
-    "from": "UNREACHED_BY_PATH_BUDGET = 14",
-    "to": "UNREACHED_BY_PATH_BUDGET = 15",
+    "from": "UNREACHED_BY_PATH_BUDGET = 13",
+    "to": "UNREACHED_BY_PATH_BUDGET = 14",
     "why": "THE DOWN DIRECTION on the by-path count. Fails naming 18. **REPOINTED 2026-10-23 from 20 to 18** — `plant --self-test` refused it (`its anchor occurs 0 time(s)`) the moment failure mode 7 was fixed and the budget followed the instrument down, which is exactly what that self-test exists to catch: a committed plant whose anchor has moved is evidence that has quietly expired. **REPOINTED 2026-10-23 (owner decision 43), THE FOURTH TIME `--self-test` HAS CAUGHT THIS MECHANISM'S OWN EVIDENCE EXPIRING.** Both anchors read 0 the moment the budget moved, and both are repointed rather than deleted: the hazard is unchanged, only its number moved. It will expire again on the next wiring, which is the cost of anchoring a plant on a literal and is accepted here — the literal IS the thing being tested."
   },
   "unreachable-controller-budget-raised": {

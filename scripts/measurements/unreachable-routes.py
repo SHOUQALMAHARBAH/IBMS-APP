@@ -385,7 +385,18 @@ if _positional:
 # 16 -> 14 in the next commit of the same batch: `GET /imports/customers/batches` and
 # `.../batches/:id` — the durable customer-import report, which had been a RECORDED defect since
 # 2026-10-02 ("THE DURABLE REPORT HAS NO SCREEN") rather than something this triage discovered.
-UNREACHED_BY_PATH_BUDGET = 14
+# 14 -> 13, the last of decision 43's three commits: `DELETE /insurers/:id/financial-strength-rating`,
+# decision 93's one control on a screen that already RENDERED the value it could not clear.
+#
+# AND MEASURING THAT MOVE FOUND A BLIND SPOT IN THIS SCRIPT ITSELF, reported in
+# `scripts/measurements/dead-client-helpers.py` and NOT fixed here. The count fell to 13 the moment
+# the CLIENT FUNCTION was written, with no screen calling it — because this pass reads the path out of
+# every resolvable call including the one inside a helper's own declaration. So a route is counted
+# REACHED as soon as a helper addresses it, whether or not anything calls that helper, and both
+# figures are an UPPER BOUND on reachability. 19 of 337 route-addressing helpers are called by
+# nothing; `updateInsurer` is the proven case — it addresses `PATCH /insurers/:id`, nothing calls it,
+# and that route is in NEITHER findings list.
+UNREACHED_BY_PATH_BUDGET = 13
 # 11 -> 10 in the same move. `provider.controller.ts` leaves the list entirely, which is also the
 # controller whose TWO `@Controller` prefixes failure mode 6 collapsed into one — so the file that
 # produced both of this measurement's known defects is the file both fixes remove from the findings.

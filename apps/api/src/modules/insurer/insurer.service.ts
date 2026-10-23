@@ -502,11 +502,16 @@ export class InsurerService {
       // Nothing to clear — a no-op rather than a 422, because "already clear" is the state the
       // caller asked for.
       //
-      // AN EARLIER VERSION OF THIS COMMENT SAID "the screen does not offer the action in this state
-      // either", which described a screen that does not exist: measured 2026-10-15, NOTHING in
-      // `apps/web` calls `DELETE /insurers/:id/financial-strength-rating`, so decision 93's single
-      // button is unbuilt and this route is unreachable from the product. Corrected rather than
-      // deleted, because the no-op behaviour is still right — what was wrong was the reason given.
+      // THIS COMMENT HAS NOW BEEN WRONG IN BOTH DIRECTIONS, AND BOTH CORRECTIONS ARE KEPT because
+      // the pair is the lesson. It first said "the screen does not offer the action in this state
+      // either", describing a screen that did not exist; corrected on 2026-10-15 to say that nothing
+      // in `apps/web` called this route at all, which was true then.
+      //
+      // IT IS BUILT NOW — owner decision 43, 2026-10-23. `/insurers/[id]` carries a single Clear
+      // control, and it is rendered ONLY where there is something to clear, so the original claim is
+      // true again for the first time: the screen does not offer the action in this state. What
+      // keeps the no-op branch right regardless is that "already clear" is the state the caller
+      // asked for, and that does not depend on any screen.
       return deriveInsurerView(row);
     }
 

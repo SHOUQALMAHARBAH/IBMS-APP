@@ -153,7 +153,7 @@ facts in their own headed section and the server refuses an office's edit to a L
 naming the fields. That refusal is reachable; the state that produces it is not, except by a seed or a
 migration. Two codes exist, are granted, and gate nothing a person can do.
 
-### 5. Clearing the financial strength rating — 1 route
+### 5. Clearing the financial strength rating — 1 route · **WIRED**
 
 | route | code | holders |
 |---|---|---|
@@ -166,6 +166,27 @@ passed. The narrowest row here and the cheapest to close: one control on a scree
 the value, on a code one role already holds, with no new code (deliberately — the controller records
 that *"a code per action would be a checkbox on the Role screen for something nobody administers
 separately"*).
+
+**WIRED 2026-10-23 — owner decision 43. One button, no new code, and no confirmation step**: the act
+is a correction rather than a disposal, and the audit row carries BOTH halves of what was there as
+`beforeValue`, so the old rating is recoverable by a person reading the trail. It renders only where
+there is something to clear and the reader holds `insurer.update`, which also keeps the api's own
+no-op branch unreachable from the screen rather than merely harmless.
+
+**AND BUILDING IT FOUND THAT THE SCREEN WAS DROPPING THE AS-OF DATE.** `financialStrengthRatingAsOf`
+has always been on the wire; the screen's hand-copied interface did not declare it, so this office's
+own judgement about an insurer's solvency rendered with no date on it — which is the exact state
+decision 93 exists to prevent, one layer above the clear. It renders now, with wording derived from
+`dcmpScanAsOf`'s shape and `dashAsOf`'s words.
+
+**WHAT IS NOT CLOSED, AND IS THE ADJACENT GAP**: no screen SETS a rating either. Measured —
+`updateInsurer` has no caller anywhere in `apps/web`, so `PATCH /insurers/:id` is reachable by nothing
+a person can click, and clearing a rating cannot be undone from the product. **IT IS IN NEITHER
+FINDINGS LIST**, which is a defect in the instruments rather than in the triage: both passes read the
+path out of a client helper's own declaration, so a helper nothing calls still makes its route look
+addressed. 19 of 337 route-addressing helpers are called by nothing —
+`scripts/measurements/dead-client-helpers.py`, which is a REPORT and not a gate, and every row of
+which needs reading by hand. **So the figures in this document are a FLOOR on the real gap.**
 
 ### 6. What each archive-retrieval basis MEANS — 1 route · **STRUCTURAL HALF WIRED, WORDING HALF WITH THE OWNER**
 
