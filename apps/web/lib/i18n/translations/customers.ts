@@ -35,6 +35,23 @@ export const CUSTOMERS = {
       'الصفوف مستوردة، والمطابقات في قائمة مراجعة الجزاءات للفصل فيها.',
     impColLine: 'رقم السطر في ملفك',
     impColReason: 'السبب',
+
+    // THE DURABLE IMPORT REPORT — owner decision 43. Every Arabic run here is sliced out of a
+    // string already in the product: «سجل X» is this tree's own register-heading shape, the
+    // import word comes from `impSubmit`, the empty state is `coiRegEmpty` with its noun swapped,
+    // the load error is `endorsementLoadError` split around ITS noun (so the way-forward tail
+    // gate 14 measures comes across intact), and «بانتظار المراجعة» is sliced out of
+    // `dpowDpiaRegister`'s own parentheses.
+    //
+    // THERE ARE NO WORDS FOR `DUPLICATE` AND `BAD_DATA` AND NONE IS INVENTED HERE. Nothing in the
+    // whole i18n tree carries «مكرر» or «تكرار», so there is no source to slice; those two kinds
+    // render their MEMBER NAME, which is the eighteen-workflow-words decision and is less jarring
+    // on this table than elsewhere, because the `detail` beside it is the SERVER's own English
+    // sentence — this api has no message i18n at all. Two words the owner writes.
+    impPastHeading: 'سجل الاستيراد',
+    impPastNone: 'لا يوجد استيراد مسجّل في هذا المكتب بعد.',
+    impPastLoadError: 'تعذر تحميل سجل الاستيراد — حاول مرة أخرى.',
+    impIssueKindNeedsReview: 'بانتظار المراجعة',
     customersHeading: "العملاء",
     customersProcessIntro:
       "العملية 3-4 — اكتساب العملاء والتهيئة (أفراد وشركات)، اعرف عميلك، والملكية النفعية.",
@@ -293,6 +310,10 @@ export const CUSTOMERS = {
       'decided.',
     impColLine: 'Line in your file',
     impColReason: 'Reason',
+    impPastHeading: 'Import register',
+    impPastNone: 'Nobody in this office has run an import yet.',
+    impPastLoadError: 'Could not load the import register — try again.',
+    impIssueKindNeedsReview: 'Awaiting review',
     customersHeading: "Customers",
     customersProcessIntro:
       "Process 3-4 — customer acquisition and onboarding (individual and corporate), KYC, and " +

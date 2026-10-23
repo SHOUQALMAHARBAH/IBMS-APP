@@ -16,7 +16,7 @@
  * request. Nothing here should ever add a "save the upload first" step.
  */
 
-import { apiPostFormData } from '../auth/api-client';
+import { apiGet, apiPostFormData } from '../auth/api-client';
 
 /** The seven fields the importer understands. Mirrors `LEGACY_IMPORT_FIELDS`. */
 export const IMPORT_FIELDS = [
@@ -41,16 +41,46 @@ export const IMPORT_REQUIRED_FIELDS: ImportField[] = [
   'customerType',
 ];
 
-export interface ImportRejection {
+/**
+ * ONE ISSUE LIST CARRYING A KIND — and this shape is why `/settings/customer-import` CRASHED on
+ * every successful import for three weeks.
+ *
+ * Phase 2 item 1 replaced the api's `rejections` and `failures` with one `issues` list plus
+ * `refusedDuplicates` and `batchId`, and this file was never updated. The screen then evaluated
+ * `result.rejections.length + result.failures.length` — both `undefined` — and threw during render:
+ * the rows imported, and the panel reporting on them died. **TypeScript could not see it**, because
+ * an interface declared by hand over an HTTP response is checked against nothing, and the Playwright
+ * fixture supplied the old fields itself, so a green suite covered a screen that could not work.
+ * That is why `packages/db/prisma/legacy-import-shape-parity.spec.ts` exists: it is the only place
+ * that can read BOTH declarations.
+ *
+ * The KIND is a kind and not a wording, which is the api's own argument: as prose *"a duplicate is
+ * reported differently from bad data"* decays into two messages that read alike and a screen that
+ * lists them together.
+ */
+export type ImportIssueKind = 'DUPLICATE' | 'BAD_DATA' | 'IMPORTED_NEEDS_REVIEW';
+
+export interface ImportIssue {
+  /** 1-based, counting the header as line 1 — the line the office sees in their own spreadsheet. */
   lineNumber: number;
-  reason: string;
+  kind: ImportIssueKind;
+  /** The server's own sentence. English: this api has no message i18n (a recorded gap). */
+  detail: string;
+  /** For a DUPLICATE: the customer the row collided with, so an officer can open it and decide. */
+  collidedWithCustomerId?: string;
 }
 
 export interface ImportResult {
+  /** What a screen reads the durable report back by. */
+  batchId: string;
   fileName: string;
   totalDataRows: number;
   imported: number;
+  /** Rows that did NOT land: duplicates plus bad data. Excludes `IMPORTED_NEEDS_REVIEW`. */
   rejected: number;
+  /** Of those, how many were duplicates — apart from bad data because one needs an identity
+   *  decision and the other a typo fixed. */
+  refusedDuplicates: number;
   screened: number;
   /**
    * Rows whose screening produced a potential match.
@@ -60,10 +90,46 @@ export interface ImportResult {
    * a real hit as a data problem.
    */
   screeningFlagged: number;
-  /** Rows refused before any write — a malformed row. */
-  rejections: ImportRejection[];
-  /** Rows that passed validation and then failed to write. */
-  failures: ImportRejection[];
+  issues: ImportIssue[];
+}
+
+/**
+ * THE DURABLE REPORT — `GET /imports/customers/batches` and `.../batches/:id`, owner decision 43.
+ *
+ * Recorded as a defect on 2026-10-02 and left alone by instruction at the time: *"DEFECT 2: THE
+ * DURABLE REPORT HAS NO SCREEN"*, so `batchId`, both routes and the DUPLICATE-versus-BAD_DATA split
+ * all worked and nothing reachable by clicking read any of it. An officer who imported 2,000 rows
+ * read its refusals ONCE, in a panel that then threw.
+ *
+ * These are the RAW rows the api returns (it has no derived view for them), and this file declares
+ * only the fields the screen reads — `organizationId` is on the wire and is deliberately not here,
+ * because declaring fewer fields than the payload carries is harmless while reading one the payload
+ * LACKS is the defect above.
+ */
+export interface ImportBatch {
+  id: string;
+  fileName: string;
+  startedAt: string;
+  totalDataRows: number;
+  imported: number;
+  /** The api calls this `refused`, not `rejected` — the batch row's own column name. */
+  refused: number;
+  screened: number;
+  needsReview: number;
+}
+
+export interface ImportBatchWithIssues extends ImportBatch {
+  /** Ordered by KIND then line: resolving duplicates is a different job from fixing typos, and
+   *  interleaving them by line number makes the list something to re-sort before either can start. */
+  issues: ImportIssue[];
+}
+
+export function listImportBatches(): Promise<ImportBatch[]> {
+  return apiGet('/imports/customers/batches');
+}
+
+export function getImportBatch(id: string): Promise<ImportBatchWithIssues> {
+  return apiGet(`/imports/customers/batches/${id}`);
 }
 
 export function importCustomers(

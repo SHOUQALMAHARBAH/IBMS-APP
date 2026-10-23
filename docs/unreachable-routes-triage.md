@@ -56,7 +56,7 @@ holder, so there is no "a route whose code no plausible caller holds" finding.
 Each row names the screen that would call it, the code that gates it, and who holds that code. **Every
 one of these is the owner's decision to start or leave; none is begun here.**
 
-### 1. The durable customer-import report — 2 routes
+### 1. The durable customer-import report — 2 routes · **WIRED**
 
 | route | code | holders |
 |---|---|---|
@@ -72,6 +72,36 @@ the whole reason `LegacyImportBatch` exists."*
 The gate is the same code as the import itself, so whoever may run one may read what theirs did and
 nobody else has any use for it — **no permission decision is needed, only a screen.** Of the seven
 capabilities here this is the only one whose fix is purely additive to an existing screen.
+
+**WIRED 2026-10-23 — owner decision 43, AND IT WAS NOT PURELY ADDITIVE AFTER ALL.** That sentence
+above was written about the ROUTES and it is wrong about the SCREEN, which is worth correcting rather
+than quietly working around: `/settings/customer-import` **threw during render on every successful
+import** and had done since Phase 2, the other half of the 2026-10-02 row (*"DEFECT 1: THE IMPORT
+SCREEN CRASHES AFTER A SUCCESSFUL IMPORT"*). Item 1 replaced the api's `rejections` and `failures`
+with one `issues` list plus `refusedDuplicates` and `batchId`; the web read `result.rejections.length
++ result.failures.length`, both `undefined`. So the rows went into the book and the panel reporting on
+them died. **Fixing that is a PRECONDITION of this row, not scope creep** — a register cannot be added
+to a screen whose main path throws, and the batch detail returns the same `issues` shape anyway.
+
+**THREE THINGS FAILED TO SEE IT AND EACH FAILURE IS A GENERAL ONE.** TypeScript cannot check an
+interface a screen declares by hand over an HTTP response. The Playwright fixture SUPPLIED THE OLD
+FIELDS ITSELF, so the suite was green against a shape the server had stopped sending — no assertion
+added to that spec would have helped, because a mocked endpoint cannot drop a field the api dropped.
+And the api e2e asserted the response it got, which was correct; both sides were right about
+themselves.
+
+**SO THE INSTRUMENT IS `packages/db/prisma/legacy-import-shape-parity.spec.ts`**, which reads BOTH
+declarations as text and is the only place that can see them together — the remedy `CLAUDE.md` named
+on 2026-10-02 (*"a third parity guard over the import's response shape, not a patch to line 221"*),
+and the fourth such guard now. It covers `LegacyImportResult`/`LegacyImportIssueView` only: the two
+BATCH routes return raw Prisma rows with no declared api view, so there is nothing to compare, and
+that direction is held by the api e2e's key-set assertions and by nothing here.
+
+**AND CORRECTING THE CLIENT MADE THE OLD READ UNREPRESENTABLE RATHER THAN MERELY WRONG** — planted,
+the build fails with `error TS2339: Property 'rejections' does not exist on type 'ImportResult'` and
+Playwright cannot start at all. **TWO WORDS ARE OWED**: there is no Arabic anywhere in the i18n tree
+for *duplicate*, so `DUPLICATE` and `BAD_DATA` render their MEMBER NAME while
+`IMPORTED_NEEDS_REVIEW` has a derived word. Register entry 123.
 
 ### 2. The GLOBAL insurer form-template catalogue — 3 routes
 

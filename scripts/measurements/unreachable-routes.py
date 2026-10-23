@@ -382,7 +382,10 @@ if _positional:
 # `GET /retention-archive/bases` now have readers on `/retention-disposal`. The distinction the
 # paragraph above insists on is therefore live: that move was an instrument correction, this one is
 # progress on decision 34's fault (3), and the two must not be read as the same event.
-UNREACHED_BY_PATH_BUDGET = 16
+# 16 -> 14 in the next commit of the same batch: `GET /imports/customers/batches` and
+# `.../batches/:id` — the durable customer-import report, which had been a RECORDED defect since
+# 2026-10-02 ("THE DURABLE REPORT HAS NO SCREEN") rather than something this triage discovered.
+UNREACHED_BY_PATH_BUDGET = 14
 # 11 -> 10 in the same move. `provider.controller.ts` leaves the list entirely, which is also the
 # controller whose TWO `@Controller` prefixes failure mode 6 collapsed into one — so the file that
 # produced both of this measurement's known defects is the file both fixes remove from the findings.
@@ -391,7 +394,8 @@ UNREACHED_BY_PATH_BUDGET = 16
 # carried exactly ONE unreached route, so wiring two routes took two controllers off the list. That
 # is why this count is gated separately — two routes and two controllers moving together is a
 # different fact from two routes leaving one controller, and a single total cannot tell them apart.
-UNREACHED_CONTROLLER_BUDGET = 8
+# 8 -> 7: `legacy-import.controller.ts` carried exactly those two and nothing else.
+UNREACHED_CONTROLLER_BUDGET = 7
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both
