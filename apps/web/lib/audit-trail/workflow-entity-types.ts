@@ -97,13 +97,18 @@ export type WorkflowEntityType =
  * one and would never be corrected. Declare it in `MAY_HAVE_NO_LABEL` in the parity spec, which is
  * EMPTY now and is what makes a null a flat ban.
  *
- * ## A VOCABULARY DIVERGENCE, RECORDED RATHER THAN RECONCILED
+ * ## A VOCABULARY DIVERGENCE, FOUND HERE AND RESOLVED ELSEWHERE — OWNER DECISION 42
  *
- * This product uses TWO Arabic words for an endorsement. `endorsementSectionHeading` on the policy
- * screen says «التعديلات»; the document-category vocabulary says «ملحق»/«الملحقات», and that is the
- * family the owner chose for this map. So a reader who picks «الملحقات» here and then opens a policy
- * sees «التعديلات» over the same records. Not reconciled here — choosing between two live words is the
- * Arabic pass's call, not this file's.
+ * For one day this product used TWO Arabic words for an endorsement: the policy screen's own
+ * `endorsementSectionHeading` said «التعديلات» while the document-category vocabulary says
+ * «ملحق»/«الملحقات», which is the family this map took. So a reader who picked «الملحقات» here
+ * and then opened a policy saw a different word over the same records.
+ *
+ * **DECIDED 2026-10-23: the product keeps «الملحقات» and the policy screen was corrected to it.** The
+ * owner's grounds are worth keeping, because they are the test for the next word like this: «ملحق»
+ * is her own word in the ز.١ list of licence-gated acts, and «تعديل» is a GENERAL word that would
+ * fit any change anywhere in the system. So this map's label did not move; the divergence closed
+ * from the other end, and nothing here depends on that having happened.
  *
  * ## Two labels that are broader than their member, recorded rather than silently accepted
  *

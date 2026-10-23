@@ -526,10 +526,10 @@ export const COMPLIANCE_RISK = {
     // `caColInvoices`. Their own keys rather than pointers at those three, so an entity label is
     // not hostage to a table column's wording or a nav entry's second noun.
     //
-    // NOTE FOR THE ARABIC PASS: this product carries TWO words for an endorsement.
-    // `endorsementSectionHeading` on the policy screen says «التعديلات»; the document-category
-    // vocabulary says «ملحق»/«الملحقات», which is the family the owner chose. A reader who picks
-    // «الملحقات» here and then opens a policy sees «التعديلات» over the same records.
+    // THE DIVERGENCE THIS COMMENT ONCE REPORTED IS CLOSED — OWNER DECISION 42, same day. The policy
+    // screen's `endorsementSectionHeading` said «التعديلات», a GENERAL word that would fit any
+    // change anywhere; it now says «الملحقات», so the word in this dropdown and the word at the top
+    // of the policy screen are one word. «ملحق» is the owner's own word in the ز.١ list.
     workflowEntityOpportunity: 'الفرص',
     workflowEntityEndorsement: 'الملحقات',
     workflowEntityInvoice: 'الفواتير',
