@@ -1762,32 +1762,48 @@ administrator granting their own role `customer.create` and then writing a custo
 provider organization that starts with nothing but the dashboard, its two registration routes and its
 own administration.
 
-### OPEN — the bulk import's screen is broken, and its report has no screen at all
+### CLOSED 2026-10-23 — the bulk import's screen crashed, and its report had no screen at all
 
-Both introduced 2026-10-02 by Phase 2 item 1, found 2026-10-02 while preparing
-`docs/phase-2-walkthrough.md`. Recorded rather than fixed: the owner is walking Phase 2 and the system
-must not change under her.
+Both introduced 2026-10-02 by Phase 2 item 1 and recorded here rather than fixed, because the owner
+was walking Phase 2 and the system must not change under her. **Closed together by owner decision 43**
+— fixing the crash was a PRECONDITION of giving the report a screen, not a separate job.
 
-1. **`apps/web/app/(app)/settings/customer-import/page.tsx` reads two fields the API no longer sends.**
-   Item 1 replaced `rejections` and `failures` on `LegacyImportResult` with a single `issues` list plus
-   `refusedDuplicates` and `batchId`; the web side was not updated. Line 221 evaluates
-   `result.rejections.length + result.failures.length`, both now `undefined`, which throws during
-   render. **The rows import; the result panel crashes.** `apps/web/lib/customer/legacy-import-api.ts`
-   still declares the old `ImportResult` shape.
+1. **`/settings/customer-import` read two fields the API no longer sent, and threw during render on
+   every successful import.** Item 1 replaced `rejections` and `failures` on `LegacyImportResult` with
+   one `issues` list plus `refusedDuplicates` and `batchId`; the web side was not updated, so
+   `result.rejections.length + result.failures.length` was `undefined + undefined`. The rows went into
+   the book and the panel reporting on them died.
 
-   TypeScript cannot see it: the web declares its own interface over an HTTP response, and a value
-   arriving over HTTP is never checked against a declared type. **The same drift class as
-   `audit-action-parity.spec.ts` and `notification-kinds-parity.spec.ts`** — item 5 of the same pass
-   built a guard for one hand-copied list while this one shipped unguarded. A third parity guard over
-   the import's response shape would close it, and is the shape of the fix rather than a patch to line
-   221.
+   **THREE THINGS FAILED TO SEE IT FOR THREE WEEKS AND EACH FAILURE IS A GENERAL ONE.** TypeScript
+   cannot check an interface a screen declares by hand over an HTTP response. **The Playwright fixture
+   supplied the old fields itself**, so the suite was green against a shape the server had stopped
+   sending — no assertion added to that spec would have helped, because a mocked endpoint cannot drop a
+   field the api dropped. And the api e2e asserted the response it got, which was correct: both sides
+   were right about themselves.
 
-2. **No screen calls `GET /imports/customers/batches` or `/batches/:id`.** The durable report, its
-   `batchId`, and the `DUPLICATE`-versus-`BAD_DATA` separation all exist and are proven by
-   `legacy-import-report.e2e-spec.ts` and `walkthrough-fixtures.e2e-spec.ts` over real HTTP. Nothing
-   reachable by clicking reads them, so item 1's actual deliverable — the report that tells a duplicate
-   from a typo — is a capability nobody can exercise. Same class as the routes
-   `scripts/measurements/unreachable-routes.py` measures, in work added after the last run of it.
+   **The fix is the one this section already named** — *"a third parity guard over the import's
+   response shape, rather than a patch to line 221"*:
+   `packages/db/prisma/legacy-import-shape-parity.spec.ts`, the fourth such guard, reading BOTH
+   declarations as text because `turbo prune web --docker` stops a spec in either app importing the
+   other. And correcting the client made the old read **unrepresentable** rather than merely wrong:
+   planted, the build fails with `error TS2339: Property 'rejections' does not exist on type
+   'ImportResult'`.
+
+   It covers the RESULT and the ISSUE. The two BATCH routes return raw Prisma rows with no declared
+   api view, so there is nothing to compare; that direction is held by the api e2e's key-set
+   assertions and by nothing else.
+
+2. **`GET /imports/customers/batches` and `/batches/:id` now have a reader.** A register at the bottom
+   of the same screen: each past import renders the SAME two sentences the office was shown on the day
+   (`impResultCounts` and the screening keys, reused rather than reworded, so a reader cannot be told
+   two different things about one import), and the file name is the button that opens its lines —
+   which is what exercises the DETAIL route. A test that only read the list would have left it exactly
+   as unreachable as before.
+
+   **TWO ARABIC WORDS ARE OWED AND ARE DECLARED RATHER THAN INVENTED** (register entry 123): nothing in
+   the i18n tree carries a word for *duplicate*, so `DUPLICATE` and `BAD_DATA` render their MEMBER NAME
+   while `IMPORTED_NEEDS_REVIEW` has a derived word. Less jarring here than elsewhere, because the
+   `detail` beside each kind is the server's own English sentence and this api has no message i18n.
 
 ### OPEN — two import validations that differ from the single-customer route
 

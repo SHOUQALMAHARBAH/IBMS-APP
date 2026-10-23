@@ -17,6 +17,20 @@ and `UNREACHED_CONTROLLER_BUDGET` 10 → 7 across decision 43's three commits, e
 exactly what it closed. `MISSING_METHOD_BUDGET` stays 9 — none of the five wired routes was a
 by-METHOD row.
 
+| commit | what it wired | by path | by controller |
+|---|---|---|---|
+| `b08014b` | the retention extension register, and the retrieval bases | 18 → 16 | 10 → 8 |
+| `a26b697` | the durable customer-import report (2 routes) | 16 → 14 | 8 → 7 |
+| `f0fad7f` | clearing the financial strength rating | 14 → 13 | 7 (unchanged) |
+
+**AND THE FIGURES IN THIS DOCUMENT ARE A FLOOR ON THE REAL GAP, which the third commit found out by
+measuring rather than by reading.** Both reachability passes read the path out of a client helper's
+OWN DECLARATION, so a helper nothing calls still makes its route look addressed: the count fell 14 → 13
+the moment `clearFinancialStrengthRating` was written, before any screen called it. 19 of 337
+route-addressing helpers are called by nothing (`scripts/measurements/dead-client-helpers.py`, a
+REPORT and not a gate), and `updateInsurer` is the proven case — it addresses `PATCH /insurers/:id`,
+nothing calls it, and that route is in NEITHER findings list. Register entry 124.
+
 ## The figure is 27, and which 27
 
 **18 unreached BY PATH** (`scripts/measurements/unreachable-routes.py`) plus **9 addressed by path but
@@ -103,7 +117,7 @@ Playwright cannot start at all. **TWO WORDS ARE OWED**: there is no Arabic anywh
 for *duplicate*, so `DUPLICATE` and `BAD_DATA` render their MEMBER NAME while
 `IMPORTED_NEEDS_REVIEW` has a derived word. Register entry 123.
 
-### 2. The GLOBAL insurer form-template catalogue — 3 routes
+### 2. The GLOBAL insurer form-template catalogue — 3 routes · **TO THE INSURANCE-COMPANY MODULE**
 
 | route | code | holders |
 |---|---|---|
@@ -120,7 +134,13 @@ is the platform-wide one, and the grid's reason for withholding `insurer.form.ma
 administrator is that **the mapping becomes the form every other office submits against.** So a screen
 for this is a decision about who edits a shared catalogue, not a missing button.
 
-### 3. This office's OWN insurer form mappings — Q9 — 3 routes
+**DEFERRED TO THE INSURANCE-COMPANY MODULE — owner decision 43, 2026-10-23, register entry 118.** Her
+rule was that what has no future module is built now and what has one waits for it, and this has one.
+The reason it waits rather than being three more buttons is the sentence above: the write is
+platform-wide, so the screen is a decision about a shared catalogue. **Recorded WITH THE MODULE NAMED
+so it is not rediscovered as a new finding** — that is the whole point of naming it.
+
+### 3. This office's OWN insurer form mappings — Q9 — 3 routes · **TO PLACEMENT & QUOTING**
 
 | route | code | holders |
 |---|---|---|
@@ -137,7 +157,13 @@ reaches no reader. Its own controller explains why the write has its own code ra
 global one: folding them together *"would force a choice between denying an administrator their own
 office's forms and granting them a platform-wide write."* That argument is live and unexercised.
 
-### 4. Linking an insurer record to a registered insurance company — 2 routes
+**DEFERRED TO PLACEMENT & QUOTING — owner decision 43, 2026-10-23, register entry 119.** The owner's
+own words on it: *«on which form do I submit?» is a daily broker question whose answer is built and
+reaches nobody.* It belongs there because that is WHERE THE QUESTION IS ASKED — at the moment an
+officer submits to an insurer, not on a settings screen — and it is the largest of the four
+deferrals rather than the smallest.
+
+### 4. Linking an insurer record to a registered insurance company — 2 routes · **TO THE GATEWAY / COMPANY REGISTRY**
 
 | route | code | holders |
 |---|---|---|
@@ -152,6 +178,10 @@ whatever the office last typed"* — and `/insurers/[id]` can neither create nor
 facts in their own headed section and the server refuses an office's edit to a LINKED record with a 422
 naming the fields. That refusal is reachable; the state that produces it is not, except by a seed or a
 migration. Two codes exist, are granted, and gate nothing a person can do.
+
+**DEFERRED TO THE GATEWAY / COMPANY REGISTRY — owner decision 43, 2026-10-23, register entry 120.**
+A link is an assertion that this office's insurer record and a REGISTERED COMPANY are the same party,
+which is the registry's question rather than this screen's.
 
 ### 5. Clearing the financial strength rating — 1 route · **WIRED**
 
@@ -264,6 +294,16 @@ handle to show, inventing one is the display fix rule 2 refuses, and rendering t
 the rendered-identifier budget, which this batch was forbidden to do. The id is in the response and in
 each row's own `data-extension-for`, so the accountability is intact; the missing piece is a handle
 for the person reading it, which is register entry 94's deferred family.
+
+### 8. The `Endorsement` and `Invoice` inbound links — not routes · **TO WHICHEVER MODULE BUILDS THOSE SCREENS**
+
+Not part of the 27 and recorded here because it is the fourth of owner decision 43's deferrals, and
+three of the four being in this document while the fourth sat in a word-derivation entry is how one
+gets missed. **TWO, NOT THREE** — `KYCRecord` already has its link, in
+`apps/web/components/customer/KycQueue.tsx`, which is why a measurement of `WorkflowHistoryLink`
+rooted at `app/(app)` reads 15 of 16 and makes that type look unlinked. `Endorsement` and `Invoice`
+owe one because neither has a screen; the module that builds either adds the link in the same commit.
+Register entries 114 and 121.
 
 ## REDUNDANT — 14 routes
 
