@@ -214,7 +214,7 @@ decision 93 exists to prevent, one layer above the clear. It renders now, with w
 a person can click, and clearing a rating cannot be undone from the product. **IT IS IN NEITHER
 FINDINGS LIST**, which is a defect in the instruments rather than in the triage: both passes read the
 path out of a client helper's own declaration, so a helper nothing calls still makes its route look
-addressed. 19 of 337 route-addressing helpers are called by nothing —
+addressed. 18 of 337 route-addressing helpers are reported dead and 17 are real —
 `scripts/measurements/dead-client-helpers.py`, which is a REPORT and not a gate, and every row of
 which needs reading by hand. **So the figures in this document are a FLOOR on the real gap.**
 
@@ -310,6 +310,73 @@ gets missed. **TWO, NOT THREE** — `KYCRecord` already has its link, in
 rooted at `app/(app)` reads 15 of 16 and makes that type look unlinked. `Endorsement` and `Invoice`
 owe one because neither has a screen; the module that builds either adds the link in the same commit.
 Register entries 114 and 121.
+
+## THE SECOND SOURCE — 17 ROUTES ADDRESSED ONLY BY A HELPER NOTHING CALLS
+
+**Batch five item 4. REPORTED, NOT BUILT** — including the insurer edit, because a capability is the
+owner's decision and she takes them off ONE list, not two.
+
+Every route below is counted **REACHED** by both reachability passes, so none of them appears in the
+27 above. Both passes read the path out of a client helper's own DECLARATION, and a declaration is
+not a caller — measured in batch four, when the by-path count fell the instant a helper was written
+with no screen behind it. So the findings above are a FLOOR and this section is the rest of the floor.
+
+**THE COUNT IS 18 REPORTED, ONE FALSE POSITIVE, 17 TO CLASSIFY — AND MY OWN FIGURE OF 19 WAS WRONG.**
+Batch four's report, this document and `CLAUDE.md` all said 19. `scripts/measurements/dead-client-helpers.py`
+is byte-identical since then (`git diff 785e0fe` is empty) and reports **18** at batch four's own tip.
+So 19 was never measured; it is corrected here and in both other places rather than carried forward.
+
+**THE FALSE POSITIVE IS AN ALIASED IMPORT, and it is a defect in the instrument rather than a row.**
+`updateLanguagePreference` is imported as `patchLanguagePreference` by
+`apps/web/lib/i18n/language-context.tsx`, and the matcher counts occurrences of the BARE name: the
+import line is the single "use" it sees, and every aliased call is invisible to it. So the helper
+reads as dead while `PATCH /auth/me/language` is in fact called on every language switch —
+`language-switcher.spec.ts` asserts the request is made and passes. **Exactly one of the 18 has that
+shape**, checked across all of them by searching for `<name> as <alias>`; word-bounding will not fix
+it and resolving aliases needs a real import graph, which is the same limit the route matcher
+declares. Owed to whoever is next in that script.
+
+### Verified by hand — REDUNDANT (3)
+
+| helper | route | why the data is still reachable |
+|---|---|---|
+| `listBcpDrPlans` | `GET /bcp-dr-plans` | `/bcp-dr-plans` renders `entry.plans` out of `getBcpDrPlanCoverage()`, which is live. The plans ARE on the screen; the list route is a second way to the same rows. |
+| `listSlaHolidays` | `GET /sla/holidays` | batch four's own spot-check, re-confirmed: the route stays reachable through `getHolidayYear`. The HELPER is dead code and the ROUTE is not — which is why *dead helper* and *unreachable route* are kept as different findings. |
+| `getKycRecord` | `GET /kyc-records/*` | the queue reads `listKycRecords` and the approve/reject/run-screening writes all return a `KycRecord`, so the detail shape reaches the screen through four live paths. The standalone detail GET returns what the screen already holds. |
+
+### Verified by hand — MISSING (3)
+
+| helper | route | the capability a person loses |
+|---|---|---|
+| `getSecurityConfig` | `GET /auth/security-config` | **an office cannot see its own security configuration.** `/settings/security` imports `changePassword`, `enrollTotp`, `listTrustedDevices`, `logout`, `revokeTrustedDevice` and `verifyTotpEnrollment`, and neither of these two. The codes exist (`security-config.read`, `security-config.manage`) and gate nothing a person can reach. |
+| `updateSecurityConfig` | `PUT /auth/security-config` | and cannot change it. The pair is one capability and is counted as two rows because they are two routes. |
+| `updateInsurer` | `PATCH /insurers/*` | **an office cannot edit an insurer record at all** — batch four's proven case, unchanged. Its consequence is also why batch five's rating CLEAR has no SET beside it: the control that would set a financial strength rating is this route. |
+
+### Unclassified — 11, each with the question that decides it
+
+**NOT A ZERO, AND THAT IS THE DIFFERENCE FROM BATCH THREE.** That triage read all 27 by hand and
+reported 0 unclassified honestly. These eleven were NOT read to the same depth, and saying so is the
+point: a classification asserted from a derived signal is the hand-written ACTS column that had four
+of six spot-checked rows wrong. Each row names what has to be read.
+
+| helper | route | what decides it |
+|---|---|---|
+| `assignServiceRequest` | `POST /service-requests/*/assign` | does anything else make a person responsible for a service request? `fulfilServiceRequest` is live; if assignment has no other path this is MISSING, and it is the `Claim` handler gap one entity over (register entry 68). |
+| `rerunScreening` | `POST /kyc-records/*/rerun-screening` | shares `screening.run` with the LIVE `runScreening` and returns a different shape (`ScreeningRunResult`). REDUNDANT only if `runScreening` can be called a second time on the same record — read `KycService.runScreening`'s own refusals. |
+| `scheduleReview` | `POST /kyc-records/*/schedule-review` | **the one to read first.** Periodic re-KYC cadence is `meta/lex/kyc-aml-sla-timers.md`'s own subject — a tracked deadline, not documentation — so if nothing can schedule a review this is a compliance capability with no door, not a tidy-up. |
+| `getCurrentPiPolicy` | `GET /pi-policy/current` | no live sibling and NO `operational-risk` screen exists. Probably MISSING, and probably a whole screen rather than a button. |
+| `getScreeningConfig` | `GET /screening/providers/config` | `/screening-health` exists; does it render the provider configuration, or only the sync state? |
+| `listInteractions` | `GET /customers/*/interactions` | the 360° timeline aggregates interactions, so REDUNDANT if the timeline's own read returns them — check whether `crm-api`'s live helper carries the same rows. |
+| `updateAsset` | `PATCH /risk-profiles/*/assets/*` | `addAsset` and `deleteAsset` are live, so an asset can be added and removed but perhaps not CORRECTED. Whether delete-then-add is an acceptable path is a decision, not a reading. |
+| `getRenewalCase` | `GET /renewal-cases/*` | `listRenewalCases` is live and there is NO `renewals` screen; the detail GET's reader would be that screen. |
+| `getSlaPolicy` | `GET /sla/policies/*` | `listSlaPolicies` is live and `/sla-policies` exists — almost certainly the batch-three REDUNDANT pattern (a detail GET whose list returns the same view), but unread. |
+| `getLatestEmployeePerformance` | `GET /employee-performance/*/latest` | `listEmployeePerformance` and `computeEmployeePerformance` are live; no `dashboards/employee-performance` screen exists. |
+| `getLatestInsurerPerformance` | `GET /insurer-performance/*/latest` | same shape as the row above, same two live siblings. |
+
+**SOURCE PER ROW**: every row in this section comes from
+`python scripts/measurements/dead-client-helpers.py`, which is a REPORT and not a gate and must stay
+one — the matcher is textual, it has one known false-positive class (aliased imports, above), and a
+gate over 17 rows that each need reading by hand is a red build nobody can clear.
 
 ## REDUNDANT — 14 routes
 

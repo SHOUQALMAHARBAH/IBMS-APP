@@ -88,6 +88,18 @@ def body_of(src: str, at: int) -> str:
     return src[open_brace:]
 
 
+# ONE KNOWN FALSE-POSITIVE CLASS, FOUND 2026-10-23 BY READING THE OUTPUT RATHER THAN COUNTING IT:
+# AN ALIASED IMPORT. `updateLanguagePreference` is imported as `patchLanguagePreference`, and the
+# use counter below matches the BARE name — so the import line is the one "use" it sees and every
+# aliased call is invisible. The helper read as dead while `PATCH /auth/me/language` is in fact
+# called on every language switch, which `language-switcher.spec.ts` asserts and passes.
+#
+# Exactly one of the 18 current rows has that shape, checked across all of them. NOT FIXED: word
+# bounding does not help, and resolving an alias needs a real import graph — the same limit the
+# route matcher declares about two levels of indirection. A matcher that has been wrong in one
+# direction does not get a new way to be confidently right, so the class is declared instead.
+
+
 def main() -> int:
     lib = os.path.join(WEB, "lib")
     client_files = [p for p in walk(lib, (".ts",)) if not p.endswith(".test.ts")]
