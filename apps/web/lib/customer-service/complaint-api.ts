@@ -37,6 +37,15 @@ export interface ComplaintEscalation {
 export interface Complaint {
   id: string;
   customerId: string;
+  /**
+   * RULE 2 — WHO THE ROW IS ABOUT, resolved by the api. This column used to render the first
+   * eight characters of a uuid, which identifies nobody.
+   *
+   * Hand-copied over HTTP where TypeScript cannot check it against the api's own view, which
+   * is how the customer-import result panel broke — so it is asserted on the response body in
+   * an api e2e, not only in a Playwright mock that supplies it itself.
+   */
+  customerName: string;
   claimId: string | null;
   policyId: string | null;
   issue: string;

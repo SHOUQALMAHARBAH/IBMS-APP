@@ -135,8 +135,20 @@ describe('every screen speaks both languages (rule 6)', () => {
  * was introduced by a REFORMAT — prettier wrapped a line and `{r.entityId}` moved to a JSX-text position
  * the rule did not recognise. The violation never changed; only its formatting did. So this budget pins
  * what the detector can currently see, which is not the same as what exists.
+ *
+ * 29 -> 24 on 2026-10-23 (batch five item 1a), lowered by exactly what was fixed: five screens whose
+ * Customer column rendered the first eight characters of a uuid now render the customer's name,
+ * resolved by the api. `/complaints`, `/feedback`, `/service-requests`, `/retention-cases`,
+ * `/communications`.
+ *
+ * THIS FIGURE IS A SECOND HOME FOR THE ONE IN `scripts/measurements/rendered-identifiers.py`, and
+ * that is not an oversight: the two detectors are different implementations (this one is this file's
+ * own regex pass, the script's is its own), so a shared constant would couple two measurements that
+ * are deliberately independent. What keeps them honest is that BOTH fail in both directions — this
+ * one caught the stale 29 the moment the script's count fell, which is the ratchet's second half
+ * doing the job the second half exists for.
  */
-const RENDERED_IDENTIFIER_BUDGET = 29;
+const RENDERED_IDENTIFIER_BUDGET = 24;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

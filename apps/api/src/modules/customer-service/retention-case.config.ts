@@ -95,6 +95,8 @@ export function classifyRenewalCaseForRetention(
 export interface RetentionCaseRow {
   id: string;
   customerId: string;
+  /** RULE 2 — required rather than optional, so a read path that forgets it is a compile error. */
+  customer: { legalName: string };
   reason: string;
   status: string;
   createdAt: Date;
@@ -104,6 +106,8 @@ export interface RetentionCaseRow {
 export interface RetentionCaseView {
   id: string;
   customerId: string;
+  /** RULE 2 — the name the screen renders where it used to render eight characters of a uuid. */
+  customerName: string;
   reason: string;
   status: string;
   isClosed: boolean;
@@ -117,6 +121,7 @@ export function deriveRetentionCaseView(
   return {
     id: row.id,
     customerId: row.customerId,
+    customerName: row.customer.legalName,
     reason: row.reason,
     status: row.status,
     isClosed: isTerminalRetentionCaseStatus(row.status),

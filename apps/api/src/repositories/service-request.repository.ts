@@ -4,6 +4,11 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const WITH_SLA = {
   include: {
+    /*
+     * RULE 2 — WHICH CUSTOMER, BY NAME. This screen rendered the first eight characters of a uuid,
+     * which identifies nobody: the column exists to say who the row is about.
+     */
+    customer: { select: { legalName: true } },
     slaTimer: {
       select: {
         id: true,

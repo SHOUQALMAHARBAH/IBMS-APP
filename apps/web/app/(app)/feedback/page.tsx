@@ -206,7 +206,10 @@ export default function FeedbackPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td style={cell}>{r.customerId.slice(0, 8)}…</td>
+                    {/* RULE 2 — the name, never the id. */}
+                    <td style={cell}>
+                      <bdi>{r.customerName}</bdi>
+                    </td>
                     <td style={cell}>
                       {CONTEXT_LABEL_KEY[r.context] ? t(CONTEXT_LABEL_KEY[r.context]) : r.context}
                     </td>

@@ -32,6 +32,7 @@ interface MfaEnrollBody {
 interface CommunicationBody {
   id: string;
   customerId: string | null;
+  customerName: string | null;
   channel: string;
   languageUsed: string | null;
   direction: string;
@@ -214,6 +215,17 @@ describe('Customer Communication (e2e) — backlog Part C #44', () => {
       })
       .expect(201);
     const s = serviceSend.body as CommunicationBody;
+    /*
+     * RULE 2 — THE CUSTOMER'S NAME, ON THE RESPONSE BODY. The screen used to render the first eight
+     * characters of `customerId`, which identifies nobody; it renders this instead.
+     *
+     * Asserted HERE and not only in a Playwright mock, because a mock supplies whatever the screen
+     * reads and so can never catch the api dropping the field — the customer-import class. Paired
+     * with an absence assertion on the id, which is the half that catches a resolver that returned
+     * the id under a new name.
+     */
+    expect(s.customerName).toContain('Comm E2E Co');
+    expect(s.customerName).not.toBe(customer.id);
     expect(s.channel).toBe('EMAIL');
     expect(s.languageUsed).toBe('AR');
     expect(s.direction).toBe('OUTBOUND');
@@ -343,6 +355,21 @@ describe('Customer Communication (e2e) — backlog Part C #44', () => {
     expect(ids).toContain(s.id);
     expect(ids).toContain(m.id);
     expect(ids).not.toContain(rfqCorr.id); // the RFQ-correspondence row is excluded
+    /*
+     * RULE 2 — THE NAME ON THE LIST PATH, AND IT NEEDS ITS OWN ASSERTION.
+     *
+     * `CommunicationLog.customerId` has NO relation, so this name cannot ride on an include: it is
+     * resolved by a second read, and the LIST resolves it in one query for the page while the
+     * single-row paths resolve it one at a time. Those are two different code paths, so an
+     * assertion on the create proves nothing about the list — which was measured, not reasoned:
+     * a plant that dropped the list resolution entirely left the create assertion above green AND
+     * left the Playwright test green, because that test mocks this endpoint. Without this line the
+     * list path had no observer anywhere.
+     */
+    expect(
+      listBody.every((r) => (r.customerName ?? '').includes('Comm E2E Co')),
+    ).toBe(true);
+    expect(listBody.every((r) => r.customerName !== r.customerId)).toBe(true);
 
     const marketingOnly = await request(app.getHttpServer())
       .get(`/communications?customerId=${customer.id}&isMarketing=true`)

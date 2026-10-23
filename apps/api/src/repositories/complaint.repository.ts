@@ -25,6 +25,17 @@ const WITH_DETAIL = {
      * `ComplaintWithDetail` derives from this object, so the type widens with it and names every site.
      */
     closureCombinedDutyAct: true,
+    /*
+     * RULE 2 — WHO THE COMPLAINT IS FROM, BY NAME. The list screen rendered the first eight
+     * characters of a uuid in its Customer column, which identifies nobody: a compliance officer
+     * working a queue of complaints cannot tell two of them apart, and the whole point of the
+     * column is which customer is unhappy.
+     *
+     * `Customer.legalName` is NOT NULL and the relation is required, so there is no absent case to
+     * render — which is why this projects a plain `string` rather than a nullable one, and why a
+     * `?? '—'` beside it would be dead code guarding a state the database forbids.
+     */
+    customer: { select: { legalName: true } },
   },
 } as const;
 

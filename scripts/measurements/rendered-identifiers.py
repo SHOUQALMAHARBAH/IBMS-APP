@@ -232,7 +232,18 @@ def self_test():
 # Measured 2026-10-22 across 106 screens. The figure matched the screen-pass measurement document's
 # own, which is why this was wired rather than stopped on — a document and a script that disagree
 # mean one of them is wrong and we do not yet know which.
-RENDERED_IDENTIFIER_BUDGET = 29
+#
+# 29 -> 24 on 2026-10-23, batch five item 1(a), lowered by exactly what was fixed and no more: five
+# screens whose Customer column rendered the first eight characters of a uuid now render the
+# customer's name, resolved by the api — `/complaints`, `/feedback`, `/service-requests`,
+# `/retention-cases` and `/communications`.
+#
+# FOUR OF THE FIVE ARE AN `include`; THE FIFTH IS NOT, AND THAT IS A FINDING RATHER THAN A STYLE
+# CHOICE. `CommunicationLog.customerId` is a bare `String?` with no `@relation` and no foreign key,
+# so there is nothing to include and an id pointing at a deleted customer is representable — the
+# `Customer.ownerUserId` shape one table over (register entry 63). Its name is resolved by a second
+# read over the ids a page returned, one query for the page.
+RENDERED_IDENTIFIER_BUDGET = 24
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped

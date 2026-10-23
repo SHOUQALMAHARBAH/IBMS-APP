@@ -1,0 +1,20 @@
+{
+  "a-name-that-is-really-the-id": {
+    "file": "apps/api/src/modules/customer-service/complaint.config.ts",
+    "from": "    customerName: row.customer.legalName,",
+    "to": "    customerName: row.customerId,",
+    "why": "THE FIELD POPULATED WITH THE THING IT EXISTS TO REPLACE. Every structural check still passes — the view has the field, the client declares it, the column is not empty, the screen renders a `<bdi>` — and the Customer column is back to showing a uuid under a new name. This is the one wrong answer that is indistinguishable from the right one unless something asserts the CONTENT, which is why the api e2e assertion is a PAIR: `toContain('Cx E2E Co')` catches it, and the `not.toBe(customer.id)` beside it is what would catch a resolver that returned the id through some other route. `complaint.e2e-spec.ts` fails on the first of the two. The Playwright test does NOT fail and cannot: it MOCKS the endpoint, so it supplies the name itself and the api's mapper is not in its path — the same blindness batch four found twice, and the reason this assertion lives in the api e2e at all."
+  },
+  "the-column-shows-the-id-again": {
+    "file": "apps/web/app/(app)/complaints/page.tsx",
+    "from": "                      <bdi>{c.customerName}</bdi>",
+    "to": "                      <bdi>{c.customerId.slice(0, 8)}…</bdi>",
+    "why": "THE SCREEN REVERTED, with the api still sending the name. This is the state every one of these five screens was in until 2026-10-23 — and the plant's value is that it measures what nothing measured before: with the screens changed and the build forced, all 18 pre-existing tests in these five files PASSED, because not one of them looked at the Customer column. So the defect had no observer and neither would the fix. `complaints.spec.ts` now fails on the RULE 2 test, at the `toContainText` half. The absence half beside it is what catches the opposite mistake — a screen rendering the name AND the id, which a positive-only assertion passes straight through."
+  },
+  "the-communication-list-resolves-nothing": {
+    "file": "apps/api/src/modules/customer-service/communication.service.ts",
+    "from": "        r.customerId === null ? null : (names.get(r.customerId) ?? null),",
+    "to": "        null,",
+    "why": "THE RESOLUTION DROPPED ON THE LIST PATH ONLY, which is the shape this one is about. `CommunicationLog.customerId` has no relation, so its name cannot ride on an include and has to be resolved by a second read — and a resolution wired on the single-row paths but not on the list is exactly the asymmetry an include makes impossible and a hand-rolled lookup does not. The screen would name the customer on a detail read and show an em dash for the same row in the list, which reads as the record having no customer rather than as the read having forgotten to ask. **AND THIS PLANT KILLED NOTHING ON ITS FIRST RUN, which is the whole of its value.** The `why` first written here claimed `communications.spec.ts` would fail. It did not — 4 of 4 passed — because that spec MOCKS this endpoint, which is the blindness stated two plants above in this same file and then claimed anyway. The create assertion in `communication.e2e-spec.ts` stayed green too, because a service send is one of the paths still wired. **SO THE LIST PATH HAD NO OBSERVER ANYWHERE**, and the plant is what found that rather than confirming anything. A list assertion was added beside the create one; with it in place this plant fails `communication.e2e-spec.ts` at `expected false to be true`. THE GENERAL RULE, THIRD INSTANCE IN THIS BATCH: an api-side plant can never be observed by a Playwright test, so a resolver with two code paths needs an assertion on EACH in the api e2e — one on a create proves nothing about a list."
+  }
+}

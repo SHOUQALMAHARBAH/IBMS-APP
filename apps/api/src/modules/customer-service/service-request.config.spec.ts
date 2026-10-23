@@ -36,6 +36,9 @@ describe('deriveServiceRequestView (Process 41)', () => {
   const base: ServiceRequestRow = {
     id: 'sr-1',
     customerId: 'cust-1',
+    // RULE 2 — supplied because the Row type REQUIRES it: the strict type is what names
+    // every read path, which is why it is not optional.
+    customer: { legalName: 'Al-Yarmouk Trading Company' },
     policyId: 'pol-1',
     requestType: 'certificate',
     detail: 'Certificate of insurance for the landlord',

@@ -20,6 +20,9 @@ describe('deriveFeedbackView (Process 45)', () => {
   const row: FeedbackRow = {
     id: 'fb-1',
     customerId: 'cust-1',
+    // RULE 2 — supplied because `FeedbackRow` REQUIRES it: the strict type is
+    // what names every read path, which is why it is not optional.
+    customer: { legalName: 'Al-Yarmouk Trading Company' },
     context: 'post_claim',
     score: 4,
     comments: 'The adjuster was responsive throughout.',
@@ -30,6 +33,7 @@ describe('deriveFeedbackView (Process 45)', () => {
     expect(deriveFeedbackView(row)).toEqual({
       id: 'fb-1',
       customerId: 'cust-1',
+      customerName: 'Al-Yarmouk Trading Company',
       context: 'post_claim',
       score: 4,
       comments: 'The adjuster was responsive throughout.',

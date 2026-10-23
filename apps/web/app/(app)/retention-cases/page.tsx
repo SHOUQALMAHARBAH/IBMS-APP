@@ -205,7 +205,10 @@ export default function RetentionCasesPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td style={cell}>{r.customerId.slice(0, 8)}…</td>
+                    {/* RULE 2 — the name, never the id. */}
+                    <td style={cell}>
+                      <bdi>{r.customerName}</bdi>
+                    </td>
                     <td style={cell}>
                       {REASON_LABEL_KEY[r.reason] ? t(REASON_LABEL_KEY[r.reason]) : r.reason}
                     </td>

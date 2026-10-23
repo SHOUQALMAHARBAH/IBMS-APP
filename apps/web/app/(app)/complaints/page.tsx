@@ -285,7 +285,11 @@ export default function ComplaintsPage() {
               <tbody>
                 {rows.map((c) => (
                   <tr key={c.id}>
-                    <td style={cell}>{c.customerId.slice(0, 8)}…</td>
+                    {/* RULE 2 — the name, never the id. `bdi` because a legal name may be in
+                        the other script from the page it is rendered on. */}
+                    <td style={cell}>
+                      <bdi>{c.customerName}</bdi>
+                    </td>
                     <td style={cell}>
                       <bdi>{c.issue}</bdi>
                     </td>

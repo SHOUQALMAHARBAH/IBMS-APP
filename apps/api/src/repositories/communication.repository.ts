@@ -5,6 +5,22 @@ import type {
   LanguagePreference,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * RULE 2 — WHICH CUSTOMER, BY NAME, AND IT CANNOT BE AN INCLUDE.
+ *
+ * MEASURED: `CommunicationLog.customerId` is a bare `String?` — no `@relation`, no foreign key,
+ * nothing in the database connecting it to a `Customer`. So `include: { customer: … }` does not
+ * compile here, which is how this was found; it is the `Customer.ownerUserId` shape one table over
+ * (register entry 63), a column naming a record with nothing enforcing that the record exists.
+ *
+ * The name is therefore resolved by a SECOND read over the ids a page returned — one query for the
+ * page, never one per row, the shape `RetentionNoticeRepository.recordHandles` uses. And because
+ * there is no FK, the name has TWO absent cases rather than one: the log may carry no customerId at
+ * all, or carry one that resolves to nothing. A MISSING key means the second; the view keeps them
+ * apart rather than flattening both into a blank.
+ */
+export type CommunicationWithCustomer = CommunicationLog;
 import type { MarketingConsentRow } from '../modules/customer-service/communication.config';
 
 export interface CommunicationCustomer {
@@ -82,7 +98,32 @@ export class CommunicationRepository {
     });
   }
 
-  create(input: CreateCommunicationInput): Promise<CommunicationLog> {
+  /*
+   * RULE 2 — the include is on the CREATE as well as on the reads, because
+   * `deriveCommunicationView` is called on the row a create returns. Without it the screen that has
+   * just logged a communication would render no name for it while the list beside it does — which
+   * reads as the record being wrong rather than the read, and is the worse of the two failures.
+   */
+  /**
+   * The names for a page of communication logs. ONE query for the page.
+   *
+   * Returns a Map, and a MISSING key is not a null value: a log carrying a customerId that resolves
+   * to nothing is absent from this map, which is a different fact from a log carrying no customerId
+   * at all — and only possible here because the column has no foreign key behind it.
+   */
+  async customerNames(
+    customerIds: readonly string[],
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(customerIds)];
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.client.customer.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, legalName: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.legalName]));
+  }
+
+  create(input: CreateCommunicationInput): Promise<CommunicationWithCustomer> {
     return this.prisma.client.communicationLog.create({
       data: {
         customerId: input.customerId,
@@ -103,7 +144,7 @@ export class CommunicationRepository {
 
   /** A Process-44 row by id — `rfqId IS NULL` so an RFQ-correspondence id
    * 404s here (it is not a customer communication). */
-  findProcess44ById(id: string): Promise<CommunicationLog | null> {
+  findProcess44ById(id: string): Promise<CommunicationWithCustomer | null> {
     return this.prisma.client.communicationLog.findFirst({
       where: { id, rfqId: null },
     });
@@ -112,7 +153,7 @@ export class CommunicationRepository {
   findManyProcess44(
     scope: CommunicationScope,
     take: number,
-  ): Promise<CommunicationLog[]> {
+  ): Promise<CommunicationWithCustomer[]> {
     return this.prisma.client.communicationLog.findMany({
       where: {
         rfqId: null,

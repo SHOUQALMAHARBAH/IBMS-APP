@@ -54,6 +54,8 @@ export const FEEDBACK_READ_LIMIT = 5000;
 export interface FeedbackRow {
   id: string;
   customerId: string;
+  /** RULE 2 — required rather than optional, so a read path that forgets it is a compile error. */
+  customer: { legalName: string };
   context: string;
   score: number | null;
   comments: string | null;
@@ -63,6 +65,8 @@ export interface FeedbackRow {
 export interface FeedbackView {
   id: string;
   customerId: string;
+  /** RULE 2 — the name the screen renders where it used to render eight characters of a uuid. */
+  customerName: string;
   context: string;
   score: number | null;
   comments: string | null;
@@ -73,6 +77,7 @@ export function deriveFeedbackView(row: FeedbackRow): FeedbackView {
   return {
     id: row.id,
     customerId: row.customerId,
+    customerName: row.customer.legalName,
     context: row.context,
     score: row.score,
     comments: row.comments,

@@ -86,6 +86,8 @@ export interface ServiceRequestSlaTimerRow {
 export interface ServiceRequestRow {
   id: string;
   customerId: string;
+  /** RULE 2 — required rather than optional, so a read path that forgets it is a compile error. */
+  customer: { legalName: string };
   policyId: string | null;
   requestType: string;
   detail: string | null;
@@ -113,6 +115,8 @@ export interface ServiceRequestSlaView {
 export interface ServiceRequestView {
   id: string;
   customerId: string;
+  /** RULE 2 — the name the screen renders where it used to render eight characters of a uuid. */
+  customerName: string;
   policyId: string | null;
   requestType: string;
   detail: string | null;
@@ -134,6 +138,7 @@ export function deriveServiceRequestView(
   return {
     id: row.id,
     customerId: row.customerId,
+    customerName: row.customer.legalName,
     policyId: row.policyId,
     requestType: row.requestType,
     detail: row.detail,

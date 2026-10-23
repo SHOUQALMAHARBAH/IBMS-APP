@@ -31,6 +31,7 @@ const COMPLAINTS = [
   {
     id: "c-1",
     customerId: "11111111-1111-1111-1111-111111111111",
+    customerName: "Al-Yarmouk Trading Company",
     claimId: "claim-1",
     policyId: null,
     issue: "The settlement was 200 JOD below the assessed amount",
@@ -248,4 +249,25 @@ test("prints Closed and declares nothing when two people signed the closure off"
     page.getByRole("cell", { name: "Closed", exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId("combined-duty-complaint-c-10")).toHaveCount(0);
+});
+
+test("RULE 2 — the Customer column names the customer, and never shows the id", async ({
+  page,
+}) => {
+  /*
+   * MEASURED BEFORE THIS WAS WRITTEN: with the screen changed and the build forced, every existing
+   * test in this file still passed — nothing was looking at the Customer column, so the column
+   * rendering eight characters of a uuid had no observer at all and neither would the fix.
+   *
+   * ASSERTED AS A PAIR. The name alone passes against a screen that renders BOTH, and the absence
+   * alone passes against a screen that renders NEITHER — which is what an empty cell looks like.
+   */
+  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
+  await mockComplaints(page);
+
+  await page.goto("/complaints");
+
+  const main = page.locator("main");
+  await expect(main).toContainText("Al-Yarmouk Trading Company");
+  await expect(main).not.toContainText("11111111");
 });
