@@ -40,7 +40,15 @@ import {
  */
 
 const sectionStyle: CSSProperties = {
-  border: '1px solid var(--border)',
+  /*
+   * `--border-default`, not the undefined `--border` this read for months — a bare `var()` on an
+   * undefined custom property drops the whole declaration, so every section on this screen rendered
+   * with NO OUTLINE. Resolved by the repo's own measured convention rather than by taste: a panel
+   * outline is `--border-default` (the `impactPanelStyle` precedent), a table header rule is
+   * `--border-default`, and a row separator is `--border-subtle`. See the surfaces note in
+   * globals.css and `scripts/measurements/undefined-css-properties.py`.
+   */
+  border: '1px solid var(--border-default)',
   borderRadius: 8,
   padding: '1rem 1.25rem',
   marginBottom: '1.25rem',
@@ -66,11 +74,13 @@ const noteStyle: CSSProperties = {
 const tableStyle: CSSProperties = { width: '100%', borderCollapse: 'collapse' };
 const thStyle: CSSProperties = {
   textAlign: 'start',
-  borderBottom: '1px solid var(--border)',
+  /* a header rule — `--border-default`, per the convention noted above */
+  borderBottom: '1px solid var(--border-default)',
   padding: '0.4rem 0.5rem',
 };
 const tdStyle: CSSProperties = {
-  borderBottom: '1px solid var(--border)',
+  /* a row separator — `--border-subtle`, per the convention noted above */
+  borderBottom: '1px solid var(--border-subtle)',
   padding: '0.4rem 0.5rem',
 };
 

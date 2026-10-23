@@ -152,8 +152,10 @@ describe('every screen speaks both languages (rule 6)', () => {
  * nineteen are DEFERRED-BY-DECISION to module 7 (owner decision 46 — a readable handle for a
  * settlement or a commission entry means inventing this product's first numbering scheme, and
  * that belongs with the money), and four more need a decision rather than a name.
+ *
+ * 19 -> 18 on 2026-10-23 (batch seven item 2).
  */
-const RENDERED_IDENTIFIER_BUDGET = 19;
+const RENDERED_IDENTIFIER_BUDGET = 18;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

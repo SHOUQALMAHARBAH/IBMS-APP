@@ -18,6 +18,8 @@ export interface CrossBorderTransferRecord {
   legalBasis: string;
   legalBasisEvidenceRef: string | null;
   approvedByUserId: string | null;
+  /** Item 2 — WHO approved it, by name, resolved by the api through decision 48's one resolver. */
+  approvedByName: string | null;
   transferredAt: string;
 }
 

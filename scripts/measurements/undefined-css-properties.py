@@ -89,14 +89,31 @@ MIN_REFERENCED = 55
 # `property @ path` — every BARE reference to an undefined property that is known and deliberately
 # not fixed. Adding a row is a decision; removing one is how a fix is recorded. See the module
 # docstring for why each survives.
-DECLARED_BARE = {
-    "--border @ apps/web/app/(app)/company-record/page.tsx",
-    "--border @ apps/web/app/(app)/provider-register-insurer/page.tsx",
-    "--border @ apps/web/app/(app)/provider-register-office/page.tsx",
-    "--line @ apps/web/app/(app)/provider-offices/page.tsx",
-    "--line @ apps/web/components/ui/EntitySearch.tsx",
-    "--shadow-raised @ apps/web/components/ui/EntitySearch.tsx",
-}
+# EMPTY, AND THAT IS THE POINT — a flat ban with no switch to throw.
+#
+# It held six rows for one batch. Batch seven closed all three remaining properties on the owner's
+# ruling, and the ruling's own escape clause is what settled them: "if you find something better and
+# sounder, take that instead and say why". Better was available for every one, so no new property
+# was invented and no colour value had to be decided.
+#
+#   --border         5 sites  ->  `--border-default` for a panel outline and a table header rule,
+#                                 `--border-subtle` for a row separator. This repository's own
+#                                 convention, measured from its existing `cell`/`head` styles and
+#                                 `impactPanelStyle` — not a judgement between two plausible tokens.
+#   --line           4 sites  ->  the same split: `--border-subtle` for a table cell,
+#                                 `--border-default` for a banner and a warning outline.
+#   --shadow-raised  1 site   ->  `--shadow-md`, and this one was decided one component over rather
+#                                 than by picking an elevation. `NotificationBell`'s panel is the
+#                                 app's only other floating dropdown and is the exact comparable —
+#                                 same `--surface-card`, same `--border-default`, same
+#                                 `--shadow-md`. Matching it makes the two overlays in this product
+#                                 look like one product.
+#
+# RE-POPULATING THIS SET NEEDS A REASON BESIDE THE NAME. A row here says "this reference is bare,
+# the declaration is undefined, and we are shipping it anyway" — which renders an element with no
+# background, no border or no shadow. The gate fails on a STALE row too, so a fix is recorded by
+# deleting its row and cannot be left to cover the next regression.
+DECLARED_BARE: set[str] = set()
 
 
 def tracked_files():

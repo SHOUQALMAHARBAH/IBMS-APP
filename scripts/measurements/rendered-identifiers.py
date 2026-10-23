@@ -261,7 +261,10 @@ def self_test():
 # A FURTHER FOUR of the nineteen need a DECISION rather than a name and are reported in register
 # entry 126 with the question that decides each: three polymorphic `entityId`s over an OPEN
 # `entityType` set, and `/dashboards/policy`'s reachable `policyNumber ?? policyId` fallback.
-RENDERED_IDENTIFIER_BUDGET = 19
+# 19 -> 18 on 2026-10-23, batch seven item 2: `/cross-border-transfers`' Approved-by column now
+# names the approver, resolved through decision 48's one resolver (the HR record where the account
+# is linked) rather than rendering eight characters of a uuid.
+RENDERED_IDENTIFIER_BUDGET = 18
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped

@@ -418,11 +418,23 @@ const listStyle: CSSProperties = {
   top: '100%',
   zIndex: 20,
   background: 'var(--surface-card)',
-  border: '1px solid var(--line)',
+  /*
+   * `--border-default` and `--shadow-md`, resolved by MEASUREMENT rather than by picking an
+   * elevation: `--line` and `--shadow-raised` are both defined nowhere, so this dropdown rendered
+   * with no edge and no shadow — floating over the page with nothing separating it from the content
+   * underneath.
+   *
+   * The answer was already decided one component over. `NotificationBell`'s panel is the app's only
+   * other floating dropdown and is the exact comparable: absolutely positioned, `--surface-card`
+   * background, `border: 1px solid var(--border-default)`, `boxShadow: var(--shadow-md)`. Matching
+   * it is sounder than choosing between `--shadow-sm`/`md`/`lg` on taste, and it makes the two
+   * overlays in this product look like one product.
+   */
+  border: '1px solid var(--border-default)',
   borderRadius: 'var(--radius-sm)',
   maxHeight: '16rem',
   overflowY: 'auto',
-  boxShadow: 'var(--shadow-raised)',
+  boxShadow: 'var(--shadow-md)',
 };
 const optionStyle = (active: boolean): CSSProperties => ({
   padding: 'var(--space-1) var(--space-2)',

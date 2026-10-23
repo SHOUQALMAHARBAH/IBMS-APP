@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CrossBorderTransferService } from './cross-border-transfer.service';
 import type { CrossBorderTransferRepository } from '../../repositories/cross-border-transfer.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { UserRepository } from '../../repositories/user.repository';
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: 'cbt-1',
@@ -23,11 +24,22 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     ...over.repo,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  /*
+   * Item 2 / decision 48 — the approver's DISPLAY name comes from the one resolver. The double
+   * returns a real name rather than an empty Map, so the assertions are about the view carrying it.
+   */
+  const users = {
+    displayNameForUserId: vi.fn().mockResolvedValue('ليلى حسن الدقامسة'),
+    displayNamesForUserIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['u-dpo', 'ليلى حسن الدقامسة']])),
+  };
   const service = new CrossBorderTransferService(
     repo as unknown as CrossBorderTransferRepository,
     audit as unknown as AuditService,
+    users as unknown as UserRepository,
   );
-  return { service, repo, audit };
+  return { service, repo, audit, users };
 }
 
 describe('CrossBorderTransferService.create', () => {

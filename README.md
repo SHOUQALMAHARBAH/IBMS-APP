@@ -1561,6 +1561,39 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### DECLARED 2026-10-23 — the MODULE 0-ب SCREEN PASS closes as a declared state, not as a zero
+
+Every one of decision 34's six fault classes is now gated in CI, and the remaining rows are
+accounted for by name in `docs/screen-pass-measurement.md` § 9 rather than left as a number.
+Read that section before chasing any of the budgets, because several of them CANNOT reach
+zero and the reason is a decision rather than unfinished work:
+
+* **six rendered identifiers are DEFERRED-BY-DECISION to module 7** (owner decision 46). A
+  readable handle for a settlement, an opportunity, a needs assessment or a retention
+  schedule item means inventing this product's FIRST numbering scheme, and all four
+  families live in module 7, whose money is frozen. The four-state `recordHandle` field is
+  the answer until then — and *nobody wrote the reference down* must never collapse into
+  *this kind of record carries none*.
+* **four more need the owner**: three polymorphic `entityId`s over an OPEN `entityType`
+  set, and `/dashboards/policy`'s reachable `policyNumber ?? policyId` fallback. Each is
+  recorded with the question that decides it.
+* **the five pre-sign-in `app/(auth)` screens are MEASURED AND CLEAN** — 0 rendered
+  identifiers, 0 typed identifiers, 0 missing load-error branches, 0 missing empty states.
+  The scanners still root at `app/(app)` and are deliberately not widened, so that figure
+  is a SNAPSHOT rather than a gate: if a pre-sign-in screen ever renders or asks for an
+  identifier, nothing will catch it.
+* **two capabilities are real and deferred**: nobody can be made responsible for a service
+  request (owed to the customer-service module), and an office cannot see its
+  sanctions-match thresholds (owed to compliance). Register entries 129 and 130.
+* **`PUT /auth/security-config` is deferred to the employees-and-permissions module**
+  (owner decision 47). The READ half shipped — an office can now answer "what is your
+  session and lockout policy?" from the product, which it could not before.
+* **three four-states rows are READ AND CORRECT**, not defects: `(home)` makes zero api
+  calls so a load error is impossible, `prospects/new` is a create-only form with no list,
+  and `vendors/[id]` HAS an empty state the detector cannot see. Do not lower those two
+  budgets by loosening the detector — `{x.length > 0 && <list>}` renders nothing when empty
+  and IS the defect they exist to catch.
+
 ### CLOSED 2026-10-19 for Compliance and the DPO, STILL OPEN for Claims — an oversight read of an RFQ is ANCHORED
 
 The owner decided that Claims, Compliance and the Data Protection Officer may read an RFQ and its

@@ -6,10 +6,10 @@
     "why": "THE DEFECT ITSELF, re-planted on the exact block it was found on: the section carrying the owner's own Arabic DPO notice, which rendered with no surface behind it from the day it shipped. A bare `var()` on an undefined custom property is invalid at computed-value time, so the browser drops the WHOLE declaration. `npm run check:css-properties` fails naming the property and the file. Nothing else in this repository can see it — no compiler reads a stylesheet against a `.tsx` string, the CSS is never invalid, every Playwright assertion still passes because the text still renders, and axe passes because a missing background is not a contrast failure but a contrast ACCIDENT. That is the whole argument for a text-level join."
   },
   "a-declared-exception-silently-fixed": {
-    "file": "apps/web/components/ui/EntitySearch.tsx",
-    "from": "var(--shadow-raised)",
-    "to": "var(--shadow-md)",
-    "why": "THE DOWN DIRECTION, and it is a REAL improvement rather than a contrived break — which is the point. Fixing a declared row without removing its declaration leaves the list covering a site that no longer has the defect, so the list becomes a ceiling that silently absorbs the next regression at that path. The gate fails naming the stale row to delete. This is the `screen-route-fit-declared.json` property: the check refuses a stale declaration as well as a new finding, in both directions, so a fix is recorded by deleting its row."
+    "file": "scripts/measurements/undefined-css-properties.py",
+    "from": "DECLARED_BARE: set[str] = set()",
+    "to": "DECLARED_BARE: set[str] = {\"--surface-raised @ apps/web/app/globals.css\"}",
+    "why": "THE STALE-DECLARATION HALF OF THE GATE, re-expressed because the set is EMPTY now. A row is added for a site that does not occur, and the gate fails naming it as a row to delete — which is what stops the declared list becoming a ceiling that quietly covers the next regression at that path. REPOINTED 2026-10-23 (batch seven item 3): this plant used to FIX a declared row (`--shadow-raised` on `EntitySearch`) and be refused for not removing its declaration. Batch seven closed all three remaining properties on the owner's ruling, so `DECLARED_BARE` is empty and there is no declared row left to fix — the plant's own premise was retired by the work it was guarding. `plant --self-test` refused it the moment the anchor went, which is the mechanism doing its job on evidence whose subject had disappeared rather than merely moved."
   },
   "reference-matcher-stops-matching": {
     "file": "scripts/measurements/undefined-css-properties.py",

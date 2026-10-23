@@ -194,7 +194,16 @@ export default function CrossBorderTransfersPage() {
                     <td style={cell}>{r.destinationCountry}</td>
                     <td style={cell}>{r.legalBasis}</td>
                     <td style={cell}>{r.description}</td>
-                    <td style={cell}>{r.approvedByUserId ? r.approvedByUserId.slice(0, 8) + '…' : '—'}</td>
+                    {/*
+                      * RULE 2 — WHO approved this transfer, by name. It rendered eight characters
+                      * of a uuid, which on the register evidencing that a named person authorised
+                      * personal data leaving the country identifies nobody. The em dash is the real
+                      * absent case: creation IS publishing in this module, so a record can exist
+                      * before anybody approved it.
+                      */}
+                    <td style={cell}>
+                      {r.approvedByName ? <bdi>{r.approvedByName}</bdi> : '—'}
+                    </td>
                     <td style={cell}>{r.transferredAt.slice(0, 10)}</td>
                   </tr>
                 ))}

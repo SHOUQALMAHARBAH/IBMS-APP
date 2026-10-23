@@ -466,10 +466,15 @@ export default function SecuritySettingsPage() {
        * is what an inspector asks. Removing the self-service lines to avoid the repetition would
        * take that answer away from ten of eleven roles.
        *
-       * REPORTED, NOT RESOLVED: the two blocks use two different Arabic words for one concept —
-       * «مهلة الخمول» above and the owner's «مدّة الخمول» here. That is the «التعديلات»/«الملحقات»
-       * divergence class (decision 42) one screen smaller, and which word wins is hers; her
-       * decision-47 labels are reproduced verbatim and must not be reworded to match.
+       * RESOLVED 2026-10-23 — the owner ruled «مدّة», because it is the word in the six labels she
+       * had already approved, and the five CLDR forms of `secIdleTimeoutMinutes` above were
+       * corrected to it. The divergence this comment used to report is closed, and the word was
+       * DERIVED by slicing her own `secCfgIdleLabel` rather than retyped.
+       *
+       * «مهلة» SURVIVES EVERYWHERE ELSE AND MUST: in this product it means an SLA DEADLINE — a
+       * complaint's resolution window, a DSR's statutory clock, a service request's target — which
+       * is a different concept from a session DURATION. 38 of its 43 occurrences are that, and
+       * sweeping them would be decision 42's discipline thrown away rather than applied.
        */}
       <OfficeSecurityConfiguration />
 

@@ -153,11 +153,11 @@ const AR: PluralDictionary = {
     other: 'صُدِّر {count} سجل.',
   },
   secIdleTimeoutMinutes: {
-    one: 'مهلة الخمول: دقيقة واحدة',
-    two: 'مهلة الخمول: دقيقتان',
-    few: 'مهلة الخمول: {count} دقائق',
-    many: 'مهلة الخمول: {count} دقيقة',
-    other: 'مهلة الخمول: {count} دقيقة',
+    one: 'مدّة الخمول: دقيقة واحدة',
+    two: 'مدّة الخمول: دقيقتان',
+    few: 'مدّة الخمول: {count} دقائق',
+    many: 'مدّة الخمول: {count} دقيقة',
+    other: 'مدّة الخمول: {count} دقيقة',
   },
   secHardLogoutMinutes: {
     one: 'تسجيل الخروج التلقائي بعد: دقيقة واحدة من الخمول',

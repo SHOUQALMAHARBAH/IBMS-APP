@@ -20,7 +20,7 @@ const row = (
 
 describe('deriveCrossBorderTransferView', () => {
   it('serializes transferredAt to an ISO string', () => {
-    const v = deriveCrossBorderTransferView(row());
+    const v = deriveCrossBorderTransferView(row(), 'ليلى حسن الدقامسة');
     expect(v.transferredAt).toBe('2026-09-07T00:00:00.000Z');
     expect(v.legalBasis).toBe('standard_contractual_clauses');
     expect(v.approvedByUserId).toBe('u-dpo');
@@ -29,6 +29,7 @@ describe('deriveCrossBorderTransferView', () => {
   it('passes through a null legalBasisEvidenceRef', () => {
     const v = deriveCrossBorderTransferView(
       row({ legalBasisEvidenceRef: null }),
+      null,
     );
     expect(v.legalBasisEvidenceRef).toBeNull();
   });

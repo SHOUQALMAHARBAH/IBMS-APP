@@ -70,20 +70,24 @@ import {
  */
 
 const cell: CSSProperties = {
-  border: '1px solid var(--line)',
+  /* `--line` is defined nowhere — these cells had no borders. A cell-level rule is
+   * `--border-subtle` by this repo's own convention. */
+  border: '1px solid var(--border-subtle)',
   padding: '0.4rem 0.6rem',
   textAlign: 'start',
   verticalAlign: 'top',
 };
 
 const bannerStyle: CSSProperties = {
-  border: '1px solid var(--line)',
+  /* a banner outline — `--border-default`, like a panel */
+  border: '1px solid var(--border-default)',
   padding: '0.6rem 0.8rem',
   marginBottom: '1rem',
 };
 
 const warningStyle: CSSProperties = {
-  border: '1px solid var(--line)',
+  /* a warning outline — `--border-default`, like a panel */
+  border: '1px solid var(--border-default)',
   padding: '0.4rem 0.6rem',
 };
 

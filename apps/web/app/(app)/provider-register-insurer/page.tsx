@@ -48,7 +48,9 @@ import {
  */
 
 const sectionStyle: CSSProperties = {
-  border: '1px solid var(--border)',
+  /* `--border-default` — `--border` is defined nowhere, so this section had no outline at all.
+   * See the surfaces note in globals.css. */
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   padding: '1rem',
   marginBottom: '1rem',

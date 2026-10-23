@@ -11,6 +11,7 @@ import type { DpiaScreeningRepository } from '../../repositories/dpia-screening.
 import type { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import type { CrossBorderTransferRepository } from '../../repositories/cross-border-transfer.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { UserRepository } from '../../repositories/user.repository';
 
 const dsrRow = (over: Record<string, unknown> = {}) => ({
   id: 'dsr-1',
@@ -130,6 +131,10 @@ function makeService() {
     legalHolds as unknown as LegalHoldRepository,
     crossBorderTransfers as unknown as CrossBorderTransferRepository,
     audit as unknown as AuditService,
+    // Item 2 / decision 48 — the cross-border register's approver, by name.
+    {
+      displayNamesForUserIds: vi.fn().mockResolvedValue(new Map()),
+    } as unknown as UserRepository,
   );
   return {
     service,
