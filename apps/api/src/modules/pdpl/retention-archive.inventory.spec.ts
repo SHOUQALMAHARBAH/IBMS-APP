@@ -164,7 +164,13 @@ describe('the archive service has NO write path to a destruction', () => {
   }
 });
 
-describe('the retrieval basis is a closed TWO and the register is append-only', () => {
+/*
+ * RENAMED 2026-10-23 (owner decision 45): this read *a closed TWO* and the list is FOUR now.
+ * The property it is about is unchanged and is the one that matters — the list is CLOSED, so
+ * free text may ACCOMPANY a basis and may never BE one. The assertion below still pins the
+ * ORIGINAL migration's own text, which legitimately still names the two it created.
+ */
+describe('the retrieval basis is a CLOSED list and the register is append-only', () => {
   it('the migration asserts both triggers by name AND by event', () => {
     const text = readFileSync(
       join(
