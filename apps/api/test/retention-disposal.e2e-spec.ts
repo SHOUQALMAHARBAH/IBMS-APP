@@ -148,6 +148,9 @@ async function dropCommissionFixture(chain: {
   }
 }
 
+/** ONE HOME for the fixture's own name, because the extension register now asserts it on the wire. */
+const E2E_USER_FULL_NAME = 'Retention E2E User';
+
 async function makeUser(
   app: INestApplication<App>,
   label: string,
@@ -156,7 +159,7 @@ async function makeUser(
   const email = uniqueEmail(label);
   await request(app.getHttpServer())
     .post('/auth/signup')
-    .send({ fullName: 'Retention E2E User', email, password: PASSWORD })
+    .send({ fullName: E2E_USER_FULL_NAME, email, password: PASSWORD })
     .expect(201);
   const login = await request(app.getHttpServer())
     .post('/auth/login')
@@ -1462,6 +1465,40 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       expect(entries[0].legislativeArticle).toBe('art. 19');
       expect(entries[0].extendedByUserId).toBe(compliance.userId);
       expect(String(entries[0].note)).toContain('pending examination');
+      /*
+       * OWNER DECISION 43 — `extendedByName`, ASSERTED ON THE RESPONSE BODY.
+       *
+       * The register now has a reader, and `apps/web/lib/pdpl/retention-disposal-api.ts` declares
+       * this shape by hand over HTTP where TypeScript cannot check it — which is how the
+       * customer-import result panel broke. So a field the screen reads is asserted HERE, where a
+       * drop is visible, rather than only in a Playwright mock that supplies the field itself.
+       *
+       * A uuid identifies nobody to the person reading a register, which is why the name is
+       * resolved at all: the sibling retrieval register already did it this way.
+       */
+      expect(entries[0].extendedByName).toBe(E2E_USER_FULL_NAME);
+      /*
+       * AND THE EXACT KEY SET. A disclosure or a drop arrives as an ADDITION or an OMISSION, and a
+       * list of `toHaveProperty` calls keeps passing through both — the company-record shape guard's
+       * own argument, applied to the one shape a screen now copies by hand.
+       */
+      expect(Object.keys(entries[0]).sort()).toEqual([
+        'basis',
+        'consentDuration',
+        'consentPurpose',
+        'consentRecordId',
+        'extendedAt',
+        'extendedByName',
+        'extendedByUserId',
+        'extendedUntil',
+        'id',
+        'legalHold',
+        'legislativeArticle',
+        'legislativeInstrument',
+        'note',
+        'recordCategory',
+        'recordId',
+      ]);
 
       // ---------------------------------------------- (4b) THE SECOND NOTICE, after it elapses
       /*

@@ -242,7 +242,35 @@ export class RetentionNoticeService {
     return { extended: written, extendedUntil: extendedUntil.toISOString() };
   }
 
-  /** The register — which category, which records, which basis, who, when, until when. */
+  /**
+   * THE REGISTER — which category, which records, which basis, who, when, until when.
+   *
+   * ## IT IS NOT THE NOTICE LIST, AND THAT IS WHY IT HAS TO EXIST SEPARATELY
+   *
+   * `list()` above returns records whose period has ELAPSED. An extended record LEAVES that list by
+   * design — that is what an extension does. So this is the only place an extension is readable,
+   * and without a reader the office could extend retention and nobody, a regulator included, could
+   * ask what was extended and why. Group 7b's own rule is that an extension is a DECISION, NOT AN
+   * EXIT, and *the register must name WHICH* records were extended.
+   *
+   * ## ONE ROW PER EXTENSION, NEVER ONE PER CATEGORY
+   *
+   * The write is per RECORD for a measured reason — the period is one number for a whole category,
+   * so raising it would extend records nobody was asked about — and a register that aggregated by
+   * category would throw away exactly the half that makes an extension answerable.
+   *
+   * ## `extendedByName` RESOLVES THE ACTOR, AND THE RECORD DELIBERATELY STAYS AN ID
+   *
+   * The name is resolved in the repository's include, the same way the sibling retrieval register
+   * does it, because a uuid identifies nobody to a reader and rule 2 refuses to render one.
+   *
+   * `recordId` has no readable form at all and is returned as the id: measured, of the four
+   * blockable models only `Receipt.reference` and `CommissionLedgerEntry.paymentReference` carry
+   * anything a person could recognise, and `Remittance` and `Settlement` carry nothing. So the
+   * SCREEN does not render it (register entry 94) while the API still returns it — the
+   * accountability is in the response and in the row's own test hook, and inventing a handle here
+   * would be the display fix that rule refuses.
+   */
   async register(recordCategory?: string) {
     const rows = await this.notices.listExtensions(recordCategory);
     return rows.map((r) => ({
@@ -265,6 +293,7 @@ export class RetentionNoticeService {
       consentDuration: r.consentDuration,
       consentPurpose: r.consentPurpose,
       extendedByUserId: r.extendedByUserId,
+      extendedByName: r.extendedBy.fullName,
       extendedAt: r.extendedAt.toISOString(),
     }));
   }

@@ -3,9 +3,19 @@
 **Module 0-ب, screen pass batch three.** Decision 34's fault (3): *every capability a role holds must
 have a route to it, and every route must have something that calls it.*
 
-This is a **REPORT**. Nothing here is built, deleted or widened, and no budget moved —
-`UNREACHED_BY_PATH_BUDGET` stays 18 and `MISSING_METHOD_BUDGET` stays 9 until something is actually
-wired. **A classification is not a connection.**
+This started as a **REPORT** and is now a **LIVE REGISTER**. Nothing was built, deleted or widened
+when it was written, and no budget moved: a classification is not a connection.
+
+**IT IS NOT A SNAPSHOT ANY MORE.** Owner decision 43 (2026-10-23) ruled that the capabilities with no
+future module are built now and the four that have one go to their modules. So a row that has since
+been WIRED says so, with the commit that wired it, and a row that went to a module names the module —
+because a row that got built must stop reading as a gap, and a row somebody else owns must stop
+reading as unclaimed work.
+
+**THE BUDGETS MOVE ONLY WHEN SOMETHING IS WIRED, AND THEY HAVE**: `UNREACHED_BY_PATH_BUDGET` 18 → 13
+and `UNREACHED_CONTROLLER_BUDGET` 10 → 7 across decision 43's three commits, each lowering it by
+exactly what it closed. `MISSING_METHOD_BUDGET` stays 9 — none of the five wired routes was a
+by-METHOD row.
 
 ## The figure is 27, and which 27
 
@@ -28,7 +38,7 @@ is stated.
 
 | class | routes | capabilities |
 |---|---|---|
-| **MISSING** — a real capability no screen can reach | 13 | 7 |
+| **MISSING** — a real capability no screen can reach | 13 (5 WIRED, 8 to their modules) | 7 (3 built, 4 deferred) |
 | **REDUNDANT** — superseded; the data is already reachable | 14 | — |
 | **CORRECTLY ABSENT** — called from outside the web by design | 0 (see below) | — |
 | **UNCLASSIFIED** | 0 | — |
@@ -127,7 +137,7 @@ the value, on a code one role already holds, with no new code (deliberately — 
 that *"a code per action would be a checkbox on the Role screen for something nobody administers
 separately"*).
 
-### 6. What each archive-retrieval basis MEANS — 1 route
+### 6. What each archive-retrieval basis MEANS — 1 route · **STRUCTURAL HALF WIRED, WORDING HALF WITH THE OWNER**
 
 | route | code | holders |
 |---|---|---|
@@ -145,7 +155,27 @@ Jordan. Record the audit it belongs to"* — instructions about what to put in t
 the basis, which nobody sees. The second-copy problem is the other half: two homes for a closed
 two-value vocabulary, and the route is the one that was meant to win.
 
-### 7. The retention EXTENSION register — 1 route
+**WIRED 2026-10-23 — owner decision 43, and it SPLIT in half.** The owner's ruling was that this row
+is in scope by her own rule (no future module owns it, and it lives on the same screen as row 7), and
+that the two halves go separately.
+
+**THE STRUCTURAL HALF IS DONE.** `/retention-disposal` reads which bases exist from the route and no
+longer carries a copy of the closed two: the `<option>`s are built from the response and the Arabic
+labels stay in i18n keyed by member, so a third basis added server-side appears without a web change
+and renders its own member name until somebody decides its word — the same decision the eighteen
+workflow-entity labels made for a member with no word, and the opposite of `t(undefined)`, which
+renders nothing at all. A Playwright test offers a third basis from the mock and proves it is both
+offered and selectable. **It also fixed a live mislabelling nobody had reported**: the retrieval
+register's own table decided the basis with a ternary on one member, so ANY basis other than
+`JUDICIAL_REQUEST` rendered the Central Bank audit label — a third basis would have been recorded on
+screen as an audit that never happened. One lookup now serves the form and the table.
+
+**THE WORDING HALF IS THE OWNER'S AND IS NOT BUILT.** The meanings exist in ENGLISH ONLY, there is
+nothing in the i18n tree to derive Arabic from, and shipping an English sentence into an Arabic screen
+as a placeholder is worse than the gap. Two sentences she writes; the client declares the `meaning`
+field already, so nothing has to change on the web when they arrive. Register entry 122.
+
+### 7. The retention EXTENSION register — 1 route · **WIRED**
 
 | route | code | holders |
 |---|---|---|
@@ -163,6 +193,26 @@ the extension itself is readable.
 That matters more than its size: batch 5 group 7's own rule is that **an extension is a decision, not an
 exit**, and *"the register must name WHICH"* records were extended. The write path records all of it
 faithfully. Nothing reads it back.
+
+**WIRED 2026-10-23 — owner decision 43, her explicit «ماشي», and the one row of the 27 that was a hole
+in something already declared CLOSED.** `/retention-disposal` now carries a register section gated on
+the notice's own any-of, showing the category, the date the extended clock elapses, the basis as a
+word, the office's own statement, the instrument and article, the HOLD'S SCOPE AND REASON rather than
+its id, who extended it and when.
+
+**ONE API CHANGE WENT WITH IT**: the view resolves `extendedByName`, because the only thing it could
+otherwise say about the actor is a uuid — which rule 2 refuses to render and which identifies nobody.
+The sibling retrieval register already resolved its actor the same way.
+
+**AND THE OWNER'S OWN REQUIREMENT IS MET EXCEPT IN ONE RESPECT, WHICH IS REPORTED RATHER THAN
+SMOOTHED OVER**: *the register must name WHICH records were extended*, and the screen does NOT render
+the record id. Measured for the retrieval register next door and unchanged here — of the four
+blockable models only `Receipt.reference` and `CommissionLedgerEntry.paymentReference` carry anything
+a person could recognise, and `Remittance` and `Settlement` carry nothing — so there is no readable
+handle to show, inventing one is the display fix rule 2 refuses, and rendering the uuid would raise
+the rendered-identifier budget, which this batch was forbidden to do. The id is in the response and in
+each row's own `data-extension-for`, so the accountability is intact; the missing piece is a handle
+for the person reading it, which is register entry 94's deferred family.
 
 ## REDUNDANT — 14 routes
 

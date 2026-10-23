@@ -34,6 +34,7 @@ import {
   type RetentionScheduleItem,
 } from '../../../lib/pdpl/retention-disposal-api';
 import { ApiError } from '../../../lib/auth/api-client';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 // TEN, imported rather than written again. The api holds this figure in exactly one place
 // (`common/declaration-reason.ts`) and the owner's instruction was that two minimums for one
 // concept is the drift we keep paying for — which applies across the boundary too.
@@ -42,10 +43,14 @@ import {
   extendRetention,
   listRetentionNotices,
   listArchiveRetrievals,
+  listArchiveRetrievalBases,
+  listRetentionExtensions,
   retrieveBlockedRecords,
   type ArchiveRetrieval,
   type ArchiveRetrievalBasis,
+  type ArchiveRetrievalBasisDefinition,
   type ExtendRetentionInput,
+  type RetentionExtensionRegisterRow,
   type RetentionNotice,
 } from '../../../lib/pdpl/retention-disposal-api';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
@@ -97,6 +102,37 @@ const DISPOSE_APPROVE_ROLES = [
   'retention.dispose.approve',
 ];
 
+/**
+ * THE WORD FOR EACH RETRIEVAL BASIS, AND WHAT HAPPENS TO A BASIS WITH NO WORD.
+ *
+ * The LIST of bases now comes from `GET /retention-archive/bases` — the screen no longer carries a
+ * copy of the closed two — and the WORDS stay here, keyed by member. That split is the point: a
+ * third basis added server-side appears in the dropdown without a web change, and its label is the
+ * only thing that has to be decided.
+ *
+ * `satisfies` over the union keeps the compile-time half: a third member added to
+ * `ArchiveRetrievalBasis` is a build error until it is named. The DECLARED type is a partial map
+ * over `string`, which is the runtime truth — the server may send a member this build has never
+ * heard of — so the lookup needs no cast to be honest about it.
+ */
+/**
+ * THE WORD FOR EACH EXTENSION BASIS. A TOTAL map, unlike the archive one below, and the difference
+ * is where the list lives: the three extension bases are a closed union this build owns — the api's
+ * DTO validates against exactly them and the extend form renders a different field for each — so a
+ * fourth is a build error here rather than something that can arrive over HTTP. No fallback is
+ * reachable, which is why this one has none.
+ */
+const EXTENSION_BASIS_LABEL = {
+  LEGISLATIVE_PROVISION: 'rdNoticeBasisLegislative',
+  LEGAL_HOLD_OR_DISPUTE: 'rdNoticeBasisHold',
+  CUSTOMER_EXPLICIT_CONSENT: 'rdNoticeBasisConsent',
+} satisfies Record<ExtendRetentionInput['basis'], TranslationKey>;
+
+const ARCHIVE_BASIS_LABEL: Partial<Record<string, TranslationKey>> = {
+  JUDICIAL_REQUEST: 'rdRetrieveBasisJudicial',
+  CBJ_AUDIT: 'rdRetrieveBasisCbj',
+} satisfies Record<ArchiveRetrievalBasis, TranslationKey>;
+
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid var(--border-subtle)',
@@ -121,10 +157,22 @@ export default function RetentionDisposalPage() {
   const canRetrieve = hasAnyPermission(user, ARCHIVE_RETRIEVE_ROLES);
 
   const [retrievals, setRetrievals] = useState<ArchiveRetrieval[] | null>(null);
+  const [extensions, setExtensions] = useState<
+    RetentionExtensionRegisterRow[] | null
+  >(null);
+  const [bases, setBases] = useState<ArchiveRetrievalBasisDefinition[] | null>(
+    null,
+  );
   const [retrieveCategory, setRetrieveCategory] = useState('');
   const [retrieveIds, setRetrieveIds] = useState('');
-  const [retrieveBasis, setRetrieveBasis] =
-    useState<ArchiveRetrievalBasis>('JUDICIAL_REQUEST');
+  /*
+   * EMPTY UNTIL THE SERVER SAYS WHICH BASES EXIST. It used to be `'JUDICIAL_REQUEST'`, which was
+   * the screen's own second copy of a closed vocabulary the route already answers for — and the
+   * route existed for exactly that reason and had no caller. A `string` rather than the union for
+   * the same reason the client's `basis` field is: a basis this build has not heard of must still
+   * be selectable, not typed out of existence.
+   */
+  const [retrieveBasis, setRetrieveBasis] = useState<string>('');
   const [retrieveNote, setRetrieveNote] = useState('');
   const [retrieveDone, setRetrieveDone] = useState(false);
   const [schedule, setSchedule] = useState<RetentionScheduleItem[] | null>(null);
@@ -199,6 +247,23 @@ export default function RetentionDisposalPage() {
       // must still see the schedule, which is the defect this screen was named for.
       { key: 'notices', label: t('rdNoticeHeading'), load: listRetentionNotices },
       /*
+       * THE EXTENSION REGISTER, gated the same ANY-OF as the notice above and so conditional on it.
+       *
+       * It sits beside the notice rather than inside it because it is NOT the same list: the notice
+       * returns records whose period has ELAPSED, and an extended record leaves that list by design.
+       * Until this read existed an office could extend retention and nobody could see what had been
+       * extended or why — the write recorded all of it faithfully and nothing read it back.
+       */
+      ...(canSeeNotices
+        ? [
+            {
+              key: 'extensions',
+              label: t('rdExtRegisterHeading'),
+              load: listRetentionExtensions,
+            },
+          ]
+        : []),
+      /*
        * CONDITIONAL, unlike the four above — and deliberately so. This route is gated on a code most
        * readers of this screen do not hold, so an unconditional entry would 403 for them and the
        * partial-load branch would tell them a list "did not load" every single time. That is both
@@ -212,6 +277,15 @@ export default function RetentionDisposalPage() {
               label: t('rdRetrieveRegisterHeading'),
               load: listArchiveRetrievals,
             },
+            /*
+             * WHICH BASES EXIST, from the route that was written so the screen would not restate
+             * them. Same gate as the retrieval itself, so it joins the same conditional block.
+             */
+            {
+              key: 'bases',
+              label: t('rdRetrieveBasisLabel'),
+              load: listArchiveRetrievalBases,
+            },
           ]
         : []),
     ]);
@@ -220,12 +294,33 @@ export default function RetentionDisposalPage() {
     setBatches((values.batches as DisposalBatch[] | undefined) ?? null);
     setNotices((values.notices as RetentionNotice[] | undefined) ?? null);
     setRetrievals((values.retrievals as ArchiveRetrieval[] | undefined) ?? null);
+    setExtensions(
+      (values.extensions as RetentionExtensionRegisterRow[] | undefined) ?? null,
+    );
+    const loadedBases =
+      (values.bases as ArchiveRetrievalBasisDefinition[] | undefined) ?? null;
+    setBases(loadedBases);
+    /*
+     * A FUNCTIONAL UPDATE, so a basis the officer has already chosen survives the reload every
+     * action triggers. Only a value the server no longer offers is replaced, and the fallback is
+     * the first basis the server named rather than a literal — which is the whole point of reading
+     * the list. Empty while the list has not arrived, and the submit is disabled on that.
+     */
+    setRetrieveBasis((current) => {
+      if (loadedBases === null) return current;
+      const offered = loadedBases.map((b) => b.basis);
+      return offered.includes(current) ? current : (offered[0] ?? '');
+    });
     const allRefused =
       // THE THRESHOLD MOVES WITH THE PANEL COUNT, which is what this comment demanded when it read
-      // "4, not 3". It is now computed rather than written, because 7c made the panel count depend
-      // on a permission: a reader who may retrieve loads five lists, everybody else loads four, and
-      // a literal would make the all-of sentence unreachable for exactly one of those two readers.
-      failures.length === (canRetrieve ? 5 : 4) &&
+      // "4, not 3", and again when it read "five lists". It is COMPUTED rather than written because
+      // the panel count depends on two permissions now. Decision 43 added
+      // the extension register (on the notice's own any-of) and the basis list (on the retrieval's
+      // code), so a reader holding none of the codes fails four and a reader holding all of them
+      // fails seven — and a literal would make the all-of sentence unreachable for all but one
+      // kind of reader. This is the second time that comment has had to be honoured.
+      failures.length ===
+        4 + (canRetrieve ? 2 : 0) + (canSeeNotices ? 1 : 0) &&
       failures.every((f) => f.error instanceof ApiError && f.error.status === 403);
     setLoadError(
       failures.length === 0
@@ -238,7 +333,7 @@ export default function RetentionDisposalPage() {
             ])
           : `${t('commonListsMissing')} ${namedFailures(failures)}`,
     );
-  }, [t, canRetrieve]);
+  }, [t, canRetrieve, canSeeNotices]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -266,6 +361,24 @@ export default function RetentionDisposalPage() {
   }
 
   /** The sentence this screen renders, and the exact text it sends back to be recorded. */
+  /**
+   * THE WORD FOR A BASIS, or the basis itself when this build has no word for it.
+   *
+   * One helper for both readers of a basis — the retrieval form's `<select>` and the retrieval
+   * register's own table — because they used to disagree: the table was a ternary on one member, so
+   * ANY other basis rendered the Central Bank audit label. A third basis would have been reported on
+   * the register as an audit that never happened.
+   *
+   * The fallback renders the member NAME rather than nothing. `t(undefined)` renders nothing at all
+   * — the notification-bell defect — and an English member name in an Arabic dropdown is obviously
+   * unfinished, where a blank option is indistinguishable from a bug. Same decision the eighteen
+   * workflow-entity labels made for a member with no word.
+   */
+  const basisLabel = (basis: string): string => {
+    const key = ARCHIVE_BASIS_LABEL[basis];
+    return key ? t(key) : basis;
+  };
+
   const noFloorNotice = t('rdNoFloorNotice');
 
   function noFloorDeclarationPayload() {
@@ -719,20 +832,27 @@ export default function RetentionDisposalPage() {
                 data-testid="retrieve-basis"
                 aria-label={t('rdRetrieveBasisLabel')}
                 value={retrieveBasis}
-                onChange={(e) =>
-                  setRetrieveBasis(e.target.value as ArchiveRetrievalBasis)
-                }
+                onChange={(e) => setRetrieveBasis(e.target.value)}
+                disabled={bases === null || bases.length === 0}
                 style={{ width: '100%' }}
               >
                 {/*
-                  A CLOSED TWO, and there is deliberately no "internal review" option: an office
-                  retrieving a blocked record for its own purposes is not retrieving it on a basis,
-                  it is processing it — which is what condition 1 refuses.
+                  THE OPTIONS COME FROM THE SERVER, and the list is still a closed two with
+                  deliberately no "internal review" among them: an office retrieving a blocked
+                  record for its own purposes is not retrieving it on a basis, it is processing it,
+                  which is what condition 1 refuses. What changed is WHERE that list lives — this
+                  screen used to carry its own copy of it.
+
+                  NO PLACEHOLDER OPTION AND NO "loading" TEXT. An empty disabled select is honest in
+                  both the not-yet and the did-not-load states, where a word would have to pick one
+                  of them and would be a wrong claim in the other; the named-failure sentence at the
+                  top of the screen is what says the list did not arrive.
                 */}
-                <option value="JUDICIAL_REQUEST">
-                  {t('rdRetrieveBasisJudicial')}
-                </option>
-                <option value="CBJ_AUDIT">{t('rdRetrieveBasisCbj')}</option>
+                {(bases ?? []).map((b) => (
+                  <option key={b.basis} value={b.basis}>
+                    {basisLabel(b.basis)}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
@@ -746,7 +866,11 @@ export default function RetentionDisposalPage() {
                 style={{ width: '100%' }}
               />
             </label>
-            <button type="submit" disabled={busy} data-testid="retrieve-submit">
+            <button
+              type="submit"
+              disabled={busy || retrieveBasis === ''}
+              data-testid="retrieve-submit"
+            >
               {busy ? t('rdSavingButton') : t('rdRetrieveSubmit')}
             </button>
           </form>
@@ -798,14 +922,115 @@ export default function RetentionDisposalPage() {
                         display fix the rule refuses. The row keeps it as a test hook, which is an
                         attribute and not text a reader sees.
                       */}
-                      <td style={cell}>
-                        {r.basis === 'JUDICIAL_REQUEST'
-                          ? t('rdRetrieveBasisJudicial')
-                          : t('rdRetrieveBasisCbj')}
-                      </td>
+                      {/*
+                        THE SAME LOOKUP THE SELECT USES. This was a ternary on one member, so any
+                        basis that was not `JUDICIAL_REQUEST` rendered the CBJ-audit label — a third
+                        basis would have been mislabelled as a Central Bank audit on the register
+                        that exists to say why a blocked record was opened.
+                      */}
+                      <td style={cell}>{basisLabel(r.basis)}</td>
                       <td style={cell}>{r.note}</td>
                       <td style={cell}>{r.retrievedByName ?? '—'}</td>
                       <td style={cell}>{r.retrievedAt.slice(0, 10)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {/*
+        THE EXTENSION REGISTER — owner decision 43, and the one row of the triage that was a hole in
+        something already declared closed.
+
+        ## It is not the notice list, and that is why it had to exist
+
+        `GET /retention-notices` returns records whose period has ELAPSED. An extended record LEAVES
+        that list by design — that is what an extension does — so until this section existed an
+        office could extend retention and nobody, a regulator asking *what did you extend and why*
+        included, could see the list. The write path recorded the record, the basis, the note, the
+        instrument and article and the legal hold faithfully, and nothing read any of it back.
+
+        ## Gated on the notice's own any-of, and rendered for nobody else
+
+        Holders of any of the three acts see the notice; the same three see what was extended. A
+        reader without them gets no section at all rather than a refusal sentence — the frontend
+        directive's rule, and the same treatment the retrieval section above gets.
+
+        ## THE RECORD'S OWN ID IS NOT RENDERED, and that is rule 2 rather than an omission
+
+        The owner's standing requirement is that the register must name WHICH records were extended,
+        and the honest state of that is: the api returns `recordId` and this table does not show it.
+        Measured for the retrieval register next door and unchanged here — of the four blockable
+        models only `Receipt.reference` and `CommissionLedgerEntry.paymentReference` carry anything a
+        person could recognise, and `Remittance` and `Settlement` carry nothing — so there is no
+        readable handle to render, and inventing one is the display fix rule 2 refuses. Rendering the
+        uuid would raise the rendered-identifier budget, which this batch is forbidden to do. The id
+        is in the response and in each row's own `data-extension-for`, so the accountability the
+        register exists for is intact; what is missing is a handle for the person reading it, and
+        that is register entry 94's deferred family.
+      */}
+      {canSeeNotices ? (
+        <section style={sectionStyle} data-testid="retention-extension-section">
+          {/* `h2`, like every other top-level section on this page — the retrieval register above is
+              an `h3` because it sits INSIDE the retrieval section, under its own `h2`. */}
+          <h2>{t('rdExtRegisterHeading')}</h2>
+          {extensions === null ? (
+            <p>{t('rdLoading')}</p>
+          ) : extensions.length === 0 ? (
+            <p
+              data-testid="retention-extension-none"
+              style={{ color: 'var(--ink-secondary)' }}
+            >
+              {t('rdExtRegisterNone')}
+            </p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                data-testid="retention-extension-table"
+                style={{ borderCollapse: 'collapse', width: '100%' }}
+              >
+                <thead>
+                  <tr>
+                    <th style={head}>{t('rdNoticeColCategory')}</th>
+                    <th style={head}>{t('rdExtColUntil')}</th>
+                    <th style={head}>{t('rdRetrieveColBasis')}</th>
+                    <th style={head}>{t('rdRetrieveColNote')}</th>
+                    <th style={head}>{t('rdNoticeInstrumentLabel')}</th>
+                    <th style={head}>{t('rdNoticeArticleLabel')}</th>
+                    <th style={head}>{t('rdNoticeHoldLabel')}</th>
+                    <th style={head}>{t('rdExtColWho')}</th>
+                    <th style={head}>{t('rdRetrieveColWhen')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {extensions.map((x) => (
+                    <tr key={x.id} data-extension-for={x.recordId}>
+                      <td style={cell}>{x.recordCategory}</td>
+                      <td style={cell}>{x.extendedUntil.slice(0, 10)}</td>
+                      <td style={cell}>{t(EXTENSION_BASIS_LABEL[x.basis])}</td>
+                      <td style={cell}>{x.note}</td>
+                      {/*
+                        An em dash rather than an omitted row where the basis did not need an
+                        instrument: "this extension cites no statute" and "somebody left it blank"
+                        are different facts, and a missing cell says neither.
+                      */}
+                      <td style={cell}>{x.legislativeInstrument ?? '—'}</td>
+                      <td style={cell}>{x.legislativeArticle ?? '—'}</td>
+                      {/*
+                        THE HOLD'S SCOPE AND REASON, never its id — which is both rule 2 and the
+                        useful half: a reader checking whether an extension is justified needs to
+                        know WHAT was held and why, and a uuid tells them neither.
+                      */}
+                      <td style={cell}>
+                        {x.legalHold === null
+                          ? '—'
+                          : `${x.legalHold.scope} — ${x.legalHold.reason}`}
+                      </td>
+                      <td style={cell}>{x.extendedByName ?? '—'}</td>
+                      <td style={cell}>{x.extendedAt.slice(0, 10)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -165,6 +165,11 @@ export class RetentionNoticeRepository {
       orderBy: { extendedAt: 'desc' },
       include: {
         legalHold: { select: { id: true, scope: true, reason: true } },
+        // WHO extended it, by NAME. The sibling retrieval register already resolves its actor this
+        // way (`retention-archive.service.ts`), and without it the only thing the register could
+        // say about the actor is a uuid — which rule 2 refuses to render and which identifies
+        // nobody to the person reading the register.
+        extendedBy: { select: { fullName: true } },
       },
     });
   }

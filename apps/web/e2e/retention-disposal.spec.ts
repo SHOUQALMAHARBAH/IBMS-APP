@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { permissionsForRoles } from './fixtures/role-permissions';
+import { anchoredTexts, expectAbsentWithin } from './support/anchored';
 
 const ME_BASE = {
   id: 'user-1',
@@ -167,6 +168,10 @@ async function mockRegister(
     notices?: unknown[];
     retrievalsStatus?: number;
     retrievals?: unknown[];
+    extensionsStatus?: number;
+    extensions?: unknown[];
+    basesStatus?: number;
+    bases?: unknown[];
   } = {},
 ) {
   await page.route('http://localhost:4000/retention-schedule**', (route) => {
@@ -193,6 +198,50 @@ async function mockRegister(
       retrievedByName: 'Compliance Officer',
     },
   ];
+  /*
+   * THE EXTENSION REGISTER — owner decision 43. One row per `RetentionExtension`, which is NOT the
+   * notice list: an extended record leaves the notices by design, so this is the only place the
+   * extension itself is readable.
+   */
+  const EXTENSIONS = [
+    {
+      id: 'ext-1',
+      recordCategory: 'Receipt',
+      recordId: 'receipt-7',
+      extendedUntil: '2029-03-31T00:00:00.000Z',
+      basis: 'LEGAL_HOLD_OR_DISPUTE',
+      note: 'Held pending the Amman dispute, file 404 of 2026.',
+      legislativeInstrument: null,
+      legislativeArticle: null,
+      legalHold: {
+        id: 'hold-9',
+        scope: 'Customer file — Al-Yarmouk',
+        reason: 'Litigation reasonably in prospect',
+      },
+      consentRecordId: null,
+      consentDuration: null,
+      consentPurpose: null,
+      extendedByUserId: 'u-1',
+      extendedByName: 'Compliance Officer',
+      extendedAt: '2026-10-22T09:00:00.000Z',
+    },
+  ];
+  /*
+   * WHICH BASES EXIST, from the route rather than from the screen. The default is the real closed
+   * two; a test that wants a THIRD passes its own list, which is the whole point of reading it.
+   */
+  const BASES = [
+    {
+      basis: 'JUDICIAL_REQUEST',
+      meaning:
+        'A request from a court or a judicial authority. Record which authority asked, and for what.',
+    },
+    {
+      basis: 'CBJ_AUDIT',
+      meaning:
+        'An official audit by the Central Bank of Jordan. Record the audit it belongs to.',
+    },
+  ];
   const REFUSED = {
     message: 'You do not hold a permission required to perform this action',
   };
@@ -217,6 +266,22 @@ async function mockRegister(
     opts.batchesStatus && opts.batchesStatus !== 200
       ? route.fulfill({ status: opts.batchesStatus, json: REFUSED })
       : route.fulfill({ status: 200, json: opts.batches ?? BATCHES }),
+  );
+  /*
+   * REGISTERED LAST, AND THAT IS LOAD-BEARING. `/retention-notices**` above also matches
+   * `/retention-notices/register`, and Playwright gives precedence to the handler registered LAST
+   * — so this must come after it or the register read would be served the notice array, which
+   * would render as a table of undefined cells rather than failing.
+   */
+  await page.route('http://localhost:4000/retention-notices/register**', (route) =>
+    opts.extensionsStatus && opts.extensionsStatus !== 200
+      ? route.fulfill({ status: opts.extensionsStatus, json: REFUSED })
+      : route.fulfill({ status: 200, json: opts.extensions ?? EXTENSIONS }),
+  );
+  await page.route('http://localhost:4000/retention-archive/bases**', (route) =>
+    opts.basesStatus && opts.basesStatus !== 200
+      ? route.fulfill({ status: opts.basesStatus, json: REFUSED })
+      : route.fulfill({ status: 200, json: opts.bases ?? BASES }),
   );
 }
 
@@ -374,6 +439,34 @@ test('a user holding NONE of the three permissions sees the translated 403 messa
   ).toBeVisible();
   await expect(
     page.getByText('You do not hold a permission required', { exact: false }),
+  ).toHaveCount(0);
+});
+
+test('OWNER DECISION 43 — a reader holding none of the three acts gets no extension register', async ({
+  page,
+}) => {
+  /*
+   * The register is gated on the notice's own ANY-OF, so the reader who is refused all three acts
+   * sees no section at all rather than a refusal sentence — the frontend directive's rule, and the
+   * same treatment the retrieval section gets one code over.
+   *
+   * THE ANCHOR IS THE REFUSAL ITSELF, from the same render: without something positive asserted
+   * first, `toHaveCount(0)` passes on its first poll against a page that has not hydrated.
+   */
+  await mockAuth(page, ['SALES_RELATIONSHIP_OFFICER']);
+  await mockRegister(page, {
+    scheduleStatus: 403,
+    holdsStatus: 403,
+    batchesStatus: 403,
+    noticesStatus: 403,
+  });
+
+  await page.goto('/retention-disposal');
+  await expect(page.locator('main').getByRole('alert')).toContainText(
+    'You do not hold',
+  );
+  await expect(
+    page.getByTestId('retention-extension-section'),
   ).toHaveCount(0);
 });
 
@@ -831,4 +924,136 @@ test('MODULE 0-ب — a category WITH a period shows no such notice', async ({
   await expect(
     page.locator('[data-no-period="AuditLogEntry"]'),
   ).toHaveCount(0);
+});
+
+test('OWNER DECISION 43 — the extension register is the only place an extension is readable, and it names the basis, the hold and who', async ({
+  page,
+}) => {
+  /*
+   * THE HOLE THIS CLOSES. `GET /retention-notices` returns records whose period has ELAPSED, and an
+   * extended record LEAVES that list by design — that is what an extension does. So before this
+   * section existed an office could extend retention and nobody, a regulator asking *what did you
+   * extend and why* included, could see the list: the write recorded the record, the basis, the
+   * note, the instrument and the hold faithfully, and nothing read any of it back.
+   *
+   * Group 7b's own rule is that an extension is a DECISION, NOT AN EXIT, and that the register must
+   * name WHICH records were extended. What that rule gets here is everything except the record's own
+   * handle — see the last assertion.
+   */
+  await mockAuth(page, ['DATA_PROTECTION_OFFICER']);
+  await mockRegister(page);
+
+  await page.goto('/retention-disposal');
+
+  const row = page.locator('[data-extension-for="receipt-7"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Receipt');
+  // The date the EXTENDED clock elapses — the one fact that says when the same notice comes back.
+  await expect(row).toContainText('2029-03-31');
+  // The basis as a WORD, through the total label map, not the stored member name.
+  await expect(row).toContainText('A live legal hold or dispute');
+  await expect(row).toContainText('Amman dispute, file 404 of 2026');
+  // THE HOLD'S SCOPE AND REASON, never its id: a reader checking whether an extension is justified
+  // needs to know what was held and why, and a uuid tells them neither.
+  await expect(row).toContainText('Customer file — Al-Yarmouk');
+  await expect(row).toContainText('Litigation reasonably in prospect');
+  await expect(row).toContainText('Compliance Officer');
+  await expect(row).toContainText('2026-10-22');
+
+  /*
+   * AND THE RECORD'S OWN ID IS NOT RENDERED — rule 2, and the honest limit of this register.
+   * Measured for the retrieval register next door: of the four blockable models only
+   * `Receipt.reference` and `CommissionLedgerEntry.paymentReference` carry anything a person could
+   * recognise, so there is no readable handle to show, and rendering the uuid would raise the
+   * rendered-identifier budget. It stays in the response and in this row's own attribute, which is
+   * what this locator just used to find it.
+   */
+  await expectAbsentWithin(page.getByTestId('retention-extension-table'), (scope) =>
+    scope.getByText('receipt-7'),
+  );
+});
+
+test('OWNER DECISION 43 — an office that has extended nothing is told so, rather than shown an empty table', async ({
+  page,
+}) => {
+  await mockAuth(page, ['DATA_PROTECTION_OFFICER']);
+  await mockRegister(page, { extensions: [] });
+
+  await page.goto('/retention-disposal');
+
+  await expect(page.getByTestId('retention-extension-none')).toContainText(
+    'has recorded an extension yet',
+  );
+  // The TABLE is absent, not merely empty: a header row with nothing under it reads as a list that
+  // failed to load. Anchored on the empty state, which is from the same render.
+  await expect(page.getByTestId('retention-extension-table')).toHaveCount(0);
+});
+
+test('OWNER DECISION 43 — the retrieval bases come from the SERVER, and one the web has no word for is still offered under its own name', async ({
+  page,
+}) => {
+  /*
+   * THE STRUCTURAL HALF of the bases route. This screen used to carry its own copy of the closed two
+   * as a hardcoded pair of `<option>`s and a `useState('JUDICIAL_REQUEST')` default, while
+   * `GET /retention-archive/bases` existed so that *"the screen renders them rather than restating
+   * them"* — its controller's own words — and reached no caller at all.
+   *
+   * The proof is a THIRD basis the server offers and this build has never heard of. It must be
+   * SELECTABLE (the capability is the server's to grant) and labelled by its own member name, which
+   * is visibly unfinished — the same decision the eighteen workflow-entity labels made for a member
+   * with no word, and the opposite of `t(undefined)`, which renders nothing at all.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegister(page, {
+    bases: [
+      { basis: 'JUDICIAL_REQUEST', meaning: 'A court asked.' },
+      { basis: 'CBJ_AUDIT', meaning: 'The Central Bank asked.' },
+      { basis: 'REGULATORY_INSPECTION', meaning: 'Added server-side.' },
+    ],
+  });
+
+  await page.goto('/retention-disposal');
+
+  const basis = page.getByTestId('retrieve-basis');
+  /*
+   * THE ANCHOR IS THE SELECT BEING ENABLED, and it had to be: my first version anchored on the
+   * select merely being VISIBLE, which it is from the first paint with no options in it at all, so
+   * `anchoredTexts` read an empty list and the test failed on a correct screen. The select is
+   * DISABLED until the server's list arrives, which makes "enabled" the one signal that proves the
+   * fetch resolved — a semantic anchor rather than a count of the thing being asserted.
+   */
+  await expect(basis).toBeEnabled();
+  const texts = await anchoredTexts(basis.locator('option'), basis);
+  expect(texts).toHaveLength(3);
+  // The two this build knows are WORDS, not member names.
+  expect(texts[0]).toBe('A judicial request');
+  expect(texts[1]).toBe('An official audit by the Central Bank of Jordan');
+  // The third renders its own member name: unfinished and obviously so, rather than blank.
+  expect(texts[2]).toBe('REGULATORY_INSPECTION');
+  await expect(
+    basis.locator('option[value="REGULATORY_INSPECTION"]'),
+  ).toHaveCount(1);
+
+  // AND IT IS SELECTABLE AND SENDS ITS OWN VALUE — the server is the validator here
+  // (`@IsIn(ARCHIVE_RETRIEVAL_BASES)` answers 400 on anything it did not offer), so the screen
+  // narrowing the list a second time would only stop a third basis working.
+  let posted: Record<string, unknown> | null = null;
+  await page.route(
+    'http://localhost:4000/retention-archive/retrievals',
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        posted = route.request().postDataJSON() as Record<string, unknown>;
+        return route.fulfill({ status: 201, json: { retrievals: [] } });
+      }
+      return route.fulfill({ status: 200, json: [] });
+    },
+  );
+  await basis.selectOption('REGULATORY_INSPECTION');
+  await page.getByTestId('retrieve-category').fill('Receipt');
+  await page.getByTestId('retrieve-records').fill('receipt-7');
+  await page.getByTestId('retrieve-note').fill('Inspection reference 2026/11.');
+  await page.getByTestId('retrieve-submit').click();
+
+  await expect(page.getByTestId('retrieve-done')).toBeVisible();
+  expect(posted).toMatchObject({ basis: 'REGULATORY_INSPECTION' });
 });

@@ -245,6 +245,18 @@ export const PDPL = {
       'مَن استخرجَه',
     rdRetrieveColWhen:
       'متى',
+
+    // THE EXTENSION REGISTER — owner decision 43. Four new keys and every Arabic run sliced
+    // out of a string already in the product, never typed: «سجل X» is this dictionary's own
+    // register-heading shape (`dpowHoldRegister`, `dpowCbtRegister`, `dpowDpiaRegister`), the
+    // extension word comes from `rdNoticeExtendSubmit`, the empty state is `coiRegEmpty` with
+    // its own noun swapped, «حتى» comes from `dpowColDaysUntilDue` and «من» from
+    // `coiRegWhoHeading`. Every other column reuses an existing key outright — the basis, the
+    // statement, the category, the instrument, the article and the hold all already render here.
+    rdExtRegisterHeading: 'سجل التمديد',
+    rdExtRegisterNone: 'لا يوجد تمديد مسجّل في هذا المكتب بعد.',
+    rdExtColUntil: 'حتى',
+    rdExtColWho: 'من',
     rdRetrieveDone:
       'تمّ تدوينُ الاستخراج.',
     rdNoticeTwoChoices:
@@ -659,6 +671,10 @@ export const PDPL = {
       'Retrieved by',
     rdRetrieveColWhen:
       'When',
+    rdExtRegisterHeading: 'Extension register',
+    rdExtRegisterNone: 'Nobody in this office has recorded an extension yet.',
+    rdExtColUntil: 'Until',
+    rdExtColWho: 'Who',
     rdRetrieveDone:
       'The retrieval has been recorded.',
     rdNoticeTwoChoices:

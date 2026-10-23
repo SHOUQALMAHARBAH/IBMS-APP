@@ -134,6 +134,48 @@ export function extendRetention(
 }
 
 /**
+ * ONE ROW PER EXTENSION — `GET /retention-notices/register`, owner decision 43.
+ *
+ * NOT the notice list. `listRetentionNotices` returns records whose period has ELAPSED, and an
+ * extended record LEAVES that list by design — that is what an extension does. So this is the only
+ * place an extension is readable, and until this function existed an office could extend retention
+ * and nobody, a regulator included, could ask what was extended and why.
+ *
+ * `recordId` is returned and is NOT rendered (register entry 94): of the four blockable models only
+ * `Receipt.reference` and `CommissionLedgerEntry.paymentReference` carry anything a person could
+ * recognise, so there is no readable handle to show and inventing one is the display fix rule 2
+ * refuses. The id stays in the payload and in the row's own test hook.
+ */
+export interface RetentionExtensionRegisterRow {
+  id: string;
+  recordCategory: string;
+  recordId: string;
+  /** When the EXTENDED clock elapses — the date the same notice comes back with the same choices. */
+  extendedUntil: string;
+  basis: ExtendRetentionInput['basis'];
+  /** Free text that ACCOMPANIES the basis. NOT NULL on the api side: the basis says which kind of
+   *  cover was claimed, this says what the office is actually relying on. */
+  note: string;
+  legislativeInstrument: string | null;
+  legislativeArticle: string | null;
+  legalHold: { id: string; scope: string; reason: string } | null;
+  consentRecordId: string | null;
+  consentDuration: string | null;
+  consentPurpose: string | null;
+  extendedByUserId: string;
+  /** Resolved by the api, the same way the retrieval register resolves its own actor. A uuid
+   *  identifies nobody to the person reading the register. */
+  extendedByName: string | null;
+  extendedAt: string;
+}
+
+export function listRetentionExtensions(): Promise<
+  RetentionExtensionRegisterRow[]
+> {
+  return apiGet('/retention-notices/register');
+}
+
+/**
  * BATCH 5 GROUP 7c — a retrieval from the blocked phase.
  *
  * These interfaces are HAND-COPIED over HTTP and TypeScript cannot check them against the api's own
@@ -142,11 +184,47 @@ export function extendRetention(
  */
 export type ArchiveRetrievalBasis = 'JUDICIAL_REQUEST' | 'CBJ_AUDIT';
 
+/**
+ * WHICH BASES EXIST, FROM THE SERVER — `GET /retention-archive/bases`, owner decision 43.
+ *
+ * The screen used to carry its own copy of the closed two as a hardcoded pair of `<option>`s and a
+ * `useState('JUDICIAL_REQUEST')` default, while this route existed so that *"the screen renders them
+ * rather than restating them"* (its controller's own words) and reached no caller. Two homes for one
+ * closed fact is the defect this codebase refuses everywhere else.
+ *
+ * `basis` IS A STRING AND NOT `ArchiveRetrievalBasis`, deliberately. The server owns this list; a
+ * third basis added there must reach the screen rather than be typed out of existence, and the
+ * label lookup falls back to rendering the member name — visibly unfinished, which is the same
+ * decision the workflow-entity labels made for a member with no word.
+ *
+ * `meaning` IS NOT RENDERED YET and that is not an oversight: `ARCHIVE_RETRIEVAL_BASIS_DEFINITIONS`
+ * carries it in English only, there is nothing in the i18n tree to derive Arabic from, and shipping
+ * an English sentence into an Arabic screen as a placeholder is worse than the gap. Two sentences
+ * the owner writes; the field is declared so nothing has to change here when they arrive.
+ */
+export interface ArchiveRetrievalBasisDefinition {
+  basis: string;
+  meaning: string;
+}
+
+export function listArchiveRetrievalBases(): Promise<
+  ArchiveRetrievalBasisDefinition[]
+> {
+  return apiGet('/retention-archive/bases');
+}
+
 export interface ArchiveRetrieval {
   id: string;
   recordCategory: string;
   recordId: string;
-  basis: ArchiveRetrievalBasis;
+  /**
+   * A STRING, for the same reason `ArchiveRetrievalBasisDefinition.basis` is: the server owns this
+   * list, so a basis this build has never heard of must arrive and be rendered (as its own member
+   * name, visibly unfinished) rather than be typed out of existence and silently mislabelled. The
+   * table used to decide this with a ternary on one member, so every other basis rendered the
+   * Central Bank audit label.
+   */
+  basis: string;
   note: string;
   retrievedAt: string;
   retrievedByUserId: string;
@@ -156,7 +234,13 @@ export interface ArchiveRetrieval {
 export interface RetrieveBlockedRecordsInput {
   recordCategory: string;
   recordIds: string[];
-  basis: ArchiveRetrievalBasis;
+  /**
+   * A STRING, and the SERVER is the validator — `@IsIn(ARCHIVE_RETRIEVAL_BASES)` answers 400 on
+   * anything it did not offer. The screen only ever sends a value the server itself named in
+   * `GET /retention-archive/bases`, so narrowing this to the union would do nothing except stop a
+   * third basis working until the web caught up.
+   */
+  basis: string;
   note: string;
 }
 

@@ -375,11 +375,23 @@ if _positional:
 # NOTHING WAS CLOSED TO EARN THIS. Two false positives were removed. That distinction matters to
 # whoever reads these two numbers next: a drop here can mean a capability was connected OR that the
 # matcher stopped being wrong, and only one of those is progress on decision 34's fault (3).
-UNREACHED_BY_PATH_BUDGET = 18
+#
+# 18 -> 16 ON 2026-10-23, AND THIS ONE IS THE OTHER KIND OF DROP — owner decision 43, the first time
+# these two numbers have moved because something was WIRED rather than because the matcher stopped
+# being wrong. `GET /retention-notices/register` (the extension register) and
+# `GET /retention-archive/bases` now have readers on `/retention-disposal`. The distinction the
+# paragraph above insists on is therefore live: that move was an instrument correction, this one is
+# progress on decision 34's fault (3), and the two must not be read as the same event.
+UNREACHED_BY_PATH_BUDGET = 16
 # 11 -> 10 in the same move. `provider.controller.ts` leaves the list entirely, which is also the
 # controller whose TWO `@Controller` prefixes failure mode 6 collapsed into one — so the file that
 # produced both of this measurement's known defects is the file both fixes remove from the findings.
-UNREACHED_CONTROLLER_BUDGET = 10
+#
+# 10 -> 8 on 2026-10-23: `retention-notice.controller.ts` and `retention-archive.controller.ts` each
+# carried exactly ONE unreached route, so wiring two routes took two controllers off the list. That
+# is why this count is gated separately — two routes and two controllers moving together is a
+# different fact from two routes leaving one controller, and a single total cannot tell them apart.
+UNREACHED_CONTROLLER_BUDGET = 8
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both
