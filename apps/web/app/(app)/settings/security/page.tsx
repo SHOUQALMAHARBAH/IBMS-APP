@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { EncryptionKeyInventory } from '../../../../components/security/EncryptionKeyInventory';
 import { ConflictOfInterestRegister } from '../../../../components/security/ConflictOfInterestRegister';
+import { OfficeSecurityConfiguration } from '../../../../components/security/OfficeSecurityConfiguration';
 import {
   changePassword,
   enrollTotp,
@@ -454,6 +455,23 @@ export default function SecuritySettingsPage() {
           </p>
         ) : null}
       </section>
+
+      {/*
+       * OWNER DECISION 47, the READ half — the OFFICE'S policy, gated on
+       * `security-config.read`, where the section above is the reader's OWN session.
+       *
+       * The two overlap on two numbers (idle timeout, hard logout) and that is deliberate: the
+       * section above answers "when will I be signed out", which every role needs and which is
+       * why it is ungated, and this one answers "what is this office's policy of record", which
+       * is what an inspector asks. Removing the self-service lines to avoid the repetition would
+       * take that answer away from ten of eleven roles.
+       *
+       * REPORTED, NOT RESOLVED: the two blocks use two different Arabic words for one concept —
+       * «مهلة الخمول» above and the owner's «مدّة الخمول» here. That is the «التعديلات»/«الملحقات»
+       * divergence class (decision 42) one screen smaller, and which word wins is hers; her
+       * decision-47 labels are reproduced verbatim and must not be reworded to match.
+       */}
+      <OfficeSecurityConfiguration />
 
       {/* Renders only for a holder of `encryption-key.read`. A gated SECTION on an
        * ungated page: this route is the only way through the MFA enrolment guard, so

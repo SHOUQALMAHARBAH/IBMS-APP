@@ -205,6 +205,26 @@ const AR: PluralDictionary = {
     many: 'لا استجابة من المؤمِّن بعد {count} يوم عمل من التسجيل',
     other: 'لا استجابة من المؤمِّن بعد {count} يوم عمل من التسجيل',
   },
+  secCfgUnitMinutes: {
+    one: 'دقيقة واحدة',
+    two: 'دقيقتان',
+    few: '{count} دقائق',
+    many: '{count} دقيقة',
+    other: '{count} دقيقة',
+  },
+  secCfgUnitDays: {
+    one: 'يوم واحد',
+    two: 'يومان',
+    few: '{count} أيام',
+    many: '{count} يوماً',
+    other: '{count} يوم',
+  },
+  secCfgUnitAttempts: {
+    one: 'محاولة واحدة',
+    few: '{count} محاولات',
+    many: '{count} محاولة',
+    other: '{count} محاولة',
+  },
 };
 
 const EN: PluralDictionary = {
@@ -259,6 +279,18 @@ const EN: PluralDictionary = {
   claimFollowUpBusinessDays: {
     one: 'No insurer response {count} business day after registration',
     other: 'No insurer response {count} business days after registration',
+  },
+  secCfgUnitMinutes: {
+    one: '{count} minute',
+    other: '{count} minutes',
+  },
+  secCfgUnitDays: {
+    one: '{count} day',
+    other: '{count} days',
+  },
+  secCfgUnitAttempts: {
+    one: '{count} attempt',
+    other: '{count} attempts',
   },
 };
 
