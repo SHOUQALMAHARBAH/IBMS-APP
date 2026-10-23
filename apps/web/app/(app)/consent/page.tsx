@@ -316,9 +316,24 @@ export default function ConsentPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>
-                      {r.leadId
-                        ? `Lead ${r.leadId.slice(0, 8)}…`
-                        : `${(r.customerId ?? r.insuredPersonId ?? '—').slice(0, 8)}…`}
+                      {/*
+                        * RULE 2 — WHOSE consent, by name. This rendered `Lead <8 chars of a uuid>`
+                        * or a bare sliced uuid, which identifies nobody on the one screen whose
+                        * whole subject is who agreed to what.
+                        *
+                        * THE `Lead ` PREFIX IS GONE AND THAT IS A SECOND FIX: it was a hardcoded
+                        * ENGLISH word inside a template literal, so an Arabic reader saw it too — a
+                        * rule-6 escape the hardcoded-english detector did not catch, which is a
+                        * finding about that detector and not about this cell.
+                        *
+                        * WHAT IS OWED: a marker saying WHICH KIND of subject a row names. It
+                        * matters for PDPL — consent captured at lead capture pre-dates the customer
+                        * record — and the three ids are all still on the wire, so the screen can
+                        * see the kind. What is missing is the Arabic WORD: `navLeads` ships the
+                        * plural «العملاء المحتملون» and the singular would be morphology nobody
+                        * here may invent. Reported rather than approximated.
+                        */}
+                      {r.subjectName ? <bdi>{r.subjectName}</bdi> : '—'}
                     </td>
                     <td style={cell}>{r.purpose}</td>
                     <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>

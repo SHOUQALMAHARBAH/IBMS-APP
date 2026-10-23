@@ -16,6 +16,9 @@ const row = (over: Partial<LegalHoldRow> = {}): LegalHoldRow => ({
   retentionScheduleItemId: 'rsi-1',
   customerId: null,
   insuredPersonId: null,
+  // Batch six item 2 — the default is "this hold names no customer", which is a real state
+  // (`hasAtMostOneSubjectReference` allows neither). The tests that are ABOUT the name override it.
+  customer: null,
   ...over,
 });
 
@@ -61,6 +64,27 @@ describe('deriveLegalHoldView', () => {
     expect(v.customerId).toBe('cust-1');
     expect(v.insuredPersonId).toBeNull();
   });
+
+  /*
+   * BATCH SIX ITEM 2, RULE 2 — the Subject column rendered eight characters of a uuid, which
+   * identifies nobody. Both directions are asserted, because a mapper that always returned the
+   * name would pass the first and a mapper that always returned null would pass the second.
+   */
+  it('names the customer whose records are frozen, rather than eight characters of a uuid', () => {
+    const v = deriveLegalHoldView(
+      row({
+        customerId: 'cust-1',
+        customer: { legalName: 'شركة اليرموك للتأمين' },
+      }),
+    );
+    expect(v.customerName).toBe('شركة اليرموك للتأمين');
+    // and the id is still on the wire — the screen stops RENDERING it, the api keeps SENDING it.
+    expect(v.customerId).toBe('cust-1');
+  });
+
+  it('reports no name when the hold names no customer — a real state, not a missing lookup', () => {
+    expect(deriveLegalHoldView(row()).customerName).toBeNull();
+  });
 });
 
 describe('legalHoldAuditSnapshot', () => {
@@ -74,6 +98,12 @@ describe('legalHoldAuditSnapshot', () => {
       customerId: null,
       insuredPersonId: null,
       isActive: true,
+      /*
+       * `customerName` IS DELIBERATELY ABSENT, and this EXACT key set is what enforces it. What
+       * enters an append-only audit row is described, not quoted: the name is a lookup the id
+       * already resolves, and copying it in would freeze one rendering of a mutable fact. A
+       * `toMatchObject` here would pass the day somebody adds it.
+       */
     });
   });
 

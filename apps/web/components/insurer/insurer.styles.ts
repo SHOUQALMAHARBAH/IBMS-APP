@@ -50,7 +50,8 @@ export const impactPanelStyle: CSSProperties = {
   borderRadius: '0.5rem',
   padding: '0.75rem 1rem',
   marginTop: '0.75rem',
-  background: 'var(--surface-raised)',
+  /* was `--surface-raised`, which is defined nowhere — see the surfaces note in globals.css */
+  background: 'var(--surface-sunken)',
 };
 
 export const impactRowStyle: CSSProperties = {

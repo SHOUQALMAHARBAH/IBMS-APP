@@ -2,6 +2,29 @@ import { Injectable } from '@nestjs/common';
 import type { ConsentRecord, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
+/*
+ * RULE 2 — WHOSE CONSENT, BY NAME. The register's Subject column rendered `Lead <8 chars>` or a
+ * bare sliced uuid, which identifies nobody — and that column is the whole point of a consent
+ * register.
+ *
+ * All three subject relations, because a record names one of the three and the service allows at
+ * most one. Each name column is NOT NULL on its own model, so a named subject always has a name.
+ *
+ * `ConsentRecordWithSubject` derives from this object, so the type widens with it and names every
+ * site.
+ */
+export const WITH_SUBJECT = {
+  include: {
+    customer: { select: { legalName: true } },
+    lead: { select: { fullName: true } },
+    insuredPerson: { select: { fullName: true } },
+  },
+} as const;
+
+export type ConsentRecordWithSubject = Prisma.ConsentRecordGetPayload<
+  typeof WITH_SUBJECT
+>;
+
 /**
  * M03 — Consent Management (backlog Part D §5.1). Owns the `ConsentRecord`
  * rows, wrapping `PrismaService` (services depend on repositories in this
@@ -45,8 +68,9 @@ export class ConsentRecordRepository {
     granted: boolean;
     consentTextVersion: string;
     grantedAt: Date | null;
-  }): Promise<ConsentRecord> {
+  }): Promise<ConsentRecordWithSubject> {
     return this.prisma.client.consentRecord.create({
+      ...WITH_SUBJECT,
       data: {
         customerId: input.customerId,
         insuredPersonId: input.insuredPersonId,
@@ -60,8 +84,11 @@ export class ConsentRecordRepository {
     });
   }
 
-  findById(id: string): Promise<ConsentRecord | null> {
-    return this.prisma.client.consentRecord.findUnique({ where: { id } });
+  findById(id: string): Promise<ConsentRecordWithSubject | null> {
+    return this.prisma.client.consentRecord.findUnique({
+      where: { id },
+      ...WITH_SUBJECT,
+    });
   }
 
   /**
@@ -111,8 +138,9 @@ export class ConsentRecordRepository {
       granted?: boolean;
     },
     take: number,
-  ): Promise<ConsentRecord[]> {
+  ): Promise<ConsentRecordWithSubject[]> {
     return this.prisma.client.consentRecord.findMany({
+      ...WITH_SUBJECT,
       where: {
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
         ...(scope.insuredPersonId

@@ -98,6 +98,18 @@ jobs:
       - name: No label names a column instead of its purpose
         run: python scripts/measurements/identifier-labels.py --check
 
+      # `--surface-raised` was referenced at three sites and defined nowhere, so three blocks —
+      # one of them the owner's own Arabic DPO notice — rendered with NO BACKGROUND for months. A
+      # bare `var()` on an undefined custom property is invalid at computed-value time and the
+      # browser drops the whole declaration. Nothing in this repository could see it: no compiler
+      # reads a stylesheet against a `.tsx` string, the CSS was never invalid, and a missing
+      # background is not a contrast failure so axe passed. This is the text-level join that can,
+      # and it keeps the two classes apart — a reference WITH a fallback degrades by design and is
+      # reported, never gated. A DECLARED SET rather than a count, because a count survives a
+      # substitution.
+      - name: Every custom property a screen references is defined in the stylesheet
+        run: npm run check:css-properties
+
       # ------------------------------------------------------------------ DECISION 34, THE SCREEN PASS
       #
       # THE COUNT NEVER RISES. The owner struck the attrition rule she had been given in batch 4 —

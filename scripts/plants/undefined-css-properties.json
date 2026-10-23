@@ -1,0 +1,20 @@
+{
+  "surface-raised-reintroduced": {
+    "file": "apps/web/components/admin/DpoAssignmentSection.tsx",
+    "from": "                background: 'var(--surface-sunken)',",
+    "to": "                background: 'var(--surface-raised)',",
+    "why": "THE DEFECT ITSELF, re-planted on the exact block it was found on: the section carrying the owner's own Arabic DPO notice, which rendered with no surface behind it from the day it shipped. A bare `var()` on an undefined custom property is invalid at computed-value time, so the browser drops the WHOLE declaration. `npm run check:css-properties` fails naming the property and the file. Nothing else in this repository can see it — no compiler reads a stylesheet against a `.tsx` string, the CSS is never invalid, every Playwright assertion still passes because the text still renders, and axe passes because a missing background is not a contrast failure but a contrast ACCIDENT. That is the whole argument for a text-level join."
+  },
+  "a-declared-exception-silently-fixed": {
+    "file": "apps/web/components/ui/EntitySearch.tsx",
+    "from": "var(--shadow-raised)",
+    "to": "var(--shadow-md)",
+    "why": "THE DOWN DIRECTION, and it is a REAL improvement rather than a contrived break — which is the point. Fixing a declared row without removing its declaration leaves the list covering a site that no longer has the defect, so the list becomes a ceiling that silently absorbs the next regression at that path. The gate fails naming the stale row to delete. This is the `screen-route-fit-declared.json` property: the check refuses a stale declaration as well as a new finding, in both directions, so a fix is recorded by deleting its row."
+  },
+  "reference-matcher-stops-matching": {
+    "file": "scripts/measurements/undefined-css-properties.py",
+    "from": "REFERENCE = re.compile(r\"var\\(\\s*(--[A-Za-z0-9_-]+)\\s*([,)])\")",
+    "to": "REFERENCE = re.compile(r\"varr\\(\\s*(--[A-Za-z0-9_-]+)\\s*([,)])\")",
+    "why": "THE NON-VACUITY FLOOR, aimed at the direction that reports a clean nothing. With the reference pattern broken, nothing is found anywhere and every assertion about undefined properties passes — the exact shape that has cost this repository four wrong measurements. The floor REFUSES BY NAME (`found only 0 references against a floor of 55`) instead of printing a green gate. The definition floor is deliberately NOT the one planted here: breaking THAT direction empties `defined` and reports every property in the tree as undefined, which is a flood nobody mistakes for success."
+  }
+}

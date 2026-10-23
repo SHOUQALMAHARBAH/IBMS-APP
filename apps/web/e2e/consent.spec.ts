@@ -29,6 +29,9 @@ const CONSENT_RECORDS = [
     id: "consent-1",
     customerId: "11111111-1111-1111-1111-111111111111",
     insuredPersonId: null,
+    leadId: null,
+    // Batch six item 2 — whichever subject the record names, BY NAME.
+    subjectName: "شركة اليرموك للتأمين",
     purpose: "MARKETING",
     isMarketing: true,
     granted: true,
@@ -42,6 +45,9 @@ const CONSENT_RECORDS = [
     id: "consent-2",
     customerId: "11111111-1111-1111-1111-111111111111",
     insuredPersonId: null,
+    leadId: null,
+    // Batch six item 2 — whichever subject the record names, BY NAME.
+    subjectName: "شركة اليرموك للتأمين",
     purpose: "KYC_AML",
     isMarketing: false,
     granted: false,
@@ -85,6 +91,29 @@ test("lists consent records with the capture form and withdrawal actions", async
   await expect(
     page.getByRole("button", { name: "Confirm withdrawal" }),
   ).toHaveCount(1);
+
+  /*
+   * RULE 2 (batch six item 2) — WHOSE consent, by name. This column rendered `Lead <8 chars>` or a
+   * bare sliced uuid on the one screen whose whole subject is who agreed to what.
+   *
+   * THE PAIR: the name present AND the uuid gone. And the `Lead ` prefix is asserted ABSENT too,
+   * because it was hardcoded ENGLISH inside a template literal — an Arabic reader saw it as well,
+   * and removing it is a second fix rather than a side effect.
+   */
+  /*
+   * ASSERTED ON THE CELL WITH `exact: true`, NOT PAGE-WIDE, and the first version taught me why:
+   * `getByText("Lead ")` matched the CAPTURE FORM's own «Lead ID» label — a correct element that
+   * must stay — so the test failed on a correct screen. That is the page-wide-absence class
+   * `check:absence` exists for, met inside a test written to check rule 2.
+   *
+   * `exact: true` on the cell is strictly stronger than what the page-wide pair could say: it
+   * fails if the name is there AND fails if anything is prefixed to it, so the removed `Lead `
+   * prefix and the removed uuid are both covered by one assertion about one element.
+   */
+  await expect(
+    page.getByRole("cell", { name: "شركة اليرموك للتأمين", exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByRole("cell", { name: /11111111/ })).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

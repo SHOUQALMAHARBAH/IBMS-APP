@@ -24,6 +24,11 @@ const row = (over: Partial<ConsentRecordRow> = {}): ConsentRecordRow => ({
   grantedAt: new Date('2026-09-04T09:00:00.000Z'),
   withdrawnAt: null,
   createdAt: new Date('2026-09-04T09:00:00.000Z'),
+  // Batch six item 2 — the default fixture names a CUSTOMER, so that relation carries a name and
+  // the other two are absent, which is the shape the service enforces (at most one subject).
+  customer: { legalName: 'شركة اليرموك للتأمين' },
+  lead: null,
+  insuredPerson: null,
   ...over,
 });
 
@@ -70,6 +75,48 @@ describe('deriveConsentView', () => {
     expect(v.granted).toBe(true);
     expect(v.isActive).toBe(false);
     expect(v.withdrawnAt).toBe('2026-09-05T00:00:00.000Z');
+  });
+
+  /*
+   * BATCH SIX ITEM 2, RULE 2 — the register's Subject column rendered `Lead <8 chars of a uuid>` or
+   * a bare sliced uuid. All THREE subject kinds are asserted, because the mapper is a `??` chain and
+   * a chain that reached only its first link would pass a test that exercised only a customer.
+   */
+  it('names a CUSTOMER subject', () => {
+    expect(deriveConsentView(row()).subjectName).toBe('شركة اليرموك للتأمين');
+  });
+
+  it('names a LEAD subject — the touchpoint that pre-dates the customer record', () => {
+    const v = deriveConsentView(
+      row({
+        customerId: null,
+        customer: null,
+        leadId: 'lead-1',
+        lead: { fullName: 'سامر عبدالله' },
+      }),
+    );
+    expect(v.subjectName).toBe('سامر عبدالله');
+    // the id stays on the wire, so the screen can still say WHICH kind this is
+    expect(v.leadId).toBe('lead-1');
+  });
+
+  it('names an INSURED PERSON subject', () => {
+    expect(
+      deriveConsentView(
+        row({
+          customerId: null,
+          customer: null,
+          insuredPersonId: 'ip-1',
+          insuredPerson: { fullName: 'ليلى حسن' },
+        }),
+      ).subjectName,
+    ).toBe('ليلى حسن');
+  });
+
+  it('reports no name when the record names no subject at all', () => {
+    expect(
+      deriveConsentView(row({ customerId: null, customer: null })).subjectName,
+    ).toBeNull();
   });
 
   it('serialises null timestamps as null, not an empty string', () => {

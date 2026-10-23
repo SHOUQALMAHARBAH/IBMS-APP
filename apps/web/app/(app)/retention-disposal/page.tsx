@@ -207,11 +207,13 @@ const basisMeaningStyle: CSSProperties = {
   border: '1px solid var(--border-subtle)',
   borderRadius: '6px',
   /*
-   * `--surface-sunken` AND NOT `--surface-raised`, which three other sites in this app reference
-   * and `globals.css` DEFINES NOWHERE — so those three render with no background at all, an
-   * undefined custom property falling back to `transparent`. Reported rather than fixed here:
-   * defining that token would change the appearance of three existing screens and needs a value
-   * for the dark theme too, which is a design decision rather than a typo.
+   * `--surface-sunken`, which is now the one answer for this shape. Batch five recorded that three
+   * other sites referenced `--surface-raised`, a property `globals.css` defines NOWHERE, so all
+   * three rendered with no background at all — a bare `var()` on an undefined property drops the
+   * whole declaration. Batch six closed that (owner's instruction) by pointing those three here
+   * rather than defining a fifth surface: all four blocks are the same job, an inset notice on a
+   * card, which is what `--surface-sunken` already means. `undefined-css-properties.py` is the
+   * gate that can see the class at all.
    */
   background: 'var(--surface-sunken)',
   fontSize: '0.9rem',
@@ -1266,7 +1268,8 @@ export default function RetentionDisposalPage() {
               padding: '0.75rem',
               border: '1px solid var(--border-default)',
               borderRadius: '0.25rem',
-              background: 'var(--surface-raised)',
+              /* was `--surface-raised`, which is defined nowhere — see the surfaces note in globals.css */
+              background: 'var(--surface-sunken)',
             }}
           >
             <h3 style={{ margin: '0 0 0.5rem' }}>{t('rdNoFloorHeading')}</h3>
@@ -1549,11 +1552,23 @@ export default function RetentionDisposalPage() {
                         {h.retentionScheduleItemId ? h.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
                       </td>
                       <td style={cell}>
-                        {h.customerId
-                          ? `Customer ${h.customerId.slice(0, 8)}…`
-                          : h.insuredPersonId
-                            ? t('rdInsuredPersonGeneric')
-                            : '—'}
+                        {/*
+                          * RULE 2 — WHOSE records are frozen, by name. This rendered
+                          * `Customer <8 chars of a uuid>`, so a DPO working the six-monthly
+                          * necessity review could not tell whose file each hold covers.
+                          *
+                          * The insured-person branch still renders its GENERIC label rather than a
+                          * name: `InsuredPerson.fullName` exists, but that id is not among the 24
+                          * this pass measures (the screen never rendered it), so resolving it is a
+                          * widening nobody asked for and a disclosure decision of its own.
+                          */}
+                        {h.customerName ? (
+                          <bdi>{h.customerName}</bdi>
+                        ) : h.insuredPersonId ? (
+                          t('rdInsuredPersonGeneric')
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>
                       <td style={cell}>{h.isActive ? 'Active' : t('rdReleased')}</td>

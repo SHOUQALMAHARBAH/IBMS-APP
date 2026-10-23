@@ -297,6 +297,9 @@ export interface LegalHold {
   retentionScheduleItemId: string | null;
   customerId: string | null;
   insuredPersonId: string | null;
+  /** Batch six item 2 — the customer's own name, resolved by the api. Null when the hold names no
+   *  customer, which `hasAtMostOneSubjectReference` allows. */
+  customerName: string | null;
   isActive: boolean;
 }
 

@@ -212,7 +212,12 @@ export function DpoAssignmentSection({ canDeclare }: { canDeclare: boolean }) {
                 padding: '0.9rem 1rem',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: '0.4rem',
-                background: 'var(--surface-raised)',
+                /*
+                 * was `--surface-raised`, which `globals.css` defines nowhere — so THIS block, the
+                 * one carrying the owner's own Arabic notice, rendered with no surface behind it
+                 * from the day it shipped. See the surfaces note in globals.css.
+                 */
+                background: 'var(--surface-sunken)',
                 whiteSpace: 'pre-line',
                 maxWidth: '44rem',
               }}

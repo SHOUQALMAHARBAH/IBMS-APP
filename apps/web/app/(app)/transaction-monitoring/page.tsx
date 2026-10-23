@@ -217,7 +217,16 @@ export default function TransactionMonitoringPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td style={cell}>{r.customerId ? `${r.customerId.slice(0, 8)}…` : '—'}</td>
+                    {/*
+                      * RULE 2 — the customer's NAME, resolved by the api. This rendered eight
+                      * characters of a uuid, which on an AML queue is the one column the screen is
+                      * about: an officer could not tell two alerts apart. The em dash is the real
+                      * absent case — an alert raised against a pattern with no single customer
+                      * behind it — and NOT a name the api failed to send.
+                      */}
+                    <td style={cell}>
+                      {r.customerName ? <bdi>{r.customerName}</bdi> : '—'}
+                    </td>
                     <td style={cell}>{r.patternType}</td>
                     <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
                     <td style={cell}>{r.escalatedToSuspiciousActivity ? 'yes' : 'no'}</td>

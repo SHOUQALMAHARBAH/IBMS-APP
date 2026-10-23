@@ -217,6 +217,8 @@ describe('deriveTransactionMonitoringAlertView (Process 48)', () => {
     reportedToAuthorityAt: null,
     status: 'open',
     classification: 'HIGHLY_CONFIDENTIAL',
+    // Batch six item 2 — an alert can be raised with no single customer behind it.
+    customer: null,
   };
 
   it('renders a fresh open alert with ISO timestamps and null escalation fields', () => {
@@ -234,7 +236,35 @@ describe('deriveTransactionMonitoringAlertView (Process 48)', () => {
       status: 'open',
       isClosed: false,
       classification: 'HIGHLY_CONFIDENTIAL',
+      // The EXACT key set is what catches a view shape change — a list of `toHaveProperty`
+      // calls each keeps passing while a field appears.
+      customerName: null,
     });
+  });
+
+  /*
+   * BATCH SIX ITEM 2, RULE 2 — the alert queue's Customer column rendered eight characters of a
+   * uuid. Both directions, because a mapper that always returned the name passes the first and one
+   * that always returned null passes the second.
+   */
+  it('names the customer whose transactions tripped the pattern', () => {
+    const v = deriveTransactionMonitoringAlertView({
+      ...row,
+      customer: { legalName: 'مؤسسة النور للتجارة' },
+    });
+    expect(v.customerName).toBe('مؤسسة النور للتجارة');
+    // the id stays on the wire; the screen stops rendering it
+    expect(v.customerId).toBe('cust-1');
+  });
+
+  it('reports no name for an alert with no customer behind it', () => {
+    expect(
+      deriveTransactionMonitoringAlertView({
+        ...row,
+        customerId: null,
+        customer: null,
+      }).customerName,
+    ).toBeNull();
   });
 
   it('an escalated + reported + closed alert carries all three', () => {

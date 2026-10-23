@@ -121,6 +121,9 @@ const HOLDS = [
     retentionScheduleItemId: 'rsi-1',
     customerId: null,
     insuredPersonId: null,
+    // A hold that names NO customer — a real state (`hasAtMostOneSubjectReference` allows neither),
+    // so the api sends no name and the cell falls back to its em dash.
+    customerName: null,
     isActive: true,
   },
   {
@@ -133,6 +136,9 @@ const HOLDS = [
     retentionScheduleItemId: null,
     customerId: 'cust-12345678-e2e',
     insuredPersonId: null,
+    // Batch six item 2 — the api resolves the name now, so the Subject column renders this rather
+    // than eight characters of a uuid.
+    customerName: 'شركة اليرموك للتأمين',
     isActive: true,
   },
 ];
@@ -375,7 +381,21 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
   );
 
   await page.goto('/retention-disposal');
-  await expect(page.getByText('Customer cust-123…')).toBeVisible();
+  /*
+   * RE-POINTED 2026-10-23 (batch six item 2) WITH THE REVERSAL STATED. This asserted
+   * `Customer cust-123…` — the uuid rendering — which was correct until the api started resolving
+   * the hold's customer by name. The property the test is about is unchanged and is in its own
+   * title: a hold shows WHOSE records it freezes. What changed is that the answer is now a name.
+   *
+   * Both halves, because a screen that rendered the id BESIDE the name would pass a name-only
+   * assertion: the name is present AND the uuid is gone.
+   */
+  await expect(
+    page.getByRole('cell', { name: 'شركة اليرموك للتأمين', exact: true }).first(),
+  ).toBeVisible();
+  // On the CELL rather than page-wide — `check:absence` bans the page-wide `getByText` shape, and
+  // `exact: true` additionally fails on a name with the old `Customer ` prefix still attached.
+  await expect(page.getByRole('cell', { name: /cust-12345678-e2e/ })).toHaveCount(0);
 
   let lastCreateBody: Record<string, unknown> | null = null;
   await page.route('http://localhost:4000/legal-holds', (route) => {
@@ -396,6 +416,7 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
           retentionScheduleItemId: null,
           customerId: 'cust-new',
           insuredPersonId: null,
+          customerName: 'Al-Ufuq Trading Co.',
           isActive: true,
         },
       });

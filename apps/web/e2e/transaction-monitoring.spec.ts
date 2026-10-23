@@ -39,6 +39,9 @@ const ALERTS = [
     status: "open",
     isClosed: false,
     classification: "HIGHLY_CONFIDENTIAL",
+    // Batch six item 2 — the api resolves the customer by name, so the Customer column renders
+    // this rather than eight characters of a uuid.
+    customerName: "مؤسسة النور للتجارة",
   },
   {
     id: "tma-2",
@@ -54,6 +57,9 @@ const ALERTS = [
     status: "closed",
     isClosed: true,
     classification: "HIGHLY_CONFIDENTIAL",
+    // Batch six item 2 — the api resolves the customer by name, so the Customer column renders
+    // this rather than eight characters of a uuid.
+    customerName: "مؤسسة النور للتجارة",
   },
 ];
 
@@ -93,6 +99,22 @@ test("lists transaction-monitoring alerts with the log form and sweep button", a
   // the open, unescalated alert shows Escalate + Close; the closed one shows neither.
   await expect(page.getByRole("button", { name: "Escalate" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Close" })).toHaveCount(1);
+
+  /*
+   * RULE 2 (batch six item 2) — WHOSE transactions tripped the pattern, by name. This column
+   * rendered the first eight characters of a uuid, which on an AML queue identifies nobody: an
+   * officer working a list of alerts could not tell two of them apart.
+   *
+   * THE PAIR IS WHAT MAKES IT AN ASSERTION: the name present AND the uuid gone. A screen rendering
+   * both would pass a name-only check, and that is the realistic half-done state.
+   */
+  await expect(
+    page.getByRole("cell", { name: "مؤسسة النور للتجارة", exact: true }).first(),
+  ).toBeVisible();
+  // Asserted on the CELL, never page-wide: `check:absence` bans a page-wide `getByText` absence
+  // because it matches any text anywhere, and my first version of this pair pushed that class from
+  // 42 to 44. `exact: true` is also stronger — it fails on anything prefixed to the name.
+  await expect(page.getByRole("cell", { name: /11111111/ })).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

@@ -147,8 +147,13 @@ describe('every screen speaks both languages (rule 6)', () => {
  * are deliberately independent. What keeps them honest is that BOTH fail in both directions — this
  * one caught the stale 29 the moment the script's count fell, which is the ratchet's second half
  * doing the job the second half exists for.
+ *
+ * 24 -> 19 on 2026-10-23 (batch six item 2). The floor cannot reach 0 in this module: six of the
+ * nineteen are DEFERRED-BY-DECISION to module 7 (owner decision 46 — a readable handle for a
+ * settlement or a commission entry means inventing this product's first numbering scheme, and
+ * that belongs with the money), and four more need a decision rather than a name.
  */
-const RENDERED_IDENTIFIER_BUDGET = 24;
+const RENDERED_IDENTIFIER_BUDGET = 19;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {
@@ -182,7 +187,14 @@ ${output.slice(-1200)}`,
       `The budget is stale — only ${count} identifiers remain, so lower RENDERED_IDENTIFIER_BUDGET to ` +
         'that number. A budget that stays above the real count stops being a ratchet.',
     ).toBe(RENDERED_IDENTIFIER_BUDGET);
-  });
+    // THE SAME EXPLICIT TIMEOUT RULE 6 ALREADY CARRIES, applied to its sibling. This test shells
+    // out to a Python measurement over the whole screen tree exactly as that one does, and it was
+    // left on vitest's 5000ms default — so it failed once in a full workspace run while the repo's
+    // 6-workspace typecheck was executing, and passed twice cleanly on its own. Rule 6's own note
+    // above makes the argument and this is the other half of it: the assertion is correct, the work
+    // is a subprocess, and 5s is the wrong budget for it. The gap was a fix applied to one of two
+    // identical mechanisms.
+  }, 60_000);
 });
 
 describe('a load error announces itself (rule 3)', () => {
@@ -580,5 +592,7 @@ describe('a load failure tells the reader what to do (rules 3 and 4)', () => {
           `follow it. Full output:\n${output}`,
       ).toBe(0);
     }
-  });
+    // The THIRD subprocess in this file, and the last one still on the 5000ms default. Timed for the
+    // same reason as the two above rather than waiting for it to be the one that goes red.
+  }, 60_000);
 });

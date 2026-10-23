@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { LegalHold, Prisma } from '@ibms/db';
+import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateLegalHoldInput {
@@ -10,6 +10,28 @@ export interface CreateLegalHoldInput {
   customerId: string | null;
   insuredPersonId: string | null;
 }
+
+/*
+ * RULE 2 — WHOSE RECORDS ARE FROZEN, BY NAME. The hold register's Subject column rendered the first
+ * eight characters of a uuid, which identifies nobody: a DPO reviewing holds every six months (the
+ * `legal_hold_necessity_review` SLA) could not tell whose file each one covers.
+ *
+ * `Customer.legalName` is NOT NULL, so when a hold names a customer there is always a name to show.
+ * The RELATION is optional, though, because a hold may legitimately name no subject at all and rely
+ * on `scope`/`retentionScheduleItemId` — see `hasAtMostOneSubjectReference`. So this projects a
+ * NULLABLE name, and the null case is a real state rather than dead code.
+ *
+ * `LegalHoldWithSubject` derives from this object, so the type widens with it and names every site.
+ */
+export const WITH_SUBJECT = {
+  include: {
+    customer: { select: { legalName: true } },
+  },
+} as const;
+
+export type LegalHoldWithSubject = Prisma.LegalHoldGetPayload<
+  typeof WITH_SUBJECT
+>;
 
 export interface LegalHoldFilter {
   retentionScheduleItemId?: string;
@@ -41,16 +63,23 @@ export class LegalHoldRepository {
       .then((n) => n > 0);
   }
 
-  create(input: CreateLegalHoldInput): Promise<LegalHold> {
-    return this.prisma.client.legalHold.create({ data: input });
+  create(input: CreateLegalHoldInput): Promise<LegalHoldWithSubject> {
+    return this.prisma.client.legalHold.create({
+      data: input,
+      ...WITH_SUBJECT,
+    });
   }
 
-  findById(id: string): Promise<LegalHold | null> {
-    return this.prisma.client.legalHold.findUnique({ where: { id } });
+  findById(id: string): Promise<LegalHoldWithSubject | null> {
+    return this.prisma.client.legalHold.findUnique({
+      where: { id },
+      ...WITH_SUBJECT,
+    });
   }
 
-  findMany(filter: LegalHoldFilter): Promise<LegalHold[]> {
+  findMany(filter: LegalHoldFilter): Promise<LegalHoldWithSubject[]> {
     return this.prisma.client.legalHold.findMany({
+      ...WITH_SUBJECT,
       where: {
         retentionScheduleItemId: filter.retentionScheduleItemId,
         customerId: filter.customerId,

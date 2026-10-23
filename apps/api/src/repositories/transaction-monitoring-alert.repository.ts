@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, TransactionMonitoringAlert } from '@ibms/db';
+import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { RetentionArchiveRepository } from './retention-archive.repository';
 import { notBlockedWhere } from '../modules/pdpl/retention-archive.config';
@@ -11,6 +11,27 @@ export interface CreateTransactionMonitoringAlertInput {
   sourceEntityType?: string | null;
   sourceEntityId?: string | null;
 }
+
+/*
+ * RULE 2 — WHOSE TRANSACTIONS TRIPPED THE PATTERN, BY NAME. The alert queue's Customer column
+ * rendered the first eight characters of a uuid, which identifies nobody — and on an AML queue that
+ * is the column the whole screen is about.
+ *
+ * `Customer.legalName` is NOT NULL, so whenever an alert names a customer there is a name to show.
+ * The RELATION is optional (`customerId String?`), so the projected name is nullable and that null
+ * is a real state rather than dead code.
+ *
+ * `AlertWithCustomer` derives from this object, so the type widens with it and names every site.
+ */
+export const WITH_CUSTOMER = {
+  include: {
+    customer: { select: { legalName: true } },
+  },
+} as const;
+
+export type AlertWithCustomer = Prisma.TransactionMonitoringAlertGetPayload<
+  typeof WITH_CUSTOMER
+>;
 
 export interface TransactionMonitoringAlertScope {
   customerId?: string;
@@ -57,8 +78,9 @@ export class TransactionMonitoringAlertRepository {
 
   create(
     input: CreateTransactionMonitoringAlertInput,
-  ): Promise<TransactionMonitoringAlert> {
+  ): Promise<AlertWithCustomer> {
     return this.prisma.client.transactionMonitoringAlert.create({
+      ...WITH_CUSTOMER,
       data: {
         customerId: input.customerId,
         patternType: input.patternType,
@@ -70,17 +92,19 @@ export class TransactionMonitoringAlertRepository {
     });
   }
 
-  findById(id: string): Promise<TransactionMonitoringAlert | null> {
+  findById(id: string): Promise<AlertWithCustomer | null> {
     return this.prisma.client.transactionMonitoringAlert.findUnique({
       where: { id },
+      ...WITH_CUSTOMER,
     });
   }
 
   findMany(
     scope: TransactionMonitoringAlertScope,
     take: number,
-  ): Promise<TransactionMonitoringAlert[]> {
+  ): Promise<AlertWithCustomer[]> {
     return this.prisma.client.transactionMonitoringAlert.findMany({
+      ...WITH_CUSTOMER,
       where: {
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
         ...(scope.patternType ? { patternType: scope.patternType } : {}),

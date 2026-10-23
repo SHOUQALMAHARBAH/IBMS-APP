@@ -243,7 +243,25 @@ def self_test():
 # so there is nothing to include and an id pointing at a deleted customer is representable — the
 # `Customer.ownerUserId` shape one table over (register entry 63). Its name is resolved by a second
 # read over the ids a page returned, one query for the page.
-RENDERED_IDENTIFIER_BUDGET = 24
+# 24 -> 19 on 2026-10-23, batch six item 2, lowered by exactly what was fixed and no more:
+#
+#   /transaction-monitoring   1  the AML queue's Customer column — `include`, name resolved by the api
+#   /retention-disposal       2  the legal hold's Subject column (one expression, two lines)
+#   /consent                  2  the consent register's Subject — one of THREE relations
+#
+# AND THE BUDGET CANNOT REACH 0 IN THIS MODULE, BY OWNER DECISION 46 RATHER THAN BY SHORTFALL.
+# Six of the nineteen are records with NO HANDLE AT ALL — an opportunity, a needs assessment, an
+# insurance programme, a retention schedule item. Giving any of them a readable reference means
+# inventing THE FIRST NUMBERING SCHEME IN THIS PRODUCT (batch five measured that nothing here
+# generates one), and receipts, remittances, settlements and commission entries all live in module
+# 7, whose money is frozen. Designing a financial numbering scheme before its module is building
+# blind, so those six are DEFERRED-BY-DECISION to module 7 and the four-state `recordHandle` field
+# is the answer for them until then. Do not try to take the budget to zero here.
+#
+# A FURTHER FOUR of the nineteen need a DECISION rather than a name and are reported in register
+# entry 126 with the question that decides each: three polymorphic `entityId`s over an OPEN
+# `entityType` set, and `/dashboards/policy`'s reachable `policyNumber ?? policyId` fallback.
+RENDERED_IDENTIFIER_BUDGET = 19
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped
