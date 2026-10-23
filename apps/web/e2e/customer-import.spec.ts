@@ -252,8 +252,22 @@ test("reports a clear screening result apart from the rejections", async ({ page
   // leads the reason: a duplicate needs an identity decision where bad data needs a typo fixed.
   const refused = page.locator('[data-import-issue="3"]');
   await expect(refused).toContainText("legalName is required");
-  // BAD_DATA has no Arabic word yet, so it renders its own member name — declared, not invented.
-  await expect(refused).toContainText("BAD_DATA");
+  /*
+   * BAD_DATA'S WORD ARRIVED — register entry 123, and this assertion is RE-POINTED rather than
+   * relaxed, with the reversal stated: it used to read *"BAD_DATA has no Arabic word yet, so it
+   * renders its own member name — declared, not invented"*, which was true and is now not.
+   *
+   * The owner's word is an INSTRUCTION and not a label — *check the format of the data you added* —
+   * which is her decision rather than an oddity to tidy into a noun phrase: a rejected row is
+   * useless to a broker unless it says what to do about it. So the assertion is on the instruction,
+   * and the property this test was always about is unchanged — the kind LEADS the reason, so a
+   * reader tells a typo from a duplicate without parsing the server's English sentence.
+   */
+  await expect(refused).toContainText("Check the format of the data you added");
+  // AND THE MEMBER NAME IS GONE, asserted as an absence: a map that lost this entry would fall back
+  // to rendering `BAD_DATA` again, and the positive check above would not notice if the word were
+  // appended rather than substituted.
+  await expect(refused).not.toContainText("BAD_DATA");
 });
 
 test("a screening hit is reported as work, and says the rows WERE imported", async ({
@@ -390,7 +404,9 @@ test("OWNER DECISION 43 — the durable report is readable, and opening one past
   // THE KIND LEADS THE REASON, and two of the three kinds have no Arabic word yet so they render
   // their member name — declared rather than invented, the eighteen-workflow-words decision.
   await expect(lines.locator('[data-import-issue="3"]')).toContainText(
-    "DUPLICATE",
+    // DUPLICATE'S WORD ARRIVED TOO (entry 123) — «العميل موجود بالفعل», *this customer already
+    // exists*. Re-pointed, not relaxed; the member name used to render here by declared design.
+    "This customer already exists",
   );
   // AND THE THIRD KIND DOES HAVE A WORD, which is what proves the label map is consulted rather
   // than the member name always being rendered: `IMPORTED_NEEDS_REVIEW` reads "Awaiting review".

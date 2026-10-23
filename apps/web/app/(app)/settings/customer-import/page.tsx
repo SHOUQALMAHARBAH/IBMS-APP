@@ -76,26 +76,24 @@ const FIELD_LABEL = {
 } satisfies Record<ImportField, TranslationKey>;
 
 /**
- * THE WORD FOR EACH ISSUE KIND — and TWO OF THE THREE HAVE NO WORD YET, declared rather than
- * invented.
+ * THE WORD FOR EACH ISSUE KIND — all three worded now, the last two by the owner (register entry
+ * 123). They rendered their MEMBER NAME until 2026-10-23 because nothing in the i18n tree carried a
+ * word for *duplicate* to derive one from, and inventing either is what the eighteen-workflow-words
+ * procedure forbids.
  *
- * Nothing in the whole i18n tree contains an Arabic word for *duplicate*, so there was nothing to
- * derive `DUPLICATE` or `BAD_DATA` from, and writing one is what the eighteen-workflow-words
- * procedure forbids. Those two render their MEMBER NAME, which is the same decision and the same
- * mechanism: an English member name is visibly unfinished, where a plausible invented word is
- * indistinguishable from a decided one and would never be corrected.
+ * `BAD_DATA` IS AN INSTRUCTION AND NOT A LABEL — «تأكد من شكل البيانات التي أضفتها», *check the
+ * format of the data you added* — which is the owner's decision and not an oddity to tidy into a
+ * noun phrase: a rejected row is useless to a broker unless it says what to do about it. The English
+ * is written the same way for the same reason.
  *
- * ON THIS PARTICULAR TABLE IT IS LESS JARRING THAN ELSEWHERE, and that is a fact rather than an
- * excuse: the `detail` rendered beside the kind is the SERVER's own sentence, which is English
- * because this api has no message i18n at all — a recorded gap. So the row is already
- * mixed-language by necessity, and the kind is strictly more informative than a blank.
- *
- * `Partial<Record<...>>` as the declared type with `satisfies` over the union: adding a fourth kind
- * is a build error until it is named, while the lookup stays honest about a key being absent.
+ * The map is TOTAL over the union now, so a fourth kind is a build error rather than a row that
+ * quietly renders its own member name.
  */
-const ISSUE_KIND_LABEL: Partial<Record<ImportIssue['kind'], TranslationKey>> = {
+const ISSUE_KIND_LABEL = {
+  DUPLICATE: 'impIssueKindDuplicate',
+  BAD_DATA: 'impIssueKindBadData',
   IMPORTED_NEEDS_REVIEW: 'impIssueKindNeedsReview',
-} satisfies Partial<Record<ImportIssue['kind'], TranslationKey>>;
+} satisfies Record<ImportIssue['kind'], TranslationKey>;
 
 export default function CustomerImportPage() {
   const { t } = useLanguage();
@@ -116,10 +114,7 @@ export default function CustomerImportPage() {
   const [openBatch, setOpenBatch] = useState<string | null>(null);
   const [openIssues, setOpenIssues] = useState<ImportIssue[] | null>(null);
 
-  const kindLabel = (kind: ImportIssue['kind']): string => {
-    const key = ISSUE_KIND_LABEL[kind];
-    return key ? t(key) : kind;
-  };
+  const kindLabel = (kind: ImportIssue['kind']): string => t(ISSUE_KIND_LABEL[kind]);
 
   /*
    * THE DURABLE REPORT, LOADED ON MOUNT. Gated by nothing of its own: the whole screen is behind

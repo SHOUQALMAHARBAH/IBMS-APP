@@ -51,6 +51,8 @@ export const CUSTOMERS = {
     impPastHeading: 'سجل الاستيراد',
     impPastNone: 'لا يوجد استيراد مسجّل في هذا المكتب بعد.',
     impPastLoadError: 'تعذر تحميل سجل الاستيراد — حاول مرة أخرى.',
+    impIssueKindDuplicate: 'العميل موجود بالفعل',
+    impIssueKindBadData: 'تأكد من شكل البيانات التي أضفتها',
     impIssueKindNeedsReview: 'بانتظار المراجعة',
     customersHeading: "العملاء",
     customersProcessIntro:
@@ -313,6 +315,8 @@ export const CUSTOMERS = {
     impPastHeading: 'Import register',
     impPastNone: 'Nobody in this office has run an import yet.',
     impPastLoadError: 'Could not load the import register — try again.',
+    impIssueKindDuplicate: 'This customer already exists',
+    impIssueKindBadData: 'Check the format of the data you added',
     impIssueKindNeedsReview: 'Awaiting review',
     customersHeading: "Customers",
     customersProcessIntro:
