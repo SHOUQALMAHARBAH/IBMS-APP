@@ -224,23 +224,35 @@ async function mockRegister(
       extendedByUserId: 'u-1',
       extendedByName: 'Compliance Officer',
       extendedAt: '2026-10-22T09:00:00.000Z',
+      /*
+       * WHICH RECORD — owner decision 44. A `Receipt`, so the handle is the client's own bank
+       * reference and the state is RECORDED. The other three states are proven in
+       * `retention-resolution.config.spec.ts`, where the input can be chosen: two of them are
+       * states no fixture can reach (a record destroyed under a surviving extension row, and a
+       * category whose records cannot be named and therefore has nothing to show a value for).
+       */
+      recordHandle: {
+        state: 'RECORDED',
+        value: 'BANK-TRF-8812',
+        description: 'the client payment, bank or voucher reference',
+      },
     },
   ];
   /*
-   * WHICH BASES EXIST, from the route rather than from the screen. The default is the real closed
-   * two; a test that wants a THIRD passes its own list, which is the whole point of reading it.
+   * WHICH BASES EXIST, from the route rather than from the screen. The default is the real FOUR
+   * since owner decision 45; a test that wants a fifth passes its own list, which is the whole
+   * point of reading it.
+   *
+   * `meaning` IS GONE FROM THE ROW, and removing it here in the same commit is the rule rather than
+   * tidiness: a fixture that keeps supplying a field the api has stopped sending is green against a
+   * shape that no longer exists, which is exactly what hid the customer-import crash for three
+   * weeks. The meanings are the owner's Arabic and live in the i18n tree.
    */
   const BASES = [
-    {
-      basis: 'JUDICIAL_REQUEST',
-      meaning:
-        'A request from a court or a judicial authority. Record which authority asked, and for what.',
-    },
-    {
-      basis: 'CBJ_AUDIT',
-      meaning:
-        'An official audit by the Central Bank of Jordan. Record the audit it belongs to.',
-    },
+    { basis: 'JUDICIAL_REQUEST' },
+    { basis: 'CBJ_AUDIT' },
+    { basis: 'AMLU_REQUEST' },
+    { basis: 'OTHER' },
   ];
   const REFUSED = {
     message: 'You do not hold a permission required to perform this action',
@@ -817,11 +829,22 @@ test('BATCH 5 GROUP 7c — the retrieval section is offered on its own code, tak
   await expect(section).toBeVisible();
   await expect(section).toContainText('cannot be edited or deleted once written');
 
-  // ---------------------------------------------- A CLOSED TWO, AND NO "INTERNAL" OPTION
+  /*
+   * A CLOSED FOUR SINCE OWNER DECISION 45 — AND THE REVERSAL IS STATED RATHER THAN RENUMBERED.
+   * This block used to read *"A CLOSED TWO, AND NO INTERNAL OPTION"*, on the reasoning that an
+   * office retrieving a blocked record for its own purposes is not retrieving it on a basis, it is
+   * processing it. `OTHER` now lists an internal review and the office's own annual auditor among
+   * its kinds, so that rule has moved and the owner moved it; what survives is the `note` floor,
+   * which is NOT NULL for every basis and is what makes a declared internal retrieval answerable
+   * instead of recorded under a judicial request nobody made.
+   */
   const basis = page.getByTestId('retrieve-basis');
-  await expect(basis.locator('option')).toHaveCount(2);
+  await expect(basis).toBeEnabled();
+  await expect(basis.locator('option')).toHaveCount(4);
   await expect(basis.locator('option[value="JUDICIAL_REQUEST"]')).toHaveCount(1);
   await expect(basis.locator('option[value="CBJ_AUDIT"]')).toHaveCount(1);
+  await expect(basis.locator('option[value="AMLU_REQUEST"]')).toHaveCount(1);
+  await expect(basis.locator('option[value="OTHER"]')).toHaveCount(1);
 
   // ---------------------------------------------- THE REGISTER RENDERS WHAT IT RECORDED
   const row = page.locator('[data-retrieval-for="entry-1"]');
@@ -989,6 +1012,197 @@ test('OWNER DECISION 43 — an office that has extended nothing is told so, rath
   await expect(page.getByTestId('retention-extension-table')).toHaveCount(0);
 });
 
+test('OWNER DECISION 45 — the chosen basis explains itself in three named parts, and the shared line renders under all four', async ({
+  page,
+}) => {
+  /*
+   * THE WORDING HALF of the bases route, which register entry 122 left open: the meanings existed in
+   * English only, nothing in the i18n tree could derive Arabic from them, and shipping an English
+   * sentence into an Arabic screen as a placeholder is worse than the gap. The owner has written
+   * them.
+   *
+   * THREE NAMED PARTS AND NOT ONE STRING, which is the thing worth asserting: a definition does not
+   * help a reader choose and a selection condition does, so each part is asserted SEPARATELY. One
+   * `toContainText` of the whole block would pass against a reword that dropped the example, which
+   * is the part a well-meaning edit cuts first for being long.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegister(page);
+
+  await page.goto('/retention-disposal');
+
+  const basis = page.getByTestId('retrieve-basis');
+  await expect(basis).toBeEnabled();
+
+  /*
+   * THE FIRST BASIS THE SERVER NAMED IS ALREADY SELECTED, so its words are already on screen — the
+   * screen defaults to `offered[0]` rather than to an empty choice, which is a decision batch four
+   * took and this test had to be corrected to match: my first version asserted that NOTHING was
+   * explained before a choice was made, and failed on a correct screen because a choice is made for
+   * the reader the moment the list arrives. The absence that IS real is tested below, on a basis
+   * whose words nobody has written.
+   */
+  await expect(basis).toHaveValue('JUDICIAL_REQUEST');
+  const meaning = page.getByTestId('retrieve-basis-meaning');
+  await expect(meaning).toBeVisible();
+  // WHEN it is chosen — the selection condition, in the impersonal voice the owner wrote it in.
+  await expect(meaning).toContainText('Choose this basis when');
+  await expect(meaning).toContainText('the public prosecution');
+  // WHAT goes in the box.
+  await expect(meaning).toContainText('In the box, record');
+  await expect(meaning).toContainText('the case number if there is one');
+  // AND THE EXAMPLE, asserted on its own hook so a reword that drops it fails here rather than
+  // passing a block-wide text check.
+  await expect(meaning.locator('[data-basis-example]')).toContainText(
+    'letter no. 1234',
+  );
+  // The shared line, which is one fact about every retrieval rather than four.
+  await expect(meaning.locator('[data-basis-shared]')).toContainText(
+    'after its retention period had ended',
+  );
+
+  // IT FOLLOWS THE SELECTION. Without this the test would pass against an implementation that
+  // rendered the first basis's words whatever was chosen — the `SelectedValueDescription` defect.
+  await basis.selectOption('AMLU_REQUEST');
+  await expect(meaning).toContainText('Anti-Money Laundering');
+  await expect(meaning).not.toContainText('the public prosecution');
+
+  /*
+   * `OTHER` CARRIES A FOURTH PART, and it is the reason the shape has named parts at all: its text
+   * lists six kinds before saying what to write, and folding that into the selection condition would
+   * bury the list the list exists to be.
+   */
+  await basis.selectOption('OTHER');
+  await expect(meaning).toContainText('Among its kinds');
+  await expect(meaning).toContainText('reopened by the insurer');
+  // AND THE ONE EXAMPLE DELIBERATELY LEFT OUT — a potential dispute raised by the office's own
+  // lawyer. A legal hold already covers that, and two mechanisms for one fact is what this codebase
+  // refuses; asserted as an absence so nobody adds it back to be helpful.
+  await expect(meaning).not.toContainText('lawyer');
+});
+
+test('OWNER DECISION 45 — a basis whose words nobody has written shows NO meaning block, rather than an empty one', async ({
+  page,
+}) => {
+  /*
+   * THE REAL ABSENCE, and the one the conditional exists for. A fifth basis added server-side is
+   * selectable by design (decision 43) and has no words until somebody decides them — so the block
+   * must not render at all. An empty bordered box under the select would read as a meaning that
+   * failed to load, and the `aria-describedby` would then name an id that is not in the document,
+   * which is itself an accessibility violation.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER']);
+  await mockRegister(page, { bases: [{ basis: 'REGULATORY_INSPECTION' }] });
+
+  await page.goto('/retention-disposal');
+
+  const basis = page.getByTestId('retrieve-basis');
+  await expect(basis).toBeEnabled();
+  // The option IS offered and IS selected — which is what makes the absence below meaningful rather
+  // than the state of a screen that simply has no basis chosen.
+  await expect(basis).toHaveValue('REGULATORY_INSPECTION');
+  await expectAbsentWithin(page.getByTestId('retention-retrieve-section'), (s) =>
+    s.getByTestId('retrieve-basis-meaning'),
+  );
+  // AND THE SELECT DESCRIBES NOTHING, which is the half axe would otherwise fail on.
+  await expect(basis).not.toHaveAttribute('aria-describedby', /./);
+});
+
+test('OWNER DECISION 44 — the extension register names WHICH record, and never its id', async ({
+  page,
+}) => {
+  /*
+   * The half of group 7b's rule that register entry 94 recorded as open: *the register must name
+   * WHICH records*. The handle is the real reference the RECORD carries — resolved by the api per
+   * category — and the id is still not rendered, so the rendered-identifier budget does not move.
+   */
+  await mockAuth(page, ['DATA_PROTECTION_OFFICER']);
+  await mockRegister(page);
+
+  await page.goto('/retention-disposal');
+
+  const row = page.locator('[data-extension-for="receipt-7"]');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('BANK-TRF-8812');
+  // AND THE ID IS NOT ON THE ROW. `receipt-7` is the record id and it is the row's own test hook, so
+  // this is asserted on the row's TEXT rather than on the element — the hook must survive and the
+  // rendering must not.
+  await expect(row).not.toContainText('receipt-7');
+});
+
+test('OWNER DECISION 44 — a record that cannot be named says WHICH of the reasons applies, never an em dash', async ({
+  page,
+}) => {
+  /*
+   * The three absent states are different answers to a regulator and an em dash is none of them:
+   * "nobody wrote the reference down" is a gap somebody can still close, "this kind of record has
+   * none" never will be, and "the record is gone" is a third thing again. A single dash for all
+   * three is what makes a register look complete while saying nothing.
+   */
+  await mockAuth(page, ['DATA_PROTECTION_OFFICER']);
+  await mockRegister(page, {
+    extensions: [
+      {
+        id: 'ext-none',
+        recordCategory: 'Settlement',
+        recordId: 'settle-3',
+        extendedUntil: '2029-03-31T00:00:00.000Z',
+        basis: 'LEGISLATIVE_PROVISION',
+        note: 'Pending examination by the tax department.',
+        legislativeInstrument: 'Commercial Law No. 12 of 1966',
+        legislativeArticle: 'art. 19',
+        legalHold: null,
+        consentRecordId: null,
+        consentDuration: null,
+        consentPurpose: null,
+        extendedByUserId: 'u-1',
+        extendedByName: 'Compliance Officer',
+        extendedAt: '2026-10-22T09:00:00.000Z',
+        recordHandle: {
+          state: 'CATEGORY_HAS_NO_REFERENCE',
+          reason: 'a settlement carries no reference of its own',
+        },
+      },
+      {
+        id: 'ext-gap',
+        recordCategory: 'CommissionLedgerEntry',
+        recordId: 'entry-9',
+        extendedUntil: '2029-03-31T00:00:00.000Z',
+        basis: 'LEGISLATIVE_PROVISION',
+        note: 'Pending examination by the tax department.',
+        legislativeInstrument: 'Commercial Law No. 12 of 1966',
+        legislativeArticle: 'art. 19',
+        legalHold: null,
+        consentRecordId: null,
+        consentDuration: null,
+        consentPurpose: null,
+        extendedByUserId: 'u-1',
+        extendedByName: 'Compliance Officer',
+        extendedAt: '2026-10-22T09:00:00.000Z',
+        recordHandle: {
+          state: 'NOT_RECORDED',
+          description: 'the commission payment reference',
+        },
+      },
+    ],
+  });
+
+  await page.goto('/retention-disposal');
+
+  const noneRow = page.locator('[data-extension-for="settle-3"]');
+  await expect(noneRow).toBeVisible();
+  await expect(noneRow).toContainText('No reference exists for this kind');
+  const gapRow = page.locator('[data-extension-for="entry-9"]');
+  await expect(gapRow).toContainText('No reference recorded');
+  /*
+   * AND THE TWO SENTENCES ARE DIFFERENT, asserted both ways. Each row alone would pass against an
+   * implementation that rendered one sentence for every absent state, which is the collapse this
+   * decision is about.
+   */
+  await expect(noneRow).not.toContainText('No reference recorded');
+  await expect(gapRow).not.toContainText('for this kind');
+});
+
 test('OWNER DECISION 43 — the retrieval bases come from the SERVER, and one the web has no word for is still offered under its own name', async ({
   page,
 }) => {
@@ -1006,9 +1220,9 @@ test('OWNER DECISION 43 — the retrieval bases come from the SERVER, and one th
   await mockAuth(page, ['COMPLIANCE_OFFICER']);
   await mockRegister(page, {
     bases: [
-      { basis: 'JUDICIAL_REQUEST', meaning: 'A court asked.' },
-      { basis: 'CBJ_AUDIT', meaning: 'The Central Bank asked.' },
-      { basis: 'REGULATORY_INSPECTION', meaning: 'Added server-side.' },
+      { basis: 'JUDICIAL_REQUEST' },
+      { basis: 'CBJ_AUDIT' },
+      { basis: 'REGULATORY_INSPECTION' },
     ],
   });
 
@@ -1027,7 +1241,7 @@ test('OWNER DECISION 43 — the retrieval bases come from the SERVER, and one th
   expect(texts).toHaveLength(3);
   // The two this build knows are WORDS, not member names.
   expect(texts[0]).toBe('A judicial request');
-  expect(texts[1]).toBe('An official audit by the Central Bank of Jordan');
+  expect(texts[1]).toBe('A Central Bank audit');
   // The third renders its own member name: unfinished and obviously so, rather than blank.
   expect(texts[2]).toBe('REGULATORY_INSPECTION');
   await expect(

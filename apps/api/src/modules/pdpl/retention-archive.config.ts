@@ -90,35 +90,59 @@
  */
 
 /**
- * The two bases on which a blocked record may be retrieved. A closed list, the `EXTENSION_BASES`
- * precedent: free text may ACCOMPANY a basis and may never BE one.
+ * The four bases on which a blocked record may be retrieved — owner decision 45. A closed list, the
+ * `EXTENSION_BASES` precedent: free text may ACCOMPANY a basis and may never BE one.
+ *
+ * THE ORDER IS THE ENUM'S OWN SORT ORDER and the migration asserts it, because this array is what
+ * the screen renders as a dropdown: a list whose order drifts from the database's gives two readers
+ * two different first options for the same closed set.
+ *
+ * `OTHER` IS NOT A HOLE IN THE CLOSED LIST. `RetentionArchiveRetrieval.note` is NOT NULL for every
+ * basis and carries the `common/declaration-reason.ts` floor, so a retrieval on this basis already
+ * cannot be recorded without saying what the reason was — the rule the list exists to enforce is
+ * enforced by the column, unconditionally, and a second mechanism keyed on the member would be the
+ * two-homes defect. `20261209100000` asserts that NOT NULL rather than trusting it, so the premise
+ * fails a migration rather than the feature.
+ *
+ * WHAT EACH ONE MEANS IS NOT ON THE WIRE, and that is a decision rather than an omission. The four
+ * meanings are the owner's Arabic (three named parts each, plus one shared line) and this api has no
+ * message i18n at all, so they live in `apps/web/lib/i18n/translations/pdpl.ts` keyed by member —
+ * which also keeps decision 43's property intact: a fifth basis added here appears on the screen
+ * with no web change, rendering its own member name until somebody decides its word. The English
+ * gloss of each is kept HERE, as a comment, so this file still explains its own enum to a developer
+ * without becoming a second source for what a reader is shown:
+ *
+ *   JUDICIAL_REQUEST  a letter from a court, the public prosecution, the execution department or any
+ *                     judicial authority, asking for a document from the archive.
+ *   CBJ_AUDIT         an official audit by the Central Bank of Jordan.
+ *   AMLU_REQUEST      a request from the Anti-Money Laundering and Counter-Terrorist Financing Unit.
+ *   OTHER             any other legitimate compulsion — a reopened claim, a tax-department audit, the
+ *                     office's own external auditor, a customer asking for a copy of their file.
+ *                     NOT a potential dispute raised by the office's own lawyer: a LEGAL HOLD already
+ *                     covers that, and two mechanisms for one fact is what this codebase refuses.
+ *                     Owner decision 45 left it out deliberately; do not add it to the examples.
  */
 export const ARCHIVE_RETRIEVAL_BASES = [
   'JUDICIAL_REQUEST',
   'CBJ_AUDIT',
+  'AMLU_REQUEST',
+  'OTHER',
 ] as const;
 
 export type ArchiveRetrievalBasis = (typeof ARCHIVE_RETRIEVAL_BASES)[number];
 
+/**
+ * One row per basis, and the row carries the MEMBER and nothing else — see the note on
+ * `ARCHIVE_RETRIEVAL_BASES` for why the meaning is not here. It stays an object rather than becoming
+ * a bare `string[]` so that a fact the SERVER genuinely owns about a basis — whether it is still
+ * selectable, say — can join it without a shape change at four call sites.
+ */
 export interface ArchiveRetrievalBasisDefinition {
   basis: ArchiveRetrievalBasis;
-  /** What the basis means, in the words a reader is shown. */
-  meaning: string;
 }
 
 export const ARCHIVE_RETRIEVAL_BASIS_DEFINITIONS: readonly ArchiveRetrievalBasisDefinition[] =
-  [
-    {
-      basis: 'JUDICIAL_REQUEST',
-      meaning:
-        'A request from a court or a judicial authority. Record which authority asked, and for what.',
-    },
-    {
-      basis: 'CBJ_AUDIT',
-      meaning:
-        'An official audit by the Central Bank of Jordan. Record the audit it belongs to.',
-    },
-  ];
+  ARCHIVE_RETRIEVAL_BASES.map((basis) => ({ basis }));
 
 export function isArchiveRetrievalBasis(
   value: string,

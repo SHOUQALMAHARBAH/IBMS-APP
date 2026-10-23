@@ -1365,11 +1365,20 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       const policy = { id: chain.policyId };
       const elevenYearsAgo = new Date();
       elevenYearsAgo.setUTCFullYear(elevenYearsAgo.getUTCFullYear() - 11);
+      /*
+       * `paymentReference` IS SET DELIBERATELY — owner decision 44. It is what the extension
+       * register renders as *which record*, so without it this fixture would exercise only the
+       * NOT_RECORDED state and the one state that actually puts a value on the wire would go
+       * untested. Run-unique, because db-test is cumulative and a fixed reference could not be told
+       * apart from a leftover.
+       */
+      const paymentReference = `E2E-PAYREF-${Date.now()}`;
       const entry = await prisma.commissionLedgerEntry.create({
         data: {
           policyId: policy.id,
           amount: '100.000',
           paidAt: elevenYearsAgo,
+          paymentReference,
         },
         select: { id: true },
       });
@@ -1478,6 +1487,43 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
        */
       expect(entries[0].extendedByName).toBe(E2E_USER_FULL_NAME);
       /*
+       * OWNER DECISION 44 — *WHICH RECORD*, ASSERTED ON THE RESPONSE BODY.
+       *
+       * This is the half of group 7b's rule that register entry 94 recorded as open, and it is
+       * asserted here for the same reason `extendedByName` is: the screen declares this shape by
+       * hand over HTTP, TypeScript cannot check it, and a Playwright mock supplies whatever the
+       * screen reads — so a mock can never catch the api dropping a field, which is how the
+       * customer-import panel came to throw on every successful import for three weeks.
+       *
+       * The VALUE is the real reference the RECORD carries — this entry's own `paymentReference` —
+       * and the id is still in the response and still not rendered. The rendered-identifier budget
+       * does not move for this feature.
+       */
+      const handle = entries[0].recordHandle as Record<string, unknown>;
+      expect(handle.state).toBe('RECORDED');
+      expect(handle.value).toBe(paymentReference);
+      expect(String(handle.description)).toContain('payment reference');
+      /*
+       * THE HANDLE'S OWN EXACT KEY SET, for the reason the row's is asserted the same way: a field
+       * added to this union arrives as an ADDITION, and three `toBe` checks keep passing straight
+       * through one. It also pins the discriminated shape — a `value` appearing beside a
+       * NOT_RECORDED state would be an internally inconsistent answer, which is the whole reason
+       * the four states are ONE field rather than a value plus a reason column.
+       */
+      expect(Object.keys(handle).sort()).toEqual([
+        'description',
+        'state',
+        'value',
+      ]);
+      /*
+       * AND THE ID IS NOT THE HANDLE, asserted as an absence. Without this the assertion above would
+       * pass against an implementation that resolved the handle to `recordId` — the one wrong answer
+       * that looks exactly like the right one in a table.
+       */
+      expect(JSON.stringify(entries[0].recordHandle)).not.toContain(
+        String(entryId),
+      );
+      /*
        * AND THE EXACT KEY SET. A disclosure or a drop arrives as an ADDITION or an OMISSION, and a
        * list of `toHaveProperty` calls keeps passing through both — the company-record shape guard's
        * own argument, applied to the one shape a screen now copies by hand.
@@ -1497,6 +1543,7 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         'legislativeInstrument',
         'note',
         'recordCategory',
+        'recordHandle',
         'recordId',
       ]);
 

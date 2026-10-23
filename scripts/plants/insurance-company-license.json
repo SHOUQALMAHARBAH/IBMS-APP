@@ -25,9 +25,9 @@
   },
   "standing-reaches-a-second-module": {
     "file": "apps/api/src/modules/pdpl/retention-archive.service.ts",
-    "from": "  /** The two bases and what each means, for the screen to render rather than restate. */",
-    "to": "  /** The two bases and what each means, for the screen to render rather than restate. */\n  private readonly licenseStanding: unknown = null;\n",
-    "kills": "insurance-company-license.inventory.spec.ts > no file outside the company-record module mentions it — the absence 7d's brief requires be asserted. Planted in an unrelated module on purpose: the sweep must catch a mention ANYWHERE, not only in a plausible place."
+    "from": "  bases() {",
+    "to": "  private readonly licenseStanding: unknown = null;\n\n  bases() {",
+    "kills": "insurance-company-license.inventory.spec.ts > no file outside the company-record module mentions it — the absence 7d's brief requires be asserted. Planted in an unrelated module on purpose: the sweep must catch a mention ANYWHERE, not only in a plausible place. REPOINTED 2026-10-23 (owner decision 45): anchored on the doc comment above `bases()`, which that decision rewrote — the bases are four now and the comment no longer says two. `plant --self-test` refused it, the fifth time that mechanism has caught its own evidence expiring, and it is repointed at the METHOD DECLARATION rather than at prose beside it: an anchor on a sentence is an anchor on something free to be reworded."
   },
   "cascade-leaves-the-licence-terms": {
     "file": "apps/api/test/tenant-prisma.ts",

@@ -285,15 +285,21 @@ its id, who extended it and when.
 otherwise say about the actor is a uuid — which rule 2 refuses to render and which identifies nobody.
 The sibling retrieval register already resolved its actor the same way.
 
-**AND THE OWNER'S OWN REQUIREMENT IS MET EXCEPT IN ONE RESPECT, WHICH IS REPORTED RATHER THAN
-SMOOTHED OVER**: *the register must name WHICH records were extended*, and the screen does NOT render
-the record id. Measured for the retrieval register next door and unchanged here — of the four
-blockable models only `Receipt.reference` and `CommissionLedgerEntry.paymentReference` carry anything
-a person could recognise, and `Remittance` and `Settlement` carry nothing — so there is no readable
-handle to show, inventing one is the display fix rule 2 refuses, and rendering the uuid would raise
-the rendered-identifier budget, which this batch was forbidden to do. The id is in the response and in
-each row's own `data-extension-for`, so the accountability is intact; the missing piece is a handle
-for the person reading it, which is register entry 94's deferred family.
+**AND THE OWNER'S OWN REQUIREMENT IS MET IN FULL SINCE 2026-10-23 — owner decision 44.** It read
+*the register must name WHICH records were extended*, and batch four reported the residual honestly:
+the screen did not render the record id, because of the blockable models only `Receipt.reference` and
+`CommissionLedgerEntry.paymentReference` carried anything a person could recognise.
+
+The register renders a HANDLE now, resolved by the api per category, and the id is still not rendered
+— so the rendered-identifier budget did not move. **AND THE MEASUREMENT CAME OUT DIFFERENTLY FROM
+THE WAY DECISION 44 ASKED IT**: nothing in this product generates a human-readable reference for
+anything, so there was no pattern to copy; what closed `Remittance` was that `receiptId` is `@unique`,
+making its handle its own receipt's reference one hop away, with no column and no backfill. Two of the
+five still cannot be named — `Settlement` (whose one hop resolves to nothing on 18 of 18 rows, because
+`Claim.claimNumber` is optional at its own boundary) and `Quotation` (no reference column at all) — and
+those rows SAY SO, in one of three distinct absent states rather than an em dash. Register entry 94 is
+closed for this register and remains open for the RETRIEVAL one next door, which is a different table
+over a different set of categories.
 
 ### 8. The `Endorsement` and `Invoice` inbound links — not routes · **TO WHICHEVER MODULE BUILDS THOSE SCREENS**
 

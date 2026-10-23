@@ -14,7 +14,10 @@ import {
   elapsedBefore,
   type RetentionNoticeView,
 } from './retention-notice.config';
-import { resolutionFor } from './retention-resolution.config';
+import {
+  describeRecordHandle,
+  resolutionFor,
+} from './retention-resolution.config';
 import { periodIsActionable } from './retention-template.config';
 import {
   assertExtensionBasis,
@@ -259,24 +262,66 @@ export class RetentionNoticeService {
    * so raising it would extend records nobody was asked about — and a register that aggregated by
    * category would throw away exactly the half that makes an extension answerable.
    *
-   * ## `extendedByName` RESOLVES THE ACTOR, AND THE RECORD DELIBERATELY STAYS AN ID
+   * ## BOTH THE ACTOR AND THE RECORD ARE NAMED NOW — owner decision 44
    *
-   * The name is resolved in the repository's include, the same way the sibling retrieval register
-   * does it, because a uuid identifies nobody to a reader and rule 2 refuses to render one.
+   * `extendedByName` resolves the actor in the repository's include, the same way the sibling
+   * retrieval register does, because a uuid identifies nobody to a reader.
    *
-   * `recordId` has no readable form at all and is returned as the id: measured, of the four
-   * blockable models only `Receipt.reference` and `CommissionLedgerEntry.paymentReference` carry
-   * anything a person could recognise, and `Remittance` and `Settlement` carry nothing. So the
-   * SCREEN does not render it (register entry 94) while the API still returns it — the
-   * accountability is in the response and in the row's own test hook, and inventing a handle here
-   * would be the display fix that rule refuses.
+   * `recordHandle` answers *WHICH records* — the half of group 7b's rule that register entry 94
+   * recorded as open. It is THREE STATES AS ONE FIELD, and the three are genuinely different
+   * answers to a regulator:
+   *
+   *   `RECORDED`                     the reference the record carries, and what it IS.
+   *   `NOT_RECORDED`                 this kind of record carries a reference and this one has none.
+   *                                  A gap in the office's own bookkeeping — an outstanding
+   *                                  commission entry has no payment reference by nature.
+   *   `CATEGORY_HAS_NO_REFERENCE`    no record of this kind carries one, with the reason. A property
+   *                                  of the system rather than of this row.
+   *   `RECORD_NO_LONGER_PRESENT`     the extension row survives and the record it named does not.
+   *
+   * Collapsing any pair of those into "—" would make the register say less than it knows, and the
+   * first two are the pair most easily confused: one is answerable by going and finding the
+   * reference, the other never will be.
+   *
+   * THREE OF THE FIVE CATEGORIES RESOLVE AND TWO CANNOT, measured — see `RecordHandleSource` in
+   * `retention-resolution.config.ts` for the figures and for why no reference is generated for the
+   * other two. Nothing in this product assigns a human-readable reference to anything, so there was
+   * no pattern to copy; what closed the gap for `Remittance` was that it is `@unique` on its own
+   * receipt, so its handle was already there, one hop away.
+   *
+   * `recordId` IS STILL RETURNED AND STILL NOT RENDERED. The id is the accountability record and the
+   * row's own test hook; the rendered-identifier budget does not move for this feature.
    */
   async register(recordCategory?: string) {
     const rows = await this.notices.listExtensions(recordCategory);
+
+    /*
+     * ONE HANDLE QUERY PER CATEGORY PRESENT IN THE RESULT, not one per row. Grouped first so a
+     * register showing fifty extensions across three categories costs three reads, and so a
+     * category the resolver does not recognise costs none at all.
+     */
+    const byCategory = new Map<string, string[]>();
+    for (const r of rows) {
+      const ids = byCategory.get(r.recordCategory);
+      if (ids) ids.push(r.recordId);
+      else byCategory.set(r.recordCategory, [r.recordId]);
+    }
+    const handles = new Map<string, Map<string, string | null>>();
+    for (const [category, ids] of byCategory) {
+      const resolution = resolutionFor(category);
+      if (!resolution) continue;
+      handles.set(category, await this.notices.recordHandles(resolution, ids));
+    }
+
     return rows.map((r) => ({
       id: r.id,
       recordCategory: r.recordCategory,
       recordId: r.recordId,
+      recordHandle: describeRecordHandle(
+        r.recordCategory,
+        r.recordId,
+        handles.get(r.recordCategory),
+      ),
       extendedUntil: r.extendedUntil.toISOString(),
       basis: r.basis,
       note: r.note,

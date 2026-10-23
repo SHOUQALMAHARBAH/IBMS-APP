@@ -48,7 +48,10 @@ export class RetentionArchiveService {
     private readonly audit: AuditService,
   ) {}
 
-  /** The two bases and what each means, for the screen to render rather than restate. */
+  /**
+   * WHICH bases exist, for the screen to render rather than restate. The WORDS are the web's — see
+   * `ARCHIVE_RETRIEVAL_BASES` — so this answers the one half the screen cannot answer for itself.
+   */
   bases() {
     return ARCHIVE_RETRIEVAL_BASIS_DEFINITIONS;
   }

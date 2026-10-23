@@ -44,6 +44,83 @@
 
 import { floorForCategory, normaliseCategory } from './retention-floors.config';
 
+/**
+ * HOW A RECORD OF A CATEGORY IS NAMED TO A PERSON — owner decision 44, and the measurement that
+ * answered it differently from the way it was asked.
+ *
+ * ## THERE IS NO GENERATION PATTERN IN THIS PRODUCT TO FOLLOW
+ *
+ * Decision 44 said to measure how `Receipt.reference` is generated, scoped and made unique and to do
+ * the same for the models that carry nothing. Measured: **it is not generated at all.** It is the
+ * CLIENT's own payment/bank/voucher reference, supplied by whoever records the receipt
+ * (`RecordReceiptDto.reference`, required) and doubling as the collection endpoint's idempotency key.
+ *
+ * And it is not an exception. Swept across the whole schema, **nothing in this product assigns a
+ * human-readable reference to anything**: `Policy.policyNumber` is the INSURER's, recorded at
+ * issuance; `Claim.claimNumber` is a broker-internal number that is OPTIONAL at its own boundary;
+ * every `code` column is a seeded catalogue code. So "do the same for `Remittance` and `Settlement`"
+ * has no scheme to copy, and inventing one would be the first sequence scheme in this codebase —
+ * which decision 44 explicitly forbids rather than permits.
+ *
+ * ## AND TWO OF THE FIVE NEEDED NOTHING, WHICH IS WHY THIS IS A LOOKUP AND NOT A MIGRATION
+ *
+ * `Remittance.receiptId` is `@unique`, so a remittance is ONE-TO-ONE with the receipt whose money it
+ * moves on — its handle is that receipt's own reference, one hop, no column and no backfill. The
+ * batch-four report that said `Remittance` "carries nothing" was true of its COLUMNS and false of
+ * the RECORD.
+ *
+ * ## WHAT STILL CANNOT BE NAMED, AND THE FIGURES
+ *
+ * Measured on db-test, which is the cumulative e2e database and the only one holding these rows at
+ * all (dev holds zero receipts, remittances, ledger entries and settlements):
+ *
+ *   Receipt                 38 rows,  8 with no reference — the 8 predate the DTO requiring it.
+ *   Remittance              13 rows,  1 whose receipt has none.
+ *   CommissionLedgerEntry   11 rows,  7 with no `paymentReference` — it is written when the entry is
+ *                                     PAID, so an outstanding entry has none by nature. The
+ *                                     batch-four report called this a handle without that
+ *                                     qualification; it is a handle only once paid.
+ *   Settlement              18 rows, 18 whose claim has no number. `claimId` is `@unique` so the one
+ *                                     hop exists, and `Claim.claimNumber` is optional at its own
+ *                                     boundary — null on 78 of 82 claims. So the hop resolves to
+ *                                     nothing on every settlement that exists.
+ *   Quotation                        no reference column of any kind. A quote is recognisable as
+ *                                     "the one from <insurer>, version N", which is a DESCRIPTION
+ *                                     built at render time and not a reference the record carries —
+ *                                     exactly what rule 2 refuses.
+ *
+ * So three of five resolve and two cannot, and the two that cannot are REPORTED rather than given an
+ * invented handle: `NONE` carries its own reason, the register renders it as a distinct state, and
+ * nobody has to re-derive why.
+ *
+ * ## THE THREE STATES ARE ONE FIELD, NEVER A VALUE PLUS A FLAG
+ *
+ * "this record's reference was never recorded" and "a record of this kind carries no reference at
+ * all" are different facts and a reader needs them apart — the first is a gap in the office's own
+ * bookkeeping, the second is a property of the system. A `string | null` plus a separate reason
+ * column would be two fields free to disagree; one discriminated union cannot be inconsistent.
+ */
+export type RecordHandleSource =
+  | {
+      kind: 'OWN_COLUMN';
+      /** A column on the model itself, selected directly. */
+      column: 'reference' | 'paymentReference';
+      /** What the value IS, for a reader of this file. */
+      description: string;
+    }
+  | {
+      kind: 'VIA_ONE_TO_ONE_PARENT';
+      /** The `@unique` relation that makes the hop a hop and not a join. */
+      relation: 'receipt';
+      column: 'reference';
+      description: string;
+    }
+  | {
+      kind: 'NONE';
+      /** Why this category cannot be named, in the words the register reports. */
+      reason: string;
+    };
+
 /** How a category's records are found and when their clock starts. */
 export interface CategoryResolution {
   /** The category name as an office would type it — matched through `normaliseCategory`. */
@@ -92,6 +169,12 @@ export interface CategoryResolution {
    * actually asking and a column name does not answer it.
    */
   triggerDescription: string;
+  /**
+   * How a record of this category is NAMED to a person — owner decision 44. See
+   * `RecordHandleSource` above for the measurement, including why two of the five are `NONE` and why
+   * no reference is generated for them.
+   */
+  recordHandle: RecordHandleSource;
 }
 
 export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
@@ -103,6 +186,12 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     triggerIsNullable: false,
     triggerDescription:
       'the date the client payment was received, which closes that transaction',
+    recordHandle: {
+      kind: 'OWN_COLUMN',
+      column: 'reference',
+      description:
+        "the client's own payment, bank or voucher reference — required when the receipt is recorded, and the collection endpoint's idempotency key",
+    },
   },
   {
     recordCategory: 'Remittance',
@@ -112,6 +201,13 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     triggerIsNullable: true,
     triggerDescription:
       'the date the premium was remitted to the insurer, which closes that transaction',
+    recordHandle: {
+      kind: 'VIA_ONE_TO_ONE_PARENT',
+      relation: 'receipt',
+      column: 'reference',
+      description:
+        'the reference of the receipt whose money this remittance moves on — `receiptId` is `@unique`, so it is one hop and the same money rather than a join that could fan out',
+    },
   },
   {
     recordCategory: 'CommissionLedgerEntry',
@@ -121,6 +217,12 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     triggerIsNullable: true,
     triggerDescription:
       'the date the commission was paid, which closes that transaction',
+    recordHandle: {
+      kind: 'OWN_COLUMN',
+      column: 'paymentReference',
+      description:
+        'the payment reference, written when the entry is PAID — an outstanding entry has none by nature, which is why the register has a state for an unrecorded handle rather than treating it as an error',
+    },
   },
   {
     recordCategory: 'Settlement',
@@ -130,6 +232,11 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     triggerIsNullable: true,
     triggerDescription:
       'the date the client settlement payment was confirmed, which closes that transaction',
+    recordHandle: {
+      kind: 'NONE',
+      reason:
+        'a settlement carries no reference of its own, and the one hop that exists resolves to nothing: `claimId` is `@unique`, and `Claim.claimNumber` is optional at its own boundary and absent on every settlement in the e2e database (18 of 18, measured 2026-10-23). Giving one a reference means generating one, and nothing in this product generates a reference for anything — owner decision 44 forbids inventing the first scheme here.',
+    },
   },
   {
     /*
@@ -166,6 +273,11 @@ export const CATEGORY_RESOLUTIONS: readonly CategoryResolution[] = [
     triggerIsRelational: true,
     triggerDescription:
       'the date the client REFUSED — the end of the purpose the quote was requested for. A quote the client accepted, or has not answered, has no trigger and is never counted; the quote’s own expiry is the other limb of this trigger and is not recorded anywhere',
+    recordHandle: {
+      kind: 'NONE',
+      reason:
+        'a quotation has no reference column of any kind — 25 fields and not one is a number a person could quote back. What makes a quote recognisable is a DESCRIPTION assembled at render time (the insurer, and which version), and rule 2 refuses exactly that: a label built on the screen is not an identity the record carries.',
+    },
   },
 ] as const;
 
@@ -200,6 +312,54 @@ export function resolutionFor(
       (r) => normaliseCategory(r.recordCategory) === needle,
     ) ?? null
   );
+}
+
+/**
+ * WHICH OF THE FOUR STATES A GIVEN RECORD'S HANDLE IS IN — owner decision 44.
+ *
+ * The caller supplies the map `RetentionNoticeRepository.recordHandles` returned for this category,
+ * or `undefined` when no resolution matched the category at all. The distinction between an ABSENT
+ * key and a `null` value is load-bearing and is why the map is passed rather than a flat value:
+ *
+ *   key present, value set     -> `RECORDED`
+ *   key present, value null    -> `NOT_RECORDED` — the record exists, its reference does not
+ *   key absent                 -> `RECORD_NO_LONGER_PRESENT` — the extension outlived the record
+ *   no handle source at all    -> `CATEGORY_HAS_NO_REFERENCE`, carrying the config's own reason
+ *
+ * An UNRECOGNISED category is `CATEGORY_HAS_NO_REFERENCE` too, with the honest reason, because
+ * `recordCategory` is free text — an office may extend a category this system cannot resolve, and
+ * claiming its record is gone would be a false statement about the office's own data.
+ */
+export type RecordHandleState =
+  | { state: 'RECORDED'; value: string; description: string }
+  | { state: 'NOT_RECORDED'; description: string }
+  | { state: 'RECORD_NO_LONGER_PRESENT' }
+  | { state: 'CATEGORY_HAS_NO_REFERENCE'; reason: string };
+
+export function describeRecordHandle(
+  recordCategory: string,
+  recordId: string,
+  handles: Map<string, string | null> | undefined,
+): RecordHandleState {
+  const resolution = resolutionFor(recordCategory);
+  if (!resolution) {
+    return {
+      state: 'CATEGORY_HAS_NO_REFERENCE',
+      reason:
+        'this system cannot resolve that record category at all, so it holds no reference for it — `recordCategory` is free text and an office may set a period for a category nothing here recognises',
+    };
+  }
+  const source = resolution.recordHandle;
+  if (source.kind === 'NONE') {
+    return { state: 'CATEGORY_HAS_NO_REFERENCE', reason: source.reason };
+  }
+  if (!handles || !handles.has(recordId)) {
+    return { state: 'RECORD_NO_LONGER_PRESENT' };
+  }
+  const value = handles.get(recordId) ?? null;
+  return value === null
+    ? { state: 'NOT_RECORDED', description: source.description }
+    : { state: 'RECORDED', value, description: source.description };
 }
 
 /**

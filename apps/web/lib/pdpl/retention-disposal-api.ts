@@ -146,10 +146,33 @@ export function extendRetention(
  * recognise, so there is no readable handle to show and inventing one is the display fix rule 2
  * refuses. The id stays in the payload and in the row's own test hook.
  */
+/**
+ * HOW A RECORD IS NAMED TO A PERSON — owner decision 44, resolved by the api per category.
+ *
+ * FOUR STATES AS ONE DISCRIMINATED FIELD, because they are four different answers and a reader needs
+ * them apart. `NOT_RECORDED` is a gap in the office's own bookkeeping and somebody could still go and
+ * find the reference; `CATEGORY_HAS_NO_REFERENCE` is a property of the system and nobody ever will.
+ * A `string | null` plus a reason beside it would be two fields free to disagree.
+ *
+ * `description` says what the value IS — a client bank reference, a commission payment reference —
+ * and is the api's, not this screen's: the four categories name four different kinds of thing and a
+ * single column heading cannot say which.
+ */
+export type RecordHandleState =
+  | { state: 'RECORDED'; value: string; description: string }
+  | { state: 'NOT_RECORDED'; description: string }
+  | { state: 'RECORD_NO_LONGER_PRESENT' }
+  | { state: 'CATEGORY_HAS_NO_REFERENCE'; reason: string };
+
 export interface RetentionExtensionRegisterRow {
   id: string;
   recordCategory: string;
   recordId: string;
+  /**
+   * WHICH RECORD, in words — owner decision 44, closing the half of group 7b's rule that register
+   * entry 94 recorded as open. `recordId` above is still the id and is still NOT RENDERED.
+   */
+  recordHandle: RecordHandleState;
   /** When the EXTENDED clock elapses — the date the same notice comes back with the same choices. */
   extendedUntil: string;
   basis: ExtendRetentionInput['basis'];
@@ -182,7 +205,11 @@ export function listRetentionExtensions(): Promise<
  * view, which is how the customer-import result panel once broke. When this shape changes, the
  * client, the screen and every Playwright mock move in the SAME commit.
  */
-export type ArchiveRetrievalBasis = 'JUDICIAL_REQUEST' | 'CBJ_AUDIT';
+export type ArchiveRetrievalBasis =
+  | 'JUDICIAL_REQUEST'
+  | 'CBJ_AUDIT'
+  | 'AMLU_REQUEST'
+  | 'OTHER';
 
 /**
  * WHICH BASES EXIST, FROM THE SERVER — `GET /retention-archive/bases`, owner decision 43.
@@ -197,14 +224,20 @@ export type ArchiveRetrievalBasis = 'JUDICIAL_REQUEST' | 'CBJ_AUDIT';
  * label lookup falls back to rendering the member name — visibly unfinished, which is the same
  * decision the workflow-entity labels made for a member with no word.
  *
- * `meaning` IS NOT RENDERED YET and that is not an oversight: `ARCHIVE_RETRIEVAL_BASIS_DEFINITIONS`
- * carries it in English only, there is nothing in the i18n tree to derive Arabic from, and shipping
- * an English sentence into an Arabic screen as a placeholder is worse than the gap. Two sentences
- * the owner writes; the field is declared so nothing has to change here when they arrive.
+ * THE ROW CARRIES ONLY THE MEMBER, AND `meaning` IS GONE FROM THE WIRE — owner decision 45,
+ * 2026-10-23. It was declared and unrendered under entry 122, on the honest grounds that the api
+ * carried it in English only and shipping an English sentence into an Arabic screen as a placeholder
+ * is worse than the gap. The owner has now written the meanings, and they are bilingual and have
+ * THREE NAMED PARTS each (a selection condition, what goes in the box, and an example) plus one
+ * shared line — so they live in `translations/pdpl.ts` keyed by member, where every other bilingual
+ * string in this product lives and where this api cannot reach, having no message i18n at all.
+ *
+ * That keeps decision 43's property rather than trading it away: a FIFTH basis added server-side
+ * still appears in this dropdown with no web change, rendering its own member name and no meaning
+ * until somebody decides its words.
  */
 export interface ArchiveRetrievalBasisDefinition {
   basis: string;
-  meaning: string;
 }
 
 export function listArchiveRetrievalBases(): Promise<

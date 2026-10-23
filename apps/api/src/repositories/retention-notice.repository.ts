@@ -173,4 +173,69 @@ export class RetentionNoticeRepository {
       },
     });
   }
+
+  /**
+   * THE HUMAN-READABLE HANDLE FOR A SET OF RECORDS IN ONE CATEGORY — owner decision 44.
+   *
+   * ONE QUERY PER CATEGORY, never one per record: the extension register is one row per extended
+   * record, so resolving each handle on its own would be N queries to render a table whose whole
+   * purpose is to be read in one go.
+   *
+   * THE SWITCH IS EXHAUSTIVE OVER `modelProperty` AND MUST STAY SO. A sixth category added to
+   * `CATEGORY_RESOLUTIONS` is a compile error here until somebody decides whether its records can be
+   * named — which is the decision, not an implementation detail. `recordHandle.kind === 'NONE'`
+   * short-circuits before any query, so the two categories that carry no reference cost nothing.
+   *
+   * IT RETURNS A MAP AND NOT AN ARRAY, and a MISSING key is not the same as a null value: a record
+   * whose row has been destroyed since the extension was written is absent from the map, while a
+   * record that exists and carries no reference maps to `null`. The register renders those
+   * differently, because "this record is gone" and "nobody wrote its reference down" are different
+   * answers to a regulator.
+   */
+  async recordHandles(
+    resolution: CategoryResolution,
+    recordIds: readonly string[],
+  ): Promise<Map<string, string | null>> {
+    const out = new Map<string, string | null>();
+    if (resolution.recordHandle.kind === 'NONE' || recordIds.length === 0) {
+      return out;
+    }
+    const ids = [...new Set(recordIds)];
+
+    switch (resolution.modelProperty) {
+      case 'receipt': {
+        const rows = await this.prisma.client.receipt.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, reference: true },
+        });
+        for (const r of rows) out.set(r.id, r.reference ?? null);
+        return out;
+      }
+      case 'remittance': {
+        const rows = await this.prisma.client.remittance.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, receipt: { select: { reference: true } } },
+        });
+        for (const r of rows) out.set(r.id, r.receipt.reference ?? null);
+        return out;
+      }
+      case 'commissionLedgerEntry': {
+        const rows = await this.prisma.client.commissionLedgerEntry.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, paymentReference: true },
+        });
+        for (const r of rows) out.set(r.id, r.paymentReference ?? null);
+        return out;
+      }
+      /*
+       * Unreachable while both of these declare `NONE` — the guard above returns first — and
+       * present so the switch is exhaustive over the union rather than relying on a `default`. A
+       * `default` here would silently return an empty map the day one of them gained a handle,
+       * which is the same class as a label map that quietly renders nothing.
+       */
+      case 'settlement':
+      case 'quotation':
+        return out;
+    }
+  }
 }

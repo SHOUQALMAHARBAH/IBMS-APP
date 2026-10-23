@@ -5008,6 +5008,15 @@ model RetentionExtension {
 enum RetentionArchiveRetrievalBasis {
   JUDICIAL_REQUEST
   CBJ_AUDIT
+  /// Owner decision 45 — a named statutory counterparty in its own right, NOT an example under
+  /// `OTHER`. Folding it in would leave the register unable to say how many times the
+  /// anti-money-laundering unit asked without reading every note by hand.
+  AMLU_REQUEST
+  /// Owner decision 45 — a DECLARED kind of compulsion ("legitimate, and none of the three above"),
+  /// not an escape from declaring one. `note` is NOT NULL for every basis and already carries the
+  /// `common/declaration-reason.ts` floor, so this member cannot be selected without an explanation
+  /// and needs no conditional rule of its own.
+  OTHER
 }
 
 enum RetentionExtensionBasis {

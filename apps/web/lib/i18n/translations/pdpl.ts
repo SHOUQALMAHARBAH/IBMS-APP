@@ -222,9 +222,41 @@ export const PDPL = {
     rdRetrieveBasisLabel:
       'على أيِّ أساسٍ يُستخرَجُ',
     rdRetrieveBasisJudicial:
-      'طلبٌ قضائي',
+      'طلب قضائي',
+    rdRetrieveWhenJudicial:
+      'يُختارُ هذا السببُ إذا وصلَ المكتبَ كتابٌ من محكمةٍ أو من النيابةِ العامّةِ أو من دائرةِ التنفيذِ أو من أيِّ جهةٍ قضائيّةٍ يَطلُبُ مستنداً من الأرشيف.',
+    rdRetrieveWriteJudicial:
+      'ويُكتَبُ في الخانة: الجهةُ التي طلبت باسمِها، ورقمُ كتابِها وتاريخُه، ورقمُ الدعوى إن وُجِد، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgJudicial:
+      'مثال: محكمةُ بدايةِ عمّان — كتابٌ رقم ١٢٣٤ تاريخ ٥/٣/٢٠٢٦ — الدعوى ٥٦٧/٢٠٢٦ — وثيقةُ تأمينِ العميل (فلان) وإيصالاتُ أقساطِها.',
     rdRetrieveBasisCbj:
-      'تدقيقٌ رسميٌّ من البنكِ المركزيِّ الأردني',
+      'تدقيق البنك المركزي',
+    rdRetrieveWhenCbj:
+      'يُختارُ هذا السببُ إذا كانَ الاسترجاعُ لتدقيقٍ رسميٍّ من البنكِ المركزيِّ الأردنيّ.',
+    rdRetrieveWriteCbj:
+      'ويُكتَبُ في الخانة: أيُّ تدقيقٍ هو — رقمُ كتابِ البنكِ المركزيِّ وتاريخُه، أو الفترةُ التي يُغطّيها التدقيق — ومَن طلبَ المستندَ من فريقِ التدقيق، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgCbj:
+      'مثال: تدقيقُ البنكِ المركزيِّ لفترةِ ٢٠٢٥ — كتابٌ رقم ٧٨٩ تاريخ ١٠/٢/٢٠٢٦ — ملفُّ «اعرف عميلك» للعميل (فلان).',
+    rdRetrieveBasisAmlu:
+      'طلب وحدة مكافحة غسل الأموال وتمويل الإرهاب',
+    rdRetrieveWhenAmlu:
+      'يُختارُ هذا السببُ إذا وصلَ المكتبَ طلبٌ من وحدةِ مكافحةِ غسلِ الأموالِ وتمويلِ الإرهاب.',
+    rdRetrieveWriteAmlu:
+      'ويُكتَبُ في الخانة: رقمُ كتابِ الوحدةِ وتاريخُه، واسمُ العميلِ أو السجلِّ المطلوبِ، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgAmlu:
+      'مثال: وحدةُ مكافحةِ غسلِ الأموال — كتابٌ رقم ٤٥٦ تاريخ ٨/٣/٢٠٢٦ — ملفُّ «اعرف عميلك» وسجلُّ الفرزِ للعميل (فلان) وإيصالاتُ أقساطِه.',
+    rdRetrieveBasisOther:
+      'أخرى',
+    rdRetrieveWhenOther:
+      'يُختارُ هذا السببُ إذا كانَ الاسترجاعُ لسببٍ مشروعٍ لا يَنطبِقُ عليه أيٌّ من الأسبابِ السابقة — ويُكتَبُ السببُ نفسُه في الخانة.',
+    rdRetrieveKindsOther:
+      'ومن أمثلتِه: شكوى عميلٍ يُعادُ فحصُها · مطالبةٌ تُعادُ فتحُها من شركةِ التأمين · تدقيقُ دائرةِ ضريبةِ الدخلِ والمبيعات · طلبُ العميلِ نسخةً من ملفِّه · تدقيقُ مدقّقِ حساباتِ المكتبِ السنويّ · مراجعةٌ داخليةٌ أو تحقيقٌ داخليّ.',
+    rdRetrieveWriteOther:
+      'ويُكتَبُ في الخانة: مَن طلب، وبأيِّ كتابٍ أو طلبٍ وتاريخِه إن وُجِد، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgOther:
+      'مثال: شكوى العميل (فلان) رقم ١٢ — أُعيدَ فحصُها بطلبِ مديرِ المكتبِ تاريخ ٥/٣/٢٠٢٦ — ملفُّ الشكوى ومرفقاتُها.',
+    rdRetrieveBasisShared:
+      'هذا الملفُّ خرجَ من الأرشيفِ بعدَ انتهاءِ مدّةِ حفظِه، وما يُكتَبُ هنا هو جوابُ المكتبِ إذا سُئِلَ لاحقاً: لماذا استُرجِع، ولمن.',
     rdRetrieveRecordsLabel:
       'السجلّاتُ التي طلبَها القضاءُ أو التدقيق',
     rdRetrieveNoteLabel:
@@ -255,6 +287,14 @@ export const PDPL = {
     // statement, the category, the instrument, the article and the hold all already render here.
     rdExtRegisterHeading: 'سجل التمديد',
     rdExtRegisterNone: 'لا يوجد تمديد مسجّل في هذا المكتب بعد.',
+    rdExtColRecord:
+      'مرجع السجل',
+    rdExtRecordNotRecorded:
+      'لم يُسجَّل مرجع.',
+    rdExtRecordTypeNone:
+      'لا يوجد مرجع لهذا النوع من السجلات.',
+    rdExtRecordGone:
+      'السجل غير موجود.',
     rdExtColUntil: 'حتى',
     rdExtColWho: 'من',
     rdRetrieveDone:
@@ -649,8 +689,40 @@ export const PDPL = {
       'On what basis it is being retrieved',
     rdRetrieveBasisJudicial:
       'A judicial request',
+    rdRetrieveWhenJudicial:
+      'Choose this basis when a letter reaches the office from a court, the public prosecution, the execution department or any judicial authority asking for a document from the archive.',
+    rdRetrieveWriteJudicial:
+      'In the box, record: the authority that asked, by name; its letter number and date; the case number if there is one; and exactly what was asked for.',
+    rdRetrieveEgJudicial:
+      'Example: Amman Court of First Instance — letter no. 1234 dated 5/3/2026 — case 567/2026 — the insurance policy of customer (name) and its instalment receipts.',
     rdRetrieveBasisCbj:
-      'An official audit by the Central Bank of Jordan',
+      'A Central Bank audit',
+    rdRetrieveWhenCbj:
+      'Choose this basis when the retrieval is for an official audit by the Central Bank of Jordan.',
+    rdRetrieveWriteCbj:
+      'In the box, record: which audit it is — the Central Bank letter number and date, or the period the audit covers — who on the audit team asked for the document, and exactly what was asked for.',
+    rdRetrieveEgCbj:
+      'Example: Central Bank audit for the 2025 period — letter no. 789 dated 10/2/2026 — the know-your-customer file of customer (name).',
+    rdRetrieveBasisAmlu:
+      'A request from the Anti-Money Laundering and Counter-Terrorist Financing Unit',
+    rdRetrieveWhenAmlu:
+      'Choose this basis when a request reaches the office from the Anti-Money Laundering and Counter-Terrorist Financing Unit.',
+    rdRetrieveWriteAmlu:
+      'In the box, record: the letter number and date of the Unit, the name of the customer or the record asked for, and exactly what was asked for.',
+    rdRetrieveEgAmlu:
+      'Example: Anti-Money Laundering Unit — letter no. 456 dated 8/3/2026 — the know-your-customer file, the screening record and the instalment receipts of customer (name).',
+    rdRetrieveBasisOther:
+      'Other',
+    rdRetrieveWhenOther:
+      'Choose this basis when the retrieval is for a legitimate reason that none of the bases above covers — and write the reason itself in the box.',
+    rdRetrieveKindsOther:
+      'Among its kinds: a customer complaint being re-examined · a claim reopened by the insurer · an Income and Sales Tax Department audit · a customer asking for a copy of their file · the annual external auditor of the office · an internal review or internal investigation.',
+    rdRetrieveWriteOther:
+      'In the box, record: who asked, under which letter or request and its date if there is one, and exactly what was asked for.',
+    rdRetrieveEgOther:
+      'Example: complaint no. 12 of customer (name) — re-examined at the request of the office manager on 5/3/2026 — the complaint file and its attachments.',
+    rdRetrieveBasisShared:
+      'This file left the archive after its retention period had ended, and what is written here is the answer the office gives if it is later asked: why was it retrieved, and for whom.',
     rdRetrieveRecordsLabel:
       'The records the court or the audit asked for',
     rdRetrieveNoteLabel:
@@ -673,6 +745,14 @@ export const PDPL = {
       'When',
     rdExtRegisterHeading: 'Extension register',
     rdExtRegisterNone: 'Nobody in this office has recorded an extension yet.',
+    rdExtColRecord:
+      'Record reference',
+    rdExtRecordNotRecorded:
+      'No reference recorded.',
+    rdExtRecordTypeNone:
+      'No reference exists for this kind of record.',
+    rdExtRecordGone:
+      'The record is no longer present.',
     rdExtColUntil: 'Until',
     rdExtColWho: 'Who',
     rdRetrieveDone:

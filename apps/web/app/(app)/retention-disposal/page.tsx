@@ -131,7 +131,61 @@ const EXTENSION_BASIS_LABEL = {
 const ARCHIVE_BASIS_LABEL: Partial<Record<string, TranslationKey>> = {
   JUDICIAL_REQUEST: 'rdRetrieveBasisJudicial',
   CBJ_AUDIT: 'rdRetrieveBasisCbj',
+  AMLU_REQUEST: 'rdRetrieveBasisAmlu',
+  OTHER: 'rdRetrieveBasisOther',
 } satisfies Record<ArchiveRetrievalBasis, TranslationKey>;
+
+/**
+ * WHAT EACH BASIS MEANS — owner decision 45. Her texts, and the shape is HERS rather than one
+ * string: a `when` that states the SELECTION CONDITION (which is what actually helps somebody
+ * choose, where a definition does not), a `write` saying what goes in the box, and an `example`
+ * whose shape is meant to be copied. Her brief's own instruction was to extend the shape rather than
+ * cram three parts into one line with separators, and rather than drop the example.
+ *
+ * `kinds` IS PRESENT ON `OTHER` ALONE and is not padding: that basis lists six kinds before it says
+ * what to write, and folding them into `when` would bury the list the list exists to be.
+ *
+ * Declared `Partial` over `string` and `satisfies` the UNION — the `ARCHIVE_BASIS_LABEL` pattern
+ * directly above, and for the same two reasons. A fifth basis added server-side is a build error
+ * here until its words are decided, and until then the lookup is honestly empty rather than
+ * rendering `undefined` through `t()`, which renders nothing at all.
+ */
+const ARCHIVE_BASIS_MEANING: Partial<
+  Record<
+    string,
+    {
+      when: TranslationKey;
+      kinds?: TranslationKey;
+      write: TranslationKey;
+      example: TranslationKey;
+    }
+  >
+> = {
+  JUDICIAL_REQUEST: {
+    when: 'rdRetrieveWhenJudicial',
+    write: 'rdRetrieveWriteJudicial',
+    example: 'rdRetrieveEgJudicial',
+  },
+  CBJ_AUDIT: {
+    when: 'rdRetrieveWhenCbj',
+    write: 'rdRetrieveWriteCbj',
+    example: 'rdRetrieveEgCbj',
+  },
+  AMLU_REQUEST: {
+    when: 'rdRetrieveWhenAmlu',
+    write: 'rdRetrieveWriteAmlu',
+    example: 'rdRetrieveEgAmlu',
+  },
+  OTHER: {
+    when: 'rdRetrieveWhenOther',
+    kinds: 'rdRetrieveKindsOther',
+    write: 'rdRetrieveWriteOther',
+    example: 'rdRetrieveEgOther',
+  },
+} satisfies Record<
+  ArchiveRetrievalBasis,
+  { when: TranslationKey; kinds?: TranslationKey; write: TranslationKey; example: TranslationKey }
+>;
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -141,6 +195,28 @@ const cell: CSSProperties = {
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const sectionStyle: CSSProperties = { margin: '2rem 0' };
+/*
+ * The basis explanation. A bordered block rather than muted body text, deliberately: it is four
+ * sentences in a form and has to read as guidance attached to the field above it rather than as
+ * small print. No `opacity` and no muted ink — that pair is what produced this app's only a11y
+ * contrast regression, and the text here is the instruction somebody is meant to follow.
+ */
+const basisMeaningStyle: CSSProperties = {
+  margin: '0.25rem 0 0',
+  padding: '0.6rem 0.75rem',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: '6px',
+  /*
+   * `--surface-sunken` AND NOT `--surface-raised`, which three other sites in this app reference
+   * and `globals.css` DEFINES NOWHERE — so those three render with no background at all, an
+   * undefined custom property falling back to `transparent`. Reported rather than fixed here:
+   * defining that token would change the appearance of three existing screens and needs a value
+   * for the dark theme too, which is a design decision rather than a typo.
+   */
+  background: 'var(--surface-sunken)',
+  fontSize: '0.9rem',
+  lineHeight: 1.6,
+};
 
 
 export default function RetentionDisposalPage() {
@@ -378,6 +454,15 @@ export default function RetentionDisposalPage() {
     const key = ARCHIVE_BASIS_LABEL[basis];
     return key ? t(key) : basis;
   };
+
+  /*
+   * The chosen basis's own words, or nothing. `undefined` on both the no-choice-yet state and on a
+   * basis whose words have not been decided — the two are the same thing to render (no block), and
+   * keeping them one expression is what stops a half-written `aria-describedby` pointing at an id
+   * that is not there.
+   */
+  const chosenBasisMeaning =
+    retrieveBasis === '' ? undefined : ARCHIVE_BASIS_MEANING[retrieveBasis];
 
   const noFloorNotice = t('rdNoFloorNotice');
 
@@ -834,14 +919,35 @@ export default function RetentionDisposalPage() {
                 value={retrieveBasis}
                 onChange={(e) => setRetrieveBasis(e.target.value)}
                 disabled={bases === null || bases.length === 0}
+                /*
+                 * Pointed at the meaning block only when there IS one — an `aria-describedby` naming
+                 * an id that is not in the document is itself a violation, and a basis whose words
+                 * nobody has written yet has no block to name.
+                 */
+                aria-describedby={
+                  chosenBasisMeaning ? 'rd-retrieve-basis-meaning' : undefined
+                }
                 style={{ width: '100%' }}
               >
                 {/*
-                  THE OPTIONS COME FROM THE SERVER, and the list is still a closed two with
-                  deliberately no "internal review" among them: an office retrieving a blocked
-                  record for its own purposes is not retrieving it on a basis, it is processing it,
-                  which is what condition 1 refuses. What changed is WHERE that list lives — this
-                  screen used to carry its own copy of it.
+                  THE OPTIONS COME FROM THE SERVER — four of them since owner decision 45, and the
+                  list is no longer the closed two. WHERE the list lives is the server's; this screen
+                  used to carry its own copy.
+
+                  AND DECISION 45 REVERSES A RECORDED DECISION, STATED RATHER THAN SMOOTHED OVER.
+                  This comment used to read *"a closed two with deliberately no internal review among
+                  them: an office retrieving a blocked record for its own purposes is not retrieving
+                  it on a basis, it is processing it"*. `OTHER` now lists an internal review and the
+                  office's own annual auditor among its kinds, so that rule has moved and the owner
+                  moved it. What makes the new position the stronger one is the `note` floor: an
+                  office that needs a blocked file for an internal review retrieves it either way,
+                  and a list with no slot for that leaves the retrieval recorded under a basis that
+                  never happened — a judicial request nobody made. A declared internal reason, with
+                  its note, is answerable; a mislabelled one is worse than either.
+
+                  `OTHER` IS STILL NOT FREE TEXT AS A BASIS. It is a declared KIND of compulsion and
+                  `note` is NOT NULL for every basis, carrying the shared declaration-reason floor —
+                  so it cannot be selected without saying what the reason was.
 
                   NO PLACEHOLDER OPTION AND NO "loading" TEXT. An empty disabled select is honest in
                   both the not-yet and the did-not-load states, where a word would have to pick one
@@ -855,6 +961,38 @@ export default function RetentionDisposalPage() {
                 ))}
               </select>
             </label>
+            {/*
+              THE CHOSEN BASIS EXPLAINS ITSELF, BETWEEN THE SELECT AND THE BOX IT IS ABOUT. Owner
+              decision 45: a reader who has just chosen *a judicial request* is one field away from
+              the note, and what they need there is not a definition of the phrase but the three
+              things she wrote — when this is the right choice, what goes in the box, and an example
+              whose shape they can copy.
+
+              THE SHARED LINE RENDERS UNDER ALL FOUR and is not repeated per basis, because it is
+              one fact about every retrieval rather than four: this file left the archive after its
+              period had ended, and the note is the office's answer if it is asked later.
+            */}
+            {chosenBasisMeaning ? (
+              <div
+                id="rd-retrieve-basis-meaning"
+                role="note"
+                data-testid="retrieve-basis-meaning"
+                data-basis={retrieveBasis}
+                style={basisMeaningStyle}
+              >
+                <p style={{ margin: '0 0 0.4rem' }}>{t(chosenBasisMeaning.when)}</p>
+                {chosenBasisMeaning.kinds ? (
+                  <p style={{ margin: '0 0 0.4rem' }}>{t(chosenBasisMeaning.kinds)}</p>
+                ) : null}
+                <p style={{ margin: '0 0 0.4rem' }}>{t(chosenBasisMeaning.write)}</p>
+                <p style={{ margin: '0 0 0.4rem' }} data-basis-example="">
+                  {t(chosenBasisMeaning.example)}
+                </p>
+                <p style={{ margin: 0 }} data-basis-shared="">
+                  {t('rdRetrieveBasisShared')}
+                </p>
+              </div>
+            ) : null}
             <label>
               {t('rdRetrieveNoteLabel')}
               <textarea
@@ -995,6 +1133,7 @@ export default function RetentionDisposalPage() {
                 <thead>
                   <tr>
                     <th style={head}>{t('rdNoticeColCategory')}</th>
+                    <th style={head}>{t('rdExtColRecord')}</th>
                     <th style={head}>{t('rdExtColUntil')}</th>
                     <th style={head}>{t('rdRetrieveColBasis')}</th>
                     <th style={head}>{t('rdRetrieveColNote')}</th>
@@ -1008,6 +1147,36 @@ export default function RetentionDisposalPage() {
                 <tbody>
                   {extensions.map((x) => (
                     <tr key={x.id} data-extension-for={x.recordId}>
+                      {/*
+                        WHICH RECORD — owner decision 44, and the id is STILL not rendered. The
+                        reference is the real one the record carries (a client bank reference, a
+                        commission payment reference), resolved by the api per category; where there
+                        is none the cell says WHICH of the three reasons applies, because "nobody
+                        wrote it down", "this kind of record has none" and "the record is gone" are
+                        different answers to a regulator and an em dash is none of them.
+
+                        The api's `description` rides along as a `title`, not as visible text: four
+                        categories name four different kinds of reference and one column heading
+                        cannot say which, but a cell crowded with that sentence stops being a
+                        reference.
+                      */}
+                      <td style={cell} data-extension-handle={x.recordHandle.state}>
+                        {x.recordHandle.state === 'RECORDED' ? (
+                          <bdi title={x.recordHandle.description}>
+                            {x.recordHandle.value}
+                          </bdi>
+                        ) : x.recordHandle.state === 'NOT_RECORDED' ? (
+                          <span title={x.recordHandle.description}>
+                            {t('rdExtRecordNotRecorded')}
+                          </span>
+                        ) : x.recordHandle.state === 'CATEGORY_HAS_NO_REFERENCE' ? (
+                          <span title={x.recordHandle.reason}>
+                            {t('rdExtRecordTypeNone')}
+                          </span>
+                        ) : (
+                          t('rdExtRecordGone')
+                        )}
+                      </td>
                       <td style={cell}>{x.recordCategory}</td>
                       <td style={cell}>{x.extendedUntil.slice(0, 10)}</td>
                       <td style={cell}>{t(EXTENSION_BASIS_LABEL[x.basis])}</td>

@@ -1,0 +1,20 @@
+{
+  "the-meaning-ignores-the-selection": {
+    "file": "apps/web/app/(app)/retention-disposal/page.tsx",
+    "from": "    retrieveBasis === '' ? undefined : ARCHIVE_BASIS_MEANING[retrieveBasis];",
+    "to": "    retrieveBasis === '' ? undefined : ARCHIVE_BASIS_MEANING.JUDICIAL_REQUEST;",
+    "why": "THE EXPLANATION PINNED TO THE FIRST BASIS, whatever the reader chose. This is the `SelectedValueDescription` defect in its original form — a description rendered from `rows[0]` rather than from the selection — and it is invisible on a screen whose first basis happens to be the one being looked at, which is why the test selects a SECOND and a THIRD. The harm is specific: somebody retrieving a file for the anti-money-laundering unit would be told to record a court's letter number and a case number, and would write the wrong thing into the one box that answers *why did this leave the archive, and for whom*. **IT KILLS TWO TESTS AND THE `why` FIRST WRITTEN HERE CLAIMED ONE**, predicting that the no-words test would still pass and that the plant therefore isolated the lookup from the conditional. MEASURED, both die: the three-parts test at its AMLU assertion, and the no-words test because a basis with NO words now resolves to the judicial ones and renders a block that should not exist. THAT IS A PROPERTY OF THE DESIGN RATHER THAN A FLAW IN THE PLANT — *which words* and *whether a block renders at all* are deliberately ONE expression, because keeping them apart is how an `aria-describedby` comes to name an id that is not in the document. So the two are not separable by any plant, and a plant on that expression must name both."
+  },
+  "other-loses-its-fourth-part": {
+    "file": "apps/web/app/(app)/retention-disposal/page.tsx",
+    "from": "    when: 'rdRetrieveWhenOther',\n    kinds: 'rdRetrieveKindsOther',",
+    "to": "    when: 'rdRetrieveWhenOther',",
+    "why": "`OTHER`'s SIX KINDS, DROPPED — and it COMPILES, which is the whole reason this plant exists. `kinds` is optional on the shape because three of the four bases have no such part, so removing it from the one that does is a silent loss rather than a build error: the basis that most needs examples is the free-text one, and without the list a reader choosing `OTHER` is told only that it is for a reason the others do not cover. `retention-disposal.spec.ts` fails on the decision-45 test at `Among its kinds`. The optionality is still right — padding three bases with an empty part to make the field required would be worse — which is exactly why the loss has to be observed by a test instead of by the type."
+  },
+  "the-describedby-names-a-block-that-is-not-there": {
+    "file": "apps/web/app/(app)/retention-disposal/page.tsx",
+    "from": "                aria-describedby={\n                  chosenBasisMeaning ? 'rd-retrieve-basis-meaning' : undefined\n                }",
+    "to": "                aria-describedby=\"rd-retrieve-basis-meaning\"",
+    "why": "THE DESCRIPTION MADE UNCONDITIONAL. A fifth basis added server-side is selectable by design and has no words until somebody decides them, so on that basis there is no block — and an `aria-describedby` pointing at an id that is not in the document is itself an accessibility violation, which is the failure mode that makes this worse than a missing description rather than merely redundant. `retention-disposal.spec.ts` fails on the no-words test's last assertion. The @a11y test does NOT fail, and that is the finding rather than a gap in the plant: axe runs against the DEFAULT fixture, where every basis has words and the attribute always resolves, so the only thing that can see this is a fixture offering a basis this build has never heard of."
+  }
+}
