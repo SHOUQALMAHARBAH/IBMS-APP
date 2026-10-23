@@ -10,7 +10,9 @@ import { apiGet, apiPost } from '../auth/api-client';
 export interface ConflictOfInterestEntry {
   id: string;
   declaredByUserId: string;
-  declaredByName: string;
+  /** Owner decision 48 — nullable to match the api's resolver contract, like its three sibling
+   *  registers. The FK is RESTRICT so it always resolves today. */
+  declaredByName: string | null;
   disclosure: string;
   declaredAt: string;
 }

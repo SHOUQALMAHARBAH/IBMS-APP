@@ -169,7 +169,13 @@ export class RetentionNoticeRepository {
         // way (`retention-archive.service.ts`), and without it the only thing the register could
         // say about the actor is a uuid — which rule 2 refuses to render and which identifies
         // nobody to the person reading the register.
-        extendedBy: { select: { fullName: true } },
+        /*
+         * NO `extendedBy` ANY MORE — owner decision 48. The actor's name is resolved by
+         * `UserRepository.displayNamesForUserIds`, which applies the HR record where the account is
+         * linked; reading `User.fullName` from an include here was the bypass that let this register
+         * show an English role label instead of a person. Dropping it rather than leaving it unused
+         * is deliberate: two sources for one name is how the next reader picks the wrong one.
+         */
       },
     });
   }

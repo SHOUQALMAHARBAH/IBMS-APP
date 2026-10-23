@@ -77,9 +77,12 @@ export class DpoDesignationService {
     const office = await this.organizations.findById(actor.organizationId);
     if (!office) throw new NotFoundException('Organization not found');
 
-    const acknowledgedBy = office.dpoManagerCombinedAcknowledgedByUserId
-      ? await this.users.findById(office.dpoManagerCombinedAcknowledgedByUserId)
-      : null;
+    // Owner decision 48 — the HR record's name where the account is linked, same resolver. This
+    // register records who acknowledged a legal notice about combining the DPO and manager roles,
+    // so a job title in that column answers the question with nobody.
+    const acknowledgedByName = await this.users.displayNameForUserId(
+      office.dpoManagerCombinedAcknowledgedByUserId,
+    );
 
     return {
       dataProtectionOfficerName: office.dataProtectionOfficerName,
@@ -92,7 +95,7 @@ export class DpoDesignationService {
       }),
       acknowledgedAt: office.dpoManagerCombinedAcknowledgedAt,
       acknowledgedByUserId: office.dpoManagerCombinedAcknowledgedByUserId,
-      acknowledgedByName: acknowledgedBy?.fullName ?? null,
+      acknowledgedByName,
       noticeShown: office.dpoManagerCombinedNoticeShown,
     };
   }

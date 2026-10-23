@@ -10,6 +10,7 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import type { TenantTransactionClient } from '../prisma/tenant-scope.extension';
 import { OrgContextService } from '../common/org-context/org-context.service';
+import { resolveDisplayName } from '../common/display-name.util';
 
 /** One of a caller's active roles. `id` is what authorization resolves from;
  * `name` is office-chosen free text, for display only. */
@@ -148,6 +149,65 @@ export class UserRepository {
 
   findById(id: string): Promise<User | null> {
     return this.prisma.client.user.findUnique({ where: { id } });
+  }
+
+  /**
+   * THE DISPLAY NAME FOR A SET OF ACCOUNTS — the one place that answers "who did this", for a
+   * human to read. Owner decision 48.
+   *
+   * WHAT IT FIXES. `resolveDisplayName` has existed, with the rule written down, since the HR link
+   * gained a writer: `Employee.fullName` is composed server-side from the four Jordanian name parts
+   * and is the REAL identity, while `User.fullName` is free text and the fallback for an account
+   * with no HR record. It was used in two services. SEVEN sites rendered an actor's name as raw
+   * `User.fullName` and bypassed it — including both registers built to hold a person accountable.
+   * That file's own header records why it matters: in the demo data ALL SIXTEEN linked accounts
+   * DISAGREED, the user row holding an English ROLE LABEL and the employee row holding the person.
+   * So a regulator asking "who extended these records?" could be shown «Compliance Officer» — a
+   * register technically true and naming nobody.
+   *
+   * WHY IT TAKES IDS RATHER THAN A RELATION, which is the decision rather than a convenience.
+   * Measured: 96 of this schema's 115 `*UserId` columns have no `User` relation at all (register
+   * entry 127), so an include-based resolver cannot serve them and a per-site lookup would be a
+   * new mechanism each time. Taking ids means the five relation-less sites are five CALLS, the
+   * seven relation-bearing ones are the same call, and the twenty-sixth next year finds it ready.
+   *
+   * WHY IT IS BATCHED. One query for a page of rows. A resolver that turns a 50-row register into
+   * 51 queries is a defect of its own, and these are registers — the extension register and the
+   * retrieval register both render a page at a time.
+   *
+   * A MISSING KEY AND A PRESENT ONE ARE DIFFERENT FACTS: an id with no row is absent from the Map
+   * rather than mapped to `null` or to an empty string, so a caller can tell "no such account"
+   * from "an account whose name is blank" — the discipline `describeRecordHandle` already uses.
+   *
+   * AND THE BOUNDARY THE RULE ALREADY DRAWS IS NOT CROSSED HERE. This is for a register answering
+   * "who did this, for a human to read". An AUDIT-TRAIL row keeps the name it STORED, raw, because
+   * the trail records what was stored and not what a screen displayed — rewriting it through a
+   * display rule would make the trail disagree with the row it describes. Both halves are pinned
+   * by tests; one assertion only pins half of a boundary.
+   */
+  async displayNamesForUserIds(
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Map<string, string>> {
+    const unique = [...new Set(ids.filter((id): id is string => !!id))];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.client.user.findMany({
+      where: { id: { in: unique } },
+      select: {
+        id: true,
+        fullName: true,
+        employee: { select: { fullName: true } },
+      },
+    });
+    return new Map(rows.map((r) => [r.id, resolveDisplayName(r)]));
+  }
+
+  /** The single-id case, for a view that names one actor. Same query, same rule — a sibling rather
+   *  than a second mechanism, so a caller never reaches for `findById().fullName` again. */
+  async displayNameForUserId(
+    id: string | null | undefined,
+  ): Promise<string | null> {
+    if (!id) return null;
+    return (await this.displayNamesForUserIds([id])).get(id) ?? null;
   }
 
   /**

@@ -9,7 +9,18 @@ export interface ConflictOfInterestRegisterEntryView {
   id: string;
   /** The person who declared it — who is also its subject. */
   declaredByUserId: string;
-  declaredByName: string;
+  /**
+   * Owner decision 48 — the HR record's name where the account is linked, resolved through
+   * `UserRepository.displayNamesForUserIds`.
+   *
+   * NULLABLE TO MATCH THE RESOLVER'S CONTRACT, not because this table allows it: the
+   * `declaredByUserId` FK is RESTRICT, so a declarer's account can never be deleted and the name
+   * always resolves today. The type follows what the resolver can promise rather than asserting a
+   * guarantee the resolver cannot make — and it matches its three sibling registers
+   * (`extendedByName`, `retrievedByName`, the mode's `declaredByName`), which were all nullable
+   * already, so the screen's absent branch is the family's and not dead code for this one table.
+   */
+  declaredByName: string | null;
   disclosure: string;
   declaredAt: Date;
 }
@@ -84,11 +95,11 @@ export class ConflictOfInterestRegisterService {
     // carries no name: `AuthenticatedUser` has an id, an email and role ids, measured. Falling back
     // to the email rather than to the id, because an email identifies a colleague and a uuid does
     // not, which is the identifier-where-a-name-exists fault one screen away.
-    const declaredBy = await this.users.findById(actor.id);
+    const declaredByName = await this.users.displayNameForUserId(actor.id);
     return {
       id: row.id,
       declaredByUserId: row.declaredByUserId,
-      declaredByName: declaredBy?.fullName ?? actor.email,
+      declaredByName: declaredByName ?? actor.email,
       disclosure: row.disclosure,
       declaredAt: row.declaredAt,
     };
@@ -113,10 +124,17 @@ export class ConflictOfInterestRegisterService {
       afterValue: { entryCount: rows.length },
     });
 
+    // Owner decision 48 — one query for the page's declarers, resolved through the HR record where
+    // the account is linked. A conflict-of-interest register that names a job title instead of a
+    // person is the clearest case of the defect: the whole row exists to say WHO disclosed.
+    const names = await this.users.displayNamesForUserIds(
+      rows.map((row) => row.declaredByUserId),
+    );
+
     return rows.map((row) => ({
       id: row.id,
       declaredByUserId: row.declaredByUserId,
-      declaredByName: row.declaredBy.fullName,
+      declaredByName: names.get(row.declaredByUserId) ?? null,
       disclosure: row.disclosure,
       declaredAt: row.declaredAt,
     }));

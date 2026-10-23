@@ -197,7 +197,14 @@ export function ConflictOfInterestRegister() {
                       exactly this reason. `bdi` because a name may be in either script.
                     */}
                     <td style={cell}>
-                      <bdi>{row.declaredByName}</bdi>
+                      {/* Owner decision 48 — the HR record's name, resolved by the api. The em
+                        * dash is the resolver's absent case, the same branch the three sibling
+                        * registers have; the FK is RESTRICT so it does not arise today. */}
+                      {row.declaredByName ? (
+                        <bdi>{row.declaredByName}</bdi>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td style={cell}>
                       {formatDateTime(row.declaredAt, language)}

@@ -33,15 +33,21 @@ export class DutySegregationModeService {
     const office = await this.organizations.findById(actor.organizationId);
     if (!office) throw new NotFoundException('Organization not found');
 
-    const declaredBy = office.dutySegregationModeDeclaredByUserId
-      ? await this.users.findById(office.dutySegregationModeDeclaredByUserId)
-      : null;
+    /*
+     * OWNER DECISION 48 — the HR record's name where the account is linked, through the ONE
+     * resolver. `findById().fullName` is free text and held an English role label on all sixteen
+     * linked demo accounts, so "who decided this office stopped segregating duties" could answer
+     * with a job title.
+     */
+    const declaredByName = await this.users.displayNameForUserId(
+      office.dutySegregationModeDeclaredByUserId,
+    );
 
     return {
       mode: office.dutySegregationMode,
       declaredAt: office.dutySegregationModeDeclaredAt,
       declaredByUserId: office.dutySegregationModeDeclaredByUserId,
-      declaredByName: declaredBy?.fullName ?? null,
+      declaredByName,
     };
   }
 

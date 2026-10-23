@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConsentController } from './consent.controller';
 import { ConsentService } from './consent.service';
+import { UserRepository } from '../../repositories/user.repository';
 import { ConsentRecordRepository } from '../../repositories/consent-record.repository';
 import { DsrController } from './dsr.controller';
 import { DsrService } from './dsr.service';
@@ -119,6 +120,10 @@ import { SlaModule } from '../sla/sla.module';
     DpoWorkspaceController,
   ],
   providers: [
+    // Owner decision 48 — the two registers in this module name their actor through
+    // `UserRepository.displayNamesForUserIds`, the one place that applies the HR record where the
+    // account is linked. The other three modules that resolve an actor's name already injected it.
+    UserRepository,
     ConsentService,
     ConsentRecordRepository,
     DsrService,

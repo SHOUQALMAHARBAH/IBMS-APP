@@ -397,6 +397,108 @@ describe('1b — the conflict-of-interest disclosure register (e2e)', () => {
     ]);
   });
 
+  /*
+   * OWNER DECISION 48 — BOTH SIDES OF THE BOUNDARY, IN ONE TEST, because one assertion only pins
+   * half of it.
+   *
+   * A REGISTER answering "who did this, for a human to read" shows the HR record's name where the
+   * account is linked. An AUDIT-TRAIL row shows what was STORED, raw. Rewriting the trail through a
+   * display rule would make it disagree with the row it describes, which is why
+   * `display-name.util.ts` has always said the rule is deliberately not applied there — and why
+   * asserting only the register would leave somebody free to "fix" the trail next year.
+   *
+   * WHY THIS TEST HAD TO BE WRITTEN AT ALL: with all seven sites corrected, every existing api e2e
+   * still passed, because their fixture actors have no HR record and the rule falls back to
+   * `User.fullName`. Measured on db-test: 3,568 users, 25 linked, and 23 of the 25 DISAGREE — so
+   * the state is real and nothing observed the fix. That is the batch-five lesson again: a
+   * correction nothing can see is a correction nobody will keep.
+   *
+   * THE ROWS ARE LEFT BEHIND DELIBERATELY. `ConflictOfInterestRegisterEntry.declaredByUserId` is
+   * RESTRICT and the table is immutable by trigger, so a user who declares a conflict is
+   * PERMANENTLY undeletable and so is their organization. Every assertion is therefore set
+   * membership on this run's own ids.
+   */
+  it('a register names the HR record and the audit trail keeps the stored name — both halves', async () => {
+    const server = (app as INestApplication<App>).getHttpServer();
+
+    // The two names must DIFFER, or the test passes whichever source the code reads. This is the
+    // shape 23 of db-test's 25 linked accounts are really in: the account holds a role label and
+    // the HR record holds the person.
+    const ACCOUNT_NAME = `COI coi-linked`;
+    const PERSON_NAME = `سامية عبد الله الحوراني ${RUN}`;
+
+    const declarer = await actorHolding('coi-linked', []);
+    const reader = await actorHolding('coi-linked-reader', [
+      'conflict-of-interest.register.read',
+      'audit-log.read',
+    ]);
+
+    // The account's own name is what signup stored, unchanged.
+    const before = await rawPrisma.user.findUniqueOrThrow({
+      where: { id: declarer.userId },
+      select: { fullName: true, employeeId: true },
+    });
+    expect(before.fullName).toBe(ACCOUNT_NAME);
+    expect(before.employeeId).toBeNull();
+
+    // Link an HR record whose composed name is the real person. `Employee.fullName` cannot be
+    // supplied through a DTO — it is composed from the four parts — so the parts are given here.
+    /*
+     * Written with rawPrisma rather than through `POST /employees`, which would need an admin
+     * holding `employee.create`, a department and a branch — none of which this test is about.
+     * `nationalIdEnc` is NOT NULL and is encrypted by `modules/security/encrypted-fields.ts` at the
+     * SERVICE layer rather than by a Prisma extension (measured), so a raw write stores the string
+     * given and nothing here ever reads it back.
+     */
+    const employee = await rawPrisma.employee.create({
+      data: {
+        organizationId: TEST_ORGANIZATION_ID,
+        fullName: PERSON_NAME,
+        nationalIdEnc: `not-a-real-national-id-${RUN}`,
+      },
+      select: { id: true },
+    });
+    await rawPrisma.user.update({
+      where: { id: declarer.userId },
+      data: { employeeId: employee.id },
+    });
+
+    const created = await request(server)
+      .post('/conflict-of-interest/disclosures')
+      .set(bearer(declarer.accessToken))
+      .send({ disclosure: `A linked-account disclosure (${RUN}).` })
+      .expect(201);
+    const entryId = (created.body as RegisterEntryBody).id;
+    createdEntryIds.push(entryId);
+
+    // HALF ONE — THE REGISTER NAMES THE PERSON, and not the account's role label.
+    const register = await request(server)
+      .get('/conflict-of-interest/disclosures')
+      .set(bearer(reader.accessToken))
+      .expect(200);
+    const mine = (register.body as RegisterEntryBody[]).find(
+      (r) => r.id === entryId,
+    );
+    expect(mine).toBeDefined();
+    expect(mine?.declaredByName).toBe(PERSON_NAME);
+    // Both directions: the account's own free-text name must NOT be what a reader sees.
+    expect(mine?.declaredByName).not.toBe(ACCOUNT_NAME);
+
+    // HALF TWO — THE AUDIT TRAIL KEEPS THE STORED NAME, raw. The declarer's own READ rows are not
+    // in play here; what is asserted is the actor name the trail reports for this account.
+    const trail = await request(server)
+      .get(`/audit-trail?userId=${declarer.userId}`)
+      .set(bearer(reader.accessToken))
+      .expect(200);
+    const items = (trail.body as { items: { actorName: string | null }[] })
+      .items;
+    // A non-vacuity floor: an empty page would make the absence assertion below trivially true.
+    expect(items.length).toBeGreaterThan(0);
+    const actorNames = [...new Set(items.map((e) => e.actorName))];
+    expect(actorNames).toEqual([ACCOUNT_NAME]);
+    expect(actorNames).not.toContain(PERSON_NAME);
+  });
+
   it('refuses a disclosure below the shared declaration minimum', async () => {
     const server = (app as INestApplication<App>).getHttpServer();
     const anybody = await actorHolding('coi-terse', []);

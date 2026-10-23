@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
+import { UserRepository } from '../../repositories/user.repository';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import { RetentionNoticeRepository } from '../../repositories/retention-notice.repository';
@@ -59,6 +60,7 @@ export class RetentionNoticeService {
     private readonly notices: RetentionNoticeRepository,
     private readonly legalHolds: LegalHoldRepository,
     private readonly audit: AuditService,
+    private readonly users: UserRepository,
   ) {}
 
   /**
@@ -264,8 +266,13 @@ export class RetentionNoticeService {
    *
    * ## BOTH THE ACTOR AND THE RECORD ARE NAMED NOW — owner decision 44
    *
-   * `extendedByName` resolves the actor in the repository's include, the same way the sibling
-   * retrieval register does, because a uuid identifies nobody to a reader.
+   * `extendedByName` names the actor, because a uuid identifies nobody to a reader. CORRECTED BY
+   * OWNER DECISION 48: it used to read the included `User.fullName` directly, which is FREE TEXT
+   * and, measured in the demo data, held an English ROLE LABEL on all sixteen linked accounts. So
+   * this register could answer "who extended these records?" with «Compliance Officer» — true of
+   * the account and naming nobody, on the one register whose purpose is to hold a person
+   * accountable. It resolves through `UserRepository.displayNamesForUserIds` now, which applies the
+   * HR record where the account is linked, batched one query per page.
    *
    * `recordHandle` answers *WHICH records* — the half of group 7b's rule that register entry 94
    * recorded as open. It is THREE STATES AS ONE FIELD, and the three are genuinely different
@@ -313,6 +320,12 @@ export class RetentionNoticeService {
       handles.set(category, await this.notices.recordHandles(resolution, ids));
     }
 
+    // Owner decision 48 — one query for the page's actors, resolved through the HR record where the
+    // account is linked. See the method header.
+    const names = await this.users.displayNamesForUserIds(
+      rows.map((r) => r.extendedByUserId),
+    );
+
     return rows.map((r) => ({
       id: r.id,
       recordCategory: r.recordCategory,
@@ -338,7 +351,7 @@ export class RetentionNoticeService {
       consentDuration: r.consentDuration,
       consentPurpose: r.consentPurpose,
       extendedByUserId: r.extendedByUserId,
-      extendedByName: r.extendedBy.fullName,
+      extendedByName: names.get(r.extendedByUserId) ?? null,
       extendedAt: r.extendedAt.toISOString(),
     }));
   }

@@ -383,9 +383,9 @@ export class RetentionArchiveRepository {
     return this.prisma.client.retentionArchiveRetrieval.findMany({
       where: recordCategory ? { recordCategory } : {},
       orderBy: { retrievedAt: 'desc' },
-      include: {
-        retrievedBy: { select: { id: true, fullName: true } },
-      },
+      // NO `retrievedBy` include — owner decision 48. The name comes from
+      // `UserRepository.displayNamesForUserIds` (the HR record where the account is linked), and a
+      // second source for one name is how the wrong one gets rendered.
     });
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
+import { UserRepository } from '../../repositories/user.repository';
 import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import { resolutionFor } from './retention-resolution.config';
 import {
@@ -46,6 +47,7 @@ export class RetentionArchiveService {
   constructor(
     private readonly archive: RetentionArchiveRepository,
     private readonly audit: AuditService,
+    private readonly users: UserRepository,
   ) {}
 
   /**
@@ -153,6 +155,15 @@ export class RetentionArchiveService {
   /** The register, newest first — "every retrieval can be justified from one place". */
   async list(recordCategory?: string): Promise<ArchiveRetrievalView[]> {
     const rows = await this.archive.listRetrievals(recordCategory);
+    /*
+     * OWNER DECISION 48 — the name comes from the HR record where the account is linked, through
+     * the ONE resolver, rather than from raw `User.fullName`. This register exists to hold a PERSON
+     * accountable for retrieving a blocked record; before this it could show «Compliance Officer»,
+     * which is true of the account and names nobody. One query for the page, not one per row.
+     */
+    const names = await this.users.displayNamesForUserIds(
+      rows.map((r) => r.retrievedByUserId),
+    );
     return rows.map((r) => ({
       id: r.id,
       recordCategory: r.recordCategory,
@@ -161,7 +172,7 @@ export class RetentionArchiveService {
       note: r.note,
       retrievedAt: r.retrievedAt.toISOString(),
       retrievedByUserId: r.retrievedByUserId,
-      retrievedByName: r.retrievedBy?.fullName ?? null,
+      retrievedByName: names.get(r.retrievedByUserId ?? '') ?? null,
     }));
   }
 }
