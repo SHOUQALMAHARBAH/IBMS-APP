@@ -366,7 +366,13 @@ export default function InternalControlsPage() {
           <section style={sectionStyle}>
             <h2>{t('icByPair')}</h2>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
+              {/* A hook so a test can scope an assertion to THIS table. The dormant and
+                  truncation markers live here, and a page-wide `getByText` for either could match
+                  an unrelated element — which is what `check:absence` exists to refuse. */}
+              <table
+                data-testid="ic-by-pair"
+                style={{ borderCollapse: 'collapse', minWidth: '52rem' }}
+              >
                 <thead>
                   <tr>
                     <th style={leftHead}>{t('icColEntity')}</th>

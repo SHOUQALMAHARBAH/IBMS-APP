@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -118,8 +119,14 @@ test("renders a clean audit with the per-pair breakdown", async ({ page }) => {
    * reasoning: «غير مستعمل» alone would leave the reader asking why the pair is listed at all,
    * which is the question the flag exists to answer.
    */
-  await expect(page.getByText("(watched, and not yet used)")).toBeVisible();
-  await expect(page.getByText("(dormant)")).toHaveCount(0);
+  const byPair = page.getByTestId("ic-by-pair");
+  await expect(byPair.getByText("(watched, and not yet used)")).toBeVisible();
+  // SCOPED, because `check:absence` refuses a page-wide text absence — and it caught these two in
+  // CI after I ran that gate and then added them. The helper takes a Locator, so the compiler
+  // refuses a page-wide root, and it asserts the scope VISIBLE first: scoping fixes the
+  // wrong-element failure and NOT the not-yet-rendered one, since `toHaveCount(0)` passes on its
+  // first poll.
+  await expectAbsentWithin(byPair, (s) => s.getByText("(dormant)"));
 
   /*
    * AND THE TRUNCATION MARKER'S SENTENCE, asserted here because it is the one marker on this
@@ -138,10 +145,13 @@ test("renders a clean audit with the per-pair breakdown", async ({ page }) => {
     }),
   );
   await page.reload();
+  const truncatedTable = page.getByTestId("ic-by-pair");
   await expect(
-    page.getByText("(incomplete result — only the first 20,000 records were scanned)"),
+    truncatedTable.getByText(
+      "(incomplete result — only the first 20,000 records were scanned)",
+    ),
   ).toBeVisible();
-  await expect(page.getByText("(truncated)")).toHaveCount(0);
+  await expectAbsentWithin(truncatedTable, (s) => s.getByText("(truncated)"));
   await expect(
     page.getByRole("heading", { name: "Self-approval violations found" }),
   ).not.toBeVisible();
