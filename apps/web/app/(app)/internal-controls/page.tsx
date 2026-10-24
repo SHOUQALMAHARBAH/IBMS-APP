@@ -393,14 +393,17 @@ export default function InternalControlsPage() {
                             style={{ color: 'var(--ink-secondary)' }}
                           >
                             {' '}
-                            (dormant)
+                            {t('icDormantNote')}
                           </span>
                         ) : null}
                       </td>
                       <td style={leftCell}>{p.pairLabel}</td>
                       <td style={cell}>
                         {p.rowsChecked}
-                        {p.truncated ? ' (truncated)' : ''}
+                        {/* OWNER DECISION 54 — a real sentence in both languages, because this
+                            is the one marker on this screen that can make an INCOMPLETE scan
+                            read as a clean one. Not a bare word in either language now. */}
+                        {p.truncated ? ` ${t('icTruncatedNote')}` : ''}
                       </td>
                       <td style={cell}>{p.violationCount}</td>
                       <td style={leftCell}>{p.dbCheckConstraint ?? '—'}</td>

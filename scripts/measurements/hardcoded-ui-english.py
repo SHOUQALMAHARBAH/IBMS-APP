@@ -98,6 +98,37 @@ ONE_WORD_LABEL = re.compile(r'(?:^|[>`]|\}\s)\s*([A-Z][a-z]{2,})\s*:')
 # two words of which the first is 3+ letters. Any line carrying JSX or an expression is already covered by
 # the patterns above and is excluded here, which is what keeps this from firing on ordinary markup.
 BARE_TEXT_LINE = re.compile(r'^[^<>{}=\'"`]*?([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)\s*$')
+# FAILURE MODE 7 — A PARENTHETICAL. Found by the OWNER reading `/internal-controls` while this script
+# reported 0 for it, and the diagnosis is a shape rather than an accident:
+#
+#   `(dormant)`                        a bare JSX text line WRAPPED IN PARENTHESES
+#   `{p.truncated ? ' (truncated)' : ''}`   a QUOTED lowercase fragment in a JSX expression
+#
+# Why all five patterns above miss both, traced one at a time rather than guessed:
+#   - PROSE needs `[A-Z][a-z]+` and two words. Both are one lowercase word.
+#   - TEMPLATE_PROSE needs BACKTICKS and two words. One is single-quoted, both are one word.
+#   - ONE_WORD_LABEL needs a colon. Neither has one.
+#   - BARE_TEXT_LINE ends `\s*$`, so the CLOSING PAREN defeats it — the leading `(` is inside its
+#     character class and fine, the trailing `)` is not whitespace. That one character is the whole miss.
+#   - And `' (truncated)'` carries `{`, `}` and `'`, every one excluded by BARE_TEXT_LINE's class.
+#
+# Both words were LOAD-BEARING, which is why this is the eighth and worst miss: `(truncated)` is the only
+# thing telling a reader the self-approval scan hit its limit and the result is INCOMPLETE, so an Arabic
+# reader saw a row of zeroes under a partial scan and had no way to know it was not clean.
+#
+# NARROW DELIBERATELY, BOTH OF THEM, because the cry-wolf direction is the one this script's own header
+# calls harder to recover from than under-counting. A parenthetical is matched only when the paired
+# parentheses are the WHOLE of the thing:
+#   - a text line that is NOTHING BUT a parenthetical. `(dormant)` matches; `doThing(arg)` does not,
+#     because the line must START with `(`. Widening BARE_TEXT_LINE's own anchor to tolerate a trailing
+#     `)` was tried first and REJECTED: it makes every bare call line a finding.
+#   - a quoted string that is NOTHING BUT a parenthetical. `' (truncated)'` matches; `'/customers/(x)'`
+#     does not, and no import, key, style value or data attribute in this tree has this shape.
+PARENTHETICAL_TEXT_LINE = re.compile(r'^\(\s*([A-Za-z][A-Za-z ,.\'\-\u2014]{1,60}?)\s*\)$')
+QUOTED_PARENTHETICAL = re.compile(
+    r'[\'"`]\s*\(\s*([A-Za-z][A-Za-z ,.\'\-\u2014]{1,60}?)\s*\)\s*[\'"`]'
+)
+
 # Bare words that are code, not copy. A statement on its own line reaches this pattern too.
 NOT_BARE_COPY = {
     'return', 'else', 'true', 'false', 'null', 'undefined', 'const', 'let', 'var', 'async', 'await',
@@ -112,6 +143,40 @@ NOT_A_LABEL = {
     'Array', 'Date', 'Math', 'JSON', 'Omit', 'Pick', 'Exclude', 'Readonly',
 }
 
+
+# ----------------------------------------------------------------------------------------------
+# THE TEN PARENTHETICALS FAILURE MODE 7 FOUND, DECLARED — each owed an Arabic word by the owner.
+#
+# This is NOT a raised budget. The ban on hardcoded English is still flat at zero for everything
+# else, and these ten are named individually with what each MEANS, because the meaning is what
+# makes them worth her time rather than a translation chore. Every one is a status marker that
+# changes how a figure or a row should be read:
+#
+#   - `(capped)` ×3 is the same class as the `(truncated)` that started this: THE NUMBER SHOWN IS
+#     NOT THE REAL NUMBER. An Arabic reader reads the capped figure as the true one.
+#   - `(overdue)` ×3 and `(containment overdue)` are PASSED STATUTORY DEADLINES — a PDPL data
+#     subject request, a breach containment clock, a regulatory obligation, a BCP test.
+#   - `(lapsed)` is professional-indemnity cover that has ENDED.
+#   - `(drafted)` is this repository's own sourced-versus-drafted distinction on an SLA duration:
+#     a drafted figure carries no regulatory source and must not be read as one.
+#
+# A ROW IS REMOVED WHEN ITS STRING IS TRANSLATED, NEVER EDITED TO MATCH A NEW ONE. The gate fails
+# on a stale row for the same reason it fails on an undeclared finding: a declaration that no
+# longer occurs is a declaration covering whatever lands next.
+#
+# Keyed on `screen|string` exactly, so this cannot become a hiding place for a DIFFERENT kind of
+# finding on the same screen — a `PROSE` or `ONE_WORD_LABEL` hit still fails flat.
+DECLARED_PARENTHETICALS = {
+    'audit-trail|(requested)',
+    'bcp-dr-plans|(overdue)',
+    'claims-analytics|(capped)',
+    'dashboards/claims|(capped)',
+    'dsr|(overdue)',
+    'incidents|(containment overdue)',
+    'operational-pi-risk|(lapsed)',
+    'regulatory-compliance|(overdue)',
+    'sla-dashboard|(drafted)',
+}
 
 def mask_comments(src):
     """
@@ -156,6 +221,23 @@ def findings(src):
                 text = m.group(1)
                 if text not in NOT_A_LABEL and (i, text) not in out:
                     out.append((i, text + ':'))
+        # FAILURE MODE 7 — a parenthetical, in either of its two forms. Neither needs the
+        # previous-line context failure mode 6 requires, because the paired parentheses are
+        # themselves the evidence that this is a remark to a reader rather than code.
+        for m in QUOTED_PARENTHETICAL.finditer(stripped):
+            text = m.group(1).strip()
+            if (text.split()[0].lower() not in NOT_BARE_COPY
+                    and not ALLOW.match(text)
+                    and (i, text) not in out):
+                out.append((i, '(%s)' % text[:58]))
+        paren_line = PARENTHETICAL_TEXT_LINE.match(stripped.strip())
+        if paren_line:
+            text = paren_line.group(1).strip()
+            if (text.split()[0].lower() not in NOT_BARE_COPY
+                    and not ALLOW.match(text)
+                    and (i, text) not in out
+                    and (i, '(%s)' % text[:58]) not in out):
+                out.append((i, '(%s)' % text[:58]))
         # Failure mode 6 — a bare JSX text line, and it needs the PREVIOUS LINE to prove it is one.
         #
         # Without that, this fired 277 times on 97 screens and almost every hit was a multi-line CODE
@@ -249,6 +331,36 @@ def self_test():
             '      ) {\n        return\n',
             False,
         ),
+        (
+            # FAILURE MODE 7, both forms. These two lines are the real misses, byte for byte as they
+            # stood on /internal-controls while this script reported 0 for that screen.
+            'failure mode 7a — a parenthetical BARE TEXT LINE',
+            '      >\n        (dormant)\n',
+            True,
+        ),
+        (
+            'failure mode 7b — a QUOTED lowercase parenthetical in a JSX expression',
+            "                        {p.truncated ? ' (truncated)' : ''}\n",
+            True,
+        ),
+        (
+            # The cry-wolf direction, which matters more than the catch: a bare CALL must not read as
+            # a parenthetical. Widening BARE_TEXT_LINE to tolerate a trailing `)` would have made
+            # every one of these a finding.
+            'a bare function call is not a parenthetical',
+            '      >\n        doTheThing(arg)\n',
+            False,
+        ),
+        (
+            'a route literal with parentheses is not a parenthetical',
+            "  const p = '/customers/(x)';\n",
+            False,
+        ),
+        (
+            'a parenthetical that is ALREADY translated is clean',
+            "                        {p.truncated ? ` ${t('icTruncatedNote')}` : ''}\n",
+            False,
+        ),
     ]
     failures = 0
     for name, src, expected in cases:
@@ -280,6 +392,7 @@ def main():
 
     total = 0
     dirty = 0
+    seen = set()
     for rel in screens:
         src = io.open(os.path.join(APP, rel, 'page.tsx'), encoding='utf-8').read()
         hits = findings(src)
@@ -290,10 +403,39 @@ def main():
         print('%-40s %d' % (rel, len(hits)))
         for line, text in hits:
             print('      L%-5s %r' % (line, text))
+            # Keyed on screen + STRING, never on the line number, so moving a marker up or
+            # down a file is not a stale declaration.
+            seen.add('%s|%s' % (rel, text))
 
     print('\nscreens scanned                     %4d' % len(screens))
     print('screens with hardcoded English      %4d' % dirty)
     print('strings                             %4d' % total)
+
+    # THE DECLARATION, IN BOTH DIRECTIONS. `strings` stays the TOTAL and stays printed, so
+    # the real figure is never hidden behind a declaration; what the gate reads is
+    # `undeclared`.
+    undeclared = sorted(seen - DECLARED_PARENTHETICALS)
+    stale = sorted(DECLARED_PARENTHETICALS - seen)
+    print('declared parentheticals (owner)     %4d' % len(DECLARED_PARENTHETICALS))
+    print('undeclared                          %4d' % len(undeclared))
+    for key in undeclared:
+        print('      UNDECLARED  %s' % key)
+    for key in stale:
+        print('      STALE       %s' % key)
+    if stale:
+        print('\nhardcoded-ui-english: FAILED on a STALE declaration. The row(s) above no '
+              'longer occur, so remove them from DECLARED_PARENTHETICALS in the same commit '
+              'that translated the string. A declaration left behind covers whatever lands '
+              'next, which is the whole reason this is a declared SET rather than a count.')
+        return 1
+    if undeclared:
+        print('\nhardcoded-ui-english: FAILED. This platform is Arabic-first, so an '
+              'untranslated string is read by nobody in the primary language. Add the key to '
+              'a dictionary in lib/i18n/translations/ and render it through t(). DECLARING a '
+              'row is NOT the ordinary fix: the nine declared rows are the owner\'s own '
+              'backlog, each carrying a meaning she has to decide, and an eleventh needs the '
+              'same.')
+        return 1
     return 0
 
 

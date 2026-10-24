@@ -345,6 +345,18 @@ its own detector) and both were lowered together; the committed plant
 
 **6+1+1+1+1 = 10.**
 
+### WHAT BATCH TEN ADDED TO HER LIST, AND WHAT IT TOOK OFF
+
+The rendered-identifier budget did not move — nothing in batch ten was about an identifier.
+What moved is the COPY list she reads from:
+
+| what | state | why it is here |
+|---|---|---|
+| the two `/internal-controls` markers | **SHIPPED-AWAITING-CONFIRMATION** | owner decision 54, her words verbatim and live in the product. The truncation note is the only thing telling a reader the self-approval scan was INCOMPLETE. |
+| ten parenthetical status markers | **NOT-YET-WRITTEN** | ten words, each carrying a meaning she has to decide — three of them mean *the figure you are reading is not the real figure* and four mean *a statutory deadline has passed*. This is its own batch and is declared as one. |
+| the insurer's name on five outward documents | **no string owed** | fixed, not deferred. The precedence was already decided and written down; what existed was a second implementation of it, and now a third and a fourth that no list had. Nothing for her to word. |
+
+
 ### WHAT BATCH EIGHT CLOSED, AND WHAT EACH ONE COST
 
 | screen | identifier | how | cost |
@@ -398,7 +410,8 @@ One place, complete, with each row's state named. **SHIPPED-AWAITING-CONFIRMATIO
 |---|---|---|---|
 | the nine PolicyStatus words | 9 | «قبل الإصدار», a GENERAL phrase | **the limit behind decision 50.** Measured: `PolicyStatus` has nine members (PLACEMENT_CONFIRMED, ISSUED, CHECKING_IN_PROGRESS, DISCREPANCY, VERIFIED, DELIVERED, ACTIVE, CANCELLED, EXPIRED) and NOT ONE has an Arabic label anywhere in the i18n tree. When the policy module writes them, that dashboard takes the EXACT status instead. |
 | ~~the 18 missing entity words on two screens~~ | **0** | — | **WITHDRAWN 2026-10-24, owner decision 53: NOT ONE was missing.** Batch eight measured against decision 41's eighteen labels alone and never looked outside that map; every one of the 31 entries had a source already shipping, fifteen of sixteen as a POINTER at the key on that entity's own screen and one as a SLICE. Six are BROADER than their member and are shipped and recorded as such, on the DisposalBatch precedent. Register entry 133. |
-| `(dormant)` and `(truncated)` on `/internal-controls` | 2 | literal English, to an Arabic reader too | Found while switching that screen's entity words. **Both are load-bearing**: `(dormant)` means the pair has no writer yet, and `(truncated)` means the scan hit its limit and the report is INCOMPLETE for that pair — a reader who cannot read it may take an incomplete scan for a clean one. Neither word has a source anywhere in the i18n tree, measured, so neither is derivable. `hardcoded-ui-english.py` reports 0 for this screen: the shape it misses is a lowercase parenthesised word inside JSX. Register entry 135. |
+| ~~`(dormant)` and `(truncated)` on `/internal-controls`~~ | **0** | hers, live now | **SHIPPED 2026-10-24 — OWNER DECISION 54, her words verbatim.** «(نتيجة غير مكتملة — فُحِص أول ٢٠٠٠٠ سجل)» and «(مُراقَب ولم يُستعمَل بعد)», with the English given the same treatment because `(truncated)` told an English reader nothing either. The 20000 is TIED to `INTERNAL_CONTROLS_SCAN_LIMIT` by an assertion rather than interpolated, so her digits stand; committed as a plant. Register entry 135. |
+| ten parenthetical status markers across nine screens | **10** | the raw English word, to an Arabic reader too | **NOT-YET-WRITTEN, and this is the largest single thing left for her.** Found only after closing the detector's blind spot — `hardcoded-ui-english.py` reported 0 for every one of these screens. Each changes how a row should be read, which is why they are hers rather than a translation chore: **`(capped)` ×3 means THE NUMBER SHOWN IS NOT THE REAL NUMBER** (the same class as `(truncated)`), on `/claims-analytics` twice and `/dashboards/claims`; **`(overdue)` ×3 and `(containment overdue)` are PASSED STATUTORY DEADLINES** — a PDPL data subject request (`/dsr`), a breach containment clock (`/incidents`), a regulatory obligation (`/regulatory-compliance`), a BCP test (`/bcp-dr-plans`); **`(lapsed)` means professional-indemnity cover has ENDED** (`/operational-pi-risk`); `(requested)` marks a document version as not final (`/audit-trail`); and `(drafted)` marks an SLA duration with no regulatory source (`/sla-dashboard`). DECLARED in `DECLARED_PARENTHETICALS`, so the ban stays flat at zero for every other shape and a translation is recorded by deleting its row. Register entry 136. |
 | the two Arabic names for the two codes awaiting review | 2 | the lines are live | `AWAITING_OWNER_REVIEW` declares which permission descriptions were written by a coordinator rather than by her — decision 94's pass is hers. |
 | the fourteen unsourced retention categories | 14 | no floor, and the row SAYS so | her lawyer's question, not a wording one: a period beside an article number is a legal opinion. |
 

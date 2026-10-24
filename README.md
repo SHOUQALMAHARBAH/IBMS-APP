@@ -1646,11 +1646,24 @@ zero and the reason is a decision rather than unfinished work:
   the api, so a sixteenth maker/checker pair fails by name on the commit that adds it.
   **Both rows still count against the budget**, because both screens still print the record's
   NUMBER beside its type: those records have no readable handle (decision 44).
-* **`/internal-controls` renders `(dormant)` and `(truncated)` in literal English** — register
-  entry 135, found while switching that screen's words. Both are load-bearing: `(truncated)`
-  means the scan hit its limit and the report is INCOMPLETE for that pair. Neither word has a
-  source anywhere in the i18n tree, so neither is derivable, and `hardcoded-ui-english.py`
-  reports 0 for that screen — the shape it misses is a lowercase parenthesised word in JSX.
+* **~~`/internal-controls` renders two words in literal English~~ — SHIPPED 2026-10-24, owner
+  decision 54, and the DETECTOR DEFECT behind them is closed too.** Her words verbatim, with the
+  English given the same treatment because `(truncated)` told an English reader nothing either.
+  The 20,000 it names is TIED to `INTERNAL_CONTROLS_SCAN_LIMIT` by an assertion rather than
+  interpolated — interpolating renders through `formatNumber`, which keeps digits WESTERN and
+  would have silently overruled her «٢٠٠٠٠», and Arabic-Indic numerals in prose are this
+  dictionary's measured convention (210 characters across 14 files). Register entry 135.
+* **TEN PARENTHETICAL STATUS MARKERS ACROSS NINE SCREENS, found only after closing the
+  detector's blind spot** — register entry 136, and this is the largest single thing left for the
+  owner. `hardcoded-ui-english.py` reported **0** for every one of those screens; the shape it
+  missed is a parenthetical, in two forms, and the diagnosis is traced pattern by pattern in the
+  script. The figure went **0 → 10**. Each marker changes how a row should be read: **`(capped)`
+  ×3 means THE NUMBER SHOWN IS NOT THE REAL NUMBER**, `(overdue)` ×3 and `(containment overdue)`
+  are **passed statutory deadlines** (a PDPL request, a breach containment clock, a regulatory
+  obligation, a BCP test), `(lapsed)` means professional-indemnity cover has **ended**. They are
+  DECLARED in `DECLARED_PARENTHETICALS` — not a raised budget: the ban stays flat at zero for
+  every other shape, and the gate fails on an undeclared finding AND on a stale row, so a
+  translation is recorded by deleting its row.
 * **`/vendors/[id]`'s remaining row is a DETECTOR FALSE POSITIVE** — register entry 134. The
   id's only occurrence is a presence test gating the approve control, so **no uuid reaches a
   reader**, and the budget cannot fall for it without loosening the detector toward false
@@ -1664,9 +1677,18 @@ zero and the reason is a decision rather than unfinished work:
   `insurer-identity.ts` already states it in prose and code (registered company, then
   catalogue, then the office's own row — *most authoritative: the company's own record of
   itself*), which is decision 48's shape one entity over, and nothing contradicts it. So this
-  is mechanical, not a judgement. **THE ORDERING CONSTRAINT IS RECORDED IN BOTH ENTRY 132 AND
-  ENTRY 120: the precedence is fixed IN THE SAME BATCH that makes linking possible, never
-  after it** — register entry 132. It never consults `insuranceCompany`, so for an insurer linked to a registered company
+  is mechanical, not a judgement. **~~THE ORDERING CONSTRAINT~~ — DONE 2026-10-24: the
+  precedence no longer has to wait for linking, so linking can ship whenever its module is built
+  and no document will print a name that is not on the company's licence.** `insurerName`
+  delegates to the one precedence, and `insurer-name-precedence.inventory.spec.ts` keeps it that
+  way — it names the five outward documents with who relies on each, refuses one that stops
+  calling the resolver, and refuses ANY file outside `insurer-identity.ts` that spells the
+  precedence itself. **AND FIXING IT FOUND A FOURTH IMPLEMENTATION NO LIST HAD**: the insurer
+  PICKER ignored the registered company entirely AND coalesced per field, so a placement officer
+  choosing an insurer could have seen a different name from the directory and from every
+  document. The guard found it on its FIRST RUN — and then found my own first fix for it still
+  spelling the master branch for the Arabic half, which is why the name PAIR now has one home
+  too. Entries 132 and 120, in the same words. It never consults `insuranceCompany`, so for an insurer linked to a registered company
   it answers the CATALOGUE name while `/insurers` answers the COMPANY name. **Measured, the
   defect is LATENT: no `Insurer` row on either database carries an `insuranceCompanyId`**
   (dev 0 of 19, db-test 0 of 306), so nothing renders a wrong name today and it goes live on

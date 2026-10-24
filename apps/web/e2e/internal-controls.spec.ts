@@ -104,7 +104,44 @@ test("renders a clean audit with the per-pair breakdown", async ({ page }) => {
   await expect(
     page.getByRole("cell", { name: "KYCRecord", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByText("(dormant)")).toBeVisible();
+  /*
+   * RE-POINTED BY OWNER DECISION 54, AND THE REVERSAL IS STATED. This asserted the literal
+   * `(dormant)`, which was hardcoded ENGLISH — an Arabic reader saw it too, and
+   * `hardcoded-ui-english.py` reported 0 for this screen while it was there, which is the
+   * detector defect batch ten closed.
+   *
+   * The marker now carries a real sentence in both languages. BOTH HALVES on purpose: the new
+   * sentence present AND the bare word gone, because a half-done replacement would render both
+   * and satisfy a presence-only check.
+   *
+   * The word still carries BOTH meanings — watched, AND not yet used — which is the owner's own
+   * reasoning: «غير مستعمل» alone would leave the reader asking why the pair is listed at all,
+   * which is the question the flag exists to answer.
+   */
+  await expect(page.getByText("(watched, and not yet used)")).toBeVisible();
+  await expect(page.getByText("(dormant)")).toHaveCount(0);
+
+  /*
+   * AND THE TRUNCATION MARKER'S SENTENCE, asserted here because it is the one marker on this
+   * screen that can make an INCOMPLETE scan read as a clean one: a row of zeroes under a
+   * truncated scan is NOT clean, and `(truncated)` told an English reader nothing either. The
+   * figure it names is tied to `INTERNAL_CONTROLS_SCAN_LIMIT` by `screen-copy.test.ts`, so this
+   * assertion cannot go stale against the constant without that test failing first.
+   */
+  await page.route("http://localhost:4000/internal-controls/self-approval-audit", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...CLEAN_REPORT,
+        byPair: [{ ...CLEAN_REPORT.byPair[0], truncated: true }],
+      },
+    }),
+  );
+  await page.reload();
+  await expect(
+    page.getByText("(incomplete result — only the first 20,000 records were scanned)"),
+  ).toBeVisible();
+  await expect(page.getByText("(truncated)")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Self-approval violations found" }),
   ).not.toBeVisible();

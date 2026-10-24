@@ -304,6 +304,11 @@ export class InsurerRepository {
       legalName: string | null;
       legalNameAr: string | null;
       insurerMaster: { legalName: string; legalNameAr: string | null } | null;
+      /* Item 3 — step 1 of the name precedence. The picker ignored it entirely, which the new
+       * inventory guard found on its first run: a placement officer choosing an insurer saw the
+       * catalogue or local name while `/insurers` and every document showed the registered
+       * company's. */
+      insuranceCompany: { legalName: string; legalNameAr: string } | null;
     }[]
   > {
     return this.prisma.client.insurer.findMany({
@@ -313,6 +318,7 @@ export class InsurerRepository {
         legalName: true,
         legalNameAr: true,
         insurerMaster: { select: { legalName: true, legalNameAr: true } },
+        insuranceCompany: { select: { legalName: true, legalNameAr: true } },
       },
       // A TOTAL order. `legalName` is NULLABLE here — a catalogue-registered row carries none — so it
       // is not even a partial order on its own, and the id is what makes the truncation repeatable.

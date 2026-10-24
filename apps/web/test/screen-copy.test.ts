@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PERMISSION_CATALOGUE } from '../e2e/fixtures/role-permissions';
+import { lookupOptional } from '../lib/i18n/translations';
 
 /*
  * TWO RULES THAT COVER EVERY SCREEN — item 5, rules 6 and 3.
@@ -94,22 +95,56 @@ describe('every screen speaks both languages (rule 6)', () => {
       output = String((err as { stdout?: string }).stdout ?? err);
     }
 
-    const m = /strings\s+(\d+)/.exec(output);
+    /*
+     * RE-POINTED FROM `strings` TO `undeclared`, AND THE REVERSAL IS STATED.
+     *
+     * This read the TOTAL and required zero — a flat ban, which is what it should be and
+     * what it stays for every shape the detector knew about. What changed is that the
+     * detector learned FAILURE MODE 7 (a parenthetical, in two forms) and the total went
+     * 0 -> 10 across nine screens: markers like `(capped)`, `(overdue)` and `(lapsed)`
+     * that were there all along and that no pattern could see.
+     *
+     * THE TEN ARE DECLARED, NOT FORGIVEN, and the distinction is the whole design.
+     * `DECLARED_PARENTHETICALS` in the script names each `screen|string` pair with what it
+     * MEANS, and the script fails on a finding nobody declared AND on a declared row that
+     * no longer occurs — so a translation is recorded by DELETING its row, and a stale row
+     * cannot sit there covering whatever lands next. Keyed on the exact pair, so the
+     * declaration cannot become a hiding place for a DIFFERENT kind of finding on the same
+     * screen: a `PROSE` or `ONE_WORD_LABEL` hit still fails flat.
+     *
+     * Each of the ten needs an Arabic word from the owner, which is why they are declared
+     * rather than fixed — they are ten decisions, not ten engineering tasks, and they are
+     * listed in `docs/screen-pass-measurement.md` § 9 as NOT-YET-WRITTEN for her walk.
+     *
+     * THE TOTAL IS STILL READ AND STILL PRINTED in the failure message below, so the real
+     * figure is never hidden behind the declaration.
+     */
+    const total = /strings\s+(\d+)/.exec(output);
+    const m = /undeclared\s+(\d+)/.exec(output);
     // A scan that produced no parsable total is NOT a pass — the same rule `test-summary.mjs` enforces
     // one level up. Blank is not zero.
     expect(
-      m,
+      total,
       'The hardcoded-English scan produced no total. That is not a clean result — it means the scan did ' +
         `not run. Output was:\n${output.slice(-1500)}`,
+    ).not.toBeNull();
+    expect(
+      m,
+      'The scan printed no `undeclared` line. Blank is not zero — if that line is gone the ' +
+        'declaration machinery has been removed and this gate is reading nothing. Output ' +
+        `was:\n${output.slice(-1500)}`,
     ).not.toBeNull();
     expect(failed, `the scan exited non-zero:\n${output.slice(-1500)}`).toBe(
       false,
     );
     expect(
       Number(m?.[1]),
-      `Hardcoded user-facing English found. This platform is Arabic-first, so an untranslated string is ` +
-        `read by nobody in the primary language. Add the key to a dictionary in ` +
-        `lib/i18n/translations/ and render it through t(). Full output:\n${output}`,
+      `UNDECLARED hardcoded user-facing English found (the total is ${total?.[1]}, of which ` +
+        `${m?.[1]} is not declared). This platform is Arabic-first, so an untranslated ` +
+        `string is read by nobody in the primary language. Add the key to a dictionary in ` +
+        `lib/i18n/translations/ and render it through t(). DECLARING it is not the ordinary ` +
+        `fix — the rows in DECLARED_PARENTHETICALS are the owner's own backlog, each one a ` +
+        `status marker whose meaning she has to decide. Full output:\n${output}`,
     ).toBe(0);
   }, 60_000);
 });
@@ -601,4 +636,65 @@ describe('a load failure tells the reader what to do (rules 3 and 4)', () => {
     // The THIRD subprocess in this file, and the last one still on the 5000ms default. Timed for the
     // same reason as the two above rather than waiting for it to be the one that goes red.
   }, 60_000);
+});
+
+describe('owner decision 54: the truncation note still names the real scan limit', () => {
+  /*
+   * THE STRING NAMES A NUMBER THAT LIVES SOMEWHERE ELSE, WHICH IS A LIE WAITING TO HAPPEN.
+   *
+   * «فُحِص أول ٢٠٠٠٠ سجل» — *the first 20000 records were scanned* — is the owner's own wording,
+   * and `INTERNAL_CONTROLS_SCAN_LIMIT` is declared in the API. If that constant ever moves, the
+   * sentence on screen becomes false and nothing else in this repository can see it: no type
+   * connects an api constant to an i18n string, and the screen renders whatever the dictionary
+   * says.
+   *
+   * TIED BY AN ASSERTION RATHER THAN INTERPOLATED, and the reason is the owner's digits.
+   * Interpolating would render the figure through `formatNumber`, which keeps digits WESTERN —
+   * silently overruling her «٢٠٠٠٠». Arabic-Indic numerals written INTO prose are this
+   * dictionary's established convention (measured: 210 such characters across 14 files, including
+   * `dsrExtendButton`'s «١٥ يوماً»), while `formatNumber`'s Western digits are for figures
+   * rendered from DATA. So her bytes stand and this test is what keeps them true.
+   *
+   * BOTH LANGUAGES, each against its own rendering of the same constant — the Arabic in
+   * Arabic-Indic digits, the English in Western ones with a thousands separator. A test checking
+   * only one half would pass while the other went stale.
+   */
+  const limit = (() => {
+    const source = fs.readFileSync(
+      path.join(
+        __dirname,
+        '../../api/src/modules/internal-controls/internal-controls.config.ts',
+      ),
+      'utf8',
+    );
+    const m = /INTERNAL_CONTROLS_SCAN_LIMIT\s*=\s*(\d+)/.exec(source);
+    return m ? Number(m[1]) : null;
+  })();
+
+  it('reads the constant at all — a null here is a broken parser, not a missing limit', () => {
+    expect(
+      limit,
+      'INTERNAL_CONTROLS_SCAN_LIMIT could not be read out of internal-controls.config.ts. That is ' +
+        'this parser breaking rather than the constant going away; without it both assertions ' +
+        'below would compare against NaN and pass on nothing.',
+    ).not.toBeNull();
+    expect(limit).toBeGreaterThan(0);
+  });
+
+  it('both truncation notes name the limit the scan actually uses', () => {
+    const arabicIndic = String(limit).replace(/\d/g, (d) =>
+      String.fromCharCode(0x0660 + Number(d)),
+    );
+    const message =
+      'The truncation note on /internal-controls names a different number from ' +
+      `INTERNAL_CONTROLS_SCAN_LIMIT (${String(limit)}). That note is the only thing telling a ` +
+      'reader the scan was INCOMPLETE — there may be self-approval violations past the limit — ' +
+      'so a wrong figure there makes a partial scan look like a measured one. Update the string ' +
+      'to match the constant (the Arabic is the OWNER\'S, decision 54: change the digits only, ' +
+      'in Arabic-Indic, and nothing else).';
+    expect(lookupOptional('AR', 'icTruncatedNote') ?? '', message).toContain(arabicIndic);
+    expect(lookupOptional('EN', 'icTruncatedNote') ?? '', message).toContain(
+      String(limit).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+    );
+  });
 });

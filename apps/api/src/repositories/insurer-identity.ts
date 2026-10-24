@@ -36,6 +36,9 @@ import type { Prisma } from '@ibms/db';
 export const INSURER_IDENTITY_SELECT = {
   id: true,
   financialStrengthRating: true,
+  // Item 3 — step 1 of the name precedence. Selected here so every consumer of
+  // INSURER_IDENTITY_SELECT answers with the registered company's name without its own edit.
+  insuranceCompany: { select: { legalName: true, legalNameAr: true } },
   insurerMaster: { select: { legalName: true, legalNameAr: true } },
   // The office-local identity, for a company with no global row. Always
   // selected: a consumer cannot know which kind of row it is about to render,
@@ -67,6 +70,13 @@ export const INSURER_IDENTITY_SELECT = {
 export interface InsurerIdentity {
   id: string;
   financialStrengthRating: string | null;
+  /**
+   * ITEM 3 — step 1 of the name precedence, present so a row of this type can be passed to
+   * `insurerName`, and read by `resolveInsurerNamePair` — so `insurerIdentity` consults it too.
+   * The Arabic half is required alongside it: the pair resolver chooses ONE SOURCE and reads both
+   * names from it, which is only possible if a source that can win carries both.
+   */
+  insuranceCompany: { legalName: string; legalNameAr: string } | null;
   /** NULL for an office-local insurer — see this file's header. */
   insurerMaster: { legalName: string; legalNameAr: string | null } | null;
   legalName: string | null;
@@ -78,8 +88,79 @@ export interface InsurerIdentity {
  *  own type so `insurerName()` can accept a partial row without demanding the
  *  whole identity select. */
 export interface InsurerNameSources {
+  /**
+   * ITEM 3, AND THIS FIELD BEING REQUIRED IS THE WHOLE MECHANISM.
+   *
+   * The registered company is step 1 of the precedence stated above, and `insurerName` used to
+   * skip it — not as a competing policy but as a SECOND IMPLEMENTATION of the one policy, written
+   * before the registered-company link existed and never widened. Making the field required means
+   * the COMPILER names every `include` that has to grow, which is how all twelve call sites were
+   * found rather than by grep.
+   *
+   * Nothing rendered a wrong name before this, measured: no `Insurer` row on either database
+   * carried an `insuranceCompanyId` (dev 0 of 19, db-test 0 of 306), because linking is itself a
+   * capability the product does not yet expose. The divergence would have begun on the first link,
+   * on FIVE documents that leave the office.
+   */
+  insuranceCompany: { legalName: string } | null;
   insurerMaster: { legalName: string } | null;
   legalName: string | null;
+}
+
+/**
+ * THE NAME PRECEDENCE, IN ONE PLACE, AND IT IS THE ONLY ONE.
+ *
+ * Registered company, then the global catalogue, then the office's own row — the order this file's
+ * header states in prose, with *most authoritative: it is the company's own record of itself*
+ * against the first. `resolveInsurerCompanyFacts` calls this for its `name` and `insurerName`
+ * calls it too, so the two cannot answer differently however either is edited.
+ *
+ * `?? ''` is unreachable and exists only because TypeScript cannot see a CHECK constraint:
+ * `Insurer_has_identity` refuses a row carrying neither a master link nor a local name.
+ */
+/** Both names, from ONE chosen source. */
+export interface InsurerNamePair {
+  name: string;
+  nameAr: string | null;
+}
+
+/** Every source that can answer for an insurer's name, in both scripts. */
+export interface InsurerNamePairSources {
+  insuranceCompany: { legalName: string; legalNameAr: string } | null;
+  insurerMaster: { legalName: string; legalNameAr: string | null } | null;
+  legalName: string | null;
+  legalNameAr: string | null;
+}
+
+/**
+ * THE NAME PAIR, FROM ONE CHOSEN SOURCE, AND IT IS THE ONLY PLACE THAT CHOOSES.
+ *
+ * A SOURCE is picked once and BOTH names are read from it — never coalesced field by field.
+ * `insurerIdentity` already carried a paragraph explaining why, and it is worth keeping here
+ * because this function is now where that reasoning lives: per-field `??` means a row whose
+ * chosen source has no Arabic name falls through to a DIFFERENT source's Arabic name, rendering
+ * one company's Latin name beside another's Arabic one. The insurer PICKER was doing exactly that
+ * until item 3 — and the drift stopped being merely theoretical the moment a registered company
+ * became a third source.
+ *
+ * The Latin half goes through `resolveInsurerName`, so the pair and the single-name resolver
+ * cannot disagree about which source wins.
+ */
+export function resolveInsurerNamePair(
+  insurer: InsurerNamePairSources,
+): InsurerNamePair {
+  const nameAr = insurer.insuranceCompany
+    ? insurer.insuranceCompany.legalNameAr
+    : insurer.insurerMaster
+      ? insurer.insurerMaster.legalNameAr
+      : insurer.legalNameAr;
+  return { name: resolveInsurerName(insurer), nameAr };
+}
+
+export function resolveInsurerName(insurer: InsurerNameSources): string {
+  if (insurer.insuranceCompany) return insurer.insuranceCompany.legalName;
+  if (insurer.insurerMaster) return insurer.insurerMaster.legalName;
+  return insurer.legalName ?? '';
 }
 
 /**
@@ -113,12 +194,27 @@ export function insurerIdentity(insurer: InsurerIdentity): {
   // rendering the master's Latin name beside the office's own Arabic one. That is
   // precisely the two-sources-of-truth drift the master-first order exists to
   // prevent, and a unit test caught it rather than a reviewer.
-  const source = insurer.insurerMaster
-    ? {
-        name: insurer.insurerMaster.legalName,
-        nameAr: insurer.insurerMaster.legalNameAr,
-      }
-    : { name: insurer.legalName ?? '', nameAr: insurer.legalNameAr };
+  /*
+   * ITEM 3 — THIS FUNCTION DELIBERATELY DOES NOT CONSULT THE REGISTERED COMPANY, and the reason
+   * is the paragraph directly above rather than an oversight.
+   *
+   * It chooses a SOURCE and reads BOTH names from it, because per-field `??` once rendered the
+   * master's Latin name beside the office's own Arabic one. Adding the registered company as a
+   * third branch would need its `legalNameAr` too, and deciding how an Arabic name pairs with a
+   * Latin one across three sources is a wider change than item 3 — which is about the twelve
+   * `insurerName` call sites.
+   *
+   * AND NO SURFACE IS WRONG BECAUSE OF IT: `deriveInsurerView` already OVERRIDES this function's
+   * name with `resolveInsurerCompanyFacts`'s, in as many words — *the name also comes from the
+   * resolver, because a registered company outranks the catalogue and `insurerIdentity` only
+   * knows the catalogue*. So `/insurers` is correct today. What is left is that this function's
+   * own `name` is catalogue-first, which matters only for a consumer that reads it WITHOUT that
+   * override; the picker is the one such consumer, and an insurer the office has linked is one
+   * the office can already see under its registered name on `/insurers`.
+   *
+   * Register entry 132 carries this as the remaining half.
+   */
+  const source = resolveInsurerNamePair(insurer);
 
   return {
     id: insurer.id,
@@ -131,12 +227,17 @@ export function insurerIdentity(insurer: InsurerIdentity): {
 
 /** The name alone — the common case for a report row or a document line. */
 export function insurerName(insurer: InsurerNameSources): string {
-  // Same source-first rule as `insurerIdentity`. Only one field here, so the
-  // fall-through bug that one had is not reachable — written this way anyway, so
-  // the two cannot diverge if a second name field is ever added.
-  return insurer.insurerMaster
-    ? insurer.insurerMaster.legalName
-    : (insurer.legalName ?? '');
+  /*
+   * ITEM 3 — DELEGATES NOW, and that is the whole change. This function used to spell the
+   * precedence itself and SKIP the registered company, so for a linked insurer it answered the
+   * CATALOGUE name while `/insurers` answered the COMPANY name — two answers to *what is this
+   * insurer called*, which is what decision 63 removed from the insurer VIEW and which twelve
+   * call sites had kept, five of them on documents that leave the office.
+   *
+   * There is nothing left here to diverge from `resolveInsurerCompanyFacts`, because both read
+   * the same function.
+   */
+  return resolveInsurerName(insurer);
 }
 
 /* ==============================================================================================
@@ -224,7 +325,8 @@ export function resolveInsurerCompanyFacts(
     const company = insurer.insuranceCompany;
     return {
       source: 'REGISTERED_COMPANY',
-      name: company.legalName,
+      // Through the one precedence, so this branch and `insurerName` cannot drift apart.
+      name: resolveInsurerName(insurer),
       nameAr: company.legalNameAr,
       phone: company.phone,
       email: company.email,

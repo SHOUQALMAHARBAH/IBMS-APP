@@ -33,6 +33,7 @@ import type {
   RegisterInsurerDto,
   UpdateInsurerDto,
 } from './dto/insurer-crud.dto';
+import { resolveInsurerNamePair } from '../../repositories/insurer-identity';
 
 /** What the two status endpoints answer with: the record as it now stands, and what was
  *  outstanding at the moment it changed. Two named halves rather than extra keys on the
@@ -115,14 +116,35 @@ export class InsurerService {
       dto.q,
       PICKER_MAX_RESULTS.insurer,
     );
-    return rows.map((r) => ({
-      id: r.id,
-      // The local name when the office registered the company itself, the catalogue's otherwise. A row
-      // carries exactly one identity (the `Insurer_has_identity` CHECK), so this coalesce cannot be
-      // empty — and `legalName` is only nullable because of that split, not because a name is optional.
-      name: r.legalName ?? r.insurerMaster?.legalName ?? '',
-      nameAr: r.legalNameAr ?? r.insurerMaster?.legalNameAr ?? null,
-    }));
+    return rows.map((r) => {
+      /*
+       * ITEM 3 — A FOURTH IMPLEMENTATION OF THE NAME PRECEDENCE LIVED HERE, and the new inventory
+       * guard found it on its first run rather than anybody reading for it. It was worse than the
+       * other three in two ways:
+       *
+       *   - IT IGNORED THE REGISTERED COMPANY ENTIRELY, so a placement officer choosing an
+       *     insurer from this picker would see the catalogue or local name while `/insurers` and
+       *     every outward document showed the company's own registered name. The picker is where
+       *     an insurer gets CHOSEN, so a reader comparing it against the directory would have
+       *     found two names for one company.
+       *   - IT COALESCED PER FIELD (`legalName ?? master.legalName`, `legalNameAr ??
+       *     master.legalNameAr`), which is the exact drift `insurerIdentity` carries a paragraph
+       *     against: a row whose chosen source has no Arabic name falls through to a DIFFERENT
+       *     source's Arabic name, rendering one company's Latin name beside another's Arabic.
+       *     Today that is unreachable — `Insurer_has_identity` means a row carries one identity —
+       *     but it stopped being unreachable the moment a registered company became a third
+       *     source.
+       *
+       * So the SOURCE is chosen once and both names are read from it, which is `insurerIdentity`'s
+       * own discipline, and the Latin half goes through the one precedence so the two cannot
+       * disagree.
+       */
+      // THE PAIR, from the one resolver. My first fix here still spelled the master branch for
+      // `nameAr` — and the new inventory guard caught that too, on the same run, which is why the
+      // pair has its own home rather than three call sites each choosing a source.
+      const source = resolveInsurerNamePair(r);
+      return { id: r.id, name: source.name, nameAr: source.nameAr };
+    });
   }
 
   async list(query: ListInsurersQueryDto): Promise<Paginated<InsurerView>> {

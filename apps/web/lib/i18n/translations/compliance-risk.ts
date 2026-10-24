@@ -420,6 +420,30 @@ export const COMPLIANCE_RISK = {
     icIntro:
       'كل ثنائية «منفّذ/مدقّق» في المخطّط (الجزء A.5)، تُفحص مباشرةً بحثاً عن صف يكون فيه المنفّذ والمدقّق الشخص نفسه. وكل ثنائية مسنودة أصلاً بقيد في قاعدة البيانات يُفترض أن يجعل ذلك مستحيلاً — فالنتيجة النظيفة هي المتوقّع لا المفاجئ. ويُنفَّذ هذا الفحص تلقائياً كل ليلة أيضاً.',
     icViolationsHeading: 'مخالفات الموافقة الذاتية المكتشفة',
+    /*
+     * OWNER DECISION 54 — HERS VERBATIM, and the reasoning is part of the decision.
+     *
+     * `truncated` IS LOAD-BEARING. Reaching `INTERNAL_CONTROLS_SCAN_LIMIT` means that
+     * pair's result is INCOMPLETE — there may be violations past the limit — so a row
+     * reading *no violations* under a truncated scan is NOT clean. A reader who does not
+     * read English was reading `(truncated)` as clean, which is the worst available
+     * outcome for a self-approval report. The Arabic says WHY and HOW MANY, which the
+     * English never did.
+     *
+     * THE 20000 IS TIED TO THE CONSTANT BY AN ASSERTION, NOT INTERPOLATED, and the
+     * choice is deliberate: interpolating would render the figure through
+     * `formatNumber`, which keeps digits WESTERN, and would therefore silently overrule
+     * the owner's own «٢٠٠٠٠». Arabic-Indic numerals written INTO prose are this
+     * dictionary's established convention — measured, 210 such characters across 14
+     * files, `dsrExtendButton`'s «١٥ يوماً» among them — while `formatNumber`'s
+     * Western digits are for figures rendered from DATA. So her bytes stand and
+     * `screen-copy.test.ts` fails by name if the constant moves away from the string.
+     */
+    icTruncatedNote: '(نتيجة غير مكتملة — فُحِص أول ٢٠٠٠٠ سجل)',
+    /* `dormant` carries BOTH halves on purpose — watched, AND not yet written to.
+     * «غير مستعمل» alone would leave the reader asking why the pair is listed at
+     * all, which is the question the flag exists to answer. */
+    icDormantNote: '(مُراقَب ولم يُستعمَل بعد)',
     icColEntity: 'الكيان',
     icColPair: 'الثنائية',
     icColRecord: 'السجل',
@@ -951,6 +975,8 @@ export const COMPLIANCE_RISK = {
     icIntro:
       'Every maker/checker pair in the schema (Part A.5), scanned live for a row where the maker and checker resolve to the same person. Each pair is already backed by a database constraint that should make this impossible — a clean run is the expected outcome, not a surprise. This also runs automatically every night.',
     icViolationsHeading: 'Self-approval violations found',
+    icTruncatedNote: '(incomplete result — only the first 20,000 records were scanned)',
+    icDormantNote: '(watched, and not yet used)',
     icColEntity: 'Entity',
     icColPair: 'Pair',
     icColRecord: 'Record',
