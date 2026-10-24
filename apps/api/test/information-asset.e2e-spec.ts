@@ -37,6 +37,7 @@ interface InformationAssetBody {
   name: string;
   assetType: string;
   ownerUserId: string;
+  ownerName: string | null;
   classification: string;
 }
 
@@ -50,11 +51,15 @@ async function makeUser(
   app: INestApplication<App>,
   label: string,
   ...roles: RoleName[]
-): Promise<{ accessToken: string; userId: string }> {
+): Promise<{ accessToken: string; userId: string; fullName: string }> {
   const email = uniqueEmail(label);
+  /* RUN-UNIQUE AND PER-LABEL, so an assertion on a resolved name cannot pass by resolving the
+   * WRONG user: every account this helper made used to carry the same literal, which would have
+   * made "the owner's name came back" indistinguishable from "the admin's name came back". */
+  const fullName = uniqueLabel(`Information Asset E2E ${label}`);
   await request(app.getHttpServer())
     .post('/auth/signup')
-    .send({ fullName: 'Information Asset E2E User', email, password: PASSWORD })
+    .send({ fullName, email, password: PASSWORD })
     .expect(201);
   const login = await request(app.getHttpServer())
     .post('/auth/login')
@@ -91,7 +96,7 @@ async function makeUser(
       });
     }
   }
-  return { accessToken, userId: user.id };
+  return { accessToken, userId: user.id, fullName };
 }
 
 describe('Cybersecurity / Information Asset (e2e) — backlog Part C #69', () => {
@@ -235,6 +240,27 @@ describe('Cybersecurity / Information Asset (e2e) — backlog Part C #69', () =>
     ).body as InformationAssetBody;
     expect(updated.name).toBe(renamed);
     expect(updated.assetType).toBe('customer_data'); // untouched by a name-only patch
+
+    /*
+     * ITEM 1 — THE OWNER'S NAME, ON THE WIRE, ON ALL FOUR PATHS. Asserted HERE and not only in the
+     * unit spec because this is the layer a mock cannot replace: the unit double hands the service
+     * a Map, so it proves the projection and says nothing about whether the real
+     * `UserRepository.displayNamesForUserIds` is wired into this module at all — a missing provider
+     * is a RUNTIME failure invisible to `tsc`, and this module had no view layer until now.
+     *
+     * THE PAIR, each time: the name present AND the uuid gone from what a reader would see. A
+     * name-only assertion would pass against a `?? ownerUserId` fallback.
+     */
+    const ownerName = owner.fullName;
+    for (const [label, body] of [
+      ['create', created],
+      ['get', fetched],
+      ['update', updated],
+      ['list', list.find((a) => a.id === created.id)!],
+    ] as const) {
+      expect(body.ownerName, label).toBe(ownerName);
+      expect(body.ownerName, label).not.toBe(owner.userId);
+    }
   });
 
   it('404s reassigning an asset to a non-existent owner on update', async () => {

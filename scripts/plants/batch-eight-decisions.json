@@ -1,0 +1,50 @@
+{
+  "the-document-uploader-is-a-uuid-again": {
+    "file": "apps/api/src/modules/audit-trail/audit-trail.config.ts",
+    "from": "      uploadedByName: uploaderNames.get(v.uploadedByUserId) ?? null,",
+    "to": "      uploadedByName: v.uploadedByUserId,",
+    "why": "ITEM 1 REVERSED, in the form it would really arrive: not by deleting the field but by giving it the id as a FALLBACK, which is the tempting edit because it always produces something to render. It produces the defect. KILLS TWO TESTS, AND THE `why` IS CORRECTED FROM THE RUN — I predicted one. It fails both `names the colleague who filed the version, rather than their uuid` (the name becomes the id) AND `reports NO name rather than the uuid when the account is gone` (null becomes the id). That the second one dies is the point of having written it: `Document.uploadedByUserId` carries no foreign key (register entry 127), so a missing account is a REAL state, and a test asserting only the happy path would pass against this plant's own `?? id`. Two tests, two branches, one defect — a property of the design rather than a flaw in the plant."
+  },
+  "a-policy-with-no-number-shows-its-uuid-again": {
+    "file": "apps/web/app/(app)/dashboards/policy/page.tsx",
+    "from": "                          {c.policyNumber ??\n                            t('dpolBeforeIssuance', { customer: c.customerName })}",
+    "to": "                          {c.policyNumber ?? c.policyId}",
+    "why": "OWNER DECISION 50 REVERSED. This is the one `?? <uuid>` fallback in the product whose condition is genuinely REACHABLE — a policy has no number until issuance records one — so unlike the three the measurement records as structurally impossible, this branch really renders and a reader really sees a uuid where the deal's name belongs. Fails the Playwright assertion that the cancelled-policies table names the customer and not the id, and ALSO moves `check:rendered-identifiers` to 17 against its budget of 16: two independent observers, which is deliberate, because the budget alone would not say WHICH screen regressed and the screen test alone would not stop a second one appearing elsewhere."
+  },
+  "the-audit-trail-claims-a-name-for-an-unlabelled-type": {
+    "file": "apps/web/lib/audit-trail/workflow-entity-types.ts",
+    "from": "  return Object.prototype.hasOwnProperty.call(WORKFLOW_ENTITY_LABEL, type);",
+    "to": "  return true;",
+    "why": "OWNER DECISION 49's GUARD DISABLED AT ITS OWN SOURCE — every stored `entityType` claims to be one of the eighteen, so `WORKFLOW_ENTITY_LABEL[type]` is `undefined` and `t(undefined)` is reached. That is the notification-bell defect this ruling exists to avoid, and the measurement is why the guard is not optional: dev holds 32 distinct `entityType` values and db-test 139 against eighteen labels, so on db-test 122 of 139 types land in the fallback. Kills the Playwright assertions that an unlabelled type renders AS STORED and under its own \"record type as stored\" title. CORRECTED FROM THE RUN, AND THE CORRECTION IS THE INTERESTING PART. This plant first replaced the call site's `isWorkflowEntityType(r.entityType) ?` with `true ?`, and that FAILED THE BUILD — `error TS7053: expression of type 'string' can't be used to index type {...}` — so no Playwright test was ever reached and the plant proved nothing about the screen. Third time that exact trap has been paid for in this repository. But it also PROVES SOMETHING STRONGER than the test does: with a TYPE PREDICATE guarding it, bypassing the guard at the call site is UNREPRESENTABLE without a cast — the compiler refuses — which is why the predicate is a predicate and not a boolean. The plant therefore has to break the MECHANISM from inside, where narrowing stays valid and the lie is a runtime one."
+  },
+  "the-consent-register-stops-distinguishing-a-lead": {
+    "file": "apps/web/app/(app)/consent/page.tsx",
+    "from": "                        r.leadId ? (",
+    "to": "                        false ? (",
+    "why": "OWNER DECISION 51 UNDONE — the kind marker stops rendering and the register goes back to being unable to tell a lead from a customer, which is the gap removing the hardcoded ENGLISH `Lead ` prefix left open for one batch. It is PDPL-significant rather than cosmetic: consent captured at LEAD CAPTURE pre-dates the customer record, so which kind of subject a row names changes what the consent covers. Kills the Playwright assertion that a lead row carries «عميل محتمل» while a customer row does not — both halves in one test, because the presence alone would pass against a marker on every row."
+  },
+  "the-insurer-report-resolves-its-own-name-again": {
+    "file": "apps/api/src/repositories/insurer.repository.ts",
+    "from": "    return new Map(rows.map((r) => [r.id, resolveInsurerCompanyFacts(r).name]));",
+    "to": "    return new Map(rows.map((r) => [r.id, r.insurerMaster?.legalName ?? r.legalName ?? '']));",
+    "why": "THE SECOND PRECEDENCE PUT BACK — a report deciding for itself which of an insurer's names wins, instead of asking `resolveInsurerCompanyFacts`. This is not a hypothetical edit: it is BYTE-FOR-BYTE what `insurerName` does, and `findInsurerNames` really called it until this batch. It reads the catalogue and the office's own row and NEVER `insuranceCompany`, so for an insurer linked to a registered company it answers the CATALOGUE name while `/insurers` answers the COMPANY name — the two answers decision 63 removed from the insurer VIEW and that three reports had kept.\nAND THE PLANT CANNOT BE OBSERVED BY A TEST TODAY, WHICH IS THE POINT AND IS MEASURED: NO `Insurer` row on either database carries an `insuranceCompanyId` (dev 0 of 19, db-test 0 of 306), because linking an insurer to a registered company is one of the capabilities batch five's triage recorded as unreachable from the product. So both readings agree on every row that exists and this plant leaves the suite GREEN. It is committed anyway, and declaring that is better than deleting it: the defect is LATENT and goes live on the first link. The guard is the comment where `findInsurerNames` used to be, plus register entry 132 — not a test.\nREPOINTED BEFORE IT WAS EVER RUN, and the mechanism is why: my first anchor was the pre-prettier spelling of this line, `plant.mjs` REFUSED it by name as stale rather than matching nothing, and `--revert` then refused too because no backup existed. Both refusals are the tool working — a plant that silently fails to apply reads exactly like a guard that works."
+  },
+  "the-asset-inventory-names-its-owner-by-uuid-again": {
+    "file": "apps/api/src/modules/supporting-operations/information-asset.config.ts",
+    "from": "    ownerName: ownerNames.get(row.ownerUserId) ?? null,",
+    "to": "    ownerName: ownerNames.get(row.ownerUserId) ?? row.ownerUserId,",
+    "why": "ITEM 1 REVERSED IN THE FORM IT WOULD REALLY ARRIVE — not by deleting the field but by giving it the id as a FALLBACK, which is the tempting edit because it always produces something to render, and which is exactly the defect the rendered-identifier budget counts. Kills the unit test `reports NO owner name rather than the uuid when the account is gone` and the Playwright pair asserting the uuid cell is gone. `InformationAsset.ownerUserId` carries no foreign key, so a deleted owner is a REAL state rather than a defensive one, and a test asserting only the happy path would pass against this."
+  },
+  "the-payment-channel-forgets-the-insurer-half": {
+    "file": "apps/api/src/modules/finance/finance.config.ts",
+    "from": "    ownerName: ownerNames.get(row.customerId ?? row.insurerId ?? '') ?? null,",
+    "to": "    ownerName: ownerNames.get(row.customerId ?? '') ?? null,",
+    "why": "THE EITHER-OR DONE HALF-WAY, and this is the realistic half: a customer channel is the common case, so an implementation reading `customerId` alone looks correct on most rows and leaves every INSURER channel nameless. On the screen where client money is SENT, an unnamed destination is the worst row there is. Kills the unit test `names an INSURER owner from the same map` and the Playwright assertion on the insurer row's name — which is why both halves are asserted rather than just one."
+  },
+  "the-self-approval-report-names-its-violator-by-uuid-again": {
+    "file": "apps/api/src/modules/internal-controls/internal-controls.config.ts",
+    "from": "        userName: userNames.get(v.userId) ?? null,",
+    "to": "        userName: userNames.get(v.userId) ?? v.userId,",
+    "why": "THE `?? id` FALLBACK ON THE ONE REPORT THAT EXISTS TO NAME A PERSON. Kills the unit test `names the violating colleague, and reports NO name when the account is gone` and the Playwright pair. Worth planting separately from the asset one because the shape recurs and the two are reached by different layers — this one through a pure report builder taking a REQUIRED Map as a third parameter, which is what makes the name resolvable AFTER classification without an optional field."
+  }
+}

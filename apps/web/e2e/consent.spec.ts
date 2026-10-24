@@ -114,6 +114,39 @@ test("lists consent records with the capture form and withdrawal actions", async
     page.getByRole("cell", { name: "شركة اليرموك للتأمين", exact: true }).first(),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: /11111111/ })).toHaveCount(0);
+
+  /*
+   * OWNER DECISION 51 — the kind marker. Removing the old `Lead ` prefix was right (it was
+   * hardcoded ENGLISH inside a template literal, so an Arabic reader saw it too) but it left the
+   * register unable to tell a lead from a customer, and that distinction is PDPL-significant:
+   * consent captured at LEAD CAPTURE pre-dates the customer record.
+   *
+   * BOTH HALVES IN ONE TEST: the marker appears on the LEAD row and NOT on the customer row.
+   * Asserting only its presence would pass against a marker stamped on every row, which says
+   * nothing and would be worse than none.
+   */
+  await page.route("http://localhost:4000/consent**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        {
+          ...CONSENT_RECORDS[0],
+          id: "consent-lead",
+          customerId: null,
+          leadId: "22222222-2222-2222-2222-222222222222",
+          subjectName: "سامر عبدالله",
+        },
+        CONSENT_RECORDS[1],
+      ],
+    }),
+  );
+  await page.reload();
+  await expect(
+    page.getByRole("cell", { name: /سامر عبدالله.*Lead/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: /شركة اليرموك للتأمين.*Lead/ }),
+  ).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

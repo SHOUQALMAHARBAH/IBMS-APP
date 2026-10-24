@@ -1561,7 +1561,7 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
-### DECLARED 2026-10-23 — the MODULE 0-ب SCREEN PASS closes as a declared state, not as a zero
+### DECLARED 2026-10-24 — the MODULE 0-ب SCREEN PASS closes as a declared state, not as a zero
 
 Every one of decision 34's six fault classes is now gated in CI, and the remaining rows are
 accounted for by name in `docs/screen-pass-measurement.md` § 9 rather than left as a number.
@@ -1574,9 +1574,31 @@ zero and the reason is a decision rather than unfinished work:
   families live in module 7, whose money is frozen. The four-state `recordHandle` field is
   the answer until then — and *nobody wrote the reference down* must never collapse into
   *this kind of record carries none*.
-* **four more need the owner**: three polymorphic `entityId`s over an OPEN `entityType`
-  set, and `/dashboards/policy`'s reachable `policyNumber ?? policyId` fallback. Each is
-  recorded with the question that decides it.
+* **`RENDERED_IDENTIFIER_BUDGET` IS 10, down from 29 when the pass opened.** The last batch
+  closed eight — three dashboard aggregates, one either-or, three user names, and
+  `/dashboards/policy`'s reachable `policyNumber ?? policyId` fallback (owner decision 50,
+  which names the customer instead). **Four batched name resolvers now exist, one on each
+  entity's own repository** (`displayNamesForUserIds`, `namesForInsurerIds`,
+  `namesForEmployeeIds`, `namesForCustomerIds`); all four take IDS and return a Map, and a
+  MISSING key reports NO NAME rather than the uuid.
+* **two screens fell on the CLOSED side of owner decision 49 and still cannot be named** —
+  register entry 133. `/internal-controls` has 15 maker/checker entity types and 6 have an
+  Arabic word; `/sla-dashboard` has 16 and 7 do. Naming either means writing NINE words,
+  which the same ruling forbids (*the words already exist — do not write any*). Both render
+  the type AS STORED beside the number, which is what that ruling prescribes for an OPEN
+  set, and a map naming 7 of 16 would render a member name for the other nine.
+* **`/vendors/[id]`'s remaining row is a DETECTOR FALSE POSITIVE** — register entry 134. The
+  id's only occurrence is a presence test gating the approve control, so **no uuid reaches a
+  reader**, and the budget cannot fall for it without loosening the detector toward false
+  negatives. The real gap is the opposite one: that screen reports WHETHER a DPA was approved
+  and never BY WHOM.
+* **`insurerName` IS A SECOND PRECEDENCE AND HAS THIRTEEN LIVE CALL SITES** — register entry
+  132. It never consults `insuranceCompany`, so for an insurer linked to a registered company
+  it answers the CATALOGUE name while `/insurers` answers the COMPANY name. **Measured, the
+  defect is LATENT: no `Insurer` row on either database carries an `insuranceCompanyId`**
+  (dev 0 of 19, db-test 0 of 306), so nothing renders a wrong name today and it goes live on
+  the first link. Thirteen sites remain, including the invoice document and the certificate of
+  insurance.
 * **the five pre-sign-in `app/(auth)` screens are MEASURED AND CLEAN** — 0 rendered
   identifiers, 0 typed identifiers, 0 missing load-error branches, 0 missing empty states.
   The scanners still root at `app/(app)` and are deliberately not widened, so that figure

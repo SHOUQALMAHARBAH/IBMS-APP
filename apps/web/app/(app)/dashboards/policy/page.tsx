@@ -195,7 +195,20 @@ export default function PolicyDashboardPage() {
                   {summary.cancelledPolicies.map((c) => (
                     <tr key={c.policyId}>
                       <td style={{ padding: '0.25rem 0.5rem' }}>
-                        <bdi>{c.policyNumber ?? c.policyId}</bdi>
+                        {/*
+                          * OWNER DECISION 50 — a policy with no number yet is named by its
+                          * CUSTOMER plus a state word, never by its internal id. This was the one
+                          * `?? <uuid>` fallback in the product whose condition is genuinely
+                          * REACHABLE: a policy has no number until issuance records one.
+                          *
+                          * THE EM DASH AND THE ORDER LIVE IN THE ARABIC, not here: the key takes
+                          * `{customer}` so the sentence reads correctly right-to-left instead of
+                          * the screen concatenating around a separator.
+                          */}
+                        <bdi>
+                          {c.policyNumber ??
+                            t('dpolBeforeIssuance', { customer: c.customerName })}
+                        </bdi>
                       </td>
                       <td style={{ padding: '0.25rem 0.5rem' }}>
                         <bdi>{c.insuranceLine}</bdi>

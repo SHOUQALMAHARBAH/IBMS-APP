@@ -103,6 +103,7 @@ export class PolicyDashboardService {
       cancelledPolicies: cancelledRows.map((r) => ({
         policyId: r.policyId,
         policyNumber: r.policyNumber,
+        customerName: r.customerName,
         insuranceLine: r.insuranceLine,
         reason: r.reason,
         cancelledAt: r.appliedAt.toISOString(),

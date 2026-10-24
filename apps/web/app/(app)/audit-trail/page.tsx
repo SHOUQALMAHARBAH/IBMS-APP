@@ -5,6 +5,7 @@ import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { hasPermission } from '../../../lib/auth/permissions';
 import {
+  isWorkflowEntityType,
   WORKFLOW_ENTITY_LABEL,
   WORKFLOW_ENTITY_TYPES,
 } from '../../../lib/audit-trail/workflow-entity-types';
@@ -119,9 +120,49 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                   {r.occurredAt.replace('T', ' ').slice(0, 19)}
                 </td>
                 <td style={cell}>{t(ENUM_LABEL.AuditAction[r.action])}</td>
+                {/*
+                  * OWNER DECISION 49 — THE TYPE IN ARABIC PLUS THE NUMBER, NEVER A NAME.
+                  *
+                  * `AuditLogEntry.entityType` is a bare `String` with no enum: an OPEN set that
+                  * grows with the system. MEASURED — dev holds 32 distinct values and db-test 139,
+                  * because this log records every model the product touches, not just the
+                  * eighteen that have a workflow. So a NAME here would silently stop appearing
+                  * each time a module is added, and the owner's ruling is that an honest number
+                  * beats a name that quietly goes missing: the unknown is DECLARED.
+                  *
+                  * WHERE THE TYPE IS ONE OF THE EIGHTEEN, ITS OWN WORD IS USED — decision 41's
+                  * labels — so the reader sees the same word here as in the filter dropdown above
+                  * and at the top of the screen they came from. Measured coverage: 11 of dev's 32
+                  * distinct types, which is 89.6% of its ROWS; on db-test it is 17 of 139 and only
+                  * 14.1% of rows. Both figures are reported to the owner, because which of them
+                  * describes a real office changes how often the fallback is seen.
+                  *
+                  * THE FALLBACK IS VISIBLY A FALLBACK and is not dressed up as a name: the stored
+                  * type is rendered as machine text, in a monospace face and under its own label,
+                  * so a reader can tell "this is the identifier our system stores" from "this is
+                  * what the thing is called".
+                  *
+                  * THE ID STAYS IN FULL rather than being sliced: it is the only way a reader can
+                  * look the record up, and the budget keeps counting it — which the ruling
+                  * accepts. What changed is that the reader now knows WHAT KIND of record it is.
+                  */}
                 <td style={cell}>
-                  {r.entityType}{' '}
-                  <span style={{ opacity: 0.7 }}>· {r.entityId}</span>
+                  {isWorkflowEntityType(r.entityType) ? (
+                    t('atEntityRef', {
+                      type: t(WORKFLOW_ENTITY_LABEL[r.entityType]),
+                      ref: r.entityId,
+                    })
+                  ) : (
+                    <span
+                      title={t('atEntityTypeUnlabelled')}
+                      style={{
+                        fontFamily: 'var(--font-mono, monospace)',
+                        color: 'var(--ink-secondary)',
+                      }}
+                    >
+                      {r.entityType} · {r.entityId}
+                    </span>
+                  )}
                 </td>
                 <td style={cell} data-audit-actor={r.userId}>
                   {/*
@@ -581,7 +622,15 @@ function AuditTrailScreen() {
                       <td style={cell}>
                         {t(ENUM_LABEL.DataClassification[v.classification])}
                       </td>
-                      <td style={cell}>{v.uploadedByUserId}</td>
+                      {/*
+                        * RULE 2 — WHO filed this version, by name. It rendered the raw uuid, which
+                        * on a document history identifies nobody: the column exists to say which
+                        * colleague uploaded it. The em dash is real — that column carries no
+                        * foreign key, so the account can be gone.
+                        */}
+                      <td style={cell}>
+                        {v.uploadedByName ? <bdi>{v.uploadedByName}</bdi> : '—'}
+                      </td>
                       <td style={cell}>{v.createdAt.slice(0, 10)}</td>
                     </tr>
                   ))}

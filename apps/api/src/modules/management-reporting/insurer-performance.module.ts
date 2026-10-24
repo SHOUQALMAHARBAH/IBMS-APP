@@ -5,6 +5,7 @@ import { InsurerPerformanceScheduler } from './insurer-performance.scheduler';
 import { InsurerPerformanceRepository } from '../../repositories/insurer-performance.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 /**
  * Process 60 (backlog Part C #60, Domain G) — "Insurer Performance —
@@ -31,6 +32,7 @@ import { AuthModule } from '../auth/auth.module';
   imports: [AuditModule, AuthModule],
   controllers: [InsurerPerformanceController],
   providers: [
+    InsurerRepository,
     InsurerPerformanceService,
     InsurerPerformanceRepository,
     InsurerPerformanceScheduler,

@@ -139,6 +139,29 @@ export class EmployeeRepository {
    * Takes the `tx` so the person-and-account pair can check inside its own transaction rather than
    * before it, where a concurrent write could land in between.
    */
+  /**
+   * THE ONE PLACE A REPORT LEARNS A COLLEAGUE'S NAME FROM THEIR HR RECORD, and decision 48's shape
+   * applied to a third entity: ids in, a Map out, batched.
+   *
+   * `Employee.fullName` is the one decision 48 named as the REAL identity — composed server-side
+   * from the four Jordanian name parts, which is why it is preferred over `User.fullName`'s free
+   * text wherever both exist. Here there is no choice to make: an employee performance record
+   * points at an `Employee`, not a `User`, so this is the HR record directly.
+   *
+   * A MISSING key means no such employee row, which reports NO NAME. Never the id.
+   */
+  async namesForEmployeeIds(
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Map<string, string>> {
+    const unique = [...new Set(ids.filter((id): id is string => !!id))];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.client.employee.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, fullName: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.fullName]));
+  }
+
   async findActiveByCanonicalPersonName(
     organizationId: string,
     fullName: string,

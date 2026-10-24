@@ -37,6 +37,8 @@ const SUMMARY = {
     {
       policyId: "pol-1",
       policyNumber: "POL-2026-001",
+      // Owner decision 50 — the name a policy with NO number is shown by instead of its uuid.
+      customerName: "شركة اليرموك للتأمين",
       insuranceLine: "motor",
       reason: "Client sold the insured vehicle.",
       cancelledAt: "2026-08-15T00:00:00.000Z",
@@ -58,6 +60,32 @@ test("renders every metric section with real figures", async ({ page }) => {
   await expect(page.getByText("POL-2026-001")).toBeVisible();
   await expect(page.getByText("Client sold the insured vehicle.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
+
+  /*
+   * OWNER DECISION 50 — a policy with NO number yet is named by its CUSTOMER plus a state word,
+   * never by its internal id. This is the one `?? <uuid>` fallback in the product whose condition
+   * is genuinely REACHABLE: a policy has no number until issuance records one, which is why it was
+   * the only one of the four the measurement did NOT record as structurally impossible.
+   *
+   * THE PAIR: the name present AND the uuid gone. A screen rendering both would pass a name-only
+   * check, which is the realistic half-done state.
+   */
+  await page.route("http://localhost:4000/dashboards/policy**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...SUMMARY,
+        cancelledPolicies: [
+          { ...SUMMARY.cancelledPolicies[0], policyNumber: null },
+        ],
+      },
+    }),
+  );
+  await page.reload();
+  await expect(
+    page.getByText("شركة اليرموك للتأمين — before issuance"),
+  ).toBeVisible();
+  await expect(page.getByRole("cell", { name: /pol-1/ })).toHaveCount(0);
 });
 
 test("a user without the permission sees the underlying error message", async ({ page }) => {

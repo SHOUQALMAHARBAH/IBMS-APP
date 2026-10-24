@@ -663,11 +663,17 @@ describe('PaymentChannel view + audit (Process 38)', () => {
   };
 
   it('derivePaymentChannelView renders isActive + ISO dates + the masked fragment', () => {
-    expect(derivePaymentChannelView(base)).toEqual({
+    expect(
+      derivePaymentChannelView(
+        base,
+        new Map([['cust-1', 'شركة اليرموك للتأمين']]),
+      ),
+    ).toEqual({
       id: 'pc-1',
       ownerType: 'customer',
       customerId: 'cust-1',
       insurerId: null,
+      ownerName: 'شركة اليرموك للتأمين',
       channelType: 'bank_transfer',
       label: 'Primary JOD',
       bankName: 'Cairo Amman Bank',
@@ -681,13 +687,35 @@ describe('PaymentChannel view + audit (Process 38)', () => {
   });
 
   it('a disabled channel is not active', () => {
-    const v = derivePaymentChannelView({
-      ...base,
-      status: 'disabled',
-      disabledAt: new Date('2026-10-01T00:00:00.000Z'),
-    });
+    const v = derivePaymentChannelView(
+      {
+        ...base,
+        status: 'disabled',
+        disabledAt: new Date('2026-10-01T00:00:00.000Z'),
+      },
+      new Map(),
+    );
     expect(v.isActive).toBe(false);
     expect(v.disabledAt).toBe('2026-10-01T00:00:00.000Z');
+  });
+
+  /* ITEM 1 — THE EITHER-OR, both ways round, because ONE Map keyed on whichever id is set is the
+   * whole design and a test exercising only the customer side would pass against an implementation
+   * that read `customerId` alone. */
+  it('names an INSURER owner from the same map', () => {
+    const v = derivePaymentChannelView(
+      { ...base, ownerType: 'insurer', customerId: null, insurerId: 'ins-1' },
+      new Map([['ins-1', 'Jordan Insurance Co']]),
+    );
+    expect(v.ownerName).toBe('Jordan Insurance Co');
+  });
+
+  /* `PaymentChannel` carries no foreign key to either owner — the service checks existence in
+   * application code — so a dangling id is a REAL state. It reports no name, never the uuid. */
+  it('reports NO owner name rather than the uuid when the owning row is gone', () => {
+    const v = derivePaymentChannelView(base, new Map());
+    expect(v.ownerName).toBeNull();
+    expect(v.ownerName).not.toBe(base.customerId);
   });
 
   it('paymentChannelAuditSnapshot carries metadata but NEVER accountLast4', () => {

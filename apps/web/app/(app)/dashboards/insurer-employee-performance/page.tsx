@@ -159,7 +159,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
           <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
             <thead>
               <tr>
-                <th style={head}>{t('diepColInsurerId')}</th>
+                <th style={head}>{t('diepColInsurer')}</th>
                 <th style={head}>{t('diepQuoteResponse')}</th>
                 <th style={head}>{t('diepClaimsService')}</th>
                 <th style={head}>{t('diepPrice')}</th>
@@ -169,7 +169,12 @@ export default function InsurerEmployeePerformanceDashboardPage() {
             <tbody>
               {insurerScores.map((row) => (
                 <tr key={row.id}>
-                  <td style={cell}>{row.insurerId}</td>
+                  {/* ITEM 1 — the company's name, resolved by the api. An em dash where the
+                      insurer row is gone: "we hold no name" and "the name is this uuid" are
+                      different claims and only the first one is true. */}
+                  <td style={cell}>
+                    {row.insurerName ? <bdi>{row.insurerName}</bdi> : '—'}
+                  </td>
                   <td style={cell}>{row.quoteResponseScore}</td>
                   <td style={cell}>{row.claimsServiceScore}</td>
                   <td style={cell}>{row.priceScore}</td>
@@ -189,7 +194,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
           <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
             <thead>
               <tr>
-                <th style={head}>{t('diepColEmployeeId')}</th>
+                <th style={head}>{t('diepColEmployee')}</th>
                 <th style={head}>{t('diepNewClients')}</th>
                 <th style={head}>{t('diepPremiumWritten')}</th>
                 <th style={head}>{t('diepCommissionEarned')}</th>
@@ -200,7 +205,10 @@ export default function InsurerEmployeePerformanceDashboardPage() {
             <tbody>
               {employeeRecords.map((row) => (
                 <tr key={row.id}>
-                  <td style={cell}>{row.employeeId}</td>
+                  {/* ITEM 1 — the colleague's name from their HR record, resolved by the api. */}
+                  <td style={cell}>
+                    {row.employeeName ? <bdi>{row.employeeName}</bdi> : '—'}
+                  </td>
                   <td style={cell}>{displayOrDash(row.newClients)}</td>
                   <td style={cell}>{displayOrDash(row.premiumWrittenJod)}</td>
                   <td style={cell}>{displayOrDash(row.commissionEarnedJod)}</td>

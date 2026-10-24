@@ -318,22 +318,32 @@ export default function ConsentPage() {
                     <td style={cell}>
                       {/*
                         * RULE 2 — WHOSE consent, by name. This rendered `Lead <8 chars of a uuid>`
-                        * or a bare sliced uuid, which identifies nobody on the one screen whose
-                        * whole subject is who agreed to what.
+                        * or a bare sliced uuid on the one screen whose whole subject is who agreed
+                        * to what.
                         *
-                        * THE `Lead ` PREFIX IS GONE AND THAT IS A SECOND FIX: it was a hardcoded
-                        * ENGLISH word inside a template literal, so an Arabic reader saw it too — a
-                        * rule-6 escape the hardcoded-english detector did not catch, which is a
-                        * finding about that detector and not about this cell.
-                        *
-                        * WHAT IS OWED: a marker saying WHICH KIND of subject a row names. It
-                        * matters for PDPL — consent captured at lead capture pre-dates the customer
-                        * record — and the three ids are all still on the wire, so the screen can
-                        * see the kind. What is missing is the Arabic WORD: `navLeads` ships the
-                        * plural «العملاء المحتملون» and the singular would be morphology nobody
-                        * here may invent. Reported rather than approximated.
+                        * AND THE KIND MARKER IS BACK — OWNER DECISION 51, «عميل محتمل», the
+                        * singular of the «العملاء المحتملون» that already ships in `leadsHeading`
+                        * and `navLeads`. Removing the old `Lead ` prefix was right (it was
+                        * hardcoded ENGLISH inside a template literal, so an Arabic reader saw it
+                        * too) but it left the register unable to distinguish a lead from a
+                        * customer, and that distinction is PDPL-significant: consent captured at
+                        * lead capture pre-dates the customer record. The kind is derived from the
+                        * id the api already sends, never from a second wire field.
                         */}
-                      {r.subjectName ? <bdi>{r.subjectName}</bdi> : '—'}
+                      {r.subjectName ? (
+                        r.leadId ? (
+                          <>
+                            <bdi>{r.subjectName}</bdi>{' '}
+                            <span style={{ color: 'var(--ink-secondary)' }}>
+                              ({t('consSubjectLead')})
+                            </span>
+                          </>
+                        ) : (
+                          <bdi>{r.subjectName}</bdi>
+                        )
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td style={cell}>{r.purpose}</td>
                     <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>

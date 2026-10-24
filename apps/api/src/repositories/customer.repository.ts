@@ -150,6 +150,29 @@ export class CustomerRepository {
     });
   }
 
+  /**
+   * THE ONE PLACE A REPORT LEARNS A CUSTOMER'S NAME, in decision 48's shape: ids in, a Map out,
+   * batched.
+   *
+   * `legalName` is NOT NULL on `Customer`, so a key that is present always carries a real name; a
+   * MISSING key means no such customer row, which reports NO NAME rather than the uuid.
+   *
+   * It selects `legalName` ALONE — never a contact field. Those are encrypted at rest precisely so
+   * a report cannot carry them, and a name-resolution helper that widened its select would be the
+   * quietest possible way to put a decrypted phone number into a payment-channel table.
+   */
+  async namesForCustomerIds(
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Map<string, string>> {
+    const unique = [...new Set(ids.filter((id): id is string => !!id))];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.client.customer.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, legalName: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.legalName]));
+  }
+
   findById(id: string): Promise<Customer | null> {
     return this.prisma.client.customer.findUnique({ where: { id } });
   }

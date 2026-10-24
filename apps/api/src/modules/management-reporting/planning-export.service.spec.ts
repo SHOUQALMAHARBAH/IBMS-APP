@@ -4,6 +4,7 @@ import { PlanningExportService } from './planning-export.service';
 import type { PortfolioAnalysisRepository } from '../../repositories/portfolio-analysis.repository';
 import type { InsurerPerformanceRepository } from '../../repositories/insurer-performance.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { InsurerRepository } from '../../repositories/insurer.repository';
 
 function makeService(
   over: {
@@ -56,10 +57,19 @@ function makeService(
     ]),
     ...over.insurerPerformanceRepo,
   };
+  /* Item 1 — the one resolver for an insurer's name. Returns a REAL Map rather than an empty one,
+   * because an empty Map makes every `insurerName` null and a test asserting the name would then
+   * be passing on the double. */
+  const insurerRepo = {
+    namesForInsurerIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['insurer-1', 'Jordan Insurance Co']])),
+  };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new PlanningExportService(
     portfolioRepo as unknown as PortfolioAnalysisRepository,
     insurerPerformanceRepo as unknown as InsurerPerformanceRepository,
+    insurerRepo as unknown as InsurerRepository,
     audit as unknown as AuditService,
   );
   return { service, portfolioRepo, insurerPerformanceRepo, audit };
@@ -95,6 +105,9 @@ describe('PlanningExportService.generate', () => {
       {
         id: 'score-1',
         insurerId: 'insurer-1',
+        // Item 1 — the market section names the company now, through the same resolver the
+        // portfolio breakdown beside it already used.
+        insurerName: 'Jordan Insurance Co',
         periodLabel: '2026-08',
         quoteResponseScore: '90.00',
         claimsServiceScore: '80.00',

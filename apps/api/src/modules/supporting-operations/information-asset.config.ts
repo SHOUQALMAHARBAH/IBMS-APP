@@ -25,6 +25,8 @@
 
 /** The exact 6-value set from `InformationAsset.assetType`'s own schema doc
  * comment. */
+import type { DataClassification } from '@ibms/db';
+
 export const ASSET_TYPES = [
   'customer_data',
   'policy_data',
@@ -35,3 +37,54 @@ export const ASSET_TYPES = [
 ] as const;
 
 export type AssetType = (typeof ASSET_TYPES)[number];
+
+/**
+ * ITEM 1 — THE VIEW LAYER THIS MODULE DID NOT HAVE. Before this, `InformationAssetService` returned
+ * the raw Prisma `InformationAsset` from all four of its paths, so the screen had nothing but
+ * `ownerUserId` to render and rendered it: the asset inventory named its owner by uuid, in the one
+ * register whose whole purpose is saying WHO is accountable for a classified asset.
+ *
+ * `ownerName` is REQUIRED on the view and never optional — four paths project it (create, list, get,
+ * update) and an optional field would let three keep sending nothing while the list carried a name,
+ * which is the `IncidentReport.load()` defect.
+ *
+ * NULLABLE in value: `ownerUserId` is NOT NULL and carries no foreign key on this model (measured —
+ * the service checks the owner exists in application code at both write paths), so an owner whose
+ * account was later deleted is a REAL state. It reports NO name, never the uuid.
+ */
+export interface InformationAssetView {
+  id: string;
+  name: string;
+  assetType: string;
+  ownerUserId: string;
+  ownerName: string | null;
+  classification: DataClassification;
+  createdAt: string;
+}
+
+/** Pure. Resolved names come from `UserRepository.displayNamesForUserIds` — decision 48's single
+ * answer to "who is this" — never from a second read of `User.fullName` at a call site. A REQUIRED
+ * second parameter, so the compiler names every projection site. */
+export function deriveInformationAssetView(
+  row: InformationAssetRow,
+  ownerNames: Map<string, string>,
+): InformationAssetView {
+  return {
+    id: row.id,
+    name: row.name,
+    assetType: row.assetType,
+    ownerUserId: row.ownerUserId,
+    ownerName: ownerNames.get(row.ownerUserId) ?? null,
+    classification: row.classification,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export interface InformationAssetRow {
+  id: string;
+  name: string;
+  assetType: string;
+  ownerUserId: string;
+  classification: DataClassification;
+  createdAt: Date;
+}

@@ -37,6 +37,22 @@ const AUDIT_ROWS = [
     isSensitiveDataAccess: false,
     occurredAt: "2026-09-07T09:00:00.000Z",
   },
+  {
+    /*
+     * OWNER DECISION 49's FALLBACK CASE, and it is not an edge: `AuditLogEntry.entityType` is a
+     * bare `String`, so the set is OPEN. Measured 2026-10-23 — dev holds 32 distinct values and
+     * db-test 139, against decision 41's eighteen labels. On db-test 122 of the 139 fall here.
+     */
+    id: "audit-2",
+    userId: "user-2",
+    action: "UPDATE",
+    entityType: "ProfessionalIndemnityPolicy",
+    entityId: "pi-1",
+    beforeValue: null,
+    afterValue: null,
+    isSensitiveDataAccess: false,
+    occurredAt: "2026-09-07T10:00:00.000Z",
+  },
 ];
 
 const DOCUMENT_HISTORY = {
@@ -49,6 +65,8 @@ const DOCUMENT_HISTORY = {
       category: "POLICY",
       classification: "CONFIDENTIAL",
       uploadedByUserId: "user-2",
+      // Item 1 — the uploader by NAME, resolved by the api through decision 48's resolver.
+      uploadedByName: "سامر عبدالله الحوراني",
       deletionLocked: true,
       deletionOverrideByUserId: null,
       createdAt: "2026-09-01T00:00:00.000Z",
@@ -99,6 +117,36 @@ test("browses the audit log, looks up workflow history, and looks up document hi
   await page.getByRole("button", { name: "Look up" }).nth(1).click();
   await expect(page.getByRole("cell", { name: "policy-schedule.pdf" })).toBeVisible();
   await expect(page.getByText("v1 (requested)")).toBeVisible();
+
+  /*
+   * ITEM 1 — the document VERSION's uploader by NAME, through decision 48's resolver. And note
+   * which side of that decision's boundary this is: a version row is a REGISTER of who filed what,
+   * so it takes the resolver, while the audit rows on this same screen keep the STORED name. Both
+   * shapes are on one page on purpose.
+   */
+  await expect(
+    page.getByRole("cell", { name: "سامر عبدالله الحوراني" }),
+  ).toBeVisible();
+  await expect(page.getByRole("cell", { name: /user-2/ })).toHaveCount(0);
+
+  /*
+   * OWNER DECISION 49 — THE TYPE IN ARABIC PLUS THE NUMBER, NEVER A NAME, and both branches are
+   * asserted because the fallback is not an edge case: `AuditLogEntry.entityType` is a bare
+   * `String`, and measured on 2026-10-23 dev holds 32 distinct values against db-test's 139, so on
+   * db-test 122 of 139 land in the fallback.
+   *
+   * `Lead` is one of decision 41's eighteen, so it renders that type's own word.
+   * `ProfessionalIndemnityPolicy` is not, so it renders AS STORED — visibly machine text, under its
+   * own "record type as stored" label, rather than dressed up as a name.
+   */
+  // `.first()` because this screen renders AUDIT_ROWS in THREE tables (the browse, the workflow
+  // history and the document audit trail), so each row's cell resolves three times. The claim is
+  // that the type's own word plus the number renders at all, which the first match proves.
+  await expect(page.getByText("Leads number lead-1").first()).toBeVisible();
+  await expect(
+    page.getByText("ProfessionalIndemnityPolicy · pi-1").first(),
+  ).toBeVisible();
+  await expect(page.getByTitle("record type as stored").first()).toBeVisible();
 });
 
 test("an action-and-date browse sends all three filters, and `to` covers the WHOLE last day", async ({

@@ -7,9 +7,9 @@
   },
   "rendered-identifier-budget-raised": {
     "file": "scripts/measurements/rendered-identifiers.py",
-    "from": "RENDERED_IDENTIFIER_BUDGET = 18",
-    "to": "RENDERED_IDENTIFIER_BUDGET = 19",
-    "why": "THE DOWN DIRECTION, and it is the realistic regression rather than a contrived one: somebody raises the budget to make a red build green. The gate fails naming the number to lower it to, which is what stops a ratchet becoming a ceiling — the `MISSING_DESCRIPTION_BUDGET` precedent, which reached 0 and stayed there. REPOINTED AGAIN 2026-10-23 at 18 (and at 19 before that in the same day's batch six) (batch six item 2 lowered it 24 -> 19 by fixing five more). `plant --self-test` refused it the moment the figure moved — the SEVENTH time that mechanism has caught its own evidence expiring, and the second batch running in which the same plant has done it. That repetition is the argument for anchoring a plant on a MECHANISM rather than a number where one can be found: this one cannot, because the number IS the mechanism it tests. `plant --self-test` refused it the moment the figure moved — the SIXTH time that mechanism has caught its own evidence expiring, and the second time in this batch. Repointed rather than deleted: the hazard is unchanged, only the number it stands at."
+    "from": "RENDERED_IDENTIFIER_BUDGET = 10",
+    "to": "RENDERED_IDENTIFIER_BUDGET = 11",
+    "why": "THE RATCHET'S OWN DIRECTION. Raising the budget by one is the edit somebody reaches for when a screen regresses, and it is the one thing this gate exists to refuse: the owner struck attrition, so this number only falls. Exits 1 naming the stale figure. REPOINTED 18 -> 16 -> 10 ON 2026-10-24, the ELEVENTH time `plant --self-test` has caught a committed plant whose evidence quietly expired because the work it measures moved — and the eleventh time it was repointed rather than deleted. Note WHICH side it is pointed at: the script and `screen-copy.test.ts` hold this figure in two deliberately independent homes with two independent detectors, and the WEB one is what caught the stale 18 when the script's count fell in batch five. Both have to move together, which is the whole argument for keeping them apart."
   },
   "required-typed-identifier-shipped": {
     "file": "apps/web/app/(app)/complaints/page.tsx",

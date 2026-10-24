@@ -154,8 +154,12 @@ describe('every screen speaks both languages (rule 6)', () => {
  * that belongs with the money), and four more need a decision rather than a name.
  *
  * 19 -> 18 on 2026-10-23 (batch seven item 2).
+ *
+ * 18 -> 16 on 2026-10-23 (batch eight). The floor still cannot be 0: six rows are
+ * DEFERRED-BY-DECISION to module 7 (decision 46), and `/audit-trail`'s polymorphic `entityId`
+ * counts BY DECISION 49 — it is labelled with its type's Arabic word now, and the id stays.
  */
-const RENDERED_IDENTIFIER_BUDGET = 18;
+const RENDERED_IDENTIFIER_BUDGET = 10;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

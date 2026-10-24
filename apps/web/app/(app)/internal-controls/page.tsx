@@ -307,7 +307,14 @@ export default function InternalControlsPage() {
                         <td style={leftCell}>{v.entityType}</td>
                         <td style={leftCell}>{v.pairLabel}</td>
                         <td style={leftCell}>{v.entityId}</td>
-                        <td style={leftCell}>{v.userId}</td>
+                        {/* ITEM 1 — the colleague who did both halves, by NAME, resolved by the
+                            api through decision 48's resolver. An em dash where the account is
+                            gone: that is a real state here (this scan's actor has no protecting
+                            foreign key the way the audit trail's does), and "we hold no name" is
+                            not "the name is this uuid". */}
+                        <td style={leftCell}>
+                          {v.userName ? <bdi>{v.userName}</bdi> : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

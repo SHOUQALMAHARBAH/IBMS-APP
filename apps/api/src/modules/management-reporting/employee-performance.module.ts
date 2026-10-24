@@ -5,6 +5,7 @@ import { EmployeePerformanceScheduler } from './employee-performance.scheduler';
 import { EmployeePerformanceRepository } from '../../repositories/employee-performance.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { EmployeeRepository } from '../../repositories/employee.repository';
 
 /**
  * Process 61 (backlog Part C #61, Domain G) — "Employee Performance —
@@ -31,6 +32,7 @@ import { AuthModule } from '../auth/auth.module';
   imports: [AuditModule, AuthModule],
   controllers: [EmployeePerformanceController],
   providers: [
+    EmployeeRepository,
     EmployeePerformanceService,
     EmployeePerformanceRepository,
     EmployeePerformanceScheduler,

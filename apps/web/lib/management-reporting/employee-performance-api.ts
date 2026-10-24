@@ -8,6 +8,10 @@ import { apiGet, apiPost } from '../auth/api-client';
 export interface EmployeePerformanceRecord {
   id: string;
   employeeId: string;
+  /* Item 1 — the colleague's name from their HR record (`Employee.fullName`, composed server-side
+   * from the four name parts), resolved by the api. NULL means the employee row is gone — a
+   * performance record is a periodic SNAPSHOT and can outlive it — and never the uuid. */
+  employeeName: string | null;
   periodLabel: string;
   newClients: number | null;
   premiumWrittenJod: string | null;

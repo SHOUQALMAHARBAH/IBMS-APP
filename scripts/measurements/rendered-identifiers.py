@@ -264,7 +264,19 @@ def self_test():
 # 19 -> 18 on 2026-10-23, batch seven item 2: `/cross-border-transfers`' Approved-by column now
 # names the approver, resolved through decision 48's one resolver (the HR record where the account
 # is linked) rather than rendering eight characters of a uuid.
-RENDERED_IDENTIFIER_BUDGET = 18
+# 18 -> 16 on 2026-10-23, batch eight, lowered by exactly what was closed and no more:
+#
+#   /audit-trail        1  the document VERSION's uploader, by name (decision 48's resolver)
+#   /dashboards/policy  1  owner decision 50 — a policy with no number yet is named by its
+#                          CUSTOMER plus a state word, never by its internal id
+#
+# AND `/audit-trail`'s POLYMORPHIC `entityId` DELIBERATELY STILL COUNTS — owner decision 49. That
+# column now renders the type's own Arabic word plus the number («وثيقة رقم …») where the stored
+# type is one of decision 41's eighteen, and the stored type as machine text where it is not. The
+# ID STAYS IN FULL because it is the only way a reader can look the record up, and the ruling
+# accepts that: a NAME there would silently stop appearing each time a module is added.
+# Measured — dev holds 32 distinct `entityType` values and db-test 139, against eighteen labels.
+RENDERED_IDENTIFIER_BUDGET = 10
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped

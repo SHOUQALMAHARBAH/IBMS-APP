@@ -243,7 +243,11 @@ describe('buildInternalControlsReport', () => {
       },
     ];
 
-    const report = buildInternalControlsReport(pairResults, now);
+    const report = buildInternalControlsReport(
+      pairResults,
+      now,
+      new Map([['user-1', 'سامر عبدالله الحوراني']]),
+    );
     expect(report.generatedAt).toBe(now.toISOString());
     expect(report.pairsScanned).toBe(2);
     expect(report.totalRowsChecked).toBe(10);
@@ -270,8 +274,45 @@ describe('buildInternalControlsReport', () => {
     ]);
   });
 
+  /* ITEM 1 — the violating colleague is named, and the OTHER branch is asserted beside it: an
+   * account that has since been deleted reports NO name rather than its uuid. A test asserting
+   * only the resolved name would pass against a `?? v.userId` fallback, which is the edit somebody
+   * reaches for because it always produces something to render. */
+  it('names the violating colleague, and reports NO name when the account is gone', () => {
+    const violation = {
+      entityType: 'DisposalBatch',
+      pairLabel: 'nominatedByUserId / dpoApprovedByUserId',
+      entityId: 'batch-1',
+      makerField: 'nominatedByUserId',
+      checkerField: 'dpoApprovedByUserId',
+      userId: 'user-1',
+      dbCheckConstraint: 'DisposalBatch_maker_checker_distinct',
+    };
+    const pairResults = [
+      {
+        entityType: 'DisposalBatch',
+        pairLabel: 'nominatedByUserId / dpoApprovedByUserId',
+        rowsChecked: 1,
+        violations: [violation],
+        dbCheckConstraint: 'DisposalBatch_maker_checker_distinct',
+        dormant: false,
+        truncated: false,
+      },
+    ];
+    const named = buildInternalControlsReport(
+      pairResults,
+      now,
+      new Map([['user-1', 'سامر عبدالله الحوراني']]),
+    );
+    expect(named.violations[0].userName).toBe('سامر عبدالله الحوراني');
+
+    const unnamed = buildInternalControlsReport(pairResults, now, new Map());
+    expect(unnamed.violations[0].userName).toBeNull();
+    expect(unnamed.violations[0].userName).not.toBe('user-1');
+  });
+
   it('reports zero pairs/rows/violations for an empty scan', () => {
-    const report = buildInternalControlsReport([], now);
+    const report = buildInternalControlsReport([], now, new Map());
     expect(report).toEqual({
       generatedAt: now.toISOString(),
       pairsScanned: 0,

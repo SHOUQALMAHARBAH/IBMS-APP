@@ -70,6 +70,13 @@ function makeService(
   // unresolvable path — which is a real state (a seed, a scheduled sweep) and must render the id.
   const users = {
     findSummariesByIds: vi.fn().mockResolvedValue([]),
+    /*
+     * Item 1 — the DOCUMENT-VERSION uploader's name comes from decision 48's resolver, while
+     * `findSummariesByIds` above still supplies the AUDIT ROW's stored actor name. Both doubles
+     * exist in this one file on purpose: it is the one service where both sides of that boundary
+     * are exercised ten lines apart.
+     */
+    displayNamesForUserIds: vi.fn().mockResolvedValue(new Map()),
     ...over.users,
   };
   const service = new AuditTrailService(

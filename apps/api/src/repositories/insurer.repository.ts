@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
-import { INSURER_IDENTITY_SELECT } from './insurer-identity';
+import {
+  INSURER_IDENTITY_SELECT,
+  resolveInsurerCompanyFacts,
+} from './insurer-identity';
 import {
   INSURANCE_LINE_SELECT,
   OFFICE_INSURANCE_LINE_SELECT,
@@ -242,6 +245,56 @@ export class InsurerRepository {
    * to find, while offering one in a filter would invite a report on a company the office has stopped
    * placing with. Same split as the branch picker.
    */
+  /**
+   * THE ONE PLACE A REPORT LEARNS AN INSURER'S NAME, and decision 48's shape applied to a second
+   * entity: IDS IN, A MAP OUT, resolved by the resolver that already owns the question.
+   *
+   * It does NOT re-derive which name wins. `resolveInsurerCompanyFacts` is the only place that
+   * decides a registered company outranks the global catalogue, and a report that read
+   * `legalName ?? insurerMaster.legalName` itself would be a SECOND precedence for one fact — the
+   * thing decision 63 exists to remove. The screens that showed a uuid here were not short of a
+   * query; they were bypassing a resolver that was already written.
+   *
+   * BATCHED for the same reason `displayNamesForUserIds` is: these are table reads over N rows, and
+   * one query per row is how a report that works on a demonstration office stops working on a real
+   * one. A MISSING key means no such insurer row; the resolver's own `name` is non-nullable because
+   * `Insurer_has_identity` refuses a row with neither a master link nor a local name, so a key that
+   * IS present can never carry an empty name.
+   *
+   * `organizationId` is absent on purpose, exactly as the rest of this file: the tenant extension
+   * scopes `Insurer`, so a report cannot resolve another office's insurer through this.
+   */
+  async namesForInsurerIds(
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Map<string, string>> {
+    const unique = [...new Set(ids.filter((id): id is string => !!id))];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.client.insurer.findMany({
+      where: { id: { in: unique } },
+      select: {
+        id: true,
+        legalName: true,
+        legalNameAr: true,
+        companyPhone: true,
+        companyEmail: true,
+        companyWebsite: true,
+        companyCorrespondenceAddress: true,
+        insurerMaster: { select: { legalName: true, legalNameAr: true } },
+        insuranceCompany: {
+          select: {
+            legalName: true,
+            legalNameAr: true,
+            phone: true,
+            email: true,
+            website: true,
+            address: true,
+          },
+        },
+      },
+    });
+    return new Map(rows.map((r) => [r.id, resolveInsurerCompanyFacts(r).name]));
+  }
+
   searchForPicker(
     term: string,
     take: number,

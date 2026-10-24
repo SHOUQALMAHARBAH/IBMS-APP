@@ -249,6 +249,26 @@ export interface PaymentChannelView {
   /** The owning customer or insurer id (exactly one of the two is set). */
   customerId: string | null;
   insurerId: string | null;
+  /**
+   * ITEM 1 — THE OWNER'S NAME, whichever kind of owner it is. ONE field for the either-or, because
+   * the screen's column is one column: exactly one of `customerId`/`insurerId` is set (the service
+   * refuses anything else), so two name fields would be one guaranteed-null field on every row and
+   * two chances for a screen to read the wrong one.
+   *
+   * Resolved by the api through each entity's OWN resolver — `CustomerRepository.namesForCustomerIds`
+   * and `InsurerRepository.namesForInsurerIds`, the second of which goes through
+   * `resolveInsurerCompanyFacts` rather than re-deriving which name wins.
+   *
+   * REQUIRED on the view and never optional: six call sites project this view (create, two
+   * idempotent returns, disable, re-enable, list), and an optional field would let five of them
+   * keep sending nothing while the list carried a name — a name after a LIST and none after a
+   * CREATE, which is the `IncidentReport.load()` defect.
+   *
+   * NULL means the owning row is gone, never the uuid. `PaymentChannel` carries no FK to either
+   * (measured — the service checks existence in application code), so a dangling id is a real
+   * state here rather than a defensive one.
+   */
+  ownerName: string | null;
   channelType: string;
   label: string;
   bankName: string | null;
@@ -263,12 +283,17 @@ export interface PaymentChannelView {
 
 export function derivePaymentChannelView(
   row: PaymentChannelRow,
+  /** The union of both resolvers' answers. ONE Map rather than two parameters: the ids come from
+   * disjoint spaces (uuids), and a single lookup keyed on whichever id is set cannot pick the wrong
+   * one. A REQUIRED parameter, so the compiler names every call site — it named six. */
+  ownerNames: Map<string, string>,
 ): PaymentChannelView {
   return {
     id: row.id,
     ownerType: row.ownerType,
     customerId: row.customerId,
     insurerId: row.insurerId,
+    ownerName: ownerNames.get(row.customerId ?? row.insurerId ?? '') ?? null,
     channelType: row.channelType,
     label: row.label,
     bankName: row.bankName,

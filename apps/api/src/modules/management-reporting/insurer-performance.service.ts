@@ -24,6 +24,7 @@ import {
 } from './insurer-performance.config';
 import type { ListInsurerPerformanceQueryDto } from './dto/list-insurer-performance-query.dto';
 import type { ComputeInsurerPerformanceDto } from './dto/compute-insurer-performance.dto';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 export interface ComputeScoresResult {
   periodLabel: string;
@@ -48,6 +49,8 @@ export class InsurerPerformanceService {
 
   constructor(
     private readonly repo: InsurerPerformanceRepository,
+    /** Item 1 — the one resolver for an insurer's name. */
+    private readonly insurerRepo: InsurerRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -163,7 +166,10 @@ export class InsurerPerformanceService {
       afterValue: insurerPerformanceAuditSnapshot(row),
     });
 
-    return deriveInsurerPerformanceScoreView(row);
+    return deriveInsurerPerformanceScoreView(
+      row,
+      await this.insurerRepo.namesForInsurerIds([row.insurerId]),
+    );
   }
 
   async list(
@@ -173,7 +179,13 @@ export class InsurerPerformanceService {
       insurerId: query.insurerId,
       periodLabel: query.periodLabel,
     });
-    return rows.map(deriveInsurerPerformanceScoreView);
+    /* BATCHED, and this is the call site the batching exists for: an unfiltered list is every
+     * insurer this office scores, so one lookup per row is how a report that works on a
+     * demonstration office stops working on a real one. */
+    const names = await this.insurerRepo.namesForInsurerIds(
+      rows.map((r) => r.insurerId),
+    );
+    return rows.map((r) => deriveInsurerPerformanceScoreView(r, names));
   }
 
   async latest(insurerId: string): Promise<InsurerPerformanceScoreView> {
@@ -183,7 +195,10 @@ export class InsurerPerformanceService {
         `No performance score has been computed yet for insurer ${insurerId}.`,
       );
     }
-    return deriveInsurerPerformanceScoreView(row);
+    return deriveInsurerPerformanceScoreView(
+      row,
+      await this.insurerRepo.namesForInsurerIds([row.insurerId]),
+    );
   }
 
   private async computeQuoteResponseScore(

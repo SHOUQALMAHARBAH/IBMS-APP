@@ -519,6 +519,8 @@ export const COMPLIANCE_RISK = {
     // screen, resolved in `lib/audit-trail/workflow-entity-types.ts`, so the word a reader sees in this
     // list is the word at the top of the screen they came from.
     atWorkflowEntityTypeChoose: 'اختر نوع الكيان…',
+    atEntityRef: '{type} رقم {ref}',
+    atEntityTypeUnlabelled: 'نوع السجل كما هو مخزَّن',
     // The three workflow-entity words that had no label, owner decision of 2026-10-23.
     // DERIVED, never typed: each is sliced out of a string already rendering in the product —
     // «الفرص» from the corrected `/opportunities` NAV label (its `/ السوق` half belongs to the
@@ -1035,6 +1037,8 @@ export const COMPLIANCE_RISK = {
     atToLabel: 'To',
     atWorkflowEntityTypeLabel: 'Workflow entity type',
     atWorkflowEntityTypeChoose: 'Choose a type…',
+    atEntityRef: '{type} number {ref}',
+    atEntityTypeUnlabelled: 'record type as stored',
     workflowEntityOpportunity: 'Opportunities',
     workflowEntityEndorsement: 'Endorsements',
     workflowEntityInvoice: 'Invoices',

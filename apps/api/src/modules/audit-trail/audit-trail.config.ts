@@ -142,6 +142,22 @@ export interface DocumentVersionView {
   category: DocumentCategory;
   classification: DataClassification;
   uploadedByUserId: string;
+  /**
+   * WHO UPLOADED IT, BY NAME — item 1, through decision 48's resolver (the HR record where the
+   * account is linked). The screen rendered the raw uuid, which on a document HISTORY identifies
+   * nobody: the whole point of the column is which colleague filed this version.
+   *
+   * NULLABLE, AND MY FIRST VERSION OF THIS COMMENT CLAIMED AN FK THAT DOES NOT EXIST.
+   * `Document.uploadedByUserId` is a bare `String` with NO `User` relation — one of the four models
+   * register entry 127 measured — so the column is NOT NULL but the account it names CAN be gone,
+   * and the resolver can legitimately return nothing. The em dash on the screen is therefore a real
+   * state rather than dead code, and the view must not promise a string it cannot supply.
+   *
+   * THIS IS A DOCUMENT-VERSION ROW, NOT AN AUDIT ROW. The boundary decision 48 drew applies to
+   * `AuditLogEntryView.actorName`, which stays the STORED name; a version row is a register of who
+   * filed what, so it takes the resolver like any other register.
+   */
+  uploadedByName: string | null;
   deletionLocked: boolean;
   deletionOverrideByUserId: string | null;
   createdAt: string;
@@ -162,6 +178,8 @@ export interface DocumentHistoryView {
 export function buildDocumentVersionViews(
   chain: DocumentVersionRow[],
   requestedDocumentId: string,
+  /** REQUIRED, so a caller that forgets does not compile — the `IncidentReport.load()` lesson. */
+  uploaderNames: Map<string, string>,
 ): DocumentVersionView[] {
   return [...chain]
     .sort((a, b) => a.versionNumber - b.versionNumber)
@@ -172,6 +190,8 @@ export function buildDocumentVersionViews(
       category: v.category,
       classification: v.classification,
       uploadedByUserId: v.uploadedByUserId,
+      // NEVER the uuid as a fallback — that is the defect this closes, one branch down.
+      uploadedByName: uploaderNames.get(v.uploadedByUserId) ?? null,
       deletionLocked: v.deletionLocked,
       deletionOverrideByUserId: v.deletionOverrideByUserId,
       createdAt: v.createdAt.toISOString(),

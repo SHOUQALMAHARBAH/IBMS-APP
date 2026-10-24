@@ -6,6 +6,8 @@ import { apiGet } from '../auth/api-client';
 export interface CancelledPolicyRow {
   policyId: string;
   policyNumber: string | null;
+  /** Owner decision 50 — the customer's own name, for a policy with no number yet. */
+  customerName: string;
   insuranceLine: string;
   reason: string;
   cancelledAt: string;

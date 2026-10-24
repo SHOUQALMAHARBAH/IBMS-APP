@@ -146,7 +146,21 @@ export class AuditTrailService {
       throw new NotFoundException(`Document ${documentId} not found.`);
     }
 
-    const versions = buildDocumentVersionViews(chain, documentId);
+    /*
+     * Item 1 — the uploader by NAME, through decision 48's resolver. One query for the whole
+     * version chain, never one per version.
+     *
+     * NOTE THE BOUNDARY HOLDS HERE IN ONE METHOD: the VERSIONS take the resolver because a version
+     * row is a register of who filed what, and the `auditRows` below keep the STORED name, because
+     * an audit row records what was stored. Both shapes, ten lines apart, on purpose.
+     */
+    const versions = buildDocumentVersionViews(
+      chain,
+      documentId,
+      await this.users.displayNamesForUserIds(
+        chain.map((v) => v.uploadedByUserId),
+      ),
+    );
     const auditRows = await this.repo.findDocumentAuditTrail(
       chain.map((v) => v.id),
       AUDIT_TRAIL_READ_LIMIT,

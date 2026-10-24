@@ -18,6 +18,7 @@ import {
 } from './employee-performance.config';
 import type { ListEmployeePerformanceQueryDto } from './dto/list-employee-performance-query.dto';
 import type { ComputeEmployeePerformanceDto } from './dto/compute-employee-performance.dto';
+import { EmployeeRepository } from '../../repositories/employee.repository';
 
 export interface ComputeRecordsResult {
   periodLabel: string;
@@ -43,6 +44,8 @@ export class EmployeePerformanceService {
 
   constructor(
     private readonly repo: EmployeePerformanceRepository,
+    /** Item 1 — the one place a report learns a colleague's name from their HR record. */
+    private readonly employeeRepo: EmployeeRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -179,7 +182,10 @@ export class EmployeePerformanceService {
       afterValue: employeePerformanceAuditSnapshot(row),
     });
 
-    return deriveEmployeePerformanceRecordView(row);
+    return deriveEmployeePerformanceRecordView(
+      row,
+      await this.employeeRepo.namesForEmployeeIds([row.employeeId]),
+    );
   }
 
   async list(
@@ -190,7 +196,12 @@ export class EmployeePerformanceService {
       periodLabel: query.periodLabel,
       branchId: query.branchId,
     });
-    return rows.map(deriveEmployeePerformanceRecordView);
+    /* BATCHED. An unfiltered list is every scored colleague in the office, and one lookup per row
+     * is how a report that works on a demonstration office stops working on a real one. */
+    const names = await this.employeeRepo.namesForEmployeeIds(
+      rows.map((r) => r.employeeId),
+    );
+    return rows.map((r) => deriveEmployeePerformanceRecordView(r, names));
   }
 
   async latest(employeeId: string): Promise<EmployeePerformanceRecordView> {
@@ -200,7 +211,10 @@ export class EmployeePerformanceService {
         `No performance record has been computed yet for employee ${employeeId}.`,
       );
     }
-    return deriveEmployeePerformanceRecordView(row);
+    return deriveEmployeePerformanceRecordView(
+      row,
+      await this.employeeRepo.namesForEmployeeIds([row.employeeId]),
+    );
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {

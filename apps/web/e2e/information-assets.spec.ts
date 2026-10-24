@@ -29,6 +29,8 @@ const ASSET = {
   name: "Customer Data Warehouse",
   assetType: "customer_data",
   ownerUserId: "user-2",
+  // Item 1 — the accountable colleague's name, resolved by the api through decision 48's resolver.
+  ownerName: "سامر عبدالله الحوراني",
   classification: "HIGHLY_CONFIDENTIAL",
   createdAt: "2026-09-20T09:00:00.000Z",
 };
@@ -42,6 +44,23 @@ test("renders the information asset list with the create form", async ({ page })
   await page.goto("/information-assets");
   await expect(page.getByRole("heading", { name: "Information Assets" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "Customer Data Warehouse" })).toBeVisible();
+
+  /*
+   * ITEM 1 — THE ACCOUNTABLE COLLEAGUE BY NAME. Written because the spec passed the moment the
+   * view landed without observing it: every assertion here reads the asset's own NAME, so the raw
+   * row and the view are indistinguishable to them.
+   *
+   * This is the register whose whole purpose is saying WHO is accountable for a classified asset,
+   * and it was answering with a uuid. THE PAIR — the name present AND the uuid gone — because a
+   * screen rendering both would satisfy a name-only check.
+   */
+  await expect(
+    page.getByRole("cell", { name: "سامر عبدالله الحوراني" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "user-2", exact: true }),
+  ).toHaveCount(0);
+
   await expect(
     page.getByRole("heading", { name: "Record a new information asset" }),
   ).toBeVisible();

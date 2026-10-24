@@ -152,3 +152,22 @@ export const WORKFLOW_ENTITY_LABEL = {
 export const WORKFLOW_ENTITY_TYPES = Object.keys(
   WORKFLOW_ENTITY_LABEL,
 ) as WorkflowEntityType[];
+
+/**
+ * Is this stored string one of the eighteen? — OWNER DECISION 49.
+ *
+ * `AuditLogEntry.entityType` and `SlaTimer.entityType` are both bare `String` columns: an OPEN set
+ * that records every model the product touches. Measured 2026-10-23: dev holds 32 distinct values
+ * and db-test 139, against the eighteen that have a workflow. So a screen reading that column
+ * cannot assume a label exists and must ASK.
+ *
+ * Derived from the same total map as `WORKFLOW_ENTITY_TYPES`, so it cannot disagree with the union
+ * or with the dropdown — the whole reason neither is written out a second time. A type predicate
+ * rather than a boolean, so `WORKFLOW_ENTITY_LABEL[type]` is reachable without a cast at the call
+ * site, and a cast is where a guard becomes optional.
+ */
+export function isWorkflowEntityType(
+  type: string,
+): type is WorkflowEntityType {
+  return Object.prototype.hasOwnProperty.call(WORKFLOW_ENTITY_LABEL, type);
+}

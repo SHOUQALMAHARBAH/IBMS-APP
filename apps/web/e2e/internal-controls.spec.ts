@@ -61,6 +61,8 @@ const DIRTY_REPORT = {
       makerField: "issuedByUserId",
       checkerField: "checkedByUserId",
       userId: "user-x",
+      // Item 1 — the colleague who did both halves, by name.
+      userName: "سامر عبدالله الحوراني",
       dbCheckConstraint: null,
     },
   ],
@@ -106,7 +108,23 @@ test("surfaces a detected violation prominently", async ({ page }) => {
     page.getByRole("heading", { name: "Self-approval violations found" }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: "pc-1" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "user-x" })).toBeVisible();
+
+  /*
+   * ITEM 1 — RE-POINTED, AND THE REVERSAL IS STATED. This asserted the cell reading `user-x`, the
+   * actor's uuid, which was correct until the api started resolving the name. The property it was
+   * about — the violating colleague is identifiable on the row — is kept and STRENGTHENED: the
+   * name present AND the uuid gone, because a screen rendering both would pass a name-only check.
+   *
+   * The RECORD id beside it (`pc-1`) stays a uuid by decision 49 and is deliberately still
+   * asserted: fifteen maker/checker entity types, nine of them with no Arabic word yet, so a type
+   * word cannot be rendered without inventing one.
+   */
+  await expect(
+    page.getByRole("cell", { name: "سامر عبدالله الحوراني" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "user-x", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

@@ -51,6 +51,14 @@ export const DEFAULT_RENEWAL_WINDOW_DAYS = 90;
 export interface CancelledPolicyRow {
   policyId: string;
   policyNumber: string | null;
+  /**
+   * OWNER DECISION 50 — the customer's own name. A policy has NO NUMBER until issuance, so that
+   * fallback branch really renders (unlike the three this product's own measurement records as
+   * structurally impossible), and the dashboard rendered the internal uuid there.
+   *
+   * Whoever reads this dashboard is looking for the DEAL and knows its customer, not its id.
+   */
+  customerName: string;
   insuranceLine: string;
   reason: string;
   cancelledAt: string;

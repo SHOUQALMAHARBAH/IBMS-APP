@@ -109,6 +109,7 @@ test("a policy number sitting next to an Arabic insurance-line label are each is
       {
         policyId: "pol-1",
         policyNumber,
+        customerName: "شركة اليرموك للتأمين",
         insuranceLine,
         reason: "Client sold the insured vehicle.",
         cancelledAt: "2026-08-15T00:00:00.000Z",

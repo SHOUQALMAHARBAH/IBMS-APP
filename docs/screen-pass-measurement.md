@@ -321,20 +321,84 @@ The three screens still flagged were read one at a time, which is what that scri
 
 **SO THE TWO BUDGETS DO NOT MOVE, AND THAT IS THE HONEST RESULT RATHER THAN A MISS.** Lowering them would mean loosening the detector in the direction that produces FALSE NEGATIVES: `\.length\s*>\s*0` also matches `{x.length > 0 && <list>}`, which renders nothing when empty and IS the defect, and a `No[A-Z]` key pattern would match `NoFloor` and `NoTerm` on screens that have no empty state at all. A gate that reports a clean nothing is the failure this repository has paid for four times; a gate with two read exceptions is not.
 
-### WHAT REMAINS OPEN, AND WHOSE EACH ROW IS
+### WHAT REMAINS OPEN, AND WHOSE EACH ROW IS — FINAL, 2026-10-24 (batch eight)
 
-| what | count | whose | why it is open |
+`RENDERED_IDENTIFIER_BUDGET` is **10**, down from **29** when the pass opened. Batch eight closed
+**eight**: the four it was given (three dashboard aggregates, one either-or) plus three user names
+and decision 50's reachable fallback. It answered three more by ruling rather than by code, and
+found one to be an instrument artefact. The budget is held in TWO independent homes
+(`scripts/measurements/rendered-identifiers.py` and `apps/web/test/screen-copy.test.ts`, each with
+its own detector) and both were lowered together; the committed plant
+`rendered-identifier-budget-raised` is pointed at 10.
+
+| what | count | whose | state |
 |---|---|---|---|
-| rendered identifiers — records with NO HANDLE | 6 | **module 7** | Owner decision 46. A readable handle for a settlement, an opportunity, a needs assessment or a retention schedule item means inventing this product's FIRST numbering scheme, and all four families live in module 7, whose money is frozen. The four-state `recordHandle` field is the answer until then. DEFERRED-BY-DECISION, not open work. |
-| rendered identifiers — polymorphic `entityId` | 3 | **the owner** | `/audit-trail`, `/internal-controls`, `/sla-dashboard`. The audit log's `entityType` is an OPEN set, so a label map is `t(undefined)` and a NAME needs a per-type resolver over every entity the log can name. `/internal-controls`' is the narrow one — its fifteen maker/checker pairs ARE a closed list. **The question: resolve a name per entity type, or render the type and the id and accept that this one column addresses anything?** |
-| rendered identifiers — a reachable fallback | 1 | **the owner** | `/dashboards/policy`'s `policyNumber ?? policyId`. A policy has no number until issuance, so that branch really renders. **The question: what should a not-yet-issued policy be called on a dashboard?** |
-| rendered identifiers — dashboard AGGREGATES | 3 | engineering | insurer and employee names on `/dashboards/insurer-employee-performance` and `/planning-export`. The row is an aggregate, so the name joins the aggregation rather than a read — a different shape from the nine closed so far, not a decision. |
-| rendered identifiers — an either-or | 1 | engineering | `/payment-channels`' `customerId ?? insurerId`. The customer half is an include; the insurer half needs the master-vs-local plus AR/EN resolution the insurer view already owns, so it wants that resolver shared rather than a second answer to *what is this insurer called*. |
-| rendered identifiers — USER names | 4 | engineering | `/audit-trail`'s document uploader, `/information-assets`' owner, `/internal-controls`' scan actor, `/vendors/[id]`'s DPO approver. All four are now mechanical: decision 48's resolver takes IDS, so each is a CALL. The fifth of the group closed in batch seven. |
-| four-states — two budgets at 2 and 1 | 3 rows | engineering | all three read and recorded above; none is a defect and the budgets hold. |
-| four-states — permission refusal | 9 | engineering | unchanged and all read: a detail page answers 404 not 403 on purpose, and `/settings/security` must stay ungated. |
-| two capabilities with no door | 2 | **their modules** | nobody can be made responsible for a service request (owed to customer-service), and an office cannot see its sanctions-match thresholds (owed to compliance). Both REAL, both DEFERRED-BY-DECISION. |
-| `PUT /auth/security-config` | 1 | **employees-and-permissions** | decision 47 — the READ half shipped; changing the seven is a policy decision whose home is beside the other sign-in policies. |
-| a kind marker on `/consent` | 1 word | **the owner** | the register no longer says whether a subject is a lead or a customer, because the `Lead ` prefix it used was hardcoded ENGLISH. `navLeads` ships only the plural «العملاء المحتملون» and the singular is morphology nobody here may invent. |
+| records with NO HANDLE | 6 | **module 7** | DEFERRED-BY-DECISION (owner decision 46). A readable handle means inventing this product's first numbering scheme, and all four families live in module 7, whose money is frozen. The four-state `recordHandle` field answers until then. |
+| `/audit-trail`'s polymorphic `entityId` | 1 | **ANSWERED** | OWNER DECISION 49 — the type's own Arabic word plus the number, never a name, because `entityType` is a bare `String`: an OPEN set. **Measured: dev holds 32 distinct values, db-test 139**, against eighteen labels, and on db-test **122 of 139 fall in the fallback**. The id still renders and still counts, which the ruling accepts: *the unknown is DECLARED, not approximated.* |
+| `/internal-controls`' `entityId` | 1 | **the owner** | STOPPED AND REPORTED — register entry 133. Its set IS closed (15 maker/checker pairs, closed by a CI gate rather than by convention), so decision 49's test says NAME — and **only 6 of the 15 have a decision-41 word**, so delivering it means writing NINE Arabic words, which the same ruling forbids. Its USER column was closed in this batch; its RECORD column renders the type AS STORED beside the number. |
+| `/sla-dashboard`'s `entityId` | 1 | **the owner** | Same finding, same shape, same entry: 16 types, **7 with a word, NINE without**. Reported rather than half-built, because a map naming seven of sixteen renders a member name for the other nine — the notification-bell defect. |
+| `/vendors/[id]`'s DPO approver | 1 | engineering, **not closable** | A DETECTOR FALSE POSITIVE — register entry 134. The id's single occurrence is a PRESENCE TEST (`!dpa.dpoApprovedByUserId`) gating the approve control; **no uuid reaches a reader**. The budget cannot fall for it without loosening the detector toward false negatives, so it stays counted and is declared instead. The real gap is the opposite one: the screen says WHETHER a DPA was approved and never BY WHOM. |
+| four-states — 2 empty-state, 1 load-error | 3 rows | engineering | all three READ and none a defect; the budgets hold. Lowering them needs the detector loosened toward FALSE NEGATIVES. |
+| four-states — permission refusal | 9 | engineering | unchanged and all read. |
+| two capabilities with no door | 2 | **their modules** | entries 129 and 130. |
+| `PUT /auth/security-config` | 1 | **employees-and-permissions** | decision 47. |
 
-**THE PASS IS THEREFORE SHUT ON EVERY FAULT IT CAN SHUT, AND EVERY REMAINING ROW HAS A NAME AGAINST IT.** Nothing above is unaccounted for and nothing is a zero that was never measured — which is the whole difference between closing a pass and declaring one closed.
+**6+1+1+1+1 = 10.**
+
+### WHAT BATCH EIGHT CLOSED, AND WHAT EACH ONE COST
+
+| screen | identifier | how | cost |
+|---|---|---|---|
+| `/audit-trail` | document-version uploader | `uploadedByName` on the view, through decision 48's resolver | a required third parameter on `buildDocumentVersionViews` |
+| `/dashboards/policy` | `policyNumber ?? policyId` | decision 50 — the customer's name plus a state word | one include widened; register entry 131 records the nine `PolicyStatus` words owed |
+| `/dashboards/insurer-employee-performance` | `insurerId`, `employeeId` | `insurerName` + `employeeName`, each through its own entity's resolver | two new batched resolvers; two column headings corrected from «معرّف …» by SLICING |
+| `/planning-export` | `insurerId` | the SAME `InsurerPerformanceScoreView` — one change, two screens | one batched resolve covering the union of both sections |
+| `/payment-channels` | `customerId ?? insurerId` | ONE `ownerName` field for the either-or, one Map keyed on whichever id is set | `CustomerRepository.namesForCustomerIds` added; `pcOwnerIdLabel` withdrawn, `pcColOwnerType` derived |
+| `/information-assets` | `ownerUserId` | **a view layer this module did not have** — the service returned the raw Prisma row from all four paths | `InformationAssetView` + a required Map parameter |
+| `/internal-controls` | scan actor `userId` | `SelfApprovalViolationView` — the classifier's output PLUS the name | a required third parameter on the report builder, because which ids matter is unknown until classification has run |
+
+**FOUR BATCHED RESOLVERS NOW EXIST AND EACH SITS ON ITS OWN ENTITY'S REPOSITORY** —
+`UserRepository.displayNamesForUserIds` (decision 48, batch seven),
+`InsurerRepository.namesForInsurerIds`, `EmployeeRepository.namesForEmployeeIds`,
+`CustomerRepository.namesForCustomerIds`. All four take IDS and return a Map; a MISSING key reports
+NO NAME, never the uuid. **A fifth must not be a second answer to a question one of these already
+owns** — which is the finding register entry 132 records against `insurerName`'s thirteen remaining
+call sites.
+
+**THE PASS IS THEREFORE SHUT ON EVERY FAULT IT CAN SHUT, AND EVERY REMAINING ROW HAS A NAME AGAINST
+IT.** Nothing above is unaccounted for and nothing is a zero that was never measured — which is the
+whole difference between closing a pass and declaring one closed.
+
+## 10. EVERY STRING THE OWNER MUST SEE OR WRITE — the walk reads from here
+
+One place, complete, with each row's state named. **SHIPPED-AWAITING-CONFIRMATION** means the words are live in the product and she is being asked to confirm them; **NOT-YET-WRITTEN** means the product is rendering something else — a member name, a type as stored, or nothing — until she supplies a word. A reader cannot guess which is which, so neither is left implied.
+
+### SHIPPED-AWAITING-CONFIRMATION — live now, hers to confirm
+
+| what | strings | where | note |
+|---|---|---|---|
+| the seven security-configuration labels and their meanings | 14 | `secCfg*Label` / `secCfg*Meaning` in `translations/operations.ts` | decision 47, **her own words, transferred verbatim**. The English is mine. |
+| the four retrieval-basis texts | 13 | `rdBasis*` in `translations/pdpl.ts` | decision 45, **hers verbatim** — three named parts plus a shared line, and `OTHER` carries a fourth. |
+| «مدّة الخمول» on the idle-timeout plural | 5 forms | `secIdleTimeoutMinutes` in `plurals.ts` | decision 4 of batch eight's brief — «مدّة» replacing «مهلة», DERIVED by slicing her own `secCfgIdleLabel`. |
+| «(اسم العميل) — قبل الإصدار» | 1 | `dpolBeforeIssuance` in `translations/dashboards.ts` | **owner decision 50, hers.** See the LIMIT below — it stands in for a status that cannot yet be named. |
+| «عميل محتمل» | 1 | `consSubjectLead` in `translations/pdpl.ts` | **owner decision 51, hers** — the singular of the plural already in `leadsHeading`/`navLeads`. |
+| «{type} رقم {ref}» and the fallback label | 2 | `atEntityRef`, `atEntityTypeUnlabelled` in `translations/compliance-risk.ts` | decision 49's shape. «رقم» already ships 89 times; the pattern is mine, built around her «وثيقة رقم …». |
+| the DPO combined-assignment notice | 2 | `dpoAssignNotice`, `dpoAssignAcknowledge` | **hers, pinned by `sha256 eecf5f3b…`** — a changed hash means somebody reworded a legal notice she wrote. |
+| the no-floor retention declaration | 2 | `rdNoFloor*` | **hers, pinned by `sha256 b47fe02b…`**. |
+| the eighteen workflow-entity words | 18 | `WORKFLOW_ENTITY_LABEL` | decision 41 — every one SLICED from a string already in the product, none typed. |
+| the two import outcome words | 2 | `DUPLICATE` / `BAD_DATA` in the import panel | her decision; the second is an INSTRUCTION, not a label, and must not be shortened into a noun phrase. |
+| 230 permission descriptions | 230 AR | `translations/permissions.ts` | hers. **215 still carry the CARRIED ENGLISH hint** (`CARRIED_ENGLISH_BUDGET`), which is a separate, measured backlog rather than a gap in the Arabic. |
+| 55 reference-table Arabic descriptions | 46 still OWED | the generated reference-values export | hers; the export's own figure self-corrects as she writes. |
+| three column headings corrected from «معرّف …» | 3 | `diepColInsurer`, `diepColEmployee` in `translations/dashboards.ts`; `pcColOwnerType` in `translations/finance.ts` | **batch eight item 1, and every one DERIVED rather than typed.** Three columns that used to render a uuid now render a name, so a heading saying *identifier* had become false. «شركة التأمين» and «الموظف» are the existing strings with their own first word («معرّف») sliced off; «نوع الجهة المالكة» is `pcOwnerTypeAria`'s text, already in the product. `pcOwnerIdLabel` was WITHDRAWN in both languages rather than left declared-and-unused. |
+
+### NOT-YET-WRITTEN — the product is rendering something else until she supplies these
+
+| what | how many | what renders today | why it is not written |
+|---|---|---|---|
+| the nine PolicyStatus words | 9 | «قبل الإصدار», a GENERAL phrase | **the limit behind decision 50.** Measured: `PolicyStatus` has nine members (PLACEMENT_CONFIRMED, ISSUED, CHECKING_IN_PROGRESS, DISCREPANCY, VERIFIED, DELIVERED, ACTIVE, CANCELLED, EXPIRED) and NOT ONE has an Arabic label anywhere in the i18n tree. When the policy module writes them, that dashboard takes the EXACT status instead. |
+| `/internal-controls`' 9 missing entity words | 9 | the member name AS STORED, beside the record's uuid — and the USER column now carries a NAME | `AccessRecertificationItem`, `CommissionLedgerEntry`, `DataProcessingAgreement`, `DataSharingApproval`, `PolicyChecking`, `Recommendation`, `Refund`, `RetentionScheduleItem`, `Settlement`. Decision 49 says NAME for a closed set, and this set IS closed — by `check:maker-checker-pairs`, not by convention — but only **6 of 15** have a word, so naming it means writing these nine. Register entry 133. |
+| `/sla-dashboard`'s 9 missing entity words | 9 | the member name AS STORED, beside the timer's uuid | `AccessDeprovisioningChecklist`, `AccessRecertificationCycle`, `ConsentRecord`, `DataSharingApproval`, `DpiaScreening`, `LegalHold`, `ScreeningMatch`, `ServiceRequest`, `Vendor`. Same shape, same entry: **7 of 16** have a word. A map naming seven and silently rendering a member name for nine is the notification-bell defect, which is why neither screen was half-built. |
+| the two Arabic names for the two codes awaiting review | 2 | the lines are live | `AWAITING_OWNER_REVIEW` declares which permission descriptions were written by a coordinator rather than by her — decision 94's pass is hers. |
+| the fourteen unsourced retention categories | 14 | no floor, and the row SAYS so | her lawyer's question, not a wording one: a period beside an article number is a legal opinion. |
+
+**NOTHING ELSE IS OUTSTANDING AS COPY.** Every other string this pass touched was either DERIVED from one already shipping (the rule throughout: a slice cannot put a combining mark in the wrong order, which renders identically and compares unequal) or is English, which is written by whoever ships it.
