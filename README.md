@@ -1561,6 +1561,44 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### ACCEPTED 2026-10-24 — ONE known high-severity advisory ships, and it is unreachable
+
+Two high advisories were published on 2026-10-23, after the last green CI run. **One is
+FIXED and one is ACCEPTED**, which are different states and are not blurred here:
+
+* **`body-parser` — FIXED.** GHSA-27r3-jxmh-p828 (DoS via trailing bytes after a
+  compressed request body), vulnerable `< 2.4.0`. `express` declares `^2.2.1`, so the fix
+  is inside its own range and `npm update body-parser` reached it; the floor is now
+  declared as an override (`^2.4.0`) so a lockfile regeneration cannot resolve back inside
+  the vulnerable range.
+* **`multer` — ACCEPTED, with a review date of 2026-11-24.** GHSA-q7qp-rjg7-q26m, DoS via
+  a pending **asynchronous** `fileFilter` after request teardown, first patched in 2.5.0.
+  **There is no upgrade path**: `@nestjs/platform-express` pins multer at an EXACT `2.4.0`
+  and every published version through 12.2.0 still does, so raising the pinning package
+  reaches nothing. **And every mechanism that forces 2.5.0 breaks something, proven by
+  running the upload route**: a root override makes npm drop multer from the tree
+  ENTIRELY — the gate then goes green because the package VANISHED — and a direct
+  dependency plus an override installs it and takes the customer-import e2e from 8/8 to
+  five failures, every multipart request answering 400.
+
+**The acceptance rests on the advisory's own sentence, not on our reading of it**: *uploads
+using a synchronous `fileFilter` are not affected*. Measured — `fileFilter` appears ZERO
+times in `apps/api/src`, the single upload route passes only
+`limits: { fileSize, files: 1 }`, and `@nestjs/platform-express` injects none (the string
+occurs once in its whole tree, in a `.d.ts` declaring the option as optional). `files: 1`
+also means no second file can have a filter pending while another is rejected, which is the
+mechanism the advisory describes.
+
+**ADDING A `fileFilter` ANYWHERE MAKES THAT REASONING FALSE AND THE ACKNOWLEDGEMENT MUST
+COME OUT IN THE SAME COMMIT.** This repository has already been bitten by exactly that:
+four multer advisories were accepted in 2026-09 on the same two grounds, and the
+reachability half had been false for sixteen days because a `FileInterceptor` route landed
+four days after the acknowledgement was written (`IMPROVEMENTS.md` § 1.82). **The owner
+declined that acceptance** on the ground that this system goes in front of a regulator and
+does not ship with a known accepted vulnerability, and a fix was found instead. There is
+no fix to find this time — if she declines again, the answer is to stop offering multipart
+upload, never to override the pin.
+
 ### DECLARED 2026-10-24 — the MODULE 0-ب SCREEN PASS closes as a declared state, not as a zero
 
 Every one of decision 34's six fault classes is now gated in CI, and the remaining rows are
