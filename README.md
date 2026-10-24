@@ -1653,17 +1653,25 @@ zero and the reason is a decision rather than unfinished work:
   interpolated — interpolating renders through `formatNumber`, which keeps digits WESTERN and
   would have silently overruled her «٢٠٠٠٠», and Arabic-Indic numerals in prose are this
   dictionary's measured convention (210 characters across 14 files). Register entry 135.
-* **TEN PARENTHETICAL STATUS MARKERS ACROSS NINE SCREENS, found only after closing the
-  detector's blind spot** — register entry 136, and this is the largest single thing left for the
-  owner. `hardcoded-ui-english.py` reported **0** for every one of those screens; the shape it
-  missed is a parenthetical, in two forms, and the diagnosis is traced pattern by pattern in the
-  script. The figure went **0 → 10**. Each marker changes how a row should be read: **`(capped)`
-  ×3 means THE NUMBER SHOWN IS NOT THE REAL NUMBER**, `(overdue)` ×3 and `(containment overdue)`
-  are **passed statutory deadlines** (a PDPL request, a breach containment clock, a regulatory
-  obligation, a BCP test), `(lapsed)` means professional-indemnity cover has **ended**. They are
-  DECLARED in `DECLARED_PARENTHETICALS` — not a raised budget: the ban stays flat at zero for
-  every other shape, and the gate fails on an undeclared finding AND on a stale row, so a
-  translation is recorded by deleting its row.
+* **~~ten parenthetical status markers~~ — ADOPTED BY THE OWNER 2026-10-24, decision 55.**
+  Eleven markers across nine screens, ten distinct strings, and the STATE is the part to read:
+  **coordinator-drafted from the MEASURED MEANING and adopted by her** — which is NOT the same
+  state as her own verbatim prose (the DPO notice, the four retrieval bases), and
+  `screen-pass-measurement.md` § 9 keeps the two apart rather than blurring them. `(capped)`
+  was the most dangerous: the loss ratio exceeded `MAX_LOSS_RATIO` and was **clamped**, so the
+  figure on screen is the CEILING and not the ratio — and the renewal workflow depends on it.
+  **One key serves `(overdue)` on three screens**, because the marker sits beside the DATE
+  there; `/incidents` keeps a longer form because its marker sits beside a SEVERITY. A wording
+  trap she ruled on is written into the code as a comment: a PI record can be the CURRENT one
+  while its cover has LAPSED, so `current` is «الحالية» (the RECORD) and never «سارية» (the
+  COVER). Register entry 137.
+* **FIVE STRINGS ON TWO MORE SCREENS, found by the detector's THIRD widening** — register
+  entry 138, declared rather than written because the owner's list is closed for now.
+  `/data-sharing-approvals` renders a PDPL register's three-state STATUS in English, and
+  `/sales-performance` renders a BUTTON LABEL. The shape is a ternary of bare literals, and
+  **the false-positive boundary is a POSITION rather than a word**: the same shape is an HTML
+  select `value=` or a `data-*` test hook on other screens, where nobody reads it, and flagging
+  those is the noise that gets a gate loosened. Both exclusions are self-test cases.
 * **`/vendors/[id]`'s remaining row is a DETECTOR FALSE POSITIVE** — register entry 134. The
   id's only occurrence is a presence test gating the approve control, so **no uuid reaches a
   reader**, and the budget cannot fall for it without loosening the detector toward false

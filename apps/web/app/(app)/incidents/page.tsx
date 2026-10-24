@@ -242,7 +242,12 @@ export default function IncidentsPage() {
                   <td style={cell}>{inc.title}</td>
                   <td style={cell}>
                     {t(ENUM_LABEL.IncidentSeverity[inc.severity])}
-                    {inc.isContainmentOverdue ? " (containment overdue)" : ""}
+                    {/* Owner decision 55 — the LONGER form, because this marker sits beside the
+                        incident's SEVERITY rather than beside a date, so a reader who is not told
+                        WHICH clock expired cannot work it out from the row. */}
+                    {inc.isContainmentOverdue
+                      ? ` ${t("statusContainmentOverdue")}`
+                      : ""}
                   </td>
                   <td style={cell}>
                     {t(ENUM_LABEL.IncidentStatus[inc.status])}

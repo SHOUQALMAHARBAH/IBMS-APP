@@ -166,17 +166,96 @@ NOT_A_LABEL = {
 #
 # Keyed on `screen|string` exactly, so this cannot become a hiding place for a DIFFERENT kind of
 # finding on the same screen — a `PROSE` or `ONE_WORD_LABEL` hit still fails flat.
+# FAILURE MODE 8 — A TERNARY OF BARE STRING LITERALS IN A JSX TEXT POSITION. Found by the OWNER
+# while measuring the meaning of the nine declared parentheticals, with this script reporting
+# CLEAN for both screens. The third distinct shape it has missed, and the third found by a
+# person reading a screen rather than by the instrument:
+#
+#   {p.isCurrent ? 'current' : 'past'}            /operational-pi-risk
+#   {it.isSubmitted ? 'submitted' : 'pending'}    /regulatory-compliance
+#
+# Why all seven patterns above miss it: PROSE and ONE_WORD_LABEL need a capital; TEMPLATE_PROSE
+# needs backticks and two words; BARE_TEXT_LINE's class excludes braces and quotes; and the
+# two parenthetical patterns need parentheses. A lowercase single word inside single quotes
+# inside a brace expression matches nothing.
+#
+# THE FALSE-POSITIVE BOUNDARY IS THE HARD PART HERE, AND IT IS A POSITION RATHER THAN A WORD.
+# The same shape appears constantly as an ATTRIBUTE value, where nobody reads it — the owner's
+# own search turned up two, and both are CORRECT code:
+#
+#   value={activeOnly === undefined ? 'all' : ...}   insurers/page.tsx — an HTML select value
+#   data-hr-link={u.employeeId ? 'linked' : 'none'}  settings/users/page.tsx — a test hook
+#
+# Flagging those would be noise, and noise is what gets a gate LOOSENED later — which is how a
+# detector dies. So the discriminator is POSITION: a JSX child expression is a line that is
+# ENTIRELY a brace expression, while an attribute is always preceded by `name=` or sits inside
+# a tag. Both exclusions are in the self-test with that reason, as the rejected trailing-paren
+# widening already is.
+# CORRECTED FROM ITS OWN FIRST RUN. The first version matched a PAIR of literals and so lost a
+# branch of a CHAINED ternary: `{a ? 'Approved' : b ? 'Declined' : 'Pending'}` reported two of
+# its three, because a paired match finds the LAST pair and `Approved` sits before it. That is
+# an under-count, which is the direction that looks like a clean result — so the shape is now
+# detected in two steps: the LINE is recognised as a ternary child expression, and then EVERY
+# bare literal in it is reported.
+#
+# The literal pattern requires the WHOLE quoted content to be letters and spaces, which is what
+# keeps format strings out: `'yyyy-MM-dd'` carries hyphens and cannot match, and `','` and
+# `' '` are under the three-letter floor.
+TERNARY_TEXT = re.compile(r"^\{[^{}]*\?[^{}]*:[^{}]*\}$")
+TERNARY_LITERAL = re.compile(r"'([A-Za-z]{3,}[A-Za-z ]{0,40})'")
+
 DECLARED_PARENTHETICALS = {
-    'audit-trail|(requested)',
-    'bcp-dr-plans|(overdue)',
-    'claims-analytics|(capped)',
-    'dashboards/claims|(capped)',
-    'dsr|(overdue)',
-    'incidents|(containment overdue)',
-    'operational-pi-risk|(lapsed)',
-    'regulatory-compliance|(overdue)',
-    'sla-dashboard|(drafted)',
+    # ------------------------------------------------------------------------------------------
+    # FAILURE MODE 8's FINDINGS, DECLARED 2026-10-24. NEW DECLARATIONS WITH THEIR OWN REASON —
+    # NOT survivors of the nine parentheticals, which were emptied from this very set in the same
+    # commit once owner decision 55 translated them. That distinction is the owner's instruction
+    # and it matters: a row that outlives its reason is how a gate stops meaning anything.
+    #
+    # The owner has just written ELEVEN of these words in one sitting and the list is closed for
+    # now, which is why these five are declared rather than written. Both screens are LOAD-BEARING
+    # rendered text, read one at a time rather than assumed:
+    #
+    #   `/data-sharing-approvals` — the STATUS cell of a PDPL data-sharing register. The comment
+    #   beside it on that screen already says why `Approved` is the load-bearing one: *"Approved"
+    #   is the claim being made and it is only true of a TWO-person decision*. An Arabic reader
+    #   saw the whole three-state status in English on the register that records whether sending
+    #   personal data to a third party was approved at all.
+    #
+    #   `/sales-performance` — a BUTTON LABEL, which is the one kind of string a reader has to
+    #   understand before acting rather than after. `Revise` and `Set target` are different acts
+    #   on the same control, and which one it is depends on whether a target already exists.
+    #
+    # `Approved` IS HERE BECAUSE THE DETECTOR WAS CORRECTED, not because the screen changed:
+    # failure mode 8's first version matched a PAIR of literals and lost the earliest branch of a
+    # chained ternary, reporting two of the three. That is an under-count, which is the direction
+    # that looks like a clean result.
+    'data-sharing-approvals|Approved',
+    'data-sharing-approvals|Declined',
+    'data-sharing-approvals|Pending',
+    'sales-performance|Revise',
+    'sales-performance|Set target',
 }
+# ^ THE NINE PARENTHETICALS ARE GONE FROM HERE, AND THESE FIVE ARE NOT THEM.
+#
+# The set held NINE rows for exactly one batch. All eleven markers behind them were
+# translated on 2026-10-24 (owner decision 55) and those rows were emptied IN THE SAME
+# COMMIT. The five above arrived in the same commit from a DIFFERENT shape — failure mode 8,
+# a ternary of bare literals — and carry their own dated reason.
+#
+# It held NINE rows for exactly one batch. All eleven markers behind them were translated on
+# 2026-10-24 (owner decision 55) and the set was emptied IN THE SAME COMMIT, because a declared
+# list that outlives its reason is how a gate stops meaning anything — the next hardcoded
+# string would have landed on a screen that was already declared and said nothing.
+#
+# THE STALENESS DIRECTION IS WHAT FORCED IT, which is the argument for a declared SET over a
+# count: re-measuring after the translations FAILED with six STALE rows named one by one. A
+# budget of nine would have read 'three remain' and looked like progress.
+#
+# RE-POPULATING THIS NEEDS A DATED REASON PER ROW, and a new row is a NEW declaration rather
+# than a survivor of these — the owner has just written eleven of these words in one sitting
+# and the list is closed for now. Each row must say what the marker MEANS, because that is
+# what makes it worth her time: of the nine, three meant *the figure you are reading is not
+# the real figure* and four meant *a statutory deadline has passed*.
 
 def mask_comments(src):
     """
@@ -221,6 +300,19 @@ def findings(src):
                 text = m.group(1)
                 if text not in NOT_A_LABEL and (i, text) not in out:
                     out.append((i, text + ':'))
+        # FAILURE MODE 8 — a ternary of bare literals, matched only when the line is ENTIRELY
+        # a brace expression, which is what separates a rendered child from an attribute
+        # value. Both branches are reported, because both render.
+        line = stripped.strip()
+        if TERNARY_TEXT.match(line) and len(TERNARY_LITERAL.findall(line)) >= 2:
+            # EVERY literal, not a matched pair — a chained ternary has three or more, and
+            # the first version silently dropped the earliest one.
+            for text in TERNARY_LITERAL.findall(line):
+                text = text.strip()
+                if (text.split()[0].lower() not in NOT_BARE_COPY
+                        and not ALLOW.match(text)
+                        and (i, text) not in out):
+                    out.append((i, text))
         # FAILURE MODE 7 — a parenthetical, in either of its two forms. Neither needs the
         # previous-line context failure mode 6 requires, because the paired parentheses are
         # themselves the evidence that this is a remark to a reader rather than code.
@@ -361,6 +453,55 @@ def self_test():
             "                        {p.truncated ? ` ${t('icTruncatedNote')}` : ''}\n",
             False,
         ),
+        (
+            # FAILURE MODE 8. These two lines are the real misses, byte for byte, while this
+            # script reported clean for both screens.
+            'failure mode 8a — a ternary of bare literals as JSX text',
+            "                  {p.isCurrent ? 'current' : 'past'}\n",
+            True,
+        ),
+        (
+            'failure mode 8b — the same shape, lowercase, on another screen',
+            "          {it.isSubmitted ? 'submitted' : 'pending'}\n",
+            True,
+        ),
+        (
+            # CORRECTED FROM THE RUN: the first version of failure mode 8 reported only
+            # TWO of these three, losing `Approved` to a paired match. On a PDPL
+            # data-sharing register, `Approved` is the load-bearing one — the comment
+            # beside it on that screen says so in as many words.
+            'failure mode 8c — a CHAINED ternary loses no branch',
+            "      {r.isApproved ? 'Approved' : r.isDeclined ? 'Declined' : 'Pending'}\n",
+            True,
+        ),
+        (
+            # A format string in a ternary branch is not copy, and the three-letter,
+            # letters-and-spaces-only literal pattern is what keeps it out: `yyyy-MM-dd`
+            # carries hyphens and cannot match.
+            'a date format string in a ternary is not copy',
+            "      {d ? fmt(d, 'yyyy-MM-dd') : fmt(e, 'yyyy-MM-dd')}\n",
+            False,
+        ),
+        (
+            # THE FALSE-POSITIVE BOUNDARY, and it matters more than the catch: an HTML select
+            # VALUE is not copy. Nobody reads it, and translating it would break the control.
+            # Flagging it is the noise that gets a gate loosened.
+            'an HTML select value is not rendered copy',
+            "            value={activeOnly === undefined ? 'all' : 'active'}\n",
+            False,
+        ),
+        (
+            # The same, for a TEST HOOK. `data-*` attributes are read by Playwright, not by a
+            # person, and this repository deliberately keys assertions on them.
+            'a data-* test hook is not rendered copy',
+            "          <td data-hr-link={u.employeeId ? 'linked' : 'none'}>\n",
+            False,
+        ),
+        (
+            'a ternary of TRANSLATED calls is clean',
+            "          {p.isCurrent ? t('statusRecordCurrent') : t('statusRecordPast')}\n",
+            False,
+        ),
     ]
     failures = 0
     for name, src, expected in cases:
@@ -432,8 +573,8 @@ def main():
         print('\nhardcoded-ui-english: FAILED. This platform is Arabic-first, so an '
               'untranslated string is read by nobody in the primary language. Add the key to '
               'a dictionary in lib/i18n/translations/ and render it through t(). DECLARING a '
-              'row is NOT the ordinary fix: the nine declared rows are the owner\'s own '
-              'backlog, each carrying a meaning she has to decide, and an eleventh needs the '
+              'row is NOT the ordinary fix: every declared row is one of the owner\'s own '
+              'backlog, each carrying a meaning she has to decide, and a new one needs the '
               'same.')
         return 1
     return 0

@@ -134,7 +134,11 @@ export default function ClaimsAnalyticsPage() {
                     </td>
                     <td style={cellStyle}>
                       {ratioPct(r.ratio)}
-                      {r.ratioCapped ? ' (capped)' : ''}
+                      {/* OWNER DECISION 55 — THE MOST DANGEROUS OF THE ELEVEN. The ratio exceeded
+                          `MAX_LOSS_RATIO` and was CLAMPED to fit `Decimal(7, 4)`, so the figure on
+                          screen IS THE CEILING, NOT THE RATIO — and the renewal workflow depends on
+                          that number. An Arabic reader was reading a clamped ratio as the true one. */}
+                      {r.ratioCapped ? ` ${t('statusRatioCapped')}` : ''}
                     </td>
                     <td style={cellStyle}>{formatMoney(r.periodClaims, language)}</td>
                     <td style={cellStyle}>{formatMoney(r.periodPremium, language)}</td>
@@ -148,7 +152,7 @@ export default function ClaimsAnalyticsPage() {
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {ratioPct(data.totals.ratio)}
-                    {data.totals.ratioCapped ? ' (capped)' : ''}
+                    {data.totals.ratioCapped ? ` ${t('statusRatioCapped')}` : ''}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {formatMoney(data.totals.periodClaims, language)}

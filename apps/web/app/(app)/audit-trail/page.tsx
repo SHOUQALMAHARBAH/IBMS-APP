@@ -597,7 +597,8 @@ function AuditTrailScreen() {
           <>
             <h3>{t('atColVersions')}</h3>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+              <table
+                data-testid="document-versions" style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
                 <thead>
                   <tr>
                     <th style={head}>{t('atColVersion')}</th>
@@ -613,7 +614,7 @@ function AuditTrailScreen() {
                     <tr key={v.id}>
                       <td style={cell}>
                         v{v.versionNumber}
-                        {v.isRequestedVersion ? ' (requested)' : ''}
+                        {v.isRequestedVersion ? ` ${t('statusRequestedVersion')}` : ''}
                       </td>
                       <td style={cell}>{v.fileName}</td>
                       <td style={cell}>

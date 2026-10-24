@@ -290,7 +290,7 @@ export default function SlaDashboardPage() {
                               style={{ color: 'var(--ink-secondary)' }}
                             >
                               {' '}
-                              (drafted)
+                              {tr('statusNoRegulatorySource')}
                             </span>
                           ) : null}
                         </td>

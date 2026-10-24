@@ -229,7 +229,7 @@ export default function DsrPage() {
                     <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
                     <td style={cell}>
                       {d.slaDueAt.slice(0, 10)}
-                      {d.isOverdue ? ' (overdue)' : ''}
+                      {d.isOverdue ? ` ${t('statusOverdue')}` : ''}
                     </td>
                     <td style={cell}>
                       {/* Owner decision 41 — carries this request's id into `/audit-trail`'s

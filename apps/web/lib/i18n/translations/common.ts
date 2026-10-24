@@ -10,6 +10,68 @@ export const COMMON = {
     commonLoading: 'جارٍ التحميل…',
     commonWorking: 'جارٍ التنفيذ…',
     commonSaving: 'جارٍ الحفظ…',
+    /*
+     * OWNER DECISION 55 — ONE KEY FOR THREE SCREENS, not three keys: one concept, one
+     * word, one place to change it. `/bcp-dr-plans`, `/dsr` and
+     * `/regulatory-compliance` all render it.
+     *
+     * IT NAMES NO DEADLINE, AND THAT IS MEASURED RATHER THAN TERSE: on all three the
+     * marker sits BESIDE THE DATE ITSELF, so the column already says which deadline
+     * expired. `/incidents` is the exception and keeps the longer form — see below.
+     */
+    statusOverdue: '(فات موعده)',
+    /*
+     * THE EXCEPTION, AND THE REASON IS THE LAYOUT. On `/incidents` this marker sits
+     * beside the incident's SEVERITY, not beside a date, so a reader who is not told
+     * WHICH clock expired cannot work it out from the row. Do not shorten it to
+     * `statusOverdue` for symmetry.
+     */
+    statusContainmentOverdue: '(فات موعد الاحتواء)',
+    /*
+     * THE MOST DANGEROUS OF THE ELEVEN, and the wording carries the danger rather than
+     * the mechanism. Measured: the loss ratio exceeded `MAX_LOSS_RATIO` (999.9999) and
+     * was CLAMPED to fit `LossRatio.ratio @db.Decimal(7, 4)` — so THE DISPLAYED FIGURE
+     * IS THE CEILING, NOT THE RATIO, and the renewal workflow depends on that number.
+     * An Arabic reader was reading a clamped ratio as the true one.
+     *
+     * IT DELIBERATELY DOES NOT NAME THE LIMIT, unlike decision 54's «٢٠٠٠٠», so there
+     * is NOTHING TO TIE TO `MAX_LOSS_RATIO` and no assertion is owed. A figure in the
+     * string would be a second home for that constant; *the true one is higher* is
+     * true at any ceiling.
+     *
+     * Shared by `/claims-analytics` (twice) and `/dashboards/claims`.
+     */
+    statusRatioCapped: '(بلغت الحدّ — الحقيقية أكبر)',
+    /* `/operational-pi-risk` — professional-indemnity cover has ENDED. Speaks about the
+     * COVER, which is why the record marker beside it speaks about the RECORD; see
+     * `statusRecordCurrent`. */
+    statusCoverLapsed: '(التغطية منتهية)',
+    /* `/sla-dashboard` — a DRAFTED duration carries no regulatory source, so it must
+     * not be read as one. This repository already keeps sourced and drafted SLA
+     * durations apart as a decision; this is that distinction on the screen. */
+    statusNoRegulatorySource: '(بلا سند نظاميّ)',
+    /* `/audit-trail` — this document version is the one that was REQUESTED, not a final one. */
+    statusRequestedVersion: '(النسخة المطلوبة)',
+    /*
+     * A WORDING TRAP THE OWNER RULED ON, AND IT MUST SURVIVE IN THIS COMMENT.
+     *
+     * A professional-indemnity record can be the CURRENT one while its cover has
+     * LAPSED — that is precisely the state `statusCoverLapsed` exists for. So this is
+     * «الحالية» and NOT «سارية»: «الحالية» speaks about the RECORD, «سارية» would
+     * speak about the COVER, and «سارية (التغطية منتهية)» is a contradiction on one
+     * line.
+     *
+     * DO NOT 'IMPROVE' THIS TO «سارية» LATER.
+     */
+    statusRecordCurrent: 'الحالية',
+    /* The other half of the same pair — a superseded PI record. */
+    statusRecordPast: 'سابقة',
+    /* `/regulatory-compliance` — the obligation has been filed. */
+    statusSubmitted: 'مُقدَّم',
+    /* NOT «قيد الانتظار». The English said `pending`, which reads as *being processed*;
+     * measured, `isSubmitted` is false — nothing has been filed at all, which is a
+     * different fact and the one a regulator would ask about. */
+    statusNotSubmitted: 'لم يُقدَّم',
     commonSave: 'حفظ',
     commonCancel: 'إلغاء',
     commonSearch: 'بحث',
@@ -241,6 +303,16 @@ export const COMMON = {
     commonLoading: 'Loading…',
     commonWorking: 'Working…',
     commonSaving: 'Saving…',
+    statusOverdue: '(past its deadline)',
+    statusContainmentOverdue: '(containment deadline passed)',
+    statusRatioCapped: '(at the ceiling — the true ratio is higher)',
+    statusCoverLapsed: '(cover has ended)',
+    statusNoRegulatorySource: '(no regulatory source)',
+    statusRequestedVersion: '(the requested version)',
+    statusRecordCurrent: 'current',
+    statusRecordPast: 'past',
+    statusSubmitted: 'submitted',
+    statusNotSubmitted: 'not submitted',
     commonSave: 'Save',
     commonCancel: 'Cancel',
     commonSearch: 'Search',

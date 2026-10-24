@@ -60,7 +60,9 @@ function LossRatioTable({
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.periodPremium}</td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>
                   {r.ratio}
-                  {r.ratioCapped ? ' (capped)' : ''}
+                  {/* Owner decision 55 — the displayed ratio is the CEILING, not the ratio. See
+                      `statusRatioCapped`. */}
+                  {r.ratioCapped ? ` ${t('statusRatioCapped')}` : ''}
                 </td>
               </tr>
             ))}

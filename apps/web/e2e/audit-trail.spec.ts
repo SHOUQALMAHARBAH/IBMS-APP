@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 import { anchoredAttributes, anchoredTexts, expectNone } from "./support/anchored";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -116,7 +117,23 @@ test("browses the audit log, looks up workflow history, and looks up document hi
   await page.getByLabel("Document id").fill("doc-1");
   await page.getByRole("button", { name: "Look up" }).nth(1).click();
   await expect(page.getByRole("cell", { name: "policy-schedule.pdf" })).toBeVisible();
-  await expect(page.getByText("v1 (requested)")).toBeVisible();
+  /*
+   * RE-POINTED BY OWNER DECISION 55, AND THE REVERSAL IS STATED. This asserted the literal
+   * `v1 (requested)`, where `(requested)` was hardcoded ENGLISH — an Arabic reader saw it too.
+   * It now carries a real sentence in both languages, because `(requested)` told an English
+   * reader as little as `(truncated)` did.
+   *
+   * SCOPED to the version list rather than page-wide: `check:absence` refuses a page-wide text
+   * absence, and it caught exactly that mistake of mine in CI one batch ago. The helper takes a
+   * Locator so the compiler refuses a page-wide root, and it asserts the scope VISIBLE first —
+   * scoping fixes the wrong-element failure and not the not-yet-rendered one.
+   *
+   * BOTH HALVES: the new sentence present AND the bare word gone, because a half-done
+   * replacement would render both and satisfy a presence-only check.
+   */
+  const versions = page.getByTestId("document-versions");
+  await expect(versions.getByText("v1 (the requested version)")).toBeVisible();
+  await expectAbsentWithin(versions, (s) => s.getByText("(requested)", { exact: true }));
 
   /*
    * ITEM 1 — the document VERSION's uploader by NAME, through decision 48's resolver. And note

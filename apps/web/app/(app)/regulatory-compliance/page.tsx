@@ -1088,10 +1088,16 @@ export default function RegulatoryCompliancePage() {
                     <td style={cell}>{it.obligationName}</td>
                     <td style={cell}>
                       {it.dueDate.slice(0, 10)}
-                      {it.isOverdue ? ' (overdue)' : ''}
+                      {it.isOverdue ? ` ${t('statusOverdue')}` : ''}
                     </td>
                     <td style={cell}>
-                      {it.isSubmitted ? 'submitted' : 'pending'}
+                      {/* Owner decision 55 — «لم يُقدَّم», NOT «قيد الانتظار»: the English said `pending`,
+                          which reads as BEING PROCESSED, while `isSubmitted` false means nothing has
+                          been filed at all. Different facts, and the second is the one a regulator
+                          asks about. */}
+                      {it.isSubmitted
+                        ? t('statusSubmitted')
+                        : t('statusNotSubmitted')}
                     </td>
                     <td style={cell}>{it.evidenceOfSubmissionRef ?? '—'}</td>
                     <td style={cell}>
