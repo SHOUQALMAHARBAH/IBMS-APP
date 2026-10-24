@@ -92,7 +92,18 @@ test("renders a clean audit with the per-pair breakdown", async ({ page }) => {
     page.getByRole("heading", { name: "Internal controls — self-approval audit" }),
   ).toBeVisible();
   await expect(page.getByText("None")).toBeVisible();
-  await expect(page.getByRole("cell", { name: "KYCRecord", exact: true })).toBeVisible();
+  /* RE-POINTED BY OWNER DECISION 53, AND THE REVERSAL IS STATED. This asserted the raw member
+     name `KYCRecord` in the by-pair table. That cell now renders the entity's own WORD — the KYC
+     queue's heading, which is BROADER than one record and is shipped as such on decision 53's
+     explicit instruction (narrowing it would mean writing Arabic, which is the owner's). Both
+     halves: the word present AND the member name gone, because a half-switched table would
+     satisfy a word-only check — which is exactly how this screen's OTHER table was caught. */
+  await expect(
+    page.getByRole("cell", { name: /KYC compliance queue/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "KYCRecord", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByText("(dormant)")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Self-approval violations found" }),
@@ -107,7 +118,28 @@ test("surfaces a detected violation prominently", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Self-approval violations found" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "pc-1" })).toBeVisible();
+  /*
+   * OWNER DECISION 53 — RE-POINTED, AND THE REVERSAL IS STATED. This asserted the bare record
+   * uuid `pc-1`. The cell now carries the record TYPE IN ARABIC plus that number, which is
+   * decision 49's shape for a set that is CLOSED — fifteen maker/checker entity types, closed by
+   * `check:maker-checker-pairs` rather than by convention.
+   *
+   * `PolicyChecking` is deliberately the member this fixture uses: it is the ONE of the sixteen
+   * whose word had to be SLICED rather than pointed at, because the only string naming it calls
+   * it a DISCREPANCY — which a policy-checking record may not have.
+   *
+   * THE PAIR: the type word present AND the bare-uuid cell gone, because a screen rendering both
+   * would satisfy a word-only check.
+   */
+  await expect(
+    page.getByRole("cell", { name: /Policy Checking number pc-1/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "pc-1", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("cell", { name: "PolicyChecking", exact: true }),
+  ).toHaveCount(0);
 
   /*
    * ITEM 1 — RE-POINTED, AND THE REVERSAL IS STATED. This asserted the cell reading `user-x`, the
@@ -146,7 +178,18 @@ test("internal-controls screen has no serious/critical accessibility violations 
   await mockAudit(page);
 
   await page.goto("/internal-controls");
-  await expect(page.getByRole("cell", { name: "KYCRecord", exact: true })).toBeVisible();
+  /* RE-POINTED BY OWNER DECISION 53, AND THE REVERSAL IS STATED. This asserted the raw member
+     name `KYCRecord` in the by-pair table. That cell now renders the entity's own WORD — the KYC
+     queue's heading, which is BROADER than one record and is shipped as such on decision 53's
+     explicit instruction (narrowing it would mean writing Arabic, which is the owner's). Both
+     halves: the word present AND the member name gone, because a half-switched table would
+     satisfy a word-only check — which is exactly how this screen's OTHER table was caught. */
+  await expect(
+    page.getByRole("cell", { name: /KYC compliance queue/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "KYCRecord", exact: true }),
+  ).toHaveCount(0);
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter(

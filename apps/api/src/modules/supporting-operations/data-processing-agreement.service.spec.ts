@@ -9,6 +9,7 @@ import { DataProcessingAgreementService } from './data-processing-agreement.serv
 import type { DataProcessingAgreementRepository } from '../../repositories/data-processing-agreement.repository';
 import type { VendorRepository } from '../../repositories/vendor.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { UserRepository } from '../../repositories/user.repository';
 
 function baseDpa(over: Record<string, unknown> = {}) {
   return {
@@ -26,6 +27,7 @@ function makeService(
   over: {
     dpaRepo?: Record<string, unknown>;
     vendorRepo?: Record<string, unknown>;
+    users?: Record<string, unknown>;
   } = {},
 ) {
   const dpaRepo = {
@@ -47,13 +49,25 @@ function makeService(
   // own self-approval assertions pass on the mock rather than on the code.
   const dutySegregation = segregatedOfficeDutySegregation();
 
+  /* Item 4(a) — decision 48's resolver. A REAL Map rather than an empty one, so a test asserting
+   * the assessor's or approver's name observes the code rather than the double. */
+  const users = {
+    displayNamesForUserIds: vi.fn().mockResolvedValue(
+      new Map([
+        ['assessor-1', 'سامر عبدالله الحوراني'],
+        ['dpo-1', 'ليلى محمود الزعبي'],
+      ]),
+    ),
+    ...over.users,
+  };
   const service = new DataProcessingAgreementService(
     dpaRepo as unknown as DataProcessingAgreementRepository,
+    users as unknown as UserRepository,
     vendorRepo as unknown as VendorRepository,
     audit as unknown as AuditService,
     dutySegregation,
   );
-  return { service, dpaRepo, vendorRepo, audit };
+  return { service, dpaRepo, vendorRepo, audit, users };
 }
 
 describe('DataProcessingAgreementService.create', () => {
@@ -140,6 +154,34 @@ describe('DataProcessingAgreementService.dpoApprove', () => {
         isSensitiveDataAccess: true,
       }),
     );
+  });
+
+  /*
+   * ITEM 4(a) — THE TWO PEOPLE BY NAME, ON ALL FOUR PATHS, AND THIS ASSERTION IS HERE BECAUSE A
+   * PLAYWRIGHT TEST CANNOT SEE IT. Planting `dpoApprovedByName: r.dpoApprovedByUserId` — sending
+   * the uuid as the name, the realistic edit because it always produces something to render — left
+   * `vendor-detail.spec.ts` at 7/7, because that spec MOCKS the endpoint and so supplies the field
+   * itself. A mocked endpoint cannot drop a field the api dropped. This is the layer that can.
+   *
+   * BOTH SIDES AND BOTH BRANCHES: the resolved name, and NO name rather than the uuid when the
+   * account is gone. A test asserting only the resolved name would pass against the `?? id`
+   * fallback, which is the whole defect.
+   */
+  it('names the assessor and the approver, and never falls back to a uuid', async () => {
+    const { service, users } = makeService();
+    const approved = await service.dpoApprove('dpa-1', 'dpo-1');
+    expect(approved.assessedByName).toBe('سامر عبدالله الحوراني');
+    expect(approved.dpoApprovedByName).toBe('ليلى محمود الزعبي');
+    expect(approved.dpoApprovedByName).not.toBe(approved.dpoApprovedByUserId);
+    // ONE batched resolve, both ids in one call — not two lookups per row.
+    expect(users.displayNamesForUserIds).toHaveBeenCalledTimes(1);
+
+    const { service: svc2 } = makeService({
+      users: { displayNamesForUserIds: vi.fn().mockResolvedValue(new Map()) },
+    });
+    const unnamed = await svc2.dpoApprove('dpa-1', 'dpo-1');
+    expect(unnamed.dpoApprovedByName).toBeNull();
+    expect(unnamed.assessedByName).toBeNull();
   });
 
   it('rejects a self-approval (maker/checker)', async () => {

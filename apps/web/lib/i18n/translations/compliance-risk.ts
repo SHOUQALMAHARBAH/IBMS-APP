@@ -532,6 +532,9 @@ export const COMPLIANCE_RISK = {
     // screen's `endorsementSectionHeading` said «التعديلات», a GENERAL word that would fit any
     // change anywhere; it now says «الملحقات», so the word in this dropdown and the word at the top
     // of the policy screen are one word. «ملحق» is the owner's own word in the ز.١ list.
+    /* Owner decision 53 — SLICED out of `opSourcePolicyCheckingDiscrepancy`, never typed:
+     * that string calls it a DISCREPANCY, which a policy-checking record may not have. */
+    recordEntityPolicyChecking: 'تدقيق الوثيقة',
     workflowEntityOpportunity: 'الفرص',
     workflowEntityEndorsement: 'الملحقات',
     workflowEntityInvoice: 'الفواتير',
@@ -1039,6 +1042,7 @@ export const COMPLIANCE_RISK = {
     atWorkflowEntityTypeChoose: 'Choose a type…',
     atEntityRef: '{type} number {ref}',
     atEntityTypeUnlabelled: 'record type as stored',
+    recordEntityPolicyChecking: 'Policy Checking',
     workflowEntityOpportunity: 'Opportunities',
     workflowEntityEndorsement: 'Endorsements',
     workflowEntityInvoice: 'Invoices',

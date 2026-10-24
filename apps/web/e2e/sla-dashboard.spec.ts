@@ -222,7 +222,26 @@ test("renders the summary stats, the by-workflow table and the timer list", asyn
   await expect(
     page.getByRole("cell", { name: "Customer complaint resolution", exact: true }),
   ).toHaveCount(2); // by-workflow row + at least one timer row
-  await expect(page.getByRole("cell", { name: "cmp-1", exact: false })).toBeVisible();
+  /*
+   * OWNER DECISION 53 — the tracked record's TYPE IN ARABIC plus its number. Sixteen SLA-tracked
+   * entity types, closed by the registry's own inventory spec, so decision 49's test says NAME;
+   * batch eight reported nine of them wordless and every one had a source already in the product.
+   *
+   * `Complaint` was one of the seven decision 41 already worded, so it proves the two maps point
+   * at the SAME key rather than diverging — «الشكاوى» here and on `/internal-controls`.
+   *
+   * THE PAIR, and then the bare member name, because a half-switched screen would render the
+   * stored string beside the number and satisfy a type-word-only check.
+   */
+  await expect(
+    page.getByRole("cell", { name: /Complaints number cmp-1/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "Complaint", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("cell", { name: "cmp-1", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

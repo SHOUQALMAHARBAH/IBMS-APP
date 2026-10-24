@@ -1561,43 +1561,58 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
-### ACCEPTED 2026-10-24 — ONE known high-severity advisory ships, and it is unreachable
+### OWNER DECISION 52, 2026-10-24 — one advisory is FIXED, one is recorded as NOT EXPOSED
 
-Two high advisories were published on 2026-10-23, after the last green CI run. **One is
-FIXED and one is ACCEPTED**, which are different states and are not blurred here:
+Two high advisories were published on 2026-10-23. **One is FIXED and one is recorded as
+NOT EXPOSED** — and that second wording is the owner's ruling rather than a turn of phrase.
+*The vulnerable code path does not exist in this product* is a different claim from *a known
+vulnerability has been accepted*, and the second is not ours to make: this system goes in
+front of a regulator. Do not reword either entry into the language of accepted risk.
 
 * **`body-parser` — FIXED.** GHSA-27r3-jxmh-p828 (DoS via trailing bytes after a
   compressed request body), vulnerable `< 2.4.0`. `express` declares `^2.2.1`, so the fix
-  is inside its own range and `npm update body-parser` reached it; the floor is now
-  declared as an override (`^2.4.0`) so a lockfile regeneration cannot resolve back inside
-  the vulnerable range.
-* **`multer` — ACCEPTED, with a review date of 2026-11-24.** GHSA-q7qp-rjg7-q26m, DoS via
-  a pending **asynchronous** `fileFilter` after request teardown, first patched in 2.5.0.
-  **There is no upgrade path**: `@nestjs/platform-express` pins multer at an EXACT `2.4.0`
-  and every published version through 12.2.0 still does, so raising the pinning package
-  reaches nothing. **And every mechanism that forces 2.5.0 breaks something, proven by
-  running the upload route**: a root override makes npm drop multer from the tree
-  ENTIRELY — the gate then goes green because the package VANISHED — and a direct
-  dependency plus an override installs it and takes the customer-import e2e from 8/8 to
-  five failures, every multipart request answering 400.
+  is inside its own range and `npm update body-parser` reached it; the floor is declared as
+  an override (`^2.4.0`) so a lockfile regeneration cannot resolve back inside the
+  vulnerable range.
+* **`multer` — NOT EXPOSED, reviewed 2026-11-24.** GHSA-q7qp-rjg7-q26m, DoS via a pending
+  **asynchronous** `fileFilter` after request teardown.
 
-**The acceptance rests on the advisory's own sentence, not on our reading of it**: *uploads
-using a synchronous `fileFilter` are not affected*. Measured — `fileFilter` appears ZERO
-times in `apps/api/src`, the single upload route passes only
-`limits: { fileSize, files: 1 }`, and `@nestjs/platform-express` injects none (the string
-occurs once in its whole tree, in a `.d.ts` declaring the option as optional). `files: 1`
-also means no second file can have a filter pending while another is rejected, which is the
-mechanism the advisory describes.
+**The claim is the advisory's own sentence, not our reading of it**: *any application using
+multer with an asynchronous `fileFilter` is affected... uploads using a synchronous
+`fileFilter` are not affected.* Measured — `fileFilter` appears **zero** times in
+`apps/api/src`, the api's single multipart route passes only
+`limits: { fileSize, files: 1 }`, and `@nestjs/platform-express` injects none (one
+occurrence in its whole tree, in a `.d.ts` declaring the option optional). `files: 1` also
+means no second file can sit with a filter pending while another is rejected, which **is**
+the mechanism.
 
-**ADDING A `fileFilter` ANYWHERE MAKES THAT REASONING FALSE AND THE ACKNOWLEDGEMENT MUST
-COME OUT IN THE SAME COMMIT.** This repository has already been bitten by exactly that:
-four multer advisories were accepted in 2026-09 on the same two grounds, and the
-reachability half had been false for sixteen days because a `FileInterceptor` route landed
-four days after the acknowledgement was written (`IMPROVEMENTS.md` § 1.82). **The owner
-declined that acceptance** on the ground that this system goes in front of a regulator and
-does not ship with a known accepted vulnerability, and a fix was found instead. There is
-no fix to find this time — if she declines again, the answer is to stop offering multipart
-upload, never to override the pin.
+**BOTH PREMISES ARE PINNED BY A TEST, WHICH IS THE OWNER'S CONDITION AND IS NOT OPTIONAL.**
+`apps/api/src/common/multipart-upload-exposure.inventory.spec.ts` asserts, over the WHOLE
+api source rather than one controller, that no upload route passes a `fileFilter` and none
+accepts more than one file — so **the premise fails rather than the feature**, and it fails
+for a SECOND upload route somebody adds rather than only for a change to the existing one.
+It carries a non-vacuity floor, because every assertion in it is a loop and an empty loop
+passes. Three committed plants cover both premises and the floor. **This is why that test
+exists rather than a comment**: four multer advisories were accepted here in 2026-09 on the
+same two grounds, and the reachability half had already been false for sixteen days because
+a `FileInterceptor` route landed four days after the acknowledgement was written
+(`IMPROVEMENTS.md` § 1.82).
+
+**It is a WAIT WITH A DATE, not an exemption.** The fix exists upstream in multer 2.5.0 and
+what is being waited for is Nest moving its exact pin: `@nestjs/platform-express` pins
+`multer: 2.4.0` EXACTLY and every published version through 12.2.0 still does — checked one
+at a time rather than off the latest major. Every mechanism that forces 2.5.0 breaks
+something, proven by running the upload route: a root override makes npm **drop multer from
+the tree entirely** (the gate then goes green *because the package vanished*), and a direct
+dependency plus an override takes the customer-import e2e from 8/8 to five failures, every
+multipart request answering 400.
+
+**AND REMOVING THE UPLOAD ROUTE WOULD NOT CLEAR IT** — measured, which is why that remedy
+was withdrawn. `multer` is not our dependency: it appears exactly once in the lockfile, as a
+dependency of `@nestjs/platform-express`, and is declared in no `package.json` of ours. So
+dropping the one multipart route would leave the package installed and the advisory
+standing, while costing the customer-import feature. If the record is ever declined, the
+answer is to carry the red until Nest moves its pin, never to override it.
 
 ### DECLARED 2026-10-24 — the MODULE 0-ب SCREEN PASS closes as a declared state, not as a zero
 
@@ -1619,19 +1634,39 @@ zero and the reason is a decision rather than unfinished work:
   entity's own repository** (`displayNamesForUserIds`, `namesForInsurerIds`,
   `namesForEmployeeIds`, `namesForCustomerIds`); all four take IDS and return a Map, and a
   MISSING key reports NO NAME rather than the uuid.
-* **two screens fell on the CLOSED side of owner decision 49 and still cannot be named** —
-  register entry 133. `/internal-controls` has 15 maker/checker entity types and 6 have an
-  Arabic word; `/sla-dashboard` has 16 and 7 do. Naming either means writing NINE words,
-  which the same ruling forbids (*the words already exist — do not write any*). Both render
-  the type AS STORED beside the number, which is what that ruling prescribes for an OPEN
-  set, and a map naming 7 of 16 would render a member name for the other nine.
+* **~~two screens cannot be named~~ — CLOSED 2026-10-24 by owner decision 53, and the
+  correction matters more than the fix.** Batch eight reported nine Arabic words owed on each
+  of `/internal-controls` and `/sla-dashboard`. The figures were right and the conclusion was
+  wrong: they were measured against decision 41's eighteen labels ALONE, and nothing looked
+  outside that map. **Every one of the 31 entries had a source already shipping** — fifteen of
+  sixteen distinct entries are POINTERS at the key on that entity's own screen, and one is a
+  SLICE. Not one Arabic word was typed. Six are BROADER than their member and are shipped and
+  recorded as such, on the DisposalBatch precedent, because narrowing means writing.
+  `record-entity-types.test.ts` asserts each map is TOTAL over its source of truth read from
+  the api, so a sixteenth maker/checker pair fails by name on the commit that adds it.
+  **Both rows still count against the budget**, because both screens still print the record's
+  NUMBER beside its type: those records have no readable handle (decision 44).
+* **`/internal-controls` renders `(dormant)` and `(truncated)` in literal English** — register
+  entry 135, found while switching that screen's words. Both are load-bearing: `(truncated)`
+  means the scan hit its limit and the report is INCOMPLETE for that pair. Neither word has a
+  source anywhere in the i18n tree, so neither is derivable, and `hardcoded-ui-english.py`
+  reports 0 for that screen — the shape it misses is a lowercase parenthesised word in JSX.
 * **`/vendors/[id]`'s remaining row is a DETECTOR FALSE POSITIVE** — register entry 134. The
   id's only occurrence is a presence test gating the approve control, so **no uuid reaches a
   reader**, and the budget cannot fall for it without loosening the detector toward false
   negatives. The real gap is the opposite one: that screen reports WHETHER a DPA was approved
   and never BY WHOM.
-* **`insurerName` IS A SECOND PRECEDENCE AND HAS THIRTEEN LIVE CALL SITES** — register entry
-  132. It never consults `insuranceCompany`, so for an insurer linked to a registered company
+* **`insurerName` IS A SECOND IMPLEMENTATION OF AN ALREADY-DECIDED RULE, with TWELVE live call
+  sites — and FIVE documents that leave the office carry it**, not two: the invoice, the
+  certificate of insurance, the policy schedule summary, the broker recommendation report and
+  the quote comparison. Read `docs/insurer-name-precedence.md` — every call site with what it
+  prints and who reads it. **There is nothing to decide about precedence**:
+  `insurer-identity.ts` already states it in prose and code (registered company, then
+  catalogue, then the office's own row — *most authoritative: the company's own record of
+  itself*), which is decision 48's shape one entity over, and nothing contradicts it. So this
+  is mechanical, not a judgement. **THE ORDERING CONSTRAINT IS RECORDED IN BOTH ENTRY 132 AND
+  ENTRY 120: the precedence is fixed IN THE SAME BATCH that makes linking possible, never
+  after it** — register entry 132. It never consults `insuranceCompany`, so for an insurer linked to a registered company
   it answers the CATALOGUE name while `/insurers` answers the COMPANY name. **Measured, the
   defect is LATENT: no `Insurer` row on either database carries an `insuranceCompanyId`**
   (dev 0 of 19, db-test 0 of 306), so nothing renders a wrong name today and it goes live on

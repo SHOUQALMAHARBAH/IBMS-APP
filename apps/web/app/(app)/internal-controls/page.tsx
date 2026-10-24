@@ -15,6 +15,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { makerCheckerEntityLabel } from '../../../lib/audit-trail/record-entity-types';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -295,18 +296,57 @@ export default function InternalControlsPage() {
                 >
                   <thead>
                     <tr>
-                      <th style={leftHead}>{t('icColEntity')}</th>
-                      <th style={leftHead}>{t('icColPair')}</th>
+                      {/* Decision 53 — the type and the record number are ONE cell now, so
+                          the two headings collapse into the one naming the record. */}
                       <th style={leftHead}>{t('icColRecord')}</th>
+                      <th style={leftHead}>{t('icColPair')}</th>
                       <th style={leftHead}>{t('icColUser')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {report.violations.map((v) => (
                       <tr key={`${v.entityType}-${v.entityId}-${v.makerField}`}>
-                        <td style={leftCell}>{v.entityType}</td>
+                        {/*
+                          * OWNER DECISION 53 — THE RECORD'S TYPE IN ARABIC PLUS ITS NUMBER.
+                          *
+                          * Decision 49's test is a NAME where the set is CLOSED, and this set is:
+                          * fifteen maker/checker entity types, closed by `check:maker-checker-pairs`
+                          * rather than by convention. Batch eight stopped here because only six of
+                          * the fifteen had a decision-41 word — true of that map, and the wrong
+                          * conclusion, because every one of the nine had a source elsewhere in the
+                          * product. All fifteen are DERIVED now, none typed.
+                          *
+                          * THE NUMBER STAYS, which is the half worth reading. A maker/checker
+                          * record has no human-readable handle — decision 44 measured that NOTHING
+                          * in this product generates one — so the type is named and the id is the
+                          * honest answer to WHICH record. That is the same shape `/audit-trail`
+                          * uses, and it is why this row still counts against the
+                          * rendered-identifier budget rather than coming off it.
+                          *
+                          * The fallback cannot be reached while the map is total, and
+                          * `record-entity-types.test.ts` is what keeps it total — but it is still
+                          * rendered rather than omitted, because a sixteenth pair would otherwise
+                          * render an empty cell between a green test and a deploy.
+                          */}
+                        <td style={leftCell}>
+                          {makerCheckerEntityLabel(v.entityType) ? (
+                            t('atEntityRef', {
+                              type: t(makerCheckerEntityLabel(v.entityType)!),
+                              ref: v.entityId,
+                            })
+                          ) : (
+                            <span
+                              title={t('atEntityTypeUnlabelled')}
+                              style={{
+                                fontFamily: 'var(--font-mono, monospace)',
+                                color: 'var(--ink-secondary)',
+                              }}
+                            >
+                              {v.entityType} · {v.entityId}
+                            </span>
+                          )}
+                        </td>
                         <td style={leftCell}>{v.pairLabel}</td>
-                        <td style={leftCell}>{v.entityId}</td>
                         {/* ITEM 1 — the colleague who did both halves, by NAME, resolved by the
                             api through decision 48's resolver. An em dash where the account is
                             gone: that is a real state here (this scan's actor has no protecting
@@ -340,7 +380,13 @@ export default function InternalControlsPage() {
                   {report.byPair.map((p) => (
                     <tr key={`${p.entityType}-${p.pairLabel}`}>
                       <td style={leftCell}>
-                        {p.entityType}
+                        {/* Decision 53 — the TYPE'S WORD, no number: this row is about a PAIR, not
+                            one record. Found the same way the SLA dashboard's two were: by this
+                            screen's own assertion that the member name is gone. The violations
+                            table had been switched and this one had not. */}
+                        {makerCheckerEntityLabel(p.entityType)
+                          ? t(makerCheckerEntityLabel(p.entityType)!)
+                          : p.entityType}
                         {p.dormant ? (
                           <span
                             title={t('icNoWriter')}

@@ -66,48 +66,64 @@ const ACKNOWLEDGED = [
   {
     name: 'multer',
     why: `GHSA-q7qp-rjg7-q26m / CVE-2026-113872, published 2026-10-23 — DoS via a pending
-ASYNCHRONOUS fileFilter after request teardown. Accepted 2026-10-24 with all four rules
-above MEASURED rather than assumed, and the owner may reverse it.
+ASYNCHRONOUS fileFilter after request teardown.
 
-RULE 1, NO UPGRADE PATH — and it is the PINNING package that blocks it, exactly as the
-note below this list already says. The advisory range is >= 2.0.0, < 2.5.0 with
-first_patched_version 2.5.0, read off the advisory itself; there is no 2.4.x patch.
-@nestjs/platform-express pins multer at an EXACT 2.4.0, and EVERY published version
+OWNER DECISION 52, 2026-10-24: THIS IS RECORDED AS *THE VULNERABLE CODE PATH DOES NOT
+EXIST IN THIS PRODUCT*, NOT AS *A KNOWN VULNERABILITY ACCEPTED*. Those are different
+claims and the second one is not ours to make: this system goes in front of a regulator.
+The distinction is the whole of her ruling, so do not reword this entry into the
+language of accepted risk.
+
+THE CLAIM IS THE ADVISORY'S OWN SENTENCE, not our reading of it: any application using
+multer with an ASYNCHRONOUS fileFilter is affected, and uploads using a SYNCHRONOUS
+fileFilter are not affected. Measured: the string fileFilter appears ZERO times in
+apps/api/src; the api's single multipart route
+(modules/customer/legacy-import.controller.ts) passes only limits { fileSize, files: 1 };
+and @nestjs/platform-express injects none — the string occurs once in its whole tree, in
+a .d.ts DECLARING the option as optional. files: 1 also means there can never be a
+second file sitting with a filter pending while another is rejected, which IS the
+mechanism the advisory describes.
+
+AND THE PREMISE IS PINNED BY A TEST, WHICH IS HER CONDITION AND IS NOT OPTIONAL:
+apps/api/src/common/multipart-upload-exposure.inventory.spec.ts asserts both facts BY
+NAME over the whole api source — no upload route passes a fileFilter, and none accepts
+more than one file — so the PREMISE fails rather than the feature, and it fails for a
+SECOND upload route somebody adds rather than only for a change to the existing one. It
+carries a non-vacuity floor, because every assertion in it is a loop and an empty loop
+passes. Three committed plants cover both premises and the floor.
+
+THE 2026-09 HISTORY IS WHY THAT TEST EXISTS RATHER THAN A COMMENT. Four multer
+advisories were accepted here on these same two grounds and the reachability half had
+ALREADY BEEN FALSE for sixteen days, because a FileInterceptor route landed four days
+after the acknowledgement was written (IMPROVEMENTS.md section 1.82). A record whose
+premise nothing checks is a record that goes quietly false.
+
+RULE 1, NO UPGRADE PATH, AND THIS IS A WAIT WITH A DATE RATHER THAN AN EXEMPTION. The
+fix EXISTS upstream in multer 2.5.0; what is being waited for is Nest moving its exact
+pin. @nestjs/platform-express pins multer at an EXACT 2.4.0, and EVERY published version
 through 12.2.0 still pins 2.4.0 — checked one at a time rather than off the latest
-major — so raising the pinning package reaches nothing and would be a Nest MAJOR bump
-for no fix.
+major, which is rule 1's own instruction. That sentence is what makes the review date
+honest.
 
-AND THE THREE MECHANISMS THAT FORCE IT WERE TRIED, AND EACH BROKE SOMETHING, PROVEN BY
-RUNNING THE UPLOAD ROUTE rather than by reading. A root override of ^2.5.0 alone made npm
-DROP multer from the tree entirely (node_modules/multer ABSENT) — a latent crash on the
-one route that uses it, not a fix, and the security gate went GREEN because the package
-had VANISHED. An exact 2.5.0 override did the same. Declaring multer ^2.5.0 directly in
-apps/api PLUS the override did install 2.5.0 deduped onto one copy — and
+AND THE THREE MECHANISMS THAT FORCE 2.5.0 WERE EACH TRIED AND EACH BROKE SOMETHING,
+PROVEN BY RUNNING THE UPLOAD ROUTE. A root override of ^2.5.0 alone made npm DROP multer
+from the tree entirely (node_modules/multer ABSENT) — and this gate then went GREEN
+BECAUSE THE PACKAGE HAD VANISHED, which would have shipped a latent crash on the one
+route that uses it. An exact 2.5.0 override did the same. Declaring multer ^2.5.0
+directly in apps/api PLUS the override did install 2.5.0 deduped onto one copy — and
 legacy-import.e2e-spec.ts + legacy-import-report.e2e-spec.ts went from 8/8 to FIVE
 FAILED, every multipart request answering 400. Isolated afterwards by single variable:
 body-parser 2.4.0 alone is 8/8, multer 2.4.0 UNDER the override is 5 failed, and HEAD is
-8/8 — so it is the OVERRIDE MECHANISM against an exact pin that breaks it, which is this
-file's own recorded finding met for the second time.
+8/8 — so it is the OVERRIDE MECHANISM against an exact pin, which is this file's own
+recorded finding met for the second time.
 
-RULE 2, UNREACHABLE — and this half is the advisory's OWN sentence rather than our
-reading: any application using multer with an asynchronous fileFilter is affected, and
-uploads using a synchronous fileFilter are not affected. Measured: the string fileFilter
-appears ZERO times in apps/api/src; the single upload route
-(customer/legacy-import.controller.ts) passes only limits { fileSize, files: 1 }; and
-@nestjs/platform-express injects none — the string occurs once in its whole tree, in a
-.d.ts DECLARING the option as optional. files: 1 also means there can never be a second
-file whose async filter is pending while another is rejected, which is the exact
-mechanism the advisory describes.
-
-THE 2026-09 HISTORY IS WHY THIS ENTRY DISTRUSTS ITSELF. Four multer advisories were
-accepted here on these same two grounds and the reachability half had ALREADY BEEN FALSE
-for sixteen days, because a FileInterceptor route landed four days after the
-acknowledgement was written. So this entry is correct ONLY while that route passes no
-fileFilter: adding one anywhere makes this reasoning false, and the entry must come out
-in the same commit. The owner declined the last acceptance on the ground that this system
-goes in front of a regulator and does not ship with a known accepted vulnerability, and a
-fix was found instead. There is no fix to find this time — if she declines again, the
-answer is to stop offering multipart upload, never to override the pin.`,
+THE OBVIOUS REMEDY IS WITHDRAWN, AND THE MEASUREMENT IS WHY: removing our upload route
+would NOT clear this advisory. multer is NOT OUR DEPENDENCY — it appears exactly ONCE in
+the lockfile, as a dependency of @nestjs/platform-express, and is declared in no
+package.json of ours. So dropping the one multipart route would leave the package
+installed and the advisory standing, while costing the customer-import feature. If the
+owner declines this record, the answer is to carry the red until Nest moves its pin,
+never to override it.`,
     reviewBy: '2026-11-24',
   },
   /*

@@ -26,6 +26,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
+import { slaEntityLabel } from '../../../lib/audit-trail/record-entity-types';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -293,7 +294,18 @@ export default function SlaDashboardPage() {
                             </span>
                           ) : null}
                         </td>
-                        <td style={leftCell}>{w.entityType}</td>
+                        {/* Decision 53 — the TYPE'S WORD, with no number: this row is about a
+                            WORKFLOW, not one record, so there is nothing to number. Found by this
+                            screen's own Playwright assertion, which asserted the member name was
+                            gone and found TWO cells still rendering it — the timer list had been
+                            switched and these two tables had not, which is precisely the
+                            half-built state the sequencing rule refuses. Neither cell carries a
+                            uuid, so the rendered-identifier budget could never have seen them. */}
+                        <td style={leftCell}>
+                          {slaEntityLabel(w.entityType)
+                            ? tr(slaEntityLabel(w.entityType)!)
+                            : w.entityType}
+                        </td>
                         <td style={cell}>
                           {formatSlaDuration(w.configuredDuration)}
                         </td>
@@ -333,7 +345,15 @@ export default function SlaDashboardPage() {
                 <tbody>
                   {summary.byEntityType.map((e) => (
                     <tr key={e.entityType}>
-                      <td style={leftCell}>{e.entityType}</td>
+                      {/* The same word, in the by-entity-type breakdown. The KEY stays the stored
+                          member name — a React key must be stable and language-independent, and
+                          keying on a translated word would re-key every row on a language
+                          switch. */}
+                      <td style={leftCell}>
+                        {slaEntityLabel(e.entityType)
+                          ? tr(slaEntityLabel(e.entityType)!)
+                          : e.entityType}
+                      </td>
                       <td style={cell}>{e.total}</td>
                       <td style={cell}>{e.entityCount}</td>
                       <td style={cell}>{e.breached}</td>
@@ -412,9 +432,32 @@ export default function SlaDashboardPage() {
                     timers.map((r) => (
                       <tr key={r.id}>
                         <td style={leftCell}>{r.label}</td>
+                        {/*
+                          * OWNER DECISION 53 — the tracked workflow's type in Arabic plus its
+                          * number. Sixteen SLA-tracked entity types, closed by the registry's own
+                          * inventory spec, so decision 49's test says NAME; all sixteen derived.
+                          *
+                          * The id stays for the same reason as on `/internal-controls`: an SLA
+                          * timer's subject has no readable handle, so the number is the honest
+                          * answer to WHICH record rather than an approximation of a name.
+                          */}
                         <td style={leftCell}>
-                          {r.entityType}
-                          <span style={{ opacity: 0.7 }}> · {r.entityId}</span>
+                          {slaEntityLabel(r.entityType) ? (
+                            tr('atEntityRef', {
+                              type: tr(slaEntityLabel(r.entityType)!),
+                              ref: r.entityId,
+                            })
+                          ) : (
+                            <span
+                              title={tr('atEntityTypeUnlabelled')}
+                              style={{
+                                fontFamily: 'var(--font-mono, monospace)',
+                                color: 'var(--ink-secondary)',
+                              }}
+                            >
+                              {r.entityType} · {r.entityId}
+                            </span>
+                          )}
                         </td>
                         <td style={leftCell}>
                           {tr(STATE_FILTER_LABEL_KEY[r.state])}

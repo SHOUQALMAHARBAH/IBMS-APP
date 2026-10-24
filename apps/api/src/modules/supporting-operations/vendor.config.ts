@@ -88,6 +88,34 @@ export function dpoApprovalRequiredForTier(tier: RiskTier): boolean {
   return tier === 'high';
 }
 
+/**
+ * ITEM 4(a) — THE DPA REGISTER NAMES THE TWO PEOPLE, through decision 48's resolver.
+ *
+ * `/vendors/[id]` reported WHETHER a Data Processing Agreement was approved and never BY WHOM.
+ * That is the register question: a DPA is what makes a third party lawful to send personal data
+ * to at all, and its approval is a maker/checker decision with a database CHECK behind it — so
+ * "approved" with nobody's name on it is the half that cannot be audited.
+ *
+ * BOTH SIDES, not only the approver, because the pair is the control: one person assesses the
+ * processor and a DIFFERENT person DPO-approves the agreement, and a reader cannot see that two
+ * people were involved from one name. One resolve covers both ids.
+ *
+ * NAMES ARE NULLABLE AND A MISSING ONE IS NEVER THE UUID. `assessedByUserId` is itself nullable on
+ * the model, and either account can since have been deleted — `DataProcessingAgreement` carries no
+ * FK to `User` for them (96 of 115 `*UserId` columns in this schema do not, register entry 127).
+ *
+ * AND THIS MOVES NO BUDGET, which is worth stating where somebody will look for the change:
+ * `rendered-identifiers.py` counts `/vendors/[id]`'s `dpoApprovedByUserId` because the detector
+ * matches the identifier on a line, and that line is a PRESENCE TEST gating the approve control —
+ * no uuid ever reached a reader there. Register entry 134. Taking the row off the count would mean
+ * loosening the detector toward false negatives, which is the trade refused on the four-states
+ * budgets.
+ */
+export interface DpaActorNames {
+  assessedByName: string | null;
+  dpoApprovedByName: string | null;
+}
+
 export interface ActiveDpaSummary {
   id: string;
   signedAt: Date | null;
