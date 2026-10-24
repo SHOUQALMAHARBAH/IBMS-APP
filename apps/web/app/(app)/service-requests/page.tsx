@@ -204,7 +204,10 @@ export default function ServiceRequestsPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td style={cell}>{r.customerId.slice(0, 8)}…</td>
+                    {/* RULE 2 — the name, never the id. */}
+                    <td style={cell}>
+                      <bdi>{r.customerName}</bdi>
+                    </td>
                     <td style={cell}>
                       {TYPE_LABEL_KEY[r.requestType as keyof typeof TYPE_LABEL_KEY]
                         ? t(TYPE_LABEL_KEY[r.requestType as keyof typeof TYPE_LABEL_KEY])

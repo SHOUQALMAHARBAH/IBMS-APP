@@ -219,6 +219,72 @@ def self_test():
     return 0
 
 
+# ---------------------------------------------------------------------------- the ratchet
+#
+# Decision 34's third part: THE COUNT NEVER RISES. A screen delivered carrying an identifier where
+# the record has a human name is NOT DELIVERED, and does not become a deferred row — so this is a
+# budget that comes DOWN as screens are fixed and may never go up.
+#
+# It fails in BOTH directions, which is the half that stops a ratchet becoming a ceiling: at 0 it is
+# a flat ban on the class with no switch to throw, exactly as `MISSING_DESCRIPTION_BUDGET` reached 0
+# and stayed there.
+#
+# Measured 2026-10-22 across 106 screens. The figure matched the screen-pass measurement document's
+# own, which is why this was wired rather than stopped on — a document and a script that disagree
+# mean one of them is wrong and we do not yet know which.
+#
+# 29 -> 24 on 2026-10-23, batch five item 1(a), lowered by exactly what was fixed and no more: five
+# screens whose Customer column rendered the first eight characters of a uuid now render the
+# customer's name, resolved by the api — `/complaints`, `/feedback`, `/service-requests`,
+# `/retention-cases` and `/communications`.
+#
+# FOUR OF THE FIVE ARE AN `include`; THE FIFTH IS NOT, AND THAT IS A FINDING RATHER THAN A STYLE
+# CHOICE. `CommunicationLog.customerId` is a bare `String?` with no `@relation` and no foreign key,
+# so there is nothing to include and an id pointing at a deleted customer is representable — the
+# `Customer.ownerUserId` shape one table over (register entry 63). Its name is resolved by a second
+# read over the ids a page returned, one query for the page.
+# 24 -> 19 on 2026-10-23, batch six item 2, lowered by exactly what was fixed and no more:
+#
+#   /transaction-monitoring   1  the AML queue's Customer column — `include`, name resolved by the api
+#   /retention-disposal       2  the legal hold's Subject column (one expression, two lines)
+#   /consent                  2  the consent register's Subject — one of THREE relations
+#
+# AND THE BUDGET CANNOT REACH 0 IN THIS MODULE, BY OWNER DECISION 46 RATHER THAN BY SHORTFALL.
+# Six of the nineteen are records with NO HANDLE AT ALL — an opportunity, a needs assessment, an
+# insurance programme, a retention schedule item. Giving any of them a readable reference means
+# inventing THE FIRST NUMBERING SCHEME IN THIS PRODUCT (batch five measured that nothing here
+# generates one), and receipts, remittances, settlements and commission entries all live in module
+# 7, whose money is frozen. Designing a financial numbering scheme before its module is building
+# blind, so those six are DEFERRED-BY-DECISION to module 7 and the four-state `recordHandle` field
+# is the answer for them until then. Do not try to take the budget to zero here.
+#
+# A FURTHER FOUR of the nineteen need a DECISION rather than a name and are reported in register
+# entry 126 with the question that decides each: three polymorphic `entityId`s over an OPEN
+# `entityType` set, and `/dashboards/policy`'s reachable `policyNumber ?? policyId` fallback.
+# 19 -> 18 on 2026-10-23, batch seven item 2: `/cross-border-transfers`' Approved-by column now
+# names the approver, resolved through decision 48's one resolver (the HR record where the account
+# is linked) rather than rendering eight characters of a uuid.
+# 18 -> 16 on 2026-10-23, batch eight, lowered by exactly what was closed and no more:
+#
+#   /audit-trail        1  the document VERSION's uploader, by name (decision 48's resolver)
+#   /dashboards/policy  1  owner decision 50 — a policy with no number yet is named by its
+#                          CUSTOMER plus a state word, never by its internal id
+#
+# AND `/audit-trail`'s POLYMORPHIC `entityId` DELIBERATELY STILL COUNTS — owner decision 49. That
+# column now renders the type's own Arabic word plus the number («وثيقة رقم …») where the stored
+# type is one of decision 41's eighteen, and the stored type as machine text where it is not. The
+# ID STAYS IN FULL because it is the only way a reader can look the record up, and the ruling
+# accepts that: a NAME there would silently stop appearing each time a module is added.
+# Measured — dev holds 32 distinct `entityType` values and db-test 139, against eighteen labels.
+RENDERED_IDENTIFIER_BUDGET = 10
+
+# The floor is the smaller of the two guards and the one that has fired for real. Four separate
+# measurements in this repository have reported a clean nothing because their matcher stopped
+# matching: a screen root that moves takes the count to zero and the report then reads exactly like
+# a fixed codebase. Blank is not zero.
+MINIMUM_SCREENS_SCANNED = 90
+
+
 def main():
     if '--self-test' in sys.argv:
         return self_test()
@@ -246,6 +312,58 @@ def main():
 
     print('\nscreens scanned                     %4d' % len(screens))
     print('identifiers reaching a reader       %4d' % total)
+
+    if '--check' not in sys.argv:
+        return 0
+
+    if args:
+        print(
+            '\nrendered-identifiers: REFUSED — --check measures the whole app and was given a '
+            'screen filter (%s). A budget compared against a subset is not a budget.' % ', '.join(args)
+        )
+        return 1
+
+    if len(screens) < MINIMUM_SCREENS_SCANNED:
+        print(
+            '\nrendered-identifiers: REFUSED — only %d screen(s) scanned, against a floor of %d. '
+            'The screen root has moved and every number above is meaningless. Blank is not zero.'
+            % (len(screens), MINIMUM_SCREENS_SCANNED)
+        )
+        return 1
+
+    if total > RENDERED_IDENTIFIER_BUDGET:
+        print(
+            '\nrendered-identifiers: FAILED — %d identifier(s) reach a reader against a budget of '
+            '%d.' % (total, RENDERED_IDENTIFIER_BUDGET)
+        )
+        print(
+            'A uuid or a raw enum rendered where the record has a name or an Arabic label is this '
+            'product failing at the one thing it exists for: the broker cannot read it, cannot act '
+            'on it, and cannot tell you which record it names.'
+        )
+        print(
+            'Render the name the record already carries. Where the view does not send one, include '
+            'it — one include rather than N lookups, which is what `ConflictOfInterestRegisterEntry` '
+            'does and why.'
+        )
+        print('Do NOT raise the budget: the owner struck attrition, so this number only falls.')
+        return 1
+
+    if total < RENDERED_IDENTIFIER_BUDGET:
+        print(
+            '\nrendered-identifiers: FAILED — only %d remain, so lower RENDERED_IDENTIFIER_BUDGET '
+            'to %d.' % (total, total)
+        )
+        print(
+            'This half is what stops the ratchet becoming a ceiling. An improvement recorded is an '
+            'improvement that cannot be silently given back.'
+        )
+        return 1
+
+    print(
+        '\nrendered-identifiers: the class is at its declared budget of %d.'
+        % RENDERED_IDENTIFIER_BUDGET
+    )
     return 0
 
 

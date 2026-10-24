@@ -20,6 +20,12 @@ export interface DataProcessingAgreement {
   signedAt: string | null;
   assessedByUserId: string | null;
   dpoApprovedByUserId: string | null;
+  /* Item 4(a) — the two people, resolved by the api through decision 48's resolver. BOTH, not only
+   * the approver: a DPA's approval is a maker/checker decision, and a reader cannot see that two
+   * people were involved from one name. NULL means no such account (or, for the assessor, none
+   * recorded), never the uuid. */
+  assessedByName: string | null;
+  dpoApprovedByName: string | null;
   /**
    * Part 4 step 5 — present when ONE person both assessed the processor and DPO-approved the agreement,
    * in an office that declared COMBINED. A DPA is what makes a third party lawful to send personal data

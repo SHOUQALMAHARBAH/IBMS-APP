@@ -28,6 +28,20 @@ export class ProvisionEmployeeDto extends PersonRecordDto {}
 /**
  * Backlog A.2 — provision a user account WITH its initial role grants.
  *
+ * ## THERE IS NO OFFICE FIELD HERE AND THE ABSENCE IS THE CONTROL (entry 74, decision 18)
+ *
+ * This route creates the account in the office of whoever called it, supplied by
+ * `tenantScopeExtension` through `User.organizationId`'s `@default(dbgenerated())` — never by
+ * anything a caller sends. Adding a field to name the office would be a WIDENING: `user.manage` is
+ * held by OFFICE_ADMINISTRATOR and SYSTEM_SECURITY_ADMINISTRATOR, and either could then write an
+ * account into another office.
+ *
+ * The provider side already has the narrow way to do that —
+ * `POST /provider/brokerage-offices/:officeId/administrator`, gated on a PLATFORM-scoped code and
+ * taking the office in the PATH — and its whole point is that THIS path cannot. Same shape as
+ * `UpdateCustomerContactDto`, where the absent fields are the control:
+ * `provisioning-is-tenant-bound.spec.ts` fails if one is added, in any spelling.
+ *
  * Deliberately distinct from `SignupDto`: public signup creates an account
  * with no roles (and therefore no permissions), which is the correct default
  * for a self-service registration but leaves the account unusable. Every real

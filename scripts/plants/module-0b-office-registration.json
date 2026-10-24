@@ -1,0 +1,38 @@
+{
+  "the-duplicate-establishment-read-is-dropped": {
+    "_": "Refusal 1. Without the read the collision reaches the unique index and surfaces as a 500 instead of a 409 naming the field. Must kill 'the same national establishment number twice'.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "        if (existingEstablishment) {",
+    "to": "        if (false && existingEstablishment) {"
+  },
+  "article-3a-is-not-checked-at-registration": {
+    "_": "Refusal 3. A natural-person office is then registered holding both insurance types, which art. 3/a does not permit — and it exists in that state rather than being corrected into it later. Must kill the art. 3/a test.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "        if (breachesNaturalPersonOneTypeRule(dto.brokerKind, branches)) {",
+    "to": "        if (false && breachesNaturalPersonOneTypeRule(dto.brokerKind, branches)) {"
+  },
+  "capital-becomes-a-gate": {
+    "_": "The fourth, inverted: art. 4/a read as a refusal rather than as information. Narrowed to the RECORDED-and-short case on purpose — the first version refused every office (none of the fixtures record capital) and killed seven tests, which proves nothing about isolation. Must kill 'REFUSAL 4 IS NOT ONE' alone.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "        const licenseIssuedAt = parseCalendarDate(",
+    "to": "        if (!capital.capitalIsUnrecorded && !capital.meetsRequirement) {\n          throw new UnprocessableEntityException('capital below the requirement');\n        }\n        const licenseIssuedAt = parseCalendarDate("
+  },
+  "the-grant-set-is-copied-from-another-office": {
+    "_": "The defect the owner's instruction exists to prevent: resolve the administrator's grants by COPYING what an existing office's administrator role holds, instead of from the declared catalogue list. Must kill the grant-set test. Worth knowing WHY it dies: `RolePermission` is tenant-scoped, so inside runAs(newOrgId) a copy query sees the new office's own grants — none — and the length check refuses. The architecture makes the copy approach fail loudly rather than silently, which is a stronger property than the plant was written to test. SINGLE-LINE anchor on purpose: this file is CRLF and a multi-line LF anchor silently matches nothing.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "      where: { code: { in: [...OFFICE_ADMINISTRATOR_GRANTS] } },",
+    "to": "      where: { roles: { some: { role: { name: OFFICE_ADMINISTRATOR_ROLE_NAME } } } },"
+  },
+  "the-provider-check-is-dropped": {
+    "_": "Item (j)'s third layer. The PLATFORM flag hides the code and `setPermissions` refuses it — but a hidden control the API still honours is not a boundary. Must kill the boundary test.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "    if (org?.type !== 'PROVIDER') {",
+    "to": "    if (false && org?.type !== 'PROVIDER') {"
+  },
+  "the-administrator-is-granted-a-short-set": {
+    "_": "ISOLATION for the grant-set test. A PARTIAL WRITE — the grants resolve correctly and one row is not written — which is what that test can actually observe. The first version of this plant edited OFFICE_ADMINISTRATOR_GRANTS itself and killed nothing, because the test compares the role against that same constant: an e2e cannot see a wrong DECLARATION, which is what the parity guard in packages/db is for. Must kill the grant-set test alone.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "      data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })),",
+    "to": "      data: permissions.slice(1).map((p) => ({ roleId: role.id, permissionId: p.id })),"
+  }
+}

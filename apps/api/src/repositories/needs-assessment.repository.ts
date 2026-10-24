@@ -22,7 +22,7 @@ export interface NeedsAssessmentFilter {
 /**
  * BOTH combined-duty acts, on every read and write that returns an assessment.
  *
- * `NeedsAssessment` is the only table in the fifteen carrying TWO pairs, and therefore two escape columns:
+ * `NeedsAssessment` is the only table in the sixteen carrying TWO pairs, and therefore two escape columns:
  * `NeedsAssessment_reviewer_maker_checker_distinct` (the capturer is not the reviewer) and
  * `NeedsAssessment_approver_maker_checker_distinct` (the capturer is not the approver). One shared column
  * would let a declared combined REVIEW excuse a self-APPROVAL, which is the reason there are fifteen

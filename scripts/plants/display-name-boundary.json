@@ -1,0 +1,20 @@
+{
+  "a-register-shows-the-account-name-again": {
+    "file": "apps/api/src/repositories/user.repository.ts",
+    "from": "    return new Map(rows.map((r) => [r.id, resolveDisplayName(r)]));",
+    "to": "    return new Map(rows.map((r) => [r.id, r.fullName]));",
+    "why": "OWNER DECISION 48 REVERSED AT THE ONE PLACE IT LIVES — the resolver stops applying the HR record and hands back raw `User.fullName`, which is free text and, measured on db-test, DISAGREES with the HR record on 23 of the 25 linked accounts. Fails the register half of `a register names the HR record and the audit trail keeps the stored name`, by name: the disclosure register reports the account's role label where a person should be. The AUDIT half of that same test still passes, which is the point of writing both in one test — the trail is supposed to show the stored name, so a plant that breaks the register must not look like a trail change."
+  },
+  "the-audit-trail-gets-rewritten-through-the-display-rule": {
+    "file": "apps/api/src/modules/audit-trail/audit-trail.service.ts",
+    "from": "    const distinct = [...new Set(rows.map((r) => r.userId))];\n    if (distinct.length === 0) return new Map();\n    return new Map(\n      (await this.users.findSummariesByIds(distinct)).map((u) => [\n        u.id,\n        u.fullName,\n      ]),\n    );",
+    "to": "    const distinct = [...new Set(rows.map((r) => r.userId))];\n    if (distinct.length === 0) return new Map();\n    return this.users.displayNamesForUserIds(distinct);",
+    "why": "THE OTHER HALF OF THE BOUNDARY, AND THE REALISTIC REGRESSION: somebody sees the register naming a person, sees the audit trail naming a role label, and \"harmonises\" the trail onto the shared resolver. It is a ONE-LINE, entirely plausible edit — the resolver is right there and does exactly what the trail appears to want. It is also what `display-name.util.ts` has forbidden since it was written: the trail records what was STORED, not what a screen displayed, so this makes the trail disagree with the row it describes and a historical entry change its answer whenever somebody's HR record is corrected. Fails the AUDIT half of `a register names the HR record and the audit trail keeps the stored name` (`actorNames` comes back as the HR name where the stored account name is asserted) while the REGISTER half still passes — which is why both live in one test. CORRECTED FROM THE RUN: the first version of this plant changed `u.fullName` to `u.employee?.fullName ?? u.fullName` and KILLED NOTHING, 12 of 12 green. `findSummariesByIds` does not select the employee relation, so `u.employee` was simply undefined and the plant was INERT — it read a field that is not there rather than disabling a mechanism. That is the recorded rule met again: a plant must disable a MECHANISM, and the `why` has to be written from the run rather than from the intention."
+  },
+  "the-resolver-stops-batching": {
+    "file": "apps/api/src/repositories/user.repository.ts",
+    "from": "    const unique = [...new Set(ids.filter((id): id is string => !!id))];",
+    "to": "    const unique = ids.filter((id): id is string => !!id);",
+    "why": "THE PERFORMANCE HALF OF THE DECISION, which no behavioural test can see — and that is why it is recorded here rather than asserted. Dropping the `Set` sends duplicate ids into the `IN` clause: still ONE query, so nothing fails, but the register's actors are no longer deduplicated and a 50-row page naming one person fifty times passes fifty ids. It is committed as a plant precisely because it is INVISIBLE: the brief's instruction was to batch the lookup, and the thing that would really regress is somebody moving the call INSIDE `rows.map`, which turns a 50-row register into 51 queries. No gate in this repository counts queries, so this plant's whole value is naming that absence."
+  }
+}

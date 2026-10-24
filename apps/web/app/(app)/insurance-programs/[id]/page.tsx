@@ -32,6 +32,7 @@ import {
   programPanelStyle,
   programTableStyle,
 } from '../../../../components/insurance-program/insurance-program.styles';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 export default function InsuranceProgramDetailPage() {
   const { language, t } = useLanguage();
@@ -144,6 +145,9 @@ export default function InsuranceProgramDetailPage() {
               ? t('iprogdHeadingWithSite', { site: ctx.siteLabel })
               : t('iprogdHeading')}
           </h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='InsuranceProgram' entityId={program.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             {t('iprogdStatus', {
               status: t(ENUM_LABEL.InsuranceProgramStatus[program.status]),

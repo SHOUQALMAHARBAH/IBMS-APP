@@ -18,6 +18,7 @@ import {
 import type { LeadSource, LeadStatus } from '../../../../lib/lead/lead-api';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { leadStatusLabelKey } from '../../../../lib/lead/lead-status';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 // Typed, not `string`: these two are printed to a person, so they go through
 // ENUM_LABEL, and that lookup only compiles against the real vocabulary.
@@ -130,6 +131,9 @@ export default function LeadDetailPage() {
       <h1 style={{ marginBottom: '1.5rem' }}>
         {t('leaddLeadDetails')} — <bdi>{lead.fullName}</bdi>
       </h1>
+      <p style={{ margin: '0 0 1rem' }}>
+        <WorkflowHistoryLink entityType='Lead' entityId={lead.id} />
+      </p>
 
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>

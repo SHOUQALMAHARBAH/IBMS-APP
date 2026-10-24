@@ -311,9 +311,51 @@ export default function VendorDetailPage() {
                         {dpa.signedAt
                           ? dpa.signedAt.slice(0, 10)
                           : t("vendUnsigned")}
+                        {/* And WHO assessed the processor — the maker side of the same pair, so a
+                            reader can see that two different people were involved rather than
+                            inferring it from the absence of a combined-duty act. */}
+                        {dpa.assessedByName ? (
+                          <div
+                            style={{ color: 'var(--ink-secondary)' }}
+                            data-dpa-assessor={dpa.id}
+                          >
+                            <bdi>{dpa.assessedByName}</bdi>
+                          </div>
+                        ) : null}
                       </td>
                       <td style={cell}>
                         {dpa.dpoApprovedByUserId ? t("vendYes") : t("vendNo")}
+                        {/*
+                          ITEM 4(a) — WHO APPROVED IT, which this register did not say.
+
+                          A DPA is what makes sending personal data to a third party lawful at
+                          all, and its approval is a maker/checker decision with a database CHECK
+                          behind it — so "Yes" with nobody's name on it is the half that cannot be
+                          audited. The name is resolved by the api through decision 48's resolver
+                          (`Employee.fullName` is the real identity; `User.fullName` is the
+                          fallback), never read off `User.fullName` here.
+
+                          Rendered only when there IS a name: an approved agreement whose approver
+                          account has since been deleted keeps its "Yes" and says nothing further,
+                          because "approved by nobody" would be a false claim about a record that
+                          WAS approved.
+
+                          The existing «اعتمده {user}» pattern is reused rather than a new phrasing
+                          invented — it is already how this product says "approved by X", on the
+                          refund approver.
+                        */}
+                        {dpa.dpoApprovedByName ? (
+                          <div
+                            style={{ color: 'var(--ink-secondary)' }}
+                            data-dpa-approver={dpa.id}
+                          >
+                            <bdi>
+                              {t('endorsementRefundApprovedBy', {
+                                user: dpa.dpoApprovedByName,
+                              })}
+                            </bdi>
+                          </div>
+                        ) : null}
                         {/*
                           Part 4 step 5. "Yes" is true of a self-approved agreement and of a two-person one
                           alike, so without this the cell cannot distinguish them — and a DPA is the record

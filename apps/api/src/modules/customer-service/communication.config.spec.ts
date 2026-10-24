@@ -254,9 +254,10 @@ describe('deriveCommunicationView (Process 44)', () => {
   };
 
   it('renders the row with ISO timestamps and the body intact', () => {
-    expect(deriveCommunicationView(row)).toEqual({
+    expect(deriveCommunicationView(row, 'Al-Yarmouk Trading Company')).toEqual({
       id: 'comm-1',
       customerId: 'cust-1',
+      customerName: 'Al-Yarmouk Trading Company',
       channel: 'EMAIL',
       templateId: 'welcome-v2',
       languageUsed: 'AR',

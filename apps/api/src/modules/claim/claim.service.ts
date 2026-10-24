@@ -74,6 +74,7 @@ import type { CloseClaimDto } from './dto/close-claim.dto';
 import type { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 import { LossRatioService } from '../loss-ratio/loss-ratio.service';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -275,6 +276,7 @@ export class ClaimService {
     private readonly encryption: EncryptionService,
     private readonly lossRatio: LossRatioService,
     private readonly dutySegregation: DutySegregationService,
+    private readonly archive: RetentionArchiveRepository,
   ) {}
 
   private canReachAnyClaim(actor: AuthenticatedUser): boolean {
@@ -1657,6 +1659,43 @@ export class ClaimService {
       // coalesce to `'' === actor.id` (always false).
       throw new ConflictException(
         `Claim ${id}: the settlement has no recorded first approver and cannot be second-approved.`,
+      );
+    }
+
+    // CONDITION 1 OF THE ARCHIVED STATE (batch 5 group 7c) — a BLOCKED record enters no ongoing
+    // processing, and this is the ONE user-facing write that can reach one.
+    //
+    // MEASURED: ten write sites touch the four blockable models and eight refuse a blocked record
+    // STRUCTURALLY, by re-asserting a state it cannot be in — the four `create` sites by nature;
+    // three commission `updateMany`s on `status: 'outstanding'`, which a blocked entry cannot hold
+    // because `paidAt` is written in exactly one place and always with `status: 'paid'`; and
+    // `confirmSettlementPayment` on `clientPaymentConfirmedAt: null`, the very column a blocked
+    // settlement has filled. `retention-archive.inventory.spec.ts` asserts those eight, so they are
+    // proven rather than claimed.
+    //
+    // This one is different: a second approval re-asserts only `secondApproverUserId: null`, which a
+    // blocked settlement CAN hold. The state is anomalous — payment is normally confirmed after the
+    // second approval, not before — but it is representable, and approving a settlement whose client
+    // payment was confirmed over a decade ago is exactly the processing the block forbids.
+    //
+    // REFUSED HERE AND NOT IN `reconcileReversalForPolicy`, deliberately. That path is driven by a
+    // Process 22 endorsement rather than by a person, returns `void`, and a throw would fail the
+    // endorsement AND leave a legally-owed commission clawback unrecorded. Refusing a money
+    // correction to protect a record that holds no personal data is the worse failure, and the
+    // reasoning is recorded beside that call rather than left as an omission.
+    const settlementBlocked =
+      await this.archive.blockedExclusionFor('Settlement');
+    if (
+      settlementBlocked !== null &&
+      s.clientPaymentConfirmedAt !== null &&
+      s.clientPaymentConfirmedAt <= settlementBlocked.cutoff &&
+      !settlementBlocked.extendedRecordIds.includes(s.id)
+    ) {
+      throw new UnprocessableEntityException(
+        `Claim ${id}: this settlement is in the blocked retention phase — its retention period has ` +
+          `elapsed, so it is kept and not processed. It cannot be second-approved. A blocked record ` +
+          `is retrievable only on a judicial request or an official CBJ audit, which is recorded at ` +
+          `Settings -> Retention and disposal.`,
       );
     }
     const combinedDutyActId = await this.dutySegregation.resolve({

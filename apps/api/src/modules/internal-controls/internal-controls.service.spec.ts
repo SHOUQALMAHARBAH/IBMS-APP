@@ -3,6 +3,7 @@ import { InternalControlsService } from './internal-controls.service';
 import { MAKER_CHECKER_REGISTRY } from './internal-controls.config';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
+import type { UserRepository } from '../../repositories/user.repository';
 
 function makeService(
   rowsByModel: Record<string, Array<Record<string, unknown>>> = {},
@@ -34,11 +35,19 @@ function makeService(
     record: vi.fn().mockResolvedValue(undefined),
     recordMany: vi.fn().mockResolvedValue(undefined),
   };
+  /* Item 1 — decision 48's resolver. A REAL Map, so a test asserting the violating colleague's
+   * name is observing the code rather than an empty double. */
+  const users = {
+    displayNamesForUserIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['u-1', 'سامر عبدالله الحوراني']])),
+  };
   const service = new InternalControlsService(
     prisma,
+    users as unknown as UserRepository,
     audit as unknown as AuditService,
   );
-  return { service, audit, client };
+  return { service, audit, client, users };
 }
 
 describe('InternalControlsService.runSelfApprovalAudit (Process 56)', () => {

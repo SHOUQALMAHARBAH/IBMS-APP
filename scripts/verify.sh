@@ -81,6 +81,12 @@ gate "Database Schema (divergence from the database)" npm run db:test:divergence
 # And the privilege surface, which neither of the two above looks at: a GRANT of owner
 # membership leaves rolsuper FALSE and lets the runtime role read past every RLS policy.
 gate "Database Privileges (runtime role)" npm run db:test:privileges
+# EVERY MIGRATION FROM NOTHING, THEN THE SEED, on a throwaway database that is dropped afterwards.
+# The gates above all run against db-test, which is already populated — so a migration that only
+# works on a database that already HAS rows passes every one of them and fails on a deploy. It is
+# also the only gate that exercises the seed's CREATE path rather than its update path, which is
+# exactly how a broken seed once reached CI looking locally green. SKIPS loudly without Docker.
+gate "Database (from empty)" bash scripts/from-empty.sh
 gate "Database Seed"       npm run db:test:seed
 # The THIRD copy of the role -> permission grid: Playwright mocks `/auth/me` from a checked-in
 # fixture, and a mock missing a code renders an empty nav because the sidebar helpers fail

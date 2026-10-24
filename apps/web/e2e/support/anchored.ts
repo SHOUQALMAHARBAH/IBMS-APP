@@ -120,3 +120,45 @@ export async function expectNone(target: Locator, anchor: Locator): Promise<void
    */
   await expect(target).toHaveCount(0);
 }
+
+/**
+ * A SCOPED ABSENCE ASSERTION, with the page-wide root made UNWRITABLE rather than discouraged.
+ *
+ * ## WHY A HELPER AND NOT A RULE
+ *
+ * The rule — "do not assert an absence page-wide" — has existed and failed four times, the fourth
+ * one commit after it was written down. The last occurrence: a role-name absence loop on the RFQ
+ * not-found notice matched "Compliance" in the NAV SIDEBAR and failed on a correct tree.
+ *
+ * `scope` is a `Locator`, never a `Page`. Playwright's `Page` is not a `Locator`, so passing
+ * `page` is a COMPILE error rather than a review comment — which is the only form that cannot be
+ * forgotten under time pressure.
+ *
+ * ## IT FIXES ONE OF TWO FAILURE MODES, AND CLOSES THE OTHER BY CONSTRUCTION
+ *
+ * Scoping fixes WRONG ELEMENT. It does NOT fix NOT-YET-RENDERED: `toHaveCount(0)` passes on its
+ * FIRST poll, which is why `expectNone` above takes an anchor and why `navbar.spec.ts` asserted a
+ * vacuous absence for 107 commits. So this asserts the SCOPE IS VISIBLE first — the scope is the
+ * anchor, from the same render as the thing being denied, and it cannot be omitted because it is
+ * the same argument.
+ *
+ * ## WHAT IT DELIBERATELY DOES NOT COVER
+ *
+ *  * A string-level `expect(text).not.toContain(x)` on one element's own text. There is no locator
+ *    to scope and the scope is already implicit in `scope.textContent()`.
+ *  * The NAV absence case, which must NOT be scoped to `main` — the assertion is about the sidebar.
+ *    Use `expectNone(target, anchor)` by HREF; `test/e2e-anchored-reads.test.ts` guards it.
+ *  * A genuinely page-level absence ("this dialog is nowhere on the page"), which is real and rare.
+ *
+ * `scripts/measurements/page-wide-absence-assertions.py --check` ratchets the remaining
+ * page-wide TEXT class, which is the one that can match an unrelated element.
+ */
+export async function expectAbsentWithin(
+  scope: Locator,
+  build: (scope: Locator) => Locator,
+): Promise<void> {
+  // The anchor, and it is not optional: a scope that has not rendered makes any absence inside it
+  // trivially true.
+  await expect(scope).toBeVisible();
+  await expect(build(scope)).toHaveCount(0);
+}

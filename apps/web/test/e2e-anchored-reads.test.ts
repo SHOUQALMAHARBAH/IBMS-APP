@@ -211,10 +211,28 @@ describe("the three non-waiting reads are reached only through the helper", () =
 
   it("is available from the helper, which is where the waiting happens", () => {
     const helper = readFileSync(join(E2E, "support", "anchored.ts"), "utf8");
-    for (const name of ["anchoredCount", "anchoredAttributes", "anchoredTexts", "expectNone"]) {
+    for (const name of [
+      "anchoredCount",
+      "anchoredAttributes",
+      "anchoredTexts",
+      "expectNone",
+      // DECISION 13, 2026-10-19 — the scoped absence assertion. Its `scope` is typed `Locator`, so
+      // passing `page` is a COMPILE error rather than a review comment, which is what makes a
+      // page-wide root unwritable instead of discouraged.
+      "expectAbsentWithin",
+    ]) {
       expect(helper, `${name} is missing from the helper`).toContain(`export async function ${name}`);
     }
-    // Each one anchors before reading. Without this, the helper could be an alias for the raw read.
-    expect(helper.match(/toBeVisible/g)?.length, "every helper must assert its anchor first").toBe(4);
+    /*
+     * Each one anchors before reading. Without this, the helper could be an alias for the raw read.
+     *
+     * FIVE since `expectAbsentWithin` arrived, and this count failing is the guard working: a new
+     * helper in this file is a new way to assert an absence, and the property that matters is that
+     * it waits on something positive FIRST. Scoping fixes the wrong-element failure; it does not
+     * fix not-yet-rendered, because `toHaveCount(0)` passes on its first poll. So a helper that
+     * took a scope and did not assert it visible would close one trap and leave the other — which
+     * is what this number refuses.
+     */
+    expect(helper.match(/toBeVisible/g)?.length, "every helper must assert its anchor first").toBe(5);
   });
 });

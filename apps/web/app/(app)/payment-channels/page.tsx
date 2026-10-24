@@ -249,8 +249,10 @@ export default function PaymentChannelsPage() {
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
               <thead>
                 <tr>
+                  {/* Item 1 — the second column holds the owner's NAME now, so the headings
+                      swap roles: the first says what KIND of owner, the second says who. */}
+                  <th style={headCellStyle}>{t('pcColOwnerType')}</th>
                   <th style={headCellStyle}>{t('pcOwnerLabel')}</th>
-                  <th style={headCellStyle}>{t('pcOwnerIdLabel')}</th>
                   <th style={headCellStyle}>{t('pcColType')}</th>
                   <th style={headCellStyle}>{t('pcLabelLabel')}</th>
                   <th style={headCellStyle}>{t('pcColBank')}</th>
@@ -263,7 +265,13 @@ export default function PaymentChannelsPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cellStyle}>{r.ownerType}</td>
-                    <td style={cellStyle}>{r.customerId ?? r.insurerId}</td>
+                    {/* ITEM 1 — the owner's name, whichever kind of owner it is, resolved by
+                        the api through each entity's own resolver. An em dash where the owning row
+                        is gone: `PaymentChannel` carries no FK to either, so that is a real state,
+                        and "we hold no name" is not "the name is this uuid". */}
+                    <td style={cellStyle}>
+                      {r.ownerName ? <bdi>{r.ownerName}</bdi> : '—'}
+                    </td>
                     <td style={cellStyle}>{r.channelType}</td>
                     <td style={cellStyle}>{r.label}</td>
                     <td style={cellStyle}>{r.bankName ?? '—'}</td>

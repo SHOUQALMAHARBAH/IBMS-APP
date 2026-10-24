@@ -63,6 +63,69 @@ import { execFileSync } from 'node:child_process';
 
 /** @type {{name: string, why: string, reviewBy: string}[]} */
 const ACKNOWLEDGED = [
+  {
+    name: 'multer',
+    why: `GHSA-q7qp-rjg7-q26m / CVE-2026-113872, published 2026-10-23 — DoS via a pending
+ASYNCHRONOUS fileFilter after request teardown.
+
+OWNER DECISION 52, 2026-10-24: THIS IS RECORDED AS *THE VULNERABLE CODE PATH DOES NOT
+EXIST IN THIS PRODUCT*, NOT AS *A KNOWN VULNERABILITY ACCEPTED*. Those are different
+claims and the second one is not ours to make: this system goes in front of a regulator.
+The distinction is the whole of her ruling, so do not reword this entry into the
+language of accepted risk.
+
+THE CLAIM IS THE ADVISORY'S OWN SENTENCE, not our reading of it: any application using
+multer with an ASYNCHRONOUS fileFilter is affected, and uploads using a SYNCHRONOUS
+fileFilter are not affected. Measured: the string fileFilter appears ZERO times in
+apps/api/src; the api's single multipart route
+(modules/customer/legacy-import.controller.ts) passes only limits { fileSize, files: 1 };
+and @nestjs/platform-express injects none — the string occurs once in its whole tree, in
+a .d.ts DECLARING the option as optional. files: 1 also means there can never be a
+second file sitting with a filter pending while another is rejected, which IS the
+mechanism the advisory describes.
+
+AND THE PREMISE IS PINNED BY A TEST, WHICH IS HER CONDITION AND IS NOT OPTIONAL:
+apps/api/src/common/multipart-upload-exposure.inventory.spec.ts asserts both facts BY
+NAME over the whole api source — no upload route passes a fileFilter, and none accepts
+more than one file — so the PREMISE fails rather than the feature, and it fails for a
+SECOND upload route somebody adds rather than only for a change to the existing one. It
+carries a non-vacuity floor, because every assertion in it is a loop and an empty loop
+passes. Three committed plants cover both premises and the floor.
+
+THE 2026-09 HISTORY IS WHY THAT TEST EXISTS RATHER THAN A COMMENT. Four multer
+advisories were accepted here on these same two grounds and the reachability half had
+ALREADY BEEN FALSE for sixteen days, because a FileInterceptor route landed four days
+after the acknowledgement was written (IMPROVEMENTS.md section 1.82). A record whose
+premise nothing checks is a record that goes quietly false.
+
+RULE 1, NO UPGRADE PATH, AND THIS IS A WAIT WITH A DATE RATHER THAN AN EXEMPTION. The
+fix EXISTS upstream in multer 2.5.0; what is being waited for is Nest moving its exact
+pin. @nestjs/platform-express pins multer at an EXACT 2.4.0, and EVERY published version
+through 12.2.0 still pins 2.4.0 — checked one at a time rather than off the latest
+major, which is rule 1's own instruction. That sentence is what makes the review date
+honest.
+
+AND THE THREE MECHANISMS THAT FORCE 2.5.0 WERE EACH TRIED AND EACH BROKE SOMETHING,
+PROVEN BY RUNNING THE UPLOAD ROUTE. A root override of ^2.5.0 alone made npm DROP multer
+from the tree entirely (node_modules/multer ABSENT) — and this gate then went GREEN
+BECAUSE THE PACKAGE HAD VANISHED, which would have shipped a latent crash on the one
+route that uses it. An exact 2.5.0 override did the same. Declaring multer ^2.5.0
+directly in apps/api PLUS the override did install 2.5.0 deduped onto one copy — and
+legacy-import.e2e-spec.ts + legacy-import-report.e2e-spec.ts went from 8/8 to FIVE
+FAILED, every multipart request answering 400. Isolated afterwards by single variable:
+body-parser 2.4.0 alone is 8/8, multer 2.4.0 UNDER the override is 5 failed, and HEAD is
+8/8 — so it is the OVERRIDE MECHANISM against an exact pin, which is this file's own
+recorded finding met for the second time.
+
+THE OBVIOUS REMEDY IS WITHDRAWN, AND THE MEASUREMENT IS WHY: removing our upload route
+would NOT clear this advisory. multer is NOT OUR DEPENDENCY — it appears exactly ONCE in
+the lockfile, as a dependency of @nestjs/platform-express, and is declared in no
+package.json of ours. So dropping the one multipart route would leave the package
+installed and the advisory standing, while costing the customer-import feature. If the
+owner declines this record, the answer is to carry the red until Nest moves its pin,
+never to override it.`,
+    reviewBy: '2026-11-24',
+  },
   /*
    * EMPTY, and that is the intended steady state — every advisory at `high` or above fails this gate.
    *

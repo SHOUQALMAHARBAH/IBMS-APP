@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { anchoredAttributes, anchoredTexts, expectNone } from "./support/anchored";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -36,6 +38,22 @@ const AUDIT_ROWS = [
     isSensitiveDataAccess: false,
     occurredAt: "2026-09-07T09:00:00.000Z",
   },
+  {
+    /*
+     * OWNER DECISION 49's FALLBACK CASE, and it is not an edge: `AuditLogEntry.entityType` is a
+     * bare `String`, so the set is OPEN. Measured 2026-10-23 — dev holds 32 distinct values and
+     * db-test 139, against decision 41's eighteen labels. On db-test 122 of the 139 fall here.
+     */
+    id: "audit-2",
+    userId: "user-2",
+    action: "UPDATE",
+    entityType: "ProfessionalIndemnityPolicy",
+    entityId: "pi-1",
+    beforeValue: null,
+    afterValue: null,
+    isSensitiveDataAccess: false,
+    occurredAt: "2026-09-07T10:00:00.000Z",
+  },
 ];
 
 const DOCUMENT_HISTORY = {
@@ -48,6 +66,8 @@ const DOCUMENT_HISTORY = {
       category: "POLICY",
       classification: "CONFIDENTIAL",
       uploadedByUserId: "user-2",
+      // Item 1 — the uploader by NAME, resolved by the api through decision 48's resolver.
+      uploadedByName: "سامر عبدالله الحوراني",
       deletionLocked: true,
       deletionOverrideByUserId: null,
       createdAt: "2026-09-01T00:00:00.000Z",
@@ -85,7 +105,11 @@ test("browses the audit log, looks up workflow history, and looks up document hi
   await page.getByRole("button", { name: "Browse" }).click();
   await expect(page.getByRole("cell", { name: "Status change" }).first()).toBeVisible();
 
-  await page.getByLabel("Workflow entity type").fill("Lead");
+  // `selectOption`, not `fill` — owner decision 41 made this a `<select>` over the eighteen entity
+  // types the transition engine knows. It was a free-text box validated server-side against
+  // `@Length(1, 100)` and against nothing else, so a person had to guess the exact string the writers
+  // store and a wrong guess returned an empty history that reads as "nothing ever happened here".
+  await page.getByLabel("Workflow entity type").selectOption("Lead");
   await page.getByLabel("Workflow entity id").fill("lead-1");
   await page.getByRole("button", { name: "Look up" }).first().click();
   await expect(page.getByText("lead-1").first()).toBeVisible();
@@ -93,7 +117,53 @@ test("browses the audit log, looks up workflow history, and looks up document hi
   await page.getByLabel("Document id").fill("doc-1");
   await page.getByRole("button", { name: "Look up" }).nth(1).click();
   await expect(page.getByRole("cell", { name: "policy-schedule.pdf" })).toBeVisible();
-  await expect(page.getByText("v1 (requested)")).toBeVisible();
+  /*
+   * RE-POINTED BY OWNER DECISION 55, AND THE REVERSAL IS STATED. This asserted the literal
+   * `v1 (requested)`, where `(requested)` was hardcoded ENGLISH — an Arabic reader saw it too.
+   * It now carries a real sentence in both languages, because `(requested)` told an English
+   * reader as little as `(truncated)` did.
+   *
+   * SCOPED to the version list rather than page-wide: `check:absence` refuses a page-wide text
+   * absence, and it caught exactly that mistake of mine in CI one batch ago. The helper takes a
+   * Locator so the compiler refuses a page-wide root, and it asserts the scope VISIBLE first —
+   * scoping fixes the wrong-element failure and not the not-yet-rendered one.
+   *
+   * BOTH HALVES: the new sentence present AND the bare word gone, because a half-done
+   * replacement would render both and satisfy a presence-only check.
+   */
+  const versions = page.getByTestId("document-versions");
+  await expect(versions.getByText("v1 (the requested version)")).toBeVisible();
+  await expectAbsentWithin(versions, (s) => s.getByText("(requested)", { exact: true }));
+
+  /*
+   * ITEM 1 — the document VERSION's uploader by NAME, through decision 48's resolver. And note
+   * which side of that decision's boundary this is: a version row is a REGISTER of who filed what,
+   * so it takes the resolver, while the audit rows on this same screen keep the STORED name. Both
+   * shapes are on one page on purpose.
+   */
+  await expect(
+    page.getByRole("cell", { name: "سامر عبدالله الحوراني" }),
+  ).toBeVisible();
+  await expect(page.getByRole("cell", { name: /user-2/ })).toHaveCount(0);
+
+  /*
+   * OWNER DECISION 49 — THE TYPE IN ARABIC PLUS THE NUMBER, NEVER A NAME, and both branches are
+   * asserted because the fallback is not an edge case: `AuditLogEntry.entityType` is a bare
+   * `String`, and measured on 2026-10-23 dev holds 32 distinct values against db-test's 139, so on
+   * db-test 122 of 139 land in the fallback.
+   *
+   * `Lead` is one of decision 41's eighteen, so it renders that type's own word.
+   * `ProfessionalIndemnityPolicy` is not, so it renders AS STORED — visibly machine text, under its
+   * own "record type as stored" label, rather than dressed up as a name.
+   */
+  // `.first()` because this screen renders AUDIT_ROWS in THREE tables (the browse, the workflow
+  // history and the document audit trail), so each row's cell resolves three times. The claim is
+  // that the type's own word plus the number renders at all, which the first match proves.
+  await expect(page.getByText("Leads number lead-1").first()).toBeVisible();
+  await expect(
+    page.getByText("ProfessionalIndemnityPolicy · pi-1").first(),
+  ).toBeVisible();
+  await expect(page.getByTitle("record type as stored").first()).toBeVisible();
 });
 
 test("an action-and-date browse sends all three filters, and `to` covers the WHOLE last day", async ({
@@ -163,6 +233,170 @@ test("a user without any of the three permissions sees a friendly message per se
   await expect(
     page.getByText("(audit-log.read)", { exact: false }),
   ).toBeVisible();
+});
+
+test("the two fields a person could not fill arrive FILLED from the URL", async ({
+  page,
+}) => {
+  /*
+   * OWNER DECISION 41's WHOLE MECHANISM. Both fields were `required` and both took a uuid, so this
+   * screen's workflow- and document-history sections could not be used at all by anybody who did not
+   * already have the id. They are no longer required, and the normal way they get filled is NAVIGATION:
+   * sixteen screens whose rows carry a workflow state link here with `?entityType=&entityId=`. The
+   * `documentId` half is prefilled the same way and has NO inbound link yet — `Document` is not one of
+   * the eighteen workflow types, so A3's link instruction did not cover it — which is why this test
+   * supplies all three in one URL rather than clicking through.
+   *
+   * Asserting the VALUES rather than that a lookup succeeded: a test that only clicked Look up would
+   * pass against a screen that ignored the URL and sent an empty id, because the mock answers anything.
+   */
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto(
+    "/audit-trail?entityType=DisposalBatch&entityId=batch-7&documentId=doc-9",
+  );
+  await expect(page.getByRole("heading", { name: "Audit Trail" })).toBeVisible();
+
+  await expect(page.getByLabel("Workflow entity type")).toHaveValue(
+    "DisposalBatch",
+  );
+  await expect(page.getByLabel("Workflow entity id")).toHaveValue("batch-7");
+  await expect(page.getByLabel("Document id")).toHaveValue("doc-9");
+
+  // And the button is reachable, which is the other half of dropping `required`: the server needs BOTH
+  // halves, so the submit is gated on them rather than by HTML5 validation.
+  await expect(
+    page.getByRole("button", { name: "Look up" }).first(),
+  ).toBeEnabled();
+});
+
+test("every entity the engine knows is offered, and every one of the eighteen has a WORD", async ({
+  page,
+}) => {
+  // The select is built from a map that is total over the union, so this asserts the COUNT against the
+  // eighteen the api declares (kept honest by `workflow-entity-type-parity.spec.ts`) plus the empty
+  // option.
+  //
+  // THE NAME AND THE ASSERTION BOTH CHANGED ON 2026-10-23, and the old ones are worth knowing. This
+  // test used to be called "...and the three with no word show their member name", and it checked that
+  // `Endorsement` rendered as its own member name because nothing had worded it. All three were worded
+  // that day from strings already in the product, so the fallback is now reachable by nothing — and a
+  // test whose NAME counts something is a test whose name goes stale, which is a class this repository
+  // has paid for in a test name, a register row and a CLAUDE.md figure.
+  //
+  // So the assertion is INVERTED into the one that is now meaningful: no option may render its own
+  // member name, because that is what a `null` label looks like on screen. Measured — not one of the
+  // eighteen English labels equals its member name ("Policies" against `Policy`, "Claims" against
+  // `Claim`, "Opportunities" against `Opportunity`), so this cannot fire on a correct label.
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto("/audit-trail");
+  const select = page.getByLabel("Workflow entity type");
+  await expect(select).toBeVisible();
+  await expect(select.locator("option")).toHaveCount(19);
+
+  // A DERIVED label, asserted by its words: `DisposalBatch` takes its screen's own heading.
+  await expect(
+    select.locator("option", { hasText: "Retention & Disposal" }),
+  ).toHaveCount(1);
+
+  /*
+   * AND NO OPTION IS EVER BLANK except the deliberate empty one.
+   *
+   * This replaces an assertion on the literal text "Endorsement", which was the wrong shape: that
+   * member has no Arabic word yet, so it renders its member name — and the day the owner writes the
+   * word, that assertion would have gone RED. A gate failing because somebody did the work it exists
+   * to support is a cost this repository has already paid once, in the permission-description harvest,
+   * and `MAY_HAVE_NO_LABEL` in the parity spec is a subset check for exactly that reason.
+   *
+   * What this asserts instead is the real failure mode and survives either state: a label map that
+   * stopped being total renders `t(undefined)`, which is NOTHING — an option a reader cannot read,
+   * the notification-bell defect on a dropdown. Eighteen non-empty labels plus one empty placeholder.
+   */
+  // `anchoredTexts`, not a raw read — `npm run lint` refuses the raw one by name, because it does not
+  // auto-wait and returns `[]` before render, which would make the emptiness assertion below pass
+  // against an unrendered page. The anchor is the select itself, asserted visible first.
+  const texts = await anchoredTexts(select.locator("option"), select);
+  expect(texts[0]).toBe("Choose a type…");
+  expect(texts.slice(1).filter((t) => t.trim() === "")).toEqual([]);
+  expect(texts.slice(1)).toHaveLength(18);
+
+  // AND NO OPTION RENDERS ITS OWN MEMBER NAME — the visible signature of a `null` label.
+  const values = await anchoredAttributes(select.locator("option"), "value", select);
+  const unworded = values
+    .map((v, i) => ({ value: v, text: texts[i] }))
+    .filter((o) => o.value !== "" && o.value === o.text);
+  expect(unworded).toEqual([]);
+
+  // Selecting by VALUE works for every member, which is what the links send.
+  await select.selectOption("CrossSellOpportunity");
+  await expect(select).toHaveValue("CrossSellOpportunity");
+});
+
+test("the customer chooser appears for the Customer type ALONE", async ({
+  page,
+}) => {
+  /*
+   * A4. One chooser, on Customer, and it is one rather than eighteen for a measured reason: thirteen of
+   * the eighteen entities carry no human-readable field at all, and of the five that do, the read codes
+   * for Policy, Claim and Lead reach neither role that stands on this screen while `IncidentReport` has
+   * no read code at all. Customer is the one entity whose search route BOTH readers already reach.
+   *
+   * THE ABSENCE FOR EVERY OTHER TYPE IS THE HALF WORTH ASSERTING. Without it this test would pass
+   * against a chooser rendered unconditionally, which would offer a customer search on a screen asking
+   * about a disposal batch — a control that cannot fill the field it sits beside.
+   */
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto("/audit-trail");
+  const select = page.getByLabel("Workflow entity type");
+  await expect(select).toBeVisible();
+
+  // Anchored on the id field, which renders for every type — so the absence is not satisfied by an
+  // unhydrated page.
+  await expectNone(
+    page.getByLabel("Find a customer"),
+    page.getByLabel("Workflow entity id"),
+  );
+
+  await select.selectOption("Customer");
+  await expect(page.getByLabel("Find a customer")).toBeVisible();
+
+  // And it goes away again, so the condition is on the live value rather than on having ever chosen.
+  await select.selectOption("DisposalBatch");
+  await expectNone(
+    page.getByLabel("Find a customer"),
+    page.getByLabel("Workflow entity id"),
+  );
+});
+
+test("the document chooser is ABSENT for the external auditor and PRESENT for compliance", async ({
+  page,
+}) => {
+  /*
+   * THE ABSENCE IS THE DECISION, NOT A GAP — owner decision 41.
+   *
+   * `GET /documents/search` is gated on `document.read` ALONE, a deliberate departure from the picker
+   * rule argued in the api's `common/picker-search.config.ts`. Measured on the seeded grid, that code
+   * reaches COMPLIANCE_OFFICER and NOT the EXTERNAL_AUDITOR — so the auditor keeps the TYPED FIELD and
+   * is shown no chooser. NOT an inbound link, which is a correction: `/documents` is gated on
+   * `document.read` too, so that role cannot open the register a link would come from. What reaches it
+   * is the audit-log table on this same screen, whose Entity column renders `Document <id>` rows.
+   * Widening the route would hand a read-only auditor a name search over every document in the office.
+   *
+   * BOTH halves in one test, because either alone is weak: the absence alone would pass against a
+   * chooser nobody ever gets, and the presence alone would pass against one everybody gets.
+   */
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.goto("/audit-trail");
+  // The anchor is the field the auditor DOES keep, from the same render — without it the absence below
+  // is satisfied by a page that has not hydrated.
+  await expectNone(
+    page.getByLabel("Find a document"),
+    page.getByLabel("Document id"),
+  );
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.goto("/audit-trail");
+  await expect(page.getByLabel("Find a document")).toBeVisible();
 });
 
 test("audit trail screen has no serious/critical accessibility violations @a11y", async ({

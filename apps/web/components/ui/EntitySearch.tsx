@@ -16,6 +16,7 @@ import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import { searchEmployees } from '../../lib/supporting-operations/employee-api';
 import {
   searchBranches,
+  searchDocuments,
   searchInsurers,
   searchPolicies,
   searchUsers,
@@ -136,7 +137,8 @@ export type EntityKind =
   | 'insurer'
   | 'policy'
   | 'user'
-  | 'branch';
+  | 'branch'
+  | 'document';
 
 export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
   /**
@@ -347,6 +349,42 @@ export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
     },
   },
 
+  /**
+   * `GET /documents/search` — owner decision 41, so `/audit-trail`'s document-history field can be
+   * filled by naming a file instead of pasting a uuid.
+   *
+   * `minChars: 3`, the server's own floor for this entity: the register holds every version of every
+   * file this office has ever attached, which makes it the largest of the seven sets.
+   *
+   * THE DETAIL LINE IS LOAD-BEARING HERE, more than on any other source. File names repeat by nature —
+   * forty policies each carry a "policy.pdf" — so the category and the version are what tell two
+   * matches apart, and a chooser showing names alone would be a list of identical rows. `v2` is written
+   * as a literal rather than through a key because it is language-free, which is the same treatment the
+   * version column on `/audit-trail` itself already gives it.
+   *
+   * NOT AVAILABLE TO EVERY READER OF THE SCREEN THAT USES IT, deliberately: `document.read` does not
+   * reach the EXTERNAL_AUDITOR, who keeps the typed field. See the api config for why that absence is
+   * the decision rather than a defect to be widened away.
+   */
+  document: {
+    searchLabel: 'entitySearchDocumentLabel',
+    placeholder: 'entitySearchDocumentPlaceholder',
+    noMatches: 'entitySearchDocumentNoMatches',
+    error: 'entitySearchDocumentError',
+    minChars: 3,
+    async search(term) {
+      const rows = await searchDocuments(term);
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.fileName,
+        detail: [
+          { key: ENUM_LABEL.DocumentCategory[r.category] },
+          `v${r.versionNumber}`,
+        ],
+      }));
+    },
+  },
+
   auditActor: {
     searchLabel: 'entitySearchActorLabel',
     placeholder: 'entitySearchActorPlaceholder',
@@ -380,11 +418,23 @@ const listStyle: CSSProperties = {
   top: '100%',
   zIndex: 20,
   background: 'var(--surface-card)',
-  border: '1px solid var(--line)',
+  /*
+   * `--border-default` and `--shadow-md`, resolved by MEASUREMENT rather than by picking an
+   * elevation: `--line` and `--shadow-raised` are both defined nowhere, so this dropdown rendered
+   * with no edge and no shadow — floating over the page with nothing separating it from the content
+   * underneath.
+   *
+   * The answer was already decided one component over. `NotificationBell`'s panel is the app's only
+   * other floating dropdown and is the exact comparable: absolutely positioned, `--surface-card`
+   * background, `border: 1px solid var(--border-default)`, `boxShadow: var(--shadow-md)`. Matching
+   * it is sounder than choosing between `--shadow-sm`/`md`/`lg` on taste, and it makes the two
+   * overlays in this product look like one product.
+   */
+  border: '1px solid var(--border-default)',
   borderRadius: 'var(--radius-sm)',
   maxHeight: '16rem',
   overflowY: 'auto',
-  boxShadow: 'var(--shadow-raised)',
+  boxShadow: 'var(--shadow-md)',
 };
 const optionStyle = (active: boolean): CSSProperties => ({
   padding: 'var(--space-1) var(--space-2)',

@@ -7,10 +7,11 @@ import { useAuth } from '../../../lib/auth/auth-context';
 import {
   createBrokerLicense,
   getBrokerLicense,
-  markBrokerLicenseLapsed,
+  recordRegulatoryAction,
   recordRenewalRequest,
   renewBrokerLicense,
   type BrokerLicense,
+  type BrokerLicenseSeries,
 } from '../../../lib/compliance-risk/broker-license-api';
 import {
   addLicenseScopeBranch,
@@ -33,8 +34,43 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+
+/**
+ * The six derived states, as a TOTAL map over the union.
+ *
+ * `satisfies Record<..., TranslationKey>` rather than a loose index, deliberately: a seventh state
+ * added to the api union is then a COMPILE ERROR here instead of a cell rendering a raw enum word
+ * to a reader. That is the §1.45 lesson, and it is sharper on this screen than most — the thing
+ * being labelled is whether the office may lawfully trade.
+ */
+const STANDING_LABEL = {
+  NO_TERM_ON_RECORD: 'rcStandingNoTerm',
+  ACTIVE: 'rcStandingActive',
+  RENEWAL_PENDING: 'rcStandingRenewalPending',
+  EXPIRED: 'rcStandingExpired',
+  SUSPENDED: 'rcStandingSuspended',
+  CANCELLED: 'rcStandingCancelled',
+} satisfies Record<BrokerLicenseSeries['standing']['status'], TranslationKey>;
+
+/**
+ * The notice stages. TOTAL over the union for the same reason as `STANDING_LABEL`: a sixth stage is
+ * then a compile error rather than a blank line where a deadline warning should be.
+ *
+ * `NONE` has no sentence on purpose — the notice is not rendered at all while the expiry is far off,
+ * and a cheerful "nothing to do" line is how a reader learns to stop looking at this panel.
+ */
+const NOTICE_LABEL = {
+  FIRST: 'rcNoticeFirst',
+  SECOND: 'rcNoticeSecond',
+  CONTINUING: 'rcNoticeContinuing',
+  EXPIRED: 'rcNoticeExpired',
+} satisfies Record<
+  Exclude<BrokerLicenseSeries['renewalNotice']['stage'], 'NONE'>,
+  TranslationKey
+>;
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -56,6 +92,11 @@ const warningStyle: CSSProperties = {
   padding: '0.6rem 0.75rem',
   margin: '0.75rem 0',
   maxWidth: '48rem',
+};
+const noteStyle: CSSProperties = {
+  margin: '0.35rem 0',
+  maxWidth: '48rem',
+  color: 'var(--ink-muted)',
 };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
@@ -83,6 +124,17 @@ export default function RegulatoryCompliancePage() {
   // the office may practise, and the history a regulator asks for.
   const [license, setLicense] = useState<BrokerLicense | null>(null);
   const [terms, setTerms] = useState<BrokerLicense[]>([]);
+  // THE ONE ANSWER, derived by the api on every read and enforced by `LicenseGateService`. It is
+  // held separately from `license` because it is a fact about the OFFICE, not a column on a term:
+  // `NO_TERM_ON_RECORD` is a real standing and there is no term to hang it on.
+  const [standing, setStanding] = useState<
+    BrokerLicenseSeries['standing'] | null
+  >(null);
+  // PIECE 3. Derived by the api on every licence read, so there is no "already shown" state here
+  // either — the component renders what the last read said, which is what the date says.
+  const [notice, setNotice] = useState<
+    BrokerLicenseSeries['renewalNotice'] | null
+  >(null);
   const [licenseLoaded, setLicenseLoaded] = useState(false);
   const [licenseLoadError, setLicenseLoadError] = useState<string | null>(null);
   const [items, setItems] = useState<ComplianceCalendarItem[] | null>(null);
@@ -100,6 +152,17 @@ export default function RegulatoryCompliancePage() {
   const [certificateFileName, setCertificateFileName] = useState('');
   const [certificateStorageRef, setCertificateStorageRef] = useState('');
   const [renewalRequestedAt, setRenewalRequestedAt] = useState('');
+  // The regulator-decision draft. SANCTION is the default basis because it is the case an office
+  // meets without choosing it; a suspension at the office own request is something it applied for.
+  const [actionKind, setActionKind] = useState<
+    'SUSPENSION' | 'CANCELLATION' | 'REINSTATEMENT'
+  >('SUSPENSION');
+  const [actionBasis, setActionBasis] = useState<'BROKER_REQUEST' | 'SANCTION'>(
+    'SANCTION',
+  );
+  const [actionEffectiveFrom, setActionEffectiveFrom] = useState('');
+  const [actionDecisionRef, setActionDecisionRef] = useState('');
+  const [actionSuspendedUntil, setActionSuspendedUntil] = useState('');
   // Module 0 item (e). The scope is loaded separately from the licence because a reader may hold
   // `license.manage` and the office may still have no term — in which case the scope route 404s and
   // the licence panel is the one that explains why.
@@ -118,11 +181,18 @@ export default function RegulatoryCompliancePage() {
       const series = await getBrokerLicense();
       setLicense(series.current);
       setTerms(series.terms);
+      setStanding(series.standing);
+      setNotice(series.renewalNotice);
       setLicenseLoaded(true);
       setLicenseLoadError(null);
     } catch (err) {
       setLicense(null);
       setTerms([]);
+      // Cleared, never left stale: a standing from a previous successful read, shown beside a load
+      // failure, would be this screen asserting that the office may trade on evidence it no longer
+      // has in front of it.
+      setStanding(null);
+      setNotice(null);
       setLicenseLoaded(false);
       // The 404 branch that used to sit here is GONE because the route no longer returns one: an
       // office with no licence is answered as `{ current: null, terms: [] }`. A 404 could not be
@@ -297,11 +367,39 @@ export default function RegulatoryCompliancePage() {
                 <td style={cell}>{t('rcLicenseNumberLabel')}</td>
                 <td style={cell}>{license.licenseNumber}</td>
               </tr>
+              {/*
+                THE DERIVED STANDING, where a STORED FLAG used to be — and the old row was the
+                three-answer defect made visible: it rendered `status` (two values, stored) and then
+                appended "(currently lapsed)" from `isCurrentlyLapsed` (live-derived), so a reader
+                saw two answers in one cell and had no way to know which the system acts on.
+
+                Now it shows the six-state derivation the GATE enforces, so what the screen says and
+                what the system refuses are the same value.
+              */}
               <tr>
-                <td style={cell}>{t('rcColStatus')}</td>
-                <td style={cell}>
-                  {t(ENUM_LABEL.BrokerLicenseStatus[license.status])}
-                  {license.isCurrentlyLapsed ? ' (currently lapsed)' : ''}
+                <td style={cell}>{t('rcStandingHeading')}</td>
+                <td style={cell} data-testid="rc-standing">
+                  {/*
+                    `== null`, LOOSE, so `undefined` lands here too — which is what a field the api
+                    stopped sending looks like. It was `=== null`, and an absent `standing` then
+                    reached `STANDING_LABEL[undefined]` and took the whole licence panel down: the
+                    page rendered the CREATE form and "Loading…", indistinguishable from an office
+                    that holds no licence. These types are hand-copied over HTTP and nothing checks
+                    them against the view, so the degraded state has to be a state.
+                  */}
+                  {standing == null
+                    ? '—'
+                    : (STANDING_LABEL[standing.status] ?? null) === null
+                      ? standing.status
+                      : t(STANDING_LABEL[standing.status])}
+                  {standing?.standingActDecisionRef == null ? null : (
+                    <>
+                      {' · '}
+                      {t('rcStandingDecisionRef')}
+                      {': '}
+                      {standing.standingActDecisionRef}
+                    </>
+                  )}
                 </td>
               </tr>
               <tr>
@@ -343,15 +441,28 @@ export default function RegulatoryCompliancePage() {
             </p>
           ) : null}
 
-          {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
-              system is content with, and explain neither. */}
-          {license.validByOperationOfLaw ? (
+          {/* Art. 10/b's PART-YEAR rule. `=== false` and not `!matches`: null means no issue date
+              on record, which is a missing field and not a discrepancy, and would otherwise warn
+              every office that never recorded one. Also a warning only — same reason as above. */}
+          {license.expiryMatchesThreeYearTerm === false ? (
             <p
               style={warningStyle}
               role="status"
-              data-valid-by-operation-of-law=""
+              data-expiry-not-three-year-term=""
             >
-              {t('rcValidByOperationOfLaw')}
+              {t('rcExpiryNotThreeYearTermWarning')}
+            </p>
+          ) : null}
+
+          {/* Art. 11. Without this the screen would show an expiry in the past and a licence the
+              system is content with, and explain neither. */}
+          {license.validPendingRenewalDecision ? (
+            <p
+              style={warningStyle}
+              role="status"
+              data-valid-pending-renewal-decision=""
+            >
+              {t('rcValidPendingRenewalDecision')}
             </p>
           ) : null}
 
@@ -362,15 +473,141 @@ export default function RegulatoryCompliancePage() {
               {t('rcRenewalFiledLate')}
             </p>
           ) : null}
-          {canManage && !license.isCurrentlyLapsed ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void run(() => markBrokerLicenseLapsed())}
-              style={{ marginTop: '0.5rem' }}
+          {/*
+            WHAT THE BLOCK ACTUALLY IS, said once and in full.
+
+            `mayPractise` is read, never the label — the api header is explicit that the two are not
+            interchangeable, and the gate reads the same field. So what a reader sees here and what
+            the system refuses are one value.
+
+            It NAMES the six acts refused and the five that continue, because an office told only
+            that it is blocked has no way to know whether it may still collect a premium or handle a
+            claim — and an over-wide reading of a block is a worse defect than the block missing.
+          */}
+          {standing !== null && !standing.mayPractise ? (
+            <p
+              style={warningStyle}
+              role="status"
+              data-standing-may-not-practise=""
             >
-              {t('rcMarkLapsedButton')}
-            </button>
+              {t('rcStandingMayNotPractise')}
+            </p>
+          ) : null}
+          {/*
+            Art. 14/c, and the distinction is the whole reason this flag exists on the wire: a
+            cancellation the CBJ DECIDED and one the law reached on its own are different facts, and
+            only the second is something an office can be surprised by.
+          */}
+          {standing?.deemedCancelledUnderArticle14C ? (
+            <p style={warningStyle} role="status" data-deemed-cancelled="">
+              {t('rcStandingDeemedCancelled')}
+            </p>
+          ) : null}
+          <p style={{ ...noteStyle, marginTop: '0.5rem' }} role="status">
+            {t('rcStandingDerived')}
+          </p>
+
+          {/*
+            THE OFFICE RECORDS THE LETTER IT RECEIVED — in place of a one-click button that marked
+            the licence lapsed and stored nothing about why.
+
+            There is no regulator in this system: the CBJ acts outside the product, and three
+            organization types exist. This is the office own record, which is why it sits on the
+            office own screen behind the office own `license.manage`.
+          */}
+          {canManage ? (
+            <div style={{ marginTop: '0.75rem' }} data-regulatory-action-form="">
+              <h3 style={{ margin: '0 0 0.25rem' }}>{t('rcActionsHeading')}</h3>
+              <p style={noteStyle}>{t('rcActionReplacesMarker')}</p>
+              <label style={labelStyle}>
+                {t('rcActionKind')}
+                <select
+                  value={actionKind}
+                  onChange={(e) =>
+                    setActionKind(e.target.value as typeof actionKind)
+                  }
+                >
+                  <option value="SUSPENSION">
+                    {t('rcActionKindSuspension')}
+                  </option>
+                  <option value="CANCELLATION">
+                    {t('rcActionKindCancellation')}
+                  </option>
+                  <option value="REINSTATEMENT">
+                    {t('rcActionKindReinstatement')}
+                  </option>
+                </select>
+              </label>
+              <label style={labelStyle}>
+                {t('rcActionBasis')}
+                <select
+                  value={actionBasis}
+                  onChange={(e) =>
+                    setActionBasis(e.target.value as typeof actionBasis)
+                  }
+                >
+                  <option value="SANCTION">{t('rcActionBasisSanction')}</option>
+                  <option value="BROKER_REQUEST">
+                    {t('rcActionBasisBrokerRequest')}
+                  </option>
+                </select>
+              </label>
+              <label style={labelStyle}>
+                {t('rcActionEffectiveFrom')}
+                <input
+                  type="date"
+                  value={actionEffectiveFrom}
+                  onChange={(e) => setActionEffectiveFrom(e.target.value)}
+                />
+              </label>
+              <label style={labelStyle}>
+                {t('rcActionDecisionRef')}
+                <input
+                  value={actionDecisionRef}
+                  onChange={(e) => setActionDecisionRef(e.target.value)}
+                />
+              </label>
+              {/* Only a SUSPENSION may carry an end date — the database refuses it on any other
+                  kind by CHECK, so offering the field there would be offering a 400. */}
+              {actionKind === 'SUSPENSION' ? (
+                <label style={labelStyle}>
+                  {t('rcActionSuspendedUntil')}
+                  <input
+                    type="date"
+                    value={actionSuspendedUntil}
+                    onChange={(e) => setActionSuspendedUntil(e.target.value)}
+                  />
+                </label>
+              ) : null}
+              <button
+                type="button"
+                /* The reference is NOT NULL in the database and required by the DTO, so the control
+                   refuses rather than sending a request it knows will 400. */
+                disabled={
+                  busy ||
+                  actionEffectiveFrom === '' ||
+                  actionDecisionRef.trim() === ''
+                }
+                onClick={() =>
+                  void run(async () => {
+                    await recordRegulatoryAction({
+                      kind: actionKind,
+                      basis: actionBasis,
+                      effectiveFrom: actionEffectiveFrom,
+                      decisionRef: actionDecisionRef.trim(),
+                      suspendedUntil:
+                        actionKind === 'SUSPENSION' && actionSuspendedUntil
+                          ? actionSuspendedUntil
+                          : undefined,
+                    });
+                    setActionDecisionRef('');
+                    setActionSuspendedUntil('');
+                  })
+                }
+              >
+                {t('rcRecordActionButton')}
+              </button>
+            </div>
           ) : null}
           {/* Write-once: art. 11 measures lateness from the filing date, so the control disappears
               once one is recorded rather than offering an edit the API would refuse. */}
@@ -426,9 +663,14 @@ export default function RegulatoryCompliancePage() {
                         {term.issuedAt ? term.issuedAt.slice(0, 10) : '—'}
                       </td>
                       <td style={cell}>{term.expiresAt.slice(0, 10)}</td>
-                      <td style={cell}>
-                        {t(ENUM_LABEL.BrokerLicenseStatus[term.status])}
-                      </td>
+                      {/*
+                        A TERM HAS NO STATUS OF ITS OWN ANY MORE. The column it rendered is dropped,
+                        and nothing is lost: `pickCurrentTerm` decides which term governs by LATEST
+                        EXPIRY, so a superseded term needs no flag to stop governing — and the
+                        office's STANDING is one answer about the office, not a column on each row.
+                        What a reader needs per term is the period, which the two cells beside this
+                        one already give.
+                      */}
                       <td style={cell}>
                         {term.renewalRequestedAt
                           ? term.renewalRequestedAt.slice(0, 10)
@@ -450,9 +692,37 @@ export default function RegulatoryCompliancePage() {
           {/* Art. 3/a. Said BEFORE the add form rather than only in the refusal, so an officer
               learns the limit before hitting it. */}
           {scope.brokerKind === 'NATURAL_PERSON' ? (
-            <p style={warningStyle} role="status" data-sole-establishment="">
-              {t('rcScopeSoleEstablishmentNote')}
-            </p>
+            <>
+              <p style={warningStyle} role="status" data-sole-establishment="">
+                {t('rcScopeSoleEstablishmentNote')}
+              </p>
+              {/*
+               * THE REFUSAL DECLARES ITS OWN BASIS (owner's instruction, 2026-10-16).
+               *
+               * Art. 3/a's one-type refusal is keyed on `brokerKind === 'NATURAL_PERSON'` and says
+               * nothing about `brokerageKind`, so it fires on a reinsurance broker exactly as it does
+               * on a direct one — while register entry 20 records that whether Instructions No. 9 of
+               * 2026 govern a reinsurance broker at all is UNRESOLVED, and that the column's own
+               * comment once claimed those guards "must not fire" for one. They do.
+               *
+               * NOTHING IS DECIDED HERE AND NO GUARD CHANGED. Entry 20 stays open. What changes is that
+               * a refusal which may rest on an article that does not govern this office stops being
+               * silent about its own basis — the reader is told the rule is applied to every brokerage
+               * office because this product holds no separate text for reinsurance brokerage.
+               *
+               * IT IS STATED FOR EVERY NATURAL-PERSON OFFICE RATHER THAN ONLY A REINSURANCE ONE, and
+               * that is deliberate twice over: the sentence is TRUE of every brokerage office, which is
+               * precisely the thing being declared; and conditioning it on `brokerageKind` would give
+               * that column its first reader, when entry 20's finding is that it is stored and read by
+               * nothing and its meaning is unsettled. A note whose visibility depends on an unresolved
+               * field is a second unresolved question.
+               *
+               * `role="status"` and not `alert`: this is the basis of a refusal, not a second refusal.
+               */}
+              <p role="status" data-one-type-basis="">
+                {t('rcScopeOneTypeBasisNote')}
+              </p>
+            </>
           ) : null}
 
           <p>
@@ -578,6 +848,15 @@ export default function RegulatoryCompliancePage() {
           )}
 
           <h3>{t('rcCapitalHeading')}</h3>
+          {/* THE COUNTING UNIT IS NOT SETTLED, AND THE SCREEN SAYS SO RATHER THAN IMPLYING IT IS.
+              Art. 4/a's slabs count branches within a type, so the unit decides the money figure —
+              and this figure counts OUR 32-line catalogue, which an unattributed reply from the
+              Central Bank suggests is a commercial product list rather than the Bank's own shorter
+              regulatory classification. Nothing is built on that reply; what it does is stop this
+              screen stating a settled answer. See `requiredCapitalForScope`. */}
+          <p role="status" data-testid="capital-counting-unit-unverified">
+            {t('rcCapitalCountingUnitUnverified')}
+          </p>
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
@@ -679,6 +958,68 @@ export default function RegulatoryCompliancePage() {
       ) : null}
 
       <h2 style={{ marginTop: '2rem' }}>{t('rcCalendarHeading')}</h2>
+
+      {/*
+        THE RENEWAL NOTICE, AT THE TOP OF THE CALENDAR — which is its stated home, because the
+        licence renewal IS a regulatory obligation with a date, and an office reading its
+        obligations should not have to scroll up to a different panel to find the one with a
+        statutory deadline on it.
+
+        It is rendered only from FIRST onwards. `NONE` prints nothing at all: a panel that says
+        "nothing due" every day is a panel a reader stops looking at, and this one has to be
+        believed on the day it changes.
+
+        WHO SEES IT is the permission, never a role name (و.١١). `license.manage` gates the read
+        that carries it and `compliance-calendar.manage` gates this section — MEASURED to be held by
+        the same seeded set, so no routing table and no new code.
+      */}
+      {notice != null && notice.stage !== 'NONE' && notice.stage in NOTICE_LABEL ? (
+        <div style={warningStyle} role="status" data-renewal-notice="">
+          <strong>{t('rcNoticeHeading')}</strong>
+          <p style={{ margin: '0.35rem 0' }}>
+            {t(NOTICE_LABEL[notice.stage])}
+          </p>
+          <table>
+            <tbody>
+              {notice.daysToExpiry === null ? null : (
+                <tr>
+                  <td style={cell}>
+                    {/* Two labels, because "3 days remaining" and "3 days since it expired" are
+                        different facts and one of them is a block that is already in force. */}
+                    {notice.daysToExpiry < 0
+                      ? t('rcNoticeDaysSince')
+                      : t('rcNoticeDays')}
+                  </td>
+                  <td style={cell}>{Math.abs(notice.daysToExpiry)}</td>
+                </tr>
+              )}
+              <tr>
+                <td style={cell}>{t('rcExpires')}</td>
+                <td style={cell}>
+                  {notice.expiresAt ? notice.expiresAt.slice(0, 10) : '—'}
+                </td>
+              </tr>
+              <tr>
+                <td style={cell}>{t('rcNoticeApplicationDueBy')}</td>
+                <td style={cell}>
+                  {notice.applicationDueBy
+                    ? notice.applicationDueBy.slice(0, 10)
+                    : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          {/* A FILING IS NOT A DECISION — said in full, because an office that applied on time and
+              heard nothing is the one most likely to read a quiet screen as "handled". */}
+          <p style={{ margin: '0.35rem 0' }} data-renewal-notice-filing="">
+            {notice.renewalFiled ? t('rcNoticeFiled') : t('rcNoticeNotFiled')}
+          </p>
+          {/* Where each figure comes from. 45 is art. 11; 30 is ours and says so, because a number
+              shown beside a citation it does not have is this product asserting a provision. */}
+          <p style={noteStyle}>{t('rcNoticeNoSource')}</p>
+        </div>
+      ) : null}
+
       {canManage ? (
         <form onSubmit={submitItem} style={formStyle}>
           <label style={labelStyle}>
@@ -747,10 +1088,16 @@ export default function RegulatoryCompliancePage() {
                     <td style={cell}>{it.obligationName}</td>
                     <td style={cell}>
                       {it.dueDate.slice(0, 10)}
-                      {it.isOverdue ? ' (overdue)' : ''}
+                      {it.isOverdue ? ` ${t('statusOverdue')}` : ''}
                     </td>
                     <td style={cell}>
-                      {it.isSubmitted ? 'submitted' : 'pending'}
+                      {/* Owner decision 55 — «لم يُقدَّم», NOT «قيد الانتظار»: the English said `pending`,
+                          which reads as BEING PROCESSED, while `isSubmitted` false means nothing has
+                          been filed at all. Different facts, and the second is the one a regulator
+                          asks about. */}
+                      {it.isSubmitted
+                        ? t('statusSubmitted')
+                        : t('statusNotSubmitted')}
                     </td>
                     <td style={cell}>{it.evidenceOfSubmissionRef ?? '—'}</td>
                     <td style={cell}>

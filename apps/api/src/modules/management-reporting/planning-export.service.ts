@@ -15,6 +15,7 @@ import {
   resolvePeriodLabel,
   type PlanningExportSummary,
 } from './planning-export.config';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 /**
  * Process 65 — composes the portfolio + market export payload. See
@@ -29,6 +30,10 @@ export class PlanningExportService {
   constructor(
     private readonly portfolioRepo: PortfolioAnalysisRepository,
     private readonly insurerPerformanceRepo: InsurerPerformanceRepository,
+    /** One resolver for both halves of this export: the portfolio breakdown's insurer rows AND
+     * the market section's. They used to differ — the breakdown resolved a name and the market
+     * section rendered a uuid. */
+    private readonly insurerRepo: InsurerRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -50,10 +55,14 @@ export class PlanningExportService {
 
     this.warnIfTruncated(crossTableRows.length);
 
-    const insurerNames = await this.portfolioRepo.findInsurerNames(
-      insurerGroups.map((g) => g.key),
-    );
-    const insurerNameById = new Map(insurerNames.map((i) => [i.id, i.name]));
+    /* ITEM 1 — ONE batched resolve covering BOTH sections. The market rows' insurers are not
+     * necessarily the breakdown's (a scored insurer this office placed nothing with this month has
+     * no breakdown row), so the union is what has to be asked for, and asking twice would be two
+     * queries for one fact. */
+    const insurerNameById = await this.insurerRepo.namesForInsurerIds([
+      ...insurerGroups.map((g) => g.key),
+      ...marketRows.map((r) => r.insurerId),
+    ]);
 
     const ownerUserIds = [...new Set(crossTableRows.map((r) => r.ownerUserId))];
     const branchNameByOwner =
@@ -68,7 +77,9 @@ export class PlanningExportService {
         byClientSegment: reduceByClientSegment(crossTableRows),
         byGeography: reduceByGeography(crossTableRows, branchNameByOwner),
       },
-      market: marketRows.map(deriveInsurerPerformanceScoreView),
+      market: marketRows.map((r) =>
+        deriveInsurerPerformanceScoreView(r, insurerNameById),
+      ),
     };
 
     await this.safeAudit({

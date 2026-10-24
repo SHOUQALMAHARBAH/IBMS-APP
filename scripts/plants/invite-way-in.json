@@ -1,0 +1,22 @@
+{
+  "the-screen-never-calls-the-invite-route": {
+    "file": "apps/web/app/(app)/provider-offices/page.tsx",
+    "from": "        const result = await inviteOrganizationAdministrator(",
+    "to": "        const result = await (async () => ({ email: '', roleName: '', howTheySignIn: 'PASSWORD_RESET' as const, userId: '' }))() ?? await inviteOrganizationAdministrator("
+  },
+  "the-row-never-says-whether-anyone-can-sign-in": {
+    "file": "apps/web/app/(app)/provider-offices/page.tsx",
+    "from": "                  {office.users > 0 ? (",
+    "to": "                  {true ? ("
+  },
+  "a-company-is-reported-in-regulatory-default": {
+    "file": "apps/web/app/(app)/provider-offices/page.tsx",
+    "from": "                  {!isOffice\n                    ? t('providerOfficesLicenceNotApplicable')\n                    : office.isCurrentlyLapsed === null",
+    "to": "                  {false\n                    ? t('providerOfficesLicenceNotApplicable')\n                    : office.isCurrentlyLapsed === null"
+  },
+  "an-unsent-invitation-is-reported-as-sent": {
+    "file": "apps/web/app/(app)/provider-offices/page.tsx",
+    "from": "        if (result.invitation.outcome === 'SENT') {",
+    "to": "        if (true) {"
+  }
+}

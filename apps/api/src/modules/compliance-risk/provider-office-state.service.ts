@@ -33,7 +33,7 @@ import { OrganizationRepository } from '../../repositories/organization.reposito
  * ## The lapse rule is APPLIED here, not copied into SQL
  *
  * The view returns `status`, `expiresAt` and `renewalRequestedAt` raw. The regulatory answer —
- * manual lapse first, then inside the term, then art. 11's by-operation-of-law extension — comes
+ * manual lapse first, then inside the term, then the renewal-pending rule — comes
  * from `isBrokerLicenseCurrentlyLapsed`, the same function `PolicyService.place()` uses. A copy of
  * that rule in SQL would be a second home for a rule whose CHECK ORDER is load-bearing, and the
  * copy is the one that drifts. A provider dashboard calling an office lapsed when the application
@@ -60,8 +60,24 @@ export interface ProviderOfficeStateView {
   licenseNumber: string | null;
   licenseIssuedAt: string | null;
   licenseExpiresAt: string | null;
-  licenseStatus: string | null;
   renewalRequestedAt: string | null;
+  /**
+   * THE ONE REGULATORY FACT THE PROVIDER SEES: this office may not issue.
+   *
+   * TRUE when a suspension or a cancellation is standing today, by the recorded act series. FALSE —
+   * never null — when none is, because "no regulator has barred this office" is a definite answer
+   * and a null would make a reader guess whether it meant unknown.
+   *
+   * NOTHING BEHIND IT, and the omission is the decision: the reference, the basis, the dates, the
+   * letter and the kind all stay with the office. `provider-office-state.e2e-spec.ts` asserts their
+   * absence by an EXACT KEY SET.
+   *
+   * It is NOT `isCurrentlyLapsed`'s sibling and must not be folded into it. That field is the term
+   * ARITHMETIC — is the latest recorded term past its expiry — and this is a REGULATOR'S ACT. A bar
+   * on a licence whose dates are still valid is therefore distinguishable from an expiry here, which
+   * the owner has accepted: awareness of a bar is the point.
+   */
+  mayNotIssue: boolean;
   /**
    * DERIVED, never read from SQL. True when the office may not place new business.
    *
@@ -94,7 +110,7 @@ function iso(value: Date | null): string | null {
  * `expiresAt <= now` answers identically to the regulatory rule, and the `term === null` branch is
  * never reached at all. An e2e over one office simply cannot tell those apart.
  *
- * So the three licence states and the art. 11 extension are proven HERE, where the input can be
+ * So the three licence states and the renewal-pending rule are proven HERE, where the input can be
  * chosen, and the e2e proves what only it can: that the view crosses offices, that the column list
  * holds, and that the route is gated.
  */
@@ -106,7 +122,6 @@ export function toProviderOfficeStateView(
     row.licenseExpiresAt === null
       ? null
       : {
-          status: row.licenseStatus ?? 'active',
           expiresAt: row.licenseExpiresAt,
           renewalRequestedAt: row.renewalRequestedAt,
         };
@@ -123,11 +138,35 @@ export function toProviderOfficeStateView(
     licenseNumber: row.licenseNumber,
     licenseIssuedAt: iso(row.licenseIssuedAt),
     licenseExpiresAt: iso(row.licenseExpiresAt),
-    licenseStatus: row.licenseStatus,
     renewalRequestedAt: iso(row.renewalRequestedAt),
-    // THE SHARED REGULATORY RULE, never a comparison written here. Its check ORDER is load-bearing
-    // — manual lapse, then inside the term, then art. 11's by-operation-of-law extension — and a
-    // copy would drift from the one `PolicyService.place()` enforces.
+    /*
+     * PASSED THROUGH, never re-derived. The view computed it because this service CANNOT: the acts
+     * are tenant-scoped and this read crosses offices, which is register entry 97 in one sentence.
+     *
+     * And it is NOT merged into `isCurrentlyLapsed` below. Those answer different questions — a
+     * regulator's act versus the term arithmetic — and collapsing them would make a suspension on a
+     * perfectly current licence read as an expiry, which is a false statement about why the office
+     * is stopped.
+     */
+    mayNotIssue: row.mayNotIssue,
+    // THE SHARED TERM ARITHMETIC, never a comparison written here — and this is now a DECLARED
+    // LIMIT rather than the whole answer.
+    //
+    // `LicenseGateService` is the one answer to "may this office practise", and it folds the
+    // office's recorded `RegulatoryAction` rows over the term arithmetic: a CBJ suspension outranks
+    // a perfectly current term. This screen CANNOT ask it. It reads other offices through
+    // `ProviderOfficeState`, a `security_invoker = false` view that exists because those rows are
+    // unreachable by RLS, and `RegulatoryAction` is tenant-scoped like everything else.
+    //
+    // SO WHAT THIS FIELD MEANS IS NARROWER THAN ITS NAME: is this office's latest recorded term
+    // past its expiry, renewal rule applied. An office the CBJ has suspended reads here as holding
+    // a current term.
+    //
+    // It is left as it is on purpose. Putting a regulator decision into that view would disclose to
+    // every holder of `provider.office-state.read` that a competitor has been sanctioned, and the
+    // view's own migration requires that argument to be made again before any column is added. The
+    // gap is in `docs/deferred-register.md`; the dashboard gates nothing, so nothing is decided on
+    // this value.
     isCurrentlyLapsed:
       term === null ? null : isBrokerLicenseCurrentlyLapsed(term, now),
     renewalDueBy:

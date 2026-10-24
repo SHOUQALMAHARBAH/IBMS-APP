@@ -162,11 +162,16 @@ export class UserAdminService {
 
     return rows.map((r) => ({
       id: r.id,
-      // The linked HR record's name wins, because that is the name the person sees in their own navbar
-      // and the one a colleague would recognise; `User.fullName` is free text typed at provisioning.
-      // Same rule as `common/display-name.util.ts`, which this deliberately mirrors rather than
-      // re-deciding.
-      name: r.employee?.fullName ?? r.fullName,
+      /*
+       * The linked HR record's name wins, because that is the name the person sees in their own
+       * navbar and the one a colleague would recognise; `User.fullName` is free text typed at
+       * provisioning.
+       *
+       * CORRECTED BY OWNER DECISION 48: this used to RESTATE the rule inline — its own comment
+       * said it "deliberately mirrors rather than re-deciding", which is a second copy of a rule
+       * whose whole point is having one. A mirror is a copy that can stop mirroring.
+       */
+      name: resolveDisplayName(r),
     }));
   }
 

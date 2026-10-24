@@ -23,6 +23,10 @@ import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 
 /** The keys `ENUM_LABEL.RoleName` actually has — the eleven seeded names. A role
  *  an office defines is deliberately NOT one of these. */
@@ -134,6 +138,10 @@ export default function UserAdminPage() {
   // rendered as their own labelled dropdowns rather than folded in with Roles.
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
   const [branches, setBranches] = useState<OrgUnit[]>([]);
+  /* ITEM 8 — its OWN state, deliberately not `loadError`. That one hides the user list below
+   * (`: loadError ? null :`), and a refused DEPARTMENTS list must not take the user list with
+   * it: provisioning is the screen's purpose and the pickers serve one form on it. */
+  const [listsMissing, setListsMissing] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
 
@@ -168,24 +176,48 @@ export default function UserAdminPage() {
   useEffect(() => {
     if (!user || !isAdmin) return;
     void (async () => {
-      try {
-        const [depts, brs, cat] = await Promise.all([
-          listDepartments(),
-          listBranches(),
-          // GET /rbac/roles needs `role.read`, which a holder of `user.manage`
-          // does not necessarily have.
-          canReadRoles ? listRoles() : Promise.resolve([]),
-        ]);
-        setDepartments(depts);
-        setBranches(brs);
-        setRoleCatalogue(cat);
-        // The grant dropdown's default is whatever the office actually has.
-        // No shared default any more: each row falls back to the first ACTIVE role at render time,
-        // so one row's choice cannot become another row's displayed value.
-      } catch {
-        // The form's own error line covers a failed submit; an empty dropdown
-        // is self-explanatory and must not blank the user list beside it.
-      }
+      /*
+       * ITEM 8 — THIS LOADER'S OLD `catch` SET NOTHING, and its comment said an empty dropdown is
+       * "self-explanatory". It is not: the owner met eight of them on
+       * `/provider-register-office` and concluded the screen was broken. It was also the worst of
+       * the nine, because `Promise.all` discarded the two lists that HAD arrived and then said
+       * nothing at all — so a 403 on roles alone emptied departments and branches as well, with no
+       * sentence anywhere on the screen.
+       *
+       * `loadIndependently` keeps what resolved and NAMES what did not. The second half is the one
+       * that matters: a person can act on "the roles list did not load" and cannot act on a blank
+       * select.
+       */
+      const { values, failures } = await loadIndependently([
+        {
+          key: 'departments',
+          label: t('commonListDepartments'),
+          load: listDepartments,
+        },
+        {
+          key: 'branches',
+          label: t('commonListBranches'),
+          load: listBranches,
+        },
+        // GET /rbac/roles needs `role.read`, which a holder of `user.manage`
+        // does not necessarily have. A caller without it is not a failure — there is nothing to
+        // report, so the entry is absent rather than named as a list that did not load.
+        ...(canReadRoles
+          ? [{ key: 'roles', label: t('commonListRoles'), load: listRoles }]
+          : []),
+      ]);
+      if (values.departments) setDepartments(values.departments as OrgUnit[]);
+      if (values.branches) setBranches(values.branches as OrgUnit[]);
+      if (values.roles)
+        setRoleCatalogue(values.roles as RoleCatalogueEntry[]);
+      // The grant dropdown's default is whatever the office actually has.
+      // No shared default any more: each row falls back to the first ACTIVE role at render time,
+      // so one row's choice cannot become another row's displayed value.
+      setListsMissing(
+        failures.length === 0
+          ? null
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+      );
     })();
   }, [user, isAdmin, canReadRoles, t]);
 
@@ -374,6 +406,11 @@ export default function UserAdminPage() {
       {actionError ? (
         <p role="alert" style={errorStyle}>
           {actionError}
+        </p>
+      ) : null}
+      {listsMissing ? (
+        <p role="status" data-lists-missing style={{ color: 'var(--ink-muted)' }}>
+          {listsMissing}
         </p>
       ) : null}
       {loadError ? (

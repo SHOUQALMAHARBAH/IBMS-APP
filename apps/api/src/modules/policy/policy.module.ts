@@ -8,7 +8,6 @@ import { CertificateOfInsuranceDocumentService } from './certificate-of-insuranc
 import { PolicyRepository } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
 import { PolicyDeliveryRepository } from '../../repositories/policy-delivery.repository';
-import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
 import { PiPolicyRepository } from '../../repositories/pi-policy.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -44,12 +43,16 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
  *     `schedules.length === 0` data-availability gate, deliberately
  *     different CONTENT)
  *
- * `BrokerLicenseRepository` (Process 51, backlog Part C #51's first
- * checkbox — "automatically block new business issuance once the license
- * lapses") is provided directly here too, rather than importing
- * `ComplianceRiskModule` (which owns it) — a stateless `PrismaService`
- * wrapper, safe to instantiate twice, the `WatchlistEntryRepository` (#49)
- * shape, avoiding a `PolicyModule` <-> `ComplianceRiskModule` dependency for
+ * `BrokerLicenseRepository` IS NO LONGER PROVIDED HERE, and the reason is the point of this
+ * batch. It was here because `PolicyService` read the licence terms itself and derived its own
+ * "has it lapsed" answer — the SECOND of three answers to whether the office may practise, and the
+ * only one of the three that enforced anything. New business is now blocked by
+ * `LicenseGateService.assertMayPractise('PLACE_POLICY')`, a `@Global()` engine beside
+ * `WorkflowTransitionService` and `DutySegregationService`, so this module injects the GATE and the
+ * repository has no reader here. Removed rather than left dormant: a provider nothing injects is
+ * dead wiring, and the paragraph that used to sit here explained why it was needed.
+ *
+ * The old arrangement avoided a `PolicyModule` <-> `ComplianceRiskModule` dependency for
  * one narrow read. `PolicyService.place()` is the ONLY caller.
  *
  * `PiPolicyRepository` (Process 53-54) is provided the same way —
@@ -79,7 +82,6 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
     PolicyDeliveryRepository,
     PolicyScheduleSummaryDocumentService,
     CertificateOfInsuranceDocumentService,
-    BrokerLicenseRepository,
     PiPolicyRepository,
   ],
   exports: [PolicyRepository],

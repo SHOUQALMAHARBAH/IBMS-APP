@@ -547,10 +547,10 @@ test("decision buttons for a row are reachable via keyboard", async ({
 });
 
 /*
- * THE TWO COMBINED-DUTY RECORDS ON AN ACCESS RECERTIFICATION — Part 4 step 5, the last of the fifteen.
+ * THE TWO COMBINED-DUTY RECORDS ON AN ACCESS RECERTIFICATION — Part 4 step 5, the last of the original fifteen.
  *
  * `AccessRecertificationItem_maker_checker_distinct` requires that the SUBJECT of a review is not its
- * REVIEWER. It is the only row of the fifteen where the pair has TWO relations, and they are not two
+ * REVIEWER. It is the only row of the sixteen where the pair has TWO relations, and they are not two
  * pairs:
  *
  *   the ARRANGEMENT — she was SET TO review her own access. Written when the CYCLE OPENED, and in a

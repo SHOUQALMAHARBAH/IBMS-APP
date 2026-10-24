@@ -20,6 +20,14 @@ import type { CreateBrokerLicenseDto } from './dto/create-broker-license.dto';
 import type { RenewBrokerLicenseDto } from './dto/renew-broker-license.dto';
 import type { RecordRenewalRequestDto } from './dto/record-renewal-request.dto';
 import type { BrokerLicenseTermDto } from './dto/broker-license-term.dto';
+import { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
+import { RecordRegulatoryActionDto } from './dto/record-regulatory-action.dto';
+import { LicenseGateService } from './license-gate.service';
+import type { DerivedLicenseStanding } from './license-standing.config';
+import {
+  deriveRenewalNotice,
+  type RenewalNotice,
+} from './license-renewal-notice.config';
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -33,6 +41,28 @@ function isUniqueViolation(err: unknown): boolean {
 export interface BrokerLicenseSeriesView {
   current: BrokerLicenseView | null;
   terms: BrokerLicenseView[];
+  /**
+   * THE ONE ANSWER — decision 71's six states plus `mayPractise`, the same value
+   * `LicenseGateService` refuses on.
+   *
+   * It replaces the stored `status` the screen used to render beside `isCurrentlyLapsed`: a
+   * two-value flag next to a live-derived boolean, on the same row, which was the three-answer
+   * defect made visible. What a reader sees and what the system refuses are now one value.
+   */
+  standing: DerivedLicenseStanding;
+  /**
+   * PIECE 3 — THE RENEWAL NOTICE, derived on every read from the current term's own expiry.
+   *
+   * It rides THIS read rather than getting a route of its own, and the reason is measured:
+   * `license.manage` (which gates this) and `compliance-calendar.manage` are held by the SAME
+   * seeded set, so the notice already reaches exactly the people who work the regulatory calendar —
+   * no new permission code, no routing table, and و.١١'s "to a permission holder, never a role
+   * name" is satisfied by the code that is already here.
+   *
+   * Nothing is stored. A "notified at" column would be a second answer to whether the licence is in
+   * fact running out, which is the defect the first half of this batch removed one layer up.
+   */
+  renewalNotice: RenewalNotice;
 }
 
 /**
@@ -55,6 +85,8 @@ export class BrokerLicenseService {
   constructor(
     private readonly repo: BrokerLicenseRepository,
     private readonly audit: AuditService,
+    private readonly acts: RegulatoryActionRepository,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   /** This office's FIRST term. 409 if it already holds one — per office now, where the old 409 was
@@ -120,26 +152,84 @@ export class BrokerLicenseService {
     return deriveBrokerLicenseView(after, new Date());
   }
 
-  /** Manual override — Compliance flags the CURRENT term lapsed ahead of its calendar expiry (e.g.
-   *  a CBJ suspension). Idempotent on an already-lapsed term, 404 if the office holds none. */
-  async markLapsed(actorUserId: string): Promise<BrokerLicenseView> {
-    const current = await this.mustFindCurrentTerm();
-    if (current.status === 'lapsed') {
-      return deriveBrokerLicenseView(current, new Date());
-    }
+  /**
+   * THE OFFICE RECORDS A DECISION THE REGULATOR TOOK ABOUT ITS LICENCE.
+   *
+   * ## THIS REPLACES `markLapsed`, AND THE DIFFERENCE IS THE WHOLE POINT
+   *
+   * `markLapsed` took no body — its own comment said *"the model has no reason field to hold one"* —
+   * and flipped `BrokerLicense.status` to `'lapsed'`. So the office's record of a CBJ suspension was
+   * a two-value flag: no basis, no effective date, no decision reference, no letter.
+   * `deriveLicenseStanding` read it as SUSPENDED with a NULL decision reference and called that null
+   * "the finding", because *"a suspension nobody can cite is exactly the state `RegulatoryAction`
+   * exists to end"*.
+   *
+   * MEASURED before replacing it, so the collapse order in `docs/deferred-register.md` entry 12 is
+   * followed rather than asserted: dev held 3 terms, ALL `active`; db-test held 4 active and 3
+   * lapsed, every one an e2e artefact. Nothing real was standing in for the marker, so there was
+   * nothing to convert — only a capability to replace, and this is it.
+   *
+   * ## THERE IS NO REGULATOR IN THIS SYSTEM
+   *
+   * The CBJ acts on the office outside this product, on paper or electronically. This records a
+   * letter the office RECEIVED. No regulator account, no regulator screen, no regulator action.
+   *
+   * ## AND NOTHING HERE LIFTS A BLOCK
+   *
+   * A REINSTATEMENT is recorded the same way, and the derivation stops folding a suspension once a
+   * later reinstatement stands — so the standing follows the acts rather than a button. What lifts a
+   * lapse is still what it always was: recording the new term WITH its certificate.
+   */
+  async recordRegulatoryAction(
+    dto: RecordRegulatoryActionDto,
+    /*
+     * THE ACTOR, not just an id — because `RegulatoryAction.organizationId` carries NO tenancy
+     * default. Measured off the schema: unlike most scoped models it has no
+     * `@default(dbgenerated())`, so the office has to be named on the INSERT even though RLS scopes
+     * the reads (from-empty asserts that table is ENABLEd and FORCEd). The actor is where this
+     * project gets it — `insurance-company-registration.service.ts` takes the same shape for the
+     * same reason.
+     */
+    actor: { id: string; organizationId: string },
+  ): Promise<DerivedLicenseStanding> {
+    const actorUserId = actor.id;
+    const row = await this.acts.create({
+      organizationId: actor.organizationId,
+      kind: dto.kind,
+      basis: dto.basis,
+      effectiveFrom: new Date(`${dto.effectiveFrom}T00:00:00.000Z`),
+      decisionRef: dto.decisionRef,
+      documentId: dto.documentId ?? null,
+      suspendedUntil:
+        dto.suspendedUntil === undefined
+          ? null
+          : new Date(`${dto.suspendedUntil}T00:00:00.000Z`),
+      recordedByUserId: actorUserId,
+    });
 
-    const res = await this.repo.markLapsed(current.id);
-    const after = await this.mustFindCurrentTerm();
-    if (res.count > 0) {
-      await this.safeAudit({
-        userId: actorUserId,
-        action: 'UPDATE',
-        entityType: 'BrokerLicense',
-        entityId: after.id,
-        afterValue: brokerLicenseAuditSnapshot(after),
-      });
-    }
-    return deriveBrokerLicenseView(after, new Date());
+    /*
+     * AUDITED, AND NOT BEST-EFFORT for the standing itself — but the audit row is `safeAudit`,
+     * matching every other write in this service: the act is already a durable, citable record of
+     * its own, so a failed audit must not lose it.
+     */
+    await this.safeAudit({
+      userId: actorUserId,
+      action: 'CREATE',
+      entityType: 'RegulatoryAction',
+      entityId: row.id,
+      afterValue: {
+        kind: row.kind,
+        basis: row.basis,
+        effectiveFrom: row.effectiveFrom.toISOString(),
+        decisionRef: row.decisionRef,
+        hasDocument: row.documentId !== null,
+        suspendedUntil: row.suspendedUntil?.toISOString() ?? null,
+      },
+    });
+
+    // The standing AFTER the act, returned so the caller sees what it changed to rather than being
+    // told "recorded" and having to go and look.
+    return this.licenseGate.standing();
   }
 
   /**
@@ -157,6 +247,25 @@ export class BrokerLicenseService {
     return {
       current: current ? deriveBrokerLicenseView(current, now) : null,
       terms: terms.map((t) => deriveBrokerLicenseView(t, now)),
+      /*
+       * THE STANDING — the ONE answer, and the screen's replacement for the stored `status` it used
+       * to render beside `isCurrentlyLapsed`.
+       *
+       * That pairing was the three-answer defect made visible: a two-value stored flag next to a
+       * live-derived boolean, on the same row. Now the screen shows the six-state derivation that
+       * the GATE enforces, so what a reader sees and what the system refuses are the same answer.
+       */
+      standing: await this.licenseGate.standing(now),
+      /*
+       * DERIVED FROM THE SAME `current` the gate decides on — `pickCurrentTerm`, the latest expiry.
+       * Warning about the term covering today would tell a renewed office that its licence is
+       * running out.
+       *
+       * And a recorded filing does NOT quieten it: the notice carries `renewalFiled` beside the
+       * stage, because a filing is not a decision and what lifts the block is the new term being
+       * recorded with its certificate.
+       */
+      renewalNotice: deriveRenewalNotice(current, now),
     };
   }
 

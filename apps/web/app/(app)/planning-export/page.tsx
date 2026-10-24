@@ -169,7 +169,7 @@ export default function PlanningExportPage() {
               <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>{t('diepColInsurerId')}</th>
+                    <th style={head}>{t('diepColInsurer')}</th>
                     <th style={head}>{t('diepQuoteResponse')}</th>
                     <th style={head}>{t('diepClaimsService')}</th>
                     <th style={head}>{t('diepPrice')}</th>
@@ -179,7 +179,11 @@ export default function PlanningExportPage() {
                 <tbody>
                   {summary.market.map((row) => (
                     <tr key={row.id}>
-                      <td style={cell}>{row.insurerId}</td>
+                      {/* ITEM 1 — the company's name. This export's portfolio section beside it
+                          already resolved one; the market section rendered a uuid. */}
+                      <td style={cell}>
+                        {row.insurerName ? <bdi>{row.insurerName}</bdi> : '—'}
+                      </td>
                       <td style={cell}>{row.quoteResponseScore}</td>
                       <td style={cell}>{row.claimsServiceScore}</td>
                       <td style={cell}>{row.priceScore}</td>

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import { FinancialDashboardController } from './financial-dashboard.controller';
 import { FinancialDashboardService } from './financial-dashboard.service';
 import { FinancialDashboardRepository } from '../../repositories/financial-dashboard.repository';
@@ -35,6 +36,7 @@ import { AuditModule } from '../audit/audit.module';
     FinancialDashboardService,
     FinancialDashboardRepository,
     InvoiceRepository,
+    RetentionArchiveRepository,
     FinancialReportRepository,
     ProfitabilityPolicyRepository,
   ],

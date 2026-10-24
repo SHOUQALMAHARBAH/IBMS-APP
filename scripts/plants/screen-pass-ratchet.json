@@ -1,0 +1,92 @@
+{
+  "rendered-identifier-shipped": {
+    "file": "apps/web/app/(app)/settings/users/page.tsx",
+    "from": "<td style={cell}>{u.fullName}</td>",
+    "to": "<td style={cell}>{u.id}</td>",
+    "why": "FAULT (1b) SHIPPED — a uuid rendered in the one cell where the record's own human name was already available, which is the whole fault class in one line. `check:rendered-identifiers` fails at 30 against its budget of 29. This is the UP direction: the owner struck attrition precisely so a new instance cannot be absorbed into a count that shrinks later."
+  },
+  "rendered-identifier-budget-raised": {
+    "file": "scripts/measurements/rendered-identifiers.py",
+    "from": "RENDERED_IDENTIFIER_BUDGET = 10",
+    "to": "RENDERED_IDENTIFIER_BUDGET = 11",
+    "why": "THE RATCHET'S OWN DIRECTION. Raising the budget by one is the edit somebody reaches for when a screen regresses, and it is the one thing this gate exists to refuse: the owner struck attrition, so this number only falls. Exits 1 naming the stale figure. REPOINTED 18 -> 16 -> 10 ON 2026-10-24, the ELEVENTH time `plant --self-test` has caught a committed plant whose evidence quietly expired because the work it measures moved — and the eleventh time it was repointed rather than deleted. Note WHICH side it is pointed at: the script and `screen-copy.test.ts` hold this figure in two deliberately independent homes with two independent detectors, and the WEB one is what caught the stale 18 when the script's count fell in batch five. Both have to move together, which is the whole argument for keeping them apart."
+  },
+  "required-typed-identifier-shipped": {
+    "file": "apps/web/app/(app)/complaints/page.tsx",
+    "from": "              value={claimId}",
+    "to": "              value={claimId}\n              required",
+    "why": "A REQUIRED TYPED IDENTIFIER — one word added to an existing optional filter, which is how this fault really arrives. The screen stops being usable by anybody who does not already have a claim's uuid. The required class is gated APART from the total for exactly this: the total does not move at all here, so a single summed budget would have stayed green. **UPDATED 2026-10-23 (owner decision 41): `REQUIRED_TYPED_IDENTIFIER_BUDGET` fell 2 -> 0 when `/audit-trail`'s two required fields were un-required, so this plant now fails at 1 against a FLAT BAN of 0 rather than at 3 against 2. The plant is unchanged and its target is unchanged; only the number it reports moved — which is exactly the stale-figure-in-a-why class this file has already paid for, caught by re-reading the plants a budget change touches rather than by a run.**"
+  },
+  "typed-identifier-budget-raised": {
+    "file": "scripts/measurements/typed-identifier-inputs.py",
+    "from": "TYPED_IDENTIFIER_BUDGET = 26",
+    "to": "TYPED_IDENTIFIER_BUDGET = 27",
+    "why": "THE DOWN DIRECTION on the total. Fails naming 26 as the number to lower to."
+  },
+  "empty-state-removed": {
+    "file": "apps/web/app/(app)/screening-matches/page.tsx",
+    "from": "rows.length === 0 ? (",
+    "to": "false ? (",
+    "why": "FAULT (5) — the empty-state branch made unreachable, so a sanctions review queue with no matches renders nothing where the honest answer is 'no matches to review'. On THIS screen that is the worst available direction: a screening queue that silently shows nothing is indistinguishable from a screening run that cleared everybody. `check:four-states` fails at 3 against its empty-state budget of 2, while the load-error and refusal counts do not move — the argument for gating the three classes separately rather than summing them. TARGET CHOSEN BY MEASUREMENT, AND IT TOOK TWO CORRECTIONS. First I aimed at `watchlist-sync`, whose page carries TWO signals on adjacent lines (`runs.length === 0` AND the `wsNone` key name), so removing the condition left the key behind. Then I aimed at `dashboards/claims` off a list of 18 'single-signal' screens — and that list was measured over the PAGE ALONE while `probe()` reads the page PLUS its locally-imported children, so it was answering a different question from the gate. Re-measured with the script's OWN functions: only THREE screens carry exactly one signal page-and-children, and this is the clean one. A measurement that does not use the checker's own code is not a measurement about the checker."
+  },
+  "empty-state-budget-raised": {
+    "file": "scripts/measurements/four-states.py",
+    "from": "NO_EMPTY_STATE_BUDGET = 2",
+    "to": "NO_EMPTY_STATE_BUDGET = 3",
+    "why": "THE DOWN DIRECTION on the empty-state class, proving the branch fires per class rather than only on a combined total."
+  },
+  "load-error-loses-its-arabic-way-forward": {
+    "file": "apps/web/lib/i18n/translations/common.ts",
+    "from": "    dutyModeLoadError: 'تعذّر تحميل وضع الفصل بين المهام. حاول مرة أخرى.',",
+    "to": "    dutyModeLoadError: 'تعذّر تحميل وضع الفصل بين المهام.',",
+    "why": "FAULT (6), IN THE DIRECTION THAT MATTERS ON THIS PLATFORM — the English keeps its way forward and the Arabic loses it, so the reader this product is built for first is the one left at a dead end. `check:load-error-way-forward` fails with 1 key in ONE LANGUAGE ONLY against a flat ban of 0. An assertion on the English half alone would never have seen it, which is why the script compares both halves of each key rather than counting keys."
+  },
+  "a-route-loses-its-only-caller": {
+    "file": "apps/web/lib/compliance-risk/provider-offices-api.ts",
+    "from": "return apiGet<ProviderOfficeState[]>('/provider/offices');",
+    "to": "return apiGet<ProviderOfficeState[]>('/provider/office');",
+    "why": "FAULT (3) BY PATH, from a one-character typo — the provider dashboard's only read becomes addressed by nothing, so the one screen the platform operator has loses its source. `check:unreachable-routes` fails at 21 against its budget of 20. This is the class that shipped here for weeks with every other gate green: the insurer screens, the mailbox, the customer import. TARGET CHOSEN BY MEASUREMENT, and the first attempt is the finding: I aimed it at `/conflict-of-interest/disclosures`, which has TWO web literals — the GET and the POST — and the by-path pass is VERB-AGNOSTIC, so the surviving POST literal kept the path addressed and the gate stayed green. `/provider/offices` has exactly one literal. That accident is precisely what the next plant exists to cover, and it is why the two route gates are separate rather than summed."
+  },
+  "unreachable-by-path-budget-raised": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "UNREACHED_BY_PATH_BUDGET = 13",
+    "to": "UNREACHED_BY_PATH_BUDGET = 14",
+    "why": "THE DOWN DIRECTION on the by-path count. Fails naming 18. **REPOINTED 2026-10-23 from 20 to 18** — `plant --self-test` refused it (`its anchor occurs 0 time(s)`) the moment failure mode 7 was fixed and the budget followed the instrument down, which is exactly what that self-test exists to catch: a committed plant whose anchor has moved is evidence that has quietly expired. **REPOINTED 2026-10-23 (owner decision 43), THE FOURTH TIME `--self-test` HAS CAUGHT THIS MECHANISM'S OWN EVIDENCE EXPIRING.** Both anchors read 0 the moment the budget moved, and both are repointed rather than deleted: the hazard is unchanged, only its number moved. It will expire again on the next wiring, which is the cost of anchoring a plant on a literal and is accepted here — the literal IS the thing being tested."
+  },
+  "unreachable-controller-budget-raised": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "UNREACHED_CONTROLLER_BUDGET = 7",
+    "to": "UNREACHED_CONTROLLER_BUDGET = 8",
+    "why": "THE SECOND BUDGET ON THIS GATE, PLANTED SEPARATELY BECAUSE IT IS A SEPARATE FACT. The controller count is gated beside the route count because closing two routes in one controller and opening two in a fresh one leaves the route total unchanged and is not the same codebase. This plant moves only the controller number, so it proves the branch fires on it alone — `unreachable-routes` fails naming 10 while the route count stays exactly at its own budget of 18 and reports nothing. **REPOINTED 2026-10-23 (owner decision 43), THE FOURTH TIME `--self-test` HAS CAUGHT THIS MECHANISM'S OWN EVIDENCE EXPIRING.** Both anchors read 0 the moment the budget moved, and both are repointed rather than deleted: the hazard is unchanged, only its number moved. It will expire again on the next wiring, which is the cost of anchoring a plant on a literal and is accepted here — the literal IS the thing being tested."
+  },
+  "helper-built-paths-go-unseen-again": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "                    found, resolved = resolve_first_arg_paths(src, src[m.end():])",
+    "to": "                    found, resolved = first_arg_paths(src[m.end():]), True",
+    "why": "FAILURE MODE 7 RESTORED — the instrument going blind to a path built in a helper. `invitePathFor()` RETURNS `/provider/brokerage-offices/${id}/administrator` and `apiPost` receives a FUNCTION CALL, so the first argument holds no string literal and both administrator invitations read as addressed by nothing. `check:unreachable-routes` fails at 20 across 11 against 18 across 10 — which is the figure this gate was deliberately HELD at for a day (register entry 113) rather than lowered onto an uncorrected matcher. **THE `, True` IS THE POINT OF THE PLANT**: it restores the blindness while also suppressing the `unreadable calls` count, which is what makes the old behaviour a SILENT under-measurement rather than a declared gap. A matcher that cannot read a call must say so; this plant removes both the sight and the admission, which is how the false positive was reported as a finding in the first place."
+  },
+  "a-route-keeps-its-path-and-loses-its-method": {
+    "file": "apps/web/lib/compliance-risk/conflict-of-interest-api.ts",
+    "from": "return apiGet<ConflictOfInterestEntry[]>('/conflict-of-interest/disclosures');",
+    "to": "return apiPatch<ConflictOfInterestEntry[]>('/conflict-of-interest/disclosures', {});",
+    "why": "THE WHOLE REASON THE BY-VERB GATE EXISTS, demonstrated rather than argued. The PATH is still addressed — the POST in this same file reaches it — so `check:unreachable-routes` stays green at 20 and counts the GET as reachable. Only `check:unreachable-routes-by-verb` moves, failing at 10 against 9. That is precisely how `PATCH /customers/:id` shipped with no caller the day after the by-path measurement was taken, which left a statutory correction request impossible to close. Two gates, two matchers, two budgets: summing them would let this one break reporting 0 while the other rose by the same amount."
+  },
+  "unreachable-by-verb-budget-raised": {
+    "file": "scripts/measurements/unreachable-routes-by-verb.py",
+    "from": "MISSING_METHOD_BUDGET = 9",
+    "to": "MISSING_METHOD_BUDGET = 10",
+    "why": "THE DOWN DIRECTION on the by-method count. Fails naming 9."
+  },
+  "one-controller-prefix-per-file": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "                    if at < vm.start():",
+    "to": "                    if at < 10 ** 9:",
+    "why": "THE MULTI-CONTROLLER DEFECT RESTORED — positional attribution replaced by 'take the LAST prefix in the file', which is the same class of error as the original 'take the FIRST'. `provider/provider.controller.ts` declares two (`provider/brokerage-offices` then `provider/insurance-companies`), so all four of its routes collapse onto one prefix and the findings list prints `/provider/insurance-companies/*/administrator` TWICE while the brokerage one disappears — the mirror image of the bug this fixed, where the brokerage one printed twice. **IT DOES NOT MOVE EITHER BUDGET**, which is the point and the reason this plant exists: 20 routes across 11 controllers before and after, so no gate goes red and nothing fails. The only visible difference is that a reader chasing one of the two rows is sent to a route that is not there. That is a plant whose whole value is the LABEL, and the gate cannot catch it — stated here rather than discovered, because the honest limit of a count-based ratchet is that it cannot see a correctly-counted row pointing at the wrong thing."
+  },
+  "the-web-side-of-the-route-scan-goes-blind": {
+    "file": "scripts/measurements/unreachable-routes.py",
+    "from": "WEB = ['apps/web/lib', 'apps/web/app', 'apps/web/components']",
+    "to": "WEB = ['apps/web/lib-moved', 'apps/web/app', 'apps/web/components']",
+    "why": "THE NON-VACUITY FLOOR, and the failure shape it exists for. With one web root moved the scan loses most of its callers and a large block of perfectly reachable routes reads as unreachable — a BROKEN PARSER WEARING THE COSTUME OF A CATASTROPHE, which is the one direction a budget gate alone would misread as a real emergency rather than as its own instrument failing. The floor refuses by name on the path count instead of reporting a number. Its mirror — a matcher that stops matching and reports a clean nothing — is the shape that has already cost this repository four wrong measurements, and is why every one of the six carries a floor."
+  }
+}

@@ -7,7 +7,7 @@ import type { CombinedDutyAct } from '@ibms/db';
  * person under a declared mode — not only in an export. A reader looking at a refund has to be able to see
  * that nobody else signed it without going to find a report.
  *
- * One shape, so the fifteen pairs cannot each invent their own. `roles` is the HAT — the subset that actually
+ * One shape, so the sixteen pairs cannot each invent their own. `roles` is the HAT — the subset that actually
  * granted the checker permission — and `hatAmbiguous` is true when more than one of the actor's roles granted
  * it, which is the record saying "we cannot tell which" rather than picking one.
  */

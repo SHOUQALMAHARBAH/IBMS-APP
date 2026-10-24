@@ -97,7 +97,6 @@ export const COMPLIANCE_RISK = {
     rcLicenseNumberLabel: 'رقم الترخيص',
     rcColStatus: 'الحالة',
     rcExpires: 'ينتهي في',
-    rcMarkLapsedButton: 'تسجيل انتهاء الترخيص',
     rcScopeLabel: 'نطاق التفويض',
     rcIssuedAtLabel: 'تاريخ الإصدار',
     rcExpiresAtLabel: 'تاريخ الانتهاء',
@@ -133,6 +132,10 @@ export const COMPLIANCE_RISK = {
     providerOfficesColUsers: 'المستخدمون',
     providerOfficesColLastUsed: 'آخر استخدام للمكتب',
     providerOfficesNoLicence: 'لا ترخيص مسجَّل',
+    providerOfficesMayNotIssue:
+      'ممنوعٌ من الإصدار',
+    providerOfficesMayNotIssueNote:
+      'يوجدُ قرارٌ رقابيٌّ قائمٌ يَمنعُ هذا المكتبَ من إصدارِ أعمالٍ جديدة. تفاصيلُ القرارِ تبقى لدى المكتبِ نفسِه ولا تَظهرُ هنا.',
     providerOfficesNoTermOnRecord:
       'لا مدة ترخيص مسجَّلة — يُمنع العمل الجديد (م. 21/أ/9)',
     providerOfficesLapsed: 'منتهٍ — يُمنع العمل الجديد',
@@ -140,6 +143,42 @@ export const COMPLIANCE_RISK = {
     providerOfficesBranchesValue: '{total} ({dormant} بلا أي عمل)',
     providerOfficesUsersValue: '{active} نشط من {total}',
     providerOfficesNeverUsed: 'لم يُستخدم بعد',
+    providerOfficesColAdministrator: 'المسؤول الأول',
+    providerOfficesHasAdministrator: 'له حساب',
+    providerOfficesNoAccountYet: 'لا يوجد حساب — لا يستطيع أحد الدخول',
+    providerOfficesInviteOpen: 'دعوة المسؤول الأول',
+    providerOfficesInviteCancel: 'إلغاء الدعوة',
+    providerOfficesInviteHeading: 'دعوة المسؤول الأول لهذه المنظمة',
+    providerOfficesInviteEmailLabel: 'البريد الإلكتروني للعمل (يصبح هوية الدخول)',
+    providerOfficesInviteNameLabel: 'الاسم الكامل كما يظهر على الحساب',
+    providerOfficesInviteReasonLabel:
+      'سبب منح هذه المنظمة مسؤولاً أول (١٠ أحرف على الأقل)',
+    providerOfficesInviteSubmit: 'إرسال الدعوة',
+    providerOfficesInviteSending: 'جارٍ الإرسال…',
+    providerOfficesInviteReasonTooShort:
+      'السبب يحتاج ١٠ أحرف على الأقل — يُسجَّل في سجل التدقيق ويجعل هذا الإنشاء قابلاً للمساءلة.',
+    providerOfficesInviteNoPasswordNote:
+      'لا يُنشئ النظام كلمة مرور ولا يولّدها ولا يحفظها ولا يعرضها على أحد في أي مرحلة. يدخل المسؤول المدعو بطلب إعادة تعيين كلمة المرور على بريده.',
+    providerOfficesInviteChannelNote:
+      'تُرسل الدعوة من صندوق بريد المزوّد نفسه، لأن المنظمة الجديدة لا تملك صندوقاً ولا تستطيع ربطه قبل أن يدخلها أحد. وإن لم يكن بريد المزوّد مربوطاً فسيُنشأ الحساب ولن تُرسل الدعوة، وسيقول لك النظام ذلك صراحةً. ولا يُستخدم أي عنوان مشترك بديلاً.',
+    providerOfficesInviteNotLicensingNote:
+      'هذه دعوة أول حساب يفتح المنظمة على المنصّة، وليست استيفاءً لأي شرط ترخيص. الحد الأدنى للكوادر المعتمدة — مدير الأعمال التأمينية والقائم بأعمال الوساطة — شرطٌ من البنك المركزي يُسجَّل على الموظفين، وهو شيء آخر.',
+    providerOfficesInviteCompanyLimitNote:
+      'تنبيه قبل دعوة شركة تأمين: سيستطيع هذا المسؤول الدخول وقراءة سجل شركته وحده، ولا شيء غير ذلك. لا صندوق طلبات تسعير ولا تسعير ولا إصدار — تلك هي البوابة، وهي مديول منفصل لم يُبنَ بعد. وجود حساب للشركة لا يعني أنها جاهزة للعمل.',
+    providerOfficesInviteDone:
+      'أُرسلت الدعوة. أُنشئ الحساب {email} بدور {roleName}، ويدخل بطلب إعادة تعيين كلمة المرور.',
+    providerOfficesInviteFailed: 'لم تُرسل الدعوة',
+    providerOfficesInviteNotSentHeading: 'أُنشئ الحساب ولم تُرسل الدعوة',
+    providerOfficesInviteNotSentNoMailbox:
+      'أُنشئ الحساب {email} بدور {roleName}، ولم تصل الدعوة إلى صاحبها: المزوّد لم يربط صندوق بريد، فلا يوجد عنوان تُرسل منه الرسالة. لا يستطيع أحد الدخول إلى هذه المنظمة حتى تُرسل الدعوة. اربط بريد المزوّد من الإعدادات ← تكامل البريد، ثم أعد الدعوة — تُصدر رابطاً جديداً ولا تُنشئ حساباً ثانياً.',
+    providerOfficesInviteNotSentRejected:
+      'أُنشئ الحساب {email} بدور {roleName}، ولم تصل الدعوة: صندوق بريد المزوّد مربوط ولكن المزوّد رفض بيانات الاعتماد. أعد الربط من الإعدادات ← تكامل البريد، ثم أعد الدعوة.',
+    providerOfficesInviteNotSentFailed:
+      'أُنشئ الحساب {email} بدور {roleName}، ولم تصل الدعوة: فشل الإرسال لدى المزوّد. أعد الدعوة — تُصدر رابطاً جديداً ولا تُنشئ حساباً ثانياً.',
+    providerOfficesInviteDevLinkNote:
+      'بريد الدعوة غير موصول على هذا الجهاز. هذا الرابط معروضٌ لأن الواجهة البرمجية مُشغَّلة بـ ENABLE_DEV_RESET_TOKEN للتطوير والاختبار فقط، ولا يظهر أبداً في بيئة الإنتاج. وهو رمزٌ لمرّة واحدة ينتهي بعد ساعتين، وليس كلمة مرور — من يفتحه يختار كلمة مروره بنفسه.',
+    providerOfficesInviteDevLinkLabel: 'افتح رابط تعيين كلمة المرور',
+    providerOfficesLicenceNotApplicable: 'لا ينطبق — ليست مكتب وساطة',
     rcStaffingHeading: 'الحد الأدنى للكوادر المعتمدة',
     rcStaffingRequired: 'العدد المطلوب:',
     rcStaffingCurrent: 'المسجَّل حالياً:',
@@ -158,7 +197,11 @@ export const COMPLIANCE_RISK = {
     rcScopeColType: 'النوع',
     rcScopeSoleEstablishmentNote:
       'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',
+    rcScopeOneTypeBasisNote:
+      'وتُطبَّق قاعدةُ النوع الواحد على كلِّ مكتب وساطة، مباشرةً كان أو إعادةَ تأمين، لأنّ هذا النظام لا يحمل نصّاً تنظيميّاً منفصلاً لوساطة إعادة التأمين — فإن كان هذا المكتب وسيطَ إعادة تأمين فهذا هو سندُ تطبيق المادة ٣/أ عليه، ومسألةُ شمولها لوسيط إعادة التأمين غيرُ محسومةٍ هنا.',
     rcCapitalHeading: 'رأس المال (المادة 4/أ)',
+    rcCapitalCountingUnitUnverified:
+      'وحدةُ عدِّ الفروع التي تُحدَّد بها شريحةُ المادة ٤/أ قيدُ التحقّق مع البنك المركزي. يُحسَب الرقم أدناه بعدِّ فروع كتالوجنا البالغة ٣٢ فرعاً، وقد يكون التصنيفُ الرقابيُّ المعتمَد أقصرَ من ذلك — فيتغيّر العدد وتتغيّر معه الشريحة. الرقمُ للاطّلاع ولا يُعتمَد عليه التزاماً مالياً حتى يصل التصنيفُ الرسمي.',
     rcCapitalRequired: 'رأس المال المطلوب',
     rcCapitalPaidUp: 'رأس المال المدفوع',
     rcCapitalUnrecordedWarning:
@@ -169,8 +212,10 @@ export const COMPLIANCE_RISK = {
     rcRenewalDueBy: 'آخر موعد لتقديم طلب التجديد',
     rcExpiryNotEndOfYearWarning:
       'تاريخ الانتهاء المُدخل ليس 31 كانون الأول/ديسمبر. مدة الترخيص تنتهي في 31 كانون الأول (المادة 10/ب) — تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
-    rcValidByOperationOfLaw:
-      'انتهى تاريخ هذه المدة المطبوع، والترخيص ما زال ساريًا بحكم القانون لأن طلب التجديد قُدّم في موعده (المادة 11). يبقى ساريًا حتى صدور قرار البنك المركزي.',
+    rcExpiryNotThreeYearTermWarning:
+      'تاريخ الانتهاء المُدخل لا يطابق مدة الثلاث سنوات التي تقتضيها المادة 10/ب: المدة ثلاث سنوات ميلادية تنتهي في 31 كانون الأول، ويُعتبر جزء السنة الميلادية لهذه الغاية سنة — فسنة الإصدار تُحتسب سنة كاملة. تحقّق من التاريخ كما هو مطبوع على الشهادة. لم يُرفض الإدخال.',
+    rcValidPendingRenewalDecision:
+      'انتهى تاريخ هذه المدة المطبوع، ويُعامَل الترخيص على أنه ما زال ساريًا لأن طلب التجديد قُدّم في موعده، إلى حين صدور قرار البنك المركزي. هذا قرار داخلي للمكتب ولا يستند إلى نص في تعليمات رقم (9) لسنة 2026.',
     rcRenewalFiledLate:
       'قُدّم طلب التجديد بعد الموعد المحدّد (المادة 11) — لن يستمر سريان الترخيص بعد تاريخ الانتهاء.',
     rcExpectedThreeYearExpiry: 'نهاية مدة الثلاث سنوات المتوقّعة',
@@ -191,6 +236,76 @@ export const COMPLIANCE_RISK = {
     rcLoading: 'جارٍ التحميل…',
     rcLicenseLoadError: 'تعذّر تحميل ترخيص الوسيط — حاول مرة أخرى.',
     rcCalendarLoadError: 'تعذّر تحميل تقويم الالتزامات — حاول مرة أخرى.',
+    rcStandingHeading:
+      'حالةُ الترخيص',
+    rcStandingNoTerm:
+      'لا توجدُ مدّةُ ترخيصٍ مسجّلة',
+    rcStandingActive:
+      'ساري',
+    rcStandingRenewalPending:
+      'قيدَ التجديد',
+    rcStandingExpired:
+      'منتهي',
+    rcStandingSuspended:
+      'موقوف',
+    rcStandingCancelled:
+      'ملغى',
+    rcStandingDerived:
+      'هذه الحالةُ مُستنبَطةٌ من مدَدِ الترخيصِ المسجّلةِ ومن قراراتِ الجهةِ الرقابيةِ المدوَّنة، وليست محفوظةً كحقل. وهي نفسُ الحالةِ التي يَمنعُ النظامُ على أساسِها الأعمالَ الجديدة.',
+    rcStandingMayNotPractise:
+      'لا يجوزُ للمكتبِ مباشرةُ أعمالٍ جديدةٍ في هذه الحالة: إصدارُ وثيقةٍ جديدةٍ، أو تجديدُها، أو طلبُ عروضٍ من الشركات، أو إصدارُ توصيةٍ للعميل، أو ملحقٌ يزيدُ التغطية، أو إصدارُ شهادةِ تأمين. أمّا التحصيلُ والتوريدُ والمطالباتُ والإلغاءُ والتقاريرُ وأعمالُ الامتثالِ فتستمرُّ.',
+    rcStandingDecisionRef:
+      'رقمُ قرارِ الجهةِ الرقابية',
+    rcStandingDeemedCancelled:
+      'عُدَّ الترخيصُ ملغىً بحكمِ المادة ١٤/ج: مضى على الإيقافِ بناءً على طلبِ الوسيطِ أكثرُ من سنتين. لم يَصدُر بذلك قرارٌ من الجهةِ الرقابية، وهذا ما استنبطَه النظامُ من التواريخِ المسجّلة.',
+    rcActionsHeading:
+      'قراراتُ الجهةِ الرقابيةِ المدوَّنة',
+    rcActionKind:
+      'نوعُ القرار',
+    rcActionKindSuspension:
+      'إيقاف',
+    rcActionKindCancellation:
+      'إلغاء',
+    rcActionKindReinstatement:
+      'إعادةُ تفعيل',
+    rcActionBasis:
+      'سندُ القرار',
+    rcActionBasisBrokerRequest:
+      'بناءً على طلبِ المكتب',
+    rcActionBasisSanction:
+      'عقوبةٌ مفروضة',
+    rcActionEffectiveFrom:
+      'تاريخُ نفاذِ القرار',
+    rcActionDecisionRef:
+      'رقمُ القرار',
+    rcActionSuspendedUntil:
+      'ينتهي الإيقافُ في (إن كان محدَّدًا)',
+    rcRecordActionButton:
+      'تدوينُ القرار',
+    rcActionReplacesMarker:
+      'هنا يُدوَّنُ القرارُ كما وردَ في الكتاب: نوعُه وسندُه وتاريخُ نفاذِه ورقمُه. وقد حلَّ هذا محلَّ زرٍّ واحدٍ كان يُعلِّمُ الترخيصَ منتهيًا دونَ أن يَحفظَ شيئًا من ذلك، فكان الإيقافُ مدوَّنًا بلا ما يُستندُ إليه.',
+    rcNoticeHeading:
+      'تنبيهُ تجديدِ الترخيص',
+    rcNoticeFirst:
+      'بقي على انتهاءِ مدّةِ الترخيصِ خمسةٌ وأربعون يومًا، وهو الموعدُ الذي يَجبُ أن يُقدَّمَ فيه طلبُ التجديد (المادة ١١).',
+    rcNoticeSecond:
+      'بقي على انتهاءِ مدّةِ الترخيصِ ثلاثون يومًا.',
+    rcNoticeContinuing:
+      'مدّةُ الترخيصِ على وشكِ الانتهاء، وسيَظهرُ هذا التنبيهُ في كلِّ مرّةٍ حتى يَمضيَ التاريخ.',
+    rcNoticeExpired:
+      'مضى تاريخُ انتهاءِ مدّةِ الترخيص.',
+    rcNoticeDays:
+      'الأيّامُ المتبقّية',
+    rcNoticeDaysSince:
+      'الأيّامُ المنقضيةُ على الانتهاء',
+    rcNoticeApplicationDueBy:
+      'آخرُ موعدٍ لتقديمِ طلبِ التجديد (المادة ١١)',
+    rcNoticeFiled:
+      'طلبُ التجديدِ مدوَّنٌ لدينا. وهذا لا يَرفعُ المنعَ ولا يُوقِفُ التنبيه: تقديمُ الطلبِ ليس قرارًا، والذي يَرفعُ المنعَ هو تدوينُ مدّةِ الترخيصِ الجديدةِ مع شهادتِها.',
+    rcNoticeNotFiled:
+      'لا يوجدُ طلبُ تجديدٍ مدوَّنٌ لدينا.',
+    rcNoticeNoSource:
+      'موعدُ الخمسةِ والأربعين يومًا مأخوذٌ من المادة ١١. أمّا موعدُ الثلاثين يومًا فهو تنبيهٌ داخليٌّ إضافيٌّ لا يَستندُ إلى نصٍّ.',
     rcActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     rcRefusalAct: 'عرض شاشة الالتزام التنظيمي',
     rcCalendarRefusalAct: 'عرض تقويم الالتزام',
@@ -305,6 +420,30 @@ export const COMPLIANCE_RISK = {
     icIntro:
       'كل ثنائية «منفّذ/مدقّق» في المخطّط (الجزء A.5)، تُفحص مباشرةً بحثاً عن صف يكون فيه المنفّذ والمدقّق الشخص نفسه. وكل ثنائية مسنودة أصلاً بقيد في قاعدة البيانات يُفترض أن يجعل ذلك مستحيلاً — فالنتيجة النظيفة هي المتوقّع لا المفاجئ. ويُنفَّذ هذا الفحص تلقائياً كل ليلة أيضاً.',
     icViolationsHeading: 'مخالفات الموافقة الذاتية المكتشفة',
+    /*
+     * OWNER DECISION 54 — HERS VERBATIM, and the reasoning is part of the decision.
+     *
+     * `truncated` IS LOAD-BEARING. Reaching `INTERNAL_CONTROLS_SCAN_LIMIT` means that
+     * pair's result is INCOMPLETE — there may be violations past the limit — so a row
+     * reading *no violations* under a truncated scan is NOT clean. A reader who does not
+     * read English was reading `(truncated)` as clean, which is the worst available
+     * outcome for a self-approval report. The Arabic says WHY and HOW MANY, which the
+     * English never did.
+     *
+     * THE 20000 IS TIED TO THE CONSTANT BY AN ASSERTION, NOT INTERPOLATED, and the
+     * choice is deliberate: interpolating would render the figure through
+     * `formatNumber`, which keeps digits WESTERN, and would therefore silently overrule
+     * the owner's own «٢٠٠٠٠». Arabic-Indic numerals written INTO prose are this
+     * dictionary's established convention — measured, 210 such characters across 14
+     * files, `dsrExtendButton`'s «١٥ يوماً» among them — while `formatNumber`'s
+     * Western digits are for figures rendered from DATA. So her bytes stand and
+     * `screen-copy.test.ts` fails by name if the constant moves away from the string.
+     */
+    icTruncatedNote: '(نتيجة غير مكتملة — فُحِص أول ٢٠٠٠٠ سجل)',
+    /* `dormant` carries BOTH halves on purpose — watched, AND not yet written to.
+     * «غير مستعمل» alone would leave the reader asking why the pair is listed at
+     * all, which is the question the flag exists to answer. */
+    icDormantNote: '(مُراقَب ولم يُستعمَل بعد)',
     icColEntity: 'الكيان',
     icColPair: 'الثنائية',
     icColRecord: 'السجل',
@@ -399,6 +538,30 @@ export const COMPLIANCE_RISK = {
     atFromLabel: 'من تاريخ',
     atToLabel: 'إلى تاريخ',
     atWorkflowEntityTypeLabel: 'نوع كيان سير العمل',
+    // Owner decision 41 — the empty option on a select that used to be a free-text box. The eighteen
+    // option words are NOT here: each one is the translation key of the heading of that entity's own
+    // screen, resolved in `lib/audit-trail/workflow-entity-types.ts`, so the word a reader sees in this
+    // list is the word at the top of the screen they came from.
+    atWorkflowEntityTypeChoose: 'اختر نوع الكيان…',
+    atEntityRef: '{type} رقم {ref}',
+    atEntityTypeUnlabelled: 'نوع السجل كما هو مخزَّن',
+    // The three workflow-entity words that had no label, owner decision of 2026-10-23.
+    // DERIVED, never typed: each is sliced out of a string already rendering in the product —
+    // «الفرص» from the corrected `/opportunities` NAV label (its `/ السوق` half belongs to the
+    // combined screen), «الملحقات» from `policyRequestedExtensionsLabel`, «الفواتير» from
+    // `caColInvoices`. Their own keys rather than pointers at those three, so an entity label is
+    // not hostage to a table column's wording or a nav entry's second noun.
+    //
+    // THE DIVERGENCE THIS COMMENT ONCE REPORTED IS CLOSED — OWNER DECISION 42, same day. The policy
+    // screen's `endorsementSectionHeading` said «التعديلات», a GENERAL word that would fit any
+    // change anywhere; it now says «الملحقات», so the word in this dropdown and the word at the top
+    // of the policy screen are one word. «ملحق» is the owner's own word in the ز.١ list.
+    /* Owner decision 53 — SLICED out of `opSourcePolicyCheckingDiscrepancy`, never typed:
+     * that string calls it a DISCREPANCY, which a policy-checking record may not have. */
+    recordEntityPolicyChecking: 'تدقيق الوثيقة',
+    workflowEntityOpportunity: 'الفرص',
+    workflowEntityEndorsement: 'الملحقات',
+    workflowEntityInvoice: 'الفواتير',
     atWorkflowEntityIdLabel: 'معرّف كيان سير العمل',
     atDocumentIdLabel: 'معرّف المستند',
     atLookUpButton: 'بحث',
@@ -490,7 +653,6 @@ export const COMPLIANCE_RISK = {
     rcLicenseNumberLabel: 'License number',
     rcColStatus: 'Status',
     rcExpires: 'Expires',
-    rcMarkLapsedButton: 'Mark lapsed',
     rcScopeLabel: 'Scope of authorization',
     rcIssuedAtLabel: 'Issued at',
     rcExpiresAtLabel: 'Expires at',
@@ -528,6 +690,10 @@ export const COMPLIANCE_RISK = {
     providerOfficesColUsers: 'Users',
     providerOfficesColLastUsed: 'Office last used',
     providerOfficesNoLicence: 'no licence recorded',
+    providerOfficesMayNotIssue:
+      'May not issue',
+    providerOfficesMayNotIssueNote:
+      'A standing regulatory decision bars this office from issuing new business. The decision itself stays with the office and is not shown here.',
     providerOfficesNoTermOnRecord:
       'no licence term on record — new business blocked (art. 21/a/9)',
     providerOfficesLapsed: 'lapsed — new business blocked',
@@ -535,6 +701,42 @@ export const COMPLIANCE_RISK = {
     providerOfficesBranchesValue: '{total} ({dormant} with no business)',
     providerOfficesUsersValue: '{active} active of {total}',
     providerOfficesNeverUsed: 'never used',
+    providerOfficesColAdministrator: 'First administrator',
+    providerOfficesHasAdministrator: 'has an account',
+    providerOfficesNoAccountYet: 'no account — nobody can sign in',
+    providerOfficesInviteOpen: 'Invite the first administrator',
+    providerOfficesInviteCancel: 'Cancel invitation',
+    providerOfficesInviteHeading: 'Invite this organization its first administrator',
+    providerOfficesInviteEmailLabel: 'Work email (becomes the sign-in identity)',
+    providerOfficesInviteNameLabel: 'Full name, as it should appear on the account',
+    providerOfficesInviteReasonLabel:
+      'Why this organization is being given a first administrator (at least 10 characters)',
+    providerOfficesInviteSubmit: 'Send the invitation',
+    providerOfficesInviteSending: 'Sending…',
+    providerOfficesInviteReasonTooShort:
+      'The reason needs at least 10 characters — it is recorded on the audit row and is what makes this creation answerable rather than merely recorded.',
+    providerOfficesInviteNoPasswordNote:
+      'No password is created, generated, recorded or displayed anywhere, by anyone, at any point. The invited administrator signs in by requesting a password reset on their own email.',
+    providerOfficesInviteChannelNote:
+      'The invitation is sent from the provider own connected mailbox, because a new organization has none and cannot connect one before somebody is inside it. If no provider mailbox is connected the account is created and the invitation is NOT sent, and the system says so plainly. No shared or platform address is ever used instead.',
+    providerOfficesInviteNotLicensingNote:
+      'This invites the first account that OPENS the organization on this platform. It satisfies no licensing requirement: the minimum approved staff — the insurance-business manager and the broker-in-charge — is a Central Bank requirement recorded against employees, and is a different thing.',
+    providerOfficesInviteCompanyLimitNote:
+      'Before inviting an insurance company: this administrator will be able to sign in and read the company own record, and nothing more. No RFQ inbox, no pricing, no issuance — those are the gateway, which is a separate module and is not built. A company having an account does not make it operational.',
+    providerOfficesInviteDone:
+      'Invitation sent. The account {email} was created with the role {roleName}, and signs in by requesting a password reset.',
+    providerOfficesInviteFailed: 'The invitation was not sent',
+    providerOfficesInviteNotSentHeading: 'The account was created and the invitation was NOT sent',
+    providerOfficesInviteNotSentNoMailbox:
+      'The account {email} was created with the role {roleName}, and the invitation did not reach them: the provider has connected no mailbox, so there is no address to send from. Nobody can enter this organization until an invitation arrives. Connect the provider mailbox at Settings → Email integration, then re-invite — that issues a fresh link and creates no second account.',
+    providerOfficesInviteNotSentRejected:
+      'The account {email} was created with the role {roleName}, and the invitation did not arrive: a provider mailbox is connected but the provider rejected the credential. Reconnect it at Settings → Email integration, then re-invite.',
+    providerOfficesInviteNotSentFailed:
+      'The account {email} was created with the role {roleName}, and the invitation did not arrive: the mail provider failed the send. Re-invite — that issues a fresh link and creates no second account.',
+    providerOfficesInviteDevLinkNote:
+      'Invitation mail is not wired on this machine. This link is shown only because the api was started with ENABLE_DEV_RESET_TOKEN for development and testing, and it never appears in production. It is a one-time token that expires in two hours, not a password — whoever opens it chooses their own.',
+    providerOfficesInviteDevLinkLabel: 'Open the set-password link',
+    providerOfficesLicenceNotApplicable: 'not applicable — not a brokerage office',
     rcStaffingHeading: 'Minimum approved staff',
     rcStaffingRequired: 'Required:',
     rcStaffingCurrent: 'Currently recorded:',
@@ -553,7 +755,11 @@ export const COMPLIANCE_RISK = {
     rcScopeColType: 'Type',
     rcScopeSoleEstablishmentNote:
       'This office is registered as a sole establishment (natural person), which may be licensed for ONE insurance type only (art. 3/a). Adding a branch of the other type will be refused.',
+    rcScopeOneTypeBasisNote:
+      'The one-type rule is applied to every brokerage office, direct or reinsurance alike, because this product holds no separate regulatory text for reinsurance brokerage — so if this office is a reinsurance broker, that is the basis on which art. 3/a is being applied to it, and whether the article governs such a broker is not settled here.',
     rcCapitalHeading: 'Capital (art. 4/a)',
+    rcCapitalCountingUnitUnverified:
+      'The unit used to count branches for the art. 4/a slab is under verification with the Central Bank. The figure below counts the 32 lines of our own catalogue; the Bank may license against a shorter regulatory classification, which would change the count and with it the slab. Shown for information — do not rely on it as a financial obligation until the official classification arrives.',
     rcCapitalRequired: 'Required capital',
     rcCapitalPaidUp: 'Paid-up capital',
     rcCapitalUnrecordedWarning:
@@ -565,8 +771,10 @@ export const COMPLIANCE_RISK = {
     rcRenewalDueBy: 'Renewal application due by',
     rcExpiryNotEndOfYearWarning:
       'The expiry you entered is not a 31 December. A licence term ends on 31 December (art. 10/b) — check it against the date printed on the certificate. The entry was not refused.',
-    rcValidByOperationOfLaw:
-      "This term's printed expiry has passed, and the licence remains valid by operation of law because the renewal application was filed on time (art. 11). It stays valid until the CBJ's decision issues.",
+    rcExpiryNotThreeYearTermWarning:
+      'The expiry you entered does not match the three-year term art. 10/b requires: a term runs three calendar years ending 31 December, and part of a calendar year counts as a year — so the year of issue counts as a full first year. Check it against the date printed on the certificate. The entry was not refused.',
+    rcValidPendingRenewalDecision:
+      "This term's printed expiry has passed, and the licence is treated as still valid because the renewal application was filed on time, until the CBJ's decision issues. This is an internal decision and rests on no provision of Instructions No. 9 of 2026.",
     rcRenewalFiledLate:
       'The renewal application was filed after the deadline (art. 11) — the licence will not remain valid past its expiry.',
     rcExpectedThreeYearExpiry: 'Expected end of a three-year term',
@@ -587,6 +795,76 @@ export const COMPLIANCE_RISK = {
     rcLoading: 'Loading…',
     rcLicenseLoadError: 'Could not load the broker license — try again.',
     rcCalendarLoadError: 'Could not load the compliance calendar — try again.',
+    rcStandingHeading:
+      'Licence standing',
+    rcStandingNoTerm:
+      'No licence term on record',
+    rcStandingActive:
+      'Current',
+    rcStandingRenewalPending:
+      'Renewal pending',
+    rcStandingExpired:
+      'Expired',
+    rcStandingSuspended:
+      'Suspended',
+    rcStandingCancelled:
+      'Cancelled',
+    rcStandingDerived:
+      'This standing is derived from the recorded licence terms and any recorded regulator decision, not stored as a field. It is the same answer the system blocks new business on.',
+    rcStandingMayNotPractise:
+      'In this state the office may not place new business: issuing a policy, renewing one, requesting quotes from insurers, issuing a recommendation to the customer, an endorsement that increases cover, or issuing an insurance certificate. Collection and remittance, claims, cancellations, reporting and compliance work all continue.',
+    rcStandingDecisionRef:
+      'Regulator decision reference',
+    rcStandingDeemedCancelled:
+      'Deemed cancelled under art. 14/c: a suspension made at the office own request has stood for more than two years. No regulator decision says so — the system derived it from the recorded dates.',
+    rcActionsHeading:
+      'Recorded regulator decisions',
+    rcActionKind:
+      'Decision',
+    rcActionKindSuspension:
+      'Suspension',
+    rcActionKindCancellation:
+      'Cancellation',
+    rcActionKindReinstatement:
+      'Reinstatement',
+    rcActionBasis:
+      'Basis',
+    rcActionBasisBrokerRequest:
+      'At the office own request',
+    rcActionBasisSanction:
+      'Imposed as a sanction',
+    rcActionEffectiveFrom:
+      'Takes effect from',
+    rcActionDecisionRef:
+      'Decision reference',
+    rcActionSuspendedUntil:
+      'Suspension ends on (if it is dated)',
+    rcRecordActionButton:
+      'Record the decision',
+    rcActionReplacesMarker:
+      'Record the decision as the letter states it: its kind, its basis, the date it takes effect and its reference. This replaces a single button that marked the licence lapsed and stored none of that, so a suspension was recorded with nothing to cite.',
+    rcNoticeHeading:
+      'Licence renewal notice',
+    rcNoticeFirst:
+      'The licence term expires in 45 days, which is the day the renewal application falls due (art. 11).',
+    rcNoticeSecond:
+      'The licence term expires in 30 days.',
+    rcNoticeContinuing:
+      'The licence term is running out. This notice appears on every reading until the date passes.',
+    rcNoticeExpired:
+      'The licence term expiry date has passed.',
+    rcNoticeDays:
+      'Days remaining',
+    rcNoticeDaysSince:
+      'Days since expiry',
+    rcNoticeApplicationDueBy:
+      'Renewal application due by (art. 11)',
+    rcNoticeFiled:
+      'A renewal application is on record. It does NOT lift the block and it does not stop this notice: filing is not a decision, and what lifts the block is recording the new licence term together with its certificate.',
+    rcNoticeNotFiled:
+      'No renewal application is on record.',
+    rcNoticeNoSource:
+      'The 45-day point is art. 11s own deadline. The 30-day point is an additional internal reminder and rests on no provision.',
     rcActionError: 'That action failed — try again.',
     rcRefusalAct: 'view the regulatory compliance screen',
     rcCalendarRefusalAct: 'view the compliance calendar',
@@ -697,6 +975,8 @@ export const COMPLIANCE_RISK = {
     icIntro:
       'Every maker/checker pair in the schema (Part A.5), scanned live for a row where the maker and checker resolve to the same person. Each pair is already backed by a database constraint that should make this impossible — a clean run is the expected outcome, not a surprise. This also runs automatically every night.',
     icViolationsHeading: 'Self-approval violations found',
+    icTruncatedNote: '(incomplete result — only the first 20,000 records were scanned)',
+    icDormantNote: '(watched, and not yet used)',
     icColEntity: 'Entity',
     icColPair: 'Pair',
     icColRecord: 'Record',
@@ -785,6 +1065,13 @@ export const COMPLIANCE_RISK = {
     atFromLabel: 'From',
     atToLabel: 'To',
     atWorkflowEntityTypeLabel: 'Workflow entity type',
+    atWorkflowEntityTypeChoose: 'Choose a type…',
+    atEntityRef: '{type} number {ref}',
+    atEntityTypeUnlabelled: 'record type as stored',
+    recordEntityPolicyChecking: 'Policy Checking',
+    workflowEntityOpportunity: 'Opportunities',
+    workflowEntityEndorsement: 'Endorsements',
+    workflowEntityInvoice: 'Invoices',
     atWorkflowEntityIdLabel: 'Workflow entity id',
     atDocumentIdLabel: 'Document id',
     atLookUpButton: 'Look up',

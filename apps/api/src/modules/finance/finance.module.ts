@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import { InvoiceController } from './invoice.controller';
 import { InvoiceService } from './invoice.service';
 import { CollectionService } from './collection.service';
@@ -27,6 +28,7 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
 import { CustomerModule } from '../customer/customer.module';
 import { CommissionModule } from '../commission/commission.module';
 import { DocumentGenerationModule } from '../document-generation/document-generation.module';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 /**
  * Process 31–32 — Premium Billing + Collection (backlog Part C #31–32, Domain
@@ -119,6 +121,13 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     RefundController,
   ],
   providers: [
+    /* Item 1 — `PaymentChannelService` resolves an insurer owner's NAME through
+       `InsurerRepository.namesForInsurerIds`, which goes through the one resolver that decides
+       whether a registered company or the global catalogue answers. Provided independently rather
+       than by importing InsurerModule: this codebase shares REPOSITORIES, never services.
+       `CustomerRepository` needs no line here — CustomerModule is already imported above and
+       exports it. */
+    InsurerRepository,
     InvoiceService,
     CollectionService,
     InvoiceDocumentService,
@@ -129,6 +138,7 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     FinancialReportService,
     RefundService,
     InvoiceRepository,
+    RetentionArchiveRepository,
     // RefundService reads the Refund + its Endorsement/Policy context and
     // books the disbursement; the repository is provided (not the whole
     // EndorsementModule imported) to keep this a one-way, cycle-free

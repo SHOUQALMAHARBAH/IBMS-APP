@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
+import { WorkflowHistoryLink } from '../ui/WorkflowHistoryLink';
 import { KYC_STATUS_LABEL_KEY } from '../../lib/kyc/kyc-status-labels';
 import {
   approveKyc,
@@ -185,6 +186,12 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                 />
               </td>
               <td style={queueCellStyle}>
+                {/* Owner decision 41 — this KYC file's state history, without a pasted uuid. The
+                    link is to the RECORD, not the customer: `KYCRecord` is the workflow entity.
+                    Renders nothing without `workflow-history.read`. */}
+                <div style={{ marginBottom: "0.4rem" }}>
+                  <WorkflowHistoryLink entityType="KYCRecord" entityId={item.id} />
+                </div>
                 {item.status === "SUBMITTED" ? (
                   <button
                     type="button"

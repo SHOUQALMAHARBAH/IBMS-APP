@@ -75,6 +75,8 @@ const EXPECTED = {
   // relation and change the generated client's relation shape for models the whole codebase
   // reads. They are raw-SQL constraints on purpose: a child row that disagrees with its parent
   // about which office it belongs to FAILS TO INSERT.
+  'ALTER TABLE "RetentionExtension" DROP CONSTRAINT "RetentionExtension_legalHold_same_org_fkey";':
+    'composite tenant FK, raw SQL by design — an extension that cited a legal hold belonging to a different office would make the retention of one office depend on a fact it cannot see',
   'ALTER TABLE "InsurerOfferedLine" DROP CONSTRAINT "InsurerOfferedLine_insurer_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
   'ALTER TABLE "InsurerOfferedLine" DROP CONSTRAINT "InsurerOfferedLine_office_line_same_org_fkey";':

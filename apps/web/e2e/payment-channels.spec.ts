@@ -52,6 +52,8 @@ const CHANNELS = [
     ownerType: "customer",
     customerId: "cust-1",
     insurerId: null,
+    // Item 1 — the owner's name, whichever kind of owner. ONE field for the either-or.
+    ownerName: "شركة اليرموك للتأمين",
     channelType: "bank_transfer",
     label: "Client — Cairo Amman JOD",
     bankName: "Cairo Amman Bank",
@@ -67,6 +69,8 @@ const CHANNELS = [
     ownerType: "insurer",
     customerId: null,
     insurerId: "ins-1",
+    // The INSURER side of the same either-or, resolved through the insurer view's own resolver.
+    ownerName: "شركة الأردن للتأمين",
     channelType: "cheque",
     label: "Insurer settlement",
     bankName: null,
@@ -106,6 +110,31 @@ test("lists customer + insurer channels with masked account fragments", async ({
   await expect(
     page.getByRole("cell", { name: "Deactivated", exact: true }),
   ).toBeVisible();
+
+  /*
+   * ITEM 1 — THE OWNER, BY NAME, BOTH KINDS. Written because the spec passed the moment the field
+   * landed without observing it: nothing here read the owner column at all.
+   *
+   * BOTH KINDS ARE ASSERTED, which is the whole design: one `ownerName` field resolved from a
+   * single Map keyed on whichever of `customerId`/`insurerId` is set. A test exercising only the
+   * customer row would pass against an implementation that read `customerId` alone and left every
+   * insurer channel nameless — and this screen is where client money is SENT, so an unnamed
+   * destination is the worst row on it.
+   *
+   * Plus the pair: neither uuid may survive.
+   */
+  await expect(
+    page.getByRole("cell", { name: "شركة اليرموك للتأمين" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "شركة الأردن للتأمين" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "cust-1", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("cell", { name: "ins-1", exact: true }),
+  ).toHaveCount(0);
 
   // Finance sees the add form
   await expect(page.getByLabel("Owner type")).toBeVisible();

@@ -13,7 +13,9 @@ function org(id: string, legalName = `Office ${id}`): Organization {
   return {
     id,
     legalName,
-    legalNameAr: null,
+    // NOT NULL since module 0-ب Part E measurement 3: ZERO rows lacked an Arabic legal
+    // database, so the column tightened). The compiler asked for this the moment it did.
+    legalNameAr: `مكتب ${id}`,
     brokerLicenseNumber: null,
     subdomain: id,
     // Module 0 item (a). The compiler asked for this the moment the column landed, which is the
@@ -27,7 +29,69 @@ function org(id: string, legalName = `Office ${id}`): Organization {
     // low" are deliberately different states, and this runner is about neither.
     paidUpCapital: null,
     status: 'ACTIVE',
+    /*
+     * MODULE 0-ب ITEM (d) — the 35 registration columns, all null.
+     *
+     * NULL is the honest value and not a shortcut: this runner is about per-organization iteration,
+     * and these three offices were never registered through the form that collects any of this.
+     * They are listed rather than spread from a partial, because the comment below is right — the
+     * TYPE is what forces a decision here, and `...({} as Organization)` would take that away.
+     */
+    code: null,
+    tradeName: null,
+    nationalEstablishmentNo: null,
+    commercialRegistrationNo: null,
+    commercialRegistrationDate: null,
+    taxNumber: null,
+    brokerageKind: null,
+    countryId: null,
+    cityId: null,
+    address: null,
+    phone: null,
+    email: null,
+    website: null,
+    generalManagerName: null,
+    complianceOfficerName: null,
+    complianceOfficerEmail: null,
+    complianceOfficerPhone: null,
+    bankGuaranteeNo: null,
+    bankGuaranteeBankId: null,
+    bankGuaranteeAmount: null,
+    bankGuaranteeExpiry: null,
+    bankId: null,
+    ibanEnc: null,
+    currencyId: null,
+    legalFormId: null,
+    licensingAuthorityId: null,
+    shortName: null,
+    insurerLicenseNumber: null,
+    // MODULE 0-ب, DECISION 88. Both null, which is the state every existing office is in and exactly
+    // what the derived marker is for — absence is the ordinary case, not an error.
+    premisesTenureDocumentId: null,
+    associationMembershipDocumentId: null,
+    // MODULE 0-ب ITEM (e). Listed rather than spread, for the reason this fixture's own comment gives:
+    // the TYPE is the reminder that a new office-level column has to be DECIDED here, not defaulted.
+    insurerLicenseCertificateDocumentId: null,
+    businessModelId: null,
+    integrationMethod: null,
+    apiEndpoint: null,
+    quotationEmail: null,
+    claimsEmail: null,
+    createdByUserId: null,
+    updatedByUserId: null,
     dpoAlternateApproverUserId: null,
+    // MODULE 0-ب — the DPO designation and its declaration. ALL FIVE NULL, and each is the honest
+    // value rather than a shortcut: these three offices were never registered through a form that
+    // collects a designation, and an acknowledgement is a fact about a person reading a sentence, so
+    // a fixture that invented one would assert that somebody read something they have never seen.
+    //
+    // The pair reads as NOT COMBINED — `generalManagerName` above is null too — which is what every
+    // office that predates the column reads as, and is why the notice is shown to none of them.
+    dataProtectionOfficerName: null,
+    dpoManagerCombinedNoticeShown: null,
+    dpoManagerCombinedAcknowledgedAt: null,
+    dpoManagerCombinedAcknowledgedByUserId: null,
+    dpoManagerCombinedAcknowledgedPerson: null,
     // Part 4 — every office reads SEGREGATED unless it has declared otherwise, which is what the migration
     // left every existing one at. A fixture that omitted these would not compile, deliberately: the type is
     // the reminder that a new office-level setting has to be decided here rather than defaulted silently.

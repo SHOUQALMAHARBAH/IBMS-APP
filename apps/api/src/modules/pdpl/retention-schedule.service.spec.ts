@@ -8,6 +8,11 @@ import { Prisma } from '@ibms/db';
 import { RetentionScheduleService } from './retention-schedule.service';
 import type { RetentionScheduleRepository } from '../../repositories/retention-schedule.repository';
 import type { AuditService } from '../audit/audit.service';
+import {
+  combinedOfficeDutySegregation,
+  segregatedOfficeDutySegregation,
+} from '../duty-segregation/duty-segregation.double';
+import type { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 function p2002(): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -22,10 +27,46 @@ const row = (over: Record<string, unknown> = {}) => ({
   retentionPeriodMonths: 120,
   legalBasis: 'DRAFT',
   confirmedByLegalCounselAt: null,
+  // Batch 5 group 6 — all five explicit rather than omitted: under a spread an omitted field becomes
+  // `| undefined`, which is what the compiler reports instead of the omission.
+  noFloorNoticeShown: null,
+  noFloorReason: null,
+  noFloorAcknowledgedAt: null,
+  noFloorAcknowledgedByUserId: null,
+  noFloorAcknowledgedMonths: null,
   ...over,
 });
 
-function makeService(over: { repo?: Record<string, unknown> } = {}) {
+/**
+ * THE DECLARATION THESE TESTS SEND, batch 5 group 6.
+ *
+ * `AuditLogEntry` is a category this system knows no statutory minimum for — it is the one seeded
+ * row, and neither decided floor governs an audit log — so the owner's ruling asks the office to
+ * declare on the first save. Six tests here were asserting the route as it was before that, and a
+ * 422 without this is the mechanism working rather than a regression.
+ */
+const DECLARATION = {
+  noticeShown:
+    'This system does not know a statutory minimum for a record category with this name ' +
+    '— and that does not mean the law sets none for it.',
+  reason: 'Unit-test category; no statute identified for it.',
+  acknowledged: true as const,
+};
+
+/** The five columns a declaration writes, asserted TOGETHER — four of five is a 500 from the CHECK. */
+const DECLARED_COLUMNS = {
+  noFloorNoticeShown: DECLARATION.noticeShown,
+  noFloorReason: DECLARATION.reason,
+  noFloorAcknowledgedAt: expect.any(Date) as unknown as Date,
+  noFloorAcknowledgedByUserId: 'u-compliance',
+};
+
+function makeService(
+  over: {
+    repo?: Record<string, unknown>;
+    dutySegregation?: DutySegregationService;
+  } = {},
+) {
   const repo = {
     create: vi.fn().mockResolvedValue(row()),
     findById: vi.fn().mockResolvedValue(row()),
@@ -40,9 +81,19 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     ...over.repo,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  /*
+   * MODULE 0 CLOSE, DECISION 3 — THE SHARED DOUBLE, never a local `mockResolvedValue(null)`.
+   *
+   * Every existing assertion in this file is about an ordinary two-person act, and a local mock
+   * returning null would make them all pass ON THE MOCK rather than on the code — the trap the
+   * shared double was built for when fifteen service specs gained this dependency at once.
+   * `segregatedOfficeDutySegregation()` refuses exactly as a segregated office does, through the
+   * same `assertDifferentActors`.
+   */
   const service = new RetentionScheduleService(
     repo as unknown as RetentionScheduleRepository,
     audit as unknown as AuditService,
+    over.dutySegregation ?? segregatedOfficeDutySegregation(),
   );
   return { service, repo, audit };
 }
@@ -55,6 +106,7 @@ describe('RetentionScheduleService.create', () => {
         recordCategory: 'AuditLogEntry',
         retentionPeriodMonths: 120,
         legalBasis: 'DRAFT',
+        noFloorDeclaration: DECLARATION,
       },
       'u-compliance',
     );
@@ -63,11 +115,26 @@ describe('RetentionScheduleService.create', () => {
       recordCategory: 'AuditLogEntry',
       retentionPeriodMonths: 120,
       legalBasis: 'DRAFT',
+      // THE FIVE COLUMNS, TOGETHER. `noFloorAcknowledgedMonths` is the period the office was
+      // ACTUALLY acknowledging, which is what makes "asked once" work — a later save at this
+      // figure or longer is not re-asked.
+      ...DECLARED_COLUMNS,
+      noFloorAcknowledgedMonths: 120,
+      // MODULE 0 CLOSE, DECISION 3 — the MAKER is stamped, and asserting it here is what makes the
+      // pair enforceable at all: a row with no maker is a row the confirmation cannot be compared
+      // against. `u-compliance` — the actor THIS test passes, not the confirm test's actor.
+      setByUserId: 'u-compliance',
     });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'CREATE',
         entityType: 'RetentionScheduleItem',
+        // THE SENTENCE AND THE REASON, VERBATIM — not the word "acknowledged". What the person was
+        // TOLD is part of the record, because a year from now the question is what they saw.
+        afterValue: expect.objectContaining({
+          noFloorNoticeShown: DECLARATION.noticeShown,
+          noFloorReason: DECLARATION.reason,
+        }) as unknown,
       }),
     );
   });
@@ -78,7 +145,11 @@ describe('RetentionScheduleService.create', () => {
     });
     await expect(
       service.create(
-        { recordCategory: 'AuditLogEntry', retentionPeriodMonths: 120 },
+        {
+          recordCategory: 'AuditLogEntry',
+          retentionPeriodMonths: 120,
+          noFloorDeclaration: DECLARATION,
+        },
         'u-compliance',
       ),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -90,12 +161,18 @@ describe('RetentionScheduleService.update', () => {
     const { service, repo } = makeService();
     await service.update(
       'rsi-1',
-      { retentionPeriodMonths: 84 },
+      { retentionPeriodMonths: 84, noFloorDeclaration: DECLARATION },
       'u-compliance',
     );
     expect(repo.update).toHaveBeenCalledWith('rsi-1', {
       retentionPeriodMonths: 84,
       legalBasis: undefined,
+      ...DECLARED_COLUMNS,
+      noFloorAcknowledgedMonths: 84,
+      // RE-STAMPED ON EDIT, not carried forward. Otherwise A could create, B edit the figure, and B
+      // confirm their own figure — a self-confirmation the constraint could not see, because it
+      // would be comparing the checker against A.
+      setByUserId: 'u-compliance',
     });
   });
 
@@ -138,7 +215,61 @@ describe('RetentionScheduleService.confirm', () => {
     });
     const v = await service.confirm('rsi-1', 'u-dpo');
     expect(v.isConfirmed).toBe(true);
-    expect(repo.confirm).toHaveBeenCalledWith('rsi-1', expect.any(Date));
+    /*
+     * FOUR ARGUMENTS NOW, and the last two are the point. The ACTOR is what the date never had, and
+     * the escape column is `null` for an ordinary two-person confirmation — asserted as null rather
+     * than ignored, because a spurious act id would mean the engine had silently treated this as a
+     * declared combined act.
+     */
+    expect(repo.confirm).toHaveBeenCalledWith(
+      'rsi-1',
+      expect.any(Date),
+      'u-dpo',
+      null,
+    );
+  });
+
+  it('carries the act id the ENGINE returned into the write, when the office has declared merged duties', async () => {
+    /*
+     * THE TEST THE PREVIOUS ONE COULD NOT BE — § 1.51(d), found by a plant that killed nothing.
+     *
+     * The ordinary-path test asserts the fourth argument is `null`. A plant replacing
+     * `combinedDutyActId` with a literal `null` left it GREEN, because in a segregated office the
+     * engine returns null and the two are observationally identical. So the assertion could not
+     * tell the engine's result from a hardcoded value — which is the whole thing it exists to check.
+     *
+     * Only a COMBINED office distinguishes them: here the maker and the checker are the same person,
+     * the office has declared merged duties, and the engine returns an act id that the write MUST
+     * carry. Without it the database CHECK refuses the row — so dropping the engine's return value
+     * turns a legitimate declared act into a 500, which is the backstop working and not a reason to
+     * leave the service free to forget.
+     */
+    const { service, repo } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValueOnce(row({ setByUserId: 'u-solo' }))
+          .mockResolvedValueOnce(
+            row({
+              setByUserId: 'u-solo',
+              confirmedByLegalCounselAt: new Date('2026-09-14T00:00:00.000Z'),
+            }),
+          ),
+      },
+      dutySegregation: combinedOfficeDutySegregation('act-xyz'),
+    });
+
+    await service.confirm('rsi-1', 'u-solo', {
+      combinedDutyReason:
+        'Sole officer in this office; declared merged duties.',
+    });
+
+    expect(repo.confirm).toHaveBeenCalledWith(
+      'rsi-1',
+      expect.any(Date),
+      'u-solo',
+      'act-xyz',
+    );
   });
 
   it('422s a re-confirm of an already-confirmed item', async () => {

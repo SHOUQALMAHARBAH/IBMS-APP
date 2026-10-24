@@ -247,6 +247,10 @@ beforeAll(async () => {
       // Office-scoped, all of it. Planted so a leak has something recognisable to find.
       creditTermsDays: 45,
       financialStrengthRating: 'A-(office-A-only)',
+      // MODULE 0-ب ITEM (e) — `Insurer_rating_carries_its_date` refuses a rating with no date, in
+      // both directions. A direct Prisma write meets the CHECK itself; the readable message is for
+      // the API path.
+      financialStrengthRatingAsOf: new Date('2026-01-15T00:00:00.000Z'),
       rfqContactName: 'Office A Private Contact',
       claimsContactEmail: 'office-a-claims@yarmouk.test',
     },
@@ -287,6 +291,10 @@ beforeAll(async () => {
       companyWebsite: 'yarmouk.test',
       creditTermsDays: 90,
       financialStrengthRating: 'BBB(office-B-only)',
+      // MODULE 0-ب ITEM (e) — `Insurer_rating_carries_its_date` refuses a rating with no date, in
+      // both directions. A direct Prisma write meets the CHECK itself; the readable message is for
+      // the API path.
+      financialStrengthRatingAsOf: new Date('2026-01-15T00:00:00.000Z'),
       rfqContactName: 'Office B Private Contact',
     },
   });

@@ -5,6 +5,11 @@ import type { RetentionCaseRepository } from '../../repositories/retention-case.
 import type { AuditService } from '../audit/audit.service';
 
 const caseRow = (over: Record<string, unknown> = {}) => ({
+  // RULE 2 — the view projects the customer's NAME now, so the repository double has to
+  // return what the real include returns. The strict row type is what named every one of
+  // these: an optional field would have left the mapper projecting `undefined` here and in
+  // production alike.
+  customer: { legalName: 'Al-Yarmouk Trading Company' },
   id: 'rc-1',
   customerId: 'cust-1',
   reason: 'lapse_risk',

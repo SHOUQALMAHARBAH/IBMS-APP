@@ -1,0 +1,7 @@
+{
+  "the-false-art-11-citation-is-back-on-screen": {
+    "file": "apps/web/lib/i18n/translations/compliance-risk.ts",
+    "from": "      \"This term's printed expiry has passed, and the licence is treated as still valid because the renewal application was filed on time, until the CBJ's decision issues. This is an internal decision and rests on no provision of Instructions No. 9 of 2026.\",",
+    "to": "      \"This term's printed expiry has passed, and the licence remains valid by operation of law because the renewal application was filed on time (art. 11). It stays valid until the CBJ's decision issues.\","
+  }
+}

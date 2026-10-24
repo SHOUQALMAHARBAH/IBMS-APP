@@ -171,11 +171,31 @@ export interface InternalControlsAuditReportByPair {
   truncated: boolean;
 }
 
+/**
+ * ITEM 1 — the classifier's finding PLUS the colleague's name, resolved by the api through
+ * decision 48's resolver.
+ *
+ * A SEPARATE type rather than a `userName` field on `SelfApprovalViolation`, and the reason is
+ * ordering rather than taste: `classifyPairRows` and `classifyCrossTableRows` are PURE and decide
+ * whether a row is a violation at all, so the set of user ids to resolve is not known until after
+ * they have run. A name field on the classifier's own output would have to be optional, and an
+ * optional field is what lets one projection path carry a name while another carries `undefined`.
+ * Here the two layers are honestly different: one answers "did one person do both halves", the
+ * other answers "who".
+ *
+ * `userName` is REQUIRED on this view and NULLABLE in value — a violating account can since have
+ * been deleted, and `AuditLogEntry_userId_fkey` protects the audit trail's actor, not this scan's.
+ * A missing name reports NOTHING, never the uuid.
+ */
+export type SelfApprovalViolationView = SelfApprovalViolation & {
+  userName: string | null;
+};
+
 export interface InternalControlsAuditReport {
   generatedAt: string;
   pairsScanned: number;
   totalRowsChecked: number;
-  violations: SelfApprovalViolation[];
+  violations: SelfApprovalViolationView[];
   byPair: InternalControlsAuditReportByPair[];
 }
 
@@ -184,12 +204,21 @@ export interface InternalControlsAuditReport {
 export function buildInternalControlsReport(
   pairResults: MakerCheckerPairResult[],
   now: Date,
+  /** Item 1 — resolved by `UserRepository.displayNamesForUserIds` from the violating ids, which is
+   * why this is a THIRD parameter rather than a field on the classifier's own output. REQUIRED, so
+   * the compiler names every call site. */
+  userNames: Map<string, string>,
 ): InternalControlsAuditReport {
   return {
     generatedAt: now.toISOString(),
     pairsScanned: pairResults.length,
     totalRowsChecked: pairResults.reduce((sum, r) => sum + r.rowsChecked, 0),
-    violations: pairResults.flatMap((r) => r.violations),
+    violations: pairResults.flatMap((r) =>
+      r.violations.map((v) => ({
+        ...v,
+        userName: userNames.get(v.userId) ?? null,
+      })),
+    ),
     byPair: pairResults.map((r) => ({
       entityType: r.entityType,
       pairLabel: r.pairLabel,

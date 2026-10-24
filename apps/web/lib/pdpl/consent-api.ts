@@ -29,6 +29,9 @@ export interface ConsentRecord {
   withdrawnAt: string | null;
   isActive: boolean;
   createdAt: string;
+  /** Batch six item 2 — whichever subject this record names, BY NAME. The KIND is not on the
+   *  wire: the three ids are already here, so the screen can see which one is set. */
+  subjectName: string | null;
 }
 
 export interface RequestWithdrawalResult {

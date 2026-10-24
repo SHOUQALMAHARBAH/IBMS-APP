@@ -12,6 +12,7 @@ import type {
 } from '../../repositories/employee-performance.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { PeriodWindow } from './employee-performance.config';
+import type { EmployeeRepository } from '../../repositories/employee.repository';
 
 const PERIOD: PeriodWindow = {
   periodLabel: '2026-08',
@@ -57,12 +58,20 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     findLatest: vi.fn().mockResolvedValue(RECORD_ROW),
     ...over.repo,
   };
+  /* A REAL Map, not an empty one: empty makes every `employeeName` null, and a test asserting a
+   * name would then be passing on the double rather than on the code. */
+  const employeeRepo = {
+    namesForEmployeeIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['emp-1', 'سامر عبدالله الحوراني']])),
+  };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new EmployeePerformanceService(
     repo as unknown as EmployeePerformanceRepository,
+    employeeRepo as unknown as EmployeeRepository,
     audit as unknown as AuditService,
   );
-  return { service, repo, audit };
+  return { service, repo, employeeRepo, audit };
 }
 
 describe('EmployeePerformanceService.computeRecordForEmployee', () => {

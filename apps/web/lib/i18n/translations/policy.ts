@@ -57,13 +57,13 @@ export const POLICY = {
     policyRecordDeliveryButtonText: 'تسجيل التسليم',
 
     // EndorsementSection.tsx
-    endorsementSectionHeading: 'التعديلات',
+    endorsementSectionHeading: 'الملحقات',
     endorsementIntro: 'العملية 22 — تعديل الوثيقة بعد الإصدار: إضافة خطوط، زيادة الحدود، تغيير المؤمِّن.',
-    endorsementLoadError: 'تعذر تحميل التعديلات — حاول مرة أخرى.',
-    endorsementNoneYet: 'لم يُسجَّل تعديل بعد.',
+    endorsementLoadError: 'تعذر تحميل الملحقات — حاول مرة أخرى.',
+    endorsementNoneYet: 'لم يُسجَّل ملحق بعد.',
     endorsementCreateButton: 'طلب ملحق',
     endorsementChangeTypeLabel: 'التغيير',
-    endorsementRequestHeading: 'طلب تعديل',
+    endorsementRequestHeading: 'طلب ملحق',
     endorsementTypePositive: 'إيجابي (يضيف قسط)',
     endorsementTypeNegative: 'سلبي (يُرجع قسط)',
     endorsementEffectiveFromInputLabel: 'ساري من',

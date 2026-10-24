@@ -109,12 +109,19 @@ export class CombinedDutyReportService {
     // Names resolved in ONE query over the distinct actors, and NOT stored on the act: a name is a lookup,
     // whereas the roles ARE stored because a revoked role is unrecoverable. The same split the audit trail's
     // actor column already makes.
-    const actorIds = [...new Set(page.map((a) => a.actorUserId))];
-    const names = new Map(
-      (await this.users.findSummariesByIds(actorIds)).map((u) => [
-        u.id,
-        u.fullName,
-      ]),
+    /*
+     * OWNER DECISION 48 — through the ONE resolver, which applies the HR record where the account
+     * is linked. This built its own Map from raw `User.fullName`, and on THIS report that was the
+     * worst place for it: the self-approval report answers "who approved their own work", and the
+     * demo data has all sixteen linked accounts holding an English ROLE LABEL in that column. So
+     * the one register a regulator reads to find an unsegregated act could name a job title.
+     *
+     * AND IT WAS THE EIGHTH SITE, NOT ONE OF THE SEVEN. The brief's figure came from a pattern that
+     * requires the name and `fullName` on one line; here the Map is built two lines above the
+     * projection, so it was invisible to that match. Re-measured properly, there are ELEVEN.
+     */
+    const names = await this.users.displayNamesForUserIds(
+      page.map((a) => a.actorUserId),
     );
 
     // WHICH access acts are the REVIEW, and which only the arrangement.
@@ -173,9 +180,10 @@ export class CombinedDutyReportService {
       return b.at.getTime() - a.at.getTime();
     });
 
-    const declaredBy = office?.dutySegregationModeDeclaredByUserId
-      ? await this.users.findById(office.dutySegregationModeDeclaredByUserId)
-      : null;
+    // Owner decision 48 — the HR record's name where the account is linked, same resolver.
+    const declaredByName = await this.users.displayNameForUserId(
+      office?.dutySegregationModeDeclaredByUserId,
+    );
 
     // Somebody looked. Counts only, never a user id — the same "prove someone looked" precedent
     // `runSelfApprovalAudit` and the SLA dashboard set, and best-effort because a failed audit row must not
@@ -204,7 +212,7 @@ export class CombinedDutyReportService {
         mode: office?.dutySegregationMode ?? 'SEGREGATED',
         declaredAt: office?.dutySegregationModeDeclaredAt ?? null,
         declaredByUserId: office?.dutySegregationModeDeclaredByUserId ?? null,
-        declaredByName: declaredBy?.fullName ?? null,
+        declaredByName,
       },
       rows,
       accessSelfReviewCount: rows.filter((r) => r.accessSelfReview).length,

@@ -30,6 +30,11 @@ import type { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
 import type { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
 import { assertWithinRoleScope } from '../../common/role-scope';
 import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
+import {
+  CustomerFileAnchorService,
+  type CustomerFileAnchor,
+} from './customer-file-anchor.service';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
 /** Result of one follow-up sweep run — logged by the scheduler. Only
  * `candidates` and `due` are row counts; the tallies below are per-step and
@@ -127,6 +132,11 @@ export class RfqService {
     // established cross-module shape — for the line's own `category`, which the role-scope
     // decision needs and this module has no other way to know.
     private readonly lines: InsuranceLineRepository,
+    /* DOOR FOUR. Local to this module on purpose — see that service's header: if it lived in
+     * `common/` the next service wanting cross-owner reach would import it, and the widening
+     * this design refused would arrive one import at a time. */
+    private readonly anchors: CustomerFileAnchorService,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
@@ -226,6 +236,115 @@ export class RfqService {
       opportunityStatus: opportunity.status,
       opportunityCustomerId: opportunity.customerId,
     };
+  }
+
+  /**
+   * DOOR FOUR — the READ path, and the only place an anchor is consulted.
+   *
+   * Everything `findVisibleRfq` admits, this admits. It additionally admits a caller who owns no
+   * part of this customer's file but holds an OPEN piece of work on that customer assigned to them
+   * — an open DSR they are handling, or an open screening case assigned to them. See
+   * `customer-file-anchor.service.ts` for why that is not a permission code.
+   *
+   * IT IS A SEPARATE METHOD RATHER THAN A FLAG, deliberately. `findVisibleRfq` has four callers and
+   * two of them are writes (`addInsurers`, `logCommunication`); a boolean parameter defaulting to
+   * "no anchors" is precisely how a write path acquires cross-owner reach from somebody being
+   * helpful. Writes keep the owner-only policy by construction, not by remembering.
+   *
+   * The returned `anchor` is non-null ONLY when the ownership filter would have refused — which is
+   * exactly the condition the audit rule keys on, so the caller cannot get that wrong either.
+   */
+  private async findReadableRfq(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<{
+    rfq: RfqWithSubmissions;
+    opportunityCustomerId: string;
+    anchor: CustomerFileAnchor | null;
+  }> {
+    const rfq = await this.rfqs.findRfqById(id);
+    if (!rfq) {
+      throw new NotFoundException('RFQ not found');
+    }
+    const opportunity = await this.opportunities.findById(rfq.opportunityId);
+    if (!opportunity) {
+      throw new NotFoundException('RFQ not found');
+    }
+    /*
+     * ONE DECISION FOR THE LIST AND THE DETAIL. `resolveCustomerReadAccess` is the only place that
+     * compares an actor against a customer file and falls back to an anchor; two copies would be
+     * two answers to one question, and the list is the copy that would drift.
+     *
+     * The sentence is re-thrown as "RFQ not found" rather than "Customer not found" because that
+     * is what the caller asked for — and both are the same refusal, deliberately: a 403 here would
+     * confirm that another officer's record exists.
+     */
+    let anchor: CustomerFileAnchor | null;
+    try {
+      anchor = await this.resolveCustomerReadAccess(
+        opportunity.customerId,
+        actor,
+      );
+    } catch {
+      throw new NotFoundException('RFQ not found');
+    }
+    return { rfq, opportunityCustomerId: opportunity.customerId, anchor };
+  }
+
+  /**
+   * THE AUDIT ROW IS HALF OF DOOR FOUR, NOT A DECORATION ON IT.
+   *
+   * An anchored visibility can be abused by opening a sham DSR or a sham screening case. Nothing
+   * prevents that. What makes it better than a blanket grant is that the read is tied to a NAMED
+   * record at a NAMED time, so five cases opened in a day on unconnected customers are VISIBLE —
+   * and a blanket grant leaves no trace at all.
+   *
+   * SO IT IS NOT `safeAudit`. If the row cannot be written the read fails, and the blast radius of
+   * that is bounded to anchored reads alone: the owner of a file and a whole-book reader never
+   * reach this method, so an audit outage cannot break ordinary work.
+   *
+   * ONLY WHEN THE OWNERSHIP FILTER WOULD HAVE REFUSED. A one-person office owns every customer
+   * file, so it produces ZERO of these rows — which is the point, and why the rule is keyed on the
+   * anchor rather than on the role: logging every page an owner opens on his own files is noise,
+   * and under the retention decision its volume is the office's own cost.
+   */
+  private async auditAnchoredRead(
+    actor: AuthenticatedUser,
+    entity: { type: 'RFQ' | 'Customer'; id: string },
+    customerId: string,
+    view: 'rfq' | 'communications' | 'rfq-list',
+    anchor: CustomerFileAnchor,
+    extra: Record<string, string | number> = {},
+  ): Promise<void> {
+    await this.audit.record({
+      userId: actor.id,
+      action: 'READ',
+      entityType: entity.type,
+      /*
+       * THE ENTITY IS THE THING READ, and for the LIST that is the CUSTOMER rather than any one
+       * RFQ. A list read is not a read of an RFQ, and recording it against one id would make the
+       * audit trail answer "who read RFQ X" with somebody who read a chain X happened to be in.
+       * The count goes in `afterValue` instead — a count is not a set, and copying the ids of what
+       * was read into the log duplicates the thing being searched (the `/internal-controls`
+       * precedent).
+       */
+      entityId: entity.id,
+      // A cross-owner read of a customer's commercial file. The RFQ header names which customer is
+      // in the market for what cover; the correspondence carries loss history and sums insured.
+      isSensitiveDataAccess: true,
+      afterValue: {
+        view,
+        // THE ANCHOR, by type and id — so "why was this allowed" is answerable from the log alone
+        // rather than by re-running a query whose answer has since changed.
+        anchorType: anchor.type,
+        anchorId: anchor.id,
+        customerId,
+        ...extra,
+      },
+    });
+    // The ROLE the read came under is on the row already: `AuditService.record` stamps
+    // `actorRoleNames` from the request's own resolved roles, so it is not restated here. A second
+    // copy would be a second answer to one question.
   }
 
   private async mustFindRfq(id: string): Promise<RfqWithSubmissions> {
@@ -412,6 +531,12 @@ export class RfqService {
     dto: CreateRfqDto,
     actor: AuthenticatedUser,
   ): Promise<RfqWithSubmissions> {
+    /*
+     * ز.١ — A NEW QUOTE REQUEST TO INSURERS. Blocked FIRST, before the visibility read, because the
+     * licence is the thing the caller cannot change by editing the request — art. 3/a's own
+     * ordering argument, reused.
+     */
+    await this.licenseGate.assertMayPractise('REQUEST_QUOTES');
     const opportunity = await this.assertOpportunityVisible(
       dto.opportunityId,
       actor,
@@ -493,6 +618,16 @@ export class RfqService {
     dto: AddRfqInsurersDto,
     actor: AuthenticatedUser,
   ): Promise<RfqWithSubmissions> {
+    /*
+     * AND ADDING AN INSURER IS THE SAME ACT, which is why it is gated too rather than left to the
+     * creation check. The owner's words name the act as "a new quote request TO INSURERS" — an RFQ
+     * carrying no insurers has gone nowhere, so the moment a request reaches the market is the
+     * moment an insurer is added. Without this, an office could create the RFQ while licensed and
+     * then solicit the market after its licence ended.
+     *
+     * Two call sites, ONE gate — which is what the gate is for. It is not two answers.
+     */
+    await this.licenseGate.assertMayPractise('REQUEST_QUOTES');
     const { opportunityStatus } = await this.findVisibleRfq(rfqId, actor);
     this.assertOpportunityInMarketPhase(opportunityStatus);
 
@@ -585,6 +720,13 @@ export class RfqService {
       );
     }
     if (opportunityId) {
+      /*
+       * THE OPPORTUNITY FILTER IS NOT ANCHORED, DELIBERATELY, and it already refuses an
+       * anchored-only reader through `assertCustomerVisible` below it. That is the right answer
+       * rather than an oversight: an anchor is per CUSTOMER, and an Opportunity is a placement-path
+       * object whose own id a reader outside that path has no way to know. Anchoring it would also
+       * reopen the thing the design refused — a filter whose scope the anchor does not bound.
+       */
       await this.assertOpportunityVisible(
         opportunityId,
         actor,
@@ -592,8 +734,52 @@ export class RfqService {
       );
       return this.rfqs.findRfqsByOpportunityId(opportunityId);
     }
-    await this.assertCustomerVisible(customerId as string, actor);
-    return this.rfqs.findRfqsByCustomerId(customerId as string);
+
+    /*
+     * DOOR FOUR ON THE LIST. `customerId` is REQUIRED here by the refusal at the top of this
+     * method — exactly one of the two filters, never neither — so an UNFILTERED list is not a
+     * thing this route can produce. That matters more for an anchored reader than for anybody
+     * else: an unfiltered list handed to a reader whose anchor is one customer would be the
+     * blanket key the whole design refused.
+     */
+    const anchor = await this.resolveCustomerReadAccess(
+      customerId as string,
+      actor,
+    );
+    const rows = await this.rfqs.findRfqsByCustomerId(customerId as string);
+    if (anchor) {
+      await this.auditAnchoredRead(
+        actor,
+        { type: 'Customer', id: customerId as string },
+        customerId as string,
+        'rfq-list',
+        anchor,
+        { rfqCount: rows.length },
+      );
+    }
+    return rows;
+  }
+
+  /**
+   * DOOR FOUR's visibility decision, factored out so the LIST and the DETAIL cannot disagree.
+   *
+   * Returns `null` when the ownership filter admits the caller — the ordinary path, costing no
+   * anchor query and writing no audit row — and the anchor when it is the anchor that admitted
+   * them. Throws the same NotFound the ownership filter throws when neither does, because a 403
+   * would confirm that another officer's record exists.
+   */
+  private async resolveCustomerReadAccess(
+    customerId: string,
+    actor: AuthenticatedUser,
+  ): Promise<CustomerFileAnchor | null> {
+    const customer = await this.customers.findById(customerId);
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (this.canReachAnyCustomer(actor) || customer.ownerUserId === actor.id) {
+      return null;
+    }
+    const anchor = await this.anchors.resolve(customerId, actor);
+    if (!anchor) throw new NotFoundException('Customer not found');
+    return anchor;
   }
 
   /** `opportunity.customerId` is resolved for the web RFQ detail page's
@@ -605,7 +791,19 @@ export class RfqService {
     id: string,
     actor: AuthenticatedUser,
   ): Promise<RfqWithSubmissions & { opportunity: { customerId: string } }> {
-    const { rfq, opportunityCustomerId } = await this.findVisibleRfq(id, actor);
+    const { rfq, opportunityCustomerId, anchor } = await this.findReadableRfq(
+      id,
+      actor,
+    );
+    if (anchor) {
+      await this.auditAnchoredRead(
+        actor,
+        { type: 'RFQ', id: rfq.id },
+        opportunityCustomerId,
+        'rfq',
+        anchor,
+      );
+    }
     return { ...rfq, opportunity: { customerId: opportunityCustomerId } };
   }
 
@@ -684,7 +882,19 @@ export class RfqService {
     rfqId: string,
     actor: AuthenticatedUser,
   ): Promise<RfqCommunicationRow[]> {
-    await this.findVisibleRfq(rfqId, actor);
+    const { opportunityCustomerId, anchor } = await this.findReadableRfq(
+      rfqId,
+      actor,
+    );
+    if (anchor) {
+      await this.auditAnchoredRead(
+        actor,
+        { type: 'RFQ', id: rfqId },
+        opportunityCustomerId,
+        'communications',
+        anchor,
+      );
+    }
     return this.rfqs.findCommunicationsByRfqId(rfqId);
   }
 

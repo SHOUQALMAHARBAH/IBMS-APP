@@ -376,8 +376,13 @@ export default function OperationalPiRiskPage() {
                 <td style={cell}>{p.expiresAt.slice(0, 10)}</td>
                 <td style={cell}>{p.claimsHistorySummary ?? '—'}</td>
                 <td style={cell}>
-                  {p.isCurrent ? 'current' : 'past'}
-                  {p.isCurrentlyLapsed ? ' (lapsed)' : ''}
+                  {/* OWNER DECISION 55's WORDING TRAP, and it must not be 'improved' away: a PI record
+                      can be the CURRENT one while its cover has LAPSED — which is exactly the state
+                      the marker below reports. «الحالية» speaks about the RECORD; «سارية» would
+                      speak about the COVER, and «سارية (التغطية منتهية)» is a contradiction on one
+                      line. */}
+                  {p.isCurrent ? t('statusRecordCurrent') : t('statusRecordPast')}
+                  {p.isCurrentlyLapsed ? ` ${t('statusCoverLapsed')}` : ''}
                 </td>
                 {canManagePiPolicy ? (
                   <td style={cell}>

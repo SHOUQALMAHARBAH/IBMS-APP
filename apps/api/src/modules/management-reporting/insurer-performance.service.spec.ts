@@ -12,6 +12,7 @@ import type {
 } from '../../repositories/insurer-performance.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { PeriodWindow } from './insurer-performance.config';
+import type { InsurerRepository } from '../../repositories/insurer.repository';
 
 /** The `InsurerPerformanceScoreInput` `upsertScore` was called with — typed
  * so an assertion on it isn't an unsafe `any` member access. */
@@ -56,12 +57,21 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     findLatest: vi.fn().mockResolvedValue(SCORE_ROW),
     ...over.repo,
   };
+  /* Item 1 — the one resolver for an insurer's name. Returns a REAL Map rather than an empty one,
+   * because an empty Map makes every `insurerName` null and a test asserting the name would then
+   * be passing on the double. */
+  const insurerRepo = {
+    namesForInsurerIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['insurer-1', 'Jordan Insurance Co']])),
+  };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new InsurerPerformanceService(
     repo as unknown as InsurerPerformanceRepository,
+    insurerRepo as unknown as InsurerRepository,
     audit as unknown as AuditService,
   );
-  return { service, repo, audit };
+  return { service, repo, insurerRepo, audit };
 }
 
 describe('InsurerPerformanceService.computeScoreForInsurer', () => {

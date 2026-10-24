@@ -76,6 +76,11 @@ const ACTIVE_INSURER = {
   // RELATIONSHIP-level. Present in the fixture precisely so the test can prove these appear under
   // their own heading and not among the company facts.
   financialStrengthRating: "A-",
+  // THE DATE THE API HAS ALWAYS SENT AND THE WEB DROPPED. Decision 93's whole point is that the
+  // rating and its date move together, and this fixture could not have caught the omission — a mock
+  // supplies what the screen reads, so the missing field was invisible from here. It is in the
+  // fixture now so the two assertions below can tell a dated rating from a bare one.
+  financialStrengthRatingAsOf: "2026-03-01T00:00:00.000Z",
   creditTermsDays: 45,
   rfqContactName: "Rana Q.",
   rfqContactEmail: "rana@yarmouk.test",
@@ -164,13 +169,23 @@ test("keeps company facts and the office's own terms in SEPARATE sections", asyn
     .filter({ has: page.getByRole("heading", { name: "Company details" }) });
   await expect(company.getByText("Takaful", { exact: true })).toBeVisible();
   await expect(company.getByText("contact@yarmouk.test")).toBeVisible();
-  await expect(company.getByText("A-", { exact: true })).toHaveCount(0);
+  // The rating must not be here AT ALL, and the locator is the rating's own hook rather than its
+  // text: owner decision 43 made the rating render WITH its as-of date, so an `exact: true` text
+  // match on "A-" would now pass for the wrong reason — it would find nothing because the string
+  // changed, not because the rating is absent from the company section. The hook cannot drift that
+  // way. (`data-insurer-rating` is the element itself; `toHaveCount(0)` here is a real absence.)
+  await expect(company.locator("[data-insurer-rating]")).toHaveCount(0);
 
   const relationship = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Your office's terms and contacts" }),
   });
   await expect(relationship.getByText("45 days")).toBeVisible();
-  await expect(relationship.getByText("A-", { exact: true })).toBeVisible();
+  // RE-POINTED, NOT WEAKENED. This read `getByText("A-", { exact: true })` and went red the moment
+  // the rating started rendering its as-of date beside it — a real reversal rather than a break, and
+  // the property the test is about (the rating is grouped with OUR terms, never with the company's
+  // public facts) is unchanged. Asserting on the rating's own element keeps that property while the
+  // value is free to carry its date.
+  await expect(relationship.locator("[data-insurer-rating]")).toContainText("A-");
   await expect(relationship.getByText("Rana Q.")).toBeVisible();
   await expect(relationship.getByText("contact@yarmouk.test")).toHaveCount(0);
   await expect(
@@ -268,6 +283,15 @@ test("a reader without the insurer write codes sees no register or deactivate co
   await expect(
     page.getByRole("button", { name: "Stop dealing with them" }),
   ).toHaveCount(0);
+  /*
+   * AND NO CLEAR CONTROL ON THE RATING — owner decision 43. Compliance holds `insurer.read` and not
+   * `insurer.update`, so it reads this office's own judgement about an insurer's solvency and cannot
+   * remove it. Anchored on the rating VALUE being on screen, which proves both that the page
+   * rendered and that there is something to clear: without the second half the absence would be
+   * satisfied by a fixture with no rating at all, and the test would pass for the wrong reason.
+   */
+  await expect(page.locator("[data-insurer-rating]")).toContainText("A-");
+  await expect(page.getByTestId("insurer-clear-rating")).toHaveCount(0);
 });
 
 test("registration offers ONE identity path at a time", async ({ page }) => {
@@ -360,4 +384,72 @@ test("still says so plainly when the 403 really is a missing permission", async 
   await page.goto("/insurers");
   await expect(page.getByText(/\(insurer\.read\)/)).toBeVisible();
   await expect(page.getByText(/not paired an authenticator app yet/i)).toHaveCount(0);
+});
+
+test("OWNER DECISION 43 — the rating shows WHEN it was formed, and one control clears both halves", async ({
+  page,
+}) => {
+  /*
+   * DECISION 93 HAD A ROUTE AND NO BUTTON, which is why this was one of the 27: `/insurers/[id]`
+   * RENDERED the rating and offered no way to clear it, so the only ways out of a stale solvency
+   * judgement were a migration and a seed.
+   *
+   * AND THE SCREEN WAS DROPPING THE DATE. `financialStrengthRatingAsOf` has always been on the wire
+   * and this screen's hand-copied interface did not declare it, so the office's own judgement about
+   * an insurer rendered with no date on it — the exact state decision 93 exists to prevent, one
+   * layer above the clear. Nothing could see it: TypeScript cannot check an interface declared by
+   * hand over HTTP, and a mock supplies whatever the screen reads.
+   */
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockList(page, [ACTIVE_INSURER]);
+
+  let cleared = false;
+  await page.route("http://localhost:4000/insurers/ins-1", (route) =>
+    route.fulfill({
+      status: 200,
+      json: cleared
+        ? {
+            ...ACTIVE_INSURER,
+            financialStrengthRating: null,
+            financialStrengthRatingAsOf: null,
+          }
+        : ACTIVE_INSURER,
+    }),
+  );
+  await page.route(
+    "http://localhost:4000/insurers/ins-1/financial-strength-rating",
+    (route) => {
+      if (route.request().method() === "DELETE") {
+        cleared = true;
+        return route.fulfill({
+          status: 200,
+          json: {
+            ...ACTIVE_INSURER,
+            financialStrengthRating: null,
+            financialStrengthRatingAsOf: null,
+          },
+        });
+      }
+      return route.fallback();
+    },
+  );
+
+  await page.goto("/insurers/ins-1");
+
+  const rating = page.locator("[data-insurer-rating]");
+  await expect(rating).toContainText("A-");
+  // THE DATE, BESIDE THE RATING. Derived wording, not invented: the parentheses-and-placeholder
+  // shape comes from `dcmpScanAsOf` and the words from `dashAsOf`.
+  await expect(rating).toContainText("(as of 2026-03-01)");
+
+  // ---------------------------------------------- ONE CONTROL, AND IT CLEARS BOTH HALVES
+  await page.getByTestId("insurer-clear-rating").click();
+
+  // The em dash for an empty field, and NOT a dated blank: a date with no rating beside it would be
+  // the stale-judgement state wearing different clothes.
+  await expect(rating).toHaveText("—");
+  await expect(rating).not.toContainText("as of");
+  // AND THE CONTROL IS GONE, because there is nothing left to clear — which also keeps the api's own
+  // no-op branch unreachable from the screen rather than merely harmless.
+  await expect(page.getByTestId("insurer-clear-rating")).toHaveCount(0);
 });

@@ -1,0 +1,32 @@
+{
+  "a-floored-category-ships-a-number": {
+    "file": "packages/db/prisma/seed-data/retention-template.ts",
+    "from": "    recordCategory: \"KYCRecord\",\n    retentionPeriodMonths: null,",
+    "to": "    recordCategory: \"KYCRecord\",\n    retentionPeriodMonths: 60,",
+    "why": "THE DECISION, INVERTED. A category governed by a statutory floor ships with the floor's own minimum as its period — which asserts that the minimum IS the office's period, the same legal opinion decision 32 refuses, one step quieter. `retention-template.config.spec.ts`'s seed-parity test dies naming KYCRecord, and `from-empty.sh`'s floored-categories-with-a-period assertion goes to a non-zero. The owner's reason: a period shipped beside an article number reads as a legal opinion from us, and we do not have one."
+  },
+  "the-notice-alerts-on-an-unset-period": {
+    "file": "apps/api/src/modules/pdpl/retention-notice.service.ts",
+    "from": "      if (!periodIsActionable(item)) {",
+    "to": "      if (false) {",
+    "why": "THE INERT GUARD, REMOVED — and this is the half that did not exist before the template shipped. An office is alerted about records measured against a period nobody has set or legally confirmed; with a NULL period `elapsedBefore` produces a NaN cutoff and the `lte` filter answers on that. The disposal nomination has refused an unconfirmed period since batch 5 group 5; the notice did not, which is exactly what a shipped template would have turned into a live defect. The retention e2e dies on the inert-rows assertion, and TypeScript refuses it too — `periodIsActionable` is a TYPE PREDICATE so the narrowed period is what `elapsedBefore` needs, which is the point of its signature."
+  },
+  "the-quote-clock-runs-from-arrival": {
+    "file": "apps/api/src/repositories/retention-notice.repository.ts",
+    "from": "        const rows = await this.prisma.client.quotation.findMany({\n          where: {\n            rfq: {\n              opportunity: {\n                clientDecision: {\n                  is: { decision: 'REJECT', decidedAt: { lte: cutoff } },\n                },\n              },\n            },\n          },\n          select,\n        });",
+    "to": "        const rows = await this.prisma.client.quotation.findMany({\n          where: { receivedAt: { lte: cutoff } },\n          select,\n        });",
+    "why": "THE ARRIVAL CLOCK — the owner's named defect, in code. A quote the customer is still considering is swept one month after it arrived, and so is one the client ACCEPTED. Her instruction was COUNTED FROM THE END OF THE PURPOSE, NOT FROM ARRIVAL, and the three-quote e2e exists for exactly this plant: all three arrive on the same date, so the test dies on the accepted and undecided quotes rather than on the refused one. A test with only a refused quote would pass against this."
+  },
+  "the-provider-sees-the-decision-reference": {
+    "file": "apps/api/src/repositories/provider-office-state.repository.ts",
+    "from": "  'mayNotIssue',",
+    "to": "  'mayNotIssue',\n  'decisionRef',",
+    "why": "THE BOUNDARY WIDENED BY ONE FIELD, which is how it would really happen — somebody adds 'just the reference so the provider can ask about it'. A sanction's contents are the OFFICE'S: the provider neither corrects them nor is bound by any deadline they carry (decision 92). The provider e2e's EXACT KEY SET dies, which is the half a banned-name list could not catch, and the repository's own runtime column check fails against the view. Register entry 97 records that the fact is all that is exposed."
+  },
+  "the-view-folds-acts-without-the-tie-break": {
+    "file": "packages/db/prisma/migrations/20261207110000_provider_sees_the_bar/migration.sql",
+    "from": "  ORDER BY\n    ra.\"organizationId\",\n    ra.\"effectiveFrom\" DESC,\n    ra.\"recordedAt\" DESC,\n    ra.\"id\" DESC",
+    "to": "  ORDER BY\n    ra.\"organizationId\",\n    ra.\"effectiveFrom\" DESC",
+    "why": "THE SAME-DAY DEFECT, IN SQL this time. `effectiveFrom` is `@db.Date`, so a suspension and the reinstatement that lifts it on one day are equal to this comparator and `DISTINCT ON` returns whichever the plan reaches first — the provider would be told an office is barred, or not, by the query plan. The api fold was fixed for exactly this and the view has to agree with it. NOTE: a migration already applied cannot be re-run, so this plant is evidence of the hazard rather than a failing test — the api-side plant `the-fold-is-not-a-total-order` is the one that kills tests, and these two are the same defect in two languages."
+  }
+}

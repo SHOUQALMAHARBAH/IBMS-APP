@@ -85,6 +85,9 @@ export interface DocumentVersion {
   category: DocumentCategory;
   classification: DataClassification;
   uploadedByUserId: string;
+  /** Item 1 — who filed this version, by name, resolved by the api. Null when the account is gone:
+   *  `Document.uploadedByUserId` has no foreign key (register entry 127). */
+  uploadedByName: string | null;
   deletionLocked: boolean;
   deletionOverrideByUserId: string | null;
   createdAt: string;

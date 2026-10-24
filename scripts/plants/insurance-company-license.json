@@ -1,0 +1,38 @@
+{
+  "no-term-reported-as-expired": {
+    "file": "apps/api/src/modules/company/insurance-company-license.config.ts",
+    "from": "  if (current === null) {\n    return { standing: 'NO_TERM_ON_RECORD', currentTerm: null, termCount: 0 };",
+    "to": "  if (current === null) {\n    return { standing: 'EXPIRED', currentTerm: null, termCount: 0 };",
+    "kills": "insurance-company-license.config.spec.ts > NO TERM ON RECORD is not EXPIRED; and company-record-shape.e2e-spec.ts > the three-state walk. Telling a company its licence has EXPIRED when nobody wrote one down is a false statement about its regulatory standing."
+  },
+  "expired-on-the-last-day-of-its-own-licence": {
+    "file": "apps/api/src/modules/company/insurance-company-license.config.ts",
+    "from": "      current.expiresAt.getTime() >= now.getTime() ? 'CURRENT' : 'EXPIRED',",
+    "to": "      current.expiresAt.getTime() > now.getTime() ? 'CURRENT' : 'EXPIRED',",
+    "kills": "insurance-company-license.config.spec.ts > BOTH SIDES of the boundary — only the ON-the-instant case, which is the off-by-one that makes a company expired on the last day of its own licence."
+  },
+  "covering-term-instead-of-latest-expiry": {
+    "file": "apps/api/src/modules/company/insurance-company-license.config.ts",
+    "from": "    const byExpiry = b.expiresAt.getTime() - a.expiresAt.getTime();",
+    "to": "    const byExpiry = a.expiresAt.getTime() - b.expiresAt.getTime();",
+    "kills": "insurance-company-license.config.spec.ts > the LATEST expiry decides + the renewed-company case; and the e2e series walk. Reversed, a RENEWED company reads EXPIRED off its old term."
+  },
+  "registration-writes-no-term": {
+    "file": "apps/api/src/modules/provider/insurance-company-registration.service.ts",
+    "from": "        await tx.insuranceCompanyLicenseTerm.create({",
+    "to": "        if (false) await tx.insuranceCompanyLicenseTerm.create({",
+    "kills": "insurance-company-registration.e2e-spec.ts > both 7d tests — a company registered with a licence number and no term, whose own screen then says we hold none."
+  },
+  "standing-reaches-a-second-module": {
+    "file": "apps/api/src/modules/pdpl/retention-archive.service.ts",
+    "from": "  bases() {",
+    "to": "  private readonly licenseStanding: unknown = null;\n\n  bases() {",
+    "kills": "insurance-company-license.inventory.spec.ts > no file outside the company-record module mentions it — the absence 7d's brief requires be asserted. Planted in an unrelated module on purpose: the sweep must catch a mention ANYWHERE, not only in a plausible place. REPOINTED 2026-10-23 (owner decision 45): anchored on the doc comment above `bases()`, which that decision rewrote — the bases are four now and the comment no longer says two. `plant --self-test` refused it, the fifth time that mechanism has caught its own evidence expiring, and it is repointed at the METHOD DECLARATION rather than at prose beside it: an anchor on a sentence is an anchor on something free to be reworded."
+  },
+  "cascade-leaves-the-licence-terms": {
+    "file": "apps/api/test/tenant-prisma.ts",
+    "from": "  await rawPrisma.insuranceCompanyLicenseTerm.deleteMany({\n    where: { insuranceCompanyId: organizationId },\n  });",
+    "to": "  // plant: the cascade no longer clears them",
+    "kills": "organization-type.e2e-spec.ts + provider-office-state.e2e-spec.ts — three assertions about the SET of organizations, in files 7d never touched. `InsuranceCompanyLicenseTerm_insuranceCompanyId_fkey` is RESTRICT, so a company spec's teardown is REFUSED and the organization leaks; CI found exactly this with twelve leaked companies while every spec 7d touched passed."
+  }
+}

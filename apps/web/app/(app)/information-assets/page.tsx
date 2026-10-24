@@ -193,7 +193,12 @@ export default function InformationAssetsPage() {
                   </td>
                   <td style={cell}>{asset.assetType}</td>
                   <td style={cell}>{t(ENUM_LABEL.DataClassification[asset.classification])}</td>
-                  <td style={cell}>{asset.ownerUserId}</td>
+                  {/* ITEM 1 — the accountable colleague by NAME. This is the register whose whole
+                      purpose is saying WHO is accountable for a classified asset, and it was
+                      naming them by uuid. */}
+                  <td style={cell}>
+                    {asset.ownerName ? <bdi>{asset.ownerName}</bdi> : '—'}
+                  </td>
                   <td style={cell}>
                     {editingId === asset.id ? (
                       <button type="button" onClick={() => saveEdit(asset.id)}>

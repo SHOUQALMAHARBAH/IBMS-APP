@@ -55,11 +55,24 @@ export interface CrossBorderTransferRecordView {
   legalBasis: string;
   legalBasisEvidenceRef: string | null;
   approvedByUserId: string | null;
+  /**
+   * Item 2, rule 2 — WHO approved the transfer, by name, resolved through decision 48's one
+   * resolver (the HR record where the account is linked). The screen rendered eight characters of a
+   * uuid, which on a cross-border transfer register identifies nobody: this row is the evidence
+   * that a named person authorised personal data leaving the country.
+   *
+   * Nullable because `approvedByUserId` is: this module's own header records that creation IS
+   * publishing here, so a record can exist before anybody approved it.
+   */
+  approvedByName: string | null;
   transferredAt: string;
 }
 
 export function deriveCrossBorderTransferView(
   row: CrossBorderTransferRecordRow,
+  /** REQUIRED, not optional — a caller that forgets must not compile. See the module docstring of
+   *  `user.repository.ts#displayNamesForUserIds`. */
+  approvedByName: string | null,
 ): CrossBorderTransferRecordView {
   return {
     id: row.id,
@@ -68,6 +81,7 @@ export function deriveCrossBorderTransferView(
     legalBasis: row.legalBasis,
     legalBasisEvidenceRef: row.legalBasisEvidenceRef,
     approvedByUserId: row.approvedByUserId,
+    approvedByName,
     transferredAt: row.transferredAt.toISOString(),
   };
 }

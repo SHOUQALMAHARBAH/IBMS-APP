@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { EntitySearch } from "../../../components/ui/EntitySearch";
+import { WorkflowHistoryLink } from "../../../components/ui/WorkflowHistoryLink";
 import { ENUM_LABEL } from "../../../lib/i18n/enum-labels";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
@@ -284,7 +285,11 @@ export default function ComplaintsPage() {
               <tbody>
                 {rows.map((c) => (
                   <tr key={c.id}>
-                    <td style={cell}>{c.customerId.slice(0, 8)}…</td>
+                    {/* RULE 2 — the name, never the id. `bdi` because a legal name may be in
+                        the other script from the page it is rendered on. */}
+                    <td style={cell}>
+                      <bdi>{c.customerName}</bdi>
+                    </td>
                     <td style={cell}>
                       <bdi>{c.issue}</bdi>
                     </td>
@@ -302,6 +307,12 @@ export default function ComplaintsPage() {
                     <td style={cell}>{slaLabel(c, t)}</td>
                     <td style={cell}>{c.escalations.length || "—"}</td>
                     <td style={cell}>
+                      {/* Owner decision 41 — fills `/audit-trail`'s workflow-history fields from
+                          here, so reading this complaint's state history no longer needs a uuid
+                          pasted by hand. Renders nothing without `workflow-history.read`. */}
+                      <div style={{ marginBottom: "0.4rem" }}>
+                        <WorkflowHistoryLink entityType="Complaint" entityId={c.id} />
+                      </div>
                       {canLog ? (
                         <button
                           type="button"

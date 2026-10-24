@@ -21,6 +21,7 @@ interface Mocks {
   findItemsByCycle: Mock;
   findCycles: Mock;
   findSummariesByIds: Mock;
+  displayNamesForUserIds: Mock;
   getRoleNamesByIds: Mock;
   startTimer: Mock;
 }
@@ -105,9 +106,20 @@ function makeDeps(overrides?: {
   } as unknown as RoleRepository;
 
   const findSummariesByIds = vi.fn().mockResolvedValue([]);
+  /*
+   * OWNER DECISION 48 — the DISPLAY name now comes from `displayNamesForUserIds`, which applies the
+   * HR record where the account is linked, while `findSummariesByIds` still supplies the EMAIL.
+   *
+   * THE DOUBLE DEFAULTS TO AN EMPTY MAP, which is the honest default and NOT a convenience: an id
+   * with no entry means "no such account", so the three name assertions below had to be given
+   * explicit names rather than inheriting whatever the summaries happened to hold. That is the fix
+   * working — before it, a name assertion could be satisfied by the summary double alone.
+   */
+  const displayNamesForUserIds = vi.fn().mockResolvedValue(new Map());
   const getRoleNamesByIds = vi.fn().mockResolvedValue(new Map());
   const users = {
     findSummariesByIds,
+    displayNamesForUserIds,
     getRoleNamesByIds,
   } as unknown as UserRepository;
 
@@ -141,6 +153,7 @@ function makeDeps(overrides?: {
       findItemsByCycle,
       findCycles,
       findSummariesByIds,
+      displayNamesForUserIds,
       getRoleNamesByIds,
       startTimer,
     },
@@ -548,6 +561,19 @@ describe('AccessRecertificationService', () => {
           ].filter((u) => ids.includes(u.id)),
         ),
       );
+      /*
+       * OWNER DECISION 48 — the NAME comes from `displayNamesForUserIds` now (the HR record where
+       * the account is linked), while the summaries above still supply the EMAIL. Stated here
+       * rather than left implicit: before the fix a name assertion was satisfied by the summary
+       * double alone, so these three tests were pinning `User.fullName` — which is free text and,
+       * measured on db-test, disagrees with the HR record on 23 of 25 linked accounts.
+       */
+      mocks.displayNamesForUserIds.mockResolvedValue(
+        new Map([
+          ['sales-1', 'Sales Officer'],
+          ['reviewer-1', 'Compliance Officer'],
+        ]),
+      );
       mocks.getRoleNamesByIds.mockResolvedValue(
         new Map([['sales-1', ['SALES_RELATIONSHIP_OFFICER']]]),
       );
@@ -631,6 +657,14 @@ describe('AccessRecertificationService', () => {
           ].filter((u) => ids.includes(u.id)),
         ),
       );
+      // Owner decision 48 — the NAME comes from the one resolver now; the summaries above
+      // still supply the EMAIL. Same values, so what this test asserts is unchanged.
+      mocks.displayNamesForUserIds.mockResolvedValue(
+        new Map([
+          ['admin-1', 'Office Administrator'],
+          ['reviewer-1', 'Compliance Officer'],
+        ]),
+      );
       mocks.getRoleNamesByIds.mockResolvedValue(
         new Map([['admin-1', ['OFFICE_ADMINISTRATOR']]]),
       );
@@ -677,6 +711,14 @@ describe('AccessRecertificationService', () => {
             },
           ].filter((u) => ids.includes(u.id)),
         ),
+      );
+      // Owner decision 48 — the NAME comes from the one resolver now; the summaries above
+      // still supply the EMAIL. Same values, so what this test asserts is unchanged.
+      mocks.displayNamesForUserIds.mockResolvedValue(
+        new Map([
+          ['admin-1', 'Office Administrator'],
+          ['reviewer-1', 'Compliance Officer'],
+        ]),
       );
       mocks.getRoleNamesByIds.mockResolvedValue(
         new Map([['admin-1', ['OFFICE_ADMINISTRATOR']]]),

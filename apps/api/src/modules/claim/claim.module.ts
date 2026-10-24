@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import { ClaimController } from './claim.controller';
 import { ClaimService } from './claim.service';
 import { ClaimFollowUpScheduler } from './claim-followup.scheduler';
@@ -41,6 +42,13 @@ import { LossRatioModule } from '../loss-ratio/loss-ratio.module';
     LossRatioModule,
   ],
   controllers: [ClaimController],
-  providers: [ClaimService, ClaimRepository, ClaimFollowUpScheduler],
+  providers: [
+    ClaimService,
+    ClaimRepository,
+    ClaimFollowUpScheduler,
+    // Batch 5 group 7c — `ClaimService` refuses to second-approve a settlement in the blocked
+    // retention phase, so it needs the one place that answers whether a record is blocked.
+    RetentionArchiveRepository,
+  ],
 })
 export class ClaimModule {}

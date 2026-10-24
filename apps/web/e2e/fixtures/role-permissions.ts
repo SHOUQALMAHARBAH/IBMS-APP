@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 502 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 514 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -36,6 +36,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'complaint.close',
     'complaint.escalate',
     'complaint.log',
+    'conflict-of-interest.register.read',
     'cross-sell.detect',
     'cross-sell.read',
     'customer-file.all-owners.read',
@@ -176,7 +177,10 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'privacy-notice.publish',
     'privacy-notice.read',
     'recommendation.all-owners.read',
-    'retention-schedule.manage',
+    'retention-schedule.confirm',
+    'retention-schedule.update',
+    'retention.archive.retrieve',
+    'retention.extend',
     'risk-register.manage',
     'sanctions-pep.screen',
     'screening.run',
@@ -214,8 +218,11 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'legal-hold.manage',
     'privacy-notice.publish',
     'privacy-notice.read',
-    'retention-schedule.manage',
+    'retention-schedule.confirm',
+    'retention-schedule.update',
+    'retention.archive.retrieve',
     'retention.dispose.approve',
+    'retention.extend',
     'ropa.manage',
     'sla.policy.read',
     'sla.policy.regulatory',
@@ -359,6 +366,8 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'information-asset.manage',
     'insurance-line.create',
     'insurance-line.update',
+    'insurer.company.link',
+    'insurer.company.unlink',
     'insurer.create',
     'insurer.deactivate',
     'insurer.directory.read',
@@ -400,6 +409,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'endorsement.discard',
     'endorsement.read',
     'incident.report',
+    'insurer.company.link',
     'insurer.directory.read',
     'insurer.form.map',
     'insurer.master.read',
@@ -529,6 +539,8 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.contain',
     'incident.report',
     'information-asset.manage',
+    'insurer.company.link',
+    'insurer.company.unlink',
     'insurer.form.map',
     'insurer.office-form.map',
     'permission.read',
@@ -561,7 +573,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 220 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 230 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -584,7 +596,11 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'diagnostics.view', module: 'admin', description: "See raw technical detail when something fails — the server's own error text, meant for whoever maintains the system rather than for the person doing the work. Nothing is hidden from the audit trail by withholding this; it only decides whether a screen shows the underlying message or a plain sentence", scope: 'OFFICE' },
   { code: 'encryption-key.read', module: 'admin', description: "View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access)", scope: 'OFFICE' },
   { code: 'permission.read', module: 'admin', description: "View the global permission catalogue (the codes a role can be granted)", scope: 'OFFICE' },
+  { code: 'provider.insurance-company.administrator.invite', module: 'admin', description: "Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset", scope: 'PLATFORM' },
+  { code: 'provider.insurer.register', module: 'admin', description: "Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform", scope: 'PLATFORM' },
   { code: 'provider.office-state.read', module: 'admin', description: "Read the platform-wide list of brokerage offices and their state: licence number and expiry, how many licensed branches carry no business, user counts, and when each office was last used. CROSS-OFFICE — it shows other offices, not just your own — and it deliberately contains no customer, policy, premium or commission data and no personal data of any kind. Grant it only to whoever operates the platform", scope: 'PLATFORM' },
+  { code: 'provider.office.administrator.invite', module: 'admin', description: "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password", scope: 'PLATFORM' },
+  { code: 'provider.office.register', module: 'admin', description: "Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform", scope: 'PLATFORM' },
   { code: 'role.create', module: 'admin', description: "Define a new role in this office's catalogue", scope: 'OFFICE' },
   { code: 'role.deactivate', module: 'admin', description: "Retire a role, reactivate a retired one, and delete one that was never used", scope: 'OFFICE' },
   { code: 'role.read', module: 'admin', description: "View the office's role catalogue", scope: 'OFFICE' },
@@ -640,9 +656,10 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'up-sell.detect', module: 'commercial-front-office', description: "Run an on-demand under-insurance scan for a customer", scope: 'OFFICE' },
   { code: 'up-sell.read', module: 'commercial-front-office', description: "List/read up-sell recommendations", scope: 'OFFICE' },
   { code: 'aml.escalate', module: 'compliance-risk', description: "Escalate a suspicious-activity alert to the competent authority", scope: 'OFFICE' },
-  { code: 'aml.monitor', module: 'compliance-risk', description: "Monitor AML/CFT transaction-monitoring alerts", scope: 'OFFICE' },
+  { code: 'aml.monitor', module: 'compliance-risk', description: "Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code", scope: 'OFFICE' },
   { code: 'audit-log.read', module: 'compliance-risk', description: "Read the immutable audit log", scope: 'OFFICE' },
   { code: 'compliance-calendar.manage', module: 'compliance-risk', description: "Manage the regulatory compliance calendar", scope: 'OFFICE' },
+  { code: 'conflict-of-interest.register.read', module: 'compliance-risk', description: "Read the conflict-of-interest disclosure register — the conflicts this office's people have declared about themselves", scope: 'OFFICE' },
   { code: 'document-history.read', module: 'compliance-risk', description: "Read document version/workflow history", scope: 'OFFICE' },
   { code: 'duty-segregation.mode.declare', module: 'compliance-risk', description: "Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason", scope: 'OFFICE' },
   { code: 'incident.classification.co-sign', module: 'compliance-risk', description: "Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it", scope: 'OFFICE' },
@@ -657,7 +674,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'license.manage', module: 'compliance-risk', description: "Manage the broker's regulatory license record", scope: 'OFFICE' },
   { code: 'pi-policy.manage', module: 'compliance-risk', description: "Manage the broker's own Professional Indemnity policy record", scope: 'OFFICE' },
   { code: 'risk-register.manage', module: 'compliance-risk', description: "Manage the operational/cyber/financial/compliance/reputational risk register", scope: 'OFFICE' },
-  { code: 'sanctions-pep.screen', module: 'compliance-risk', description: "Run recurring sanctions screening batches", scope: 'OFFICE' },
+  { code: 'sanctions-pep.screen', module: 'compliance-risk', description: "The whole sanctions/PEP screening surface: run screening and the recurring batch, work the match queue (assign, review, escalate, annotate), AND maintain the watchlists themselves — including rolling a dataset generation back, which decides that screening runs against an older list. 17 routes across three controllers", scope: 'OFFICE' },
   { code: 'workflow-history.read', module: 'compliance-risk', description: "Read workflow-state transition history for a record", scope: 'OFFICE' },
   { code: 'customer.all-owners.read', module: 'customer', description: "See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design)", scope: 'OFFICE' },
   { code: 'customer.bulk-import', module: 'customer', description: "Load an office legacy customer file (Part III §7) — a bulk write path, distinct from creating one customer", scope: 'OFFICE' },
@@ -702,6 +719,8 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'endorsement.read', module: 'insurance-operations', description: "List/read endorsements, their premium adjustment, the tied commission reversal, the refund approval state and the versioned coverage schedule", scope: 'OFFICE' },
   { code: 'insurance-line.create', module: 'insurance-operations', description: "Add a line of business to this office's vocabulary", scope: 'OFFICE' },
   { code: 'insurance-line.update', module: 'insurance-operations', description: "Correct a line of business this office added", scope: 'OFFICE' },
+  { code: 'insurer.company.link', module: 'insurance-operations', description: "Link this office's insurer record to an insurance company registered on the platform. Changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's own copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record.", scope: 'OFFICE' },
+  { code: 'insurer.company.unlink', module: 'insurance-operations', description: "Remove the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note.", scope: 'OFFICE' },
   { code: 'insurer.create', module: 'insurance-operations', description: "Register an insurer for this office, whether it is in the global catalogue or in none", scope: 'OFFICE' },
   { code: 'insurer.deactivate', module: 'insurance-operations', description: "Stop and resume dealing with an insurer, and read the live impact of doing so", scope: 'OFFICE' },
   { code: 'insurer.directory.read', module: 'insurance-operations', description: "Search the cross-office insurer directory — companies any office has registered, with their public contact details and the lines they offer. Never shows which offices deal with a company, or any office's commercial terms.", scope: 'OFFICE' },
@@ -762,9 +781,12 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'legal-hold.manage', module: 'pdpl', description: "Place/review a Legal Hold", scope: 'OFFICE' },
   { code: 'privacy-notice.publish', module: 'pdpl', description: "Publish a version-controlled bilingual privacy notice", scope: 'OFFICE' },
   { code: 'privacy-notice.read', module: 'pdpl', description: "Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)", scope: 'OFFICE' },
-  { code: 'retention-schedule.manage', module: 'pdpl', description: "Maintain the retention-period table (record categories, months, Legal Counsel confirmation)", scope: 'OFFICE' },
+  { code: 'retention-schedule.confirm', module: 'pdpl', description: "Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row", scope: 'OFFICE' },
+  { code: 'retention-schedule.update', module: 'pdpl', description: "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded", scope: 'OFFICE' },
+  { code: 'retention.archive.retrieve', module: 'pdpl', description: "Read a record that is in the BLOCKED retention phase — past the period its category was given, kept only to satisfy a statutory minimum, and otherwise out of every ongoing report and sweep. Retrieval is permitted on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each retrieval is recorded in an append-only register with the basis, who asked and for what, which cannot afterwards be edited or deleted. Holding this does NOT permit retrieval for the office's own purposes — that is the processing the block exists to prevent", scope: 'OFFICE' },
   { code: 'retention.dispose.approve', module: 'pdpl', description: "Give final DPO approval on a disposal batch (checker side of dual control)", scope: 'OFFICE' },
   { code: 'retention.dispose.nominate', module: 'pdpl', description: "Nominate a disposal batch (maker side of dual control)", scope: 'OFFICE' },
+  { code: 'retention.extend', module: 'pdpl', description: "Extend the retention of specific records past the period set for their category, on one of exactly three bases — a named legislative provision, a live legal hold or dispute, or the customer's explicit consent. Free text may accompany a basis; it may not BE one. Every extension is recorded in the register with which records, which basis, who, when and until when, so it can be justified from one place. Extending WITHOUT legislative cover and WITHOUT the customer's consent carries real liability under the PDPL, which is why the basis is a closed list rather than a field", scope: 'OFFICE' },
   { code: 'ropa.manage', module: 'pdpl', description: "Maintain the Records of Processing Activities register", scope: 'OFFICE' },
   { code: 'sla.holiday.create', module: 'sla', description: "Add a public holiday to the business-day calendar every SLA deadline is counted against", scope: 'OFFICE' },
   { code: 'sla.policy.create', module: 'sla', description: "Create an SLA policy — its duration, calendar and escalation stages", scope: 'OFFICE' },

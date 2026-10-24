@@ -33,6 +33,22 @@ export interface RetentionCaseScope {
  * (a side column, the `RfqInsurer.followUpAlertSentAt` shape): the retention
  * sweep observes the renewal lifecycle, it never drives it.
  */
+const WITH_CUSTOMER = {
+  /*
+   * RULE 2 — WHICH CUSTOMER, BY NAME. This screen rendered the first eight characters of a uuid,
+   * which identifies nobody: the column exists to say who the row is about.
+   */
+  include: { customer: { select: { legalName: true } } },
+} as const;
+
+/**
+ * The read shape, DERIVED from the include rather than written out — so the include and
+ * the type cannot disagree, and a field added to one reaches the other.
+ */
+export type RetentionCaseWithCustomer = Prisma.RetentionCaseGetPayload<
+  typeof WITH_CUSTOMER
+>;
+
 @Injectable()
 export class RetentionCaseRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -120,8 +136,9 @@ export class RetentionCaseRepository {
     });
   }
 
-  create(input: CreateRetentionCaseInput): Promise<RetentionCase> {
+  create(input: CreateRetentionCaseInput): Promise<RetentionCaseWithCustomer> {
     return this.prisma.client.retentionCase.create({
+      ...WITH_CUSTOMER,
       data: {
         customerId: input.customerId,
         reason: input.reason,
@@ -130,12 +147,19 @@ export class RetentionCaseRepository {
     });
   }
 
-  findById(id: string): Promise<RetentionCase | null> {
-    return this.prisma.client.retentionCase.findUnique({ where: { id } });
+  findById(id: string): Promise<RetentionCaseWithCustomer | null> {
+    return this.prisma.client.retentionCase.findUnique({
+      where: { id },
+      ...WITH_CUSTOMER,
+    });
   }
 
-  findMany(scope: RetentionCaseScope, take: number): Promise<RetentionCase[]> {
+  findMany(
+    scope: RetentionCaseScope,
+    take: number,
+  ): Promise<RetentionCaseWithCustomer[]> {
     return this.prisma.client.retentionCase.findMany({
+      ...WITH_CUSTOMER,
       where: {
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
         ...(scope.status ? { status: scope.status } : {}),

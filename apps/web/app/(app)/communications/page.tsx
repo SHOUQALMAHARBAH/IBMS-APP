@@ -265,7 +265,15 @@ export default function CommunicationsPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>
-                      {r.customerId ? `${r.customerId.slice(0, 8)}…` : '—'}
+                      {/* RULE 2 — the name, never the id. The em dash covers a log against
+                          no customer AND one whose customerId resolves to nothing: this is
+                          the one model in the group whose column has no foreign key, so both
+                          are reachable, and a LIST cell cannot usefully tell them apart. */}
+                      {r.customerName === null ? (
+                        '—'
+                      ) : (
+                        <bdi>{r.customerName}</bdi>
+                      )}
                     </td>
                     <td style={cell}>
                       {CHANNEL_LABEL_KEY[r.channel] ? t(CHANNEL_LABEL_KEY[r.channel]) : r.channel}

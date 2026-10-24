@@ -126,12 +126,80 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // exactly two of the four: it is the only member of a `provider` family, and one CRUD verb is
     // not a family, so it lands in the TOGGLE list. Families and the codes they cover do not move —
     // the same arithmetic `diagnostics.view` produced, for the same reason.
-    expect(PERMISSION_CATALOGUE.length).toBe(220);
+    // `provider.office.register` (Module 0-ب item (d), the route that creates a tenant) moves exactly
+    // ONE of the four. It is PLATFORM-scoped like its sibling, so the matrix never offers it: the
+    // catalogue grows and the toggle list does not. `provider` now holds TWO codes — but
+    // `office-state.read` and `office.register` are two different FAMILIES by the matrix's own
+    // reading (`provider.office-state` and `provider.office`), so no five-state row appears either,
+    // which is the right answer for a pair an office may never hold.
+    // `insurer.company.link` and `insurer.company.unlink` (module 0-ب item (e), decision 63) move
+    // THREE of the four. They are OFFICE-scoped, so the matrix does offer them — and `insurer.company`
+    // is a new family with exactly two members, but neither `link` nor `unlink` is one of the seven
+    // CRUD verbs a five-state row is built from, so they land in the TOGGLE list and the family count
+    // does not move. The same arithmetic `discard` produced, for the same reason: a five-state control
+    // offers none / read / read+write / +delete / full, and "link" is not a point on that scale.
+    // `provider.insurer.register` (module 0-ب item (e)) moves exactly ONE of the four: it is
+    // PLATFORM-scoped like its two siblings, so the matrix never offers it and the toggle list does
+    // not grow. The catalogue does.
+    // `provider.office.administrator.invite` (module 0-ب item (f)) moves exactly ONE of the four,
+    // for the third time and the same reason: PLATFORM-scoped, so the matrix never offers it and the
+    // toggle list does not grow. It also does NOT create a family — `provider.office.register` and
+    // `provider.office.administrator.invite` read as the families `provider.office` and
+    // `provider.office.administrator` by the matrix's own segment rule, and a one-member family is
+    // not a five-state row. So the catalogue grows and the other three figures stand.
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — the retention umbrella SPLIT, so the catalogue moves +1 (one code
+     * out, two in) and the TOGGLE list moves +1 for the same reason.
+     *
+     * NO NEW FAMILY, and the arithmetic is the matrix's own: a five-state row needs TWO OR MORE of
+     * the seven CRUD verbs, and `retention-schedule` now holds `.update` (a verb) and `.confirm`
+     * (not one — "confirm" is not a point on the none/read/write/delete/full scale, the same reason
+     * `link`, `unlink` and `discard` land in the toggle list). One verb is not a family.
+     */
+    /*
+     * BATCH 5 GROUP 7b — 227 -> 228, the first catalogue move in ten commits. `retention.extend` is
+     * ONE new code, and it lands in the TOGGLE list because "extend" is not one of the seven CRUD
+     * verbs — the same reason `confirm`, `link`, `unlink`, `nominate` and `discard` are toggles. So
+     * the FAMILY count and the family-code count do not move, and the toggle count moves by exactly
+     * one. It is OFFICE-scoped, so unlike `provider.office-state.read` it does reach this matrix.
+     */
+    /*
+     * BATCH 5 GROUP 7c — 228 -> 229. `retention.archive.retrieve` is ONE new code and it lands in
+     * the TOGGLE list for the same reason `extend` did: "retrieve" is not one of the seven CRUD
+     * verbs. So families and family codes do not move, and the toggle count moves by exactly one.
+     * OFFICE-scoped, so it does reach this matrix — a blocked record belongs to the office whose
+     * records they are, and the two bases for retrieving one are both external compulsion on THAT
+     * office, not a platform capability.
+     */
+    /*
+     * MODULE 0-ب, DECISION 36 — 229 -> 230. `conflict-of-interest.register.read` is ONE new code,
+     * and unlike `extend` and `retrieve` above it DOES carry a CRUD verb (`read`). It still lands in
+     * the TOGGLE list, for the reason `payment-channel.manage` once did: `familyOf` gives it the
+     * family `conflict-of-interest.register`, which has exactly ONE member, and one CRUD verb is not
+     * a family. So families stay 21, family codes stay 59, and the toggle count moves by one.
+     *
+     * The sibling `conflict-of-interest.disclose` does NOT join it: its family is
+     * `conflict-of-interest` and `disclose` is not a CRUD verb, so the two sit in different families
+     * and neither pulls the other into a five-state row. That is worth stating because the two codes
+     * share a prefix and are about DIFFERENT objects — one is the flagged disclosure on a
+     * recommendation, the other is the self-declaration register.
+     *
+     * OFFICE-scoped, so it reaches this matrix: a register of this office's own people is the
+     * office's, not a platform capability.
+     */
+    expect(PERMISSION_CATALOGUE.length).toBe(230);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
     // and the matrix no longer offers it — so the toggle list loses exactly the one code it added.
-    expect(toggles.length).toBe(160);
+    /*
+     * STILL 163 AFTER A 227th CODE, and that is the PLATFORM filter being observable rather than an
+     * oversight. 59 CRUD-family codes + 163 toggles = 222, not 227: the office matrix never offers a
+     * PLATFORM-scoped code (module 0 item (j)), and all FIVE of them are outside these two buckets.
+     * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
+     * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
+     */
+    expect(toggles.length).toBe(166);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

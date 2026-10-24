@@ -11,7 +11,7 @@ import { AuthModule } from '../auth/auth.module';
 
 /**
  * Process 56 (backlog Part C #56, Domain F) — Internal Controls (Maker/
- * Checker). A read-only, cross-module scan over the 15 same-table maker/
+ * Checker). A read-only, cross-module scan over the 16 same-table maker/
  * checker pairs backed by a DB `CHECK` constraint (`common/maker-checker.
  * util.ts`'s own covered-pairs table) plus the one cross-table pair no
  * single-table `CHECK` can express (`PolicyChecking.checkedByUserId` vs the

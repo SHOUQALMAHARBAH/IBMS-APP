@@ -16,6 +16,7 @@ import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
+import { licensedOffice } from '../compliance-risk/license-gate.double';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return withDerivedPermissions({
@@ -229,6 +230,7 @@ function makeDeps() {
       audit,
       workflow,
       dutySegregation,
+      licensedOffice(),
     ),
     mocks: {
       create,

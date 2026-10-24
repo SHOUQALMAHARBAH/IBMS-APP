@@ -100,13 +100,32 @@ export class OrganizationRepository {
       );
     }
     if (organizations.length > 1) {
+      /*
+       * CORRECTED, MODULE 0-ب: THIS MESSAGE HAD BECOME FALSE, AND ITS OWN TEST STILL PASSED.
+       *
+       * It said "a second office cannot currently be onboarded through the application at all:
+       * nothing in it creates an Organization", and named `seed.ts` and `seed-demo.script.ts` as
+       * "the only two writers". Items (d) and (e) made all of that untrue — there are FOUR writers
+       * now (measured) and TWO of them are reachable over HTTP. The test pinning this text asserted
+       * the two filenames and the phrase "cannot currently be onboarded", so it stayed green while
+       * the sentence it exists to protect became wrong: a reader hitting this refusal was told the
+       * application cannot do the thing it had just been built to do.
+       *
+       * What is STILL true is the narrow half, and it is the half this refusal is actually about:
+       * an ANONYMOUS request cannot resolve WHICH office it belongs to. So the message now
+       * separates the two — what onboards an office (the provider routes, which exist) from what
+       * signup cannot do (resolve a tenant, which is Phase 4).
+       */
       throw new Error(
         'More than one brokerage office exists, so anonymous signup can no longer tell which office an account belongs to. ' +
-          'A second office cannot currently be onboarded through the application at all: nothing in it creates an ' +
-          'Organization, and no request can create the first user inside one. Phase 4 (§4.10) is where that lands — ' +
-          'the Organization resolved from the request subdomain before the sign-in form is shown. ' +
-          'Today the only two writers of Organization are `packages/db/prisma/seed.ts` and ' +
-          '`apps/api/scripts/seed-demo.script.ts`, both developer tools run against a local database.',
+          'Signup is NOT how an office is onboarded: the platform provider registers one at ' +
+          '`POST /provider/brokerage-offices`, and an insurance company at ' +
+          '`POST /provider/insurance-companies`, both of which name the organization explicitly. ' +
+          'What is still missing is a way for an ANONYMOUS request to resolve which office it belongs to — ' +
+          'the Organization resolved from the request subdomain before the sign-in form is shown, which is ' +
+          'Phase 4 (§4.10). The four writers of Organization today are `packages/db/prisma/seed.ts` and ' +
+          '`apps/api/scripts/seed-demo.script.ts`, both developer tools, plus those two provider ' +
+          'registration services, which are reachable over HTTP.',
       );
     }
     return organizations[0].id;
@@ -128,6 +147,51 @@ export class OrganizationRepository {
         dutySegregationMode: mode,
         dutySegregationModeDeclaredAt: new Date(),
         dutySegregationModeDeclaredByUserId: declaredByUserId,
+      },
+    });
+  }
+
+  /**
+   * MODULE 0-ب — record who this office has assigned as its data protection officer, and the
+   * acknowledgement when that is the same person as the office manager.
+   *
+   * ## THE FOUR DECLARATION COLUMNS MOVE TOGETHER OR NOT AT ALL
+   *
+   * `declaration` is what `resolveCombinedDeclaration` returned: an object when one was owed and
+   * well-formed, `null` when none was owed. So this method cannot write a partial declaration and
+   * cannot omit one that was required — the database's all-four-or-none CHECK is the backstop, and
+   * the return type is what makes the mistake unexpressible one layer up.
+   *
+   * ## IT NEVER CLEARS AN ACKNOWLEDGEMENT
+   *
+   * When the office moves the DPO to a second person the combination ends, and the stored
+   * acknowledgement becomes inert on its own — `combinedDeclarationRequired` returns false because
+   * the designations no longer name one person. Clearing it would destroy the record of a decision
+   * somebody took on a date, which is the one thing it exists to hold.
+   *
+   * The consequence is recorded rather than discovered: an office that un-combines and later
+   * re-combines WITH THE SAME PERSON is not asked again. That is deliberate and matches the no-floor
+   * precedent, where a period at or above the one already acknowledged does not re-ask — the person
+   * acknowledged is the same person, so the exposure is the one they read about.
+   */
+  recordDpoDesignation(
+    id: string,
+    dataProtectionOfficerName: string | null,
+    declaration: { noticeShown: string; person: string } | null,
+    acknowledgedByUserId: string,
+  ): Promise<Organization> {
+    return this.prisma.client.organization.update({
+      where: { id },
+      data: {
+        dataProtectionOfficerName,
+        ...(declaration
+          ? {
+              dpoManagerCombinedNoticeShown: declaration.noticeShown,
+              dpoManagerCombinedAcknowledgedPerson: declaration.person,
+              dpoManagerCombinedAcknowledgedAt: new Date(),
+              dpoManagerCombinedAcknowledgedByUserId: acknowledgedByUserId,
+            }
+          : {}),
       },
     });
   }

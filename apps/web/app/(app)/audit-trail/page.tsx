@@ -1,8 +1,14 @@
 'use client';
 
-import { type CSSProperties, useEffect, useState } from 'react';
+import { Suspense, type CSSProperties, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { hasPermission } from '../../../lib/auth/permissions';
+import {
+  isWorkflowEntityType,
+  WORKFLOW_ENTITY_LABEL,
+  WORKFLOW_ENTITY_TYPES,
+} from '../../../lib/audit-trail/workflow-entity-types';
 import { Pagination } from '../../../components/ui/Pagination';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -114,9 +120,49 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                   {r.occurredAt.replace('T', ' ').slice(0, 19)}
                 </td>
                 <td style={cell}>{t(ENUM_LABEL.AuditAction[r.action])}</td>
+                {/*
+                  * OWNER DECISION 49 — THE TYPE IN ARABIC PLUS THE NUMBER, NEVER A NAME.
+                  *
+                  * `AuditLogEntry.entityType` is a bare `String` with no enum: an OPEN set that
+                  * grows with the system. MEASURED — dev holds 32 distinct values and db-test 139,
+                  * because this log records every model the product touches, not just the
+                  * eighteen that have a workflow. So a NAME here would silently stop appearing
+                  * each time a module is added, and the owner's ruling is that an honest number
+                  * beats a name that quietly goes missing: the unknown is DECLARED.
+                  *
+                  * WHERE THE TYPE IS ONE OF THE EIGHTEEN, ITS OWN WORD IS USED — decision 41's
+                  * labels — so the reader sees the same word here as in the filter dropdown above
+                  * and at the top of the screen they came from. Measured coverage: 11 of dev's 32
+                  * distinct types, which is 89.6% of its ROWS; on db-test it is 17 of 139 and only
+                  * 14.1% of rows. Both figures are reported to the owner, because which of them
+                  * describes a real office changes how often the fallback is seen.
+                  *
+                  * THE FALLBACK IS VISIBLY A FALLBACK and is not dressed up as a name: the stored
+                  * type is rendered as machine text, in a monospace face and under its own label,
+                  * so a reader can tell "this is the identifier our system stores" from "this is
+                  * what the thing is called".
+                  *
+                  * THE ID STAYS IN FULL rather than being sliced: it is the only way a reader can
+                  * look the record up, and the budget keeps counting it — which the ruling
+                  * accepts. What changed is that the reader now knows WHAT KIND of record it is.
+                  */}
                 <td style={cell}>
-                  {r.entityType}{' '}
-                  <span style={{ opacity: 0.7 }}>· {r.entityId}</span>
+                  {isWorkflowEntityType(r.entityType) ? (
+                    t('atEntityRef', {
+                      type: t(WORKFLOW_ENTITY_LABEL[r.entityType]),
+                      ref: r.entityId,
+                    })
+                  ) : (
+                    <span
+                      title={t('atEntityTypeUnlabelled')}
+                      style={{
+                        fontFamily: 'var(--font-mono, monospace)',
+                        color: 'var(--ink-secondary)',
+                      }}
+                    >
+                      {r.entityType} · {r.entityId}
+                    </span>
+                  )}
                 </td>
                 <td style={cell} data-audit-actor={r.userId}>
                   {/*
@@ -151,10 +197,30 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
   );
 }
 
-export default function AuditTrailPage() {
+/**
+ * OWNER DECISION 41 — the two fields on this screen that a person could not fill.
+ *
+ * `wfEntityId` and `documentId` were both `required`, so the workflow-history and document-history
+ * sections could not be used at all without pasting a uuid from somewhere else. They are no longer
+ * required, and the normal way they get filled is NAVIGATION: every screen whose rows are one of the
+ * eighteen workflow entities links here with `?entityType=&entityId=`, so the field arrives filled by
+ * WHERE THE READER CAME FROM. Typing one by hand still works and is now optional.
+ *
+ * ## Why lazy `useState` and not an effect
+ *
+ * The URL is read ONCE, as each field's initial value, so the reader can then edit it. An effect that
+ * copied the params into state would be setState-inside-an-effect — which `npm run lint` refuses here
+ * and which `EntitySearch` already records paying for twice — and would also fight the reader by
+ * resetting what they typed.
+ *
+ * `useSearchParams` forces this component to sit inside a `Suspense` boundary, which is why the default
+ * export below is a wrapper. The same shape `/opportunities` and `/rfqs/new` already use.
+ */
+function AuditTrailScreen() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
 
   const [browseUserId, setBrowseUserId] = useState('');
   const [browseEntityType, setBrowseEntityType] = useState('');
@@ -176,13 +242,19 @@ export default function AuditTrailPage() {
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [browseBusy, setBrowseBusy] = useState(false);
 
-  const [wfEntityType, setWfEntityType] = useState('');
-  const [wfEntityId, setWfEntityId] = useState('');
+  const [wfEntityType, setWfEntityType] = useState(
+    () => searchParams.get('entityType') ?? '',
+  );
+  const [wfEntityId, setWfEntityId] = useState(
+    () => searchParams.get('entityId') ?? '',
+  );
   const [wfRows, setWfRows] = useState<AuditLogEntry[] | null>(null);
   const [wfError, setWfError] = useState<string | null>(null);
   const [wfBusy, setWfBusy] = useState(false);
 
-  const [documentId, setDocumentId] = useState('');
+  const [documentId, setDocumentId] = useState(
+    () => searchParams.get('documentId') ?? '',
+  );
   const [docHistory, setDocHistory] = useState<DocumentHistory | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
   const [docBusy, setDocBusy] = useState(false);
@@ -392,14 +464,42 @@ export default function AuditTrailPage() {
       <section style={sectionStyle}>
         <h2>{t('atWorkflowHistoryHeading')}</h2>
         <form onSubmit={runWorkflowHistory} style={formStyle}>
+          {/*
+            A SELECT over the eighteen, where this was a free-text box validated server-side against
+            `@Length(1, 100)` and against nothing else. The vocabulary IS closed, so a person had to
+            guess the exact string the writers store — `CrossSellOpportunity`, not "cross-sell" — and a
+            wrong guess returned an empty history that reads exactly like "nothing ever happened to this
+            record". The options come from the label map, which is total over the union, so a nineteenth
+            member cannot be added without deciding its word.
+          */}
           <label>
             {t('atWorkflowEntityTypeLabel')}{' '}
-            <input
+            <select
               aria-label={t('atWorkflowEntityTypeLabel')}
               value={wfEntityType}
               onChange={(e) => setWfEntityType(e.target.value)}
-              required
-            />
+            >
+              <option value="">{t('atWorkflowEntityTypeChoose')}</option>
+              {WORKFLOW_ENTITY_TYPES.map((type) => {
+                const label = WORKFLOW_ENTITY_LABEL[type];
+                return (
+                  <option key={type} value={type}>
+                    {/*
+                      `null` means nobody has written a word for this type, and it renders the MEMBER
+                      NAME rather than a guess. NONE of the eighteen is null as of 2026-10-23 — three
+                      were for a day, and all three turned out to have plurals already rendering
+                      elsewhere in the product, so the branch below is now unreachable. It stays
+                      because a nineteenth member can arrive unworded, and because an English member
+                      name in an Arabic list is obviously unfinished where a plausible invented word is
+                      indistinguishable from a decided one and would never be corrected.
+                      `audit-trail.spec.ts` asserts that no option renders its own member name, which
+                      is this branch's visible signature.
+                    */}
+                    {label === null ? type : t(label)}
+                  </option>
+                );
+              })}
+            </select>
           </label>
           <label>
             {t('atWorkflowEntityIdLabel')}{' '}
@@ -407,10 +507,39 @@ export default function AuditTrailPage() {
               aria-label={t('atWorkflowEntityIdLabel')}
               value={wfEntityId}
               onChange={(e) => setWfEntityId(e.target.value)}
-              required
             />
           </label>
-          <button type="submit" disabled={wfBusy}>
+          {/*
+            THE ONE CHOOSER, ON CUSTOMER — owner decision 41, and it is one rather than eighteen for a
+            measured reason. Thirteen of the eighteen types carry NO human-readable field at all (no
+            name, no number, no title), so a chooser over them would search nothing; and of the five
+            that do, `policy.read`, `claim.read` and `lead.list.read` reach neither of the two roles
+            that stand on this screen, while there is no read code for `IncidentReport` at all. Customer
+            is the one entity whose search route BOTH readers of this screen can already reach:
+            `GET /customers/search` is gated on ANY OF `customer.read`/`dsr.log`, and `customer.read`
+            is held by COMPLIANCE_OFFICER and EXTERNAL_AUDITOR alike. So no new route and no new code.
+
+            It FILLS the id field rather than replacing it. That is what keeps the arriving-from-a-link
+            case working: a prefilled uuid is already correct and has no name to display, and
+            `EntitySearch` can only show a name it fetched itself.
+          */}
+          {wfEntityType === 'Customer' ? (
+            <EntitySearch
+              kind="customer"
+              value={wfEntityId}
+              onChange={setWfEntityId}
+              label={t('customerPickerSearchLabel')}
+            />
+          ) : null}
+          {/*
+            Disabled rather than `required` on the inputs. The server needs BOTH halves — the DTO's own
+            comment says so — and a screen must not send a request it knows will 400, which is the same
+            rule `CombinedDutyReasonField` follows for its ten-character floor.
+          */}
+          <button
+            type="submit"
+            disabled={wfBusy || !wfEntityType || !wfEntityId.trim()}
+          >
             {wfBusy ? t('atLoading') : t('atLookUpButton')}
           </button>
         </form>
@@ -431,10 +560,31 @@ export default function AuditTrailPage() {
               aria-label={t('atDocumentIdLabel')}
               value={documentId}
               onChange={(e) => setDocumentId(e.target.value)}
-              required
             />
           </label>
-          <button type="submit" disabled={docBusy}>
+          {/*
+            THE DOCUMENT CHOOSER, AND ITS ABSENCE IS PART OF THE DECISION.
+            `GET /documents/search` is gated on `document.read` ALONE — owner decision 41, argued in the
+            api's `common/picker-search.config.ts`. Measured off the seeded grid, that code reaches
+            COMPLIANCE_OFFICER and NOT the EXTERNAL_AUDITOR, so that role sees no chooser here and keeps
+            the typed field. NOT an inbound link — `/documents` is gated on `document.read`, so that
+            role cannot open the register one would come from; what it has instead is the audit-log
+            table above, whose Entity column renders the document ids. That is correct rather than a gap:
+            widening the route would hand a read-only auditor a name search over every document in the
+            office — every KYC pack, every incident report — when what the role is entitled to is the
+            history of a document it already has the id of.
+            Rendering the control for a reader who would be refused it is the thing the frontend
+            directive forbids, so the condition is on the permission and not on the response.
+          */}
+          {hasPermission(user, 'document.read') ? (
+            <EntitySearch
+              kind="document"
+              value={documentId}
+              onChange={setDocumentId}
+              label={t('entitySearchDocumentLabel')}
+            />
+          ) : null}
+          <button type="submit" disabled={docBusy || !documentId.trim()}>
             {docBusy ? t('atLoading') : t('atLookUpButton')}
           </button>
         </form>
@@ -447,7 +597,8 @@ export default function AuditTrailPage() {
           <>
             <h3>{t('atColVersions')}</h3>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+              <table
+                data-testid="document-versions" style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
                 <thead>
                   <tr>
                     <th style={head}>{t('atColVersion')}</th>
@@ -463,7 +614,7 @@ export default function AuditTrailPage() {
                     <tr key={v.id}>
                       <td style={cell}>
                         v{v.versionNumber}
-                        {v.isRequestedVersion ? ' (requested)' : ''}
+                        {v.isRequestedVersion ? ` ${t('statusRequestedVersion')}` : ''}
                       </td>
                       <td style={cell}>{v.fileName}</td>
                       <td style={cell}>
@@ -472,7 +623,15 @@ export default function AuditTrailPage() {
                       <td style={cell}>
                         {t(ENUM_LABEL.DataClassification[v.classification])}
                       </td>
-                      <td style={cell}>{v.uploadedByUserId}</td>
+                      {/*
+                        * RULE 2 — WHO filed this version, by name. It rendered the raw uuid, which
+                        * on a document history identifies nobody: the column exists to say which
+                        * colleague uploaded it. The em dash is real — that column carries no
+                        * foreign key, so the account can be gone.
+                        */}
+                      <td style={cell}>
+                        {v.uploadedByName ? <bdi>{v.uploadedByName}</bdi> : '—'}
+                      </td>
                       <td style={cell}>{v.createdAt.slice(0, 10)}</td>
                     </tr>
                   ))}
@@ -485,5 +644,19 @@ export default function AuditTrailPage() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+/**
+ * `useSearchParams` requires a `Suspense` boundary above it, so the screen is a child.
+ *
+ * `fallback={null}` matches `/opportunities` and `/rfqs/new`: there is nothing useful to render for the
+ * one frame before the params resolve, and a spinner there would flash on every visit.
+ */
+export default function AuditTrailPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuditTrailScreen />
+    </Suspense>
   );
 }

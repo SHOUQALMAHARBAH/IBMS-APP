@@ -1,0 +1,12 @@
+{
+  "art-3a-refuses-for-the-staffing-reason-instead": {
+    "file": "apps/api/src/modules/compliance-risk/broker-license-scope.service.ts",
+    "from": "    if (\n      breachesNaturalPersonOneTypeRule(brokerKind, [...existing, { category }])\n    ) {",
+    "to": "    if (\n      false &&\n      breachesNaturalPersonOneTypeRule(brokerKind, [...existing, { category }])\n    ) {"
+  },
+  "art-3a-message-drops-its-actionable-clauses": {
+    "file": "apps/api/src/modules/compliance-risk/broker-license-scope.service.ts",
+    "from": "          ` branches in ${typesInScope(existing).join(', ')}, so a ${category} branch cannot be added.` +",
+    "to": "          ` branches already.` +"
+  }
+}

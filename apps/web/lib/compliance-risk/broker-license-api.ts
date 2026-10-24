@@ -13,7 +13,8 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
-export type BrokerLicenseStatus = 'active' | 'lapsed';
+// `BrokerLicenseStatus` IS GONE: the api stopped sending it when the column was dropped, and a
+// hand-copied type for a field nothing sends is how a screen starts indexing on `undefined`.
 
 /** ONE TERM. */
 export interface BrokerLicense {
@@ -22,7 +23,6 @@ export interface BrokerLicense {
   scopeOfAuthorization: string | null;
   issuedAt: string | null;
   expiresAt: string;
-  status: BrokerLicenseStatus;
   isCurrentlyLapsed: boolean;
   /** Mandatory — a term cannot exist without its certificate. */
   certificateDocumentId: string;
@@ -33,10 +33,12 @@ export interface BrokerLicense {
   renewalDueBy: string;
   /** Whether the application was filed by that deadline. False when none was filed. */
   renewalFiledOnTime: boolean;
-  /** Past its printed expiry yet STILL VALID, because a timely application is pending (art. 11).
+  /** Past its printed expiry yet STILL VALID, because a timely application is pending a decision.
+   *  NOT art. 11 — that article contains no extension; this is the owner's decision.
+   *  See `RENEWAL_PENDING_RULE_BASIS` in the api's broker-license.config.ts.
    *  Its own field rather than folded into `isCurrentlyLapsed`, because a screen showing an expiry
    *  in the past has to be able to explain why the system is content. */
-  validByOperationOfLaw: boolean;
+  validPendingRenewalDecision: boolean;
   /** Art. 10/b — false means the entered expiry is not a 31 December. A WARNING TO VERIFY, never
    *  a block: the date is entered as printed on the certificate and the certificate is the
    *  authority. */
@@ -44,6 +46,9 @@ export interface BrokerLicense {
   /** Informational only. Nothing refuses on it — see the api config for why three-calendar-years
    *  is not a second warning condition. */
   expectedExpiryForThreeYearTerm: string | null;
+  /** Art. 10/b — whether the entered expiry matches the three-year term. NULL means no issue
+   *  date on record, which is NOT a mismatch. A warning on screen; nothing is blocked. */
+  expiryMatchesThreeYearTerm: boolean | null;
 }
 
 /**
@@ -56,6 +61,43 @@ export interface BrokerLicense {
 export interface BrokerLicenseSeries {
   current: BrokerLicense | null;
   terms: BrokerLicense[];
+  /**
+   * THE ONE ANSWER the api derives and the gate enforces — six states plus `mayPractise`.
+   *
+   * It replaces the stored `status` this file used to carry. That field was the third of three
+   * answers to "is this office licensed", and the screen rendered it BESIDE the live-derived
+   * `isCurrentlyLapsed`, so a reader saw two answers on one row.
+   *
+   * HAND-COPIED over HTTP like everything else here, so when the api view changes this type, the
+   * screen and every Playwright mock move in the SAME commit.
+   */
+  /**
+   * The renewal notice, derived by the api from the current term's own expiry — 45 days out, again
+   * at 30, then continuing until the date passes.
+   *
+   * Nothing is stored behind it, so there is no "already notified" state to go stale, and
+   * `renewalFiled` is reported BESIDE the stage rather than suppressing it: a filing is not a
+   * decision, and the block lifts on the new term being recorded with its certificate.
+   */
+  renewalNotice: {
+    stage: 'NONE' | 'FIRST' | 'SECOND' | 'CONTINUING' | 'EXPIRED';
+    daysToExpiry: number | null;
+    expiresAt: string | null;
+    applicationDueBy: string | null;
+    renewalFiled: boolean;
+  };
+  standing: {
+    status:
+      | 'NO_TERM_ON_RECORD'
+      | 'ACTIVE'
+      | 'RENEWAL_PENDING'
+      | 'EXPIRED'
+      | 'SUSPENDED'
+      | 'CANCELLED';
+    mayPractise: boolean;
+    standingActDecisionRef: string | null;
+    deemedCancelledUnderArticle14C: boolean;
+  };
 }
 
 export interface CreateOrRenewBrokerLicenseInput {
@@ -93,6 +135,25 @@ export function recordRenewalRequest(input: {
   return apiPost('/broker-license/renewal-requested', input);
 }
 
-export function markBrokerLicenseLapsed(): Promise<BrokerLicense> {
-  return apiPost('/broker-license/mark-lapsed', {});
+/**
+ * The office records a decision the REGULATOR took about its licence.
+ *
+ * This replaces `markBrokerLicenseLapsed`, which posted an EMPTY BODY to `/broker-license/mark-lapsed`
+ * and flipped a two-value column — so the office record of a CBJ suspension carried no basis, no
+ * effective date, no decision reference and no letter.
+ *
+ * THERE IS NO REGULATOR IN THIS SYSTEM. The CBJ acts outside this product; what this writes is the
+ * office own record of a letter it received.
+ *
+ * Returns the RECOMPUTED standing, so a caller never has to guess what the act did to it.
+ */
+export function recordRegulatoryAction(input: {
+  kind: 'SUSPENSION' | 'CANCELLATION' | 'REINSTATEMENT';
+  basis: 'BROKER_REQUEST' | 'SANCTION';
+  effectiveFrom: string;
+  decisionRef: string;
+  documentId?: string;
+  suspendedUntil?: string;
+}): Promise<BrokerLicenseSeries['standing']> {
+  return apiPost('/broker-license/regulatory-actions', input);
 }

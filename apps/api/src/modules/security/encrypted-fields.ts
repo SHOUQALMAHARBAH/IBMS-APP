@@ -20,6 +20,11 @@ export const ENCRYPTED_FIELDS = {
   // together rather than traded against each other.
   CustomerIdentifierCorrection: ['beforeValueEnc', 'afterValueEnc'],
   UltimateBeneficialOwner: ['nationalIdEnc'],
+  // Module 0-ب item (d). The office's IBAN. Encrypted for the same reason a national ID is:
+  // it is an account identifier that, in the clear, is directly actionable by anyone who
+  // reads the row or a backup of it. The sheet marks it mandatory and says to store it
+  // encrypted; this is that.
+  Organization: ['ibanEnc'],
   InsuredPerson: ['nationalIdEnc'],
   Employee: ['nationalIdEnc'],
   ThirdPartyClaimant: ['contactDetailsEnc'],

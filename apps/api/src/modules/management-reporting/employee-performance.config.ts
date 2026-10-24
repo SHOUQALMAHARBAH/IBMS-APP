@@ -30,6 +30,19 @@ export { previousUtcMonthRange, type PeriodWindow };
 export interface EmployeePerformanceRecordView {
   id: string;
   employeeId: string;
+  /**
+   * ITEM 1 — the colleague's name from their HR record, resolved by the api through
+   * `EmployeeRepository.namesForEmployeeIds`.
+   *
+   * REQUIRED on the view and never optional: it is read by `/dashboards/insurer-employee-performance`
+   * and projected by three service methods, and an optional field would let one of them keep
+   * sending nothing while the others carried a name — a name after a LIST and none after a COMPUTE,
+   * which is the `IncidentReport.load()` defect and is invisible to a test that only lists.
+   *
+   * NULLABLE because a performance record is a periodic SNAPSHOT and can outlive the employee row
+   * it scores. A missing row reports NO NAME, never the uuid.
+   */
+  employeeName: string | null;
   periodLabel: string;
   newClients: number | null;
   premiumWrittenJod: string | null;
@@ -66,10 +79,14 @@ export function formatMoneyOrNull(value: MoneyInput | null): string | null {
 
 export function deriveEmployeePerformanceRecordView(
   row: EmployeePerformanceRecord,
+  /** Resolved by `EmployeeRepository.namesForEmployeeIds`. A REQUIRED parameter, so the compiler
+   * names every call site — it named three plus the spec. */
+  employeeNames: Map<string, string>,
 ): EmployeePerformanceRecordView {
   return {
     id: row.id,
     employeeId: row.employeeId,
+    employeeName: employeeNames.get(row.employeeId) ?? null,
     periodLabel: row.periodLabel,
     newClients: row.newClients,
     premiumWrittenJod: formatMoneyOrNull(row.premiumWritten),

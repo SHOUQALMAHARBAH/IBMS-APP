@@ -1,0 +1,26 @@
+{
+  "capital-three-states-collapsed-into-two": {
+    "_": "Treat 'nobody typed a figure' as 'the figure is short'. The screen then tells an office it is undercapitalised when nobody entered a number — a finding about its capital made out of a missing fact. Must kill the different-facts test.",
+    "file": "apps/web/app/(app)/provider-register-office/page.tsx",
+    "from": "          {result.capital.capitalIsUnrecorded ? (",
+    "to": "          {false ? ("
+  },
+  "the-expiry-warning-never-renders": {
+    "_": "Art. 10/b's warning disabled. The CONDITION, not the block — deleting the JSX would break the page and kill every test, which proves nothing about which test observes what. Must kill the expiry test alone.",
+    "file": "apps/web/app/(app)/provider-register-office/page.tsx",
+    "from": "        {!result.expiryIsEndOfCalendarYear && (",
+    "to": "        {false && ("
+  },
+  "the-servers-refusal-becomes-a-generic-sentence": {
+    "_": "Replace the API's own message with the screen's generic one. A duplicate establishment number then reads identically to an art. 3/a breach, and the second needs a different person to fix it. Must kill the server-refusal test.",
+    "file": "apps/web/app/(app)/provider-register-office/page.tsx",
+    "from": "        error instanceof ApiError ? error.message : t('regOfficeLoadError'),",
+    "to": "        t('regOfficeLoadError'),"
+  },
+  "the-permission-check-is-dropped": {
+    "_": "The screen renders its form to a reader who cannot submit it — a control that leads to a refusal, which this product's own directive forbids. Must kill the refusal test.",
+    "file": "apps/web/app/(app)/provider-register-office/page.tsx",
+    "from": "  if (!canRegister) {",
+    "to": "  if (false) {"
+  }
+}

@@ -28,6 +28,7 @@ const COMMUNICATIONS = [
   {
     id: "comm-1",
     customerId: "11111111-1111-1111-1111-111111111111",
+    customerName: "Al-Yarmouk Trading Company",
     channel: "EMAIL",
     templateId: null,
     languageUsed: "AR",
@@ -44,6 +45,7 @@ const COMMUNICATIONS = [
   {
     id: "comm-2",
     customerId: "11111111-1111-1111-1111-111111111111",
+    customerName: "Al-Yarmouk Trading Company",
     channel: "CALL",
     templateId: "promo-v1",
     languageUsed: "AR",
@@ -128,4 +130,25 @@ test("communications screen has no serious/critical accessibility violations @a1
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+test("RULE 2 — the Customer column names the customer, and never shows the id", async ({
+  page,
+}) => {
+  /*
+   * MEASURED BEFORE THIS WAS WRITTEN: with the screen changed and the build forced, every existing
+   * test in this file still passed — nothing was looking at the Customer column, so the column
+   * rendering eight characters of a uuid had no observer at all and neither would the fix.
+   *
+   * ASSERTED AS A PAIR. The name alone passes against a screen that renders BOTH, and the absence
+   * alone passes against a screen that renders NEITHER — which is what an empty cell looks like.
+   */
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockCommunications(page);
+
+  await page.goto("/communications");
+
+  const main = page.locator("main");
+  await expect(main).toContainText("Al-Yarmouk Trading Company");
+  await expect(main).not.toContainText("11111111");
 });

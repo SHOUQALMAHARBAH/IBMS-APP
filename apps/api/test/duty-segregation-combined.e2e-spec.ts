@@ -17,7 +17,7 @@ import { makeInsurer } from './insurer-fixture';
  * PART 4 STEP 3 — one person performing both halves, through the real HTTP API, in an office that has
  * declared COMBINED mode.
  *
- * `Refund.approve` is the pair wired first. It is the sharpest of the fifteen: the refund exists because a
+ * `Refund.approve` is the pair wired first. It is the sharpest of the sixteen: the refund exists because a
  * negative endorsement moved money, and the second signature is the only thing standing between "the broker
  * decided to return premium" and "the broker returned premium to themselves".
  *
@@ -582,7 +582,7 @@ describe('duty segregation — a declared combined act through the API (e2e)', (
       /*
        * THE WIRE, AND THE PART THAT ONLY THIS PAIR CAN PROVE (Part 4 step 5).
        *
-       * `NeedsAssessment` is the only table of the fifteen carrying TWO pairs, so the response carries two
+       * `NeedsAssessment` is the only table of the sixteen carrying TWO pairs, so the response carries two
        * act fields and a declared REVIEW must fill exactly one of them. The database half is asserted
        * below on the two escape columns; this is the same property on the wire, where the SCREEN reads it.
        *

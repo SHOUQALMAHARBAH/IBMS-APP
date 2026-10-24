@@ -49,6 +49,9 @@ const SUMMARY = {
     {
       id: "score-1",
       insurerId: "insurer-1",
+      // Item 1 — the market section names the company now, through the same resolver the
+      // portfolio breakdown beside it already used.
+      insurerName: "شركة الأردن للتأمين",
       periodLabel: "2026-08",
       quoteResponseScore: "90.00",
       claimsServiceScore: "80.00",
@@ -83,7 +86,19 @@ test("generates and renders the portfolio + market export", async ({ page }) => 
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: "CORPORATE" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "Amman Branch" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "insurer-1" })).toBeVisible();
+  /*
+   * ITEM 1 — RE-POINTED. This asserted the MARKET section's `insurer-1` uuid, and the finding it
+   * encodes is why this row existed at all: the PORTFOLIO breakdown directly above it already
+   * resolved "Jordan Insurance Co" (asserted two lines up) while the market section beside it
+   * rendered a uuid — one export, two answers to what an insurer is called. Both go through one
+   * batched resolve now.
+   */
+  await expect(
+    page.getByRole("cell", { name: "شركة الأردن للتأمين" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "insurer-1", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

@@ -33,6 +33,7 @@ interface MfaEnrollBody {
 interface ComplaintBody {
   id: string;
   customerId: string;
+  customerName: string | null;
   claimId: string | null;
   issue: string;
   category: string | null;
@@ -244,6 +245,17 @@ describe('Complaints Management (e2e) — backlog Part C #42', () => {
       })
       .expect(201);
     const c = created.body as ComplaintBody;
+    /*
+     * RULE 2 — THE CUSTOMER'S NAME, ON THE RESPONSE BODY. The screen used to render the first eight
+     * characters of `customerId`, which identifies nobody; it renders this instead.
+     *
+     * Asserted HERE and not only in a Playwright mock, because a mock supplies whatever the screen
+     * reads and so can never catch the api dropping the field — the customer-import class. Paired
+     * with an absence assertion on the id, which is the half that catches a resolver that returned
+     * the id under a new name.
+     */
+    expect(c.customerName).toContain('Cx E2E Co');
+    expect(c.customerName).not.toBe(customer.id);
     expect(c.status).toBe('LOGGED');
     expect(c.claimId).toBe(claim.id);
     expect(c.sla).not.toBeNull();

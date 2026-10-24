@@ -343,6 +343,8 @@ export const OPERATIONS = {
       'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     rpLoading: 'جارٍ التحميل…',
     rpLoadError: 'تعذّر تحميل ملفات المخاطر — حاول مرة أخرى.',
+    rpListProfiles: 'سجلّات تقييم المخاطر',
+    rpListConsolidated: 'الملخّص المجمَّع',
     rpAddSiteError: 'تعذّرت إضافة الموقع — حاول مرة أخرى.',
     rpAddingButton: 'جارٍ الإضافة…',
     rpAddSiteButton: 'إضافة موقع',
@@ -491,6 +493,23 @@ export const OPERATIONS = {
       'هذه الأجهزة تتخطّى رمز التحقق عند تسجيل الدخول. ألغِ الثقة بأي جهاز لا تعرفه.',
     secNoTrustedDevices: 'لا توجد أجهزة موثوقة.',
     secUnnamedDevice: 'جهاز بلا اسم',
+    secCfgAccessTokenLabel: 'عمر رمز الجلسة',
+    secCfgAccessTokenMeaning: 'داخليّ، يُجدَّد تلقائياً',
+    secCfgFailedAttemptsLabel: 'محاولات الدخول الفاشلة',
+    secCfgFailedAttemptsMeaning: 'بعدها يُقفَل الحساب',
+    secCfgHardLogoutLabel: 'الخروج النهائي بعد الخمول',
+    secCfgHardLogoutMeaning: 'بعدها لا تُستأنَف الجلسة، ويُعاد الدخول من أوّله',
+    secCfgHeading: 'إعدادات الأمان',
+    secCfgIdleLabel: 'مدّة الخمول',
+    secCfgIdleMeaning: 'يُخرَج المستخدم إذا ترك الشاشة هذه المدّة',
+    secCfgLoadError: 'تعذّر تحميل إعدادات الأمان — حاول مرة أخرى.',
+    secCfgLoading: 'جارٍ تحميل إعدادات الأمان…',
+    secCfgLockoutLabel: 'مدّة القفل',
+    secCfgLockoutMeaning: 'ثمّ يُفتَح من نفسه',
+    secCfgRefreshTokenLabel: 'عمر رمز التجديد',
+    secCfgRefreshTokenMeaning: 'بعده دخولٌ كامل',
+    secCfgStepUpLabel: 'مدّة صلاحية التحقّق المضاعف',
+    secCfgStepUpMeaning: 'قبل أن يُطلَب مرّةً ثانيةً لفعلٍ حسّاس',
     secDeviceTrustedOn: 'مُوثَّق في',
     secDeviceExpires: 'تنتهي الثقة في',
     secRevokeDevice: 'إلغاء الثقة',
@@ -515,8 +534,9 @@ export const OPERATIONS = {
       'العملية 5 — استبيان مخاطر منظّم يقترح قائمة تغطية، ثم بوابة مراجعة ' +
       'واعتماد. ابدأ تقييماً من ملف العميل.',
     secHardwareKeyPending:
-      'يتطلب دورك مفتاح أمان مادياً. مسار التسجيل هذا غير متاح بعد — ويفي رمز ' +
-      'تطبيق المصادقة بمتطلب المصادقة الثنائية الإلزامية في الوقت الحالي.',
+      'دورُك مُعلَّمٌ بأنّه سيتطلّب مفتاحَ أمانٍ مادياً عندما يدعمه النظام. والنظامُ ' +
+      'لا يقبل مفاتيحَ الأمان اليوم، فلا شيءَ عليك فعلُه — ورمزُ تطبيق المصادقة هو ' +
+      'ما يفي بمتطلّب المصادقة الثنائية الإلزامية. هذا بيانٌ لا إجراء.',
     iprogNoCustomerSelected:
       'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح برنامج التأمين ' +
       'الخاص به من هناك.',
@@ -992,6 +1012,8 @@ export const OPERATIONS = {
       'This customer could not be found — it may not exist, or you may not have access to it.',
     rpLoading: 'Loading…',
     rpLoadError: 'Could not load risk profiles — try again.',
+    rpListProfiles: 'the risk-assessment records',
+    rpListConsolidated: 'the consolidated summary',
     rpAddSiteError: 'Could not add the site — try again.',
     rpAddingButton: 'Adding…',
     rpAddSiteButton: 'Add site',
@@ -1138,6 +1160,23 @@ export const OPERATIONS = {
       'These devices skip the verification code at sign-in. Revoke any you do not recognise.',
     secNoTrustedDevices: 'No trusted devices.',
     secUnnamedDevice: 'Unnamed device',
+    secCfgAccessTokenLabel: 'Session token expiry',
+    secCfgAccessTokenMeaning: 'Internal; renewed automatically.',
+    secCfgFailedAttemptsLabel: 'Failed sign-in attempts',
+    secCfgFailedAttemptsMeaning: 'After this the account is locked.',
+    secCfgHardLogoutLabel: 'Automatic sign-out after idle',
+    secCfgHardLogoutMeaning: 'After this the session cannot be resumed — signing in starts from the beginning.',
+    secCfgHeading: 'Security configuration',
+    secCfgIdleLabel: 'Idle timeout',
+    secCfgIdleMeaning: 'The user is signed out if they leave the screen for this long.',
+    secCfgLoadError: 'Could not load the security configuration — try again.',
+    secCfgLoading: 'Loading the security configuration…',
+    secCfgLockoutLabel: 'Lockout duration',
+    secCfgLockoutMeaning: 'Then it unlocks by itself.',
+    secCfgRefreshTokenLabel: 'Refresh token expiry',
+    secCfgRefreshTokenMeaning: 'After this, a full sign-in.',
+    secCfgStepUpLabel: 'Step-up verification expiry',
+    secCfgStepUpMeaning: 'Before it is asked for a second time for a sensitive action.',
     secDeviceTrustedOn: 'Trusted on',
     secDeviceExpires: 'Trust ends',
     secRevokeDevice: 'Revoke',
@@ -1163,9 +1202,10 @@ export const OPERATIONS = {
       "list, then a review and approval gate. Start one from a customer's " +
       'profile.',
     secHardwareKeyPending:
-      "Your role requires a hardware security key. That enrollment path isn't " +
-      'available yet — an authenticator-app code satisfies the mandatory-MFA ' +
-      'requirement for now.',
+      'Your role is marked to require a hardware security key once this system ' +
+      'supports them. It cannot accept one today, so there is nothing for you to ' +
+      'do — your authenticator-app code is what satisfies the mandatory-MFA ' +
+      'requirement. This is a note, not an action.',
     iprogNoCustomerSelected:
       'No customer selected — open a customer from {link} and open its ' +
       'insurance program from there.',

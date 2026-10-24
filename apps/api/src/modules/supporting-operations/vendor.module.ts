@@ -7,6 +7,7 @@ import { VendorRepository } from '../../repositories/vendor.repository';
 import { DataProcessingAgreementRepository } from '../../repositories/data-processing-agreement.repository';
 import { AuditModule } from '../audit/audit.module';
 import { SlaModule } from '../sla/sla.module';
+import { UserRepository } from '../../repositories/user.repository';
 
 /**
  * Process 67 (Procurement) built the foundational `Vendor` CRUD in this
@@ -28,6 +29,7 @@ import { SlaModule } from '../sla/sla.module';
   imports: [AuditModule, SlaModule],
   controllers: [VendorController, DataProcessingAgreementController],
   providers: [
+    UserRepository,
     VendorService,
     VendorRepository,
     DataProcessingAgreementService,

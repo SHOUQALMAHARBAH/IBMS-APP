@@ -44,6 +44,16 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     create: vi.fn().mockResolvedValue(commRow()),
     findProcess44ById: vi.fn().mockResolvedValue(commRow()),
     findManyProcess44: vi.fn().mockResolvedValue([]),
+    /*
+     * RULE 2 — the name resolver. A SECOND READ rather than an include, because
+     * `CommunicationLog.customerId` has no relation behind it, so the double has to carry a
+     * method and not just a wider row. A Map, because a MISSING key is a different fact from
+     * a null value here: an id that resolves to nothing is representable on a column with no
+     * foreign key.
+     */
+    customerNames: vi
+      .fn()
+      .mockResolvedValue(new Map([['cust-1', 'Al-Yarmouk Trading Company']])),
     ...over.repo,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };

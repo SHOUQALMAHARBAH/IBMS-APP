@@ -58,3 +58,8 @@ export class SearchBranchesDto extends pickerSearchDto(
   PICKER_MIN_CHARS.branch,
   'branch',
 ) {}
+/** `GET /documents/search` — owner decision 41. Gated on `document.read` alone; see the config. */
+export class SearchDocumentsDto extends pickerSearchDto(
+  PICKER_MIN_CHARS.document,
+  'document',
+) {}

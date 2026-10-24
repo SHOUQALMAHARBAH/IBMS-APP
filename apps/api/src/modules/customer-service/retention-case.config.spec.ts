@@ -99,6 +99,9 @@ describe('deriveRetentionCaseView (Process 46)', () => {
   const row: RetentionCaseRow = {
     id: 'rc-1',
     customerId: 'cust-1',
+    // RULE 2 — supplied because the Row type REQUIRES it: the strict type is what names
+    // every read path, which is why it is not optional.
+    customer: { legalName: 'Al-Yarmouk Trading Company' },
     reason: 'lapse_risk',
     status: 'open',
     createdAt: new Date('2026-09-04T09:00:00.000Z'),
@@ -109,6 +112,7 @@ describe('deriveRetentionCaseView (Process 46)', () => {
     expect(deriveRetentionCaseView(row)).toEqual({
       id: 'rc-1',
       customerId: 'cust-1',
+      customerName: 'Al-Yarmouk Trading Company',
       reason: 'lapse_risk',
       status: 'open',
       isClosed: false,

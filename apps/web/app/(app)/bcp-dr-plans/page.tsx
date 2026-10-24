@@ -183,7 +183,7 @@ export default function BcpDrPlansPage() {
                         {plan.nextTestDueAt ? (
                           <span style={isOverdue(plan.nextTestDueAt) ? { color: '#b91c1c' } : undefined}>
                             {plan.nextTestDueAt.slice(0, 10)}
-                            {isOverdue(plan.nextTestDueAt) ? ' (overdue)' : ''}
+                            {isOverdue(plan.nextTestDueAt) ? ` ${t('statusOverdue')}` : ''}
                           </span>
                         ) : (
                           'not scheduled'

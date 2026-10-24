@@ -1,5 +1,6 @@
 import { PrismaClient, RoleName } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import {
   OFFICE_ADMINISTRATOR_ROLE,
   ROLES,
@@ -7,7 +8,51 @@ import {
 } from "./seed-data/roles";
 import { PERMISSIONS } from "./seed-data/permissions";
 import { INSURANCE_LINES } from "./seed-data/insurance-lines";
-import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
+import {
+  BANKS,
+  BUSINESS_MODELS,
+  CITIES,
+  COUNTRIES,
+  CURRENCIES,
+  LEGAL_FORMS,
+  LICENSING_AUTHORITIES,
+  RATING_AGENCIES,
+  type ReferenceSeed,
+} from "./seed-data/reference-tables";
+
+/** The eight, paired with the Prisma delegate each one seeds. A tuple list rather than eight
+ *  copies of the same loop: the shape is identical by design, and eight near-identical blocks is
+ *  eight places for one of them to drift. */
+const REFERENCE_TABLES: [
+  (
+    | "country"
+    | "city"
+    | "bank"
+    | "currency"
+    | "licensingAuthority"
+    | "ratingAgency"
+    | "legalForm"
+    | "businessModel"
+  ),
+  ReferenceSeed[],
+][] = [
+  ["country", COUNTRIES],
+  ["city", CITIES],
+  ["bank", BANKS],
+  ["currency", CURRENCIES],
+  ["licensingAuthority", LICENSING_AUTHORITIES],
+  ["ratingAgency", RATING_AGENCIES],
+  ["legalForm", LEGAL_FORMS],
+  ["businessModel", BUSINESS_MODELS],
+];
+import { RETENTION_TEMPLATE_SEED } from "./seed-data/retention-template";
+import {
+  BROKERAGE_KIND_DESCRIPTIONS,
+  INTEGRATION_METHOD_DESCRIPTIONS,
+  REGULATORY_ACTION_BASIS_DESCRIPTIONS,
+  REGULATORY_ACTION_KIND_DESCRIPTIONS,
+} from "./seed-data/enum-descriptions";
+import { ensureDefaultOrgUnits } from "../src/default-org-units";
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
 import { validatePasswordPolicy } from "../src/password-policy";
 import { SAMPLE_INSURERS } from "./seed-data/insurers";
@@ -84,13 +129,14 @@ async function ensureDefaultOrganization(): Promise<void> {
       subdomain: "default",
       // Brokerage office, not an insurance company. `OrganizationType` carries NO default:
       // neither kind is a safe fallback for the other, so every creator states which it is.
-      type: 'BROKERAGE_OFFICE',
+      type: "BROKERAGE_OFFICE",
       // Required for a brokerage office by the `Organization_broker_kind_matches_type`
       // CHECK. The compiler cannot ask for it — a nullable column is optional in
       // Prisma's CreateInput — so the database is what refuses its absence.
-      brokerKind: 'CORPORATE',
+      brokerKind: "CORPORATE",
     },
   });
+
   console.log("Seeded the default organization.");
 }
 
@@ -120,6 +166,22 @@ async function ensureDefaultOrganization(): Promise<void> {
  */
 export const PROVIDER_ORGANIZATION_ID = "00000000-0000-0000-0000-0000000000f0";
 
+/**
+ * THE PROVIDER'S OWN NAME, owner's ruling of 19 October — exactly this spelling, both capital Gs.
+ *
+ * One home for it, because the branch below upserts it and the create above uses it: two literals
+ * would be two answers to what this organization is called, and the copy is the one that drifts.
+ *
+ * WHAT IT DOES NOT DO, stated so it is not read as more than it is: NOTHING IN THE WEB APP RENDERS
+ * THE SIGNED-IN ORGANIZATION'S OWN NAME. Measured — `/auth/me` does not carry it, and every
+ * `legalName` render in `apps/web` belongs to a CUSTOMER, an INSURER, or `/company-record`, which is
+ * an insurance company's view of its own registry row and is gated on organization TYPE. So this
+ * fixes what the database says the organization IS; putting it on screen is a separate change
+ * (a field on `/auth/me` plus a render) and is recorded rather than smuggled in here.
+ */
+const PROVIDER_LEGAL_NAME_EN = "GO Global";
+const PROVIDER_LEGAL_NAME_AR = "جو جلوبال";
+
 async function ensureProviderOrganization(): Promise<void> {
   const existing = await prisma.organization.findUnique({
     where: { id: PROVIDER_ORGANIZATION_ID },
@@ -131,21 +193,121 @@ async function ensureProviderOrganization(): Promise<void> {
     await prisma.organization.create({
       data: {
         id: PROVIDER_ORGANIZATION_ID,
-        legalName: "IBMS Platform Operator",
-        legalNameAr: "مُشغّل منصّة IBMS",
+        legalName: PROVIDER_LEGAL_NAME_EN,
+        legalNameAr: PROVIDER_LEGAL_NAME_AR,
         subdomain: "provider",
         type: "PROVIDER",
         // NULL, required by the item (b) CHECK for every type that is not a brokerage office.
         brokerKind: null,
       },
     });
+  } else if (
+    existing.legalName !== PROVIDER_LEGAL_NAME_EN ||
+    existing.legalNameAr !== PROVIDER_LEGAL_NAME_AR
+  ) {
+    /*
+     * THE NAME IS UPSERTED, NOT CREATE-ONLY, and that is the whole point of this branch.
+     *
+     * The seed used to create the row and never touch it again, so changing the literal would have
+     * named the organization correctly on a database built from NOTHING and left every existing
+     * database reading the old name forever. That is the seed-only asymmetry this repository has
+     * now paid for three times: a permission row that reached db-test and not dev, the default
+     * branch and department that reached neither, and this.
+     *
+     * IT TOUCHES THE TWO NAME FIELDS AND NOTHING ELSE. `subdomain` is addressing and `type` is
+     * identity; an upsert that reset either would make a hand-correction unrecoverable, which is a
+     * different and worse failure than a stale name.
+     */
+    await prisma.organization.update({
+      where: { id: PROVIDER_ORGANIZATION_ID },
+      data: {
+        legalName: PROVIDER_LEGAL_NAME_EN,
+        legalNameAr: PROVIDER_LEGAL_NAME_AR,
+      },
+    });
+    console.log(
+      `  provider organization renamed to ${PROVIDER_LEGAL_NAME_EN} (was ${existing.legalName})`,
+    );
   }
 
-  const code = "provider.office-state.read";
-  const permission = await prisma.permission.findUnique({ where: { code } });
-  if (!permission) {
+  /*
+   * MODULE 0-ب ITEM (b) — THE PROVIDER ADMINISTERS ITSELF, AND NOTHING ELSE.
+   *
+   * Item (j) gave this role one code. That left the provider organization unable to add a second
+   * operator, change a role, or repair itself from inside the application — the same shape as an
+   * office with no administrator, which `office-administrator.e2e-spec.ts` calls a defect in its
+   * own failure message.
+   *
+   * WHAT BOUNDS IT TO ITS OWN ORGANIZATION IS TENANCY, NOT A NEW MECHANISM. `User`, `Role`,
+   * `UserRoleAssignment` and `RolePermission` all carry `organizationId` and are therefore in the
+   * DMMF-derived `TENANT_SCOPED_MODELS`, so every read and write the provider makes through these
+   * codes is filtered to the provider organization before it reaches the database. A provider
+   * operator cannot see, let alone change, an office's users or roles — and that is a property of
+   * the extension plus RLS rather than of anything written here, which is why the e2e proves it by
+   * ASKING FOR an office's role by id and getting a 404.
+   *
+   * WHAT IS DELIBERATELY ABSENT: every brokerage code. No policy, customer, commission,
+   * collection, claim or employee capability. The count check below is what keeps that true.
+   *
+   * THE DECLARED GAP STAYS DECLARED: nothing structurally stops a provider administrator granting
+   * their own role an office-scoped code — they hold `role.update` and the catalogue is global.
+   * What bounds it is that the provider starts with exactly this set and a seed check that fails
+   * if the set changes. That is a GRANT-level closure, not a schema-level one, and it is stated
+   * here and in README § Known gaps rather than left for a reader to assume otherwise.
+   */
+  const PROVIDER_CODES = [
+    // The capabilities the organization exists for.
+    "provider.office-state.read",
+    // Item (d) — registering a brokerage office. One of the two routes in this product that create
+    // a tenant.
+    "provider.office.register",
+    // Item (e) — registering an insurance company. The other one.
+    "provider.insurer.register",
+    // Item (f) — giving a registered office its FIRST account. Not a tenant-creating code: this one
+    // writes INSIDE a tenant somebody else will run, which is why it is separate from the two above.
+    "provider.office.administrator.invite",
+    // Item (f), the company half — the same act for a registered insurance company. A SEPARATE code
+    // rather than a reuse: a code named for an office that also reached a company would promise
+    // other than it does, which is the defect class this module measured in two existing codes.
+    "provider.insurance-company.administrator.invite",
+    /*
+     * DECISION 25, BATCH 5 — THE PROVIDER'S OWN MAILBOX. Eleven codes became THIRTEEN, deliberately.
+     *
+     * MEASURED, and it is why this was authorised rather than convenient: the invitation that is the
+     * ONLY door into a brand-new organization leaves from the PROVIDER's own connected mailbox,
+     * because the invited organization has none and cannot connect one until somebody is inside it.
+     * And the provider held neither email code, so it could not connect a mailbox at all — making
+     * the channel real in tests (a seeded integration row) and unreachable in life.
+     *
+     * THE SENTENCE IN THE CHECK BELOW STAYS TRUE, which is the test of whether this went too far: a
+     * mailbox the organization OWNS is self-administration, the same family as `user.manage` and the
+     * three role codes item (b) already granted. It is not a brokerage capability — it reads and
+     * connects the provider's OWN integration row, which is organization-scoped and carries an RLS
+     * policy on top, so it cannot reach another organization's.
+     *
+     * NOTHING IS MINTED: both codes already exist in the catalogue, held by office roles. The
+     * catalogue total is unchanged at 227.
+     */
+    "email.integration.read",
+    "email.integration.manage",
+    // Item (b) — self-administration. Its own users, its own roles, bounded by tenancy.
+    "user.manage",
+    "role.read",
+    "role.create",
+    "role.update",
+    "role.deactivate",
+    "permission.read",
+  ] as const;
+
+  const permissions = await prisma.permission.findMany({
+    where: { code: { in: [...PROVIDER_CODES] } },
+    select: { id: true, code: true },
+  });
+  if (permissions.length !== PROVIDER_CODES.length) {
+    const found = new Set(permissions.map((x) => x.code));
+    const missing = PROVIDER_CODES.filter((c) => !found.has(c));
     throw new Error(
-      `${code} is not in the permission catalogue, so the provider organization cannot be given the one capability it exists for. Seed the catalogue first.`,
+      `${missing.join(", ")} is not in the permission catalogue, so the provider organization cannot be given the capabilities it needs. Seed the catalogue first.`,
     );
   }
 
@@ -168,30 +330,213 @@ async function ensureProviderOrganization(): Promise<void> {
     },
   });
 
-  const alreadyGranted = await prisma.rolePermission.findFirst({
-    where: { roleId: role.id, permissionId: permission.id },
+  const expectedCodes = [...PROVIDER_CODES].sort();
+
+  /*
+   * GRANT AND VERIFY IN ONE TRANSACTION, so a failing check UNDOES the grants rather than
+   * reporting them.
+   *
+   * ## This is a repair, and the incident that produced it is worth keeping
+   *
+   * The first version granted in a loop and then checked. A plant swapping `customer.create` into
+   * `PROVIDER_CODES` made the check fire exactly as designed — and the row was already written, so
+   * the provider organization really held a brokerage capability in db-test afterwards. The guard
+   * REPORTED the state it existed to prevent.
+   *
+   * That is the difference between a guard and a decoration restated at the level of a write: a
+   * check after an unconditional write can only ever describe the damage. Inside a transaction the
+   * throw rolls the grants back, so the only states that survive are "exactly the intended set" and
+   * "nothing changed".
+   *
+   * ## MEASURED, not assumed: this role holds EXACTLY these codes and no others
+   *
+   * The check this replaces demanded exactly ONE and said in its own message: "if that is changing,
+   * change this check deliberately." This is that deliberate change — item (b) widened the set from
+   * the dashboard alone to the dashboard plus self-administration.
+   *
+   * It compares the SET and not the COUNT, and that distinction was demonstrated rather than
+   * argued: with the check reduced to a count, a swapped-in `customer.create` was accepted and
+   * granted. A count is satisfied by any set of that size,
+   * including one containing a brokerage capability. (This said "seven" until 2026-10-19; the set is
+   * ELEVEN today, and the argument never depended on the number — which is why it no longer states one.)
+   */
+  await prisma.$transaction(async (tx) => {
+    for (const permission of permissions) {
+      const alreadyGranted = await tx.rolePermission.findFirst({
+        where: { roleId: role.id, permissionId: permission.id },
+      });
+      if (!alreadyGranted) {
+        await tx.rolePermission.create({
+          data: {
+            organizationId: PROVIDER_ORGANIZATION_ID,
+            roleId: role.id,
+            permissionId: permission.id,
+          },
+        });
+      }
+    }
+
+    const grantedCodes = (
+      await tx.rolePermission.findMany({
+        where: { roleId: role.id },
+        select: { permission: { select: { code: true } } },
+      })
+    )
+      .map((g) => g.permission.code)
+      .sort();
+    if (grantedCodes.join(",") !== expectedCodes.join(",")) {
+      throw new Error(
+        `PLATFORM_OPERATOR holds [${grantedCodes.join(", ")}]; it must hold exactly [${expectedCodes.join(", ")}]. The provider administers ITSELF and reads the dashboard — it holds no brokerage capability at all. If that is changing, change this list deliberately. (No grant was written: this check runs inside the same transaction.)`,
+      );
+    }
   });
-  if (!alreadyGranted) {
-    await prisma.rolePermission.create({
-      data: {
+
+  console.log(
+    `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (${PROVIDER_CODES.length} permissions: ${expectedCodes.join(", ")}).`,
+  );
+  /*
+   * ITEM 1 HALF B — the provider gets a default Branch and Department like every other organization.
+   *
+   * `provision-user.dto.ts` makes both flatly required, so without these rows the provider's own
+   * `/settings/users` meets two empty mandatory dropdowns and cannot create a single user. That is
+   * the deadlock item 1 is about, and the provider meets it first because on a fresh database it is
+   * one of only two organizations that exist.
+   *
+   * OUTSIDE the `!existing` branch, and that placement is a correction worth keeping: the first
+   * version sat inside it, so an ALREADY-SEEDED database never got the rows — which is every
+   * database that matters, including the owner's dev. Measured: a re-seed of db-test created nothing
+   * and the provider still had zero of each. `ensureDefaultOrgUnits` is idempotent by COUNT, so
+   * running it unconditionally creates the defaults exactly where there are none and leaves a
+   * renamed or retired structure alone.
+   */
+  // (Item 1 half B is handled by `ensureDefaultOrgUnitsForEveryOrganization` below, which sweeps
+    //  every organization rather than naming two ids. See its header.)
+}
+
+/**
+ * MODULE 0-ب ITEM (a) — the provider's own sign-in, with NO PASSWORD ANYWHERE.
+ *
+ * Item (j) created the provider organization and its role and stopped there, so the dashboard had
+ * no hand-walkable path at all: nobody could sign in as the operator, and nobody in that
+ * organization holds `user.manage`, so no account could be provisioned from inside the application
+ * either. This closes that.
+ *
+ * ## THE PASSWORD DOES NOT EXIST — it is not withheld, it is never created
+ *
+ * `User.passwordHash` is NOT NULL, so the row needs *something*. It gets the hash of 32 random
+ * bytes that are discarded in the same expression: nothing can present the plaintext because
+ * nothing ever held it. Not in this file, not in the environment, not in the seed's output.
+ *
+ * That is stronger than a generated-and-printed password, and it is the owner's instruction: the
+ * provider is never handed a password, and sets their own.
+ *
+ * ## HOW THE PROVIDER ACTUALLY GETS IN, through the EXISTING flow
+ *
+ * `POST /auth/forgot-password` -> the emailed link -> `POST /auth/reset-password` -> sign in ->
+ * enrol TOTP at /settings/security.
+ *
+ * Measured rather than assumed, because the brief asked for the measurement if the existing path
+ * could NOT be reused:
+ *
+ *   * `forgotPassword` resolves the account with `findByEmailAcrossOrganizations` inside
+ *     `runUnscoped("auth-bootstrap")` and then adopts the user's own organization, so a PROVIDER
+ *     user is found exactly like any office user — tenancy is no obstacle.
+ *   * `resetPassword` looks the token up unscoped too.
+ *   * MFA is already FORCED, by nothing more than the schema: `Role.requiresMfaAlways` defaults to
+ *     `true` (Phase 2 made both MFA attributes default to the STRICT value), and the
+ *     PLATFORM_OPERATOR role carries it.
+ *   * `requiresHardwareToken` also defaults true and does NOT block: `mfaPolicySatisfied` returns
+ *     `user.mfaEnabled && !requiresHardwareToken`, and its own comment says the flag is surfaced
+ *     as a banner because WebAuthn is not implemented. So TOTP enrolment is reachable.
+ *
+ * So no second enrolment path is built, and none is needed.
+ *
+ * ## WHY NO RESET LINK IS PRINTED HERE
+ *
+ * Generating one in the seed would put a live credential-equivalent in script output and in every
+ * terminal scrollback that ever ran it, to save one click. The account exists; the owner uses the
+ * ordinary "forgot password" path, which is also the path they will use the next time they need it.
+ *
+ * ## THE ADDRESS IS CONFIGURABLE AND DEFAULTS TO A NON-PERSONAL ONE
+ *
+ * `PROVIDER_ADMIN_EMAIL` overrides it. The default is deliberately not a real person's address: a
+ * personal email committed to a seed file is in git history for good, and this file is public.
+ *
+ * ## INSIDE `SEED_SAMPLE_DATA`, like the organization it belongs to
+ *
+ * A seeded operator account on a production database is a credential nobody asked for. The
+ * migration that created the type says the same thing in its own words: the dashboard is
+ * unreachable until somebody deliberately creates the operator.
+ */
+async function ensureProviderAdminUser(): Promise<void> {
+  const email = process.env.PROVIDER_ADMIN_EMAIL ?? "operator@ibms.local";
+
+  const existing = await prisma.user.findUnique({
+    where: {
+      organizationId_email: {
         organizationId: PROVIDER_ORGANIZATION_ID,
-        roleId: role.id,
-        permissionId: permission.id,
+        email,
       },
-    });
+    },
+  });
+
+  // IDEMPOTENT, and the branch matters: re-running the seed must never reset a password the owner
+  // has already chosen. An upsert with a fresh random hash in its `update` would silently lock
+  // them out on every re-seed.
+  if (existing) {
+    console.log(
+      `Provider operator ${email} already exists — password untouched.`,
+    );
+    return;
   }
 
-  // MEASURED, not assumed: this role holds exactly one code. If a later change grants it anything
-  // else, the seed says so rather than leaving the "holds no brokerage capability" claim false.
-  const granted = await prisma.rolePermission.count({ where: { roleId: role.id } });
-  if (granted !== 1) {
+  // 32 random bytes, hashed, and the plaintext is discarded in the same expression. There is no
+  // variable holding it and no way to recover it: the account is unusable until the owner sets
+  // their own password through the reset flow.
+  const unusablePassword = randomBytes(32).toString("hex");
+  const passwordHash = await bcrypt.hash(unusablePassword, 12);
+
+  const role = await prisma.role.findUnique({
+    where: {
+      organizationId_name: {
+        organizationId: PROVIDER_ORGANIZATION_ID,
+        name: "PLATFORM_OPERATOR",
+      },
+    },
+  });
+  if (!role) {
     throw new Error(
-      `PLATFORM_OPERATOR holds ${granted} permission(s); it must hold exactly 1 (${code}). The provider organization exists to read the dashboard and nothing else — if that is changing, change this check deliberately.`,
+      "PLATFORM_OPERATOR does not exist, so the provider operator cannot be given the one role it needs. ensureProviderOrganization() must run first.",
     );
   }
 
+  const user = await prisma.user.create({
+    data: {
+      organizationId: PROVIDER_ORGANIZATION_ID,
+      email,
+      fullName: "Platform Operator",
+      passwordHash,
+      // FALSE on purpose. `mustChangePassword` is for an administrator who HANDED somebody a
+      // password and wants it changed on first use. Nobody was handed anything here — the account
+      // has no usable password at all, so the forced-change prompt would be a second gate in front
+      // of a door that is already locked.
+      mustChangePassword: false,
+      languagePreference: "AR",
+    },
+  });
+
+  await prisma.userRoleAssignment.create({
+    data: {
+      organizationId: PROVIDER_ORGANIZATION_ID,
+      userId: user.id,
+      roleId: role.id,
+    },
+  });
+
   console.log(
-    `Seeded the PROVIDER organization and its PLATFORM_OPERATOR role (1 permission: ${code}).`,
+    `Seeded the provider operator ${email} with NO usable password. ` +
+      `Sign in by requesting a password reset for that address — nothing here knows a password, ` +
+      `and MFA is forced by the PLATFORM_OPERATOR role.`,
   );
 }
 
@@ -333,34 +678,77 @@ async function ensureBootstrapAdmin(
 }
 
 /**
- * Part 6.2 (M06) — seeds the retention-schedule row(s). `recordCategory` is
- * now a real unique constraint (backlog Part D §5.1's Retention & Disposal
- * build) — a genuine Prisma `upsert`, not the hand-rolled findFirst/
- * create-or-update this used before that constraint existed.
+ * MODULE 0-ب — THE SHIPPED RETENTION TEMPLATE, across EVERY brokerage office.
+ *
+ * ## IT IS A SWEEP NOW, AND THAT IS A RECORDED RULE RATHER THAN A PREFERENCE
+ *
+ * This wrote to `DEFAULT_ORGANIZATION_ID` alone. That is the defect class this repository has paid
+ * for twice: *the seed grants to the DEFAULT office only, so anything added after an office was
+ * created never reaches that office* — which is how office B's administrator role sat four grants
+ * behind with nothing warning about it. The template SHIPS, so it reaches every office, and the
+ * shape is `organization.findMany()` the way `ensureDefaultOrgUnitsForEveryOrganization` and
+ * `ensureJordanFixedHolidays` already do it.
+ *
+ * NOT inside an `if (!existing)` branch, for the same recorded reason: that is exactly why item 1
+ * half (b) produced zero branches and zero departments for days while nothing failed.
+ *
+ * ## WHAT IT WILL AND WILL NOT OVERWRITE — the half that matters
+ *
+ * The CREATE writes the template. The UPDATE writes **nothing at all**.
+ *
+ * An office's retention period is its own compliance decision, often confirmed by its own lawyer.
+ * Upserting the template over it on the next seed run would silently replace a confirmed period
+ * with our blank — destroying a legal decision and leaving the category inert, which is the worst
+ * available outcome for a control whose whole purpose is to be trustworthy. The template is a
+ * STARTING POINT (decision 80: the office grants, edits and revokes freely), not a thing we keep
+ * re-asserting.
+ *
+ * The consequence is stated rather than left implicit: a category added to the template later does
+ * reach existing offices (the create fires for a name they do not have), and a WORDING change to an
+ * existing row's `legalBasis` does NOT. That is the right trade — the first is a new capability, the
+ * second would be us editing the office's own record.
  */
 async function ensureRetentionSchedule(): Promise<void> {
-  for (const item of RETENTION_SCHEDULE) {
-    await prisma.retentionScheduleItem.upsert({
-      where: {
-        organizationId_recordCategory: {
-          organizationId: DEFAULT_ORGANIZATION_ID,
-          recordCategory: item.recordCategory,
+  const offices = await prisma.organization.findMany({
+    where: { type: "BROKERAGE_OFFICE" },
+    select: { id: true, subdomain: true },
+  });
+  let created = 0;
+  let kept = 0;
+  for (const office of offices) {
+    for (const item of RETENTION_TEMPLATE_SEED) {
+      const existing = await prisma.retentionScheduleItem.findUnique({
+        where: {
+          organizationId_recordCategory: {
+            organizationId: office.id,
+            recordCategory: item.recordCategory,
+          },
         },
-      },
-      update: {
-        retentionPeriodMonths: item.retentionPeriodMonths,
-        legalBasis: item.legalBasis,
-      },
-      create: {
-        organizationId: DEFAULT_ORGANIZATION_ID,
-        recordCategory: item.recordCategory,
-        retentionPeriodMonths: item.retentionPeriodMonths,
-        legalBasis: item.legalBasis,
-      },
-    });
+        select: { id: true },
+      });
+      if (existing) {
+        kept += 1;
+        continue;
+      }
+      await prisma.retentionScheduleItem.create({
+        data: {
+          organizationId: office.id,
+          recordCategory: item.recordCategory,
+          retentionPeriodMonths: item.retentionPeriodMonths,
+          legalBasis: item.legalBasis,
+        },
+      });
+      created += 1;
+    }
   }
+  const floored = RETENTION_TEMPLATE_SEED.filter(
+    (i) => i.retentionPeriodMonths === null,
+  ).length;
   console.log(
-    `Seeded ${RETENTION_SCHEDULE.length} retention schedule item(s).`,
+    `Seeded ${created} retention schedule item(s) across ${offices.length} brokerage office(s) ` +
+      `(${kept} already present and LEFT UNTOUCHED — an office's period is its own decision). ` +
+      `${floored} of ${RETENTION_TEMPLATE_SEED.length} template categories ship with NO period ` +
+      `because a statutory floor governs them: the office sets its own above the floor.`,
   );
 }
 
@@ -429,7 +817,34 @@ async function ensureSampleInsurers(): Promise<void> {
         insurerMasterId: master.id,
       },
     });
-    if (existing) continue;
+    if (existing) {
+      /*
+       * MODULE 0-ب ITEM (e) — THE ONE FIELD THIS SEED UPDATES ON AN EXISTING ROW, and why.
+       *
+       * `Insurer_rating_carries_its_date` is `NOT VALID` because the three sample insurers already
+       * carried a rating when the date column was added. Leaving them that way ships a declared rule
+       * with three standing exceptions; a migration backfilling a date would invent an unsourceable
+       * fact. Giving a SAMPLE row a sample date invents nothing — its rating says "(sample rating)" in
+       * its own value — so the repair belongs here, and the `VALIDATE CONSTRAINT` migration that
+       * follows can then hold for every row.
+       *
+       * Scoped to the one field deliberately: this branch must not become a general "refresh the
+       * sample insurers" path, which would overwrite whatever an office has since recorded about a
+       * counterparty it genuinely uses.
+       */
+      if (existing.financialStrengthRatingAsOf === null) {
+        await prisma.insurer.update({
+          where: { id: existing.id },
+          data: {
+            financialStrengthRating: insurer.financialStrengthRating,
+            financialStrengthRatingAsOf: new Date(
+              `${insurer.financialStrengthRatingAsOf}T00:00:00.000Z`,
+            ),
+          },
+        });
+      }
+      continue;
+    }
     await prisma.insurer.create({
       data: {
         organizationId: DEFAULT_ORGANIZATION_ID,
@@ -442,6 +857,13 @@ async function ensureSampleInsurers(): Promise<void> {
         underwriterContact: insurer.underwriterContact,
         creditTermsDays: insurer.creditTermsDays,
         financialStrengthRating: insurer.financialStrengthRating,
+        // THE PAIR, because `Insurer_rating_carries_its_date` refuses either half alone. Writing the
+        // rating without it here would make a fresh seed fail on its own constraint — and the field
+        // is OPTIONAL in Prisma's input type, so the compiler cannot ask for it. Caught by reading
+        // the create path after patching the update path, not by a failing typecheck.
+        financialStrengthRatingAsOf: new Date(
+          `${insurer.financialStrengthRatingAsOf}T00:00:00.000Z`,
+        ),
         // InsurerProduct and InsurerSlaAgreement are tenant-scoped in their
         // own right (spec §3.2 — so RLS can enforce them independently in
         // Phase 2, not only transitively through the parent Insurer).
@@ -769,10 +1191,85 @@ async function main() {
   }
   console.log(`Seeded ${INSURANCE_LINES.length} standard insurance lines.`);
 
+  // MODULE 0-ب ITEM (c) — the eight provider-maintained reference tables.
+  //
+  // Same upsert shape as the insurance lines above and for the same reasons: keyed on `code`
+  // because each database generates its own uuids, and `displayOrder` taken from the array index
+  // so reordering a seed list reorders every picker and nothing else.
+  //
+  // PLATFORM-SCOPED and therefore seeded OUTSIDE `SEED_SAMPLE_DATA`: an office picks its city and
+  // its bank from these on a production database too, and a catalogue that only existed in
+  // development would make the registration form unusable where it matters.
+  for (const [table, rows] of REFERENCE_TABLES) {
+    for (const [index, ref] of rows.entries()) {
+      await (
+        prisma[table] as {
+          upsert: (args: unknown) => Promise<unknown>;
+        }
+      ).upsert({
+        where: { code: ref.code },
+        update: {
+          nameEn: ref.nameEn,
+          nameAr: ref.nameAr,
+          displayOrder: index,
+          // Written on BOTH paths. On `update` because a re-seed must carry a corrected description
+          // through; on `create` because `LegalForm` and `BusinessModel` carry a CHECK requiring
+          // one, so a from-empty seed that omitted it would be REFUSED by the database rather than
+          // quietly producing rows with no explanation.
+          descriptionAr: ref.descriptionAr ?? null,
+        },
+        create: {
+          code: ref.code,
+          nameEn: ref.nameEn,
+          nameAr: ref.nameAr,
+          displayOrder: index,
+          descriptionAr: ref.descriptionAr ?? null,
+        },
+      });
+    }
+    console.log(`Seeded ${rows.length} ${table} reference row(s).`);
+  }
+
+  /*
+   * THE ELEVEN ENUM DESCRIPTIONS. Upserted rather than inserted, and that is the point of seeding
+   * them at all: migration `20261130100000` already INSERTed these rows, because register entry 33
+   * established that data arriving only through the seed never reaches a database nobody reseeds.
+   * But an applied migration cannot be edited — its checksum is stored and `db:checksums` fails on
+   * drift — so `seed-data/enum-descriptions.ts` is the home a correction is made in, and this loop
+   * is what carries that correction to a database that already has the row.
+   *
+   * `member` is the ENUM TYPE in each table, so a typo here is refused by Postgres rather than
+   * stored as a description nothing reads.
+   */
+  const ENUM_DESCRIPTIONS = [
+    ["brokerageKindDescription", BROKERAGE_KIND_DESCRIPTIONS],
+    ["regulatoryActionKindDescription", REGULATORY_ACTION_KIND_DESCRIPTIONS],
+    ["regulatoryActionBasisDescription", REGULATORY_ACTION_BASIS_DESCRIPTIONS],
+    ["integrationMethodDescription", INTEGRATION_METHOD_DESCRIPTIONS],
+  ] as const;
+
+  let enumDescriptionCount = 0;
+  for (const [model, rows] of ENUM_DESCRIPTIONS) {
+    for (const row of rows) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any)[model].upsert({
+        where: { member: row.member },
+        update: { descriptionAr: row.descriptionAr },
+        create: { member: row.member, descriptionAr: row.descriptionAr },
+      });
+      enumDescriptionCount += 1;
+    }
+  }
+  console.log(
+    `Seeded ${enumDescriptionCount} enum member description(s) across ${ENUM_DESCRIPTIONS.length} enums.`,
+  );
+
   if (SEED_SAMPLE_DATA) {
     // Module 0 item (j)'s gap closure. BEFORE the sample users, so a future provider user has an
     // organization and a role to be attached to.
     await ensureProviderOrganization();
+    // Item (a) — immediately after, because it needs that organization and its role.
+    await ensureProviderAdminUser();
     await ensureSampleInsurers();
     await ensureSampleUsers(roleIdByName);
     // AFTER the sample users: the certificate is attributed to a real user of the office, and in a
@@ -787,6 +1284,9 @@ async function main() {
   // Every office, every environment: a business-day deadline counted against an
   // empty calendar lands earlier than the law requires, and the error runs against
   // the brokerage (IMPROVEMENTS § 1.57).
+  // BEFORE the holiday sweep and after every organization exists: the provider is created inside
+  // `SEED_SAMPLE_DATA` above, so a sweep placed earlier would miss it on a from-empty run.
+  await ensureDefaultOrgUnitsForEveryOrganization();
   await ensureJordanFixedHolidays();
 
   // Runs in EVERY environment: in dev it is an optional extra alongside the
@@ -821,6 +1321,50 @@ async function main() {
  * Idempotent per (office, date) — the table carries a partial unique on an
  * all-calendars entry per date, so a re-run must skip rather than collide.
  */
+/**
+ * ITEM 1 HALF B — A DEFAULT BRANCH AND A DEFAULT DEPARTMENT FOR EVERY ORGANIZATION.
+ *
+ * ## WHY A SWEEP AND NOT TWO NAMED IDS
+ *
+ * It WAS two named ids, and measuring the first seed run is what showed that half of it could
+ * never fire: the default office's call sat inside `ensureDefaultOrganization`, which returns
+ * EARLY when the organization already exists, so on any database that has ever been seeded the
+ * line was unreachable. The provider's had been moved out of its own create-only branch
+ * deliberately; the sibling was not, and nothing failed — the office simply had no branch.
+ *
+ * Measured at that point: provider 1/1, default office 0/0, demo office B 0/0.
+ *
+ * A sweep cannot have that defect. It also covers the two cases named ids never could: the demo
+ * office `seed:demo` creates, and anything hand-created — which is what *every organization*
+ * means. `ensureJordanFixedHolidays` below sweeps the same way for the same reason.
+ *
+ * ## WHAT IT IS NOT
+ *
+ * It is NOT how a newly registered tenant gets its units. Both routes that create a tenant —
+ * `office-registration.service.ts` and `insurance-company-registration.service.ts` — call
+ * `ensureDefaultOrgUnits` inside the creating transaction, so a new office has a branch before
+ * anybody can open its provisioning form. This sweep is the backfill for organizations that
+ * predate that, and it is idempotent by COUNT, so an office that has retired its last branch does
+ * not get one invented on the next run.
+ */
+async function ensureDefaultOrgUnitsForEveryOrganization(): Promise<void> {
+  const organizations = await prisma.organization.findMany({
+    select: { id: true, legalName: true },
+  });
+  let branches = 0;
+  let departments = 0;
+  for (const org of organizations) {
+    const result = await ensureDefaultOrgUnits(prisma, org.id);
+    if (result.branchCreated) branches += 1;
+    if (result.departmentCreated) departments += 1;
+  }
+  console.log(
+    `Seeded ${branches} default branch(es) and ${departments} default department(s) across ` +
+      `${organizations.length} organization(s). Idempotent by count: an organization that already ` +
+      `has one of either is left alone.`,
+  );
+}
+
 async function ensureJordanFixedHolidays(): Promise<void> {
   // Month is 1-based here and 0-based in `Date.UTC`, which is exactly the kind of
   // off-by-one that silently moves a holiday; the conversion happens once, below.
@@ -831,7 +1375,9 @@ async function ensureJordanFixedHolidays(): Promise<void> {
     { month: 12, day: 25, name: "Christmas" },
   ];
 
-  const organizations = await prisma.organization.findMany({ select: { id: true } });
+  const organizations = await prisma.organization.findMany({
+    select: { id: true },
+  });
   const thisYear = new Date().getUTCFullYear();
   let created = 0;
 
@@ -848,7 +1394,12 @@ async function ensureJordanFixedHolidays(): Promise<void> {
         });
         if (existing) continue;
         await prisma.slaHoliday.create({
-          data: { organizationId: org.id, observedOn, name: h.name, calendarType: null },
+          data: {
+            organizationId: org.id,
+            observedOn,
+            name: h.name,
+            calendarType: null,
+          },
         });
         created += 1;
       }
@@ -947,7 +1498,8 @@ async function ensureBrokerLicenseTerms(): Promise<void> {
           organizationId: office.id,
           category: "BROKER_LICENSE_CERTIFICATE",
           classification: "INTERNAL",
-          fileName: "seeded-placeholder-licence-certificate--not-a-real-cbj-document.pdf",
+          fileName:
+            "seeded-placeholder-licence-certificate--not-a-real-cbj-document.pdf",
           storageRef: `seed:placeholder-licence-certificate:${office.subdomain}`,
           uploadedByUserId: uploader.id,
         },
@@ -956,10 +1508,14 @@ async function ensureBrokerLicenseTerms(): Promise<void> {
         data: {
           organizationId: office.id,
           licenseNumber: `CBJ-SEED-${office.subdomain.toUpperCase()}`,
-          scopeOfAuthorization: "Seeded placeholder — general insurance brokerage",
+          scopeOfAuthorization:
+            "Seeded placeholder — general insurance brokerage",
           issuedAt,
           expiresAt,
-          status: "active",
+          // NO `status` — module 0-ب's licence batch DROPPED that column. It was a two-value
+          // marker against the derivation's six states, and the seed writing "active" was asserting
+          // a standing that is now derived from the dates plus any recorded `RegulatoryAction`.
+          // A seeded placeholder term with no act against it derives as ACTIVE on its own.
           certificateDocumentId: certificate.id,
         },
       });

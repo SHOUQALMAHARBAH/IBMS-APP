@@ -61,6 +61,9 @@ function makeService(
   };
   const legalHolds = {
     hasActiveHold: vi.fn().mockResolvedValue(false),
+    // Batch 5 group 7b — the refusal NAMES the hold now, so the double has to be able to return one.
+    // `null` is the no-hold answer, mirroring `findFirst`.
+    findActiveHold: vi.fn().mockResolvedValue(null),
     ...over.legalHolds,
   };
   const workflow = {
@@ -146,7 +149,17 @@ describe('DisposalBatchService.nominate', () => {
 
   it('422s nominating a category under an active Legal Hold', async () => {
     const { service, repo } = makeService({
-      legalHolds: { hasActiveHold: vi.fn().mockResolvedValue(true) },
+      legalHolds: {
+        hasActiveHold: vi.fn().mockResolvedValue(true),
+        // The hold the refusal names. Its scope and reason are what an officer needs in order to
+        // go and ask about it — a boolean refuses and explains nothing.
+        findActiveHold: vi.fn().mockResolvedValue({
+          id: 'hold-1',
+          scope: 'AuditLogEntry for the 2026 CBJ examination',
+          reason: 'Requested by the Central Bank examination team.',
+          placedAt: new Date('2026-05-01T00:00:00.000Z'),
+        }),
+      },
     });
     await expect(
       service.nominate({ retentionScheduleItemId: 'rsi-1' }, 'u-manager'),
@@ -157,7 +170,7 @@ describe('DisposalBatchService.nominate', () => {
   it('allows a batch with no retentionScheduleItemId — nothing to exclude against', async () => {
     const { service, legalHolds } = makeService();
     await service.nominate({}, 'u-manager');
-    expect(legalHolds.hasActiveHold).not.toHaveBeenCalled();
+    expect(legalHolds.findActiveHold).not.toHaveBeenCalled();
   });
 });
 
@@ -172,7 +185,17 @@ describe('DisposalBatchService.managerApprove', () => {
 
   it('re-checks the active Legal Hold at this step too', async () => {
     const { service } = makeService({
-      legalHolds: { hasActiveHold: vi.fn().mockResolvedValue(true) },
+      legalHolds: {
+        hasActiveHold: vi.fn().mockResolvedValue(true),
+        // The hold the refusal names. Its scope and reason are what an officer needs in order to
+        // go and ask about it — a boolean refuses and explains nothing.
+        findActiveHold: vi.fn().mockResolvedValue({
+          id: 'hold-1',
+          scope: 'AuditLogEntry for the 2026 CBJ examination',
+          reason: 'Requested by the Central Bank examination team.',
+          placedAt: new Date('2026-05-01T00:00:00.000Z'),
+        }),
+      },
     });
     await expect(
       service.managerApprove('db-1', 'u-manager'),
@@ -245,7 +268,17 @@ describe('DisposalBatchService.dpoApprove', () => {
           .fn()
           .mockResolvedValue(row({ status: 'MANAGER_APPROVED' })),
       },
-      legalHolds: { hasActiveHold: vi.fn().mockResolvedValue(true) },
+      legalHolds: {
+        hasActiveHold: vi.fn().mockResolvedValue(true),
+        // The hold the refusal names. Its scope and reason are what an officer needs in order to
+        // go and ask about it — a boolean refuses and explains nothing.
+        findActiveHold: vi.fn().mockResolvedValue({
+          id: 'hold-1',
+          scope: 'AuditLogEntry for the 2026 CBJ examination',
+          reason: 'Requested by the Central Bank examination team.',
+          placedAt: new Date('2026-05-01T00:00:00.000Z'),
+        }),
+      },
     });
     await expect(service.dpoApprove('db-1', 'u-dpo')).rejects.toBeInstanceOf(
       UnprocessableEntityException,

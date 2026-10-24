@@ -28,6 +28,7 @@ export const COMPLIANCE_SCREENING = {
     smDecision: 'القرار',
     smReview: 'المراجعة',
     smEdd: 'عناية معززة',
+    smViewCustomerRfqs: 'طلبات عروض الأسعار لهذا العميل',
     smNoLongerOnTheSource: 'رُفع من القائمة المصدر — القرار قائم',
     smReasonForTheDecisionMin: 'سبب القرار (١٠ أحرف على الأقل)',
     smClearFalsePositive: 'مطابقة خاطئة',
@@ -153,6 +154,8 @@ export const COMPLIANCE_SCREENING = {
     slapDurationAria: 'المدة لـ {name}',
     shRefusalAct: 'عرض تقرير سلامة الفحص',
     shCouldNotLoadScreeningHealth: 'تعذّر تحميل حالة الفحص — حاول مرة أخرى.',
+    shListHealth: 'حالة مزوّد الفحص',
+    shListOverview: 'إحصاءات الفحص لآخر ٣٠ يوماً',
     shScreeningHealth: 'حالة فحص العقوبات',
     shWhichProviderActuallyPerformsScreening:
       'يوضّح هذا الجدول أي مزوّد يُجري الفحص فعلياً، وما إذا كانت بياناته حديثة، وما الذي يغطيه. «غير مهيأ» أو «غير متاح» تعني أنّ الفحص لم يجرِ — وهي ليست نتيجة سلبية.',
@@ -249,6 +252,7 @@ export const COMPLIANCE_SCREENING = {
     smDecision: 'Decision',
     smReview: 'Review',
     smEdd: 'EDD',
+    smViewCustomerRfqs: 'RFQs for this customer',
     smNoLongerOnTheSource: 'No longer on the source list — decision stands',
     smReasonForTheDecisionMin: 'Reason for the decision (min. 10 characters)',
     smClearFalsePositive: 'Clear (false positive)',
@@ -375,6 +379,8 @@ export const COMPLIANCE_SCREENING = {
     slapDurationAria: 'Duration for {name}',
     shRefusalAct: 'view the screening health report',
     shCouldNotLoadScreeningHealth: 'Could not load screening health — try again.',
+    shListHealth: 'the screening provider status',
+    shListOverview: 'the last 30 days of screening figures',
     shScreeningHealth: 'Screening health',
     shWhichProviderActuallyPerformsScreening:
       'Which provider actually performs screening, whether its data is current, and what it covers. NOT_CONFIGURED or UNAVAILABLE means screening did not happen — it is not a negative result.',

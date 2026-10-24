@@ -1,0 +1,14 @@
+{
+  "the-exemption-is-removed": {
+    "_": "Take the seventh row out. The guard must fire again naming insurance-company-registration.service.ts — which proves that row is what silences it, not something incidental about the file.",
+    "file": "apps/api/src/common/role-scope.inventory.spec.ts",
+    "from": "  'modules/provider/insurance-company-registration.service.ts':\n    \"an INSURANCE COMPANY's own licensed lines, written by the provider at registration — a third party's licence, on a row that carries no organizationId at all\",\n",
+    "to": ""
+  },
+  "a-new-unexempted-writer-appears": {
+    "_": "A DIFFERENT file starts writing a row carrying an insurance line. The guard must name THAT file — which proves the exemption is path-exact and did not broaden to cover the provider module, and that a new write surface is still found by shape rather than by a list.",
+    "file": "apps/api/src/modules/provider/reference-data.service.ts",
+    "from": "export class ReferenceDataService {",
+    "to": "export class ReferenceDataService {\n  async plantedLineWrite(insuranceLineId: string) {\n    return this.prisma.insurerLicensedLine.create({ data: { insuranceLineId } });\n  }\n"
+  }
+}

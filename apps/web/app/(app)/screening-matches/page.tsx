@@ -239,7 +239,25 @@ export default function ScreeningMatchesPage() {
                         </div>
                       ) : null}
                     </td>
-                    <td style={cell}>{r.subjectName}</td>
+                    <td style={cell}>
+                      {r.subjectName}
+                      {/*
+                        DOOR FOUR'S WAY IN. An open screening case assigned to this officer opens
+                        that customer's RFQ chain, and until this link existed the system admitted
+                        her to a record no screen told her the id of. It goes to the CUSTOMER-FILTERED
+                        list, never to `/customers/[id]`: the customer page is not what the anchor
+                        opens, so linking it would answer 404 from the ownership layer about a
+                        record that exists.
+                      */}
+                      <div style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                        <a
+                          href={`/rfqs?customerId=${encodeURIComponent(r.customerId)}`}
+                          data-customer-rfqs={r.customerId}
+                        >
+                          {t('smViewCustomerRfqs')}
+                        </a>
+                      </div>
+                    </td>
                     <td style={cell}>
                       {r.listEntryName}
                       <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>

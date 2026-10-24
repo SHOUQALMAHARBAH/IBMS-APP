@@ -3,6 +3,7 @@ import {
   INSURER_IDENTITY_SELECT,
   insurerIdentity,
   insurerName,
+  resolveInsurerName,
   type InsurerIdentity,
 } from './insurer-identity';
 
@@ -17,6 +18,9 @@ import {
  */
 
 const MASTER_LINKED: InsurerIdentity = {
+  // Item 3 — step 1 of the name precedence. NULL here, which is the ordinary case:
+  // measured, no `Insurer` row on either database is linked to a registered company.
+  insuranceCompany: null,
   id: 'ins-1',
   financialStrengthRating: 'A-',
   insurerMaster: { legalName: 'AIG Jordan', legalNameAr: 'إي آي جي الأردن' },
@@ -28,6 +32,9 @@ const MASTER_LINKED: InsurerIdentity = {
 };
 
 const OFFICE_LOCAL: InsurerIdentity = {
+  // Item 3 — step 1 of the name precedence. NULL here, which is the ordinary case:
+  // measured, no `Insurer` row on either database is linked to a registered company.
+  insuranceCompany: null,
   id: 'ins-2',
   financialStrengthRating: null,
   insurerMaster: null,
@@ -126,16 +133,54 @@ describe('insurerIdentity — the deactivated flag', () => {
 });
 
 describe('insurerName — the name alone', () => {
+  /*
+   * ITEM 3 — THE REGISTERED COMPANY OUTRANKS BOTH OTHER SOURCES, which `insurerName` used to
+   * skip entirely. This is the assertion the whole change exists for, and it is written here
+   * because it can be: nothing in the DATA exercises it — no `Insurer` row on either database is
+   * linked to a registered company (dev 0 of 19, db-test 0 of 306) — so a fix with no visible
+   * symptom has nothing observing it unless something is made to observe it.
+   *
+   * BOTH LOSING SOURCES ARE PRESENT ON PURPOSE. A fixture carrying only the registered company
+   * would pass against an implementation that merely coalesced in some order; this one fails
+   * unless the company genuinely WINS over a catalogue row AND a local name that are both there
+   * and both different.
+   */
+  it("prefers the REGISTERED COMPANY over the catalogue and the office's own row", () => {
+    expect(
+      insurerName({
+        insuranceCompany: { legalName: 'Al-Yarmouk Insurance Company PLC' },
+        insurerMaster: { legalName: 'Yarmouk Insurance (catalogue)' },
+        legalName: 'Yarmouk Ins. Co.',
+      }),
+    ).toBe('Al-Yarmouk Insurance Company PLC');
+  });
+
+  it('is the SAME function the company-facts resolver uses — one precedence, not two', () => {
+    /*
+     * The defect was never a disagreement about policy; it was a second IMPLEMENTATION of one
+     * policy, and this is what stops a third appearing. `resolveInsurerCompanyFacts` is the
+     * resolver `/insurers` renders from, so if these two ever answer differently a document and
+     * a screen name the same company two ways.
+     */
+    const linked = {
+      insuranceCompany: { legalName: 'Al-Yarmouk Insurance Company PLC' },
+      insurerMaster: { legalName: 'Yarmouk Insurance (catalogue)' },
+      legalName: 'Yarmouk Ins. Co.',
+    };
+    expect(resolveInsurerName(linked)).toBe(insurerName(linked));
+  });
+
   it('coalesces the same way as the full identity', () => {
     expect(insurerName(MASTER_LINKED)).toBe('AIG Jordan');
     expect(insurerName(OFFICE_LOCAL)).toBe('Wadi Rum Mutual');
   });
 
-  it('accepts a partial row — only the two name sources are required', () => {
+  it('accepts a partial row — only the three name sources are required', () => {
     // Deliberately narrower than `InsurerIdentity`: a report row or a document
     // line should not have to select `financialStrengthRating` to render a name.
     expect(
       insurerName({
+        insuranceCompany: null,
         insurerMaster: { legalName: 'Petra Insurance' },
         legalName: null,
       }),

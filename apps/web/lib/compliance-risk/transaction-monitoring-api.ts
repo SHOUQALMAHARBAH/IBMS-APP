@@ -31,6 +31,9 @@ export interface TransactionMonitoringAlert {
   status: TransactionMonitoringStatus;
   isClosed: boolean;
   classification: string;
+  /** Batch six item 2 — the customer's own name, resolved by the api. Null when the alert names
+   *  no customer. */
+  customerName: string | null;
 }
 
 export interface TransactionMonitoringSweepResult {

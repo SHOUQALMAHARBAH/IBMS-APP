@@ -1,0 +1,20 @@
+{
+  "the-database-answers-the-user": {
+    "_": "DECISION 90 broken outright: the service rule removed, so the CHECK answers and the user meets a raw constraint violation. Must kill the two refusal tests and the merged-state one.",
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "    if (hasRating === hasAsOf) return;",
+    "to": "    return;\n    if (hasRating === hasAsOf) return;"
+  },
+  "the-rule-reads-the-body-instead-of-the-merged-state": {
+    "_": "The reason it is not a decorator: ignore the current row, so a rating-only PATCH is refused even on a record that already carries a date. Must kill the merged-state test's ACCEPTED half.",
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "        : (current?.financialStrengthRating ?? null);",
+    "to": "        : null;"
+  },
+  "only-one-direction-is-checked": {
+    "_": "Refuse a rating without a date and accept a date without a rating. Must kill 'refuses an as-of date with no rating' ALONE — which is why that test exists beside its twin.",
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "    if (hasRating === hasAsOf) return;\n\n    if (hasRating) {",
+    "to": "    if (hasRating === hasAsOf || !hasRating) return;\n\n    if (hasRating) {"
+  }
+}

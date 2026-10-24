@@ -78,6 +78,13 @@ describe('deriveAuditLogEntryView', () => {
   });
 });
 
+/*
+ * Item 1 — the uploader's DISPLAY name, from decision 48's resolver. The fixture names the one
+ * uploader every `version()` fixture uses, so the three ordering tests keep asserting ordering and
+ * the two new ones below assert the name.
+ */
+const UPLOADERS = new Map([['user-1', 'سامر عبدالله الحوراني']]);
+
 describe('buildDocumentVersionViews', () => {
   function version(over: Partial<DocumentVersionRow> = {}): DocumentVersionRow {
     return {
@@ -101,7 +108,7 @@ describe('buildDocumentVersionViews', () => {
       version({ id: 'doc-1', versionNumber: 1 }),
       version({ id: 'doc-2', versionNumber: 2 }),
     ];
-    const views = buildDocumentVersionViews(chain, 'doc-2');
+    const views = buildDocumentVersionViews(chain, 'doc-2', UPLOADERS);
     expect(views.map((v) => v.id)).toEqual(['doc-1', 'doc-2', 'doc-3']);
   });
 
@@ -110,13 +117,27 @@ describe('buildDocumentVersionViews', () => {
       version({ id: 'doc-1' }),
       version({ id: 'doc-2', versionNumber: 2 }),
     ];
-    const views = buildDocumentVersionViews(chain, 'doc-2');
+    const views = buildDocumentVersionViews(chain, 'doc-2', UPLOADERS);
     expect(views.find((v) => v.id === 'doc-1')?.isRequestedVersion).toBe(false);
     expect(views.find((v) => v.id === 'doc-2')?.isRequestedVersion).toBe(true);
   });
 
+  it('names the colleague who filed the version, rather than their uuid', () => {
+    const views = buildDocumentVersionViews([version()], 'doc-1', UPLOADERS);
+    expect(views[0].uploadedByName).toBe('سامر عبدالله الحوراني');
+    // the id stays on the wire; the screen stops rendering it
+    expect(views[0].uploadedByUserId).toBe('user-1');
+  });
+
+  it('reports NO name rather than the uuid when the account is gone', () => {
+    // `Document.uploadedByUserId` carries no foreign key (register entry 127), so this is a real
+    // state. Falling back to the id would reintroduce the exact defect this closes.
+    const views = buildDocumentVersionViews([version()], 'doc-1', new Map());
+    expect(views[0].uploadedByName).toBeNull();
+  });
+
   it('a single-document chain (the common, dormant-version-chain case today) still works', () => {
-    const views = buildDocumentVersionViews([version()], 'doc-1');
+    const views = buildDocumentVersionViews([version()], 'doc-1', UPLOADERS);
     expect(views).toEqual([
       expect.objectContaining({ id: 'doc-1', isRequestedVersion: true }),
     ]);

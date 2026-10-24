@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+import { WorkflowHistoryLink } from '../../../components/ui/WorkflowHistoryLink';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -202,14 +203,45 @@ export default function DsrPage() {
               <tbody>
                 {rows.map((d) => (
                   <tr key={d.id}>
-                    <td style={cell}>{(d.customerId ?? d.insuredPersonId ?? '—').slice(0, 8)}…</td>
+                    <td style={cell}>
+                      {/*
+                        DOOR FOUR'S WAY IN, for the DPO. An open DSR he is handling opens that
+                        customer's RFQ chain, and until this link existed the system admitted him to
+                        a record no screen told him the id of.
+                        CONDITIONAL ON THERE BEING A CUSTOMER: `customerId` is nullable and an
+                        insured-person request names none, so a request about nobody links nowhere.
+                        And it goes to the customer-FILTERED list, never to `/customers/[id]` —
+                        the customer page is not what the anchor opens, so linking it would answer
+                        404 from the ownership layer about a record that exists.
+                      */}
+                      {d.customerId ? (
+                        <a
+                          href={`/rfqs?customerId=${encodeURIComponent(d.customerId)}`}
+                          data-customer-rfqs={d.customerId}
+                        >
+                          {t('dsrViewCustomerRfqs')}
+                        </a>
+                      ) : (
+                        `${(d.insuredPersonId ?? '—').slice(0, 8)}…`
+                      )}
+                    </td>
                     <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
                     <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
                     <td style={cell}>
                       {d.slaDueAt.slice(0, 10)}
-                      {d.isOverdue ? ' (overdue)' : ''}
+                      {d.isOverdue ? ` ${t('statusOverdue')}` : ''}
                     </td>
                     <td style={cell}>
+                      {/* Owner decision 41 — carries this request's id into `/audit-trail`'s
+                          workflow-history fields. Renders nothing without `workflow-history.read`,
+                          which the DPO does not hold, so on this screen it is for the compliance
+                          officer and the external auditor. */}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="DataSubjectRequest"
+                          entityId={d.id}
+                        />
+                      </div>
                       {d.status === 'CLOSED' ? (
                         /* A closed request has no actions left, so this cell held a bare em-dash.
                            Part 4 step 5 — if ONE person both logged and closed it, that is the one

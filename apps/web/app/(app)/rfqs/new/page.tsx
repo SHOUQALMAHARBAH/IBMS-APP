@@ -3,14 +3,21 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
+import { hasPermission } from '../../../../lib/auth/permissions';
 import {
   createRfq,
   listSelectableInsurers,
   type SelectableInsurer,
 } from '../../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  buttonStyle,
+  errorStyle,
+} from '../../../../components/auth/auth-form.styles';
+import {
+  cardMetaStyle,
+  pageStyle,
+} from '../../../../components/lead/lead.styles';
 import { insurerPickerStyle } from '../../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
@@ -71,9 +78,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       router.push(`/rfqs/${rfq.id}`);
     } catch (err) {
       setSubmitError(
-        err instanceof ApiError
-          ? err.message
-          : t('rfqNewCreateError'),
+        err instanceof ApiError ? err.message : t('rfqNewCreateError'),
       );
       setSubmitting(false);
     }
@@ -93,7 +98,10 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
 
   return (
     <form onSubmit={(e) => void submit(e)} style={{ marginTop: '1rem' }}>
-      <label htmlFor="insuranceLine" style={{ display: 'block', fontWeight: 600 }}>
+      <label
+        htmlFor="insuranceLine"
+        style={{ display: 'block', fontWeight: 600 }}
+      >
         {t('rfqNewLineLabel')}
       </label>
       <div style={cardMetaStyle}>{t('rfqNewLineHint')}</div>
@@ -107,11 +115,15 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       />
 
       <fieldset style={{ border: 'none', padding: 0, marginTop: '1.5rem' }}>
-        <legend style={{ fontWeight: 600 }}>{t('rfqNewShortlistLegend')}</legend>
+        <legend style={{ fontWeight: 600 }}>
+          {t('rfqNewShortlistLegend')}
+        </legend>
         <div style={cardMetaStyle}>{t('rfqNewShortlistHint')}</div>
         <div style={insurerPickerStyle}>
           {insurers.length === 0 ? (
-            <span style={{ color: 'var(--ink-secondary)' }}>{t('rfqNewNoInsurersOnFile')}</span>
+            <span style={{ color: 'var(--ink-secondary)' }}>
+              {t('rfqNewNoInsurersOnFile')}
+            </span>
           ) : (
             insurers.map((insurer) => (
               <label
@@ -202,6 +214,32 @@ export default function NewRfqPage() {
   }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
+
+  /*
+   * ITEM 6 — THE GATE THAT WAS MISSING. Owner decision, 2026-10-17: "install the gate. Every role in
+   * the system can open those two pages today, including the DPO and the collections officer. This is
+   * a hole in the screen layer, not a decision."
+   *
+   * AND THE CORRECTION THAT BOUNDS IT, because it was first described to her as a security hole and
+   * it is not one: `rfq.controller.ts` requires `rfq.read` on `GET /rfqs` and `rfq.create` on
+   * `POST /rfqs`, so the API refuses a caller without them. Only the PAGE was reachable, and whoever
+   * opened it saw an empty screen and no data. Same harmless direction as the other findings — a
+   * screen that renders nothing rather than a screen that discloses something.
+   *
+   * What the gate buys is therefore not confidentiality; it is that a role which has no business here
+   * is TOLD so instead of being shown a blank page it cannot act on, which is this product's standing
+   * rule for a reader who is refused.
+   */
+  if (!hasPermission(user, 'rfq.create')) {
+    return (
+      <main style={pageStyle}>
+        <h1>{t('rfqNewHeading')}</h1>
+        <p role="status" data-permission-refusal>
+          {permissionRefusal(t, 'rfqNewRefusalAct', 'rfq.create')}
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main style={pageStyle}>

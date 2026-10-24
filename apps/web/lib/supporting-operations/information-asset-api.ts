@@ -28,6 +28,10 @@ export interface InformationAsset {
   name: string;
   assetType: string;
   ownerUserId: string;
+  /* Item 1 — the accountable colleague's NAME, resolved by the api through decision 48's resolver.
+   * NULL means that account has since been deleted — `ownerUserId` carries no foreign key on this
+   * model, so it is a real state — and never the uuid. */
+  ownerName: string | null;
   classification: DataClassification;
   createdAt: string;
 }

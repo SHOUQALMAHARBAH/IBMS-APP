@@ -224,6 +224,15 @@ export interface CommunicationRow {
 export interface CommunicationView {
   id: string;
   customerId: string | null;
+  /**
+   * RULE 2 — the customer's name, or NULL.
+   *
+   * Nullable here and not on the three sibling screens, because `customerId` IS nullable on this
+   * model: a communication may be logged against a lead, or against nobody on file. So this is the
+   * one of the four with a real absent case, and the screen has to render it as one rather than as
+   * a blank.
+   */
+  customerName: string | null;
   channel: string;
   templateId: string | null;
   languageUsed: string | null;
@@ -240,10 +249,19 @@ export interface CommunicationView {
 
 export function deriveCommunicationView(
   row: CommunicationRow,
+  /*
+   * RULE 2 — the resolved name, passed in rather than read off the row, because
+   * `CommunicationLog.customerId` has NO RELATION behind it (see the repository). A SECOND
+   * parameter rather than a field on the row, so the caller cannot forget to resolve it and then
+   * silently project nothing: `undefined` here is a compile error at every call site that has a
+   * customer to resolve.
+   */
+  customerName: string | null,
 ): CommunicationView {
   return {
     id: row.id,
     customerId: row.customerId,
+    customerName: customerName ?? null,
     channel: row.channel,
     templateId: row.templateId,
     languageUsed: row.languageUsed,

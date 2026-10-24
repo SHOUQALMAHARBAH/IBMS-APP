@@ -24,6 +24,7 @@ import {
   profileFieldValueStyle,
   profileGridStyle,
 } from '../../../../components/prospect/prospect.styles';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 /**
  * DERIVED from the API client's own `Policy`, not re-declared beside it.
@@ -153,6 +154,9 @@ export default function PolicyDetailPage() {
         {t('poldPolicyDetails')}{' '}
         {policy.policyNumber && `— ${policy.policyNumber}`}
       </h1>
+      <p style={{ margin: '0 0 1rem' }}>
+        <WorkflowHistoryLink entityType='Policy' entityId={policy.id} />
+      </p>
 
       {/* Core Policy Information */}
       <div style={{ marginBottom: '2rem' }}>

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
@@ -84,22 +88,48 @@ export default function OrgUnitsPage() {
   const canUpdateBranch = hasPermission(user, 'branch.update');
   const canRetireBranch = hasPermission(user, 'branch.deactivate');
 
+  /*
+   * ITEM 8 — the two halves of this screen are independent and were loaded as if they were not.
+   *
+   * `Promise.all` plus `setDepartments(null)` meant a refused BRANCH read blanked the department
+   * table as well, under one sentence naming neither. This screen already understood the principle
+   * one layer up — `noAccess = !canReadDept && !canReadBranch` renders the half the reader holds —
+   * and the loader then threw that away on a refusal.
+   *
+   * `null` is reserved for "did not arrive", which is what the tables below already read it as, so
+   * a failed half stays `null` and the other half renders.
+   */
   const load = useCallback(async () => {
-    try {
-      const [d, b] = await Promise.all([
-        canReadDept ? listDepartments() : Promise.resolve([]),
-        canReadBranch ? listBranches() : Promise.resolve([]),
-      ]);
-      setDepartments(d);
-      setBranches(b);
-      setLoadError(null);
-    } catch (err) {
-      setDepartments(null);
-      setBranches(null);
-      setLoadError(
-        err instanceof ApiError ? err.message : t('orgUnitLoadError'),
-      );
-    }
+    const { values, failures } = await loadIndependently([
+      ...(canReadDept
+        ? [
+            {
+              key: 'departments',
+              label: t('commonListDepartments'),
+              load: listDepartments,
+            },
+          ]
+        : []),
+      ...(canReadBranch
+        ? [
+            {
+              key: 'branches',
+              label: t('commonListBranches'),
+              load: listBranches,
+            },
+          ]
+        : []),
+    ]);
+    setDepartments(canReadDept ? ((values.departments as OrgUnit[]) ?? null) : []);
+    setBranches(canReadBranch ? ((values.branches as OrgUnit[]) ?? null) : []);
+    const first = failures[0]?.error;
+    setLoadError(
+      failures.length === 0
+        ? null
+        : first instanceof ApiError
+          ? `${t('commonListsMissing')} ${namedFailures(failures)} — ${first.message}`
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
   }, [canReadDept, canReadBranch, t]);
 
   useEffect(() => {

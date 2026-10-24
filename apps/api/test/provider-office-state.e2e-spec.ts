@@ -341,6 +341,140 @@ describe('Provider dashboard (e2e) — Module 0 item (j)', () => {
     expect(typeof row.activeUsers).toBe('number');
   }, 300_000);
 
+  it('CARRIES ONE REGULATORY FACT AND NOTHING BEHIND IT — an EXACT key set', async () => {
+    /*
+     * MODULE 0-ب, ITEM B. Register entry 97, closed: the provider sees *this office may not issue*
+     * and nothing else.
+     *
+     * THE EXACT SET IS THE POINT, and it is a different guard from the banned-name loop above —
+     * both are kept deliberately:
+     *
+     *   * the LOOP catches a field somebody adds that we already thought to ban, and names it;
+     *   * the SET catches one NOBODY NAMED. That is the realistic shape of a regulatory-detail
+     *     leak: whoever adds `regulatorDecisionNumber` or `sanctionBasis` will not have read a ban
+     *     list first, and a `toHaveProperty` list keeps passing while their field appears beside it.
+     *
+     * A sanction's contents are the OFFICE'S. The provider neither corrects them nor is bound by
+     * any deadline they carry (decision 92), so it has no use for them and no business holding
+     * them.
+     */
+    const target = app as INestApplication<App>;
+    const admin = await providerUser('provider-bar');
+    const body = (
+      await request(target.getHttpServer())
+        .get('/provider/offices')
+        .set(bearer(admin.accessToken))
+        .expect(200)
+    ).body as Record<string, unknown>[];
+    const row = body[0];
+    if (!row) throw new Error('the dashboard returned no offices at all');
+
+    expect(Object.keys(row).sort()).toEqual([
+      'activeUsers',
+      'brokerKind',
+      'dormantLicensedBranches',
+      'isCurrentlyLapsed',
+      'lastActivityAt',
+      'legalName',
+      'legalNameAr',
+      'licenseExpiresAt',
+      'licenseIssuedAt',
+      'licenseNumber',
+      'licensedBranches',
+      'mayNotIssue',
+      'onboardedAt',
+      'organizationId',
+      'organizationStatus',
+      'organizationType',
+      'renewalDueBy',
+      'renewalFiledOnTime',
+      'renewalRequestedAt',
+      'subdomain',
+      'users',
+    ]);
+
+    // THE FACT IS A BOOLEAN, never null — "no regulator has barred this office" is a definite
+    // answer, and a null would make a reader guess whether it meant unknown.
+    expect(typeof row.mayNotIssue).toBe('boolean');
+  }, 300_000);
+
+  it('the one fact TURNS TRUE on a recorded bar, and the detail still does not travel', async () => {
+    /*
+     * The positive half. Without it the assertion above passes on a payload where `mayNotIssue` is
+     * hard-wired `false` — the shape would be right and the fact would be useless.
+     *
+     * A REAL `RegulatoryAction` row, written directly rather than through the route, because the
+     * route is tenant-scoped to the caller's own office and this read is about ANOTHER office. That
+     * is register entry 97 in one sentence, and it is why the fact had to be computed inside the
+     * security-definer view at all.
+     */
+    const target = app as INestApplication<App>;
+    const admin = await providerUser('provider-bar-live');
+    const office = await rawPrisma.organization.findFirstOrThrow({
+      where: { type: 'BROKERAGE_OFFICE' },
+      select: { id: true, subdomain: true },
+    });
+    const recorder = await rawPrisma.user.findFirstOrThrow({
+      where: { organizationId: office.id },
+      select: { id: true },
+    });
+
+    const suspension = await rawPrisma.regulatoryAction.create({
+      data: {
+        organizationId: office.id,
+        kind: 'SUSPENSION',
+        basis: 'SANCTION',
+        /*
+         * TODAY, not a historical date — and the first version used 2020, which FAILED.
+         *
+         * db-test accumulates acts from the licence specs, all dated the day they run, so a 2020
+         * suspension is not the STANDING act: the view folds by `effectiveFrom` then `recordedAt`
+         * then `id`, and a reinstatement dated today outranks it. The fixture was asserting about
+         * an act the fold had already superseded.
+         *
+         * Same carelessness as the 2020-term fixture one batch ago, and the fold being a total
+         * order is exactly why this is now deterministic rather than intermittent: dated today and
+         * recorded last, this act IS the standing one, every run.
+         */
+        effectiveFrom: new Date(),
+        decisionRef: 'CBJ/PROVIDER-VIEW-E2E',
+        recordedByUserId: recorder.id,
+      },
+      select: { id: true },
+    });
+    try {
+      const body = (
+        await request(target.getHttpServer())
+          .get('/provider/offices')
+          .set(bearer(admin.accessToken))
+          .expect(200)
+      ).body as Record<string, unknown>[];
+      const barred = body.find((r) => r.subdomain === office.subdomain);
+      expect(
+        barred,
+        'the barred office is missing from the dashboard',
+      ).toBeDefined();
+      expect(barred?.mayNotIssue).toBe(true);
+
+      // AND STILL NOTHING BEHIND IT, asserted on the SAME row that is now barred — which is the
+      // only row where a leak could carry anything, and therefore the only place this assertion
+      // means something.
+      expect(JSON.stringify(barred)).not.toContain('CBJ/PROVIDER-VIEW-E2E');
+      expect(JSON.stringify(barred)).not.toContain('SUSPENSION');
+      expect(JSON.stringify(barred)).not.toContain('SANCTION');
+
+      // THE CONSEQUENCE THE OWNER ACCEPTED, asserted so nobody "fixes" it by withdrawing the dates:
+      // the licence number and expiry are still here, so a bar on a currently-valid licence IS
+      // distinguishable from an expiry. That is the intent.
+      expect(barred?.licenseNumber).not.toBeNull();
+    } finally {
+      // Removed either way. A standing suspension left on db-test's only office would refuse every
+      // later policy placement in the run — and would also make this very assertion pass for the
+      // wrong reason on the next run.
+      await rawPrisma.regulatoryAction.delete({ where: { id: suspension.id } });
+    }
+  }, 300_000);
+
   it('derives the licence standing from the REGULATORY rule, not from SQL', async () => {
     // db-test's office holds a seeded term expiring well in the future, so the dashboard must read
     // it as in force. The value being a BOOLEAN rather than null is what proves a term was found
@@ -518,8 +652,11 @@ describe('Provider dashboard — the provider-only boundary', () => {
     try {
       await rawPrisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe(
-          `INSERT INTO "Organization" ("id","legalName","type","subdomain","updatedAt")
-             VALUES ('00000000-0000-0000-0000-00000000e001','E2E Second Provider','PROVIDER','e2e-second-provider', now())`,
+          // `legalNameAr` REQUIRED since module 0-ب Part E. Without it this INSERT is refused
+          // for the wrong reason — 23502 rather than the partial unique — and the test would
+          // have gone on passing while proving nothing about `Organization_one_provider`.
+          `INSERT INTO "Organization" ("id","legalName","legalNameAr","type","subdomain","updatedAt")
+             VALUES ('00000000-0000-0000-0000-00000000e001','E2E Second Provider','مزوّد ثانٍ للاختبار','PROVIDER','e2e-second-provider', now())`,
         );
         throw new Error(SENTINEL);
       });
@@ -569,9 +706,25 @@ describe('Provider dashboard — the provider-only boundary', () => {
       'the set of SECURITY DEFINER views changed. Each one reads PAST row-level security, so a new member is a new cross-office channel: declare it in `security-definer-views.e2e-spec.ts`, argue for its column list, and then change this assertion deliberately.',
     ).toEqual(['InsurerDirectory', 'ProviderOfficeState']);
 
-    // And the application-layer complement: the only sanctioned way to run a query WITHOUT tenant
-    // filtering is still the single auth-bootstrap reason. A second member of that union would be a
-    // cross-office path that no view enumeration could see.
+    /*
+     * And the application-layer complement: the only sanctioned ways to run a query WITHOUT tenant
+     * filtering are the reasons named below. A member appearing here that is not in that list is a
+     * cross-office path no view enumeration could see.
+     *
+     * ## PINNED AS A SET, AND IT USED TO BE PINNED AS ONE VALUE
+     *
+     * This read `.toEqual(['auth-bootstrap'])` under a message saying "a SECOND is a cross-office
+     * channel". It fired on module 0-ب's `UnscopedReason` split and was right to — but its premise
+     * did not hold: that change RENAMED one of two existing uses rather than adding a path.
+     * Subdomain resolution had been wearing authentication's label, so the union reported one
+     * reason while serving two. The call-site count was ten before and ten after.
+     *
+     * So the set is named rather than counted. A THIRD member still fails, which is the property
+     * worth keeping; what no longer fails is correcting a label to match what it does.
+     *
+     * The third instance in this module of the same class — a quantity asserted where a set was
+     * meant. See `docs/deferred-register.md` § standing rules.
+     */
     const orgContext = readFileSync(
       join(
         __dirname,
@@ -587,9 +740,9 @@ describe('Provider dashboard — the provider-only boundary', () => {
       ...orgContext.matchAll(/^\s*\|?\s*'([a-z-]+)'(?:;|$)/gm),
     ].map((m) => m[1]);
     expect(
-      reasons,
-      '`UnscopedReason` gained a member. Each one is a path that runs tenant-scoped queries with filtering OFF, so a second is a cross-office channel that the view enumeration above cannot see.',
-    ).toEqual(['auth-bootstrap']);
+      [...reasons].sort(),
+      '`UnscopedReason` names a reason this guard does not know. Each one is a path that runs tenant-scoped queries with filtering OFF, so an unrecognised member is a cross-office channel the view enumeration above cannot see. Adding one is a deliberate decision: argue for it, then name it here.',
+    ).toEqual(['auth-bootstrap', 'subdomain-resolution']);
   }, 300_000);
 
   it('THE ROLE-SAVE PATH REFUSES A PLATFORM CODE FOR A BROKERAGE OFFICE — the flag hides it, the server refuses it', async () => {

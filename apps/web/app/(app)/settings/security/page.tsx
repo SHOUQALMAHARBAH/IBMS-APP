@@ -5,6 +5,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { EncryptionKeyInventory } from '../../../../components/security/EncryptionKeyInventory';
+import { ConflictOfInterestRegister } from '../../../../components/security/ConflictOfInterestRegister';
+import { OfficeSecurityConfiguration } from '../../../../components/security/OfficeSecurityConfiguration';
 import {
   changePassword,
   enrollTotp,
@@ -454,11 +456,41 @@ export default function SecuritySettingsPage() {
         ) : null}
       </section>
 
+      {/*
+       * OWNER DECISION 47, the READ half — the OFFICE'S policy, gated on
+       * `security-config.read`, where the section above is the reader's OWN session.
+       *
+       * The two overlap on two numbers (idle timeout, hard logout) and that is deliberate: the
+       * section above answers "when will I be signed out", which every role needs and which is
+       * why it is ungated, and this one answers "what is this office's policy of record", which
+       * is what an inspector asks. Removing the self-service lines to avoid the repetition would
+       * take that answer away from ten of eleven roles.
+       *
+       * RESOLVED 2026-10-23 — the owner ruled «مدّة», because it is the word in the six labels she
+       * had already approved, and the five CLDR forms of `secIdleTimeoutMinutes` above were
+       * corrected to it. The divergence this comment used to report is closed, and the word was
+       * DERIVED by slicing her own `secCfgIdleLabel` rather than retyped.
+       *
+       * «مهلة» SURVIVES EVERYWHERE ELSE AND MUST: in this product it means an SLA DEADLINE — a
+       * complaint's resolution window, a DSR's statutory clock, a service request's target — which
+       * is a different concept from a session DURATION. 38 of its 43 occurrences are that, and
+       * sweeping them would be decision 42's discipline thrown away rather than applied.
+       */}
+      <OfficeSecurityConfiguration />
+
       {/* Renders only for a holder of `encryption-key.read`. A gated SECTION on an
        * ungated page: this route is the only way through the MFA enrolment guard, so
        * gating the PAGE would lock ten of eleven roles out of pairing an
        * authenticator. */}
       <EncryptionKeyInventory />
+
+      {/* MODULE 0-ب, decision 36 — the conflict-of-interest disclosure register. The DECLARING half
+       * renders for everybody (the discloser is the subject, so there is no code for it and there
+       * cannot be one); the REGISTER half renders only for a holder of
+       * `conflict-of-interest.register.read`. Here for the same reason the inventory above is: this
+       * is the only universally reachable page in the application, and the declaring half has to be
+       * reachable by every role. */}
+      <ConflictOfInterestRegister />
 
       <button
         type="button"

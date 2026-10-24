@@ -281,7 +281,7 @@ export function EndorsementSection({
                 </p>
               ) : null}
               {/* The SHARED renderer. This was four inline lines here, and it is now one component
-                  because there are fifteen maker/checker pairs and fifteen copies is fifteen chances
+                  because there are sixteen maker/checker pairs and sixteen copies is sixteen chances
                   for one of them to say less than the others. It renders nothing when there is no
                   act, which is every ordinary two-person approval. */}
               <CombinedDutyOnRecord

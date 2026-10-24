@@ -6,6 +6,7 @@ import { ENUM_LABEL } from "../../../lib/i18n/enum-labels";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { CombinedDutyOnRecord } from "../../../components/ui/CombinedDutyOnRecord";
+import { WorkflowHistoryLink } from "../../../components/ui/WorkflowHistoryLink";
 import {
   CombinedDutyReasonField,
   combinedDutyTooShort,
@@ -241,7 +242,12 @@ export default function IncidentsPage() {
                   <td style={cell}>{inc.title}</td>
                   <td style={cell}>
                     {t(ENUM_LABEL.IncidentSeverity[inc.severity])}
-                    {inc.isContainmentOverdue ? " (containment overdue)" : ""}
+                    {/* Owner decision 55 — the LONGER form, because this marker sits beside the
+                        incident's SEVERITY rather than beside a date, so a reader who is not told
+                        WHICH clock expired cannot work it out from the row. */}
+                    {inc.isContainmentOverdue
+                      ? ` ${t("statusContainmentOverdue")}`
+                      : ""}
                   </td>
                   <td style={cell}>
                     {t(ENUM_LABEL.IncidentStatus[inc.status])}
@@ -267,6 +273,12 @@ export default function IncidentsPage() {
                         minWidth: "20rem",
                       }}
                     >
+                      {/* Owner decision 41 — this incident's state history, without a pasted uuid.
+                          Renders nothing without `workflow-history.read`. */}
+                      <WorkflowHistoryLink
+                        entityType="IncidentReport"
+                        entityId={inc.id}
+                      />
                       {canContain && inc.status === "REPORTED" ? (
                         <button
                           type="button"

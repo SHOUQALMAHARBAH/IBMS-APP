@@ -199,22 +199,34 @@ test('ANY ONE of several codes — a route guard, which ORs them', async ({
 test('ALL of several codes — a screen that loads them together', async ({
   page,
 }) => {
-  // The opposite case, and the one that makes the two functions worth having. This screen loads two
-  // dashboards with `Promise.all` and closes entirely if EITHER refuses, so its reader needs BOTH. Phrasing
-  // it "any one of these" — the rule that is true at the route guard — would tell somebody holding
-  // `employee-performance.view` that they already qualify, when the screen will refuse them again.
+  // The opposite case, and the one that makes the two functions worth having. Its reader needs BOTH
+  // codes to see this screen whole, so phrasing it "any one of these" — the rule that is true at the
+  // route guard — would tell somebody holding `employee-performance.view` that they already qualify,
+  // when one panel would still be missing.
+  //
+  // ITEM 8 CORRECTED THIS TEST'S PREMISE AND ITS MOCK. The comment here used to say the screen
+  // "closes entirely if EITHER refuses", which was true and is the defect item 8 removed: each panel
+  // now renders what resolved, and the all-of refusal belongs to the reader who holds NEITHER code.
+  // FINANCE_COLLECTIONS_OFFICER is exactly that reader — measured, it holds neither
+  // `insurer-performance.view` nor `employee-performance.view`, both of which are
+  // BRANCH_DEPARTMENT_MANAGER and EXECUTIVE_MANAGEMENT only — so refusing ONE read was never
+  // faithful to what this actor really gets. It was indistinguishable from refusing both only while
+  // `Promise.all` collapsed them.
   await mockAuth(page, ['FINANCE_COLLECTIONS_OFFICER']);
-  await page.route('http://localhost:4000/insurer-performance**', (route) =>
-    route.fulfill({
-      status: 403,
-      json: {
-        message: 'You do not hold a permission required to perform this action',
-      },
-    }),
-  );
-  await page.route('http://localhost:4000/employee-performance**', (route) =>
-    route.fulfill({ status: 200, json: [] }),
-  );
+  for (const path of [
+    'http://localhost:4000/insurer-performance**',
+    'http://localhost:4000/employee-performance**',
+  ]) {
+    await page.route(path, (route) =>
+      route.fulfill({
+        status: 403,
+        json: {
+          message:
+            'You do not hold a permission required to perform this action',
+        },
+      }),
+    );
+  }
 
   await page.goto('/dashboards/insurer-employee-performance');
 

@@ -10,6 +10,9 @@ import { CustomerModule } from '../customer/customer.module';
 import { OpportunityModule } from '../opportunity/opportunity.module';
 import { InsuranceProgramModule } from '../insurance-program/insurance-program.module';
 import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
+import { DsrRepository } from '../../repositories/dsr.repository';
+import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
+import { CustomerFileAnchorService } from './customer-file-anchor.service';
 
 /** Process 11 — RFQ / Market Submission (backlog Part C #11, Domain B).
  *
@@ -43,6 +46,13 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
     // Module 0 item (h). A missing provider is a RUNTIME DI failure TypeScript cannot see —
     // item (e) shipped exactly that — so it lands in the SAME commit as the dependency.
     InsuranceLineRepository,
+    // DOOR FOUR, and the same rule applies: the service plus the two repositories it injects, in
+    // this commit. The repositories are the established cross-module shape (a repository, never a
+    // service), and they are listed HERE rather than imported from their own modules so this
+    // module's dependency on them is visible in one place.
+    CustomerFileAnchorService,
+    DsrRepository,
+    ScreeningMatchRepository,
   ],
   // QuotationModule (backlog Part C #13) reads the parent RFQ + its insurer
   // shortlist through RfqRepository — a quote can only come from a

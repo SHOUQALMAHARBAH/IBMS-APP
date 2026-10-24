@@ -1,0 +1,8 @@
+{
+  "the-third-statement-never-runs": {
+    "_": "The company certificate is enforced by the SERVICE only — the column is nullable and the mirror CHECK permits NULL, which is what makes the three-statement transaction legal. So the only thing standing between a registration and a company with no certificate on record is that third statement. Must kill the happy-path test, which asserts the pointer ON THE STORED RECORD rather than on the 201.",
+    "file": "apps/api/src/modules/provider/insurance-company-registration.service.ts",
+    "from": "        await tx.organization.update({\n          where: { id: organizationId },\n          data: { insurerLicenseCertificateDocumentId: certificate.id },\n        });",
+    "to": "        void certificate;"
+  }
+}

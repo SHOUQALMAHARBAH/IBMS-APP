@@ -333,22 +333,38 @@ export class AccessRecertificationService {
 
     const subjectIds = [...new Set(items.map((i) => i.subjectUserId))];
     const reviewerIds = [...new Set(items.map((i) => i.reviewerUserId))];
-    const [subjects, reviewers, rolesBySubject, administrators] =
+    const [subjects, rolesBySubject, administrators, displayNames] =
       await Promise.all([
+        /*
+         * The subject summaries, which supply the EMAIL. The reviewer summaries used to be fetched
+         * here too — a separate batched read, with a comment explaining that one query each kept
+         * the lookup maps honest about which id came from where.
+         *
+         * THAT READ IS GONE (owner decision 48). It existed only to supply the reviewer's NAME,
+         * and the resolver below answers both sets in ONE call, so keeping it would be a third
+         * query for a field nothing reads. `no-unused-vars` is what found it: correcting the name
+         * left `reviewerById` assigned and unread, which is the lint rule catching a leftover
+         * rather than a style point — the same rule that once caught two combined-duty act ids
+         * resolved and never passed to their writes.
+         */
         this.users.findSummariesByIds(subjectIds),
-        // A separate batched read rather than adding the reviewer to the subject set: the two
-        // sets overlap only in a declared self-review, and one query each keeps the lookup
-        // maps honest about which id came from where.
-        this.users.findSummariesByIds(reviewerIds),
         // One query for every subject's roles, not one per item — see
         // UserRepository.getRoleNamesByIds.
         this.users.getRoleNamesByIds(subjectIds),
         // One query for the whole page, same reason. Resolved through the same
         // capability the last-administrator guard uses.
         this.roles.findActiveUserIdsWithPermission('user.manage'),
+        /*
+         * OWNER DECISION 48 — the DISPLAY name, through the one resolver, which applies the HR
+         * record where the account is linked. The summary rows above still supply the EMAIL (a
+         * stored fact about the account), but the NAME must not come from `User.fullName`: this is
+         * an access-recertification register, so it answers "whose access did this person review",
+         * and a job title in that column names nobody. Both sets in one call, since a declared
+         * self-review has the same id on both sides.
+         */
+        this.users.displayNamesForUserIds([...subjectIds, ...reviewerIds]),
       ]);
     const subjectById = new Map(subjects.map((s) => [s.id, s]));
-    const reviewerById = new Map(reviewers.map((r) => [r.id, r]));
     const administratorIds = new Set(administrators);
 
     return items.map((item) => {
@@ -358,13 +374,14 @@ export class AccessRecertificationService {
         cycleId: item.cycleId,
         cycleLabel: item.cycle.cycleLabel,
         subjectUserId: item.subjectUserId,
-        subjectFullName: subject?.fullName ?? '(deleted user)',
+        subjectFullName:
+          displayNames.get(item.subjectUserId) ?? '(deleted user)',
         subjectEmail: subject?.email ?? '',
         subjectRoles: rolesBySubject.get(item.subjectUserId) ?? [],
         subjectIsUserAdministrator: administratorIds.has(item.subjectUserId),
         reviewerUserId: item.reviewerUserId,
         reviewerFullName:
-          reviewerById.get(item.reviewerUserId)?.fullName ?? '(deleted user)',
+          displayNames.get(item.reviewerUserId) ?? '(deleted user)',
         decision: item.decision,
         reviewedAt: item.reviewedAt,
         arrangementCombinedDutyAct: combinedDutyActView(item.combinedDutyAct),

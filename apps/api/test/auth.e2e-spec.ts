@@ -33,6 +33,26 @@ interface SecurityConfigBody {
   idleTimeoutMinutes: number;
 }
 
+/*
+ * OWNER DECISION 47 — the seven numbers `/settings/security` now renders, asserted ON THE RESPONSE
+ * BODY because that is the one layer a mock cannot replace.
+ *
+ * `apps/web/lib/auth/auth-api.ts` declares its own `SecurityConfig` interface over this HTTP
+ * response. TypeScript cannot check a hand-copied interface against a payload, and a Playwright
+ * fixture supplies whatever the screen reads — which is exactly how the customer-import panel came
+ * to throw on every successful import for three weeks while both suites stayed green. So a renamed
+ * or dropped column has to fail HERE.
+ */
+const SECURITY_CONFIG_FIELDS = [
+  'accessTokenTtlMinutes',
+  'hardLogoutAfterIdleMinutes',
+  'idleTimeoutMinutes',
+  'lockoutMinutes',
+  'maxFailedLoginAttempts',
+  'refreshTokenTtlDays',
+  'stepUpMaxAgeMinutes',
+] as const;
+
 function uniqueEmail(label: string): string {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@ibms.test`;
 }
@@ -500,6 +520,23 @@ describe('Auth (e2e)', () => {
       expect((res.body as SecurityConfigBody).idleTimeoutMinutes).toBeTypeOf(
         'number',
       );
+
+      /*
+       * Decision 47's read half. Asserted one field at a time rather than as a key-set equality:
+       * the response also carries `id`, `organizationId`, `updatedByUserId` and `updatedAt`, which
+       * the screen deliberately does not render — `updatedByUserId` is a uuid, and rendering it
+       * would raise the rendered-identifier budget this batch is forbidden to move.
+       *
+       * A number, not merely present: `null` would satisfy `toHaveProperty` and then render as a
+       * blank beside a unit word, which is the shape of a screen reporting a policy it does not
+       * have.
+       */
+      const body = res.body as Record<string, unknown>;
+      for (const field of SECURITY_CONFIG_FIELDS) {
+        expect(body[field], `${field} must reach the screen`).toBeTypeOf(
+          'number',
+        );
+      }
     });
   });
 

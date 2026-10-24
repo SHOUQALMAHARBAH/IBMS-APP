@@ -38,7 +38,8 @@
     "seed": "dotenv -e ../../.env -- prisma db seed",
     "seed:test": "dotenv -e ../../.env.test -- prisma db seed",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.seed.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrate:diff": "node scripts/safe-migrate-diff.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

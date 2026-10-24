@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
+import { UserRepository } from '../../repositories/user.repository';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { CrossBorderTransferRepository } from '../../repositories/cross-border-transfer.repository';
 import {
@@ -30,6 +31,7 @@ export class CrossBorderTransferService {
   constructor(
     private readonly repo: CrossBorderTransferRepository,
     private readonly audit: AuditService,
+    private readonly users: UserRepository,
   ) {}
 
   async create(
@@ -59,11 +61,18 @@ export class CrossBorderTransferService {
       isSensitiveDataAccess: true,
     });
 
-    return deriveCrossBorderTransferView(row);
+    return deriveCrossBorderTransferView(
+      row,
+      await this.users.displayNameForUserId(row.approvedByUserId),
+    );
   }
 
   async get(id: string): Promise<CrossBorderTransferRecordView> {
-    return deriveCrossBorderTransferView(await this.load(id));
+    const row = await this.load(id);
+    return deriveCrossBorderTransferView(
+      row,
+      await this.users.displayNameForUserId(row.approvedByUserId),
+    );
   }
 
   async list(
@@ -76,7 +85,16 @@ export class CrossBorderTransferService {
       },
       DEFAULT_LIST_TAKE,
     );
-    return rows.map((r) => deriveCrossBorderTransferView(r));
+    // One query for the page's approvers, never one per row.
+    const names = await this.users.displayNamesForUserIds(
+      rows.map((r) => r.approvedByUserId),
+    );
+    return rows.map((r) =>
+      deriveCrossBorderTransferView(
+        r,
+        names.get(r.approvedByUserId ?? '') ?? null,
+      ),
+    );
   }
 
   private async load(id: string) {

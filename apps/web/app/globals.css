@@ -57,7 +57,19 @@
   --nav-item-active: #3b6790;
   --nav-divider: rgba(255, 255, 255, 0.12);
 
-  /* --- surfaces -------------------------------------------------------- */
+  /*
+   * --- surfaces ---------------------------------------------------------
+   * There are FOUR, and there is deliberately no `--surface-raised`. Three sites referenced one
+   * for months and this file never defined it, so all three rendered with no background at all:
+   * a bare `var()` on an undefined custom property is invalid at computed-value time and the
+   * browser drops the whole declaration. One of the three carries the owner's own Arabic DPO
+   * notice. They were pointed at `--surface-sunken` rather than given a fifth surface, because
+   * every one of them is the same job — a bordered notice inset ON a card — which is what
+   * `--surface-sunken` already means; "raised" was the wrong metaphor for a block that sits
+   * within a card, and a fifth surface would need a light value and two dark ones decided for it.
+   * `scripts/measurements/undefined-css-properties.py` is what can see this class; it is the only
+   * thing that could, since no compiler reads a stylesheet against a `.tsx` string.
+   */
   --surface-page: #f4f6fa;
   --surface-card: #ffffff;
   --surface-sunken: #eef1f6;

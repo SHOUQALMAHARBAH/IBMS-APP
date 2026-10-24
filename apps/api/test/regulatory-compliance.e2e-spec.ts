@@ -33,7 +33,8 @@ interface MfaEnrollBody {
 interface BrokerLicenseBody {
   id: string;
   licenseNumber: string;
-  status: string;
+  // `status` IS GONE from the api view — the column was dropped with this batch. A hand-copied
+  // interface carrying a field nothing sends is how an assertion starts comparing `undefined`.
   isCurrentlyLapsed: boolean;
   certificateDocumentId: string;
   renewalRequestedAt: string | null;
@@ -43,9 +44,10 @@ interface BrokerLicenseBody {
 interface BrokerLicenseDerivedBody {
   renewalDueBy: string;
   renewalFiledOnTime: boolean;
-  validByOperationOfLaw: boolean;
+  validPendingRenewalDecision: boolean;
   expiryIsEndOfCalendarYear: boolean;
   expectedExpiryForThreeYearTerm: string | null;
+  expiryMatchesThreeYearTerm: boolean | null;
 }
 /** Module 0 item (c): `GET /broker-license` answers the current term AND the series. */
 interface BrokerLicenseSeriesBody {
@@ -222,7 +224,8 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
         .expect(201);
       const renewedBody = renewed.body as BrokerLicenseBody;
       expect(renewedBody.licenseNumber).toBe('CBJ-' + RUN + '-A');
-      expect(renewedBody.status).toBe('active');
+      // `status` IS GONE. What it asserted — a freshly renewed term is current — is now asserted
+      // on the DERIVED answer instead, which is also the answer the gate refuses on.
       expect(renewedBody.isCurrentlyLapsed).toBe(false);
       // The certificate was filed and is pointed at -- not merely requested by the DTO.
       expect(renewedBody.certificateDocumentId).toBeTruthy();
@@ -277,25 +280,78 @@ describe('Regulatory Compliance (e2e) — backlog Part C #51', () => {
       expect(d.renewalFiledOnTime).toBe(true);
       // Still inside the term, so nothing is being extended yet — the two are different states
       // and a screen needs to tell them apart.
-      expect(d.validByOperationOfLaw).toBe(false);
+      expect(d.validPendingRenewalDecision).toBe(false);
       // Art. 10/b: this spec's terms all expire on 31 December.
       expect(d.expiryIsEndOfCalendarYear).toBe(true);
-      // Informational. Issued 2026-01-01, so a three-calendar-year term would end 2028-12-31.
+      // Art. 10/b. Issued 2026-01-01, so a three-calendar-year term ends 2028-12-31.
       expect(d.expectedExpiryForThreeYearTerm).toBe('2028-12-31T00:00:00.000Z');
+      /*
+       * ASSERTED ON THE WIRE, and that is the whole reason this line exists. The screen reads
+       * this field through a hand-copied interface in `apps/web/lib/compliance-risk/`, which
+       * TypeScript cannot check against an HTTP response — dropping the field from the view is
+       * invisible to `tsc` and to every unit test, and shows up only here.
+       *
+       * `toBeDefined` before the value: a dropped field is `undefined`, and `undefined` is not
+       * `true`, so the equality alone would fail with a message about the wrong thing.
+       */
+      expect(d.expiryMatchesThreeYearTerm).toBeDefined();
+      // This spec's terms expire 31 December of highestYear+1, derived from the existing maximum
+      // rather than pinned, so whether they match art. 10/b's 2028-12-31 depends on the run.
+      // Compared against the term's OWN expiry rather than asserted as a constant.
+      expect(d.expiryMatchesThreeYearTerm).toBe(
+        d.expectedExpiryForThreeYearTerm ===
+          (derived.current as BrokerLicenseBody).expiresAt,
+      );
 
+      /*
+       * RE-POINTED from `POST /broker-license/mark-lapsed`, which is GONE along with the column it
+       * wrote. What that route asserted — Compliance can put the office out of practice — still
+       * holds; what changed is that the act is now RECORDED rather than flagged, so it carries its
+       * kind, its basis, the date it takes effect and the CBJ's own reference.
+       *
+       * The old "idempotent re-mark" case goes with it, deliberately: a second identical flip was
+       * idempotent because the column had two values. `RegulatoryAction` is APPEND-ONLY by
+       * design — two letters are two facts — so re-recording is not an idempotent no-op and
+       * asserting that it is would be asserting the opposite of what the table is for.
+       */
+      const suspendRef = 'CBJ/RC-E2E/' + Date.now();
       const lapsed = await request(app.getHttpServer())
-        .post('/broker-license/mark-lapsed')
+        .post('/broker-license/regulatory-actions')
         .set(bearer(compliance.accessToken))
+        .send({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: new Date().toISOString().slice(0, 10),
+          decisionRef: suspendRef,
+        })
         .expect(201);
-      expect((lapsed.body as BrokerLicenseBody).status).toBe('lapsed');
-      expect((lapsed.body as BrokerLicenseBody).isCurrentlyLapsed).toBe(true);
+      const standing = lapsed.body as {
+        status: string;
+        mayPractise: boolean;
+        standingActDecisionRef: string | null;
+      };
+      expect(standing.status).toBe('SUSPENDED');
+      expect(standing.mayPractise).toBe(false);
+      // CITABLE. The flag this replaced produced a suspension with a NULL reference, and the
+      // derivation's own comment called that null "the finding".
+      expect(standing.standingActDecisionRef).toBe(suspendRef);
 
-      // idempotent re-mark
-      const lapsedAgain = await request(app.getHttpServer())
-        .post('/broker-license/mark-lapsed')
+      // AND IT IS CLEARED BY THE REGULATOR UNDOING ITS OWN ACT — art. 14/b. This is load-bearing
+      // for the restore below: appending a later term does NOT clear a recorded suspension, which
+      // is a fact about the OFFICE rather than a column on a term.
+      const reinstated = await request(app.getHttpServer())
+        .post('/broker-license/regulatory-actions')
         .set(bearer(compliance.accessToken))
+        .send({
+          kind: 'REINSTATEMENT',
+          basis: 'SANCTION',
+          effectiveFrom: new Date().toISOString().slice(0, 10),
+          decisionRef: suspendRef + '/REINSTATE',
+        })
         .expect(201);
-      expect((lapsedAgain.body as BrokerLicenseBody).status).toBe('lapsed');
+      expect((reinstated.body as { mayPractise: boolean }).mayPractise).toBe(
+        true,
+      );
     } catch (err) {
       testError = err;
     }

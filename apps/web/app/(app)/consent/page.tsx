@@ -316,9 +316,34 @@ export default function ConsentPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>
-                      {r.leadId
-                        ? `Lead ${r.leadId.slice(0, 8)}…`
-                        : `${(r.customerId ?? r.insuredPersonId ?? '—').slice(0, 8)}…`}
+                      {/*
+                        * RULE 2 — WHOSE consent, by name. This rendered `Lead <8 chars of a uuid>`
+                        * or a bare sliced uuid on the one screen whose whole subject is who agreed
+                        * to what.
+                        *
+                        * AND THE KIND MARKER IS BACK — OWNER DECISION 51, «عميل محتمل», the
+                        * singular of the «العملاء المحتملون» that already ships in `leadsHeading`
+                        * and `navLeads`. Removing the old `Lead ` prefix was right (it was
+                        * hardcoded ENGLISH inside a template literal, so an Arabic reader saw it
+                        * too) but it left the register unable to distinguish a lead from a
+                        * customer, and that distinction is PDPL-significant: consent captured at
+                        * lead capture pre-dates the customer record. The kind is derived from the
+                        * id the api already sends, never from a second wire field.
+                        */}
+                      {r.subjectName ? (
+                        r.leadId ? (
+                          <>
+                            <bdi>{r.subjectName}</bdi>{' '}
+                            <span style={{ color: 'var(--ink-secondary)' }}>
+                              ({t('consSubjectLead')})
+                            </span>
+                          </>
+                        ) : (
+                          <bdi>{r.subjectName}</bdi>
+                        )
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td style={cell}>{r.purpose}</td>
                     <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>

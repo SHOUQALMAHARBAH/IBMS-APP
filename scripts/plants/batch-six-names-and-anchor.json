@@ -1,0 +1,38 @@
+{
+  "legal-hold-subject-is-a-uuid-again": {
+    "file": "apps/api/src/modules/pdpl/legal-hold.config.ts",
+    "from": "    customerName: row.customer ? row.customer.legalName : null,",
+    "to": "    customerName: null,",
+    "why": "RULE 2 REVERSED on the legal-hold register — the api stops resolving the name, so the Subject column falls back to its em dash and a DPO working the six-monthly necessity review cannot tell whose file each hold freezes. Kills exactly one test, `names the customer whose records are frozen`, and NOT its sibling `reports no name when the hold names no customer`, which is why both directions are asserted: a mapper hard-wired to null passes the second one. An api-side plant, so no Playwright test can see it — the lesson this repository paid for three times in batch five."
+  },
+  "the-name-leaks-into-the-audit-row": {
+    "file": "apps/api/src/modules/pdpl/legal-hold.config.ts",
+    "from": "    insuredPersonId: row.insuredPersonId,\n    isActive: row.releasedAt === null,\n  };\n}",
+    "to": "    insuredPersonId: row.insuredPersonId,\n    customerName: row.customer ? row.customer.legalName : null,\n    isActive: row.releasedAt === null,\n  };\n}",
+    "why": "THE OPPOSITE DIRECTION, and the one a helpful edit really makes: the customer's name copied into the APPEND-ONLY audit snapshot. What enters an audit row is described, not quoted — the name is a lookup `customerId` already resolves, and copying it freezes one rendering of a mutable fact. Fails on the snapshot's EXACT KEY SET (`toEqual`), which is precisely why that assertion is not a `toMatchObject`: a partial match would pass the day somebody adds a field. This is the inverse of `actorRoleNames`, which IS stored because a role held in the past and never written down is unrecoverable."
+  },
+  "consent-subject-chain-stops-at-its-first-link": {
+    "file": "apps/api/src/modules/pdpl/consent.config.ts",
+    "from": "    subjectName:\n      row.customer?.legalName ??\n      row.lead?.fullName ??\n      row.insuredPerson?.fullName ??\n      null,",
+    "to": "    subjectName: row.customer?.legalName ?? null,",
+    "why": "THE `??` CHAIN TRUNCATED AFTER ITS FIRST LINK — the realistic regression, because a consent record most often names a customer and a customer-only test passes against this. Kills TWO tests and leaves the customer one green: `names a LEAD subject` and `names an INSURED PERSON subject`. That is the whole argument for asserting all three kinds rather than one: the lead branch is the PDPL-significant one, since consent captured at lead capture pre-dates the customer record."
+  },
+  "communication-log-customer-key-dropped": {
+    "file": "packages/db/prisma/schema.prisma",
+    "from": "  customer         Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)",
+    "to": "  customer         Customer?              @relation(fields: [customerId], references: [id], onDelete: Cascade)",
+    "why": "ITEM 4's DELETE RULE CHANGED IN THE DECLARATION ONLY — CASCADE where the database says SET NULL, which is the realistic regression: somebody \"tidies\" a relation and silently arms the product to DESTROY PDPL send evidence the next time a customer is erased. `npm run db:divergence` fails, printing the statement `schema.prisma` no longer describes, and `db:validate` still passes — so nothing but that gate can see it. The three tests in `communication-log-customer-fk.e2e-spec.ts` ALSO still pass, because they read the DATABASE (`information_schema`) rather than the schema file. THAT DIVISION IS THE WHOLE POINT and is why both exist: the e2e proves the database refuses an orphan and keeps the log, the divergence gate proves the declaration still says so, and neither alone catches a declaration quietly changed while the constraint survives — which is exactly the state a later `migrate dev` would turn into a real migration. CORRECTED FROM THE RUN: this plant first REPLACED the relation field with a bare column, and that made the schema INVALID — `Customer.communicationLogs` lost its opposite side, so `prisma migrate diff` died on its own validation and the gate crashed instead of reporting. Loud and non-zero, but a different failure from the one the `why` claimed, and the claim is what had to change."
+  },
+  "security-config-block-ignores-its-permission": {
+    "file": "apps/web/components/security/OfficeSecurityConfiguration.tsx",
+    "from": "  if (!canRead) return null;",
+    "to": "  if (false) return null;",
+    "why": "DECISION 47's GATE BYPASSED — every role that can open `/settings/security` (which is all eleven, deliberately: it is the only route through the MFA enrolment guard) would see the office's session and lockout policy. Kills the Playwright test asserting the block is ABSENT for a reader without `security-config.read`. The presence half is asserted in the same spec and still passes, which is what makes the pair meaningful: the absence alone would pass against a block nobody ever sees, and the presence alone against one everybody sees."
+  },
+  "a-number-renders-without-its-unit": {
+    "file": "apps/web/components/security/OfficeSecurityConfiguration.tsx",
+    "from": "                {tPlural(unit, config[field])}",
+    "to": "                {config[field]}",
+    "why": "THE OWNER'S INSTRUCTION REVERSED — *never a bare integer*. A bare `15` under «مدّة الخمول» reads as fifteen of something nobody states: minutes, hours and days are all plausible, and the wrong reading changes what the office believes its own policy is. KILLS TWO TESTS, NOT ONE, AND THE `why` IS CORRECTED FROM THE RUN: the unit is asserted in EACH LANGUAGE in its own test, so dropping `tPlural` fails both the English row («15 minutes») and the Arabic one. That is a property of the design rather than a flaw in the plant — the whole reason the unit goes through a plural key is that Arabic noun agreement follows the figure (10 takes «دقائق», 15 takes «دقيقة»), which is invisible to an English-only assertion, so the two languages cannot share one test. The two that still pass are the permission absence and the load error, neither of which reads a value."
+  }
+}

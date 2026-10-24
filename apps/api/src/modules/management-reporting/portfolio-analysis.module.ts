@@ -3,6 +3,7 @@ import { PortfolioAnalysisController } from './portfolio-analysis.controller';
 import { PortfolioAnalysisService } from './portfolio-analysis.service';
 import { PortfolioAnalysisRepository } from '../../repositories/portfolio-analysis.repository';
 import { AuditModule } from '../audit/audit.module';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 /**
  * Process 62 (backlog Part C #62, Domain G) — "Portfolio Analysis: a query
@@ -17,6 +18,10 @@ import { AuditModule } from '../audit/audit.module';
 @Module({
   imports: [AuditModule],
   controllers: [PortfolioAnalysisController],
-  providers: [PortfolioAnalysisService, PortfolioAnalysisRepository],
+  providers: [
+    InsurerRepository,
+    PortfolioAnalysisService,
+    PortfolioAnalysisRepository,
+  ],
 })
 export class PortfolioAnalysisModule {}

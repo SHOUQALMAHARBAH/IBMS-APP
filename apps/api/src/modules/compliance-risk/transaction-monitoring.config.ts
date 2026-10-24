@@ -232,6 +232,17 @@ export interface TransactionMonitoringAlertRow {
   reportedToAuthorityAt: Date | null;
   status: string;
   classification: string;
+  /**
+   * Batch six item 2, rule 2 — the alert queue's Customer column rendered the first eight
+   * characters of a uuid, so an AML officer working a list of alerts could not tell WHOSE
+   * transactions had tripped a pattern.
+   *
+   * REQUIRED FIELD, NULLABLE VALUE. Required is what makes the compiler name every path that
+   * builds a row; optional would let a write path project `undefined`, giving a name after a LIST
+   * and none after a DETECT — the `IncidentReport.load()` defect. Nullable is honest: an alert can
+   * be raised against a pattern with no single customer behind it.
+   */
+  customer: { legalName: string } | null;
 }
 
 export interface TransactionMonitoringAlertView {
@@ -248,6 +259,8 @@ export interface TransactionMonitoringAlertView {
   status: string;
   isClosed: boolean;
   classification: string;
+  /** The customer's own name, resolved by the api. Null when the alert names no customer. */
+  customerName: string | null;
 }
 
 export function deriveTransactionMonitoringAlertView(
@@ -269,6 +282,7 @@ export function deriveTransactionMonitoringAlertView(
     status: row.status,
     isClosed: isTerminalTransactionMonitoringStatus(row.status),
     classification: row.classification,
+    customerName: row.customer ? row.customer.legalName : null,
   };
 }
 

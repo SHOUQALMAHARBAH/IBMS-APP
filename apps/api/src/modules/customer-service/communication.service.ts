@@ -161,7 +161,7 @@ export class CommunicationService {
       }),
     });
 
-    return deriveCommunicationView(row);
+    return deriveCommunicationView(row, await this.resolveName(row.customerId));
   }
 
   // --- 2. consent status (a pre-compose check) ----------------------
@@ -183,7 +183,7 @@ export class CommunicationService {
     if (!row) {
       throw new NotFoundException(`Communication ${id} not found.`);
     }
-    return deriveCommunicationView(row);
+    return deriveCommunicationView(row, await this.resolveName(row.customerId));
   }
 
   async list(query: ListCommunicationsQueryDto): Promise<CommunicationView[]> {
@@ -201,10 +201,39 @@ export class CommunicationService {
         `Communication list truncated at ${COMMUNICATION_READ_LIMIT} rows — narrow with customerId / channel / isMarketing / direction.`,
       );
     }
-    return rows.map((r) => deriveCommunicationView(r));
+    /*
+     * ONE NAME QUERY FOR THE PAGE, never one per row — `CommunicationLog.customerId` has no
+     * relation, so there is no include to ride on, and a per-row lookup would be up to
+     * `COMMUNICATION_READ_LIMIT` reads to render one table.
+     */
+    const names = await this.repo.customerNames(
+      rows.map((r) => r.customerId).filter((id): id is string => id !== null),
+    );
+    return rows.map((r) =>
+      deriveCommunicationView(
+        r,
+        r.customerId === null ? null : (names.get(r.customerId) ?? null),
+      ),
+    );
   }
 
   // --- helpers ---------------------------------------------------
+
+  /**
+   * The name for ONE log's customer, or null.
+   *
+   * Null covers both absent cases, and they are not the same fact: the log may carry no customerId
+   * at all, or carry one that resolves to nothing — which is representable here and nowhere else in
+   * this group, because this column has no foreign key behind it. The single-row paths collapse
+   * them because a detail screen showing one log can say no more than *no customer on file*; the
+   * LIST keeps them apart by construction, since a missing key and a null id take different
+   * branches there.
+   */
+  private async resolveName(customerId: string | null): Promise<string | null> {
+    if (customerId === null) return null;
+    const names = await this.repo.customerNames([customerId]);
+    return names.get(customerId) ?? null;
+  }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {
     try {

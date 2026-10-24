@@ -62,6 +62,43 @@ export class DsrRepository {
       .then((n) => n > 0);
   }
 
+  /**
+   * DOOR FOUR — the DPO's anchor. The id of an OPEN request on this customer HANDLED BY this user,
+   * or null.
+   *
+   * Three conditions, and dropping any one of them breaks the control:
+   *
+   *  - `customerId` is NOT NULL here even though the column is nullable. A DSR that names no
+   *    customer must open NOBODY's file; passing an id makes that structural rather than hoped for,
+   *    but the `not: null` is stated anyway so a future caller cannot pass undefined and widen it.
+   *  - `dpoHandlerUserId` is the ASSIGNMENT. "Any open DSR" would let one DPO read a file on the
+   *    strength of another DPO's work.
+   *  - the status set is OPEN_DSR_STATUSES, derived by excluding an exhaustive closed list, so a
+   *    new status is open by omission and the inventory spec fails by name.
+   *
+   * Both columns are indexed (`[customerId]`, `[dpoHandlerUserId]`), so this is the query the
+   * schema was already shaped for.
+   */
+  findOpenRequestHandledBy(
+    customerId: string,
+    userId: string,
+    openStatuses: readonly DsrStatus[],
+  ): Promise<string | null> {
+    return this.prisma.client.dataSubjectRequest
+      .findFirst({
+        where: {
+          customerId: { equals: customerId, not: null },
+          dpoHandlerUserId: userId,
+          status: { in: [...openStatuses] },
+        },
+        select: { id: true },
+        // Oldest first, so the anchor reported is the one that has been open longest - a stable
+        // answer rather than one that changes as rows arrive.
+        orderBy: { createdAt: 'asc' },
+      })
+      .then((row) => row?.id ?? null);
+  }
+
   userExists(userId: string): Promise<boolean> {
     return this.prisma.client.user
       .count({ where: { id: userId } })

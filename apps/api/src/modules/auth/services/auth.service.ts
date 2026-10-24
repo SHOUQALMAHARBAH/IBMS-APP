@@ -840,6 +840,43 @@ export class AuthService {
       // know the mode either asks everybody for a reason or asks nobody and then 422s. Not sensitive — a
       // governance posture, and anybody who can approve anything needs to know it.
       dutySegregationMode: office?.dutySegregationMode ?? 'SEGREGATED',
+      /*
+       * ITEM (f), COMPANY HALF — what KIND of organization the caller belongs to.
+       *
+       * It rides on the SAME `organizations.findById` the mode above already needed, so it costs no
+       * extra query. And it is here rather than behind a permission for the same reason the mode is:
+       * the NAVIGATION has to know. A company administrator's only screen is its own registry record,
+       * and that route is gated on organization TYPE rather than on a code — so without this the nav
+       * would either hide the entry from the one audience it exists for, or show it to every
+       * brokerage user and send them into a 403.
+       *
+       * NOT SENSITIVE: a caller already knows what kind of organization they work for. What it is not
+       * is an authorization signal — the server re-reads the type where the record is loaded, because
+       * a client-side branch is a hidden control and not a boundary.
+       */
+      organizationType: office?.type,
+      /*
+       * BATCH 1 ITEM 4 COMPLETED — the signed-in organization's OWN name, both languages.
+       *
+       * The provider was renamed to "GO Global" / «جو جلوبال» in the seed and NOTHING rendered it:
+       * `me()` did not carry an organization name at all, and every `legalName` render in the web
+       * app belongs to a customer, an insurer, or an insurance company's own registry record. So
+       * the rename was half delivered, which under the standing rule is worse than not delivered —
+       * it read as a guarantee that the owner would see the new name.
+       *
+       * NO PERMISSION. It rides on the office row `dutySegregationMode` and `organizationType`
+       * already load, so it costs no query, and it is ungated for their reason: a caller already
+       * knows which organization they work for, and a code whose absence hides a person's own
+       * employer from them is a gate nobody can fail. NOT an authorization signal — nothing
+       * branches on it.
+       *
+       * BOTH FORMS, because `legalNameAr` is NOT NULL on `Organization` and the caller is the one
+       * that knows which language it is rendering.
+       */
+      organizationName:
+        office === null
+          ? null
+          : { en: office.legalName, ar: office.legalNameAr },
     };
   }
 

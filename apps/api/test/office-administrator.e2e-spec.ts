@@ -152,6 +152,11 @@ const OFFICE_ADMINISTRATOR_CODES = [
   // Asserted from both sides so a future edit that decided "these are the same thing really"
   // has to break one of the two.
   'insurer.office-form.map',
+  // MODULE 0-ب ITEM (e), DECISION 63 — deciding that one of the office's counterparty records IS a
+  // particular registered company, and undoing that. This list is an INDEPENDENT COPY of the seed
+  // grid's, deliberately: two lists that must be edited together are two chances to notice.
+  'insurer.company.link',
+  'insurer.company.unlink',
 ] as const;
 
 /** Withheld on purpose, each for a stated reason. A code moving from this list to
@@ -319,63 +324,144 @@ describe('every office has a route to user administration', () => {
     ).toEqual([]);
   }, 120_000);
 
-  it('and the PROVIDER organization deliberately has NO route to user administration', async () => {
+  it('and the PROVIDER administers ITSELF — exactly these codes, and no brokerage capability', async () => {
     /*
-     * THE CONSEQUENCE OF THE NARROWING ABOVE, PINNED SO IT STAYS A DECISION.
+     * THE SAME PIN, REPOINTED. Module 0-ب item (b) moved its target rather than removing it.
      *
-     * The test above now excludes the platform operator, which means the platform operator cannot
-     * provision a user into itself from inside the application: nobody in it holds `user.manage`,
-     * so every route into user administration is refused for it. Measured rather than inferred —
-     * the provider's only role holds exactly one code, `provider.office-state.read`.
+     * It used to assert the opposite: that the provider held NO route to user administration. That
+     * was the honest consequence of item (j) giving its role a single code — and it was a defect,
+     * not a design. The provider organization could not add a second operator, change a role, or
+     * repair itself from inside the application, which is the same shape
+     * `every office has a route to user administration` above calls a defect in its own message.
      *
-     * That is the intended state and the migration says so in its own words: the dashboard is
-     * unreachable until somebody deliberately creates the operator. But an UNSTATED consequence of
-     * a narrowed denominator is how a real gap gets excused, so it is asserted here instead. If a
-     * later change grants the provider `user.manage` — which would let it provision its own staff,
-     * tenant-scoped exactly as an office does — this test fails and that becomes a recorded
-     * decision rather than a side effect.
+     * So the provider now administers ITSELF, and what this pins is the SET — because the risk
+     * never was that it would hold too few codes, it is that it would quietly acquire a brokerage
+     * one. A provider operator holds `role.update` and the permission catalogue is global, so
+     * nothing structurally stops them granting their own role `customer.create`. THAT is the
+     * declared gap, it stays declared in `seed.ts` and in README § Known gaps, and this assertion
+     * is what turns a silent drift into a failing build.
      *
-     * WHAT IT COSTS TODAY, said plainly so the next reader does not have to measure it: the
-     * provider dashboard has no hand-walkable path on the dev database, because the seed creates
-     * the organization and its role but no user. The api e2e creates its own provider user with the
-     * owner connection, which is the only way in.
+     * WHAT BOUNDS IT TO ITS OWN ORGANIZATION IS TENANCY, not anything written for this module:
+     * `User`, `Role`, `UserRoleAssignment` and `RolePermission` all carry `organizationId`, so
+     * every read and write through these codes is filtered before it reaches the database. That
+     * half is proven over real HTTP in `provider-self-administration.e2e-spec.ts`, by asking for an
+     * office's role BY ID and being told it does not exist.
      */
     // `rawPrisma` throughout: `Role` and `RolePermission` are tenant-scoped, so reading another
-    // organization's rows through the scoped client returns EMPTY whatever the state is — this
-    // whole test would have asserted an absence it could not have observed. The non-vacuity floor
-    // at the bottom is what caught it, which is the only reason it is not still written that way.
+    // organization's rows through the scoped client returns the DEFAULT OFFICE's — measured last
+    // module at 517 grants where one was expected. This test would not have been vacuous, it would
+    // have been confidently wrong.
     const provider = await rawPrisma.organization.findFirst({
       where: { type: 'PROVIDER' },
       select: { id: true },
     });
-    if (!provider) {
-      // Correct on a database seeded without sample data, and not a failure: `SEED_SAMPLE_DATA` is
-      // what keeps a placeholder platform operator out of production.
-      return;
-    }
-
-    const administering = await rawPrisma.role.findMany({
-      where: {
-        organizationId: provider.id,
-        status: 'ACTIVE',
-        permissions: { some: { permission: { code: 'user.manage' } } },
-      },
-      select: { name: true },
-    });
+    /*
+     * S1 OF THE NAMED SHORT PASS — THIS RETURNED BEFORE IT MEASURED.
+     *
+     * It used to `return` here, justified as "correct on a database seeded without sample data".
+     * The justification was about a database this test never runs against, and the cost was that
+     * the guard bounding the provider's capabilities PASSED SILENTLY in exactly the state where
+     * something had gone wrong: no provider organization at all.
+     *
+     * Measured rather than argued: `NODE_ENV` is assigned nowhere in `ci.yml`, `.env.example` or
+     * `.env`, so `SEED_SAMPLE_DATA` is TRUE in CI and `ensureProviderOrganization()` always runs;
+     * db-test holds exactly one PROVIDER row today. So the branch was unreachable in every
+     * environment this spec executes in — which is why nobody noticed that the one environment it
+     * WAS written for is the one where a missing provider is a finding rather than a configuration.
+     *
+     * A missing provider is now a FAILURE NAMING ITSELF. If this spec is ever pointed at a database
+     * seeded without sample data, the right answer is to skip the FILE, not to let one test report
+     * a correct grant set for an organization that does not exist.
+     */
     expect(
-      administering.map((r) => r.name),
-      'the platform operator holds user administration — intended or not, that is a decision to record',
-    ).toEqual([]);
+      provider,
+      'no PROVIDER organization exists, so the set of codes this test bounds could not be read at all. ' +
+        'It used to return here and pass. `ensureProviderOrganization()` runs inside SEED_SAMPLE_DATA ' +
+        '(NODE_ENV !== "production"), which is TRUE in CI — so an absent provider means the seed did not ' +
+        'run or did not complete, and a silent pass would hide it.',
+    ).not.toBeNull();
+    if (!provider) return; // unreachable past the assertion; narrows the type for the read below
 
-    const codes = await rawPrisma.rolePermission.findMany({
-      where: { organizationId: provider.id },
-      select: { permission: { select: { code: true } } },
-    });
-    // Non-vacuity: the assertion above is also satisfied by a provider organization holding no
-    // grants at all, which would mean the dashboard was withdrawn rather than scoped.
-    expect(codes.map((c) => c.permission.code).sort()).toEqual([
-      'provider.office-state.read',
-    ]);
+    const codes = (
+      await rawPrisma.rolePermission.findMany({
+        where: { organizationId: provider.id },
+        select: { permission: { select: { code: true } } },
+      })
+    )
+      .map((c) => c.permission.code)
+      .sort();
+
+    // THE SET, not a count. A count of eight is satisfied by a set containing `customer.create`,
+    // which is exactly the drift this exists to catch — and it is what caught item (d) adding a
+    // code, by NAME, in CI. Each entry below is a deliberate edit with a reason beside it.
+    expect(codes).toEqual(
+      [
+        'permission.read',
+        // Item (j) — the cross-office dashboard the organization exists for.
+        'provider.office-state.read',
+        // Item (d) — registering a brokerage office. PLATFORM-scoped, and the only route in this
+        // product that creates a tenant.
+        'provider.office.register',
+        // Item (e) — the other kind of tenant.
+        'provider.insurer.register',
+        /*
+         * Item (f) — giving a registered office its FIRST account, and CI caught this omission by
+         * name. I updated `PROVIDER_CODES` in the seed and the grid spec's PLATFORM set and missed
+         * THIS pin, which is the same blast-radius mistake as before: I measured "what declares the
+         * provider's codes" and the thing that mattered was "what ASSERTS them".
+         *
+         * Not a tenant-creating code like the two above — it writes INSIDE a tenant, which is why it
+         * is a separate grant: registering an office is a filing, handing over its keys is not.
+         */
+        'provider.office.administrator.invite',
+        /*
+         * Item (f), the COMPANY half. A SEPARATE code from the office invite rather than a reuse,
+         * because a code named for an office that also reached a company would promise other than it
+         * does — the defect class this close measured in `aml.monitor` and `sanctions-pep.screen`.
+         */
+        'provider.insurance-company.administrator.invite',
+        /*
+         * DECISION 25, BATCH 5 — THE PROVIDER'S OWN MAILBOX, and this pin caught the change by name
+         * exactly as it caught item (f)'s omission.
+         *
+         * Authorised because the invitation that is the only door into a brand-new organization
+         * leaves from the PROVIDER's connected mailbox — the invited organization has none and
+         * cannot connect one until somebody is inside it — and the provider held neither code, so
+         * the channel was real in tests and unreachable in life.
+         *
+         * STILL NOT A BROKERAGE CAPABILITY, which is the sentence the whole list defends: a mailbox
+         * the organization OWNS is self-administration, the same family as `user.manage` and the
+         * three role codes below. It reads and connects the provider's OWN integration row, which is
+         * organization-scoped with an RLS policy on top — asserted in both directions by
+         * `provider-self-administration.e2e-spec.ts`. Nothing was minted BY THAT WIDENING: both codes
+         * already existed in the catalogue. The TOTAL has moved since, by later batches minting
+         * codes that reach neither this role nor the provider — it is pinned in
+         * `provider-self-administration.e2e-spec.ts` and deliberately not repeated here, because a
+         * figure copied into a comment is a figure that goes stale and is then read as current.
+         */
+        'email.integration.read',
+        'email.integration.manage',
+        // Item (b) — self-administration, bounded by tenancy rather than by anything written for it.
+        'role.create',
+        'role.deactivate',
+        'role.read',
+        'role.update',
+        'user.manage',
+      ].sort(),
+    );
+
+    // Said a second way, on the SHAPE rather than the list, so a brokerage code added under a name
+    // this list does not enumerate still fails. The list above would catch it too; this one says
+    // WHY in its message, which is what a reader needs at 3am.
+    const brokerage = codes.filter((c) =>
+      /^(policy|customer|claim|commission|collection|invoice|receipt|remittance|refund|endorsement|rfq|quotation|lead|prospect|employee)\./.test(
+        c,
+      ),
+    );
+    expect(
+      brokerage,
+      'the provider organization holds a BROKERAGE capability — it administers itself and reads the dashboard, nothing else',
+    ).toEqual([]);
   }, 120_000);
 
   it('gives every Organization an isSystem OFFICE_ADMINISTRATOR with all 25 codes', async () => {

@@ -30,6 +30,7 @@ import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeD
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../../lib/i18n/format';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 
 export default function UpSellRecommendationDetailPage() {
@@ -117,6 +118,9 @@ export default function UpSellRecommendationDetailPage() {
       {recommendation ? (
         <>
           <h1>{t('upsdHeading')}</h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='UpSellRecommendation' entityId={recommendation.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             <span style={upSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[recommendation.status])}</span>
           </p>

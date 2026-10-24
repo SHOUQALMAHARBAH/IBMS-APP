@@ -13,6 +13,9 @@ import type { RecommendationRepository } from '../../repositories/recommendation
 import type { ClientDecisionRepository } from '../../repositories/client-decision.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
+import type { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
+import type { RegulatoryActRow } from '../compliance-risk/license-standing.config';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -96,12 +99,24 @@ interface Opts {
   // `null` -> the office holds NO term, which the gate refuses; an object -> that term.
   brokerLicense?: {
     licenseNumber: string;
-    status: string;
     expiresAt: Date;
-    // Module 0 item (d) — art. 11. Needed here because the gate's answer for an EXPIRED term now
-    // depends on whether a renewal application was filed on time.
+    // Module 0 item (d) — the renewal-pending rule (the owner's decision, not art. 11). Needed
+    // here because the gate's answer for an EXPIRED term now depends on whether a renewal
+    // application was filed on time.
     renewalRequestedAt?: Date | null;
+    // The term's own issue date. `foldActs` ignores an act that predates it — which is how a
+    // re-licensed office is expressible at all — so a test about a recorded act has to set it.
+    issuedAt?: Date | null;
   } | null;
+  /**
+   * Recorded `RegulatoryAction` rows, defaulting to NONE — the state every test here but two is
+   * about.
+   *
+   * MODULE 0-ب, THE LICENCE: these replaced `BrokerLicense.status`. They are fed to the REAL
+   * `LicenseGateService` rather than to a refusing double, so a test about "a recorded suspension
+   * outranks a timely filing" runs the whole six-state derivation and asserts the shipped ordering.
+   */
+  regulatoryActs?: RegulatoryActRow[];
   // Insurer management — `false` exercises the deactivated-insurer refusal, `null`
   // an insurer that does not exist. Defaults to active.
   insurerActive?: boolean | null;
@@ -287,7 +302,6 @@ function makeDeps(opts: Opts = {}) {
   const defaultTerm = {
     id: 'term-default',
     licenseNumber: 'CBJ-TEST-001',
-    status: 'active',
     expiresAt: new Date('2099-01-01T00:00:00.000Z'),
     certificateDocumentId: 'doc-certificate-1',
     renewalRequestedAt: null,
@@ -300,6 +314,33 @@ function makeDeps(opts: Opts = {}) {
   const brokerLicenses = {
     findTerms: findLicenseTerms,
   } as unknown as BrokerLicenseRepository;
+
+  /*
+   * THE REAL GATE, over this file's own licence mock — not a permissive double.
+   *
+   * `LicenseGateService` is where the licence answer now lives, and the two tests below
+   * ("REFUSES placement when the office holds no licence term", "never creates a Policy … and cites
+   * the regulation") exist to prove the refusal. A mock that resolved would make both pass on the
+   * mock rather than the code — the `duty-segregation.double.ts` lesson, where fifteen hand-written
+   * mocks would have broken fifteen self-approval assertions silently.
+   *
+   * So the real service is constructed over the mocked repositories. It is strictly STRONGER than
+   * what it replaces: the old private gate read `pickCurrentTerm` + `isBrokerLicenseCurrentlyLapsed`
+   * and knew nothing about a suspension, while this runs the whole six-state derivation.
+   *
+   * No regulatory acts, which is the state every test in this file is about — and the one case that
+   * is NOT (a recorded suspension) has its own e2e, where the act is created for real.
+   */
+  const licenseGate = new LicenseGateService(brokerLicenses, {
+    /*
+     * THE ACTS, defaulting to none — which is the state every test in this file but two is about.
+     *
+     * They are fed through the REAL repository shape rather than by swapping in a refusing double,
+     * so a test about "a recorded suspension outranks a timely filing" runs the whole six-state
+     * derivation and is asserting the shipped ordering. A double would assert the double.
+     */
+    findAll: vi.fn().mockResolvedValue(opts.regulatoryActs ?? []),
+  } as unknown as RegulatoryActionRepository);
 
   const record = vi
     .fn<
@@ -344,7 +385,6 @@ function makeDeps(opts: Opts = {}) {
       recommendations,
       clientDecisions,
       customers,
-      brokerLicenses,
       audit,
       workflow,
       // Module 0 item (h). Resolves GENERAL for every line, so these tests stay about PLACEMENT:
@@ -354,6 +394,7 @@ function makeDeps(opts: Opts = {}) {
       {
         findCategory: vi.fn().mockResolvedValue('GENERAL'),
       } as unknown as InsuranceLineRepository,
+      licenseGate,
     ),
     state,
     mocks: {
@@ -423,11 +464,25 @@ describe('PolicyService', () => {
       // Compliance looking for a system fault instead of a missing licence. Mirrors the two
       // lapsed-licence tests below, which assert the same pair.
       const { service, mocks } = makeDeps({ brokerLicense: null });
+      // RE-POINTED by the licence batch, with the change stated rather than relaxed. The old
+      // regex was `/holds no CBJ broker license term on record/`; the refusal is now built by
+      // `LicenseGateService.refusal`, which NAMES THE ACT first and spells it "licence" in prose
+      // (the model keeps `BrokerLicense`). The substance asserted is unchanged and one clause is
+      // ADDED, because naming the act is what the one-gate change is for: a reader refused at a
+      // certificate must not have to guess which of six acts was blocked.
       await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
-        /holds no CBJ broker license term on record/,
+        /Placing new business is blocked/,
+      );
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        /holds no CBJ broker licence term on record/,
       );
       await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
         /art\. 21\/a\/9/,
+      );
+      // AND IT SAYS WHAT IS NOT AFFECTED — ز.٢. An over-wide block is the worse defect, so the
+      // refusal itself carries the limit rather than leaving a reader to infer it.
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        /work on existing business/,
       );
       expect(mocks.create).not.toHaveBeenCalled();
     });
@@ -443,7 +498,6 @@ describe('PolicyService', () => {
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-1',
-          status: 'active',
           expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         },
       });
@@ -455,7 +509,6 @@ describe('PolicyService', () => {
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-1',
-          status: 'active',
           expiresAt: new Date(Date.now() - 1000),
         },
       });
@@ -465,13 +518,35 @@ describe('PolicyService', () => {
       expect(mocks.create).not.toHaveBeenCalled();
     });
 
-    it('422s when the license was manually marked lapsed ahead of its calendar expiry', async () => {
+    /*
+     * RE-POINTED. This marked the term `status: 'lapsed'` with a year still to run and asserted a
+     * 422 — the manual marker outranking a perfectly current term.
+     *
+     * The column is gone and the FACT it stood in for is now a row: a recorded CBJ SUSPENSION. So
+     * the same thing is asserted through the act, which is both honest and stronger — the marker
+     * carried no basis, no date and no reference, while this one is citable.
+     */
+    it('422s when a recorded CBJ SUSPENSION stands against an otherwise current term', async () => {
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-1',
-          status: 'lapsed',
+          issuedAt: new Date('2020-01-01T00:00:00.000Z'),
           expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         },
+        regulatoryActs: [
+          {
+            kind: 'SUSPENSION',
+            basis: 'SANCTION',
+            effectiveFrom: new Date('2020-06-01T00:00:00.000Z'),
+            suspendedUntil: null,
+            decisionRef: 'CBJ/2020/55',
+            // Required since the fold became a TOTAL order: `effectiveFrom` is a DATE, so two acts
+            // on one day need `recordedAt` to settle which is later. See
+            // `license-standing.config.spec.ts`'s own order tests.
+            recordedAt: new Date('2020-06-01T09:00:00.000Z'),
+            id: 'act-suspension-1',
+          },
+        ],
       });
       await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
         UnprocessableEntityException,
@@ -479,15 +554,16 @@ describe('PolicyService', () => {
       expect(mocks.create).not.toHaveBeenCalled();
     });
 
-    // Module 0 item (d) — CBJ Instructions No. 9 of 2026, art. 11.
-    it('PROCEEDS past expiry when the renewal application was filed on time (by operation of law)', async () => {
+    // Module 0 item (d) — the renewal-pending rule. The OWNER'S DECISION, not art. 11: that
+    // article is one sentence about a 45-day filing deadline and contains no extension.
+    // See `RENEWAL_PENDING_RULE_BASIS` in broker-license.config.ts.
+    it('PROCEEDS past expiry when the renewal application was filed on time (pending the decision)', async () => {
       // After 31 December an office that applied on time stays valid until the decision issues.
       // Blocking it would refuse business the regulation permits — an error running against the
       // brokerage, the same direction as the empty holiday calendar.
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-TEST-001',
-          status: 'active',
           expiresAt: new Date('2020-12-31T00:00:00.000Z'),
           // 45 calendar days before that expiry, i.e. exactly on art. 11's deadline.
           renewalRequestedAt: new Date('2020-11-16T00:00:00.000Z'),
@@ -499,11 +575,10 @@ describe('PolicyService', () => {
 
     it('still BLOCKS past expiry when the application was filed LATE', async () => {
       // The other half. Without it the test above would pass against an implementation that
-      // treated ANY recorded application as an extension, which is not what art. 11 says.
+      // treated ANY recorded application as an extension, which is not what the rule says.
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-TEST-001',
-          status: 'active',
           expiresAt: new Date('2020-12-31T00:00:00.000Z'),
           renewalRequestedAt: new Date('2020-12-20T00:00:00.000Z'),
         },
@@ -514,22 +589,38 @@ describe('PolicyService', () => {
       expect(mocks.create).not.toHaveBeenCalled();
     });
 
-    it('still BLOCKS a MANUALLY lapsed term even with a timely application', async () => {
-      // A CBJ suspension is not cured by having applied for renewal.
-      //
-      // The expiry is in the PAST deliberately. The first version of this test used 2099 and was
-      // INSENSITIVE to the thing it claims to be about: with the term still inside its period the
-      // ordering of the manual-lapse check against art. 11's extension never matters, so planting
-      // the inversion left this test green while its sibling in broker-license.config.spec.ts
-      // died. Expired + manually lapsed + filed on time is the only combination where the
-      // ordering decides the answer.
+    it('still BLOCKS when a RECORDED SUSPENSION stands, even with a timely application', async () => {
+      /*
+       * A CBJ suspension is not cured by having applied for renewal. RE-POINTED from the manual
+       * marker to the act, and the test's own hard-won property is KEPT: the expiry is in the PAST
+       * and the filing is timely, because that is the only combination where the ordering decides
+       * the answer.
+       *
+       * The original note is worth preserving — its first version used a 2099 expiry and was
+       * INSENSITIVE to the thing it claims to be about, so planting the inversion left it green
+       * while its sibling died. With the term expired and filed on time, the renewal-pending rule
+       * says "may practise" and only the act's precedence produces the refusal.
+       */
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-TEST-001',
-          status: 'lapsed',
+          issuedAt: new Date('2017-12-31T00:00:00.000Z'),
           expiresAt: new Date('2020-12-31T00:00:00.000Z'),
           renewalRequestedAt: new Date('2020-11-16T00:00:00.000Z'),
         },
+        regulatoryActs: [
+          {
+            kind: 'SUSPENSION',
+            basis: 'SANCTION',
+            // AFTER the term's issue, or `foldActs` correctly ignores it — an act predating the
+            // current term does not bite, which is how a re-licensed office is expressible.
+            effectiveFrom: new Date('2020-10-01T00:00:00.000Z'),
+            suspendedUntil: null,
+            decisionRef: 'CBJ/2020/56',
+            recordedAt: new Date('2020-10-01T09:00:00.000Z'),
+            id: 'act-suspension-2',
+          },
+        ],
       });
       await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
         UnprocessableEntityException,

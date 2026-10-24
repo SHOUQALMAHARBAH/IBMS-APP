@@ -58,9 +58,56 @@ describe("permission grid — every code is independent and traceable", () => {
   it("has at least one PLATFORM code, so the branch above is not vacuous", () => {
     // Without this, deleting the scope field from every entry would make the narrowing above
     // unreachable and the test would still pass.
+    //
+    // THE SET, NOT A COUNT, AND IT IS THE RIGHT SHAPE FOR THIS ONE. A PLATFORM code is a code whose
+    // effect leaves the granting office, so which codes are on this list is the boundary itself —
+    // `toHaveLength(2)` would be satisfied by any two, including one swapped for a code nobody
+    // decided should cross offices. Adding to it is a deliberate edit here, with a reason.
     expect(
-      PERMISSIONS.filter((p) => p.scope === "PLATFORM").map((p) => p.code),
-    ).toEqual(["provider.office-state.read"]);
+      PERMISSIONS.filter((p) => p.scope === "PLATFORM")
+        .map((p) => p.code)
+        .sort(),
+    ).toEqual(
+      [
+        // Module 0 item (j) — reads the cross-office dashboard.
+        "provider.office-state.read",
+        // Module 0-ب item (d) — CREATES A TENANT, which is as far outside the granting office as an
+        // effect can reach.
+        "provider.office.register",
+        // Module 0-ب item (e) — the other kind of tenant. Separate from the office code because the
+        // two create different legal entities under different instruments.
+        "provider.insurer.register",
+        /*
+         * Module 0-ب item (f) — THE ONLY CODE WHOSE EFFECT IS A WRITE *INSIDE* ANOTHER TENANT.
+         *
+         * The three above create or read across offices; this one creates an ACCOUNT in one. That is
+         * why it is separate from `provider.office.register`: registering an office is a filing, and
+         * handing somebody the keys to it is not, so an operator trusted to file is not thereby
+         * trusted to choose who runs the office.
+         *
+         * It is narrower than its name: the service refuses a non-brokerage target and refuses once
+         * the office holds ANY account, so it is the right to bootstrap an empty office once — never
+         * a standing ability to add accounts to a live one.
+         */
+        "provider.office.administrator.invite",
+        /*
+         * Module 0-ب item (f), THE COMPANY HALF — the same act for a registered insurance company,
+         * and a SEPARATE code rather than a widening of the one above.
+         *
+         * Reusing the office code for a company would make the name promise "office" while the act
+         * reached a company — the defect class this module measured in `aml.monitor` (gates an alert
+         * queue, promises monitored transactions) and `sanctions-pep.screen` (promises PEP screening
+         * against two SANCTIONS lists and no PEP source). A rename touches every role that holds a
+         * code in every office, so it is the last option considered, never the first.
+         *
+         * Narrower than its name in the same two ways: the service refuses a non-company target and
+         * refuses once the company holds ANY account. And what it hands over is SIX codes — self
+         * administration only — because an insurance company has nothing else to do in this product
+         * yet, which was raised as a stop condition before it was built.
+         */
+        "provider.insurance-company.administrator.invite",
+      ].sort(),
+    );
   });
 
   it("only references roles the seed actually installs", () => {
@@ -282,7 +329,7 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 45 codes", () => {
+  it("holds exactly 47 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
@@ -295,6 +342,11 @@ describe("permission grid — the office administrator", () => {
     // written. NOT in ADDED_AFTER_THE_MIGRATION below, and the reason is worth stating: the legacy
     // administrator holds `customer.read` too (it went to every holder of the three source codes), so this
     // is not a divergence from the legacy role — it is the count pin that makes it a decision.
+    //
+    // 47 with module 0-ب item (e)'s `insurer.company.link` and `insurer.company.unlink`. An office
+    // administrator maintains the office's counterparty records, and deciding that one of them IS a
+    // particular registered company is part of that. Both also go to the legacy `ADMIN`, so the
+    // strict-subset property asserted below still holds and this is not a divergence either.
     // 44 with Part 4 step 4's `duty-segregation.mode.declare` — which DOES add a capability, deliberately,
     // and is therefore declared in ADDED_AFTER_THE_MIGRATION below.
     // 43 with four-action Phase 1 — which ADDED no capability: three umbrellas this role held
@@ -334,6 +386,11 @@ describe("permission grid — the office administrator", () => {
         "information-asset.manage",
         "insurance-line.create",
         "insurance-line.update",
+        // Module 0-ب item (e) — deciding that one of the office's counterparty records IS a
+        // particular registered company, and undoing that. Part of maintaining the register, which
+        // is what this role is for.
+        "insurer.company.link",
+        "insurer.company.unlink",
         "insurer.create",
         "insurer.deactivate",
         "insurer.directory.read",

@@ -29,6 +29,8 @@ describe('buildPolicyDashboardSummary', () => {
         {
           policyId: 'pol-1',
           policyNumber: 'POL-001',
+          // Owner decision 50 — the name a policy with no number is shown by instead of its id.
+          customerName: 'شركة اليرموك للتأمين',
           insuranceLine: 'property',
           reason: 'Client sold the insured property.',
           cancelledAt: '2026-08-15T00:00:00.000Z',
