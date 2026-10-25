@@ -316,6 +316,58 @@ http://localhost:3000
 > هذان الدوران. فحسابا `sample.dpo@ibms.internal` و`sample.exec@ibms.internal` هما
 > الطريق الوحيد إليهما، وكلاهما يكلّف الخطوتين الموصوفتين في أول هذا القسم.
 
+### شاشات المزوِّد — آخر محطّة في التجوّل، وحسابها موجود سابقاً
+
+الشاشات الثلاث `/provider-offices` و`/provider-register-office` و`/provider-register-insurer`
+لا تُفتح بأيٍّ من حسابات المكتب أعلاه، لأنّها ليست في المكتب: هي في منظّمة **المزوِّد**،
+وحسابها هو:
+
+**`operator@ibms.local`** — الدور `PLATFORM_OPERATOR`.
+
+**لا يحتاج تجهيزاً، وقد استُعمل فعلاً.** قياس ٢٦/١٠/٢٠٢٦: أمرُ التجهيز يُنشئ هذا الحساب
+أصلاً — بكلمةٍ عشوائيّةٍ لا يعرفها أحد، تُتلَف في اللحظة نفسها — ثمّ **ضُبِطت له كلمةُ
+مرورٍ في ١٦/١٠/٢٠٢٦، ورُبِط تطبيقُ مصادقةٍ في اليوم نفسه، وقُبِل منه رمزٌ في
+١٩/١٠/٢٠٢٦** — والجلساتُ الخمس كلّها من هذا الجهاز نفسه.
+
+فـ**الربط قائمٌ وسرُّه عند من ربطه، ولا خطوةَ ربطٍ جديدةً هنا إن كان ذلك أنتِ.** وما
+قِيس هو أنّ أحداً على هذا الجهاز يملك السرَّ، لا أنّه أنتِ — والاختبارُ ثانيةٌ واحدة:
+جرّبي رمزاً. فإن قُبِل فقد انتهى الأمر؛ وإن رُفِض فاقرئي **الثغرة** في آخر هذا القسم،
+فهي حالتُك.
+
+وكلمةُ المرور وحدها لها طريقٌ على أيّ حال: `/forgot-password` — اكتبي العنوان أعلاه،
+وستظهر لك **وصلةٌ قابلةٌ للنقر** في الصفحة نفسها (لأنّ `ENABLE_DEV_RESET_TOKEN` مفعَّل
+على هذا الجهاز)، فلا حاجة إلى بريد.
+
+**ماذا يفتح، مقيساً: ٦ شاشات من ٨٤، في مجموعة واحدة من إحدى عشرة — «الإدارة» وحدها.**
+وهذا هو المقصود، لا نقص: المزوِّد يُدير نفسَه ولا يملك أيَّ قدرةٍ على أعمال الوساطة
+إطلاقاً، وأمرُ التجهيز يتوقّف بخطأٍ صريح إن حمل دورُه غير الثلاثة عشر رمزاً المحدَّدة.
+
+| الشاشة | ماذا تفعل |
+|---|---|
+| `/provider-offices` | قائمة المكاتب والشركات المسجَّلة، **ومنها تُرسَل الدعوات** — الشاشةُ نفسها تخدم النوعين وتتفرّع حسب نوع الصفّ |
+| `/provider-register-office` | تسجيل مكتب وساطة جديد |
+| `/provider-register-insurer` | تسجيل شركة تأمين جديدة |
+| `/settings/users` | مستخدمو المزوِّد نفسه |
+| `/settings/email` | ربط بريد المزوِّد نفسه |
+| `/settings/security` | كلمة المرور وتطبيق المصادقة |
+
+> **`/settings/roles` لا تُفتح لهذا الحساب، وهذا قرارٌ لا عُطل.** هو يحمل `role.read` فعلاً،
+> لكنّ الشاشة محجوبةٌ عنه بـ **نوع المنظّمة** لا بالصلاحية: مصفوفةُ الصلاحيات تتجاهل الرموز
+> المنصّية، وهو صحيحٌ لمكتبٍ ومعكوسٌ تماماً للمزوِّد — فكانت ستُعرض عليه رموزُ المكتب التي لن
+> يستعملها أبداً، وتُحجَب رموزُه الخمسة التي يملكها. شاشةُ المزوِّد الخاصّة بقدراته غير مبنيّة،
+> وهي مُسجَّلة في سجلّ المؤجَّل بدلاً من أن تُبنى نصفَ بناء.
+
+> **الدعوة: لا بريدَ يخرج من هذا الجهاز، والوصلةُ هي الطريق.** لا يوجد تطبيقُ OAuth مُسجَّل
+> ولا صندوقُ بريدٍ موصول، فنتيجةُ الإرسال تُعلَن `NOT_CONFIGURED` **صراحةً على الشاشة** — والنظام
+> لا يدّعي أنّه أرسل. وبدلاً منها تظهر **وصلةُ الدعوة قابلةً للنقر** على الشاشة ذاتها، بالبوّابة
+> نفسها التي تُظهر وصلةَ استرجاع كلمة المرور. فالتجوّل كاملٌ بلا بريد؛ وأمّا إرسالٌ حقيقيّ فيحتاج
+> قرارَ اعتمادٍ ليس هندسيّاً.
+
+> **وثغرةٌ واحدة تُقال كما هي:** إن فقدتِ مُدخَل هذا الحساب من تطبيق المصادقة (هاتفٌ جديد،
+> أو تطبيقٌ أُفرِغ) فلا أمرَ إصلاحٍ يبلغه — `demo:release` يطابق `demo.` و`sample:release` يطابق
+> `sample.`، وهذا العنوان ليس واحداً منهما، ولا توجد في النظام شاشةٌ لإعادة ضبط المصادقة. قيس
+> ٢٦/١٠/٢٠٢٦. وكلمةُ المرور وحدها لها طريقٌ (`/forgot-password` أعلاه).
+
 ## ٨. ما يستطيعه المدير وحده — وأين يوجد على الشاشة
 
 | العمل | أين | مجموعة القائمة |
@@ -423,9 +475,16 @@ yarmouk insurance (Demo)
 
 هذه ليست أعطالًا، بل أجزاء لم تُبنَ بعد. من الأفضل معرفتها قبل أن تبحثي عنها:
 
-1. **لا يمكن إنشاء مكتب ثانٍ من داخل النظام.** المكتبان الموجودان أنشأهما أمر التجهيز.
-   لا توجد شاشة ولا واجهة لتسجيل مؤسسة جديدة، وصفحة إنشاء الحساب الأولى ترفض ذلك صراحةً
-   وتقول السبب بدلًا من أن تفشل بصمت.
+1. ~~**لا يمكن إنشاء مكتب ثانٍ من داخل النظام** — لا شاشةَ ولا واجهةَ لتسجيل مؤسّسةٍ
+   جديدة.~~ **صُحِّح في ٢٦/١٠/٢٠٢٦: صار ممكناً، ومن شاشةٍ ستمرّين عليها.** مقيساً:
+   `POST /provider/brokerage-offices` و`POST /provider/insurance-companies` **ينشئان
+   مستأجراً جديداً، وهما الطريقان الوحيدان في هذا النظام اللذان يفعلان ذلك**، وشاشتاهما
+   `/provider-register-office` و`/provider-register-insurer`، وكلتاهما مفتوحةٌ لحساب
+   المزوِّد `operator@ibms.local` (انظري القسم ٧).
+   **وما يبقى صحيحاً هو النصفُ الأضيق:** صفحةُ **إنشاء الحساب الأولى** تظلّ ترفض —
+   فهي تحلّ المكتبَ الوحيد ولا تحتمل اثنين — وترفض صراحةً وتقول السبب بدلاً من أن تفشل
+   بصمت. وهذا نفسه سببُ وجود طريق المزوِّد. وانتبهي إلى أنّ تسجيل منظّمةٍ لا رجعةَ فيه
+   عمليّاً: أوّلُ دخولٍ فيها يكتب صفوفَ تدقيقٍ لا تُحذف.
 2. ~~**ثلاث صلاحيات يحملها حساب الإدارة ولا يستطيع استخدامها**، لعدم وجود شاشة لها.~~
    **صُحِّح في ٢٥/١٠/٢٠٢٦: العبارة صارت خاطئة — للثلاث شاشات الآن.** مقيسًا:
    `customer.bulk-import` شاشتها `/settings/customer-import`، و`email.integration.read`
@@ -750,6 +809,64 @@ Administration 4 of 13. Who fills them, measured: `sample.dpo` opens Privacy 9 o
 > `sample.dpo@ibms.internal` and `sample.exec@ibms.internal` are the only way in, and both
 > cost the two steps described at the top of this section.
 
+### The provider screens — the last stop on the walk, and its account already exists
+
+The three screens `/provider-offices`, `/provider-register-office` and
+`/provider-register-insurer` open for none of the office accounts above, because they are
+not in the office: they belong to the **provider** organization, whose account is:
+
+**`operator@ibms.local`** — role `PLATFORM_OPERATOR`.
+
+**It needs no seeding, and it has been used.** Measured 2026-10-26: the seed creates this
+account itself — with a random password nobody knows, discarded in the same expression —
+and then **a password was set on 2026-10-16, an authenticator was paired the same day, and
+a code from it was accepted on 2026-10-19**, all five sessions from this machine.
+
+So **the pairing stands and whoever paired it holds the secret, and there is no new pairing
+step here if that was you.** What was measured is that somebody on this machine holds it,
+not that it was you — and the test takes a second: try a code. If it is accepted you are
+done; if it is refused, read **the gap** at the end of this section, because that is your
+case.
+
+The password alone has a path either way: `/forgot-password` — enter the address above and
+a **clickable link** appears on that same page (because `ENABLE_DEV_RESET_TOKEN` is on for
+this machine), so no mailbox is needed.
+
+**What it opens, measured: 6 screens of 84, in 1 group of 11 — Administration only.**
+That is the intent and not a shortfall: the provider administers itself and holds no
+brokerage capability at all, and the seed stops with an explicit error if its role ever
+holds anything other than its thirteen named codes.
+
+| Screen | What it does |
+|---|---|
+| `/provider-offices` | The registered offices and companies, **and where invitations are sent from** — one screen serving both kinds, branching on the row's type |
+| `/provider-register-office` | Register a new brokerage office |
+| `/provider-register-insurer` | Register a new insurance company |
+| `/settings/users` | The provider's own users |
+| `/settings/email` | The provider's own mailbox connection |
+| `/settings/security` | Password and authenticator |
+
+> **`/settings/roles` does not open for this account, and that is a decision rather than a
+> fault.** It does hold `role.read`, but the screen is closed to it by **organization
+> type**, not by permission: the permission matrix skips PLATFORM-scoped codes, which is
+> right for an office and exactly inverted here — the provider would be shown every office
+> code it will never use and none of the five PLATFORM codes its own role holds. The screen
+> for the provider's own capabilities is not built, and is recorded in the deferred register
+> rather than half-built.
+
+> **The invitation: no mail leaves this machine, and the link is the way through.** No OAuth
+> application is registered and no mailbox is connected, so the send outcome is reported
+> **on screen as `NOT_CONFIGURED`** — the system does not claim it sent anything. In its
+> place the **invitation link appears, clickable**, on that same screen, through the same
+> gate that shows the password-reset link. So the walk is complete without a mailbox; a real
+> send needs a credential decision, which is not an engineering one.
+
+> **And one gap, stated plainly:** if you lose this account's entry from your authenticator
+> (a new phone, or a cleared app) no repair command reaches it — `demo:release` matches
+> `demo.` and `sample:release` matches `sample.`, and this address is neither, and there is
+> no reset-MFA screen anywhere in the product. Measured 2026-10-26. The password alone does
+> have a path (`/forgot-password`, above).
+
 ## 8. What the administrator can do that nobody else can, and where
 
 | Task | Where | Sidebar group |
@@ -866,10 +983,18 @@ for holding policies.
 These are not faults; they are parts that have not been built. Better to know before hunting
 for them:
 
-1. **You cannot create a second office from inside the system.** Both existing offices were
-   created by the seeding tool. There is no screen and no API for registering a new
-   organisation, and the initial sign-up page refuses explicitly and says why rather than
-   failing silently.
+1. ~~**You cannot create a second office from inside the system** — there is no screen and
+   no API for registering a new organisation.~~ **Corrected 2026-10-26: you can, and from
+   a screen you will walk past.** Measured: `POST /provider/brokerage-offices` and
+   `POST /provider/insurance-companies` **create a tenant, and are the only two routes in
+   this product that do**; their screens are `/provider-register-office` and
+   `/provider-register-insurer`, both open to the provider account `operator@ibms.local`
+   (see §7).
+   **What remains true is the narrower half:** the **initial sign-up page** still refuses —
+   it resolves the sole office and cannot cope with two — and it refuses explicitly and
+   says why rather than failing silently. That is also why the provider route exists. Note
+   that registering an organisation is effectively irreversible: the first sign-in inside
+   it writes append-only audit rows.
 2. ~~**Three permissions the administrator holds and cannot exercise**, because no screen
    exists for them.~~ **Corrected 2026-10-25: that is now false — all three have
    screens.** Measured: `customer.bulk-import` has `/settings/customer-import`, and
