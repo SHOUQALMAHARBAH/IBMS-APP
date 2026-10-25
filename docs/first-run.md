@@ -58,7 +58,7 @@
 > البرامج التي ثُبِّتت بعد فتحها، فستقول لكِ `command not found` عن برنامج مثبَّت فعلاً. هذا أكثر
 > سؤال يُطرح في هذه الخطوة.
 
-### ب. الأوامر الأربعة، بهذا الترتيب
+### ب. الأوامر الخمسة، بهذا الترتيب
 
 افتحي PowerShell على مجلد المشروع `C:\Users\user\Downloads\ibms-app` ونفّذي:
 
@@ -134,10 +134,18 @@ npm run dev
 
 **كيف تعرفين أنه بدأ فعلًا؟**
 
-- الواجهة (الموقع) تجهز بسرعة — بحدود ٣ ثوانٍ — ويظهر في النافذة السطر
-  `✓ Ready in 3.1s` مع العنوان `http://localhost:3000`.
-- الخدمة الخلفية (API) **أبطأ بكثير: نحو ٧٥ ثانية** على هذا الجهاز، لأنها تترجم الكود أولًا.
-  هذا طبيعي. إذا فتحتِ الموقع في هذه الفترة فقد يقول إنه لا يستطيع الوصول للخدمة — انتظري.
+- الواجهة (الموقع) تجهز أولًا — **نحو ٢٠ ثانية** — ويظهر في النافذة السطر
+  `✓ Ready in 19.1s` مع العنوان `http://localhost:3000`.
+- الخدمة الخلفية (API) **أبطأ بكثير: نحو خمس دقائق** على هذا الجهاز، لأنها تترجم الكود
+  أولًا. هذا طبيعي، ولا يعني أن شيئًا تعطّل. **ولا تُوقفي الأمر في هذه الفترة** — هذه أكثر
+  لحظة يُقتل فيها تشغيلٌ سليم.
+- **الدليل على أنها تعمل الآن** سطران يظهران في النافذة بالترتيب:
+  `Starting compilation in watch mode...` ثم — بعد نحو ثلاث دقائق وربع —
+  `Found 0 errors. Watching for file changes.`
+  وعند السطر الثاني فقط تبدأ الخدمة بالاستجابة.
+  (القياس على هذا الجهاز في ٢٥/١٠/٢٠٢٦: الواجهة ١٩٫١ ثانية، والترجمة ٣ دقائق و١٧ ثانية،
+  ومن لحظة `npm run dev` إلى أن يجيب `/health` نحو خمس دقائق. الرقم القديم كان ٧٥ ثانية
+  وهو خاطئ بفارق أربعة أضعاف، في الاتجاه الذي يجعل التشغيل السليم يبدو فاشلًا.)
 - الفحص الأكيد: افتحي هذا العنوان في المتصفح:
 
   `http://localhost:4000/health/db`
@@ -291,6 +299,23 @@ http://localhost:3000
 **للاطلاع على أوسع مساحة عمل: `demo.sales@office-a.ibms.internal`** — يرى العملاء
 المحتملين والعملاء والوثائق والمطالبات، وهو الحساب الوحيد الذي يستطيع **إضافة عميل جديد**.
 
+**ولتجوّل القائمة الجانبية كلها: `demo.manager@office-a.ibms.internal`** (الدور
+`BRANCH_DEPARTMENT_MANAGER`). قياس ٢٥/١٠/٢٠٢٦: هو **الحساب الوحيد الذي تُفتح له
+المجموعات الإحدى عشرة كلها**، و٤٩ شاشة من ٨٤ — مقابل ١٠ مجموعات و٣١ شاشة لـ
+`demo.sales`. فإن كان سؤالك «هل أرى كل أقسام النظام؟» فهذا هو الحساب؛ وإن كان
+«هل أعمل يوم عمل كامل؟» فـ `demo.sales`.
+
+**ولا تُخفى عنه أي مجموعة — لكن ثلاث مجموعات رقيقة من الداخل**، وهذا صلاحيات لا عيب:
+«الخصوصية وحماية البيانات» شاشة واحدة من ٩، و«الالتزام والمخاطر» ٤ من ١٢، و«الإدارة»
+٤ من ١٣. من يملؤها، مقيسًا: `sample.dpo` يفتح الخصوصية ٩ من ٩، و`demo.compliance`
+يفتح الالتزام ١٢ من ١٢، و`demo.officeAdmin` يفتح الإدارة ٩ من ١٢، و`demo.finance`
+يفتح المالية ٦ من ٦، و`sample.exec` يفتح الأداء والتحليل ٧ من ٧.
+
+> **لماذا `sample.` لاثنين منها؟** لأنه **لا يوجد حساب `demo.` لمسؤول حماية البيانات
+> ولا للإدارة التنفيذية** — مقيس على المكتب الأول: تسعة حسابات `demo.` فقط، وليس فيها
+> هذان الدوران. فحسابا `sample.dpo@ibms.internal` و`sample.exec@ibms.internal` هما
+> الطريق الوحيد إليهما، وكلاهما يكلّف الخطوتين الموصوفتين في أول هذا القسم.
+
 ## ٨. ما يستطيعه المدير وحده — وأين يوجد على الشاشة
 
 | العمل | أين | مجموعة القائمة |
@@ -304,9 +329,12 @@ http://localhost:3000
 | **تسجيل شركة تأمين** (بالكتالوج أو محليًا)، تعديلها، **إيقافها عن التعامل** | `شركات التأمين` ← `/insurers` | الأعمال الجديدة |
 | **البحث في دليل الشركات** عبر المكاتب | `دليل شركات التأمين` ← `/insurer-directory` | الأعمال الجديدة |
 
-> **شاشةُ الأقسام والفروع تبدأ فارغة، وهذا ليس خطأً.** قِيس في ١٦/١٠/٢٠٢٦ أنّ القاعدة تحمل **صفر**
-> فرعاً و**صفر** قسماً، في كلِّ المنظّمات، وأمرُ `seed:demo` لا يُنشئ فرعاً واحداً. فإن أردتِ أن تري
-> المرشِّح بالفرع في شاشة الموظفين عاملاً، فأنشئي فرعاً واحداً هنا أولاً — واحدٌ يكفي.
+> **شاشةُ الأقسام والفروع لم تعد تبدأ فارغة.** ~~قِيس في ١٦/١٠/٢٠٢٦ أنّ القاعدة تحمل **صفر** فرعاً
+> و**صفر** قسماً في كلِّ المنظّمات، وأنّ `seed:demo` لا يُنشئ فرعاً واحداً.~~ **صُحِّح في ٢٥/١٠/٢٠٢٦:** قياسُ
+> قاعدةِ التطوير يُعطي **فرعاً واحداً وقسماً واحداً لكلِّ منظّمة** — في المنظّمات الستّ كلِّها، لا في
+> الأولى وحدها. أغلقَ ذلك مسحٌ أُضيف في ١٩/١٠/٢٠٢٦ يمرّ على كلِّ منظّمة بدلاً من تسمية معرّفات،
+> ولهذا بلغَ شركتَي التأمين و`goglobal` أيضاً. فالمرشِّحُ بالفرع في شاشة الموظفين يعمل من غير أن
+> تُنشئي شيئاً — وإن أردتِ فرعاً ثانياً فمن هنا.
 >
 > وانتبهي إلى أنّ كلمة «فرع» تعني في هذا النظام شيئين مختلفين: الفرعُ هنا **موقعٌ مكانيّ** للمكتب،
 > أما «فروع» موافقة البنك المركزي في سجلّ الموظف فهي **فروعُ تأمينٍ** — أي خطوطُ الأعمال داخل النوع،
@@ -381,7 +409,7 @@ yarmouk insurance (Demo)
 | ما ترينه | السبب وما تفعلينه |
 |---|---|
 | **أدخلتُ الرمز الصحيح من التطبيق ويقول إن الرمز خطأ** | إن حدث هذا **قبل** أن تربطي التطبيق بنفسك، فالحساب كان يحمل تسجيل مصادقة قديمًا أُنشئ داخل أداة التجهيز ولم يره أحد — فكل رمز تكتبينه خاطئ فعلًا عند النظام، ولو كان صحيحًا في تطبيقك. الحل: `npm run demo:release -w api` ثم سجّلي الدخول من جديد وستُطلب منك خطوة الربط. أما إن حدث **بعد** الربط فالسبب الغالب أن ساعة الهاتف غير مضبوطة تلقائيًا، أو أن الرقم تغيّر أثناء الكتابة. |
-| **الموقع يقول إنه لا يستطيع الوصول للخدمة** | الخدمة الخلفية لم تكمل الإقلاع بعد (نحو ٧٥ ثانية). تأكدي من `http://localhost:4000/health/db`. |
+| **الموقع يقول إنه لا يستطيع الوصول للخدمة** | الخدمة الخلفية لم تكمل الإقلاع بعد — **نحو خمس دقائق** على هذا الجهاز، لا ٧٥ ثانية (قياس ٢٥/١٠/٢٠٢٦). انتظري ظهور `Found 0 errors.` في نافذة الأوامر، ثم تأكدي من `http://localhost:4000/health/db`. |
 | **كل شاشة ترفض العمل والتنبيه التحذيري ظاهر** | لم يتم ربط تطبيق المصادقة. القسم ٦. |
 | **شاشة تقول إنك لا تملك صلاحية** | هذا الحساب فعلًا لا يملكها — راجعي جدول القسم ٧ واستخدمي الحساب المناسب. |
 | **`npm run seed:demo` يتوقف فورًا ويقول `DEMO_PASSWORD is not set`** | نافذة الأوامر هذه لا تحمل كلمة المرور. كرّري سطر `$env:DEMO_PASSWORD = (Read-Host ...)` في **نفس** النافذة. |
@@ -389,6 +417,7 @@ yarmouk insurance (Demo)
 | **`Port 3000 is in use` ثم `Another next dev server is already running`** | نسخة أخرى من النظام تعمل بالفعل. **المهم أن تعرفي أن الأمر كله يفشل، لا الواجهة وحدها**: يختار Next المنفذ 3001 ثم يرفض العمل، فيتوقف `turbo` ومعه الخدمة الخلفية — فلا تعملي على المنفذ القديم بافتراض أن كل شيء يعمل، لأن الخدمة الخلفية قد لا تكون قائمة. Next يطبع لك رقم العملية والأمر اللازم لإيقافها؛ نفّذيه ثم أعيدي `npm run dev`: `taskkill /PID <الرقم> /F` — ولإيقاف الخدمة الخلفية أيضًا إن بقيت: `netstat -ano \| findstr :4000` ثم نفس الأمر على رقمها. |
 | **أعدتُ تهيئة قاعدة بيانات الاختبار، والآن كل شيء يرفض العمل** | أمر `prisma migrate reset --force` **ينفّذ الترحيلات ولا ينفّذ تجهيز البيانات الأساسية**. فتبقى القاعدة بلا صلاحيات على الإطلاق، وكل طلب يُرفض — والمظهر يشبه خطأً في عملك، وهو ليس كذلك. **المؤشّر هو الصفر، لا رقمٌ بعينه.** عدد الصلاحيات وحده لا يكفي: قد تُجهَّز الصلاحيات دون إسناداتها، والتجهيز **لا يطبع عدد الإسنادات إطلاقاً** — فلا بدّ من سؤال القاعدة: `SELECT count(*) FROM "RolePermission"`. إن كان صفراً فنفّذي التجهيز صراحةً: من مجلد `packages/db` نفّذي `npx tsx prisma/seed.ts` بعد توجيه `DATABASE_URL` إلى قاعدة الاختبار، ثم أعيدي السؤال. وإن كان رقماً آخر غير صفر فهو ليس عيباً: القياس في ١٦/١٠/٢٠٢٦ أعطى ٢٢٧ صلاحية و٥٢٠ إسناداً على قاعدة التطوير وعلى قاعدة بُنيت من الصفر — **أما قاعدة الاختبار فأعلى من ذلك** (٥٣٨ إسناداً و٤٣ دوراً يوم القياس)، لأن اختبارات الطرف الطرفي تُنشئ أدواراً تتراكم فيها. |
 | **قاعدة البيانات لا تعمل** | افتحي Docker Desktop وتأكدي أن الحاوية `ibms-app-db-1` حالتها `healthy`، أو نفّذي `docker compose up -d db`. |
+| **Docker Desktop نفسه لا يبدأ** (أو `error during connect`) | **أولًا:** أغلقيه إغلاقًا تامًّا من أيقونة شريط المهام (زر الفأرة الأيمن ← Quit Docker Desktop)، انتظري نحو عشر ثوانٍ، ثم افتحيه من جديد — **إعادة فتح النافذة وحدها لا تكفي**، لأن الخدمة الخلفية `com.docker.backend` تبقى معلّقة كما هي. **ثانيًا:** إن بقي معلّقًا فالسبب الغالب على هذا الجهاز هو امتلاء القرص `C:` — فرّغي مساحة ثم أعيدي المحاولة؛ ملف Docker (`docker_data.vhdx`) يكبر ولا يصغر من تلقاء نفسه. (المساحة الحرة يوم ٢٥/١٠/٢٠٢٦: ٤٩ غيغابايت، فالمشكلة ليست قائمة الآن.) |
 
 ## ١١. ما لا يمكن فعله بعد — بصراحة
 
@@ -397,9 +426,15 @@ yarmouk insurance (Demo)
 1. **لا يمكن إنشاء مكتب ثانٍ من داخل النظام.** المكتبان الموجودان أنشأهما أمر التجهيز.
    لا توجد شاشة ولا واجهة لتسجيل مؤسسة جديدة، وصفحة إنشاء الحساب الأولى ترفض ذلك صراحةً
    وتقول السبب بدلًا من أن تفشل بصمت.
-2. **ثلاث صلاحيات يحملها حساب الإدارة ولا يستطيع استخدامها**، لعدم وجود شاشة لها:
-   - `customer.bulk-import` — استيراد العملاء بملف (الواجهة البرمجية موجودة، الشاشة لا).
-   - `email.integration.read` و `email.integration.manage` — ربط البريد الإلكتروني.
+2. ~~**ثلاث صلاحيات يحملها حساب الإدارة ولا يستطيع استخدامها**، لعدم وجود شاشة لها.~~
+   **صُحِّح في ٢٥/١٠/٢٠٢٦: العبارة صارت خاطئة — للثلاث شاشات الآن.** مقيسًا:
+   `customer.bulk-import` شاشتها `/settings/customer-import`، و`email.integration.read`
+   و`email.integration.manage` شاشتهما `/settings/email`؛ وكلتا الشاشتين موجودة كصفحة
+   **وكمقصد في قائمة التنقّل**، ويحمل `demo.officeAdmin` الصلاحيات الثلاث. **وتقرير
+   الاستيراد الدائم صار له شاشة أيضًا** (قرار المالكة ٤٣): كل استيراد سابق يُفتح من
+   سجلّ الاستيراد على الشاشة نفسها، بعد أن كانت نتيجته تُقرأ مرة واحدة ثم يتعطّل
+   العرض. العبارة الأصلية كانت صحيحة يوم كُتبت، وهي مذكورة هنا لأنها تفسّر سبب بناء
+   هذه الشاشات.
 3. **لا يوجد مفتاح أمان مادي (WebAuthn)** — وهذا سبب التنبيه في الخطوة ٨ من القسم ٦.
 4. **الشركة الموقوفة لا تُحذف** ولا يوجد حذف لشركة أو لدور — بالتصميم: السجل هو الدليل.
 5. **دليل الشركات للقراءة فقط** ولا يُظهر علاقات المكاتب الأخرى بالشركة — فقط أن الشركة
@@ -531,10 +566,18 @@ npm run dev
 
 **How to know it actually started:**
 
-- The website is ready in about **3 seconds** — the window prints `✓ Ready in 3.1s` and
-  `http://localhost:3000`.
-- The API is much slower: about **75 seconds** on this machine, because it compiles first.
-  Opening the site during that window may say it cannot reach the server. That is expected.
+- The website is ready first — about **20 seconds** — and the window prints
+  `✓ Ready in 19.1s` with `http://localhost:3000`.
+- The API is much slower: about **five minutes** on this machine, because it compiles
+  first. That is expected and nothing has broken. **Do not stop the command during that
+  window** — it is the likeliest moment for a healthy start to be killed.
+- **The proof it is alive** is two lines, in this order:
+  `Starting compilation in watch mode...`, then — about three and a quarter minutes later —
+  `Found 0 errors. Watching for file changes.`
+  Only at the second line does the API begin answering.
+  (Measured on this machine 2026-10-25: web 19.1s, compile 3m17s, and about five minutes
+  from `npm run dev` to `/health` answering. The old figure of 75 seconds was wrong by
+  four times over, in the direction that makes a working start look like a failure.)
 - The definitive check: open `http://localhost:4000/health/db`. `{"status":"ok"}` means the
   API is up **and** reaching the database. (`http://localhost:4000/health` proves only that
   the API process is alive.)
@@ -689,6 +732,24 @@ one asks for authenticator pairing on its first sign-in** — the same §6 steps
 leads, prospects, customers, policies and claims, and the only account that can **add a new
 customer**.
 
+**To walk the whole sidebar, sign in as `demo.manager@office-a.ibms.internal`**
+(role `BRANCH_DEPARTMENT_MANAGER`). Measured 2026-10-25: it is the **only account that
+opens all eleven groups**, at 49 of 84 screens — against 10 groups and 31 screens for
+`demo.sales`. If the question is *do I see every part of the system*, this is the account;
+if it is *can I work a full day*, it is `demo.sales`.
+
+**No group is hidden from it — but three are thin inside**, which is permissions and not a
+fault: Privacy & data protection is 1 screen of 9, Compliance & risk 4 of 12, and
+Administration 4 of 13. Who fills them, measured: `sample.dpo` opens Privacy 9 of 9,
+`demo.compliance` opens Compliance 12 of 12, `demo.officeAdmin` opens Administration 9 of
+12, `demo.finance` opens Finance 6 of 6, and `sample.exec` opens Performance 7 of 7.
+
+> **Why `sample.` for two of them?** Because **there is no `demo.` account for the Data
+> Protection Officer or for Executive Management** — measured on the first office: nine
+> `demo.` accounts, and neither of those two roles is among them. So
+> `sample.dpo@ibms.internal` and `sample.exec@ibms.internal` are the only way in, and both
+> cost the two steps described at the top of this section.
+
 ## 8. What the administrator can do that nobody else can, and where
 
 | Task | Where | Sidebar group |
@@ -702,10 +763,13 @@ customer**.
 | **Register an insurer** (catalogue or local), edit it, **deactivate** it | `Insurers` → `/insurers` | New business |
 | **Search the cross-office directory** | `Insurer directory` → `/insurer-directory` | New business |
 
-> **The departments-and-branches screen starts empty, and that is not a fault.** Measured
-> 2026-10-16: the database holds **0** branches and **0** departments across every organization, and
-> `seed:demo` creates no branch at all. So if you want to see the branch filter on the employees
-> screen working, create one branch here first — one is enough.
+> **The departments-and-branches screen no longer starts empty.** ~~Measured 2026-10-16: the
+> database holds **0** branches and **0** departments across every organization, and `seed:demo`
+> creates no branch at all.~~ **Corrected 2026-10-25:** dev measures **1 branch and 1 department
+> per organization** — all six of them, not just the first. A sweep added 2026-10-19 closed it by
+> walking every organization rather than naming ids, which is why it reached the two insurance
+> companies and `goglobal` too. So the branch filter on the employees screen works without your
+> creating anything — and if you want a second branch, this is where.
 >
 > Note that "branch" means two different things in this system. A branch here is a **physical
 > location** of the office. The **CBJ-approval branches** on an employee's record are **insurance
@@ -787,7 +851,7 @@ for holding policies.
 | What you see | Why, and what to do |
 |---|---|
 | **I entered the correct code from the app and it says the code is wrong** | If this happens **before** you paired the app yourself, the account was carrying an authenticator registration created inside the seeding tool that nobody ever saw — so every code you type genuinely is wrong server-side, however correct it is in your app. Fix: `npm run demo:release -w api`, then sign in again and you will be asked to pair. If it happens **after** pairing, the usual cause is the phone's clock not being set automatically, or the number changing mid-typing. |
-| **The site says it cannot reach the server** | The API has not finished starting (~75 s). Check `http://localhost:4000/health/db`. |
+| **The site says it cannot reach the server** | The API has not finished starting — **about five minutes** on this machine, not 75 seconds (measured 2026-10-25). Wait for `Found 0 errors.` in the command window, then check `http://localhost:4000/health/db`. |
 | **Every screen refuses and the warning banner is showing** | The authenticator is not paired. See §6. |
 | **A screen says you lack a permission** | That account genuinely lacks it — check the §7 table and use the right account. |
 | **`npm run seed:demo` stops immediately with `DEMO_PASSWORD is not set`** | That window does not carry the password. Repeat the `$env:DEMO_PASSWORD = (Read-Host ...)` line in the **same** window. |
@@ -795,6 +859,7 @@ for holding policies.
 | **`Port 3000 is in use`, then `Another next dev server is already running`** | Another copy is already running. **The part worth knowing is that the whole command fails, not just the website**: Next picks port 3001, then refuses, and `turbo` brings the API task down with it — so do not carry on against the old port assuming everything is up, because the API may not be. Next prints the PID and the exact command to stop it; run that, then `npm run dev` again: `taskkill /PID <pid> /F`. If an API is also left behind, find it with `netstat -ano \| findstr :4000` and stop that PID the same way. |
 | **I reset the test database and now everything refuses me** | `prisma migrate reset --force` **runs the migrations and does NOT run the seed.** The database is left with no permission grants at all, so every request is refused — and it looks exactly like something you broke, which it is not. **The signal is ZERO, not a particular number.** The permission count alone is not enough — permissions can seed while grants do not — and the seed **never prints a grant count at all**, so you have to ask the database: `SELECT count(*) FROM "RolePermission"`. If it is 0, run the seed explicitly: from `packages/db`, point `DATABASE_URL` at the test database, run `npx tsx prisma/seed.ts`, and ask again. **Any other number is not a fault.** Measured 2026-10-16: 227 permissions and 520 grants on dev and on a database built from nothing — and **the test database is higher** (538 grants across 43 roles that day), because the end-to-end tests create roles and it is cumulative. |
 | **The database is not running** | In Docker Desktop, confirm `ibms-app-db-1` is `healthy`, or run `docker compose up -d db`. |
+| **Docker Desktop itself will not start** (or `error during connect`) | **First:** quit it completely from the tray icon (right-click -> Quit Docker Desktop), wait about ten seconds, and open it again — **relaunching the window alone is not enough**, because the `com.docker.backend` service stays stuck as it was. **Second:** if it is still stuck, the usual cause on this machine is a full `C:` drive — free some space and try again; Docker's own file (`docker_data.vhdx`) grows and never shrinks by itself. (Free space on 2026-10-25: 49 GB, so this is not the problem today.) |
 
 ## 11. What you cannot do yet — honestly
 
@@ -805,11 +870,15 @@ for them:
    created by the seeding tool. There is no screen and no API for registering a new
    organisation, and the initial sign-up page refuses explicitly and says why rather than
    failing silently.
-2. **Three permissions the administrator holds and cannot exercise**, because no screen
-   exists for them:
-   - `customer.bulk-import` — importing customers from a file (the API exists, the screen
-     does not).
-   - `email.integration.read` and `email.integration.manage` — email integration.
+2. ~~**Three permissions the administrator holds and cannot exercise**, because no screen
+   exists for them.~~ **Corrected 2026-10-25: that is now false — all three have
+   screens.** Measured: `customer.bulk-import` has `/settings/customer-import`, and
+   `email.integration.read` / `email.integration.manage` have `/settings/email`; both
+   exist as pages **and as destinations in the navigation**, and `demo.officeAdmin` holds
+   all three codes. **The durable import report has a screen too** (owner decision 43):
+   every past import opens from the import register on that same screen, where its result
+   used to be readable once and then threw. The original sentence was true when written,
+   and is kept here because it is what explains why those screens were built.
 3. **No physical security key (WebAuthn)** — which is why the banner in §6 step 8 stays.
 4. **A deactivated insurer is never deleted**, and neither insurers nor roles can be
    deleted — by design: the record is the evidence.
