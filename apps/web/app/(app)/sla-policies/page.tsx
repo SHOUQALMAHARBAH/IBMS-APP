@@ -173,7 +173,9 @@ export default function SlaPoliciesPage() {
             disabled={busy}
             style={{ fontWeight: s === status ? 700 : 400 }}
           >
-            {s}
+            {s === 'ALL'
+              ? t('slaPolFilterAll')
+              : t(ENUM_LABEL.SlaPolicyStatus[s])}
           </button>
         ))}
       </div>

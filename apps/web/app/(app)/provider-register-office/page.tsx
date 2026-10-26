@@ -5,6 +5,7 @@ import { useAuth } from '../../../lib/auth/auth-context';
 import { ApiError } from '../../../lib/auth/api-client';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
@@ -474,8 +475,12 @@ export default function RegisterBrokerageOfficePage() {
                 onChange={(e) => set('brokerageKind')(e.target.value)}
                 style={{ width: '100%' }}
               >
-                <option value="DIRECT">DIRECT</option>
-                <option value="REINSURANCE">REINSURANCE</option>
+                <option value="DIRECT">
+                  {t(ENUM_LABEL.BrokerageKind.DIRECT)}
+                </option>
+                <option value="REINSURANCE">
+                  {t(ENUM_LABEL.BrokerageKind.REINSURANCE)}
+                </option>
               </select>
               {/*
                 * DECLARED ON SCREEN, because the field is collected and carries no consequence.

@@ -4,6 +4,7 @@ import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import {
   addInsuranceLine,
@@ -210,8 +211,12 @@ export default function InsuranceLinesPage() {
                   }))
                 }
               >
-                <option value="GENERAL">GENERAL</option>
-                <option value="LIFE">LIFE</option>
+                <option value="GENERAL">
+                  {t(ENUM_LABEL.InsuranceLineCategory.GENERAL)}
+                </option>
+                <option value="LIFE">
+                  {t(ENUM_LABEL.InsuranceLineCategory.LIFE)}
+                </option>
               </select>
             </label>
             <button
@@ -296,8 +301,12 @@ export default function InsuranceLinesPage() {
                           }))
                         }
                       >
-                        <option value="GENERAL">GENERAL</option>
-                        <option value="LIFE">LIFE</option>
+                        <option value="GENERAL">
+                          {t(ENUM_LABEL.InsuranceLineCategory.GENERAL)}
+                        </option>
+                        <option value="LIFE">
+                          {t(ENUM_LABEL.InsuranceLineCategory.LIFE)}
+                        </option>
                       </select>
                     ) : (
                       l.category

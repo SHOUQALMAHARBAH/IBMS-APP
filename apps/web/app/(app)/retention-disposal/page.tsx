@@ -1571,7 +1571,7 @@ export default function RetentionDisposalPage() {
                         )}
                       </td>
                       <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>
-                      <td style={cell}>{h.isActive ? 'Active' : t('rdReleased')}</td>
+                      <td style={cell}>{h.isActive ? t('rdHoldInForce') : t('rdReleased')}</td>
                       <td style={cell}>
                         {canManageHolds && h.isActive ? (
                           <div style={{ display: 'flex', gap: '0.35rem' }}>

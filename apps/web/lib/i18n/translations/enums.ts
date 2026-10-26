@@ -170,6 +170,9 @@ export const ENUMS = {
     matchStatusCleared: 'مستبعد',
     matchStatusConfirmed: 'مؤكَّد',
     // SlaPolicyStatus
+    // «الكل» copied from `insFilterAll`, for the FILTER's ALL pseudo-member — which
+    // is not an enum member, so `ENUM_LABEL.SlaPolicyStatus` has no slot for it.
+    slaPolFilterAll: 'الكل',
     slaPolStatusDraft: 'مسودة',
     slaPolStatusActive: 'سارية',
     slaPolStatusInactive: 'غير سارية',
@@ -476,6 +479,7 @@ export const ENUMS = {
     matchStatusCleared: 'Cleared',
     matchStatusConfirmed: 'Confirmed',
     // SlaPolicyStatus
+    slaPolFilterAll: 'All',
     slaPolStatusDraft: 'Draft',
     slaPolStatusActive: 'Active',
     slaPolStatusInactive: 'Inactive',

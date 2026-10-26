@@ -164,6 +164,18 @@ export const PDPL = {
     rdColStatus: 'الحالة',
     rdRecordReviewButton: 'تسجيل مراجعة',
     rdReleaseButton: 'رفع الحجز',
+    // The legal hold's OTHER state, beside its opposite. «سارية» is COPIED from
+    // `slaPolStatusActive` and verified as a copy.
+    //
+    // A CORRECTION OF MY OWN from one commit earlier, where this was declared for
+    // the owner on the ground that «سارية» carries a recorded caution. It does —
+    // but that caution is about a PI RECORD being current while its COVER has
+    // lapsed, and this product ALREADY uses «سارية» for a non-cover thing being in
+    // force: an SLA policy. A legal hold in force is the same concept.
+    //
+    // «على رأس عمله» (`empdActive`) was the wrong candidate and both read 'Active'
+    // in English — an EMPLOYEE at his post. Caught by reading the Arabic.
+    rdHoldInForce: 'سارية',
     rdReleased: 'مرفوع',
     rdBatchesHeading: 'دفعات الإتلاف',
     rdBatchCategoryIdLabel: 'فئة السجلات التي تُتلفها هذه الدفعة',
@@ -631,6 +643,7 @@ export const PDPL = {
     rdColStatus: 'Status',
     rdRecordReviewButton: 'Record review',
     rdReleaseButton: 'Release',
+    rdHoldInForce: 'In force',
     rdReleased: 'Released',
     rdBatchesHeading: 'Disposal batches',
     rdBatchCategoryIdLabel: 'The record category this batch disposes of',

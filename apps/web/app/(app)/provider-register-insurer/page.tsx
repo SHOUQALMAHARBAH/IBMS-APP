@@ -5,6 +5,7 @@ import { useAuth } from '../../../lib/auth/auth-context';
 import { ApiError } from '../../../lib/auth/api-client';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
@@ -463,10 +464,18 @@ export default function RegisterInsuranceCompanyPage() {
                 onChange={(e) => set('integrationMethod')(e.target.value)}
                 style={{ width: '100%' }}
               >
-                <option value="EMAIL">EMAIL</option>
-                <option value="PORTAL">PORTAL</option>
-                <option value="API">API</option>
-                <option value="MANUAL">MANUAL</option>
+                <option value="EMAIL">
+                  {t(ENUM_LABEL.IntegrationMethod.EMAIL)}
+                </option>
+                <option value="PORTAL">
+                  {t(ENUM_LABEL.IntegrationMethod.PORTAL)}
+                </option>
+                <option value="API">
+                  {t(ENUM_LABEL.IntegrationMethod.API)}
+                </option>
+                <option value="MANUAL">
+                  {t(ENUM_LABEL.IntegrationMethod.MANUAL)}
+                </option>
               </select>
             </label>
             {text('apiEndpoint', t('regInsApiEndpoint'))}

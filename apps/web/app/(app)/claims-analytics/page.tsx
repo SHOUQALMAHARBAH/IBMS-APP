@@ -96,7 +96,7 @@ export default function ClaimsAnalyticsPage() {
         >
           {LOSS_RATIO_GROUP_BY.map((g) => (
             <option key={g} value={g}>
-              {GROUP_LABEL_KEY[g]}
+              {t(GROUP_LABEL_KEY[g])}
             </option>
           ))}
         </select>
@@ -117,7 +117,7 @@ export default function ClaimsAnalyticsPage() {
               <thead>
                 <tr>
                   <th style={{ ...headCellStyle, textAlign: 'start' }}>
-                    {GROUP_LABEL_KEY[data.groupBy]}
+                    {t(GROUP_LABEL_KEY[data.groupBy])}
                   </th>
                   <th style={headCellStyle}>{t('claLossRatio')}</th>
                   <th style={headCellStyle}>{t('claClaimsPaid')}</th>

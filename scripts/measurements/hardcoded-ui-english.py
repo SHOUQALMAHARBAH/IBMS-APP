@@ -341,25 +341,21 @@ DECLARED_PARENTHETICALS = {
     'apps/web/components/policy/PolicySection.tsx|Checked by',
     'apps/web/components/policy/PolicySection.tsx|receipt acknowledged',
     # ------------------------------------------------------------------------------------------
-    # THE TWELFTH, from masking attribute values rather than skipping the line.
+    # THE TWELFTH WAS DECLARED HERE AND IS NOW DERIVED — the row is gone, and the
+    # correction is recorded because it ran the wrong way for one commit.
     #
-    # Five of the six that surfaced were fixed with copy that already shipped.
-    # This one is not derivable and the reason is a CAUTION this repository already
-    # carries. It is a LEGAL HOLD's state — in force, versus released, which is
-    # `rdReleased` on the other branch of the same ternary.
+    # `/retention-disposal`'s `'Active'` is a LEGAL HOLD's state. It was declared
+    # for the owner on the ground that «سارية» carries a standing instruction not
+    # to reach for it. That instruction is real and it is NARROWER than I read it:
+    # it is about a PI RECORD being current while its COVER has lapsed. This
+    # product already uses «سارية» for a non-cover thing being in force —
+    # `slaPolStatusActive`, for an SLA policy — and a legal hold in force is the
+    # same concept, so it is `rdHoldInForce` now, copied from there and sitting
+    # beside its own opposite `rdReleased`.
     #
-    #   * «على رأس عمله» (`empdActive`) is the wrong word: it means an EMPLOYEE is
-    #     at his post. Caught by reading the Arabic rather than the English, which
-    #     both read 'Active'.
-    #   * «سارية» ships only inside prose and `dpolActivePolicies` («الوثائق
-    #     السارية»), and `common.ts` carries an explicit standing instruction NOT
-    #     to reach for it — it speaks about COVER being in force, which is why
-    #     `statusRecordCurrent` is «الحالية» and not «سارية».
-    #
-    # A legal hold is a court or regulator instruction that records may not be
-    # destroyed, so its two states are a wording judgement in a legal context —
-    # hers, not a slice.
-    'retention-disposal|Active',
+    # Declaring a word that was derivable is a smaller mistake than writing one
+    # that was not, and a larger one than it looks: it puts an errand on her list
+    # that was never hers. Measured both ways, which is what found it.
     # ------------------------------------------------------------------------------------------
     # FAILURE MODE 8's FINDINGS, DECLARED 2026-10-24. NEW DECLARATIONS WITH THEIR OWN REASON —
     # NOT survivors of the nine parentheticals, which were emptied from this very set in the same
