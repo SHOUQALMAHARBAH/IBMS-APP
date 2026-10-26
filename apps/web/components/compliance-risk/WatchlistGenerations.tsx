@@ -152,7 +152,7 @@ export function WatchlistGenerations() {
                   <td style={cell}>{d.version}</td>
                   <td style={cell}>
                     <span data-testid={`generation-status-${d.id}`}>
-                      {d.status}
+                      {t(ENUM_LABEL.DatasetVersionStatus[d.status])}
                     </span>
                     {d.rollbackReason && (
                       <div style={muted}>

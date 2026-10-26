@@ -81,6 +81,32 @@ MACHINE = re.compile(
     r'process\.env|console\.|new RegExp)'
 )
 CODE_PREFIX = ('//', '*', '/*', 'import ', 'export type', 'type ', 'interface ', 'const ', 'let ')
+# ATTRIBUTE VALUES ARE MASKED, NOT SKIPPED — the largest blind spot this script has
+# had, larger than the component root.
+#
+# `MACHINE.search(s)` discarded the WHOLE LINE on `style=`, `className`, `key=`,
+# `aria-*` or a `data-testid` — and in this codebase nearly every rendered table
+# cell is `<td style={cell}>…</td>`. Measured: **5,218 non-blank lines, 10.7% of
+# the web tree, were skipped whole, and 1,233 of those also carried a text
+# position.** So twelve patterns were blind to the text beside an attribute.
+#
+# This is mode 2's own principle, never applied to attributes: *a line that is
+# half translated has its untranslated half examined rather than being skipped
+# whole.* Masking leaves the `MACHINE` guard meaningful — a line that is NOTHING
+# but machinery still goes, because after masking there is nothing left to match.
+#
+# ONE level of nested braces, which covers `style={{ marginTop: '1rem' }}`.
+# Adopting it moved the figure 16 -> 22 with no false positive among the six, every
+# one read by hand: a yes/no cell on /audit-trail, three `Reason:`/`Status:` label
+# prefixes, and the owner's own «نصه عربي و نصه انج» on /retention-disposal — a
+# mode-9 ternary sitting inside a `<td style={cell}>`.
+ATTR_BRACE = re.compile(r'\b[A-Za-z-]+=\{(?:[^{}]|\{[^{}]*\})*\}')
+ATTR_QUOTED = re.compile(r'\b[A-Za-z-]+=("(?:[^"]*)"|\'(?:[^\']*)\')')
+
+
+def mask_attributes(line):
+    """Replace `name={…}` and `name="…"` with a placeholder, keeping positions sane."""
+    return ATTR_QUOTED.sub('ATTR', ATTR_BRACE.sub('ATTR', line))
 # Two or more words starting with a capital, after ANY boundary that can precede JSX text — including a
 # BACKTICK, which failure mode 3 missed.
 PROSE = re.compile(r'(?:^|[>`]|\}\s|\{\'|\{"|\{`)\s*([A-Z][a-z]+(?:\s+[A-Za-z()—-]+){1,})')
@@ -227,6 +253,27 @@ NOT_A_LABEL = {
 # keeps format strings out: `'yyyy-MM-dd'` carries hyphens and cannot match, and `','` and
 # `' '` are under the three-letter floor.
 TERNARY_TEXT = re.compile(r"^\{[^{}]*\?[^{}]*:[^{}]*\}$")
+# FAILURE MODE 12 — the same shape as 8, INLINE in a tag on one line:
+# `<td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>`.
+#
+# Mode 8 requires the line to be ENTIRELY a brace expression, which was an
+# APPROXIMATION of 'this is a text position' — a good one for a multi-line JSX
+# child and blind to a one-line cell. A brace expression sitting BETWEEN `>` and
+# `<` is unambiguously text, which is the same discriminator stated exactly
+# rather than approximately, and it admits no attribute.
+#
+# ITS FLOOR IS TWO CHARACTERS, not three. Mode 8's three-character floor keeps
+# format strings out — and `'No'` is two, so the pair never reached the
+# two-literal threshold and `'Yes'` alone was below it. Four pairs were invisible
+# for that reason: /consent, /employees and /transaction-monitoring twice, every
+# one a yes/no column. Two characters is safe HERE because the position is exact
+# rather than approximated, so there is no attribute value to mistake.
+#
+# Found by READING a line the raw-value report pointed at, not by this script:
+# `{r.purpose}` was the finding and `{r.isMarketing ? 'Yes' : 'No'}` was on the
+# next line down.
+TERNARY_INLINE = re.compile(r">\s*(\{[^{}]*\?[^{}]*:[^{}]*\})\s*<")
+TERNARY_LITERAL_2 = re.compile(r"'([A-Za-z]{2,}[A-Za-z ]{0,40})'")
 TERNARY_LITERAL = re.compile(r"'([A-Za-z]{3,}[A-Za-z ]{0,40})'")
 
 DECLARED_PARENTHETICALS = {
@@ -293,6 +340,26 @@ DECLARED_PARENTHETICALS = {
     'apps/web/components/policy/EndorsementSection.tsx|commission reversal',
     'apps/web/components/policy/PolicySection.tsx|Checked by',
     'apps/web/components/policy/PolicySection.tsx|receipt acknowledged',
+    # ------------------------------------------------------------------------------------------
+    # THE TWELFTH, from masking attribute values rather than skipping the line.
+    #
+    # Five of the six that surfaced were fixed with copy that already shipped.
+    # This one is not derivable and the reason is a CAUTION this repository already
+    # carries. It is a LEGAL HOLD's state — in force, versus released, which is
+    # `rdReleased` on the other branch of the same ternary.
+    #
+    #   * «على رأس عمله» (`empdActive`) is the wrong word: it means an EMPLOYEE is
+    #     at his post. Caught by reading the Arabic rather than the English, which
+    #     both read 'Active'.
+    #   * «سارية» ships only inside prose and `dpolActivePolicies` («الوثائق
+    #     السارية»), and `common.ts` carries an explicit standing instruction NOT
+    #     to reach for it — it speaks about COVER being in force, which is why
+    #     `statusRecordCurrent` is «الحالية» and not «سارية».
+    #
+    # A legal hold is a court or regulator instruction that records may not be
+    # destroyed, so its two states are a wording judgement in a legal context —
+    # hers, not a slice.
+    'retention-disposal|Active',
     # ------------------------------------------------------------------------------------------
     # FAILURE MODE 8's FINDINGS, DECLARED 2026-10-24. NEW DECLARATIONS WITH THEIR OWN REASON —
     # NOT survivors of the nine parentheticals, which were emptied from this very set in the same
@@ -366,7 +433,9 @@ def findings(src):
     """[(line_no, text)] for user-facing English in this source. Comments are masked first."""
     out = []
     lines = mask_comments(src).split('\n')
-    for i, raw in enumerate(lines, 1):
+    for i, line_src in enumerate(lines, 1):
+        # The attributes go first; what is LEFT is what a reader sees.
+        raw = mask_attributes(line_src)
         s = raw.strip()
         if s.startswith(CODE_PREFIX):
             continue
@@ -413,6 +482,19 @@ def findings(src):
                 # false positive survives: the line is on the list either way.
                 if re.search(
                         r'(?:===|!==|==|!=)\s*' + re.escape("'" + text + "'"), line):
+                    continue
+                text = text.strip()
+                if (text.split()[0].lower() not in NOT_BARE_COPY
+                        and not ALLOW.match(text)
+                        and (i, text) not in out):
+                    out.append((i, text))
+        # FAILURE MODE 12 — the same shape as 8, inline between `>` and `<`.
+        for mo in TERNARY_INLINE.finditer(raw):
+            expr = mo.group(1)
+            if T_CALL.search(expr) or 'ENUM_LABEL' in expr:
+                continue
+            for text in TERNARY_LITERAL_2.findall(expr):
+                if re.search(r'(?:===|!==|==|!=)\s*' + re.escape("'" + text + "'"), expr):
                     continue
                 text = text.strip()
                 if (text.split()[0].lower() not in NOT_BARE_COPY
@@ -621,6 +703,41 @@ def self_test():
             # person, and this repository deliberately keys assertions on them.
             'a data-* test hook is not rendered copy',
             "          <td data-hr-link={u.employeeId ? 'linked' : 'none'}>\n",
+            False,
+        ),
+        (
+            'a style= attribute no longer discards the text beside it',
+            "        <div style={cardMetaStyle}>Reason: {opportunity.dismissReason}</div>\n",
+            True,
+        ),
+        (
+            'nor does a nested style object',
+            "        <div style={{ marginTop: '1rem' }}>Checked by {x}</div>\n",
+            True,
+        ),
+        (
+            'a line that is NOTHING but machinery still goes',
+            '        <div className="row" data-testid="Some Thing" />\n',
+            False,
+        ),
+        (
+            'failure mode 12 — a yes/no ternary INLINE in a table cell',
+            "        <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>\n",
+            True,
+        ),
+        (
+            'failure mode 12 — lower case, which the 3-character floor also missed',
+            "        <td style={cell}>{r.reportedToAuthorityAt ? 'yes' : 'no'}</td>\n",
+            True,
+        ),
+        (
+            'the same cell translated is clean',
+            "        <td style={cell}>{r.isMarketing ? t('commonYes') : t('commonNo')}</td>\n",
+            False,
+        ),
+        (
+            'an ATTRIBUTE holding the same ternary is not rendered copy',
+            "        <div data-marketing={r.isMarketing ? 'Yes' : 'No'} />\n",
             False,
         ),
         (

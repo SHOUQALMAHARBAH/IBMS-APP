@@ -89,18 +89,30 @@ VOCAB = re.compile(r"(?:const|let)\s+([A-Z][A-Z0-9_]*)\s*(?::[^=]*)?=\s*\[([^\]]
 
 
 def enum_fields():
-    """field name -> the enum(s) it carries, derived from the schema."""
+    """field name -> (enum types it carries, EVERY type it carries).
+
+    BOTH, because a field NAME is not a type. `scope` is `PermissionScope` on
+    `Permission` and a free-text `String` on `LegalHold` — "description / entity
+    reference under hold" — and `purpose` is `ConsentPurpose` on `ConsentRecord`
+    and a `String` on `RopaEntry`. Rendering free text raw is CORRECT: it is the
+    office's own words. Keyed on the enum half alone, four of eleven findings were
+    false positives, and the figure had already been reported.
+    """
     src = io.open(SCHEMA, encoding='utf-8').read()
     enums = set(re.findall(r'^enum\s+(\w+)\s*\{', src, re.M))
-    out = {}
+    as_enum, as_any = {}, {}
     for block in re.findall(r'^model\s+\w+\s*\{(.*?)^\}', src, re.M | re.S):
         for line in block.splitlines():
             # `(?:\s|$)` and not `\s`: a field whose type ends the line has no trailing
             # space, and requiring one read 13 field names where there are 44.
             m = re.match(r'\s{2}(\w+)\s+(\w+)(\[\])?\??(?:\s|$)', line)
-            if m and m.group(2) in enums:
-                out.setdefault(m.group(1), set()).add(m.group(2))
-    return enums, out
+            if not m:
+                continue
+            name, typ = m.group(1), m.group(2)
+            as_any.setdefault(name, set()).add(typ)
+            if typ in enums:
+                as_enum.setdefault(name, set()).add(typ)
+    return enums, as_enum, as_any
 
 
 def labelled():
@@ -117,7 +129,7 @@ def tsx_files():
 
 
 def main():
-    enums, fields = enum_fields()
+    enums, fields, all_types = enum_fields()
     if len(fields) < 30:
         sys.stderr.write(
             'REFUSING: parsed only %d enum-bearing field names from the schema. '
@@ -149,8 +161,15 @@ def main():
                 if '.' not in expr:
                     continue
                 tail = expr.split('.')[-1].split('[')[0]
-                if tail in fields:
-                    shape_a.setdefault(rel, []).append((i, expr, sorted(fields[tail])))
+                if tail not in fields:
+                    continue
+                # A NAME USED FOR BOTH AN ENUM AND A STRING cannot be resolved from
+                # text. Reported as such rather than as an enum render, because
+                # rendering free text raw is correct and calling it a defect is the
+                # cry-wolf direction.
+                plain = sorted(all_types[tail] - enums)
+                shape_a.setdefault(rel, []).append(
+                    (i, expr, sorted(fields[tail]), plain))
 
         vocabs = {}
         for m in VOCAB.finditer(src):
@@ -184,13 +203,18 @@ def main():
     ambiguous = set()
     for rel in sorted(shape_a):
         print('  %s' % rel)
-        for line, expr, es in shape_a[rel]:
+        for line, expr, es, plain in shape_a[rel]:
             # A FIELD NAME IS NOT AN ENUM. `status` carries 23 different enums across
             # the schema and this script reads TEXT, not types, so which one a given
             # render resolves to is beyond it. Listing all 23 would overstate the
             # question and make the row unreadable; the limit is stated instead, and
             # the row still names the line to go and look at.
-            if len(es) > 3:
+            if plain:
+                mark = ('AMBIGUOUS BY TYPE — `%s` is also a plain %s on another model, '
+                        'where rendering it raw is CORRECT' % (
+                            expr.split('.')[-1], '/'.join(plain)))
+                ambiguous.add(expr.split('.')[-1])
+            elif len(es) > 3:
                 mark = ('AMBIGUOUS — `%s` carries %d different enums; which one depends '
                         'on the model, which this script cannot see' % (
                             expr.split('.')[-1], len(es)))
@@ -220,8 +244,8 @@ def main():
     print()
     print('ENUMS RENDERED RAW THAT ALREADY HAVE AN ARABIC LABEL — no new words needed,')
     print('the screen simply does not use them:')
-    already = sorted({e for rows in shape_a.values() for _l, _x, es in rows
-                      if len(es) <= 3 for e in es if e in have_label})
+    already = sorted({e for rows in shape_a.values() for _l, _x, es, plain in rows
+                      if not plain and len(es) <= 3 for e in es if e in have_label})
     for e in already:
         print('    %s' % e)
     print()
@@ -231,7 +255,7 @@ def main():
     print()
     if ambiguous:
         print()
-        print('FIELD NAMES THIS SCRIPT CANNOT RESOLVE TO ONE ENUM — read the line:')
+        print('FIELD NAMES THIS SCRIPT CANNOT RESOLVE — read the line, not the count:')
         for f in sorted(ambiguous):
             print('    %s' % f)
         print()

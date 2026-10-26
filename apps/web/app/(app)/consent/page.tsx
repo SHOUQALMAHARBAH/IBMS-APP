@@ -347,7 +347,7 @@ export default function ConsentPage() {
                       )}
                     </td>
                     <td style={cell}>{r.purpose}</td>
-                    <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>
+                    <td style={cell}>{r.isMarketing ? t('commonYes') : t('commonNo')}</td>
                     <td style={cell}>{r.granted ? t('consStatusGranted') : t('consStatusDeclined')}</td>
                     <td style={cell}>
                       {r.withdrawnAt

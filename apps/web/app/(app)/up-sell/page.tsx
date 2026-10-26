@@ -99,7 +99,7 @@ function RecommendationRow({
         })}
       </div>
       {recommendation.status === 'DISMISSED' && recommendation.dismissReason ? (
-        <div style={cardMetaStyle}>Reason: {recommendation.dismissReason}</div>
+        <div style={cardMetaStyle}>{t('commonReasonLabel')} {recommendation.dismissReason}</div>
       ) : null}
 
       {recommendation.status === 'OPEN' && canConvert ? (

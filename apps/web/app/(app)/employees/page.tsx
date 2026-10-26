@@ -584,7 +584,7 @@ export default function EmployeesPage() {
                   <td style={cell}>{row.position ?? '—'}</td>
                   <td style={cell}>{row.licensedRole ?? '—'}</td>
                   <td style={cell}>{row.hireDate?.slice(0, 10) ?? '—'}</td>
-                  <td style={cell}>{row.terminationDate ? 'Yes' : 'No'}</td>
+                  <td style={cell}>{row.terminationDate ? t('commonYes') : t('commonNo')}</td>
                   <td style={cell}>
                     <Link href={`/employees/${row.id}`}>{t('empViewButton')}</Link>
                   </td>

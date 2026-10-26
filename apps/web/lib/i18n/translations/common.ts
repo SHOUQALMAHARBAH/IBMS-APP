@@ -198,6 +198,10 @@ export const COMMON = {
     discardActionError: 'تعذّر سحب السجل. حاول مرة أخرى.',
     discardedBadge: 'مسحوب — أُنشئ بالخطأ',
     discardedOn: 'سُحب في {when}',
+    // The generic sibling of `commonStatusLabel`, value copied from
+    // `discardedReasonLabel` below — whose NAME is discard-specific while its
+    // value is not, and three screens render this prefix with no discard in sight.
+    commonReasonLabel: 'السبب:',
     discardedReasonLabel: 'السبب:',
     // /settings/duty-segregation — Part 4 step 4. Prefixed `dutyMode*`, NOT `dutySeg*`: the readiness list
     // on /settings/roles already owns that prefix (Part 5), and the i18n guard refused the collision — which
@@ -413,6 +417,7 @@ export const COMMON = {
     discardActionError: 'Could not withdraw the record. Try again.',
     discardedBadge: 'Withdrawn — raised in error',
     discardedOn: 'Withdrawn on {when}',
+    commonReasonLabel: 'Reason:',
     discardedReasonLabel: 'Reason:',
     // /settings/duty-segregation — Part 4 step 4.
     dutyModeHeading: 'Separation of duties',

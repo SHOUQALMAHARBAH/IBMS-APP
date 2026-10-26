@@ -81,7 +81,7 @@ export default function ProspectProfilePage() {
           <h1>
             <bdi>{prospect.companyName}</bdi>
           </h1>
-          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.ProspectStatus[prospect.status])}</p>
+          <p style={{ opacity: 0.8 }}>{t('commonStatusLabel')} {t(ENUM_LABEL.ProspectStatus[prospect.status])}</p>
           <div style={profileGridStyle}>
             <ProfileField label={t('prosdColSector')} value={prospect.sector} />
             <ProfileField label={t('prosdColActivity')} value={prospect.activity} />

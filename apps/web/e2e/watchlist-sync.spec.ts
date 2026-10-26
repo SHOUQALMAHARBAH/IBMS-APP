@@ -177,10 +177,29 @@ test("lists every generation and marks which one screening runs against", async 
 
   await page.goto("/watchlist-sync");
   await expect(page.getByTestId("watchlist-generations")).toBeVisible();
+  // RE-POINTED 2026-10-27, and the reversal is the point rather than a test detail:
+  // this asserted the raw member names `PUBLISHED` and `SUPERSEDED`, which WAS the
+  // defect. `DatasetVersionStatus` has carried a full Arabic label set all along
+  // and this cell rendered none of it, one line below a cell that correctly uses
+  // `ENUM_LABEL.WatchlistSource`. The property the test is about — which generation
+  // screening runs against — is unchanged and is now asserted on the words a reader
+  // actually sees.
   await expect(page.getByTestId("generation-status-ver-1")).toHaveText(
-    "PUBLISHED",
+    "Published",
   );
   await expect(page.getByTestId("generation-status-ver-old")).toHaveText(
+    "Superseded",
+  );
+  // And the member name is GONE FROM THE CELL, which is the half that would pass
+  // again if the label were dropped. SCOPED to the cell and not the section: the
+  // section's own intro paragraph legitimately names the state in prose — "The
+  // PUBLISHED one is what screening runs against right now" — and a section-wide
+  // absence failed on correct code because of it. The recorded rule, paid for
+  // again: scope an absence to the element it is about.
+  await expect(page.getByTestId("generation-status-ver-1")).not.toContainText(
+    "PUBLISHED",
+  );
+  await expect(page.getByTestId("generation-status-ver-old")).not.toContainText(
     "SUPERSEDED",
   );
 });

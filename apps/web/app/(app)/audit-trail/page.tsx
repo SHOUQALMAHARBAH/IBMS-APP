@@ -187,7 +187,7 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                   */}
                   <bdi>{r.actorName}</bdi>
                 </td>
-                <td style={cell}>{r.isSensitiveDataAccess ? 'Yes' : ''}</td>
+                <td style={cell}>{r.isSensitiveDataAccess ? t('commonYes') : ''}</td>
               </tr>
             ))
           )}

@@ -4,6 +4,7 @@ import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
@@ -280,7 +281,7 @@ export default function CompanyRecordPage() {
                       <tr key={line.code}>
                         <td style={tdStyle}>{line.code}</td>
                         <td style={tdStyle}>{named(line)}</td>
-                        <td style={tdStyle}>{line.category}</td>
+                        <td style={tdStyle}>{t(ENUM_LABEL.InsuranceLineCategory[line.category])}</td>
                       </tr>
                     ))}
                   </tbody>

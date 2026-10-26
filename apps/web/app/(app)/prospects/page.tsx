@@ -111,7 +111,7 @@ export default function ProspectsPage() {
                     <bdi>{prospect.location}</bdi>
                   </div>
                 ) : null}
-                <div style={cardMetaStyle}>Status: {t(ENUM_LABEL.ProspectStatus[prospect.status])}</div>
+                <div style={cardMetaStyle}>{t('commonStatusLabel')} {t(ENUM_LABEL.ProspectStatus[prospect.status])}</div>
               </button>
             ))}
           </div>

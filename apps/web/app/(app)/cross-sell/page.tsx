@@ -79,7 +79,9 @@ function OpportunityRow({
         Flagged {formatDate(opportunity.detectedAt, language)}
       </div>
       {opportunity.status === 'DISMISSED' && opportunity.dismissReason ? (
-        <div style={cardMetaStyle}>Reason: {opportunity.dismissReason}</div>
+        <div style={cardMetaStyle}>
+          {t('commonReasonLabel')} {opportunity.dismissReason}
+        </div>
       ) : null}
 
       {opportunity.status === 'OPEN' && canConvert ? (

@@ -230,8 +230,8 @@ export default function TransactionMonitoringPage() {
                     </td>
                     <td style={cell}>{r.patternType}</td>
                     <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
-                    <td style={cell}>{r.escalatedToSuspiciousActivity ? 'yes' : 'no'}</td>
-                    <td style={cell}>{r.reportedToAuthorityAt ? 'yes' : 'no'}</td>
+                    <td style={cell}>{r.escalatedToSuspiciousActivity ? t('commonYes') : t('commonNo')}</td>
+                    <td style={cell}>{r.reportedToAuthorityAt ? t('commonYes') : t('commonNo')}</td>
                     <td style={cell}>{r.detectedAt.slice(0, 10)}</td>
                     <td style={cell}>
                       {canMonitor && !r.isClosed ? (
