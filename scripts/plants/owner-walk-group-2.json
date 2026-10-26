@@ -1,0 +1,32 @@
+{
+  "caller-clear-not-followed": {
+    "file": "apps/web/components/ui/EntitySearch.tsx",
+    "from": "    if (value === '') {\n      setChosen(null);\n      setTerm('');",
+    "to": "    if (false) {\n      setChosen(null);\n      setTerm('');",
+    "why": "The exact state the owner hit. With the caller's clear unfollowed, the cached option survives, the search effect's own `if (chosen !== null) return` fires for ever, and no list can appear again — «بتعلّق ما بتظهر اشي». Kills complaints.spec.ts's 'finds a customer on the SECOND search too' at the `toHaveValue('')` assertion, which is the step BEFORE the second search, so the plant is observed at the earliest point it becomes wrong rather than at the symptom."
+  },
+  "enter-submits-the-form": {
+    "file": "apps/web/components/ui/EntitySearch.tsx",
+    "from": "      if (selected === null) event.preventDefault();",
+    "to": "      if (open && active >= 0) event.preventDefault();",
+    "why": "NOT a removal — a restoration of the ORIGINAL condition, which is the realistic regression: it reads as correct and is wrong only in the window before a result set lands, when `active` is still -1. Kills entity-search.spec.ts's 'a stray Enter BEFORE any result lands' by name. The pre-existing keyboard test survives it, which is the point: that test presses Enter after the list is open and so could never see this."
+  },
+  "validator-text-rendered": {
+    "file": "apps/web/lib/i18n/action-error.ts",
+    "from": "  if (isFieldValidationError(err)) return t(fallbackKey);",
+    "to": "  if (false && isFieldValidationError(err)) return t(fallbackKey);",
+    "why": "Framework text naming OUR OWN COLUMN reaches an Arabic-first screen in English — «customerId must be a UUID», the owner's own sighting. Kills complaints.spec.ts's 'a validation complaint naming one of our columns never reaches the screen' on the `not.toContainText('customerId')` half, with the positive 'That action failed' assertion failing first since the message is replaced rather than appended. Both halves are asserted separately so a reword of either still cannot pass."
+  },
+  "loading-shown-on-an-empty-register": {
+    "file": "apps/web/app/(app)/internal-audit-findings/page.tsx",
+    "from": "      {findings === null && loadError === null ? (",
+    "to": "      {!(findings && findings.length > 0) && loadError === null ? (",
+    "why": "The original condition, restored in the form it actually had: the loading line as the FALLBACK of the `length > 0` ternary. An empty register then renders the empty state and «جارٍ التحميل…» at the same time, which is what she read as the screen never finishing. Kills internal-audit-findings.spec.ts's 'an empty register says it is empty' on its `toHaveCount(0)` for the loading line."
+  },
+  "documents-loading-before-any-lookup": {
+    "file": "apps/web/app/(app)/documents/page.tsx",
+    "from": "        {summaryBusy ? <p>{t('docLoading')}</p> : null}",
+    "to": "        {!summary && loadError === null ? <p>{t('docLoading')}</p> : null}",
+    "why": "The original shape: the loading line rendered whenever `summary` was null, which includes the state before anybody has looked a policy up — so it stood under an empty field from the moment the screen opened and never cleared. Note it also guarded on `loadError`, which belongs to the document LIST rather than to this lookup, so even a failed lookup left the loading line up. Kills documents.spec.ts's 'says nothing about loading until a classification lookup is actually running'."
+  }
+}

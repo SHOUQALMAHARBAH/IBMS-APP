@@ -16,6 +16,7 @@ import {
   type PolicyFileClassificationSummary,
 } from '../../../lib/supporting-operations/document-api';
 import { ApiError } from '../../../lib/auth/api-client';
+import { actionErrorText } from '../../../lib/i18n/action-error';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
@@ -49,6 +50,11 @@ export default function DocumentsPage() {
   const [summaryPolicyId, setSummaryPolicyId] = useState('');
   const [summary, setSummary] = useState<PolicyFileClassificationSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  // IN FLIGHT, as its own fact. The block below used to render its loading line
+  // whenever `summary` was null — which is the state before anybody has looked a
+  // policy up at all — so «جارٍ التحميل…» stood under an empty field from the
+  // moment the screen opened and never cleared. Her walk reported exactly that.
+  const [summaryBusy, setSummaryBusy] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -94,7 +100,7 @@ export default function DocumentsPage() {
       setVersioningId(null);
       await load(policyId);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('docVersionError'));
+      setActionError(actionErrorText(err, t, 'docVersionError'));
     }
   }
 
@@ -118,7 +124,7 @@ export default function DocumentsPage() {
       await deleteDocument(id);
       await load(policyId);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('docDeleteError'));
+      setActionError(actionErrorText(err, t, 'docDeleteError'));
     }
   }
 
@@ -127,6 +133,7 @@ export default function DocumentsPage() {
     if (!summaryPolicyId) return;
     setSummaryError(null);
     setSummary(null);
+    setSummaryBusy(true);
     try {
       setSummary(await getPolicyFileClassification(summaryPolicyId));
     } catch (err) {
@@ -137,6 +144,8 @@ export default function DocumentsPage() {
             ? err.message
             : t('docComputeError'),
       );
+    } finally {
+      setSummaryBusy(false);
     }
   }
 
@@ -286,9 +295,18 @@ export default function DocumentsPage() {
               {summary.highestClassification ?? t('docsClassificationNone')}
             </strong>
           </p>
-        ) : loadError ? null : (
-        <p>{t('docLoading')}</p>
-      )}
+        ) : null}
+        {/* ONLY while a lookup is actually running.
+
+            This was `) : loadError ? null : (<Loading/>)`, which is wrong twice:
+            it rendered whenever `summary` was null — including before anybody had
+            looked anything up — and it guarded on `loadError`, which belongs to
+            the DOCUMENT LIST above and not to this lookup, whose error is
+            `summaryError`. So the screen said it was loading from the moment it
+            opened, for ever. Nothing is rendered before a lookup: the field's own
+            label and the paragraph above it already say what to do, and an
+            invented prompt would be a sentence nobody decided. */}
+        {summaryBusy ? <p>{t('docLoading')}</p> : null}
       </form>
     </main>
   );

@@ -16,6 +16,7 @@ import {
   type TransactionMonitoringAlert,
 } from '../../../lib/compliance-risk/transaction-monitoring-api';
 import { ApiError } from '../../../lib/auth/api-client';
+import { actionErrorText } from '../../../lib/i18n/action-error';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
@@ -87,7 +88,7 @@ export default function TransactionMonitoringPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('tmActionError'),
+        actionErrorText(err, t, 'tmActionError'),
       );
     } finally {
       setBusy(false);

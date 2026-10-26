@@ -14,6 +14,7 @@ import {
   type ConsentRecord,
 } from '../../../lib/pdpl/consent-api';
 import { ApiError } from '../../../lib/auth/api-client';
+import { actionErrorText } from '../../../lib/i18n/action-error';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
@@ -101,7 +102,7 @@ export default function ConsentPage() {
       await load(filterCustomerId.trim() || undefined);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('consSubmitError'),
+        actionErrorText(err, t, 'consSubmitError'),
       );
     } finally {
       setBusy(false);
@@ -123,7 +124,7 @@ export default function ConsentPage() {
       );
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('consRequestError'),
+        actionErrorText(err, t, 'consRequestError'),
       );
     } finally {
       setBusyId(null);
@@ -139,7 +140,7 @@ export default function ConsentPage() {
       await load(filterCustomerId.trim() || undefined);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('consWithdrawError'),
+        actionErrorText(err, t, 'consWithdrawError'),
       );
     } finally {
       setBusyId(null);

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 import { pickEntity } from "./support/pick-entity";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -150,4 +151,42 @@ test("documents screen has no serious/critical accessibility violations @a11y", 
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+/*
+ * «جارٍ التحميل…» and it never resolves — the owner's walk, 2026-10-26.
+ *
+ * A DIFFERENT shape from /internal-audit-findings', which is why it was measured
+ * rather than assumed: `scripts/measurements/loading-shown-when-empty.py` reports
+ * this screen's condition as testing a VARIABLE, so an empty list was never the
+ * cause here. The classification block rendered its loading line whenever
+ * `summary` was null — which is the state BEFORE anybody has looked a policy up —
+ * so the line stood under an empty field from the moment the screen opened and
+ * could never clear. It was also guarded on `loadError`, which belongs to the
+ * document LIST above it rather than to this lookup.
+ *
+ * Nothing is rendered before a lookup: the field's own label and the paragraph
+ * above it already say what to do, and an invented prompt would be a sentence
+ * nobody decided.
+ */
+test("says nothing about loading until a classification lookup is actually running", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route(POLICY_SEARCH, (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+
+  await page.goto("/documents");
+
+  // Anchored on the block's own heading, so the absence cannot pass while the
+  // page is still mounting.
+  // Scoped to the classification FORM, not the page: `docLoading` is rendered by
+  // the document list on this same screen, so a page-wide absence would be
+  // asserting about a different block — the wrong-element failure the shared
+  // helper exists to make unwritable. The scope is asserted visible first.
+  const classification = page
+    .locator("form")
+    .filter({ has: page.getByRole("heading", { name: "Policy file classification" }) });
+  await expectAbsentWithin(classification, (s) => s.getByText("Loading…"));
 });

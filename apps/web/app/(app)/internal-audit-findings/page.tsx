@@ -12,6 +12,7 @@ import {
   type InternalAuditFinding,
 } from '../../../lib/compliance-risk/internal-audit-finding-api';
 import { ApiError } from '../../../lib/auth/api-client';
+import { actionErrorText } from '../../../lib/i18n/action-error';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
@@ -85,7 +86,7 @@ export default function InternalAuditFindingsPage() {
       await fn();
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('iafActionError'));
+      setActionError(actionErrorText(err, t, 'iafActionError'));
     } finally {
       setBusy(false);
     }
@@ -214,12 +215,20 @@ export default function InternalAuditFindingsPage() {
             </tbody>
           </table>
         </div>
-      ) : loadError ? null : (
-        // The loading state directive §2 requires; this page rendered
-        // nothing at all while fetching. Guarded on loadError so an error
-        // and a "Loading…" line never appear together.
+      ) : null}
+      {/* FETCHING is `findings === null`, and nothing else.
+
+          This was `) : loadError ? null : (<Loading/>)` hanging off the
+          `findings.length > 0` ternary above, so an empty list — which
+          loaded perfectly — fell through to the loading line and rendered it
+          BESIDE the empty state. Her walk: «ما بتظهر شي الي، بس بكون مكتوب
+          عليها جارِ التحميل». The old comment said the branch was guarded so
+          an error and a Loading line never appear together; the EMPTY
+          coexistence was the one nobody asked about. Three states, three
+          conditions, none of them a fallback. */}
+      {findings === null && loadError === null ? (
         <p>{t('iafLoading')}</p>
-      )}
+      ) : null}
     </main>
   );
 }

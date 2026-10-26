@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -108,4 +109,41 @@ test("internal audit findings screen has no serious/critical accessibility viola
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+/*
+ * «ما بتظهر شي الي، بس بكون مكتوب عليها جارِ التحميل»
+ * — the owner's walk, 2026-10-26, on this screen.
+ *
+ * The list loaded perfectly and came back EMPTY. The loading line hung off the
+ * `findings.length > 0` ternary as its fallback, so an empty array fell straight
+ * into it — and rendered BESIDE the empty state two lines above, which is why a
+ * reader concludes the screen never finished.
+ *
+ * The comment on that branch said it was guarded so an error and a Loading line
+ * never appear together. The ERROR coexistence had been thought about; the EMPTY
+ * one had not. Three states now have three independent conditions, no fallback.
+ */
+test("an empty register says it is empty, and does not go on saying it is loading", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("http://localhost:4000/internal-audit-findings**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+
+  await page.goto("/internal-audit-findings");
+
+  // The EMPTY state, anchored on the heading so the absence below cannot pass
+  // while the read is still in flight.
+  await expect(
+    page.getByRole("heading", { name: "Internal audit findings" }),
+  ).toBeVisible();
+  await expect(page.getByText("No internal audit finding")).toBeVisible();
+  // And the loading line is GONE. Scoped to `main` through the shared helper,
+  // which asserts the scope VISIBLE first — `toHaveCount(0)` passes on its own
+  // first poll, so an unrendered page would satisfy this absence trivially.
+  await expectAbsentWithin(page.locator("main"), (s) =>
+    s.getByText("Loading…"),
+  );
 });

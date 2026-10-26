@@ -26,6 +26,7 @@ import {
   type Complaint,
 } from "../../../lib/customer-service/complaint-api";
 import { ApiError } from "../../../lib/auth/api-client";
+import { actionErrorText } from '../../../lib/i18n/action-error';
 import { errorStyle } from "../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../components/lead/lead.styles";
 import { hasAnyPermission } from "../../../lib/auth/permissions";
@@ -146,7 +147,7 @@ export default function ComplaintsPage() {
       URL.revokeObjectURL(url);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t("complaintsAckError"),
+        actionErrorText(err, t, "complaintsAckError"),
       );
     }
   }
@@ -159,7 +160,7 @@ export default function ComplaintsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t("complaintsActionError"),
+        actionErrorText(err, t, "complaintsActionError"),
       );
     } finally {
       setBusy(false);

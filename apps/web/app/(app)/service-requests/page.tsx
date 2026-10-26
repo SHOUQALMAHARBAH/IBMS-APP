@@ -13,6 +13,7 @@ import {
   type ServiceRequest,
 } from '../../../lib/customer-service/service-request-api';
 import { ApiError } from '../../../lib/auth/api-client';
+import { actionErrorText } from '../../../lib/i18n/action-error';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
@@ -108,7 +109,7 @@ export default function ServiceRequestsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('srActionError'),
+        actionErrorText(err, t, 'srActionError'),
       );
     } finally {
       setBusy(false);
