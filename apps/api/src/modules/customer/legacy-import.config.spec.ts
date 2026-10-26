@@ -48,11 +48,29 @@ describe('parseCsv', () => {
   });
 
   it('strips a UTF-8 BOM so the first heading is not corrupted', () => {
-    // Excel's "Save as CSV" writes one. Without this the first column heading
-    // is "\uFEFFlegalName", the mapping silently fails to find it, and the
-    // office is told their column does not exist.
+    // Excel's "Save as CSV" writes one \u2014 and since 2026-10-26 so does
+    // `/settings/customer-import`'s downloadable template, deliberately: Excel on
+    // Windows reads a BOM-less UTF-8 CSV as mojibake and every heading in that
+    // file is Arabic. So this is half of a real agreement between two files now,
+    // not only a tolerance for somebody else's export.
+    //
+    // CORRECTED 2026-10-26: this comment used to end "the mapping silently fails
+    // to find it, and the office is told their column does not exist". That is
+    // FALSE, and a plant proved it \u2014 removing the strip from `parseCsv` left the
+    // whole import e2e suite green, because `mapRows` trims every header before
+    // `indexOf` and `String.prototype.trim()` strips U+FEFF, which is ECMAScript
+    // whitespace. The TRIM is what protects the mapping. The strip protects every
+    // OTHER caller of this exported function, which hands out untrimmed cells \u2014
+    // and this test is the only thing that observes it, which is the reason to
+    // keep both. The same false sentence was in `parseCsv`'s own comment.
     const [header] = parseCsv('\uFEFFlegalName,type\nAcme,CORPORATE');
     expect(header[0]).toBe('legalName');
+  });
+
+  it('strips only a LEADING BOM \u2014 one mid-file is data', () => {
+    const BOM = '\uFEFF';
+    const rows = parseCsv(`name,type\n${BOM}Acme,CORPORATE`);
+    expect(rows[1][0]).toBe(`${BOM}Acme`);
   });
 
   it('keeps Arabic text intact', () => {

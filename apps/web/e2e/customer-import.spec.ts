@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { readFile } from "node:fs/promises";
 
 /**
  * Loading an office's legacy customer file — `POST /imports/customers`, which had no web caller,
@@ -443,4 +444,79 @@ test("OWNER DECISION 43 — an office that has never imported is told so, and a 
     "Something went wrong",
   );
   await expect(page.getByTestId("import-register-none")).toHaveCount(0);
+});
+
+/*
+ * THE ROUND TRIP — «لما أجيت أضيف ملف ما عندي واحد بصيغة csv، و أصلاً احنا احكينا
+ * مش رح يطلع من النظام زي قالب عشان المكتب يعبّيه بمعلومات عملائه كاملين و يرفعهم
+ * مرة وحدة» — the owner's walk, 2026-10-26.
+ *
+ * She opened this screen with no CSV to give it, and the whole point of a bulk
+ * import is that nobody enters customers one at a time.
+ *
+ * This is part 2 of 3, and the split is stated in `test/import-template.test.ts`:
+ * the generator is web-side and the parser is api-side, and no file can import
+ * both. What THIS half proves is the one that would break first — that the
+ * template's headings and the mapping the screen sends are the same strings. The
+ * api matches a column with `header.indexOf(heading.trim())`, an exact match, so
+ * a template whose columns nobody mapped imports NOTHING; and the mapping is
+ * pre-filled from the same call that produced the file for exactly that reason.
+ *
+ * The downloaded bytes are read back and UPLOADED, rather than a file being
+ * hand-built to look like the template: a hand-built fixture is a second copy of
+ * the headings, which is the thing being guarded against.
+ */
+test("downloads a template, uploads THAT file, and the mapping already matches it", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockBatches(page);
+
+  let mapping: Record<string, string> | null = null;
+  let uploadedBody = "";
+  await page.route("http://localhost:4000/imports/customers", (route) => {
+    const raw = route.request().postData() ?? "";
+    uploadedBody = raw;
+    const match = /name="mapping"\r?\n\r?\n([^\r\n]*)/.exec(raw);
+    mapping = match ? (JSON.parse(match[1]!) as Record<string, string>) : null;
+    return route.fulfill({ status: 201, json: result() });
+  });
+
+  await page.goto("/settings/customer-import");
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByTestId("import-template-download").click(),
+  ]);
+  const path = await download.path();
+  expect(path, "the template produced no file").not.toBeNull();
+  const csv = await readFile(path!, "utf8");
+
+  // THE HEADER ROW, read from the file she would actually receive.
+  const header = csv.replace(/^﻿/, "").split(/\r\n|\n/)[0]!;
+  expect(header).not.toBe("");
+
+  // THE MAPPING IS ALREADY FILLED — no typing between download and upload, which
+  // is the behaviour the owner asked for: fill the rows and send it.
+  await expect(page.getByTestId("import-map-legalName")).not.toHaveValue("");
+  await expect(page.getByTestId("import-map-customerType")).not.toHaveValue("");
+  // And it must be submittable with nothing else done to it.
+  await expect(page.getByTestId("import-missing-required")).toHaveCount(0);
+
+  await page.getByTestId("import-file").setInputFiles(path!);
+  await page.getByTestId("import-submit").click();
+  await expect(page.getByTestId("import-result")).toBeVisible();
+
+  // EVERY mapped heading is a real column of the file that was sent. This is the
+  // assertion the whole feature rests on: a heading the parser cannot find is a
+  // column silently ignored, and for `legalName` that is every row rejected.
+  const columns = header.split(",").map((c) => c.replace(/^"|"$/g, "").replace(/""/g, '"'));
+  expect(Object.keys(mapping!).length).toBeGreaterThan(0);
+  for (const [field, heading] of Object.entries(mapping!)) {
+    expect(columns, `${field} maps to a heading the file does not carry`).toContain(
+      heading,
+    );
+  }
+  // And the file really was the one that came down, not a fixture.
+  expect(uploadedBody).toContain(columns[0]!);
 });

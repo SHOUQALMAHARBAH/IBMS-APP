@@ -56,6 +56,7 @@ import {
 } from '../../../../lib/customer/legacy-import-api';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { buildImportTemplate } from '../../../../lib/customer/import-template';
 
 /**
  * A TOTAL map from field to label key.
@@ -175,6 +176,31 @@ export default function CustomerImportPage() {
     }
   }
 
+  function downloadTemplate() {
+    const { csv, headings } = buildImportTemplate({
+      label: (field) => t(FIELD_LABEL[field]),
+      requiredWord: t('commonRequired'),
+      exampleWord: t('impTemplateExampleWord'),
+    });
+    // THE MAPPING IS PRE-FILLED FROM THE SAME CALL, not from a second copy of the
+    // headings. `mapRows` matches on `header.indexOf(heading.trim())` — an exact
+    // string — so a template whose columns nobody mapped is a template that
+    // imports nothing, and two sources for one heading is how they drift.
+    setMapping(headings);
+    // `charset=utf-8`, and the bytes already carry a BOM, because every heading is
+    // Arabic and Excel on Windows reads a BOM-less UTF-8 CSV as mojibake. `parseCsv`
+    // strips a leading BOM already, with a comment saying it survives an Excel
+    // "Save as CSV" — so emitting one is both necessary and safe.
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ibms-customer-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (isLoading) return <main style={pageStyle}>{t('impLoading')}</main>;
 
   if (!canImport) {
@@ -205,6 +231,20 @@ export default function CustomerImportPage() {
       >
         <fieldset>
           <legend>{t('impUploadLegend')}</legend>
+
+          {/* THE TEMPLATE COMES FIRST, because chronologically it does: the owner
+              opened this screen with no CSV to give it. «لما أجيت أضيف ملف ما
+              عندي واحد بصيغة csv… احنا احكينا مش رح يطلع من النظام زي قالب عشان
+              المكتب يعبّيه بمعلومات عملائه كاملين و يرفعهم مرة وحدة». Downloading
+              it also FILLS THE MAPPING below, so the round trip needs no mapping
+              step — which is what `customer-import.spec.ts` asserts end to end. */}
+          <button
+            type="button"
+            onClick={downloadTemplate}
+            data-testid="import-template-download"
+          >
+            {t('impTemplateButton')}
+          </button>
 
           <label>
             {t('impFileLabel')}

@@ -13,6 +13,8 @@ export const CUSTOMERS = {
     impRefusalAct: 'استيراد ملف عملاء',
     impUploadLegend: 'الملف وربط الأعمدة',
     impFileLabel: 'ملف CSV',
+    impTemplateButton: 'تنزيل قالب CSV',
+    impTemplateExampleWord: 'مثال',
     impMappingIntro:
       'اكتب اسم العمود في ملفك مقابل كل حقل. اترك الحقل فارغاً إن لم يكن في ملفك. ' +
       'الحقول المعلَّمة بنجمة مطلوبة.',
@@ -293,6 +295,8 @@ export const CUSTOMERS = {
     impRefusalAct: 'import a customer file',
     impUploadLegend: 'The file, and which column is which',
     impFileLabel: 'CSV file',
+    impTemplateButton: 'Download CSV template',
+    impTemplateExampleWord: 'example',
     impMappingIntro:
       'Name the column in your file for each field. Leave a field empty if your file does not ' +
       'carry it. Fields marked with an asterisk are required.',

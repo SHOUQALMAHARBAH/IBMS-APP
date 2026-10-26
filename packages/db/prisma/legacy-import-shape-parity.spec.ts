@@ -195,3 +195,105 @@ describe("the customer-import response shape is declared twice and the copies mu
     }
   });
 });
+
+/**
+ * The string members of one exported array literal, read as text.
+ *
+ * Comments stripped first, for the same reason as `interfaceFields`: both of these
+ * declarations carry doc comments that NAME the fields in prose — the api's says
+ * «`legalName` is the only one without which a row is not a customer at all» — and
+ * a parser that read the comment would find `legalName` whether the array held it
+ * or not.
+ */
+function arrayMembers(source: string, name: string): string[] {
+  const stripped = source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  const at = stripped.indexOf(`export const ${name}`);
+  if (at === -1) {
+    throw new Error(
+      `legacy-import-shape-parity: no \`export const ${name}\` — it was renamed or ` +
+        `removed, and this guard must be re-pointed rather than deleted.`,
+    );
+  }
+  // The `=` FIRST, then the `[`. Taking the first `[` after the name finds the one
+  // inside a TYPE ANNOTATION — `LEGACY_IMPORT_REQUIRED_FIELDS: LegacyImportField[]`
+  // — and the matching `]` is right behind it, so the body parsed to EMPTY. Both
+  // required lists read as `[]` on the first run and the non-vacuity floor refused
+  // rather than reporting two empty arrays as equal, which is the only reason this
+  // was visible at all.
+  const eq = stripped.indexOf("=", at);
+  const open = stripped.indexOf("[", eq);
+  const close = stripped.indexOf("]", open);
+  if (eq === -1 || open === -1 || close === -1) {
+    throw new Error(
+      `legacy-import-shape-parity: could not find the body of ${name}.`,
+    );
+  }
+  return [...stripped.slice(open + 1, close).matchAll(/'(\w+)'/g)].map(
+    (m) => m[1]!,
+  );
+}
+
+/*
+ * THE IMPORTER'S FIELD LIST IS DECLARED TWICE TOO, AND NOTHING COMPARED THEM.
+ *
+ * The web's copy carries the comment «Mirrors `LEGACY_IMPORT_FIELDS`» and that
+ * comment was the whole of the guarantee. The response shape above went stale for
+ * three weeks under exactly that arrangement.
+ *
+ * What makes it load-bearing now rather than tidy: the owner asked for the import
+ * screen to GENERATE A TEMPLATE from the importer's own field list — «احنا احكينا
+ * مش رح يطلع من النظام زي قالب عشان المكتب يعبّيه بمعلومات عملائه كاملين و يرفعهم
+ * مرة وحدة» — and that template is built from the WEB's copy, because the web is
+ * where the Arabic labels are. So a stale copy no longer just mis-renders a mapping
+ * row: it hands the office a spreadsheet missing a column the importer accepts, or
+ * naming one it does not, and the office fills it in before anything refuses.
+ *
+ * ORDER IS ASSERTED, not just membership. The template's columns come out in this
+ * order, and the mapping is pre-filled from it; two lists holding the same seven
+ * names in different orders would pass a set comparison and produce a template
+ * whose columns do not line up with what the screen says they are.
+ */
+describe("the importer's field list is declared twice and the copies must agree", () => {
+  it("reads real lists from both declarations", () => {
+    // The floor first. Two empty arrays compare EQUAL, which is how a broken
+    // parser reports agreement — the shape this repository has paid for four
+    // times. A minimum rather than a pin, so an eighth field does not fail it.
+    expect(
+      arrayMembers(api, "LEGACY_IMPORT_FIELDS").length,
+      "the api-side field list parsed to nothing — the guard is broken, not the code",
+    ).toBeGreaterThan(5);
+    expect(arrayMembers(web, "IMPORT_FIELDS").length).toBeGreaterThan(5);
+    expect(
+      arrayMembers(api, "LEGACY_IMPORT_REQUIRED_FIELDS").length,
+    ).toBeGreaterThan(0);
+    expect(arrayMembers(web, "IMPORT_REQUIRED_FIELDS").length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("holds the same importable fields IN THE SAME ORDER", () => {
+    expect(arrayMembers(web, "IMPORT_FIELDS")).toEqual(
+      arrayMembers(api, "LEGACY_IMPORT_FIELDS"),
+    );
+  });
+
+  it("agrees on which fields are REQUIRED", () => {
+    // A field required by the api and optional on the web is a template that marks
+    // a column optional and an import that then refuses the file — after the office
+    // has filled it in, which is the expensive moment to find out.
+    expect(arrayMembers(web, "IMPORT_REQUIRED_FIELDS")).toEqual(
+      arrayMembers(api, "LEGACY_IMPORT_REQUIRED_FIELDS"),
+    );
+  });
+
+  it("requires nothing the importer does not accept", () => {
+    const fields = arrayMembers(api, "LEGACY_IMPORT_FIELDS");
+    for (const required of arrayMembers(api, "LEGACY_IMPORT_REQUIRED_FIELDS")) {
+      expect(fields, `${required} is required but not importable`).toContain(
+        required,
+      );
+    }
+  });
+});
