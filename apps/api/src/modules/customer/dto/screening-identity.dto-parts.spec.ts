@@ -56,7 +56,9 @@ describe('IsDateOfBirth', () => {
     // present — asserted apart, because a single "it was refused" would pass if
     // the two checks were ever collapsed into one and the wrong one fired.
     expect(messages).toContain('dateOfBirth must be a day that exists');
-    expect(messages).not.toContain('dateOfBirth must be a date in YYYY-MM-DD form');
+    expect(messages).not.toContain(
+      'dateOfBirth must be a date in YYYY-MM-DD form',
+    );
   });
 
   it.each(['2026-04-00', '2026-13-01', '2026-00-10'])(
@@ -98,13 +100,32 @@ describe('IsNationality', () => {
     },
   );
 
-  it('mirrors the database CHECK exactly, so neither can admit what the other refuses', () => {
+  it('agrees with the database CHECK on every case, independently written', () => {
     // `Customer_nationality_iso3166` is CHECK (nationality ~ '^[A-Z]{2}$').
-    // The predicate is restated here as a STRING rather than reusing the
-    // exported regex, because comparing a value against itself proves nothing —
-    // this fails if the exported pattern is ever widened away from the column.
-    expect(isNationalityCode('JO')).toBe(true);
-    expect(isNationalityCode('jo')).toBe(false);
-    expect(isNationalityCode('JOR')).toBe(false);
+    //
+    // Written out HERE as its own regex rather than importing the exported one:
+    // asserting `isNationalityCode` against the pattern it is built from would be
+    // comparing a value with itself. This way a widening of the DTO's pattern
+    // away from the column's — which is the realistic drift, since the column can
+    // only be changed by a migration — fails by case.
+    const columnCheck = /^[A-Z]{2}$/;
+    for (const value of [
+      'JO',
+      'jo',
+      'Jo',
+      'JOR',
+      'J',
+      '',
+      'Jordan',
+      '962',
+      'JO ',
+      ' JO',
+      'J0',
+    ]) {
+      expect(
+        isNationalityCode(value),
+        `the DTO and the column disagree about ${JSON.stringify(value)}`,
+      ).toBe(columnCheck.test(value));
+    }
   });
 });
