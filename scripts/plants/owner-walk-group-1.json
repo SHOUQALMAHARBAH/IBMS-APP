@@ -1,0 +1,26 @@
+{
+  "no-pending-state": {
+    "file": "apps/web/components/ui/ActionStatus.tsx",
+    "from": "  if (pending) {",
+    "to": "  if (false && pending) {",
+    "why": "The state the owner actually hit: an act in flight with nothing on screen saying so. Measured, the watchlist sync can be in flight for ~6 minutes (120s timeout x 3 attempts per source), so this is not a cosmetic gap — it is the whole of «الأزرار الي فيها مش شغالة، بضغط عليها ما بيظهر الي اشي». Kills BOTH pending assertions, one per screen: watchlist-sync.spec.ts 'says work is under way while the sync runs' and kyc-queue-duty.spec.ts 'states what running the screening did, and says so while it is running'. Two screens, one mechanism, which is why this is a component."
+  },
+  "error-announced-politely": {
+    "file": "apps/web/components/ui/ActionStatus.tsx",
+    "from": "        role=\"alert\"\n        data-testid={testId ? `${testId}-error` : undefined}",
+    "to": "        role=\"status\"\n        data-testid={testId ? `${testId}-error` : undefined}",
+    "why": "A failure rendered in the polite live region is a failure a screen-reader user can miss entirely, and it is the exact conflation `EmptyState`/`ErrorState` are two components to avoid. The role is the half a testId assertion cannot see, which is why both error tests assert it as an attribute rather than trusting the element's presence. Kills the two 'announced as a failure, not a quiet nothing' / 'announced in the row, not swallowed' tests."
+  },
+  "outcome-says-nothing": {
+    "file": "apps/web/components/customer/KycQueue.tsx",
+    "from": "        [id]: `${t(\"commonStatus\")}: ${t(KYC_STATUS_LABEL_KEY[updated.status])}`,",
+    "to": "        [id]: t(\"commonStatus\"),",
+    "why": "The CHEAP version of this fix, and the one worth refusing: a success line that renders «الحالة» and stops. It is present, it is announced, and it tells the employee nothing he did not already know — the silence he reported, with an extra step. Kills kyc-queue-duty.spec.ts's `toHaveText('Status: Screening')` by name. Deliberately NOT a plant that removes the line: the thing this must keep proving is that the outcome NAMES the resulting state."
+  },
+  "sync-outcome-dropped": {
+    "file": "apps/web/app/(app)/watchlist-sync/page.tsx",
+    "from": "        outcome={message ?? undefined}",
+    "to": "        outcome={undefined}",
+    "why": "The sync completes and the per-source result — which list, whether it succeeded, how many records — never reaches the screen. The figures already existed in `message` before this batch; what was missing was any ARIA role on them and any pending state before them, so dropping the wiring reproduces the pre-batch screen exactly. Kills the 'and then says what it did' half of watchlist-sync.spec.ts's first new test."
+  }
+}

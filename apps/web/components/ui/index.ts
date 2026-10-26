@@ -4,6 +4,7 @@
  * (frontend directive §6) and a token change lands everywhere at once.
  */
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
+export { ActionStatus } from './ActionStatus';
 export { Badge, type BadgeTone } from './Badge';
 export { Card, PageHeader } from './Card';
 export { EmptyState, ErrorState } from './EmptyState';

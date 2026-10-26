@@ -11,6 +11,7 @@ import {
   type WatchlistSyncRun,
 } from '../../../lib/compliance-risk/watchlist-sync-api';
 import { WatchlistGenerations } from '../../../components/compliance-risk/WatchlistGenerations';
+import { ActionStatus } from '../../../components/ui';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
@@ -137,20 +138,23 @@ export default function WatchlistSyncPage() {
       {canManage ? (
         <div style={{ display: 'flex', gap: '0.6rem', margin: '1rem 0' }}>
           <button type="button" disabled={busy} onClick={() => void sync()}>
-            {t('wsSyncButton')}
+            {busy ? t('commonWorking') : t('wsSyncButton')}
           </button>
           <button type="button" disabled={busy} onClick={() => void batch()}>
-            {t('wsRunBatchButton')}
+            {busy ? t('commonWorking') : t('wsRunBatchButton')}
           </button>
         </div>
       ) : null}
 
-      {message ? <p style={{ opacity: 0.75 }}>{message}</p> : null}
-      {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
-      ) : null}
+      {/* The act RAN before this; nothing said so. See ActionStatus's header:
+          the sync fetches two public lists with a 120s timeout and two retries
+          each, so `disabled` alone left the screen silent for minutes. */}
+      <ActionStatus
+        pending={busy ? t('commonWorking') : undefined}
+        outcome={message ?? undefined}
+        error={actionError ?? undefined}
+        testId="ws-action"
+      />
       {loadError ? (
         <p role="alert" style={errorStyle}>
           {loadError}
