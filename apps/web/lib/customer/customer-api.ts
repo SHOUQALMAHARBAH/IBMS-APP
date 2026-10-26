@@ -58,6 +58,22 @@ export interface CreateCustomerInput {
   grandfatherName?: string;
   familyName?: string;
   nationalId?: string;
+  /**
+   * THE TWO SCREENING DISCRIMINATORS — `YYYY-MM-DD` and ISO 3166-1 alpha-2,
+   * upper case (the column's CHECK is `^[A-Z]{2}$`).
+   *
+   * The api's DTO has accepted both since the columns shipped and this
+   * hand-copied interface never declared them, so no screen could send one
+   * even by mistake. That is the same drift class `legacy-import-shape-parity`
+   * exists for, in the other direction: a field the SERVER accepts and the
+   * client cannot express is a capability nothing can reach, and no type sees
+   * it because there is nothing to disagree with.
+   *
+   * Individual only. A company has no date of birth or nationality of its own;
+   * those belong to its UBOs, which is what `CreateUboInput` carries them for.
+   */
+  dateOfBirth?: string;
+  nationality?: string;
   registrationNumber?: string;
   taxRegistrationNumber?: string;
   registeredAddress?: string;
@@ -106,6 +122,11 @@ export interface CreateUboInput {
   grandfatherName?: string;
   familyName: string;
   nationalId: string;
+  /** As on `CreateCustomerInput`. A UBO is always a natural person, so these
+   *  are the discriminators a CORPORATE customer's screening has to rely on —
+   *  and measured, 2 of 2 UBOs carried neither. */
+  dateOfBirth?: string;
+  nationality?: string;
   ownershipPercent?: number;
   isAuthorizedSignatory?: boolean;
   isPep: boolean;

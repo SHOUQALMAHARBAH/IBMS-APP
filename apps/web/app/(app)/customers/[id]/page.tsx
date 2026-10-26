@@ -266,18 +266,44 @@ export default function CustomerProfilePage() {
           />
 
           <div style={profileGridStyle}>
-            <ProfileField
-              label={t('customerFieldNationalId')}
-              value={customer.nationalId}
-              fieldKey="nationalId"
-              revealed={revealed.nationalId}
-              onReveal={
-                customer.nationalId && canRevealNationalId
-                  ? () => setRevealTarget('nationalId')
-                  : undefined
-              }
-              revealLabel={t('customerProfileFieldReveal')}
-            />
+            {/* INDIVIDUAL ONLY — a company has no national ID, and this field was
+                rendered for one anyway. The owner's walk: «لما سجلت عميل ك شركة،
+                الرقم الوطني بطلعله – شرطة لأني ما ضفته، فش اله حقل تعبئة بعملية
+                التسجيل» — she read the dash as a field she had failed to fill,
+                which is the only reasonable reading of a labelled empty row. */}
+            {customer.customerType === 'INDIVIDUAL' ? (
+              <>
+                <ProfileField
+                  label={t('customerFieldNationalId')}
+                  value={customer.nationalId}
+                  fieldKey="nationalId"
+                  revealed={revealed.nationalId}
+                  onReveal={
+                    customer.nationalId && canRevealNationalId
+                      ? () => setRevealTarget('nationalId')
+                      : undefined
+                  }
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                {/* THE TWO SCREENING DISCRIMINATORS, rendered for the first time.
+                    `Customer.dateOfBirth` and `.nationality` have been on the wire
+                    and in the web's own type since the columns shipped, and no
+                    screen read either — so the two facts that separate a true
+                    sanctions match from a coincidence of names were invisible to
+                    the person reviewing the match. Stored in the CLEAR by decision
+                    (see the column's own comment), so no reveal control. */}
+                <ProfileField
+                  label={t('customerFieldDateOfBirth')}
+                  value={customer.dateOfBirth}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('impFieldNationality')}
+                  value={customer.nationality}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+              </>
+            ) : null}
             <ProfileField
               label={t('customerFieldContactPhone')}
               value={customer.contactPhone}
@@ -294,21 +320,32 @@ export default function CustomerProfilePage() {
               onReveal={() => setRevealTarget('contactEmail')}
               revealLabel={t('customerProfileFieldReveal')}
             />
-            <ProfileField
-              label={t('customerFieldRegistrationNumber')}
-              value={customer.registrationNumber}
-              revealLabel={t('customerProfileFieldReveal')}
-            />
-            <ProfileField
-              label={t('customerFieldRegisteredAddress')}
-              value={customer.registeredAddress}
-              revealLabel={t('customerProfileFieldReveal')}
-            />
-            <ProfileField
-              label={t('customerFieldNatureOfBusiness')}
-              value={customer.natureOfBusiness}
-              revealLabel={t('customerProfileFieldReveal')}
-            />
+            {/* CORPORATE ONLY. These three were rendered on an INDIVIDUAL's page as
+                three empty rows, and they are the very three the brief believed had
+                no form field: «سجلت عميل ك فرد وهيك طلعلي زي – عند هذول الحقول لأني
+                ما ضفتهم لأنه فش الهم حقول من البداية». They DO have form fields — on
+                the corporate branch of the wizard, which the company she registered
+                the same day used successfully. What was wrong was showing them to a
+                natural person, who can never have any of them. */}
+            {customer.customerType === 'CORPORATE' ? (
+              <>
+                <ProfileField
+                  label={t('customerFieldRegistrationNumber')}
+                  value={customer.registrationNumber}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('customerFieldRegisteredAddress')}
+                  value={customer.registeredAddress}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('customerFieldNatureOfBusiness')}
+                  value={customer.natureOfBusiness}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+              </>
+            ) : null}
             <ProfileField
               label={t('customerFieldLanguagePreference')}
               value={customer.languagePreference}

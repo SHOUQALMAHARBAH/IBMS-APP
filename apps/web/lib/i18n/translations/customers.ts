@@ -111,6 +111,11 @@ export const CUSTOMERS = {
     customerCorrectIdentifiersNote:
       "الاسم وتاريخ الميلاد والجنسية ورقم الهوية لا تُصحَّح من هنا: تغييرها يستوجب " +
       "إعادة الفحص مقابل قوائم العقوبات، وهذه الآلية لم تُبنَ بعد.",
+    // SLICED from `customerCorrectIdentifiersNote` above, which names these two
+    // fields in one sentence — «الاسم وتاريخ الميلاد والجنسية ورقم الهوية». Not
+    // typed. Nationality needs no new key at all: `impFieldNationality` already
+    // ships «الجنسية» as a standalone label for the import field list.
+    customerFieldDateOfBirth: "تاريخ الميلاد",
     customerFieldNatureOfBusiness: "طبيعة النشاط",
     customerFieldLanguagePreference: "تفضيل اللغة",
     customerFieldGivenName: "الاسم الأول",
@@ -378,6 +383,8 @@ export const CUSTOMERS = {
       "Name, date of birth, nationality and national ID are not corrected here: " +
       "changing one is a screening event against the sanctions lists, and that " +
       "mechanism is not built yet.",
+    // Sliced from the same sentence, capitalised for a label position.
+    customerFieldDateOfBirth: "Date of birth",
     customerFieldNatureOfBusiness: "Nature of business",
     customerFieldLanguagePreference: "Language preference",
     customerFieldGivenName: "Given name",

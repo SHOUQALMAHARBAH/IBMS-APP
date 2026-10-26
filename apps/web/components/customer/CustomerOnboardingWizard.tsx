@@ -47,6 +47,17 @@ import {
 // check the backend's own encryption layer is documented as waiting for its
 // first real caller (apps/web/lib/forms/privacy-by-default.ts) — this
 // wizard is that caller.
+/**
+ * Today, as `YYYY-MM-DD`, for the two date-of-birth fields' `max`.
+ *
+ * A module constant rather than a call per render: the database already refuses a
+ * future date of birth by CHECK (`Customer_dateOfBirth_not_future`), and the
+ * browser refusing it first turns a typo into a correction rather than a 500. One
+ * value for the life of the page is right for a `max` on a birth date — nobody
+ * fills this form across midnight and needs the bound to move.
+ */
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+
 const SENSITIVE_FIELD_NAMES = ['nationalId', 'contactPhone', 'contactEmail'] as const;
 
 type Step = 'type' | 'profile' | 'ubos' | 'documents' | 'review';
@@ -110,6 +121,31 @@ export function CustomerOnboardingWizard() {
   const [grandfatherName, setGrandfatherName] = useState('');
   const [familyName, setFamilyName] = useState('');
   const [nationalId, setNationalId] = useState('');
+  /**
+   * THE TWO SCREENING DISCRIMINATORS, collected for the first time.
+   *
+   * The owner's walk: «مش المفروض نضيف شو الجنسية و البلد و تاريخ الميلاد عشان
+   * عملية اعرف عميلك ولا ايش؟ يعني كيف رح تشتغل عملية اعرف عميلك ع الاسم بس؟»
+   * — and she is right that it cannot.
+   *
+   * MEASURED FIRST, and the chain was already complete everywhere else: the
+   * columns exist (with a comment saying name-only matching against ~19,000
+   * sanctions entries is the single largest source of false positives), the DTO
+   * accepts both, the service writes both, `buildScreeningSubjects` passes both,
+   * the api returns both and the web's own type declares both. This form was the
+   * ONE link where they never arrived — so the control was built end to end and
+   * its input was never collected.
+   *
+   * Proven on the data rather than argued: 839 of 840 individuals carry both,
+   * all of them seeded, and the one that carries neither is the record she
+   * registered through this form on 2026-10-26.
+   *
+   * OPTIONAL, deliberately. Whether either is MANDATORY is the owner's decision
+   * — a broker may genuinely not hold a date of birth at first contact — so they
+   * are collected and not required, and the question is in the register.
+   */
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [nationality, setNationality] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [taxRegistrationNumber, setTaxRegistrationNumber] = useState('');
   const [registeredAddress, setRegisteredAddress] = useState('');
@@ -124,6 +160,13 @@ export function CustomerOnboardingWizard() {
   const [uboGrandfatherName, setUboGrandfatherName] = useState('');
   const [uboFamilyName, setUboFamilyName] = useState('');
   const [uboNationalId, setUboNationalId] = useState('');
+  // A CORPORATE customer has no date of birth or nationality of its own —
+  // `screening-subjects.util.ts` says so and names the UBO subjects as where
+  // they come from. Measured: 2 of 2 UBOs carry neither, so that designed
+  // fallback was structurally empty and every company was screened on its NAME
+  // alone with no discriminator anywhere on the file.
+  const [uboDateOfBirth, setUboDateOfBirth] = useState('');
+  const [uboNationality, setUboNationality] = useState('');
   const [uboOwnershipPercent, setUboOwnershipPercent] = useState('');
   const [uboIsPep, setUboIsPep] = useState(false);
 
@@ -172,6 +215,15 @@ export function CustomerOnboardingWizard() {
         grandfatherName: customerType === 'INDIVIDUAL' ? (grandfatherName || undefined) : undefined,
         familyName: customerType === 'INDIVIDUAL' ? familyName : undefined,
         nationalId: customerType === 'INDIVIDUAL' ? nationalId : undefined,
+        dateOfBirth:
+          customerType === 'INDIVIDUAL' && dateOfBirth ? dateOfBirth : undefined,
+        // Upper case because the column's CHECK is `^[A-Z]{2}$` — a lower-case
+        // code is a 500 from the database rather than a refusal a person can act
+        // on, and the input accepts either.
+        nationality:
+          customerType === 'INDIVIDUAL' && nationality
+            ? nationality.toUpperCase()
+            : undefined,
         registrationNumber: customerType === 'CORPORATE' ? registrationNumber : undefined,
         taxRegistrationNumber: taxRegistrationNumber || undefined,
         registeredAddress: customerType === 'CORPORATE' ? registeredAddress : undefined,
@@ -269,6 +321,8 @@ export function CustomerOnboardingWizard() {
         grandfatherName: uboGrandfatherName || undefined,
         familyName: uboFamilyName,
         nationalId: uboNationalId,
+        dateOfBirth: uboDateOfBirth || undefined,
+        nationality: uboNationality ? uboNationality.toUpperCase() : undefined,
         ownershipPercent: uboOwnershipPercent ? Number(uboOwnershipPercent) : undefined,
         isPep: uboIsPep,
       });
@@ -473,6 +527,46 @@ export function CustomerOnboardingWizard() {
               </div>
             )}
           </div>
+
+            {/* THE TWO SCREENING DISCRIMINATORS — the owner's walk: «مش المفروض
+                نضيف شو الجنسية و البلد و تاريخ الميلاد عشان عملية اعرف عميلك ولا
+                ايش؟» Measured, every other layer already carried them and this
+                form was the only one that did not, so the control was built end
+                to end with no way to feed it.
+
+                NOT `required`: whether either is mandatory is the owner's
+                decision, because a broker may genuinely not hold a date of birth
+                at first contact. The question is in the walk register. */}
+            {customerType === 'INDIVIDUAL' ? (
+              <div style={formRowStyle}>
+                <div style={fieldStyle}>
+                  <label htmlFor="cust-date-of-birth" style={labelStyle}>
+                    {t('customerFieldDateOfBirth')}
+                  </label>
+                  <input
+                    id="cust-date-of-birth"
+                    type="date"
+                    max={TODAY_ISO}
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={fieldStyle}>
+                  <label htmlFor="cust-nationality" style={labelStyle}>
+                    {t('impFieldNationality')}
+                  </label>
+                  <input
+                    id="cust-nationality"
+                    maxLength={2}
+                    pattern="[A-Za-z]{2}"
+                    value={nationality}
+                    onChange={(e) => setNationality(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+            ) : null}
 
           {customerType === 'CORPORATE' ? (
             <div style={formRowStyle}>
@@ -721,6 +815,37 @@ export function CustomerOnboardingWizard() {
                   required
                   value={uboNationalId}
                   onChange={(e) => setUboNationalId(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              {/* A company has no date of birth or nationality of its own —
+                  `screening-subjects.util.ts` names the UBO subjects as where they
+                  come from. Measured: 2 of 2 UBOs carried neither, so that designed
+                  fallback was empty and every corporate file was screened on a NAME
+                  with no discriminator anywhere on it. */}
+              <div style={fieldStyle}>
+                <label htmlFor="ubo-date-of-birth" style={labelStyle}>
+                  {t('customerFieldDateOfBirth')}
+                </label>
+                <input
+                  id="ubo-date-of-birth"
+                  type="date"
+                  max={TODAY_ISO}
+                  value={uboDateOfBirth}
+                  onChange={(e) => setUboDateOfBirth(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="ubo-nationality" style={labelStyle}>
+                  {t('impFieldNationality')}
+                </label>
+                <input
+                  id="ubo-nationality"
+                  maxLength={2}
+                  pattern="[A-Za-z]{2}"
+                  value={uboNationality}
+                  onChange={(e) => setUboNationality(e.target.value)}
                   style={inputStyle}
                 />
               </div>

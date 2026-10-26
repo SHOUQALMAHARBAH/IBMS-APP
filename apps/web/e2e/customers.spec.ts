@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -40,6 +41,11 @@ const CUSTOMER = {
   fatherName: null,
   grandfatherName: null,
   familyName: "Al-Fulani",
+  // The two screening discriminators. Absent from this fixture until the
+  // detail page started rendering them — an unread field is one a mock never
+  // has to supply, which is why its absence cost nothing and proved nothing.
+  dateOfBirth: "1988-02-29",
+  nationality: "JO",
   registrationNumber: null,
   taxRegistrationNumber: null,
   registeredAddress: null,
@@ -769,4 +775,127 @@ test("customer list and profile screens have no serious/critical accessibility v
   expect(profileResults.violations.filter((v) => v.impact === "serious" || v.impact === "critical")).toEqual(
     [],
   );
+});
+
+/*
+ * «مش المفروض نضيف شو الجنسية و البلد و تاريخ الميلاد عشان عملية اعرف عميلك ولا
+ *  ايش؟ يعني كيف رح تشتغل عملية اعرف عميلك ع الاسم بس؟؟؟»
+ * — the owner's walk, 2026-10-26. She is right that it cannot.
+ *
+ * MEASURED BEFORE BUILDING, and the chain was already complete everywhere else:
+ * the columns exist (with a comment saying name-only matching against ~19,000
+ * sanctions entries is the single largest source of false positives), the DTO
+ * validates both, the service writes both, `buildScreeningSubjects` passes both,
+ * the api returns both — and this form was the ONE link where they never
+ * arrived. The web's own `CreateCustomerInput` had never declared them either,
+ * which the compiler said as soon as the form tried to send one.
+ *
+ * Proven on the data rather than argued: 839 of 840 individuals carry both, all
+ * seeded, and the one that carries neither is the record she registered through
+ * this form on the day of the walk.
+ */
+test("collects the date of birth and nationality, and sends both", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const posted: Record<string, unknown>[] = [];
+  await page.route("http://localhost:4000/customers", (route) => {
+    posted.push(route.request().postDataJSON() as Record<string, unknown>);
+    return route.fulfill({ status: 201, json: CUSTOMER });
+  });
+  await page.route("http://localhost:4000/customers/cust-1/kyc", (route) =>
+    route.fulfill({ status: 201, json: KYC_RECORD }),
+  );
+  await page.route(
+    "http://localhost:4000/customers/duplicate-name-check**",
+    (route) =>
+      route.fulfill({ status: 200, json: { canonicalKey: "k", matches: [] } }),
+  );
+
+  await fillIndividualProfile(page);
+  await page.getByLabel("Date of birth").fill("1988-02-29");
+  // Typed LOWER CASE on purpose: the column's CHECK is `^[A-Z]{2}$`, so a
+  // lower-case code is a 400 from the api — the field has to upper-case it, or
+  // the form sends something it knows will be refused.
+  await page.getByLabel("Nationality").fill("jo");
+  await page
+    .getByRole("button", { name: "Create customer & start KYC" })
+    .click();
+
+  await expect.poll(() => posted.length).toBe(1);
+  expect(posted[0]).toMatchObject({
+    dateOfBirth: "1988-02-29",
+    nationality: "JO",
+  });
+});
+
+/*
+ * «سجلت عميل ك فرد وهيك طلعلي زي – عند هذول الحقول لأني ما ضفتهم لأنه فش الهم
+ *  حقول من البداية» and «لما سجلت عميل ك شركة، الرقم الوطني بطلعله – شرطة»
+ * — both sentences, and ONE cause.
+ *
+ * Measured: of the eleven fields in the profile grid, only the four name parts
+ * were gated on `customerType`. The other seven rendered for both kinds — so an
+ * INDIVIDUAL showed registration number, registered address and nature of
+ * business as three empty rows, and a COMPANY showed a national ID.
+ *
+ * Those three are the very fields the brief believed had no form field. They DO
+ * have form fields, on the corporate branch, which the company she registered
+ * the same day filled successfully — «المنارة للمستحضرات الطبية» carries both.
+ * What was wrong was showing them to a natural person, who can never have any
+ * of them, which is the only reasonable reading of a labelled empty row.
+ */
+test("shows an individual no corporate fields, and a company no national ID", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await mockCustomerDetail(page);
+
+  await page.goto("/customers/cust-1");
+  // Anchored on a field that renders for BOTH kinds, from the same read, so the
+  // absences below cannot pass while the profile is still in flight.
+  await expect(page.getByText("Contact email")).toBeVisible();
+
+  // CUSTOMER is an individual.
+  await expect(page.getByText("National ID")).toBeVisible();
+  await expect(page.getByText("Date of birth")).toBeVisible();
+  await expect(page.getByText("Nationality")).toBeVisible();
+  // The three that used to render as dashes on this very page.
+  const main = page.locator("main");
+  await expectAbsentWithin(main, (s) => s.getByText("Registration number"));
+  await expectAbsentWithin(main, (s) => s.getByText("Registered address"));
+  await expectAbsentWithin(main, (s) => s.getByText("Nature of business"));
+
+  // AND THE OTHER DIRECTION, in the same test on purpose. Asserting only the
+  // individual side would pass against a page that gates nothing in reverse,
+  // which is the half she actually reported: «لما سجلت عميل ك شركة، الرقم
+  // الوطني بطلعله – شرطة».
+  await page.route("http://localhost:4000/customers/cust-1", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...CUSTOMER,
+        customerType: "CORPORATE",
+        legalName: "Al-Manara Medical Supplies",
+        givenName: null,
+        familyName: null,
+        nationalId: null,
+        dateOfBirth: null,
+        nationality: null,
+        registrationNumber: "REG-4471",
+        registeredAddress: "Amman, Jordan",
+        natureOfBusiness: "Medical supplies",
+      },
+    }),
+  );
+  await page.reload();
+  await expect(page.getByText("Registration number")).toBeVisible();
+  await expect(page.getByText("Registered address")).toBeVisible();
+  await expect(page.getByText("Nature of business")).toBeVisible();
+  // A company has no national ID, no date of birth and no nationality of its
+  // own — those belong to the natural persons behind it, which is what the UBO
+  // register is for.
+  await expectAbsentWithin(main, (s) => s.getByText("National ID"));
+  await expectAbsentWithin(main, (s) => s.getByText("Date of birth"));
+  await expectAbsentWithin(main, (s) => s.getByText("Nationality"));
 });

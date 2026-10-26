@@ -1,0 +1,32 @@
+{
+  "discriminators-not-sent": {
+    "file": "apps/web/components/customer/CustomerOnboardingWizard.tsx",
+    "from": "        dateOfBirth:\n          customerType === 'INDIVIDUAL' && dateOfBirth ? dateOfBirth : undefined,",
+    "to": "        dateOfBirth: undefined,",
+    "why": "The state the owner hit: the form collects the date of birth and never sends it, so the column stays null and the screening stays name-only. This is the WHOLE defect in miniature — every other layer carried the field, and only the one at the front did not. Kills customers.spec.ts's 'collects the date of birth and nationality, and sends both' on the `toMatchObject` by name."
+  },
+  "nationality-not-upper-cased": {
+    "file": "apps/web/components/customer/CustomerOnboardingWizard.tsx",
+    "from": "            ? nationality.toUpperCase()",
+    "to": "            ? nationality",
+    "why": "The column's CHECK is `^[A-Z]{2}$` and the DTO mirrors it, so a lower-case code is a 400 — the form would be sending something it already knows will be refused, and the person would see a validator complaint for a field they filled correctly. The test types `jo` deliberately for this reason. Kills the same test on the `nationality: 'JO'` half."
+  },
+  "corporate-fields-shown-to-an-individual": {
+    "file": "apps/web/app/(app)/customers/[id]/page.tsx",
+    "from": "            {customer.customerType === 'CORPORATE' ? (\n              <>\n                <ProfileField\n                  label={t('customerFieldRegistrationNumber')}",
+    "to": "            {true ? (\n              <>\n                <ProfileField\n                  label={t('customerFieldRegistrationNumber')}",
+    "why": "Restores exactly what she saw: an INDIVIDUAL's page rendering registration number, registered address and nature of business as three empty rows — the three fields the brief then listed as having no form field, when in fact she was reading them where they cannot apply. Kills customers.spec.ts's 'shows an individual no corporate fields' on the three `toHaveCount(0)` assertions. `true ?` rather than a deletion because the branch is a ternary and removing it would be a build error rather than a behaviour change."
+  },
+  "national-id-shown-to-a-company": {
+    "file": "apps/web/app/(app)/customers/[id]/page.tsx",
+    "from": "            {customer.customerType === 'INDIVIDUAL' ? (\n              <>\n                <ProfileField\n                  label={t('customerFieldNationalId')}",
+    "to": "            {true ? (\n              <>\n                <ProfileField\n                  label={t('customerFieldNationalId')}",
+    "why": "The other direction, and the half she reported in her own words: «لما سجلت عميل ك شركة، الرقم الوطني بطلعله – شرطة». A company gets a national-ID row with nothing in it, which is the only reasonable reading of a labelled empty row — she concluded a field was missing from registration. Kills the corporate half of the same test, which is why both directions are asserted in one test rather than two."
+  },
+  "date-of-birth-shape-only": {
+    "file": "apps/api/src/modules/customer/dto/screening-identity.dto-parts.ts",
+    "from": "    IsCalendarDate({\n      message: `${DATE_OF_BIRTH_FIELD} must be a day that exists`,\n    })(object, propertyName);",
+    "to": "    void IsCalendarDate;",
+    "why": "Leaves the SHAPE check alone and removes the DAY check — which is the state the field shipped in. `2026-02-30` then validates and is STORED as 2 March: a date of birth nobody typed, on a persisted screening discriminator, which will never match the right list entry and may match the wrong one. The database cannot catch it either, because `Customer_dateOfBirth_not_future` only refuses a future date. Kills screening-identity.dto-parts.spec.ts's 'REFUSES 30 February' and its three sibling cases, and leaves the full-timestamp test passing — which is the proof the two checks are separate refusals rather than one."
+  }
+}
