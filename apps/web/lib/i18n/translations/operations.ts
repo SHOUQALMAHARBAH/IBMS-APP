@@ -256,6 +256,15 @@ export const OPERATIONS = {
       'من يملك إدارة المستخدمين ليس مستثنى من مراجعة صلاحياته. هذا السجل يبيّن أي حسابات ' +
       'المسؤولين شملتها الدورة، ومن راجع كل منها.',
     acrAdminCycleLabel: 'الدورة',
+    // SLICED, none of it typed. «الموضوع» from `commColSubject`, «الدورة» from
+    // `acrAdminCycleLabel` directly above, «تأكيد» from `rdConfirmButton`. New keys
+    // rather than pointers at those three, so a table header on this screen is not
+    // hostage to the wording of a column on another one.
+    // «إزالة» from `rcScopeRemove`.
+    rsRemoveAssetButton: 'إزالة',
+    acrColSubject: 'الموضوع',
+    acrColCycle: 'الدورة',
+    acrConfirmButton: 'تأكيد',
     acrAdminNoCycles: 'لم تُفتح أي دورة مراجعة بعد.',
     acrAdminNoneCovered:
       'لم تشمل هذه الدورة أي حساب مسؤول. هذه هي الحالة التي يمنعها البند 5.1 — راجِع الدورة.',
@@ -926,6 +935,10 @@ export const OPERATIONS = {
       'Whoever can administer users is not exempt from review of their own access. This record ' +
       'shows which administrator accounts a cycle covered, and who reviewed each one.',
     acrAdminCycleLabel: 'Cycle',
+    rsRemoveAssetButton: 'Remove',
+    acrColSubject: 'Subject',
+    acrColCycle: 'Cycle',
+    acrConfirmButton: 'Confirm',
     acrAdminNoCycles: 'No review cycle has been opened yet.',
     acrAdminNoneCovered:
       'This cycle covered no administrator account. That is the condition Part 5.1 exists to ' +

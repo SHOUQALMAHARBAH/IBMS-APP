@@ -116,13 +116,13 @@ export function RecertificationItemsTable({
       <thead>
         <tr>
           <th style={thStyle} scope="col">
-            Subject
+            {t("acrColSubject")}
           </th>
           <th style={thStyle} scope="col">
             {t("acrCurrentRoles")}
           </th>
           <th style={thStyle} scope="col">
-            Cycle
+            {t("acrColCycle")}
           </th>
           <th style={thStyle} scope="col">
             {t("acrStatusDecision")}
@@ -200,7 +200,7 @@ export function RecertificationItemsTable({
                       })}
                       onClick={() => void handleDecide(item, "confirmed")}
                     >
-                      Confirm
+                      {t("acrConfirmButton")}
                     </button>
                     <button
                       type="button"

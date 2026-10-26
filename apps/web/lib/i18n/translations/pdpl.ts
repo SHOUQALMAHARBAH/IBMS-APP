@@ -44,6 +44,15 @@ export const PDPL = {
     consNoDecisionYet: 'لم يُسجَّل أي قرار بعد.',
     consPreviouslyDeclined: 'سبق الرفض.',
     consWithdrawing: 'جارٍ سحب الموافقة…',
+    // SLICED from the line above — «سحب الموافقة» — rather than written. A verbal
+    // noun is this dictionary's own convention for a button («تأكيد», «إزالة»,
+    // «تنزيل»), so no imperative had to be constructed.
+    //
+    // «سحب» and NOT «إلغاء»: in this product «إلغاء» is a policy CANCELLATION, and
+    // the discard control's own note in `common.ts` guards that collision. «سحب
+    // الموافقة» is also the standard term and is already the one this screen uses
+    // while the withdrawal is in flight.
+    consWithdrawButton: 'سحب الموافقة',
     consCaptureFailed: 'فشل تسجيل الموافقة — حاول مرة أخرى.',
     consStatusLoadError: 'تعذّر تحميل حالة الموافقة — حاول مرة أخرى.',
     consWidgetRefusalAct: 'عرض سجلات موافقة هذا العميل',
@@ -511,6 +520,7 @@ export const PDPL = {
     consNoDecisionYet: 'No decision captured yet.',
     consPreviouslyDeclined: 'Previously declined.',
     consWithdrawing: 'Withdrawing…',
+    consWithdrawButton: 'Withdraw consent',
     consCaptureFailed: 'The capture failed — try again.',
     consStatusLoadError: 'Could not load consent status — try again.',
     consWidgetRefusalAct: "view this customer's consent records",

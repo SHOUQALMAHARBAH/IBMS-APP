@@ -167,7 +167,7 @@ export function ConsentCaptureWidget({
             {record.consentTextVersion})
           </span>
           <button type="button" disabled={busy} onClick={() => void withdraw()}>
-            {busy ? t('consWithdrawing') : 'Withdraw'}
+            {busy ? t('consWithdrawing') : t('consWithdrawButton')}
           </button>
         </div>
       ) : (

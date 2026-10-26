@@ -350,6 +350,8 @@ export const COMPLIANCE_RISK = {
       'معرّف وثيقة المسؤولية المهنية (اختياري — الافتراضي هو الحالية)',
     opEventDescriptionLabel: 'وصف حدث مخاطر المسؤولية المهنية',
     opColSource: 'المصدر',
+    // «يدوي» from `integrationMethodManual`, sliced not typed.
+    opSourceManual: 'يدوي',
     opSourcePolicyCheckingDiscrepancy: 'اختلاف في تدقيق الوثيقة',
     opLogRiskButton: 'تسجيل خطر',
     opLogPiButton: 'تسجيل وثيقة مسؤولية مهنية',
@@ -908,6 +910,7 @@ export const COMPLIANCE_RISK = {
       'PI policy id (optional — defaults to the current one)',
     opEventDescriptionLabel: 'PI risk event description',
     opColSource: 'Source',
+    opSourceManual: 'Manual',
     opSourcePolicyCheckingDiscrepancy: 'Policy Checking discrepancy',
     opLogRiskButton: 'Log risk',
     opLogPiButton: 'Log PI policy',

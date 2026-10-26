@@ -276,7 +276,7 @@ export function EndorsementSection({
               </p>
               {e.cancellation ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                  Cancellation ({e.cancellation.basis}) · return premium{' '}
+                  {t('endorsementCancellationLabel')} ({e.cancellation.basis}) · return premium{' '}
                   {formatMoney(e.cancellation.returnPremium, language)}
                 </p>
               ) : null}

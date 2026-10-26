@@ -60,6 +60,16 @@ import re
 import sys
 
 APP = os.path.join('apps', 'web', 'app', '(app)')
+# BLIND SPOT, CLOSED 2026-10-26 — and the largest one this script has had.
+#
+# It scanned `page.tsx` and nothing else, so 63 component files had NEVER been read.
+# The owner's walk found literal English on twelve screens with her own eyes while
+# this reported 0 for every one of them: `StartCyclePanel.tsx` renders the string
+# "Start cycle" as a button label, right beside a `t()` call for the submitting
+# state. Running the EXISTING eight patterns over those files found 17 strings in 9
+# of them, with no new pattern at all — which is the measurement that matters most
+# here: the shapes were fine and the SURFACE was half missing.
+COMPONENTS = os.path.join('apps', 'web', 'components')
 
 # A translated call, so its ARGUMENT (a key) is never mistaken for prose. Removed rather than used to
 # skip the line — failure mode 2 was skipping any line that contained one.
@@ -74,8 +84,23 @@ CODE_PREFIX = ('//', '*', '/*', 'import ', 'export type', 'type ', 'interface ',
 # Two or more words starting with a capital, after ANY boundary that can precede JSX text — including a
 # BACKTICK, which failure mode 3 missed.
 PROSE = re.compile(r'(?:^|[>`]|\}\s|\{\'|\{"|\{`)\s*([A-Z][a-z]+(?:\s+[A-Za-z()—-]+){1,})')
+# FAILURE MODE 9 — a ternary where ONE branch is translated and the other is a bare
+# English literal: `busy ? t('commonWorking') : 'Start cycle'`. The most diagnostic
+# shape there is, because the key EXISTS and the mechanism is known and one state was
+# simply missed.
+#
+# None of the eight can see it. Mode 8 needs a ternary of BARE literals and here one
+# branch is a call; mode 2 strips the `t(...)` and then needs two capitalised words,
+# which `'Withdraw'` and `'manual'` are not.
+ASYMMETRIC_TERNARY = [
+    re.compile(r"[?]\s*t(?:r|Plural)?\([^)]*\)\s*:\s*(['\"])([^'\"]{2,})\1"),
+    re.compile(r"[?]\s*(['\"])([^'\"]{2,})\1\s*:\s*t(?:r|Plural)?\("),
+]
+
 # Words that look like prose but are code or a proper noun the product does not translate.
-ALLOW = re.compile(r'^(?:JOD|OK|PDF|CSV|Claude|Next|React|TypeScript|Prisma)\b')
+# `IBMS` joined this list when the component root opened: the brand in `AppNavbar` is
+# not copy and is translated nowhere.
+ALLOW = re.compile(r'^(?:JOD|OK|PDF|CSV|IBMS|Claude|Next|React|TypeScript|Prisma)\b')
 # Failure mode 1 was LOWERCASE prose — ` (as of ${...})` — which no capital-initial rule can see. So
 # template-literal strings get their own pattern: two or more space-separated lowercase words INSIDE
 # backticks. Narrow on purpose. A route template (`/customers/${id}`) has no spaces and cannot match; a
@@ -206,6 +231,69 @@ TERNARY_LITERAL = re.compile(r"'([A-Za-z]{3,}[A-Za-z ]{0,40})'")
 
 DECLARED_PARENTHETICALS = {
     # ------------------------------------------------------------------------------------------
+    # THE COMPONENT ROOT'S FINDINGS, DECLARED 2026-10-26 — the owner's walk, module 0-c.
+    #
+    # These eleven came out of closing this script's largest blind spot: it had never read
+    # `components/` at all, so 63 files were unscanned and it reported 0 for every screen she
+    # named. Eighteen strings surfaced; SEVEN were derived by slicing a string already
+    # shipping and are gone from this list. These eleven have NO source anywhere in 4,235
+    # English dictionary entries — measured, not judged — so each is a word she has to decide.
+    #
+    # EACH ROW CARRIES WHAT IT MEANS ON ITS SCREEN, not the English word, which is how
+    # decisions 54 and 55 were put to her. They are also a RELATED SET rather than eleven
+    # errands: nine of the eleven are the vocabulary of what happens to a policy after it is
+    # issued — checked, delivered, acknowledged, adjusted, reversed, reconciled against an
+    # insurer's statement — and that is one sitting rather than nine.
+    #
+    #   1. `Start cycle` — StartCyclePanel. OPENS an access-recertification cycle: every
+    #      active person's roles are assigned to a reviewer and the queue below fills. Not
+    #      derivable: «البدء» exists in `secStartingButton` and «الدورة» in
+    #      `acrAdminCycleLabel`, but joining two nouns in construct state is composition
+    #      rather than a slice, and decision 94 reserves that to her.
+    #   2. `your review queue below now reflects it` — the same panel's success line, naming
+    #      WHERE the result of the act appeared. The one thing it must not become is a bare
+    #      «تم»: the queue filling IS the outcome.
+    #   3. `Mark reviewed` — NeedsAssessmentReviewPanel. One half of a maker/checker pair: it
+    #      records that a SECOND person read the needs assessment, which is what lets the
+    #      file be approved afterwards. «المراجعة» exists as a NOUN (`smReview`); the ACT is
+    #      what has no word.
+    #   4. `Previously withdrawn` — ConsentCaptureWidget, beside a DATE. The data subject
+    #      withdrew consent on that day and has made no decision since, which under PDPL is
+    #      a different state from never having consented (`consNoDecisionYet` is translated).
+    #   5. `(pending approval)` and
+    #   6. `(approved)` — CommissionSection, beside a MANUAL COMMISSION OVERRIDE. The figure
+    #      shown is somebody's hand-entered correction to what the broker is owed, and the
+    #      marker says whether a second person has approved it yet. An Arabic reader saw a
+    #      money figure with its approval state in English.
+    #   7. `Insurer statement amount (must equal` — the same screen, a FORM LABEL carrying a
+    #      CONSTRAINT: the amount typed must equal the ledger entry, and the figure follows
+    #      in the label itself. A label stating a rule the save will enforce.
+    #   8. `Premium adjustment` — EndorsementSection, beside a money figure: what the
+    #      endorsement changed the premium BY. «التعديل» exists inside
+    #      `endorsementCalculateButton` («حساب التعديل») but not as this label.
+    #   9. `commission reversal` — the same line: the clawback owed because the premium fell.
+    #      Process 22's own money consequence, rendered in English.
+    #  10. `Checked by` — PolicySection, naming WHO performed the second-pair-of-eyes policy
+    #      check and when. The sentence that makes a maker/checker control readable.
+    #  11. `receipt acknowledged` — the same screen: the client CONFIRMED receiving the
+    #      policy document, on that date. Its opposite, `policyAwaitingAcknowledgement`, is
+    #      already translated — so one half of that pair reads in Arabic and the other does
+    #      not, on one line.
+    #
+    # DELETING a row is how a translation gets recorded, and the gate fails on a STALE row
+    # too. Adding a TWELFTH is not the ordinary fix: derive it, or it is hers.
+    'apps/web/components/access-recertification/StartCyclePanel.tsx|Start cycle',
+    'apps/web/components/access-recertification/StartCyclePanel.tsx|your review queue below now reflects it',
+    'apps/web/components/needs-assessment/NeedsAssessmentReviewPanel.tsx|Mark reviewed',
+    'apps/web/components/pdpl/ConsentCaptureWidget.tsx|Previously withdrawn',
+    'apps/web/components/policy/CommissionSection.tsx|(pending approval)',
+    'apps/web/components/policy/CommissionSection.tsx|(approved)',
+    'apps/web/components/policy/CommissionSection.tsx|Insurer statement amount (must equal',
+    'apps/web/components/policy/EndorsementSection.tsx|Premium adjustment',
+    'apps/web/components/policy/EndorsementSection.tsx|commission reversal',
+    'apps/web/components/policy/PolicySection.tsx|Checked by',
+    'apps/web/components/policy/PolicySection.tsx|receipt acknowledged',
+    # ------------------------------------------------------------------------------------------
     # FAILURE MODE 8's FINDINGS, DECLARED 2026-10-24. NEW DECLARATIONS WITH THEIR OWN REASON —
     # NOT survivors of the nine parentheticals, which were emptied from this very set in the same
     # commit once owner decision 55 translated them. That distinction is the owner's instruction
@@ -300,6 +388,16 @@ def findings(src):
                 text = m.group(1)
                 if text not in NOT_A_LABEL and (i, text) not in out:
                     out.append((i, text + ':'))
+        # FAILURE MODE 9 — one branch of a ternary translated, the other a bare literal.
+        # Read off `raw` rather than `stripped`, because `stripped` has had the `t(...)`
+        # call REMOVED and the asymmetry is the whole signal.
+        for pat in ASYMMETRIC_TERNARY:
+            for m in pat.finditer(raw):
+                text = m.group(2).strip()
+                if (not ALLOW.match(text)
+                        and text.split()[0].lower() not in NOT_BARE_COPY
+                        and (i, text) not in out):
+                    out.append((i, text))
         # FAILURE MODE 8 — a ternary of bare literals, matched only when the line is ENTIRELY
         # a brace expression, which is what separates a rendered child from an attribute
         # value. Both branches are reported, because both render.
@@ -308,6 +406,14 @@ def findings(src):
             # EVERY literal, not a matched pair — a chained ternary has three or more, and
             # the first version silently dropped the earliest one.
             for text in TERNARY_LITERAL.findall(line):
+                # NOT a comparison operand. `{busy === 'review' ? t(...) : 'Mark
+                # reviewed'}` is wholly a brace expression and holds two literals, and
+                # only the second renders — `'review'` is a state value being compared.
+                # Reported alongside a TRUE finding on the same line, which is how a
+                # false positive survives: the line is on the list either way.
+                if re.search(
+                        r'(?:===|!==|==|!=)\s*' + re.escape("'" + text + "'"), line):
+                    continue
                 text = text.strip()
                 if (text.split()[0].lower() not in NOT_BARE_COPY
                         and not ALLOW.match(text)
@@ -369,6 +475,26 @@ def self_test():
             'failure mode 3 — prose after a BACKTICK',
             "                {profile.siteLabel ?? `Risk profile ${profile.id.slice(0, 8)}`}\n",
             True,
+        ),
+        (
+            'failure mode 9 — one branch translated, the other a bare literal',
+            '            {isSubmitting ? t("secStartingButton") : "Start cycle"}\n',
+            True,
+        ),
+        (
+            'failure mode 9 — the same asymmetry the other way round',
+            "              {h.releasable ? 'Active' : t('rdHoldReleased')}\n",
+            True,
+        ),
+        (
+            'a ternary translated on BOTH branches is clean — the whole point of mode 9',
+            "            {busy ? t('commonWorking') : t('impSubmit')}\n",
+            False,
+        ),
+        (
+            'the brand is not copy',
+            "          <span>{'IBMS'}</span>\n",
+            False,
         ),
         (
             'a fully translated line is clean',
@@ -498,6 +624,19 @@ def self_test():
             False,
         ),
         (
+            'a literal used as a COMPARISON OPERAND is not a rendered branch',
+            "            {busy === 'review' ? t('nadRecording') : 'Mark reviewed'}\n",
+            # Still TRUE overall — `Mark reviewed` is a real finding on this line. The
+            # assertion that `review` is gone is in the dedicated case below, because a
+            # boolean self-test cannot express "found one of two".
+            True,
+        ),
+        (
+            'and the comparison operand alone is clean',
+            "            {busy === 'review' ? t('nadRecording') : t('nadDone')}\n",
+            False,
+        ),
+        (
             'a ternary of TRANSLATED calls is clean',
             "          {p.isCurrent ? t('statusRecordCurrent') : t('statusRecordPast')}\n",
             False,
@@ -523,19 +662,38 @@ def main():
     if '--self-test' in sys.argv:
         return self_test()
 
+    # TWO ROOTS. A screen is `app/(app)/<rel>/page.tsx`; a component is any `.tsx`
+    # under `components/`, named by its path so a finding is addressable either way.
     screens = []
     for root, _, files in os.walk(APP):
         if 'page.tsx' in files:
             rel = os.path.relpath(root, APP).replace(os.sep, '/')
             if not args or any(a in rel for a in args):
-                screens.append(rel)
+                screens.append((rel, os.path.join(APP, rel, 'page.tsx')))
+    for root, _, files in os.walk(COMPONENTS):
+        for name in sorted(files):
+            if not name.endswith('.tsx'):
+                continue
+            path = os.path.join(root, name)
+            rel = path.replace(os.sep, '/')
+            if not args or any(a in rel for a in args):
+                screens.append((rel, path))
     screens.sort()
+    # NON-VACUITY FLOOR. A walk that finds nothing reports a clean nothing, which is
+    # indistinguishable from a clean tree — and this script spent eleven batches
+    # reporting 0 for screens that had English on them. 106 pages and 63 components
+    # today; the floor is a minimum so adding either does not trip it.
+    if not args and len(screens) < 150:
+        print('REFUSING: found only %d files to scan; this tree has ~170. '
+              'A run that scans nothing reads exactly like a clean result.' % len(screens),
+              file=sys.stderr)
+        return 2
 
     total = 0
     dirty = 0
     seen = set()
-    for rel in screens:
-        src = io.open(os.path.join(APP, rel, 'page.tsx'), encoding='utf-8').read()
+    for rel, path in screens:
+        src = io.open(path, encoding='utf-8').read()
         hits = findings(src)
         if not hits:
             continue
@@ -548,8 +706,8 @@ def main():
             # down a file is not a stale declaration.
             seen.add('%s|%s' % (rel, text))
 
-    print('\nscreens scanned                     %4d' % len(screens))
-    print('screens with hardcoded English      %4d' % dirty)
+    print('\nfiles scanned (pages + components)  %4d' % len(screens))
+    print('files with hardcoded English        %4d' % dirty)
     print('strings                             %4d' % total)
 
     # THE DECLARATION, IN BOTH DIRECTIONS. `strings` stays the TOTAL and stays printed, so

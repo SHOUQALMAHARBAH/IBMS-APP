@@ -467,7 +467,9 @@ export default function OperationalPiRiskPage() {
               <tr key={ev.id}>
                 <td style={cell}>{ev.description}</td>
                 <td style={cell}>
-                  {ev.isAutoLogged ? t('opSourcePolicyCheckingDiscrepancy') : 'manual'}
+                  {ev.isAutoLogged
+                    ? t('opSourcePolicyCheckingDiscrepancy')
+                    : t('opSourceManual')}
                 </td>
                 <td style={cell}>{ev.mitigationAction ?? '—'}</td>
                 {canManagePiPolicy ? (

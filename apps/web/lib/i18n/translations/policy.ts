@@ -69,6 +69,10 @@ export const POLICY = {
     endorsementEffectiveFromInputLabel: 'ساري من',
     endorsementAdvanceButton: 'تقديم إلى المؤمِّن',
     endorsementCalculateButton: 'حساب التعديل',
+    // «إلغاء» from `rcActionKindCancellation`. CORRECT here and nowhere near the
+    // discard: this really is a cancellation endorsement on a live policy, which is
+    // the one thing «إلغاء» means in this product.
+    endorsementCancellationLabel: 'إلغاء',
     endorsementApplyButton: 'تطبيق',
     endorsementApproveRefundButton: 'الموافقة على الاسترجاع',
     endorsementNotifyButton: 'إخطار العميل',
@@ -390,6 +394,7 @@ export const POLICY = {
     endorsementEffectiveFromInputLabel: 'Effective from',
     endorsementAdvanceButton: 'Advance to insurer',
     endorsementCalculateButton: 'Calculate adjustment',
+    endorsementCancellationLabel: 'Cancellation',
     endorsementApplyButton: 'Apply',
     endorsementApproveRefundButton: 'Approve refund',
     endorsementNotifyButton: 'Notify client',

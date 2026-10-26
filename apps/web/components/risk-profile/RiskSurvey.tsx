@@ -231,7 +231,7 @@ export function RiskSurvey({
                       })}
                       onClick={() => void handleRemove(asset.id)}
                     >
-                      Remove
+                      {t('rsRemoveAssetButton')}
                     </button>
                   </td>
                 ) : null}
