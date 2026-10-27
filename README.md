@@ -1627,7 +1627,17 @@ zero and the reason is a decision rather than unfinished work:
   families live in module 7, whose money is frozen. The four-state `recordHandle` field is
   the answer until then — and *nobody wrote the reference down* must never collapse into
   *this kind of record carries none*.
-* **`RENDERED_IDENTIFIER_BUDGET` IS 10, down from 29 when the pass opened.** The last batch
+* **`RENDERED_IDENTIFIER_BUDGET` IS 12 — CORRECTED 2026-10-27, and it went UP because
+  THE INSTRUMENT WAS WRONG.** It read 10 here, down from 29 when the pass opened, and
+  that was true of what the detector could SEE rather than of what existed: its ternary
+  exclusion treated `??` as a ternary, so the `?? id` fallback — the one shape this
+  budget exists to count — was the one shape it could not see. The owner found it by
+  reading two uuids under «راجعه» and «اعتمده» on `/needs-assessments/[id]` while this
+  gate was green and that screen was not in the measurement at all. Four sites surfaced,
+  two were closed, and the rise absorbs no regression: every newly-visible site PREDATES
+  that batch, the oldest from 2026-09-03. **A falling count can mean the matcher stopped
+  being wrong rather than that something was fixed — and so can a rising one.**
+* **What the 10 recorded, when it was true:** The last batch
   closed eight — three dashboard aggregates, one either-or, three user names, and
   `/dashboards/policy`'s reachable `policyNumber ?? policyId` fallback (owner decision 50,
   which names the customer instead). **Four batched name resolvers now exist, one on each
