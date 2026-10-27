@@ -168,10 +168,11 @@ export default function InternalControlsPage() {
                 : t('icDeclaredOfficeSegregated')}{' '}
               {declared.office.declaredAt
                 ? t('icDeclaredOfficeDeclaredBy', {
-                    who:
-                      declared.office.declaredByName ??
-                      declared.office.declaredByUserId ??
-                      '—',
+                    // `?? declaredByUserId` stood here and rendered A UUID when the
+                    // name could not be resolved — the `?? id` fallback decision 48
+                    // forbids by name, on the self-approval report. The api already
+                    // sends the resolved name; a missing one reports NO NAME.
+                    who: declared.office.declaredByName ?? '—',
                   })
                 : t('icDeclaredOfficeNeverDeclared')}
             </p>

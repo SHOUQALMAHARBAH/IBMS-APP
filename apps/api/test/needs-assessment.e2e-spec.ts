@@ -31,6 +31,11 @@ interface NeedsAssessmentBody {
   createdByUserId: string;
   reviewedByUserId: string | null;
   approvedByUserId: string | null;
+  // Decision 48's resolved names, asserted ON THE WIRE because that is the layer no
+  // typecheck can reach: the web declares its own interface over HTTP, so a field the
+  // api stops sending is `undefined` at runtime and nothing fails at compile time.
+  reviewedByName: string | null;
+  approvedByName: string | null;
   recommendedCoverageLines: string[];
 }
 
@@ -309,6 +314,22 @@ describe('Needs Assessment (e2e) — backlog Part C #5', () => {
       expect((reviewed.body as NeedsAssessmentBody).reviewedByUserId).toBe(
         manager.userId,
       );
+      /*
+       * WHO REVIEWED, BY NAME. The owner read this field's ID under «راجعه» on
+       * `/needs-assessments/[id]`, and the screen now renders the NAME — so the name has
+       * to be on the wire, and it is asserted as a PAIR with the two things that make it
+       * meaningful: it is a real string, and it is NOT the uuid beside it.
+       *
+       * Asserting only `toBeDefined()` would pass against the `?? uuid` fallback this
+       * whole change removes, which is the fallback found live on two other screens.
+       */
+      const reviewedName = (reviewed.body as NeedsAssessmentBody)
+        .reviewedByName;
+      expect(typeof reviewedName).toBe('string');
+      expect(reviewedName).not.toBe(manager.userId);
+      // Not yet approved, so there is no approver to name — and NULL is the honest
+      // answer rather than an empty string or the id.
+      expect((reviewed.body as NeedsAssessmentBody).approvedByName).toBeNull();
 
       const approved = await request(app.getHttpServer())
         .post(`/needs-assessments/${id}/approve`)
@@ -318,6 +339,10 @@ describe('Needs Assessment (e2e) — backlog Part C #5', () => {
       expect((approved.body as NeedsAssessmentBody).approvedByUserId).toBe(
         manager.userId,
       );
+      const approvedName = (approved.body as NeedsAssessmentBody)
+        .approvedByName;
+      expect(typeof approvedName).toBe('string');
+      expect(approvedName).not.toBe(manager.userId);
 
       // APPROVED is terminal — a further move is rejected.
       await request(app.getHttpServer())

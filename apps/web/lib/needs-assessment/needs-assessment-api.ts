@@ -30,6 +30,15 @@ export interface NeedsAssessment {
   createdByUserId: string;
   reviewedByUserId: string | null;
   approvedByUserId: string | null;
+  // WHO, BY NAME — decision 48, resolved by the api through
+  // `UserRepository.displayNamesForUserIds`. The screen rendered the two ids above
+  // under «راجعه» and «اعتمده», which is where the owner read them.
+  //
+  // NULL MEANS NO NAME AND MUST NEVER BE FILLED FROM THE ID BESIDE IT. The ids stay on
+  // the wire because the screen keys other things on them; what may not reach a reader
+  // is the id in place of a name.
+  reviewedByName: string | null;
+  approvedByName: string | null;
   /**
    * Part 4 step 5 — TWO acts, because this is the only one of the sixteen pairs' tables carrying two of
    * them: `NeedsAssessment_reviewer_maker_checker_distinct` (the capturer is not the reviewer) and

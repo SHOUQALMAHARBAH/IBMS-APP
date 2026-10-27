@@ -199,7 +199,7 @@ export default function NeedsAssessmentDetailPage() {
             <div>
               <div style={profileFieldLabelStyle}>{t('nadReviewedBy')}</div>
               <div style={profileFieldValueStyle}>
-                {assessment.reviewedByUserId ?? '—'}
+                {assessment.reviewedByName ?? '—'}
                 {/*
                   Part 4 step 5. The row names a reviewer whether that was a second person or the
                   capturer herself. Under the REVIEWER row specifically, because the approval below has
@@ -213,8 +213,11 @@ export default function NeedsAssessmentDetailPage() {
             </div>
             <div>
               <div style={profileFieldLabelStyle}>{t('nadApprovedBy')}</div>
-              <div style={profileFieldValueStyle}>
-                {assessment.approvedByUserId ?? '—'}
+              {/* The hook is what lets a test assert the uuid is ABSENT from THIS cell
+                  rather than page-wide — `check:absence` refuses the page-wide form, and
+                  it is right to: a role-name loop once matched a nav label. */}
+              <div style={profileFieldValueStyle} data-approver-value>
+                {assessment.approvedByName ?? '—'}
                 <CombinedDutyOnRecord
                   act={assessment.approverCombinedDutyAct}
                   testId="combined-duty-assessment-approver"

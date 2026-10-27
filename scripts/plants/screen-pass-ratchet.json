@@ -7,9 +7,9 @@
   },
   "rendered-identifier-budget-raised": {
     "file": "scripts/measurements/rendered-identifiers.py",
-    "from": "RENDERED_IDENTIFIER_BUDGET = 10",
-    "to": "RENDERED_IDENTIFIER_BUDGET = 11",
-    "why": "THE RATCHET'S OWN DIRECTION. Raising the budget by one is the edit somebody reaches for when a screen regresses, and it is the one thing this gate exists to refuse: the owner struck attrition, so this number only falls. Exits 1 naming the stale figure. REPOINTED 18 -> 16 -> 10 ON 2026-10-24, the ELEVENTH time `plant --self-test` has caught a committed plant whose evidence quietly expired because the work it measures moved — and the eleventh time it was repointed rather than deleted. Note WHICH side it is pointed at: the script and `screen-copy.test.ts` hold this figure in two deliberately independent homes with two independent detectors, and the WEB one is what caught the stale 18 when the script's count fell in batch five. Both have to move together, which is the whole argument for keeping them apart."
+    "from": "RENDERED_IDENTIFIER_BUDGET = 12",
+    "to": "RENDERED_IDENTIFIER_BUDGET = 13",
+    "why": "THE RATCHET'S OWN DIRECTION. Raising the budget by one is the edit somebody reaches for when a screen regresses, and it is the one thing this gate exists to refuse: the owner struck attrition, so this number only falls. Exits 1 naming the stale figure. REPOINTED 18 -> 16 -> 10 -> 12, the TWELFTH time `plant --self-test` has caught a committed plant whose evidence quietly expired, and the twelfth time it was repointed rather than deleted. AND THE 10 -> 12 MOVE IS THE ONE EXCEPTION THIS `why` HAS EVER CARRIED: the figure ROSE, because module 0-c group 7 corrected the detector's seventh blind spot (`??` read as a ternary) and four sites became visible that had always been there — proven by date, the oldest from 2026-09-03. A rise is allowed only for that, and only with the proof beside it. A CORRECTION TO THIS NOTE'S OWN CLAIM: it used to say the script and `screen-copy.test.ts` hold the figure in \"two deliberately independent homes with two independent detectors\". That was never true — the web test SHELLS OUT to this script, so there is one detector and two copies of the number, and the `??` blind spot is what proved it: one blind spot, two numbers agreeing on a figure wrong by four. Both still have to move together."
   },
   "required-typed-identifier-shipped": {
     "file": "apps/web/app/(app)/complaints/page.tsx",

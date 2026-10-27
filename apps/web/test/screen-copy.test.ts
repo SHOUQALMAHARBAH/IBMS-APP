@@ -176,12 +176,26 @@ describe('every screen speaks both languages (rule 6)', () => {
  * resolved by the api. `/complaints`, `/feedback`, `/service-requests`, `/retention-cases`,
  * `/communications`.
  *
- * THIS FIGURE IS A SECOND HOME FOR THE ONE IN `scripts/measurements/rendered-identifiers.py`, and
- * that is not an oversight: the two detectors are different implementations (this one is this file's
- * own regex pass, the script's is its own), so a shared constant would couple two measurements that
- * are deliberately independent. What keeps them honest is that BOTH fail in both directions — this
- * one caught the stale 29 the moment the script's count fell, which is the ratchet's second half
- * doing the job the second half exists for.
+ * THIS FIGURE IS A SECOND HOME FOR THE ONE IN `scripts/measurements/rendered-identifiers.py`.
+ *
+ * CORRECTED 2026-10-27 (module 0-c group 7). The paragraph here used to say the two were
+ * "different implementations (this one is this file's own regex pass, the script's is its own)"
+ * and "deliberately independent". THAT WAS NEVER TRUE: this test has shelled out to that same
+ * script since the commit that wrote it (`0906707`), so there is ONE detector and this is a
+ * second home for the NUMBER, not for the measurement.
+ *
+ * The distinction is not pedantry — it is what the owner's walk proved. The claim said what kept
+ * them honest was independence, and the seventh blind spot (`??` read as a ternary) showed the
+ * opposite: one detector, one blind spot, and two numbers agreeing on a figure that was wrong by
+ * four. Independence would have caught it; a shared subprocess cannot.
+ *
+ * What IS true and worth keeping: both directions still fail here, and this copy caught the stale
+ * 29 the moment the script's count fell.
+ *
+ * 10 -> 12 on 2026-10-27, and the figure ROSE because the instrument was corrected rather than
+ * because anything was added — every newly-visible site predates the batch, which the script's
+ * own note proves by commit and date. Two of the four the widening found are closed in that same
+ * commit through decision 48's resolver.
  *
  * 24 -> 19 on 2026-10-23 (batch six item 2). The floor cannot reach 0 in this module: six of the
  * nineteen are DEFERRED-BY-DECISION to module 7 (owner decision 46 — a readable handle for a
@@ -194,7 +208,7 @@ describe('every screen speaks both languages (rule 6)', () => {
  * DEFERRED-BY-DECISION to module 7 (decision 46), and `/audit-trail`'s polymorphic `entityId`
  * counts BY DECISION 49 — it is labelled with its type's Arabic word now, and the id stays.
  */
-const RENDERED_IDENTIFIER_BUDGET = 10;
+const RENDERED_IDENTIFIER_BUDGET = 12;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {

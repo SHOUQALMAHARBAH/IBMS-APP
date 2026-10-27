@@ -121,7 +121,26 @@ def findings(src):
             # branch is not a display, however close it sits to one. `{u.employeeId ? (`,
             # `{x.approvedByUserId ? t('yes') : t('no')}` and `ids.has(i.id)` all read as hits to a
             # position-only rule, and all three are the id DECIDING something rather than being shown.
-            if re.match(r'\s*(?:\?[^.]|&&|\|\||\)|\s*:\s*$)', after):
+            #
+            # THE SEVENTH BLIND SPOT, AND THE OWNER FOUND IT BY READING A SCREEN.
+            # `[^.]` above was written to let OPTIONAL CHAINING (`?.`) through and it also
+            # let NULLISH COALESCING through, because the second `?` of `??` satisfies it.
+            #
+            # Those two operators mean OPPOSITE things and differ by one character:
+            #
+            #   `{x.approvedByUserId ? t('yes') : t('no')}`   the id is a CONDITION
+            #   `{x.approvedByUserId ?? '—'}`                 the id IS THE VALUE
+            #
+            # So the one shape this budget exists to count was the one shape it could not
+            # see. `CLAUDE.md` describes the class in exactly those terms — *the `?? id`
+            # fallback that always produces something to render and is exactly what the
+            # budget counts* — and the detector was blind to the operator in that sentence.
+            #
+            # Measured: excluding `??` adds FOUR findings across three screens, every one
+            # real and zero false positives. `/needs-assessments/[id]` renders a reviewer
+            # and an approver uuid under their Arabic labels, `/bank-reconciliation` an
+            # invoice id in a table cell, and `/dsr` an insured person's uuid fragment.
+            if re.match(r'\s*(?:\?[^.?]|&&|\|\||\)|\s*:\s*$)', after):
                 continue
             if re.search(r'\.(?:has|includes|indexOf|get|find)\($', before):
                 continue
@@ -203,6 +222,21 @@ def self_test():
             '            onChange={(e) => setVal(c.id, e.target.value)}\n',
             False,
         ),
+        (
+            'THE SEVENTH MISS — a `??` fallback renders the ID ITSELF when the name is absent',
+            "                {assessment.reviewedByUserId ?? '-'}\n",
+            True,
+        ),
+        (
+            'a TERNARY on that same field is the id DECIDING, not being shown',
+            "                {assessment.reviewedByUserId ? t('yes') : t('no')}\n",
+            False,
+        ),
+        (
+            'OPTIONAL CHAINING is still not a finding — the case `[^.]` was written for',
+            '                {assessment.reviewer?.fullName}\n',
+            False,
+        ),
     ]
     failures = 0
     for name, src, expected in cases:
@@ -276,7 +310,31 @@ def self_test():
 # ID STAYS IN FULL because it is the only way a reader can look the record up, and the ruling
 # accepts that: a NAME there would silently stop appearing each time a module is added.
 # Measured — dev holds 32 distinct `entityType` values and db-test 139, against eighteen labels.
-RENDERED_IDENTIFIER_BUDGET = 10
+# 10 -> 12, AND THE FIGURE WENT UP BECAUSE THE INSTRUMENT WAS CORRECTED.
+#
+# The owner read two uuids under «راجعه» and «اعتمده» on `/needs-assessments/[id]` while
+# this gate reported 10 and that screen was not in the measurement at all. The cause is
+# the seventh blind spot above: `??` was being read as a ternary, so the ONE SHAPE this
+# budget exists to count — the `?? id` fallback — was the one shape it could not see.
+#
+# Widening it found FOUR sites. Two are closed in the same commit (decision 48's
+# resolver on `/needs-assessments/[id]`), leaving 12.
+#
+# RAISING A BUDGET IS NOT ALLOWED TO ABSORB A REGRESSION, and this is not one — the
+# proof is that every newly-visible site PREDATES this batch: `/bank-reconciliation`
+# L208 is from 2026-09-03 (`fa6b9d6`, nearly two months) and `/dsr` L225 from
+# 2026-10-19 (`a5184ec`). Nothing was added; a wrong number was corrected. The mirror of
+# the recorded rule that a FALLING count can mean the matcher stopped being wrong rather
+# than that a capability was connected.
+#
+# The two that remain from the widening are both reported rather than fixed:
+#   * `/bank-reconciliation` renders an `invoiceId`, and `Invoice` carries NO readable
+#     handle at all — no number, no reference. Giving it one means inventing this
+#     product's first invoice numbering scheme, which is decision 46's ground exactly
+#     and belongs with the money.
+#   * `/dsr` renders an insured person's uuid fragment where a customer would get a
+#     link. Closing it is an api view change on a PDPL screen.
+RENDERED_IDENTIFIER_BUDGET = 12
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped

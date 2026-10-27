@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectAbsentWithin } from './support/anchored';
 import AxeBuilder from '@axe-core/playwright';
 import { permissionsForRoles } from './fixtures/role-permissions';
 
@@ -384,6 +385,9 @@ test('a declared REVIEW does not declare anything about the approval', async ({
     reviewedByUserId: 'user-1',
     reviewerCombinedDutyAct: REVIEWER_ACT,
     approvedByUserId: 'user-9',
+    // Decision 48's resolved name. The api sends it; the screen renders it INSTEAD of the
+    // id, which is the whole of group 7.
+    approvedByName: 'Layla Al-Checker',
     approverCombinedDutyAct: null,
   });
 
@@ -396,6 +400,22 @@ test('a declared REVIEW does not declare anything about the approval', async ({
   await expect(
     page.getByTestId('combined-duty-assessment-approver'),
   ).toHaveCount(0);
-  // And the approver row still names its approver — the anchor, from the same read.
-  await expect(page.getByText('user-9')).toBeVisible();
+  /*
+   * RE-POINTED, and this one is a REAL REVERSAL rather than a moved selector. It asserted
+   * `getByText('user-9')` — the uuid — as a READY ANCHOR from the same read, which worked
+   * only because the uuid WAS the text in that cell. That is the defect the owner read with
+   * her own eyes under «اعتمده», and `rendered-identifiers.py` reported this screen clean
+   * because its ternary exclusion treated `??` as a ternary.
+   *
+   * The anchor's JOB is unchanged — prove the approver row rendered, from the same read, so
+   * the absence assertion above cannot pass against an unhydrated page. What changed is that
+   * the cell now holds a NAME, and the id is additionally asserted ABSENT, because an anchor
+   * that merely moved would not catch the fallback coming back.
+   */
+  const approverCell = page.locator('[data-approver-value]');
+  await expect(approverCell).toContainText('Layla Al-Checker');
+  // SCOPED, not page-wide: `check:absence` refuses the page-wide form and was right to
+  // here, because the fixture's own `approvedByUserId` is still on the wire and a
+  // page-wide match could find it in a `data-*` attribute rather than in the cell.
+  await expectAbsentWithin(approverCell, (s) => s.getByText('user-9'));
 });

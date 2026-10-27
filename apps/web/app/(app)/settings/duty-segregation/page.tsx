@@ -147,7 +147,8 @@ export default function DutySegregationPage() {
           <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem', margin: 0 }}>
             {view.declaredAt
               ? t('dutyModeDeclaredBy', {
-                  who: view.declaredByName ?? view.declaredByUserId ?? '—',
+                  // The same `?? id` fallback as /internal-controls, found beside it.
+                  who: view.declaredByName ?? '—',
                   when: formatDateTime(view.declaredAt, language),
                 })
               : t('dutyModeNeverDeclared')}
