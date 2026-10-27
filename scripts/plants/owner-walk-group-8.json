@@ -13,8 +13,14 @@
   },
   "console-guard-listens-after-the-navigation": {
     "file": "apps/web/e2e/shell-console-clean.spec.ts",
-    "from": "  const noise = await collect(page);\n  await page.goto(\"/leads\");\n  await expect(page.getByRole(\"navigation\").first()).toBeVisible();\n\n  // Every transition, both directions",
-    "to": "  await page.goto(\"/leads\");\n  const noise = await collect(page);\n  await expect(page.getByRole(\"navigation\").first()).toBeVisible();\n\n  // Every transition, both directions",
-    "why": "A listener attached AFTER the navigation misses everything the first paint emitted, which is most of what a shell emits at all - so the ordering is the whole mechanism and not a style choice. This plant does NOT fail today, deliberately, and is committed saying so: the shell is clean, so there is nothing for the late listener to miss. It is the honest record of a mechanism whose premise its own subject retired, and it fails the first time the shell emits anything during its first paint - which is exactly when somebody would most want to know."
+    "from": "  const { noise, persisted } = await collect(page);\n  await page.goto(\"/leads\");",
+    "to": "  await page.goto(\"/leads\");\n  const { noise, persisted } = await collect(page);",
+    "why": "A listener attached AFTER the navigation misses everything the first paint emitted, which is most of what a shell emits at all - so the ordering is the mechanism and not a style choice. THIS PLANT KILLS NOTHING TODAY AND IS COMMITTED SAYING SO: the shell is clean at first paint, so there is nothing for a late listener to miss, and a plant whose premise its own subject retired is recorded rather than deleted. It fails the first time the shell emits anything during its first paint - which is exactly when somebody would most want to know. The plant that DOES fail is `language-persist-left-unmocked` beside it."
+  },
+  "language-persist-left-unmocked": {
+    "file": "apps/web/e2e/shell-console-clean.spec.ts",
+    "from": "    return route.fulfill({ status: 200, json: ME });",
+    "to": "    return route.abort();",
+    "why": "CI CAUGHT THIS GUARD'S OWN FIXTURE, and it is the honest record of two defects of mine rather than one. `language-context.tsx` persists the preference in the background, fire-and-forget, with a `console.warn` if it fails - its own header says so: the local switch already succeeded and a remote failure is logged, never surfaced as if the switch failed. So an unmocked `PATCH /auth/me/language` makes the app warn CORRECTLY, three times. AND THE ASSERTION WAS ALSO A RACE: it SNAPSHOTTED the console, so it passed on this machine and failed on the runner purely on which side of the fetch rejection the assertion landed - with no api listening in either place. It now waits for the persist COUNT to reach its target, which only ever rises, where polling the noise array would pass on its first poll (the `toHaveCount(0)` trap). Planted, it reproduces CI's exact failure LOCALLY, which the pre-fix version could not do."
   }
 }

@@ -58,8 +58,28 @@ function isExpected(text: string): boolean {
   );
 }
 
-async function collect(page: Page): Promise<string[]> {
+/*
+ * THE LANGUAGE SWITCH PERSISTS IN THE BACKGROUND, and `language-context.tsx` says so in
+ * its own header: the UI flips locally and synchronously, and `PATCH /auth/me/language`
+ * fires fire-and-forget with a `console.warn` if it fails — *"the local action has already
+ * succeeded, a remote-persistence failure is logged, never surfaced as if the switch
+ * itself failed"*.
+ *
+ * So an UNMOCKED endpoint makes the app warn CORRECTLY, and CI caught my fixture rather
+ * than a defect: three `Failed to persist language preference: TypeError: Failed to fetch`.
+ *
+ * It is COUNTED as well as mocked, because the count is the only deterministic signal that
+ * every background request has finished. Without it this test is a race — see the settle
+ * note on each assertion.
+ */
+interface Collected {
+  noise: string[];
+  persisted: () => number;
+}
+
+async function collect(page: Page): Promise<Collected> {
   const noise: string[] = [];
+  let persists = 0;
   page.on("console", (msg) => {
     if (msg.type() !== "error" && msg.type() !== "warning") return;
     const text = msg.text();
@@ -76,19 +96,29 @@ async function collect(page: Page): Promise<string[]> {
   await page.route("http://localhost:4000/leads**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
-  return noise;
+  await page.route("**/auth/me/language", (route) => {
+    persists += 1;
+    return route.fulfill({ status: 200, json: ME });
+  });
+  return { noise, persisted: () => persists };
 }
 
 test("switching the theme writes nothing to the console", async ({ page }) => {
-  const noise = await collect(page);
+  const { noise } = await collect(page);
   await page.goto("/leads");
   await expect(page.getByRole("navigation").first()).toBeVisible();
 
-  // Every transition, both directions — the warning fires on the RERENDER that swaps the
-  // two style objects, so a single click in one direction is not enough to provoke it.
-  // Two buttons only — Light and Dark; there is no System control.
+  // Every transition, both directions — a conflicting-property warning fires on the
+  // RERENDER that swaps the two style objects, so one click in one direction would not
+  // provoke it. Two buttons only: Light and Dark, with no System control.
   for (const name of ["Dark", "Light", "Dark", "Light"]) {
     await page.getByRole("button", { name, exact: true }).click();
+    // The pressed state is the ANCHOR — it proves the rerender happened, which is the
+    // thing being observed. Clicking without it would assert over a page that has not
+    // re-rendered yet.
+    await expect(
+      page.getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
   }
 
   expect(noise, `The shell wrote to the console:\n${noise.join("\n")}`).toEqual(
@@ -99,18 +129,32 @@ test("switching the theme writes nothing to the console", async ({ page }) => {
 test("switching the language writes nothing to the console", async ({
   page,
 }) => {
-  const noise = await collect(page);
+  const { noise, persisted } = await collect(page);
   await page.goto("/leads");
   await expect(page.getByRole("navigation").first()).toBeVisible();
 
   // AR then EN then AR: the active/inactive pair swaps on each press, which is the
-  // rerender the conflicting-property warning is about.
-  for (const name of ["العربية", "English", "العربية"]) {
+  // rerender a conflicting-property warning would fire on.
+  const presses = ["العربية", "English", "العربية"];
+  for (const name of presses) {
     await page.getByRole("button", { name, exact: true }).click();
     await expect(
       page.getByRole("button", { name, exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
   }
+
+  /*
+   * WAIT FOR THE BACKGROUND PERSISTS BEFORE READING THE CONSOLE — otherwise this is a
+   * RACE, and CI proved it: the first version read the array immediately, passed on this
+   * machine, and failed on the runner with three warnings, purely on which side of the
+   * fetch rejection the assertion landed. The `aria-pressed` anchors above prove the
+   * RERENDER happened; they say nothing about a request fired in a `.catch()`.
+   *
+   * The count is the right signal because it only ever RISES to its target — polling an
+   * empty array for noise would pass on its first poll, which is the `toHaveCount(0)`
+   * trap this repository already carries a rule about.
+   */
+  await expect.poll(() => persisted()).toBe(presses.length);
 
   expect(noise, `The shell wrote to the console:\n${noise.join("\n")}`).toEqual(
     [],
