@@ -53,7 +53,14 @@ export const roleBadgeStyle: CSSProperties = {
   fontSize: '0.75rem',
   padding: '0.15rem 0.5rem',
   borderRadius: '999px',
-  border: '1px solid var(--border-strong)',
+  // LONGHAND, DELIBERATELY, and never the `border` shorthand: the variant below
+  // overrides `borderColor`, and React refuses to update a longhand on a rerender when the
+  // shorthand is also set — *"can lead to styling bugs"*, which is its own warning
+  // and not a style preference. Measured across the web tree: FOUR pairs had this
+  // shape, and `style-shorthand-conflict.test.ts` refuses a fifth.
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'var(--border-strong)',
   marginInlineEnd: '0.25rem',
   marginBottom: '0.25rem',
 };

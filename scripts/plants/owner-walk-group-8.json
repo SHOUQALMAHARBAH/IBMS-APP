@@ -1,0 +1,20 @@
+{
+  "mixed-shorthand-on-the-control-she-read": {
+    "file": "apps/web/components/app/app.styles.ts",
+    "from": "  borderWidth: '1px',\n  borderStyle: 'solid',\n  borderColor: 'var(--nav-divider)',",
+    "to": "  border: '1px solid var(--nav-divider)',",
+    "why": "The exact defect the owner read in the console, on the theme toggle and the language switch, on every screen: the base set the `border` SHORTHAND and the active variant spread it and overrode the `borderColor` LONGHAND. React refuses to update a longhand on a rerender while its shorthand is set - its own words are 'can lead to styling bugs' - and on a toggle whose only visual difference IS the border, that is the control failing to show which side is on. KILLS `style-shorthand-conflict.test.ts` BY NAME, naming the pair. It kills NO Playwright test and no rendered-appearance assertion, and that is measured rather than assumed: the warning string lives in `react-dom-client.development.js` and in NO production bundle, and both style objects paint the same 1px solid border. A browser test of this PASSED ON THE BROKEN CODE before the source guard existed."
+  },
+  "shorthand-guard-parses-nothing": {
+    "file": "apps/web/test/style-shorthand-conflict.test.ts",
+    "from": "  const decl = /(?:export )?const (\\w+): CSSProperties = \\{([\\s\\S]*?)\\n\\};/g;",
+    "to": "  const decl = /(?:export )?const (\\w+): NeverUsedType = \\{([\\s\\S]*?)\\n\\};/g;",
+    "why": "THE NON-VACUITY FLOOR, which is the half that matters on a source guard: a parser that stops matching reports a clean nothing, and this repository has paid for that shape repeatedly. Planted, the declaration pattern matches no object and the FLOOR fails by name: 'The declaration parser found 0 style object(s), against a floor of 60.' AND THIS `why` IS CORRECTED FROM THE RUN. Its first version claimed exactly that outcome and was WRONG: the floor's first implementation counted files containing the literal ': CSSProperties = {' through a SEPARATE readFileSync, independent of the regex it was supposed to guard, so this plant applied and BOTH TESTS PASSED. The floor calls `parsedObjects` now - the same function the conflict test parses with - and a floor that does not run the thing it is a floor for is not a floor. Found by running the plant rather than by reading the guard."
+  },
+  "console-guard-listens-after-the-navigation": {
+    "file": "apps/web/e2e/shell-console-clean.spec.ts",
+    "from": "  const noise = await collect(page);\n  await page.goto(\"/leads\");\n  await expect(page.getByRole(\"navigation\").first()).toBeVisible();\n\n  // Every transition, both directions",
+    "to": "  await page.goto(\"/leads\");\n  const noise = await collect(page);\n  await expect(page.getByRole(\"navigation\").first()).toBeVisible();\n\n  // Every transition, both directions",
+    "why": "A listener attached AFTER the navigation misses everything the first paint emitted, which is most of what a shell emits at all - so the ordering is the whole mechanism and not a style choice. This plant does NOT fail today, deliberately, and is committed saying so: the shell is clean, so there is nothing for the late listener to miss. It is the honest record of a mechanism whose premise its own subject retired, and it fails the first time the shell emits anything during its first paint - which is exactly when somebody would most want to know."
+  }
+}

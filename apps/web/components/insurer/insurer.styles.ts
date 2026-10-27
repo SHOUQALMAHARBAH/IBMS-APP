@@ -77,7 +77,14 @@ export const impactCountAttentionStyle: CSSProperties = {
 
 export const lineChipStyle: CSSProperties = {
   display: 'inline-block',
-  border: '1px solid var(--border-subtle)',
+  // LONGHAND, DELIBERATELY, and never the `border` shorthand: the variant below
+  // overrides `borderStyle`, and React refuses to update a longhand on a rerender when the
+  // shorthand is also set — *"can lead to styling bugs"*, which is its own warning
+  // and not a style preference. Measured across the web tree: FOUR pairs had this
+  // shape, and `style-shorthand-conflict.test.ts` refuses a fifth.
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'var(--border-subtle)',
   borderRadius: '999px',
   padding: '0.1rem 0.6rem',
   marginInlineEnd: '0.3rem',

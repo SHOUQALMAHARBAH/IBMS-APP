@@ -97,7 +97,14 @@ export const navbarToggleStyle: CSSProperties = {
   // no background at all, so the browser painted its own default button face
   // on the navy rail.
   background: 'transparent',
-  border: '1px solid var(--nav-divider)',
+  // LONGHAND, DELIBERATELY, and never the `border` shorthand: the variant below
+  // overrides `borderColor`, and React refuses to update a longhand on a rerender when the
+  // shorthand is also set — *"can lead to styling bugs"*, which is its own warning
+  // and not a style preference. Measured across the web tree: FOUR pairs had this
+  // shape, and `style-shorthand-conflict.test.ts` refuses a fifth.
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'var(--nav-divider)',
   color: 'var(--nav-ink)',
   cursor: 'pointer',
   transition: 'background var(--transition-fast)',

@@ -48,7 +48,14 @@ export const cardStyle: CSSProperties = {
   maxWidth: '100%',
   padding: 'var(--space-8)',
   background: 'var(--surface-card)',
-  border: '1px solid var(--border-default)',
+  // LONGHAND, DELIBERATELY, and never the `border` shorthand: the variant below
+  // overrides `borderColor`, and React refuses to update a longhand on a rerender when the
+  // shorthand is also set — *"can lead to styling bugs"*, which is its own warning
+  // and not a style preference. Measured across the web tree: FOUR pairs had this
+  // shape, and `style-shorthand-conflict.test.ts` refuses a fifth.
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'var(--border-default)',
   borderRadius: 'var(--radius-xl)',
   boxShadow: 'var(--shadow-md)',
 };
