@@ -18,12 +18,20 @@
 export const DASHBOARDS = {
   AR: {
     // ---- shared dashboard chrome ----------------------------------------
+    // WITHDRAWN with the fourteen pickers: `dashBranchIdFilterAria` and
+    // `dashInsurerIdFilterAria` were the `aria-label` on the raw inputs, and
+    // `EntitySearch` labels its own control. Their text read «تصفية حسب معرّف الفرع» —
+    // naming our surrogate key, which is exactly what decision 21 corrected in the
+    // LABEL beside them and never in the aria, because `identifier-labels.py` counts a
+    // PROMPT and an aria-label is not one. So two strings that still named a column
+    // went out with the inputs that carried them.
+    //
+    // `spOneEmployee` / `spOneTeam` were PLACEHOLDERS on /sales-performance; each
+    // ENTITY_SOURCES entry supplies its own (`entitySearchBranchPlaceholder`).
     dashBranchIdLabel: 'اعرض فرعاً واحداً فقط',
-    dashBranchIdFilterAria: 'تصفية حسب معرّف الفرع',
     dashInsuranceLineLabel: 'فرع التأمين',
     dashInsuranceLineFilterAria: 'تصفية حسب فرع التأمين',
     dashInsurerIdLabel: 'اعرض شركة تأمين واحدة فقط',
-    dashInsurerIdFilterAria: 'تصفية حسب معرّف شركة التأمين',
     dashPeriodLabel: 'تسمية الفترة',
     dashPeriodStart: 'بداية الفترة',
     dashPeriodEnd: 'نهاية الفترة',
@@ -94,8 +102,6 @@ export const DASHBOARDS = {
     spNoTarget: 'لم تُحدَّد حصة مستهدفة للفترة الحالية بعد.',
     spTargetNewProspects: 'الحصة المستهدفة — عملاء مرتقبون جدد',
     spPickFirst: 'اختر موظفاً أو فرعاً أعلاه.',
-    spOneEmployee: 'موظف واحد',
-    spOneTeam: 'فريق واحد',
     spActualNewProspects: 'الفعلي — عملاء مرتقبون جدد',
     spActualNewLeads: 'الفعلي — عملاء محتملون جدد',
     spAchievement: 'نسبة الإنجاز',
@@ -360,11 +366,9 @@ export const DASHBOARDS = {
   },
   EN: {
     dashBranchIdLabel: 'Show one branch only',
-    dashBranchIdFilterAria: 'Branch ID filter',
     dashInsuranceLineLabel: 'Insurance line',
     dashInsuranceLineFilterAria: 'Insurance line filter',
     dashInsurerIdLabel: 'Show one insurance company only',
-    dashInsurerIdFilterAria: 'Insurer ID filter',
     dashPeriodLabel: 'Period label',
     dashPeriodStart: 'Period start',
     dashPeriodEnd: 'Period end',
@@ -431,8 +435,6 @@ export const DASHBOARDS = {
     spNoTarget: 'No target set for the current period yet.',
     spTargetNewProspects: 'Target — new prospects',
     spPickFirst: 'Pick an employee or a branch above.',
-    spOneEmployee: 'one employee',
-    spOneTeam: 'one team',
     spActualNewProspects: 'Actual — new prospects',
     spActualNewLeads: 'Actual — new leads',
     spAchievement: 'Achievement',

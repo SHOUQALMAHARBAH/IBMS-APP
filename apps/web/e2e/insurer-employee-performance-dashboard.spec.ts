@@ -112,7 +112,32 @@ test("applying the Insurer ID filter sends it only to the insurer-performance re
    * question and not this one. */
   await expect(page.getByText("شركة الأردن للتأمين")).toBeVisible();
 
-  await page.getByLabel("Insurer ID filter").fill("ins-1");
+  /*
+   * RE-POINTED at the picker, and this test's OWN COMMENT above named the reason:
+   * "the filter still TAKES an id, which is the typed-identifier budget's question and
+   * not this one". That question is now answered — the filter takes a NAME, and
+   * `getByLabel("Insurer ID filter")` is gone because the `aria-label` it read was
+   * withdrawn with the input: its text named our surrogate key, which is what decision
+   * 21 corrected in the label beside it and never in the aria.
+   *
+   * The assertion that matters is UNCHANGED and is why this is stronger rather than
+   * merely different: whatever the reader chose must reach the insurer-performance
+   * request and must NOT reach the employee-performance one.
+   */
+  await page.route(
+    "http://localhost:4000/insurers/search**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: [
+          { id: "ins-1", name: "Jordan Insurance", nameAr: "شركة الأردن للتأمين" },
+        ],
+      }),
+  );
+  const insurer = page.locator('[data-entity-search-term="insurer"]');
+  await insurer.fill("Jor");
+  await expect(page.locator('[data-entity-search-list="insurer"]')).toBeVisible();
+  await insurer.press("Enter");
   await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page.getByText("شركة الأردن للتأمين")).toBeVisible();
 

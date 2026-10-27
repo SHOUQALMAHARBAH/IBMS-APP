@@ -15,6 +15,7 @@ import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
@@ -144,16 +145,12 @@ export default function ClaimsDashboardPage() {
           margin: '0.75rem 0',
         }}
       >
-        <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-        >
-          {t('dashBranchIdLabel')}
-          <input
-            aria-label={t('dashBranchIdFilterAria')}
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-          />
-        </label>
+        <EntitySearch
+          kind="branch"
+          value={branchId}
+          onChange={setBranchId}
+          label={t('dashBranchIdLabel')}
+        />
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
         >
@@ -165,16 +162,12 @@ export default function ClaimsDashboardPage() {
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
-        <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-        >
-          {t('dashInsurerIdLabel')}
-          <input
-            aria-label={t('dashInsurerIdFilterAria')}
-            value={insurerId}
-            onChange={(e) => setInsurerId(e.target.value)}
-          />
-        </label>
+        <EntitySearch
+          kind="insurer"
+          value={insurerId}
+          onChange={setInsurerId}
+          label={t('dashInsurerIdLabel')}
+        />
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
         >

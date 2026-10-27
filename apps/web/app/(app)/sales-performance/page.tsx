@@ -15,6 +15,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
 const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
@@ -149,22 +150,18 @@ export default function SalesPerformancePage() {
       {isManager ? (
         <form onSubmit={onLookup} style={formStyle}>
           <h2>{t('spLookUp')}</h2>
-          <label style={labelStyle}>
-            {t('spOwnerUserIdLabel')}
-            <input
-              value={ownerUserId}
-              onChange={(e) => setOwnerUserId(e.target.value)}
-              placeholder={t('spOneEmployee')}
-            />
-          </label>
-          <label style={labelStyle}>
-            {t('dashBranchIdLabel')}
-            <input
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              placeholder={t('spOneTeam')}
-            />
-          </label>
+          <EntitySearch
+            kind="user"
+            value={ownerUserId}
+            onChange={setOwnerUserId}
+            label={t('spOwnerUserIdLabel')}
+          />
+          <EntitySearch
+            kind="branch"
+            value={branchId}
+            onChange={setBranchId}
+            label={t('dashBranchIdLabel')}
+          />
           <label style={labelStyle}>
             {t('spPeriodOptionalLabel')}
             <input

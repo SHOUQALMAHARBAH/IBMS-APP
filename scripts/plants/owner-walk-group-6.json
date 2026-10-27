@@ -1,0 +1,8 @@
+{
+  "branch-picker-choice-thrown-away": {
+    "file": "apps/web/app/(app)/dashboards/claims/page.tsx",
+    "from": "          onChange={setBranchId}",
+    "to": "          onChange={() => undefined}",
+    "why": "`branch` was an ENTITY_SOURCES entry with ZERO CONSUMERS — the component, `GET /admin/branches/search` and a gate naming six dashboard codes plus `insurer-performance.view` all shipped, `picker-route-reachability.mjs` reported `0 stuck` over all eleven screens that type a `branchId`, and not one screen reached for it. Fourteen sites now do, and nothing observed any of them. This plant keeps the picker visible and resolving while DISCARDING what the reader chose, which is the realistic regression: it kills `claims-dashboard.spec.ts`'s 'the branch filter is a name search, and the id it resolves reaches the request' on the `toContain(\"branchId=br-7\")` half while the name-resolution half still passes — which is why that test asserts the PAIR."
+  }
+}

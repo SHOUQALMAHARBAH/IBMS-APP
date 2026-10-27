@@ -19,9 +19,9 @@
   },
   "typed-identifier-budget-raised": {
     "file": "scripts/measurements/typed-identifier-inputs.py",
-    "from": "TYPED_IDENTIFIER_BUDGET = 26",
-    "to": "TYPED_IDENTIFIER_BUDGET = 27",
-    "why": "THE DOWN DIRECTION on the total. Fails naming 26 as the number to lower to."
+    "from": "TYPED_IDENTIFIER_BUDGET = 12",
+    "to": "TYPED_IDENTIFIER_BUDGET = 13",
+    "why": "THE DOWN DIRECTION on the total — what stops the ratchet becoming a ceiling. Fails naming 12 as the number to lower to. REPOINTED 26 -> 12 by module 0-c group 6, which closed fourteen sites: `plant --self-test` refused it the moment the budget moved, which is the mechanism catching its own evidence going stale rather than a person remembering to. The PROPERTY is unchanged and is the half that matters."
   },
   "empty-state-removed": {
     "file": "apps/web/app/(app)/screening-matches/page.tsx",

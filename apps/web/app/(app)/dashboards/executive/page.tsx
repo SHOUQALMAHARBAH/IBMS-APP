@@ -12,6 +12,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
@@ -104,16 +105,12 @@ export default function ExecutiveDashboardPage() {
           margin: '0.75rem 0',
         }}
       >
-        <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-        >
-          {t('execBranchId')}
-          <input
-            aria-label={t('dashBranchIdFilterAria')}
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-          />
-        </label>
+        <EntitySearch
+          kind="branch"
+          value={branchId}
+          onChange={setBranchId}
+          label={t('execBranchId')}
+        />
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
         >

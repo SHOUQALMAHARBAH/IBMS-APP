@@ -74,7 +74,15 @@ HAND_VERIFIED_CORRECT = {
 #
 # Both fail in BOTH directions. Measured 2026-10-22 across 106 screens; both figures matched the
 # screen-pass measurement document's own.
-TYPED_IDENTIFIER_BUDGET = 26
+# 26 -> 12 (module 0-c, group 6): the owner's walk, and the whole fall was WIRING.
+# `EntitySearch`, `GET /admin/branches/search` and a gate naming six dashboard codes all
+# shipped, and `branch` was a source with ZERO CONSUMERS — fourteen sites across eight
+# screens typed a uuid into a field whose chooser was already built and already reachable
+# by every role (`picker-route-reachability.mjs`: 0 stuck). No route, no gate and no
+# permission moved. What remains is measured in `typed-identifier-sources.py`: seven need
+# a search route, two are PARTLY closed, one is CORRECT by decision 41, one is blocked on
+# a grant decision of the owner's, and one can never be closed by a picker at all.
+TYPED_IDENTIFIER_BUDGET = 12
 #
 # 2 -> 0 on 2026-10-23, owner decision 41, and it is now a FLAT BAN with no switch to throw.
 #

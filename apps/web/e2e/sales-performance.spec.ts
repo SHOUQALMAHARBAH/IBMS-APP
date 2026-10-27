@@ -80,7 +80,29 @@ test("a Manager sees a scope picker and a set-target form", async ({
   await expect(
     page.getByRole("heading", { name: "Look up performance" }),
   ).toBeVisible();
-  await page.getByPlaceholder("one employee").fill("user-1");
+  /*
+   * RE-POINTED, and the reversal is the point: this used to type into a raw text input
+   * through `getByPlaceholder("one employee")`, and that placeholder is WITHDRAWN —
+   * `EntitySearch` supplies its own per source. A Manager now SEARCHES BY NAME for the
+   * officer whose book they want, which is what the owner's walk asked for.
+   *
+   * This is STRICTLY STRONGER than what it replaced: it proves the picker resolves a
+   * name to an id AND that the id it resolved is the one that reaches the request. The
+   * old form proved only that a uuid typed by hand was passed through.
+   */
+  await page.route(
+    "http://localhost:4000/admin/users/search**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: [{ id: "user-1", name: "Ahmad Al-Test" }],
+      }),
+  );
+  const officer = page.locator('[data-entity-search-term="user"]');
+  await officer.fill("Ahm");
+  await expect(page.locator('[data-entity-search-list="user"]')).toBeVisible();
+  await officer.press("Enter");
+  await expect(officer).toHaveValue("Ahmad Al-Test");
   await page.getByRole("button", { name: "View performance" }).click();
   await expect(page.getByText("40%")).toBeVisible();
   await expect(

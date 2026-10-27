@@ -20,6 +20,7 @@ import {
   namedFailures,
 } from '../../../../lib/load-independently';
 import { permissionRefusalAllOf } from '../../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const cell: CSSProperties = { padding: '0.35rem 0.75rem', borderBottom: '1px solid var(--border-subtle)', textAlign: 'start' };
@@ -134,14 +135,18 @@ export default function InsurerEmployeePerformanceDashboardPage() {
             onChange={(e) => setPeriodLabel(e.target.value)}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          {t('diepInsurerIdScopedLabel')}
-          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          {t('diepBranchIdScopedLabel')}
-          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
-        </label>
+        <EntitySearch
+          kind="insurer"
+          value={insurerId}
+          onChange={setInsurerId}
+          label={t('diepInsurerIdScopedLabel')}
+        />
+        <EntitySearch
+          kind="branch"
+          value={branchId}
+          onChange={setBranchId}
+          label={t('diepBranchIdScopedLabel')}
+        />
         <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 

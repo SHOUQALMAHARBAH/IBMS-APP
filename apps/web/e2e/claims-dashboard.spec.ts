@@ -62,6 +62,51 @@ test("renders every metric section with real figures", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });
 
+/*
+ * «مش هذا الشكل الغبي المبني» — her words about a uuid field, item 2.3, and this is the
+ * same defect across the seven dashboards and the sales-performance screen.
+ *
+ * THE BRANCH PICKER HAD NO OBSERVER AT ALL, which is why this test exists rather than a
+ * richer assertion inside the test above. `branch` was an `ENTITY_SOURCES` entry with
+ * ZERO CONSUMERS: the component shipped, `GET /admin/branches/search` shipped,
+ * `BRANCH_SEARCH_CODES` named six dashboard codes plus `insurer-performance.view`, and
+ * `picker-route-reachability.mjs` reported `0 stuck` over all eleven screens that type a
+ * `branchId` — and not one screen reached for it. Fourteen sites now do, and a new view
+ * that nothing asserts is a view that can be dropped without anything failing.
+ *
+ * It asserts the PAIR rather than either half: the picker resolves a NAME to an id, AND
+ * that id is what reaches the request. The first alone would pass against a picker whose
+ * choice is thrown away; the second alone would pass against a field still typed by hand.
+ */
+test("the branch filter is a name search, and the id it resolves reaches the request", async ({
+  page,
+}) => {
+  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
+  let lastUrl = "";
+  await page.route("http://localhost:4000/dashboards/claims**", (route) => {
+    lastUrl = route.request().url();
+    return route.fulfill({ status: 200, json: SUMMARY });
+  });
+  await page.route("http://localhost:4000/admin/branches/search**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: [{ id: "br-7", name: "Amman Main", nameAr: "عمّان الرئيسي" }],
+    }),
+  );
+
+  await page.goto("/dashboards/claims");
+  await expect(page.getByRole("heading", { name: "Claims Dashboard" })).toBeVisible();
+
+  const branch = page.locator('[data-entity-search-term="branch"]');
+  await branch.fill("Amm");
+  await expect(page.locator('[data-entity-search-list="branch"]')).toBeVisible();
+  await branch.press("Enter");
+  await expect(branch).toHaveValue("Amman Main");
+
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect.poll(() => lastUrl).toContain("branchId=br-7");
+});
+
 test("a user without the permission sees the underlying error message", async ({ page }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   await page.route("http://localhost:4000/dashboards/claims**", (route) =>
