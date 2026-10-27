@@ -1,0 +1,32 @@
+{
+  "attributes-no-longer-discard-the-line": {
+    "file": "apps/web/app/(app)/audit-trail/page.tsx",
+    "from": "<td style={cell}>{r.isSensitiveDataAccess ? t('commonYes') : ''}</td>",
+    "to": "<td style={cell}>{r.isSensitiveDataAccess ? 'Yes' : ''}</td>",
+    "why": "Group 5's largest finding was that `hardcoded-ui-english.py` discarded the WHOLE LINE on any `style=`, `className`, `key=`, `aria-*` or `data-testid` — 5,218 non-blank lines, 10.7% of the web tree, 1,233 of them also carrying a text position. In this codebase nearly every rendered cell is `<td style={cell}>…</td>`, so twelve patterns were blind to the text beside an attribute. This plant restores the untranslated cell: `npm run check:hardcoded-english` fails with `UNDECLARED audit-trail|Yes`. IT IS HALF OF A PAIR — apply `the-mask-is-what-sees-it` as well and the gate goes GREEN again, which is the only way to show the mask rather than `ONE_WORD_LABEL` is what catches this. On a clean tree the mask alone cannot be observed, because every site it exposed was fixed in the same commit."
+  },
+  "the-mask-is-what-sees-it": {
+    "file": "scripts/measurements/hardcoded-ui-english.py",
+    "from": "        raw = mask_attributes(line_src)",
+    "to": "        raw = line_src",
+    "why": "The other half of the pair above, and it is the one that must be read as a PAIR rather than alone: applied BY ITSELF it changes nothing (0 undeclared before and after), because the six findings the mask exposed were all fixed in the commit that added it. Applied TOGETHER with `attributes-no-longer-discard-the-line`, the gate goes from failing to green — so the mask, not the line-start patterns, is what sees an untranslated cell. A plant that kills nothing on its own and matters in combination is recorded as such rather than deleted, which is this repository's rule about a plant whose premise its own fix retired."
+  },
+  "bare-enum-member-in-a-text-position": {
+    "file": "apps/web/app/(app)/provider-register-office/page.tsx",
+    "from": "                <option value=\"CORPORATE\">\n                  {t(ENUM_LABEL.BrokerKind.CORPORATE)}\n                </option>",
+    "to": "                <option value=\"CORPORATE\">CORPORATE</option>",
+    "why": "FAILURE MODE 13 — the shape the owner's own brief named, *a stored enum member rendered raw*, which fell through all twelve earlier patterns because an ALL-CAPS token looks like machinery: `PROSE` needs a capital plus two words, `ONE_WORD_LABEL` needs a colon, `BARE_TEXT_LINE` needs the line to be nothing else, and modes 8 and 12 need a ternary. Found by READING `/provider-register-office` — a screen she walks as the provider — while the gate reported 0 undeclared over `BrokerKind`, the enum art. 3/a turns on. Fails with `UNDECLARED provider-register-office|CORPORATE`."
+  },
+  "label-after-an-em-dash": {
+    "file": "apps/web/app/(app)/crm/page.tsx",
+    "from": "            {t(ENUM_LABEL.CustomerType[view.customer.customerType])} —{' '}\n            {t('commonStatusLabel')}{' '}",
+    "to": "            {view.customer.legalName} — Status:{' '}",
+    "why": "FAILURE MODE 14 — a label after a SEPARATOR. The prefix alternation admitted the start of a line, a `>`, a backtick and a closing brace, and not the em dash or middot this product uses as its standard separator between two facts on one line, so `{row.customerType} — Status:` was examined and nothing matched. Found by reading `/crm` while fixing the raw enum on the SAME LINE. Measured before adopting: admitting `—` and `·` adds exactly ONE finding across 176 tsx files and it is real, so the widening costs nothing. Fails with `UNDECLARED crm|Status:`."
+  },
+  "crm-customer-type-widened-back-to-string": {
+    "file": "apps/web/lib/crm/crm-api.ts",
+    "from": "    customerType: CustomerType;",
+    "to": "    customerType: string;",
+    "why": "`/crm` printed «INDIVIDUAL» verbatim into an Arabic paragraph, and the reason the total `ENUM_LABEL.CustomerType` map could not simply be used is that this hand-copied HTTP interface declared the field WIDER than the api's own type. A cast at the call site would have silenced the compiler and left a third value rendering `t(undefined)` — the notification-bell defect. Pointing at the exported union makes that unrepresentable, so this plant breaks the BUILD rather than a test: `error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ INDIVIDUAL: …; CORPORATE: … }'`. No Playwright test is reached, which is the stronger result."
+  }
+}

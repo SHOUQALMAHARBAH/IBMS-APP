@@ -16,6 +16,19 @@ export const ENUM_LABEL = {
     DIRECT: 'brokerageKindDirect',
     REINSURANCE: 'brokerageKindReinsurance',
   } satisfies Labels<'DIRECT' | 'REINSURANCE'>,
+  /** Module 0-ب item (b) — the brokerage office's own legal form (art. 3/a: a natural
+   *  person may be licensed for ONE insurance type, a company for both). */
+  BrokerKind: {
+    CORPORATE: 'brokerKindCorporate',
+    NATURAL_PERSON: 'brokerKindNaturalPerson',
+  } satisfies Labels<'CORPORATE' | 'NATURAL_PERSON'>,
+  /** An individual or a company. BOTH KEYS ALREADY EXISTED — the onboarding wizard has
+   *  rendered them since it was built, through a map local to that one component, so
+   *  `/crm` printing the raw member was pure oversight and cost no Arabic at all. */
+  CustomerType: {
+    INDIVIDUAL: 'customerTypeIndividual',
+    CORPORATE: 'customerTypeCorporate',
+  } satisfies Labels<'INDIVIDUAL' | 'CORPORATE'>,
   /** Module 0-ب item (c) — how the system exchanges data with an insurance company. */
   IntegrationMethod: {
     API: 'integrationMethodApi',

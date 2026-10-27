@@ -507,8 +507,12 @@ export default function RegisterBrokerageOfficePage() {
                 onChange={(e) => set('brokerKind')(e.target.value)}
                 style={{ width: '100%' }}
               >
-                <option value="CORPORATE">CORPORATE</option>
-                <option value="NATURAL_PERSON">NATURAL_PERSON</option>
+                <option value="CORPORATE">
+                  {t(ENUM_LABEL.BrokerKind.CORPORATE)}
+                </option>
+                <option value="NATURAL_PERSON">
+                  {t(ENUM_LABEL.BrokerKind.NATURAL_PERSON)}
+                </option>
               </select>
             </label>
             {text('licenseNumber', t('regOfficeLicenseNo'), { required: true })}

@@ -280,7 +280,7 @@ export function NewSlaPolicyForm({ onCreated }: { onCreated: () => void }) {
             {/* REGULATORY only for somebody who may assert legal force — the same code that
                 gates changing an existing policy's source type. */}
             {canAssertRegulatory && (
-              <option value="REGULATORY">REGULATORY</option>
+              <option value="REGULATORY">{t('slapSourceRegulatory')}</option>
             )}
           </select>
         </label>

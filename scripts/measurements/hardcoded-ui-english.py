@@ -109,7 +109,19 @@ def mask_attributes(line):
     return ATTR_QUOTED.sub('ATTR', ATTR_BRACE.sub('ATTR', line))
 # Two or more words starting with a capital, after ANY boundary that can precede JSX text — including a
 # BACKTICK, which failure mode 3 missed.
-PROSE = re.compile(r'(?:^|[>`]|\}\s|\{\'|\{"|\{`)\s*([A-Z][a-z]+(?:\s+[A-Za-z()—-]+){1,})')
+# FAILURE MODE 14 — A LABEL AFTER A SEPARATOR. The prefix alternation below admitted
+# the start of a line, a `>`, a backtick and a closing brace, and NOT the em dash or
+# middot this product uses as its standard separator between two facts on one line.
+# So `{row.customerType} — Status:` was examined and nothing matched: the `}` is
+# followed by a space and then `—`, where the pattern wanted a capital.
+#
+# Found by READING `/crm` while fixing the raw enum beside it on the SAME LINE —
+# which is the shape of every miss in this file's history: the instrument reported
+# clean on a line a person could read English on with their own eyes.
+#
+# Measured before adopting: admitting `—` and `·` adds exactly ONE finding across
+# 176 tsx files, and it is real. Zero false positives, so the widening costs nothing.
+PROSE = re.compile(r'(?:^|[>`—·]|\}\s|\{\'|\{"|\{`)\s*([A-Z][a-z]+(?:\s+[A-Za-z()—-]+){1,})')
 # FAILURE MODE 9 — a ternary where ONE branch is translated and the other is a bare
 # English literal: `busy ? t('commonWorking') : 'Start cycle'`. The most diagnostic
 # shape there is, because the key EXISTS and the mechanism is known and one state was
@@ -139,7 +151,8 @@ TEMPLATE_PROSE = re.compile(r'`[^`]*?\b([a-z]{2,}(?:\s+[a-z]{2,}){1,})\b[^`]*?`'
 #
 # Narrow deliberately: a capitalised word of 3+ letters immediately before a colon. `Status:`, `Current:`,
 # `Withdrawn:` are labels; `http:` and `Record<` are not, and the exclusions below carry the rest.
-ONE_WORD_LABEL = re.compile(r'(?:^|[>`]|\}\s)\s*([A-Z][a-z]{2,})\s*:')
+# Mode 14 applies here too, and this is the pattern that should have caught `/crm`.
+ONE_WORD_LABEL = re.compile(r'(?:^|[>`—·]|\}\s)\s*([A-Z][a-z]{2,})\s*:')
 # FAILURE MODE 6, found in batch 5 by READING a screen for something else: a BARE JSX TEXT LINE holding one
 # English word and no colon. `/insurance-programs/new` rendered a back button whose label was the literal
 # text `← Back`, and every pattern above missed it — PROSE needs two capitalised words, TEMPLATE_PROSE needs
@@ -274,6 +287,30 @@ TERNARY_TEXT = re.compile(r"^\{[^{}]*\?[^{}]*:[^{}]*\}$")
 # next line down.
 TERNARY_INLINE = re.compile(r">\s*(\{[^{}]*\?[^{}]*:[^{}]*\})\s*<")
 TERNARY_LITERAL_2 = re.compile(r"'([A-Za-z]{2,}[A-Za-z ]{0,40})'")
+# FAILURE MODE 13 — A BARE ENUM MEMBER IN A TEXT POSITION:
+# `<option value="CORPORATE">CORPORATE</option>`.
+#
+# This is the shape the owner's own brief named — *a stored enum member rendered
+# raw* — and it had fallen through all twelve earlier patterns for one reason: an
+# ALL-CAPS token LOOKS like machinery. `PROSE` needs a capital plus two words,
+# `ONE_WORD_LABEL` needs a colon, `BARE_TEXT_LINE` needs the line to be nothing
+# else, and modes 8 and 12 need a ternary. A single screaming token matched none.
+#
+# Found by READING `/provider-register-office`, not by this script: the gate said
+# 0 undeclared while that screen offered CORPORATE / NATURAL_PERSON — `BrokerKind`,
+# the enum art. 3/a turns on, on a screen the owner walks as the provider.
+#
+# THE BOUNDARY IS THE POSITION PLUS A SHAPE TEST, and the shape test is what keeps
+# an ACRONYM out. Between `>` and `<` is a text position exactly (mode 12's own
+# discriminator, so no attribute value can reach it). Then a token is an enum
+# member rather than correct copy when it CARRIES AN UNDERSCORE or is SIX
+# CHARACTERS OR MORE: `NATURAL_PERSON`, `CORPORATE` (9), `REGULATORY` (10) are
+# words, while `JOD`, `VAT`, `PDF`, `CBJ`, `KYC`, `AML`, `RFQ`, `SLA`, `DPO`, `UBO`
+# are initialisms that read identically in both languages and are CORRECT copy.
+# Measured across 176 tsx files: the broad form (any ALL-CAPS token) finds exactly
+# THREE, all three real, so the shape test costs nothing today and is forward
+# insurance against the first `>VAT<` somebody writes.
+BARE_ENUM_TEXT = re.compile(r">\s*([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)\s*<")
 TERNARY_LITERAL = re.compile(r"'([A-Za-z]{3,}[A-Za-z ]{0,40})'")
 
 DECLARED_PARENTHETICALS = {
@@ -484,6 +521,13 @@ def findings(src):
                         and not ALLOW.match(text)
                         and (i, text) not in out):
                     out.append((i, text))
+        # FAILURE MODE 13 — a bare enum member between `>` and `<`.
+        for mo in BARE_ENUM_TEXT.finditer(raw):
+            tok = mo.group(1)
+            if ('_' not in tok and len(tok) < 6) or ALLOW.match(tok):
+                continue
+            if (i, tok) not in out:
+                out.append((i, tok))
         # FAILURE MODE 12 — the same shape as 8, inline between `>` and `<`.
         for mo in TERNARY_INLINE.finditer(raw):
             expr = mo.group(1)
@@ -714,6 +758,41 @@ def self_test():
         (
             'a line that is NOTHING but machinery still goes',
             '        <div className="row" data-testid="Some Thing" />\n',
+            False,
+        ),
+        (
+            'failure mode 14 — a label after an em dash separator',
+            "            {view.customer.customerType} — Status:{' '}\n",
+            True,
+        ),
+        (
+            'failure mode 14 — a middot separator, the products other separator',
+            '            {x.name} · Owner: {y}\n',
+            True,
+        ),
+        (
+            'the same line translated is clean',
+            "            {t(ENUM_LABEL.CustomerType[c.customerType])} — {t('commonStatusLabel')}\n",
+            False,
+        ),
+        (
+            'failure mode 13 — a bare enum member as an option label',
+            '        <option value="CORPORATE">CORPORATE</option>\n',
+            True,
+        ),
+        (
+            'failure mode 13 — screaming snake case too',
+            '        <option value="NATURAL_PERSON">NATURAL_PERSON</option>\n',
+            True,
+        ),
+        (
+            'an INITIALISM in a text position is correct copy in both languages',
+            '        <span style={cell}>VAT</span>\n',
+            False,
+        ),
+        (
+            'the same option translated is clean',
+            "        <option value=\"CORPORATE\">{t(ENUM_LABEL.BrokerKind.CORPORATE)}</option>\n",
             False,
         ),
         (

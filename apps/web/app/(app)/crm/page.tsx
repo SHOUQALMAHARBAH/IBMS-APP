@@ -203,7 +203,8 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             <bdi>{view.customer.legalName}</bdi>
           </h2>
           <p style={{ opacity: 0.8, marginTop: '0.2rem' }}>
-            {view.customer.customerType} — Status:{' '}
+            {t(ENUM_LABEL.CustomerType[view.customer.customerType])} —{' '}
+            {t('commonStatusLabel')}{' '}
             {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
           </p>
           <div style={crmCountRowStyle}>

@@ -132,6 +132,18 @@ export const COMPLIANCE_SCREENING = {
     slapCreateUnit: 'الوحدة',
     slapCreateCalendar: 'التقويم',
     slapCreateSourceType: 'مصدر الإلزام',
+    // SLICED from `slaDashRegulatoryTitle` — «هذه المهلة مصدرها نظامي» — which
+    // is this same enum member described on the SLA dashboard, so the word is already
+    // the product's own for this concept. `statusNoRegulatorySource` uses «نظاميّ» for
+    // the absence of one.
+    //
+    // ONE KEY, NOT AN `ENUM_LABEL` FAMILY, AND THAT IS DELIBERATE. `SlaSourceType` has
+    // FIVE members and only this one is hardcoded in a text position; the other four
+    // (INTERNAL_POLICY, CONTRACTUAL, OPERATIONAL, OTHER) have no Arabic anywhere and are
+    // on the owner's list. A family naming one of five would render the member name for
+    // the other four, which is the notification-bell defect this repository has already
+    // paid for — so the family is created when her four words arrive, not before.
+    slapSourceRegulatory: 'نظامي',
     slapRegulatoryCanAct: 'إنشاء هذه السياسة',
     slapRegulatoryCannotAct: 'تسجيلها كمطلوبة بحكم التنظيم',
     slapCreateRegulatoryWarning:
@@ -357,6 +369,9 @@ export const COMPLIANCE_SCREENING = {
     slapCreateUnit: 'Unit',
     slapCreateCalendar: 'Calendar',
     slapCreateSourceType: 'Where this SLA comes from',
+    // The Arabic half of this key carries the derivation and the reason there is no
+    // `ENUM_LABEL.SlaSourceType` family yet. Read it before adding one.
+    slapSourceRegulatory: 'Regulatory',
     slapRegulatoryCanAct: 'create this policy',
     slapRegulatoryCannotAct: 'record it as required by regulation',
     slapCreateRegulatoryWarning:

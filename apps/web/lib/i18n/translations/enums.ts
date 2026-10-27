@@ -12,6 +12,23 @@ export const ENUMS = {
   AR: {
     // Module 0-ب item (c) — نوع ترخيص الوساطة (المادة 3/ب). محور مستقل تمامًا عن نوعي التأمين
     // (عام/حياة) اللذين يُشتقّان من فروع الترخيص ولا يُخزَّنان.
+    // Module 0-ب item (b) — the brokerage office's own LEGAL FORM, which is a
+    // different axis from `BrokerageKind` below (direct vs reinsurance) and from the
+    // life/general split module 0 derives from the licence's branches.
+    //
+    // NEITHER WORD WAS TYPED. «مؤسسة فردية» is SLICED from the owner's own
+    // art. 3/a notice, `rcScopeOneTypeBasisNote`, which reads «هذا المكتب مسجّل
+    // كمؤسسة فردية (شخص طبيعي)» — so the word is hers, on this exact enum, and
+    // the parenthetical there is why the English keeps both halves.
+    //
+    // «شركة» is COPIED from `customerTypeCorporate`. That crosses from a CUSTOMER to
+    // this office, which is stated rather than hidden: it is the same legal-form
+    // distinction (a natural person against a registered company) and `BrokerKind` has
+    // exactly two members, so there is no partnership case for it to be wrong about.
+    // If the owner wants the office's form worded differently from a customer's, this
+    // is the key to change and the comment is why it reads as it does.
+    brokerKindCorporate: 'شركة',
+    brokerKindNaturalPerson: 'مؤسسة فردية',
     brokerageKindDirect: 'وساطة تأمين مباشر',
     brokerageKindReinsurance: 'وساطة إعادة تأمين',
     // Module 0-ب item (c) — طريقة تبادل البيانات مع شركة التأمين. بيانات الدخول والمفاتيح
@@ -320,6 +337,8 @@ export const ENUMS = {
   EN: {
     // Module 0-ب item (c) — the brokerage licence type (art. 3/b). A DIFFERENT AXIS from the
     // life/general types, which are derived from the licence's branches and never stored.
+    brokerKindCorporate: 'Corporate',
+    brokerKindNaturalPerson: 'Natural person (sole establishment)',
     brokerageKindDirect: 'Direct insurance brokerage',
     brokerageKindReinsurance: 'Reinsurance brokerage',
     // Module 0-ب item (c) — how the system exchanges data with an insurance company.
