@@ -40,7 +40,7 @@ import {
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 export default function NeedsAssessmentDetailPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
@@ -285,16 +285,35 @@ export default function NeedsAssessmentDetailPage() {
 
           <section style={{ marginTop: '2rem' }}>
             <h2>{t('nadAnswers')}</h2>
-            <ul>
+            {/*
+              Addressable because `main ul` is AMBIGUOUS on this screen — the recommended-coverage
+              list is a `<ul>` too, and a test scoped to `main ul` resolves to both. A hook here
+              rather than `.first()` in the spec: an index follows whichever list renders first,
+              which is the kind of locator that silently starts asserting about the wrong element.
+            */}
+            <ul data-testid="assessment-answers">
               {questions.map((q) => (
                 <li key={q.id}>
-                  {q.prompt}{' '}
+                  {language === 'AR' ? q.promptAr : q.prompt}{' '}
                   <strong>
+                    {/*
+                      `Yes`/`No` were HARDCODED ENGLISH here — found while converting the prompts
+                      one line above, on the same row of the same screen. The shared keys have
+                      shipped in both languages for months and this list never reached for them, so
+                      an Arabic reader saw an Arabic question answered in English.
+
+                      `hardcoded-ui-english.py` does not see it: failure mode 8 covers a ternary of
+                      bare literals, and requires the LINE to be entirely a brace expression — this
+                      one is wrapped across four lines inside a `<strong>`, so no pattern matches.
+                      Reported in the measurement doc rather than widened here, because widening
+                      mode 8 to multi-line expressions is what its own header warns makes every
+                      bare call a finding.
+                    */}
                     {q.type === 'number'
                       ? String(assessment.questionnaireAnswers[q.id] ?? 0)
                       : assessment.questionnaireAnswers[q.id]
-                        ? 'Yes'
-                        : 'No'}
+                        ? t('commonYes')
+                        : t('commonNo')}
                   </strong>
                 </li>
               ))}

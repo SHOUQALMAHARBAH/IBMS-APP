@@ -13,6 +13,16 @@ export type QuestionType = "boolean" | "number";
 export interface NeedsAssessmentQuestion {
   id: string;
   prompt: string;
+  /**
+   * The same question in Arabic, from the api. REQUIRED rather than optional, and that is what
+   * makes the fix hold: this file's interfaces are hand-copied over HTTP and nothing
+   * type-checks them against the api, so an optional field would let a render site fall back to
+   * the English prompt silently — which is the defect, not a degraded state. The form rendered
+   * `{q.prompt}` unconditionally and an Arabic officer read English questions to a Jordanian
+   * client; `hardcoded-ui-english.py` could never see it, because these strings arrive at
+   * runtime and that scanner reads SOURCE.
+   */
+  promptAr: string;
   type: QuestionType;
 }
 

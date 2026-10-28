@@ -500,7 +500,12 @@ describe('Needs Assessment (e2e) — backlog Part C #5', () => {
         .set(bearer(sales.accessToken))
         .expect(200);
       const body = res.body as {
-        questions: Array<{ id: string; prompt: string; type: string }>;
+        questions: Array<{
+          id: string;
+          prompt: string;
+          promptAr: string;
+          type: string;
+        }>;
         coverageLines: string[];
       };
       expect(body.questions.length).toBeGreaterThan(5);
@@ -508,6 +513,37 @@ describe('Needs Assessment (e2e) — backlog Part C #5', () => {
         true,
       );
       expect(body.coverageLines).toContain('Cyber');
+
+      /*
+       * `promptAr` ON THE WIRE — asserted here because no type can.
+       *
+       * `apps/web/lib/needs-assessment/needs-assessment-api.ts` declares its OWN copy of this
+       * question type over HTTP, and nothing checks the two against each other: the api could
+       * stop sending this field while the web type still insists it is there, and the form would
+       * render a BLANK legend above a Yes/No pair on a questionnaire read aloud to a client.
+       * That is not hypothetical — the `the-arabic-prompts-become-optional` plant demonstrates
+       * exactly it, failing the api's own spec and leaving the web untouched. The recorded rule
+       * is that a view field a screen reads gets a RESPONSE-BODY assertion, and this is it.
+       *
+       * Asserted per question and NAMING the one that fails, rather than as an `every(...)`
+       * boolean: `expected false to be true` would say nothing about which of thirteen.
+       */
+      for (const q of body.questions) {
+        expect(
+          (q.promptAr ?? '').trim(),
+          `${q.id} arrived with no Arabic prompt`,
+        ).not.toBe('');
+        // An Arabic letter, not merely non-empty: the English prompt copied across would
+        // satisfy a length check and IS the defect this closed.
+        expect(
+          /[\u0620-\u064A]/.test(q.promptAr ?? ''),
+          `${q.id}'s Arabic prompt carries no Arabic letter`,
+        ).toBe(true);
+        expect(
+          q.promptAr,
+          `${q.id}'s Arabic prompt is the English one`,
+        ).not.toBe(q.prompt);
+      }
     });
   });
 });

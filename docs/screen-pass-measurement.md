@@ -27,6 +27,38 @@ measurement script, and two already have a CI gate failing in both directions.**
 So the pass is **not** six greenfield sweeps. It is two ungated thirds of fault (1), a triage of
 fault (3), one judgement sweep for fault (4), and three loose ends.
 
+### Fault (4) is blind to every SERVER-SUPPLIED display string — added 2026-10-28
+
+`hardcoded-ui-english.py` reads SOURCE. A string the api sends and a screen renders verbatim is
+therefore invisible to it, however English it is, and that is a property of the instrument rather
+than a pattern it is missing: no widening of its fourteen failure modes can reach a value that
+does not exist in the web tree at all.
+
+**The instance that found it**: `NEEDS_ASSESSMENT_QUESTIONS` carried thirteen English prompts and
+all three render sites printed them unconditionally, so an Arabic officer read ENGLISH questions
+aloud to a Jordanian client on the screen that decides which cover to recommend — while that
+script reported **0** for those screens, correctly by its own rules. It was found by a person
+reading the brief's own table of Arabic prompts, not by any gate.
+
+**The class is not measured and this is not a to-do list.** What would measure it is a different
+question from the one this script asks: *which api response fields are rendered as display text,
+and does each have a bilingual counterpart?* That is a join between the api's view types and the
+web's render sites, which is the shape `check:screen-route-fit` already has for permissions — so
+it is buildable, and it is nobody's work until somebody decides it is.
+
+**What closed the instance**: `promptAr` beside `prompt`, REQUIRED on both the api's type and the
+web's, resolved at render. The REQUIRED half is the mechanism — a fourteenth question is a
+compile error until its Arabic exists — and the owner's thirteen are pinned by sha256 in
+`needs-assessment.config.spec.ts`, because they are her own prose.
+
+**And one more string on the same row, reported rather than widened for**: that answer list
+printed `Yes`/`No` as hardcoded English while `commonYes`/`commonNo` had shipped in both
+languages for months. This one IS in the web source, and the script still misses it: failure
+mode 8 covers a ternary of bare literals but requires the LINE to be entirely a brace
+expression, and that ternary is wrapped across four lines inside a `<strong>`. **Do not widen
+mode 8 to multi-line expressions** — that script's own header records that tolerating more makes
+every bare call a finding, which is the direction that gets a gate loosened.
+
 ---
 
 ## 1. THE SCREEN COUNT, RE-MEASURED
