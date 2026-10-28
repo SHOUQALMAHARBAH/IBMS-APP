@@ -219,6 +219,36 @@ shipping nor derivable by slicing a shipping string.
 
 ---
 
+## Group 6 — the three-way split, measured BEFORE any of it is changed
+
+The brief required this number first, and that **nothing in the class be touched until it is
+reported**. Nothing has been: the pilot changed no server message. What it changed on
+`/payment-channels` and `/internal-controls` are CLIENT-side raw renders and hardcoded English,
+which are different classes with different gates.
+
+`python scripts/measurements/server-message-identifiers.py` — rows to a UTF-8 file, counts to the
+console, because this host's console is cp1252 and the first run died partway through on an arrow.
+
+| class | sites | what it is |
+|---|---|---|
+| **IDENTIFIER** | **424** across 80 files | the refusal interpolates an id — `Claim ${claim.id} is ${claim.status}` hands a reader a uuid at the moment they are already stuck |
+| **ENUM** | **43** | a raw `SCREAMING_SNAKE` member where the product mostly has an Arabic word |
+| **VOCABULARY** | **142** | a field, a permission code or a route — mostly DELIBERATE and mostly correct, reported so the other two are not inflated |
+| scanned | **877** call sites, **609** carrying a readable message across **129** files | |
+
+**THE FIGURE IS NOT THE REGISTER'S 97 OF 282, AND THE DIFFERENCE IS THE POPULATION rather than a
+regression.** That measurement was taken over a narrower set; this one reads every
+`throw new …Exception(` under `apps/api/src` outside the specs, which is 877 call sites. Reported as
+measured, per the instruction.
+
+**It is a REPORT and not a gate, and the counts are a starting point for reading rows.** The matcher
+reads TEXT: a message interpolating a variable called `reference` may be carrying a human-readable
+receipt reference (correct) or a surrogate key (not), and nothing can tell those apart without
+reading it. And the owner's standing rule applies — a message whose vocabulary belongs to a module
+goes to THAT module rather than being rewritten in a design pass.
+
+---
+
 ## The screens
 
 `inline` is `grep -c 'style={{'` on that screen's own file, before → after. `asserts` names the suite
