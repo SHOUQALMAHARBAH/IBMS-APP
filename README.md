@@ -1529,6 +1529,14 @@ build actually is today:
     which is why the instruction is here rather than only in a What's New row.
     `prisma format` is idempotent (proven: formatted twice, byte-identical), so
     a diff after running it is always a diff against HEAD.
+  - **NEVER BUILD A REGEX THROUGH A SHELL HEREDOC ON THIS HOST** — eight occurrences
+    recorded, and one of them is sitting in committed code:
+    `apps/web/test/e2e-anchored-reads.test.ts` held four literal BACKSPACE bytes where
+    its four `\b` word boundaries belong, so two thirds of that guard's matcher never
+    fired. A mangled pattern compiles, matches nothing, and a guard built on it then
+    either passes on everything or flags everything — both of which read as a result.
+    Use the Write or Edit tool, and scan for the byte before trusting a matcher:
+    one pass over the tree found exactly one file carrying it.
   - **2. Maker/checker rules tested** — audited all enforcement points; **already
     fully covered, no new tests needed.** Two earlier "gaps" were
     keyword-search false negatives: DSR closure is tested (its comment says

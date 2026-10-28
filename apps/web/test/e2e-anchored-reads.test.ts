@@ -151,11 +151,18 @@ describe("an absence assertion is anchored on something that proves the page ren
             /toHaveCount\(\s*0\s*\)/.test(stmt) || /not\.toBeVisible\(\)/.test(stmt);
           if (!negative) continue;
           if (!/getByRole\(\s*["']link["']/.test(stmt)) continue;
+          // REPAIRED: this alternation held four literal BACKSPACE bytes where its four
+          // word boundaries belong, so `nav` and `sidebar` matched NOTHING and this guard
+          // ran on its third alternative alone from the day it was written. Measured
+          // before repairing it — both matchers find 0 offenders across all specs, so
+          // nothing was hiding behind it; what the repair buys is the future
+          // `sidebar.getByRole('link', …).toHaveCount(0)`, which the shipped matcher
+          // would have let through.
           // NAV-SCOPED only. A page link is in the accessibility tree — it is not inside a
           // collapsed <details> — so asserting its absence by role is sound, and flagging
           // it would be a false red. `insurers.spec.ts`'s "Register an insurer" is that
           // case and died correctly under the plant.
-          if (!/nav|sidebar|getByRole\(\s*["']navigation["']/.test(stmt)) continue;
+          if (!/\bnav\b|\bsidebar\b|getByRole\(\s*["']navigation["']/.test(stmt)) continue;
           // And exempt a test that ALSO asserts by href: `sidebar-manager.spec.ts`
           // deliberately asserts the accessibility consequence of a collapsed group,
           // anchored by a count(1)+toBeHidden pair on the href. That is the documented

@@ -186,6 +186,66 @@ describe('the per-figure period clause is one component (owner decision 58)', ()
     ).toEqual([]);
   });
 
+  it('every Playwright spec that mocks a dashboard endpoint carries `metricScope` — the field the screen reads unconditionally', () => {
+    /*
+     * THE SIXTH TIME A FIXTURE SHORT OF A FIELD HAS BITTEN, so it is a check now.
+     *
+     * CI found `bidi-text.spec.ts` mocking `/dashboards/policy` without it — a third
+     * copy of that response, in a file about bidi isolation. The screen read
+     * `undefined.activePoliciesCount`, died during render, and the failure appeared on
+     * a `<bdi>` locator that was never the problem. I had widened the two specs whose
+     * NAMES matched the feature rather than the three that mock the endpoint.
+     *
+     * NO FALLBACK WAS ADDED TO THE SCREEN, deliberately, and this is where that
+     * decision is recorded: the `IncidentReport` CBJ panel degrades to «the server did
+     * not send this» because a missing field there is survivable. The degraded state
+     * HERE is a figure with no period clause — which is exactly the bare number owner
+     * decision 58 exists to remove, and it would be invisible. A crash is the correct
+     * failure for this field.
+     *
+     * LIMIT, stated rather than discovered: this checks ONE field by name. It cannot
+     * derive what a screen reads unconditionally — that needs the api's view type, and
+     * `apps/web` cannot import it. A seventh required field needs its own line here.
+     */
+    const e2e = path.join(__dirname, '..', 'e2e');
+    const mocking = fs
+      .readdirSync(e2e)
+      .filter((f) => f.endsWith('.spec.ts'))
+      .map((f) => ({ file: f, src: fs.readFileSync(path.join(e2e, f), 'utf8') }))
+      .filter(
+        ({ src }) =>
+          src.includes('dashboards/policy') || src.includes('dashboards/sales'),
+      );
+
+    // THE FLOOR: a readdir that stops matching reports a clean nothing, and three is
+    // the measured figure.
+    expect(
+      mocking.length,
+      'no spec was found mocking a dashboard endpoint — the matcher broke, which reads exactly like a clean result',
+    ).toBeGreaterThanOrEqual(3);
+
+    const short = mocking
+      // `metricScope\s*:` and NOT `includes('metricScope')` — a plant renaming the key
+      // to `metricScopeRemoved` satisfied the substring check and the guard passed. The
+      // recorded base64-'99' class: a needle that is a PREFIX of something else is not a
+      // needle. Found by the plant, not by reading the matcher.
+      //
+      // And written WITHOUT a word boundary on purpose: the first attempt carried one,
+      // a heredoc turned it into a literal BACKSPACE byte, and the regex then matched
+      // NOTHING — so the guard flagged all three specs, including the two that are
+      // correct. A matcher that matches nothing reads exactly like one finding a real
+      // problem everywhere. The key is always preceded by whitespace in a fixture, so
+      // the boundary bought nothing and cost a false red.
+      .filter(({ src }) => !/metricScope\s*:/.test(src))
+      .map(({ file }) => file);
+    expect(
+      short,
+      'these spec(s) mock a dashboard endpoint without `metricScope`. The screen reads it ' +
+        'unconditionally, so the page dies during render and the failure surfaces on whatever ' +
+        'locator happens to be next — add the field rather than a fallback.',
+    ).toEqual([]);
+  });
+
   it('is not vacuous — the component really does use both keys, and the api really does declare the scope', () => {
     /*
      * THE FLOOR. The check above passes against a renamed key, a deleted component and a

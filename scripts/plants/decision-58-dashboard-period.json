@@ -34,5 +34,11 @@
     "from": "const AR_MONTH_LOCALE = 'ar-JO-u-nu-latn';",
     "to": "const AR_MONTH_LOCALE = 'ar-JO';",
     "why": "The OTHER half of the same tag, and a separate plant because it breaks a different property: `'ar-JO'` gives «تشرين الأول» correctly and renders the year «٢٠٢٦». `AR_LOCALE`'s own note records why that matters - Eastern Arabic-Indic numerals are a real visual change from the Western digits every reference and policy number in this app uses - so this is the version that LOOKS right in a review and differs by numbering system alone. Planted, it kills the digits test, which is the only assertion in the repository that would notice."
+  },
+  "a-dashboard-fixture-short-of-metricScope": {
+    "file": "apps/web/e2e/bidi-text.spec.ts",
+    "from": "    metricScope: {\n      activePoliciesCount: \"asOf\",",
+    "to": "    metricScopeRemoved: {\n      activePoliciesCount: \"asOf\",",
+    "why": "THE DEFECT CI FOUND, in the one form that catches it before CI does. `bidi-text.spec.ts` is a THIRD copy of the policy-dashboard response, in a file whose subject is bidi isolation, and it was the one spec whose NAME does not say it mocks a dashboard - so I widened the two that do and missed it. The screen reads `undefined.activePoliciesCount`, dies during render, and the failure surfaces on a `<bdi>` locator that was never the problem, which is why this cost a CI round trip rather than a read. Planted, it kills the new fixture-shape guard in `report-provenance.test.ts` by name and prints the offending FILE - a vitest guard, so it is caught in seconds rather than nine minutes into the full Playwright suite."
   }
 }
