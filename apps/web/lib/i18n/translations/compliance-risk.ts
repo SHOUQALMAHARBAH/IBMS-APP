@@ -23,6 +23,10 @@ export const COMPLIANCE_RISK = {
       'تُرصد تلقائياً مدفوعات الأقساط الكبيرة غير المعتادة، وعمليات الإلغاء والاسترجاع المتكرّرة، ومصادر الدفع من أطراف ثالثة (مسح ليلي، أو شغّله الآن). ويمكن تصعيد النمط المرصود إلى نشاط مشبوه ثم إبلاغ الجهة المختصة به — ويبقى السجل هنا دليلاً في الحالتين.',
     tmCustomerIdOptionalLabel: 'العميل (اختياري)',
     tmCustomerIdLabel: 'العميل',
+    /* Decision 49's declared fallback, for a `patternType` outside the five the
+     * schema declares. A contiguous slice of `atEntityTypeUnlabelled` = «نوع السجل
+     * كما هو مخزَّن», which reads correctly standing alone as a tooltip. */
+    tmPatternUnlabelled: 'كما هو مخزَّن',
     tmPatternLabel: 'النمط',
     tmDetailLabel: 'التفاصيل',
     tmRunSweepButton: 'تشغيل مسح الكشف الآن',
@@ -607,6 +611,7 @@ export const COMPLIANCE_RISK = {
       'Unusually large premium payments, frequent cancellations/refunds, and third-party payment sources are flagged automatically (nightly sweep, or run it now). Escalate a flagged pattern to suspicious activity, then report it to the competent authority — the record stays here as evidence either way.',
     tmCustomerIdOptionalLabel: 'Customer (optional)',
     tmCustomerIdLabel: 'Customer',
+    tmPatternUnlabelled: 'as stored',
     tmPatternLabel: 'Pattern',
     tmDetailLabel: 'Detail',
     tmRunSweepButton: 'Run detection sweep now',

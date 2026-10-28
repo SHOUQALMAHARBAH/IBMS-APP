@@ -159,7 +159,14 @@ export function createCustomer(input: CreateCustomerInput): Promise<Customer> {
 export interface DuplicateNameMatch {
   id: string;
   legalName: string;
-  status: string;
+  /* `CustomerStatus`, not `string` — this is a CUSTOMER's status, and `Customer.status`
+   * in this same file already declares the union. Two declarations of one field, one of
+   * them loose, is how a label map ends up indexed with a type it cannot take.
+   *
+   * AND IT IS NOT A SCREENING-MATCH STATUS, which decision 59 is about: I read this site
+   * as one and the compiler refused it. `raw-stored-values.py` calls `status` AMBIGUOUS
+   * BY TYPE for exactly this reason. */
+  status: CustomerStatus;
 }
 
 export interface DuplicateNameCheck {

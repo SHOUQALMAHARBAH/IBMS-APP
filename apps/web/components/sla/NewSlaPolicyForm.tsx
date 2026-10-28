@@ -31,6 +31,7 @@ import { useState } from 'react';
 import { ApiError } from '../../lib/auth/api-client';
 import { hasPermission } from '../../lib/auth/permissions';
 import { useAuth } from '../../lib/auth/auth-context';
+import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { errorStyle } from '../auth/auth-form.styles';
 import {
@@ -241,7 +242,9 @@ export function NewSlaPolicyForm({ onCreated }: { onCreated: () => void }) {
           >
             {DURATION_UNITS.map((unit) => (
               <option key={unit} value={unit}>
-                {unit}
+                {/* Decision 59. These five rendered `MINUTES`, `HOURS`… in a list whose
+                    sibling `<select>` was already fully translated. */}
+                {t(ENUM_LABEL.SlaDurationUnit[unit])}
               </option>
             ))}
           </select>
@@ -274,7 +277,10 @@ export function NewSlaPolicyForm({ onCreated }: { onCreated: () => void }) {
           >
             {NON_REGULATORY_SOURCES.map((type) => (
               <option key={type} value={type}>
-                {type}
+                {/* Decision 59, and this is the list where the defect was sharpest: the
+                    REGULATORY option below was ALREADY «نظامي» while these four were raw
+                    English — one Arabic option and four English in one list. */}
+                {t(ENUM_LABEL.SlaSourceType[type])}
               </option>
             ))}
             {/* REGULATORY only for somebody who may assert legal force — the same code that

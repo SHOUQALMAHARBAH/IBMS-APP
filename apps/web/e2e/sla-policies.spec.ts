@@ -292,8 +292,15 @@ test("does NOT offer REGULATORY without sla.policy.regulatory, and says why", as
   const sourceType = page.getByTestId("new-sla-source-type");
   // Anchored on an option that IS offered, so "no REGULATORY option" cannot pass on an empty
   // select that never rendered.
+  //
+  // RE-POINTED, decision 59: the anchor named the raw ENUM MEMBER, which the select stopped
+  // rendering once «داخلي» / "Internal policy" arrived. The ABSENCE half below needed no
+  // change and that is not luck — `getByRole(name)` matches case-insensitive substrings, so
+  // "REGULATORY" still matches a "Regulatory" option if one is ever wrongly offered. The
+  // anchor is the half that had to move, which is the right way round: a stale ANCHOR fails
+  // loudly, where a stale absence assertion would quietly stop being able to fail at all.
   await expect(
-    sourceType.getByRole("option", { name: "INTERNAL_POLICY" }),
+    sourceType.getByRole("option", { name: "Internal policy" }),
   ).toHaveCount(1);
   await expect(
     sourceType.getByRole("option", { name: "REGULATORY" }),

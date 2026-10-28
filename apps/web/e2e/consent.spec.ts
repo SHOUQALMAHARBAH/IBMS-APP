@@ -78,8 +78,16 @@ test("lists consent records with the capture form and withdrawal actions", async
   await expect(
     page.getByRole("heading", { name: "Consent management" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "MARKETING" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "KYC_AML" })).toBeVisible();
+  // RE-POINTED, decision 59, and the reversal is real: both lines asserted the raw ENUM
+  // MEMBER in a Purpose cell, which was correct until the labels arrived. Asserted as a
+  // PAIR now — the label present AND the member name gone — because the first of the two
+  // went on passing for the WRONG REASON: `getByRole(name)` matches case-insensitive
+  // substrings, so "MARKETING" matched the new label "Marketing" and only `KYC_AML`,
+  // whose label is "KYC / AML", actually failed. Half a reversal caught is how a screen
+  // ends up half-converted.
+  await expect(page.getByRole("cell", { name: "Marketing", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "KYC / AML", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "KYC_AML" })).toHaveCount(0);
   await expect(page.getByLabel("Purpose")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record decision" }),

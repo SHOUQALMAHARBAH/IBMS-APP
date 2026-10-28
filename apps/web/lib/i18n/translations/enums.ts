@@ -183,7 +183,25 @@ export const ENUMS = {
     holdStatusReviewRequired: 'تتطلب مراجعة',
     holdStatusBlocked: 'محجوبة',
     // ScreeningMatchStatus
-    matchStatusPending: 'قيد الانتظار',
+    /*
+     * OWNER DECISION 59 — HER OWN WORD, and it stands OVER the string that was shipping.
+     *
+     * This read «قيد الانتظار». The rule is that a word is a slice of a shipping string
+     * OR it is hers; this one is hers, so the shipping string loses.
+     *
+     * HER REASON IS WHY THE WORD MATTERS RATHER THAN THE WORDING: the other two members
+     * are DECISION words. «مستبعد» and «مؤكَّد» are verdicts, so the trio reads as one
+     * family — no verdict yet · excluded · confirmed — whereas «قيد الانتظار» says *in a
+     * queue*, which is a statement about the system's backlog rather than about a
+     * decision somebody owes.
+     *
+     * THE VALUE CHANGED; NO SECOND KEY WAS ADDED. Two words for one state is exactly the
+     * inconsistency her walk reported, and a second key is how it happens — the KYC
+     * wizard and `/screening-matches` would each pick one. Both screens now read this
+     * key through `ENUM_LABEL.ScreeningMatchStatus`, which is what makes one word
+     * structural rather than coincidental.
+     */
+    matchStatusPending: 'لم يُبَتَّ فيه',
     matchStatusCleared: 'مستبعد',
     matchStatusConfirmed: 'مؤكَّد',
     // SlaPolicyStatus

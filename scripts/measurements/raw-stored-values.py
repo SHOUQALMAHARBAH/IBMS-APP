@@ -128,6 +128,46 @@ def tsx_files():
                     yield os.path.join(dirpath, n)
 
 
+# ---------------------------------------------------------------------------
+# DECLARED — owner decision 59. Every shape-A site that is still rendered raw,
+# with the verdict a PERSON reached by reading the model rather than the row.
+#
+# WHY A DECLARATION AND NOT A FIX. This script reads TEXT, not types, so it cannot
+# tell `ConsentRecord.purpose` (a Prisma ENUM, and a defect rendered raw) from
+# `RopaEntry.purpose` (a free String a human typed, and CORRECT rendered raw). It
+# said AMBIGUOUS BY TYPE for all four field names and its *label already ships*
+# section printed empty while THREE such sites existed. The judgement is a reading;
+# what a script can hold is the ANSWER to that reading, and whether a new site has
+# appeared that nobody has read yet.
+#
+# A STALE ROW FAILS TOO — a site that stops being rendered raw must be removed from
+# here, which is what stops this becoming a ceiling. Same design as the declared
+# parentheticals in `hardcoded-ui-english.py`.
+DECLARED_RAW = {
+    # (file, line-expression) -> why rendering the stored value is CORRECT here
+    ('apps/web/app/(app)/dpo-workspace/page.tsx', 'h.scope'):
+        'FREE TEXT. `LegalHold.scope` is `String // description / entity reference '
+        'under hold` — a sentence a person typed about what is held. Rendering a '
+        "human's own words raw is the correct behaviour; a label map here would have "
+        'nothing to map.',
+    ('apps/web/app/(app)/retention-disposal/page.tsx', 'x.legalHold.scope'):
+        'FREE TEXT — the same `LegalHold.scope`, reached through the extension row.',
+    ('apps/web/app/(app)/retention-disposal/page.tsx', 'h.scope'):
+        'FREE TEXT — the same `LegalHold.scope`, on the holds table.',
+    ('apps/web/app/(app)/ropa-entries/page.tsx', 'r.purpose'):
+        'FREE TEXT. `purpose String` on the RoPA entry — the processing purpose an '
+        'officer wrote. NOT `ConsentRecord.purpose`, which is a Prisma ENUM and WAS '
+        'a defect: same field name, two models, opposite answers.',
+    ('apps/web/app/(app)/transaction-monitoring/page.tsx', 'r.patternType'):
+        "DECISION 49's DECLARED FALLBACK, and it is rendered raw ON PURPOSE. The five "
+        'declared patterns take their labels from '
+        '`ENUM_LABEL.TransactionMonitoringPattern`; `patternType` is a free `String` '
+        'in the database with its vocabulary only in the schema doc comment, so a '
+        'SIXTH value is representable and renders AS STORED in monospace under its '
+        'own tooltip — visibly machine text, never dressed up as a name.',
+}
+
+
 def main():
     enums, fields, all_types = enum_fields()
     if len(fields) < 30:
@@ -259,8 +299,57 @@ def main():
         for f in sorted(ambiguous):
             print('    %s' % f)
         print()
-    print('raw-stored-values: a REPORT, not a gate. Read the rows — the five enums above')
-    print('that already have labels are pure oversight and cost no Arabic at all.')
+    print('raw-stored-values: the shape-A rows are a GATE now — see DECLARED_RAW at the')
+    print('top. Everything else here is a REPORT: read the rows.')
+    print()
+
+    # ----------------------------------------------------------------- the gate
+    #
+    # Owner decision 59. Every shape-A site is either FIXED or DECLARED, so the
+    # ambiguous bucket is zero by declaration. A new one fails rather than joining a
+    # list nobody reads, and a STALE row fails too.
+    seen = set()
+    for rel in sorted(shape_a):
+        for line, expr, _es, _plain in shape_a[rel]:
+            seen.add((rel.replace('\\', '/'), expr))
+
+    declared = {(f.replace('\\', '/'), e) for f, e in DECLARED_RAW}
+    undeclared = sorted(seen - declared)
+    stale = sorted(declared - seen)
+
+    # A NON-VACUITY FLOOR. Both comparisons above are satisfied by a scan that found
+    # nothing — the clean-nothing shape this repository has paid for repeatedly — and
+    # five is the measured figure after decision 59.
+    if not seen:
+        print('FAIL  the shape-A scan found NOTHING, which reads exactly like a clean')
+        print('      result. The matcher broke; it is not that every site was fixed.')
+        return 1
+
+    if undeclared:
+        print('FAIL  %d shape-A site(s) are rendered raw and NOT declared:'
+              % len(undeclared))
+        for f, e in undeclared:
+            print('        %s   {%s}' % (f, e))
+        print()
+        print('      READ THE MODEL, not the row: this script cannot tell a Prisma ENUM')
+        print('      rendered raw (a defect) from a free String a human typed (correct).')
+        print('      Then either fix it, or add it to DECLARED_RAW with the reason.')
+        return 1
+
+    if stale:
+        print('FAIL  %d declared row(s) are no longer rendered raw — remove them:'
+              % len(stale))
+        for f, e in stale:
+            print('        %s   {%s}' % (f, e))
+        print()
+        print('      A row that outlives its reason covers whatever lands next, which is')
+        print('      how a declared list becomes a ceiling.')
+        return 1
+
+    print('DECLARED: all %d shape-A site(s) are accounted for, each with its reason.'
+          % len(seen))
+    for f, e in sorted(seen):
+        print('    %s   {%s}' % (f, e))
     return 0
 
 

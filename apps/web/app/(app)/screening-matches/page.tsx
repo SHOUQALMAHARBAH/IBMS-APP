@@ -169,7 +169,9 @@ export default function ScreeningMatchesPage() {
             disabled={busy}
             style={{ fontWeight: s === status ? 700 : 400 }}
           >
-            {s}
+            {/* Decision 59 — «لم يُبَتَّ فيه» · «مؤكَّد» · «مُستبعَد». The label map
+                already shipped all three; this screen rendered the stored value. */}
+            {t(ENUM_LABEL.ScreeningMatchStatus[s])}
           </button>
         ))}
       </div>

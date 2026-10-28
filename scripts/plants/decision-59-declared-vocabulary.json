@@ -1,0 +1,44 @@
+{
+  "consent-renders-the-stored-value-again": {
+    "file": "apps/web/app/(app)/consent/page.tsx",
+    "from": "                      {t(ENUM_LABEL.ConsentPurpose[r.purpose])}",
+    "to": "                      {r.purpose}",
+    "why": "The exact state she walked into, restored: a PDPL consent register whose Purpose column reads `SHARING_WITH_INSURER` at an Arabic reader, while a complete bilingual label map had shipped all along. AND NO TEST OBSERVES IT - stated rather than discovered, because it is the whole reason the gate exists: `declared-vocabulary.test.ts` asserts the MAP is total and nothing in the unit layer renders that cell, while every Playwright fixture supplies its own rows. Planted, `npm run check:raw-values` exits 1 naming the site as an UNDECLARED shape-A render. That is the one instrument that can see it, and it could not see it before decision 59 because it reported `purpose` as AMBIGUOUS BY TYPE and printed its *label already ships* section EMPTY while three such sites existed."
+  },
+  "a-second-key-carries-her-word": {
+    "file": "apps/web/lib/i18n/translations/enums.ts",
+    "from": "    matchStatusPending: 'لم يُبَتَّ فيه',",
+    "to": "    matchStatusPending: 'لم يُبَتَّ فيه',\n    matchStatusPendingShort: 'لم يُبَتَّ فيه',",
+    "why": "The realistic way her ruling gets undone: not by rewording the key she decided, but by a second key beside it for a narrower column - and the owner's instruction was explicit, *change the VALUE of the existing key, do not add a second key*. Two keys holding one word is two answers to one question, free to stop agreeing the next time either is reworded, which is the «التعديلات»/«الملحقات» divergence her own walk reported. Planted, it kills `no OTHER dictionary key carries the same Arabic` by name, printing the offending `enums.ts:matchStatusPendingShort`."
+  },
+  "her-word-as-a-literal-on-a-screen": {
+    "file": "apps/web/app/(app)/screening-matches/page.tsx",
+    "from": "            {t(ENUM_LABEL.ScreeningMatchStatus[s])}",
+    "to": "            {s === 'pending' ? 'لم يُبَتَّ فيه' : t(ENUM_LABEL.ScreeningMatchStatus[s])}",
+    "why": "A hardcoded Arabic literal, which looks like the MOST faithful possible reading of her decision and is the thing that makes it unmaintainable: the word is then correct on this screen and unreachable from anywhere else, so the next rewording leaves two. It is also invisible to `hardcoded-ui-english.py`, which by construction only reports ENGLISH. Planted, it kills `no screen or component carries it as a literal` by name - and that test strips comments first, deliberately, because this very screen records her reasoning in a `{/* … */}` block QUOTING all three words and the first run of the test reported it as an offender."
+  },
+  "the-fallback-never-fires": {
+    "file": "apps/web/lib/i18n/enum-labels.ts",
+    "from": "  return value in ENUM_LABEL.TransactionMonitoringPattern;",
+    "to": "  return true;",
+    "why": "The predicate made to accept everything, which is what a sixth `patternType` meets if anybody 'simplifies' it - and the consequence is the notification-bell defect exactly: `ENUM_LABEL.TransactionMonitoringPattern[x]` is `undefined`, `t(undefined)` renders nothing, and an AML alert appears on a compliance screen with NO WORDS AT ALL. `patternType` is a free `String` whose five values live only in a schema doc comment, so a sixth is representable today. Planted, it kills `the predicate is DERIVED from the map rather than a second list of five` by name on the `structuring_deposits` case."
+  },
+  "a-declared-row-removed": {
+    "file": "scripts/measurements/raw-stored-values.py",
+    "from": "    ('apps/web/app/(app)/ropa-entries/page.tsx', 'r.purpose'):\n        'FREE TEXT. `purpose String` on the RoPA entry — the processing purpose an '\n        'officer wrote. NOT `ConsentRecord.purpose`, which is a Prisma ENUM and WAS '\n        'a defect: same field name, two models, opposite answers.',\n",
+    "to": "",
+    "why": "The first direction of the gate: a shape-A site that nobody has read. Planted, `npm run check:raw-values` exits 1 naming `{r.purpose}` on `/ropa-entries` as UNDECLARED, with the instruction to READ THE MODEL rather than the row - which is the judgement this very row records, because `RopaEntry.purpose` is a free String an officer wrote (correct rendered raw) while `ConsentRecord.purpose` is a Prisma enum under the identical field name (a defect). One word, two models, opposite answers."
+  },
+  "a-stale-declared-row": {
+    "file": "scripts/measurements/raw-stored-values.py",
+    "from": "DECLARED_RAW = {\n",
+    "to": "DECLARED_RAW = {\n    ('apps/web/app/(app)/consent/page.tsx', 'r.purpose'):\n        'left behind after the fix',\n",
+    "why": "The second direction, and the one that stops a declared list becoming a ceiling: a row that OUTLIVED its reason. This is precisely the row that would have been written in October had the fix been a declaration - and left in place, it covers whatever lands next at that exact site, which is how the nine stale parenthetical rows came about. Planted, the gate exits 1 naming it STALE and demanding its removal. Both directions are planted because a gate that only fails on new findings reads as green while its own evidence expires - the staleness class this repository has paid for repeatedly."
+  },
+  "the-schema-parser-stops-matching": {
+    "file": "apps/web/lib/i18n/declared-vocabulary.test.ts",
+    "from": "  const block = new RegExp(`enum ${name} \\\\{([^}]*)\\\\}`).exec(source);\n  if (!block) throw new Error(`enum ${name} not found in schema.prisma`);",
+    "to": "  const block = new RegExp(`enum ${name}Z \\\\{([^}]*)\\\\}`).exec(source);\n  if (!block) return [];",
+    "why": "THE CLEAN-NOTHING SHAPE, planted at the one place it is fatal. Every totality assertion in this file compares a map's keys against a PARSED set, and an empty parsed set makes *every member is worded* vacuously true - four green results from a parser that read nothing, which is how a measurement comes to libel its own subject or bless it. Planted, the non-vacuity floor fails FIRST (`ConsentPurpose parsed 0 member(s)`) and the four totality tests then fail too, which is the honest ordering: the floor is what tells a reader the parser broke rather than the product being clean."
+  }
+}

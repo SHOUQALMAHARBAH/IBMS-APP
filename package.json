@@ -63,6 +63,7 @@
     "check:loaders": "python scripts/measurements/all-or-nothing-loaders.py --check",
     "check:absence": "python scripts/measurements/page-wide-absence-assertions.py --check",
     "check:labels": "python scripts/measurements/identifier-labels.py --check",
+    "check:raw-values": "python scripts/measurements/raw-stored-values.py",
     "check:seed-sweeps": "python scripts/measurements/seed-sweeps-vs-cascade.py --check",
     "check:maker-checker-pairs": "python scripts/measurements/combined-duty-projection.py",
     "check:css-properties": "python scripts/measurements/undefined-css-properties.py",

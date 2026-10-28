@@ -20,6 +20,7 @@ import {
 import { startKyc, submitKyc, type KycRecord } from '../../lib/kyc/kyc-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { assertNoPresetSensitiveDefaults } from '../../lib/forms/privacy-by-default';
+import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import { useLanguage } from '../../lib/i18n/language-context';
 import type { TranslationKey } from '../../lib/i18n/translations';
 import {
@@ -688,7 +689,19 @@ export function CustomerOnboardingWizard() {
                     >
                       <bdi>{match.legalName}</bdi>
                     </a>{' '}
-                    — {match.status}
+                    {/*
+                      Decision 59 — PURE OVERSIGHT, zero Arabic. `ENUM_LABEL.CustomerStatus`
+                      has shipped all four members all along and this rendered the stored
+                      value, in a list an officer reads to recognise a person.
+
+                      AND IT IS A **CUSTOMER** STATUS, NOT A SCREENING-MATCH ONE. I first
+                      wired it to `ScreeningMatchStatus` on the strength of the word
+                      *match* in `duplicateMatches`, and the compiler refused it: this is
+                      the duplicate-NAME check. `/screening-matches` is the only screen
+                      that renders a screening-match status, so decision 59's «لم يُبَتَّ
+                      فيه» has one home and one consumer.
+                    */}
+                    — {t(ENUM_LABEL.CustomerStatus[match.status])}
                   </li>
                 ))}
               </ul>

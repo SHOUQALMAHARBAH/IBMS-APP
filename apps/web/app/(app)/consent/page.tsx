@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   CONSENT_PURPOSES,
+  type ConsentPurpose,
   confirmConsentWithdrawal,
   createConsentRecord,
   listConsentRecords,
@@ -51,7 +52,10 @@ export default function ConsentPage() {
     'customer' | 'insuredPerson' | 'lead'
   >('customer');
   const [ownerId, setOwnerId] = useState('');
-  const [purpose, setPurpose] = useState<string>(CONSENT_PURPOSES[2]); // MARKETING
+  // `ConsentPurpose`, not `string`: `CONSENT_PURPOSES` is already `as const`, so the
+  // union was available and the loose state was the only thing standing between the
+  // label map and a total index.
+  const [purpose, setPurpose] = useState<ConsentPurpose>(CONSENT_PURPOSES[2]); // MARKETING
   const [decision, setDecision] = useState<'grant' | 'decline'>('grant');
   const [consentTextVersion, setConsentTextVersion] = useState('');
   const [filterCustomerId, setFilterCustomerId] = useState('');
@@ -224,10 +228,15 @@ export default function ConsentPage() {
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
             {t('consPurposeLabel')}
+            {/* The cast below is this codebase's own convention for a `<select>`
+                whose options are GENERATED from the union — `NewSlaPolicyForm`
+                does the same — and it is sound because the option set IS the
+                union: every value the handler can receive came from
+                `CONSENT_PURPOSES`. */}
             <select
               aria-label={t('consPurposeLabel')}
               value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
+              onChange={(e) => setPurpose(e.target.value as ConsentPurpose)}
             >
               {CONSENT_PURPOSES.map((p) => (
                 <option key={p} value={p}>
@@ -346,7 +355,20 @@ export default function ConsentPage() {
                         '—'
                       )}
                     </td>
-                    <td style={cell}>{r.purpose}</td>
+                    {/*
+                      Decision 59 — PURE OVERSIGHT, zero Arabic. `ConsentRecord.purpose`
+                      is a `ConsentPurpose` ENUM and `ENUM_LABEL.ConsentPurpose` has
+                      shipped all six members all along; this cell rendered the stored
+                      value beside two cells that were already translated.
+
+                      NOT the same field as `/ropa-entries`' `purpose`, which is a free
+                      `String` a human typed and is CORRECT rendered raw. Same name, two
+                      models, opposite answers — which is why `raw-stored-values.py` calls
+                      this field AMBIGUOUS BY TYPE and why each site is read, not counted.
+                    */}
+                    <td style={cell}>
+                      {t(ENUM_LABEL.ConsentPurpose[r.purpose])}
+                    </td>
                     <td style={cell}>{r.isMarketing ? t('commonYes') : t('commonNo')}</td>
                     <td style={cell}>{r.granted ? t('consStatusGranted') : t('consStatusDeclined')}</td>
                     <td style={cell}>

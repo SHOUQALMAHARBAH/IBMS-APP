@@ -5,6 +5,11 @@
 // to the vocabulary without a label to go with it. That last part is the
 // point: a missing label used to mean raw `PENDING_KYC` on screen, silently.
 import type { TranslationKey } from './translations';
+import type { ConsentPurpose } from '../pdpl/consent-api';
+import type {
+  SlaDurationUnit,
+  SlaSourceType,
+} from '../sla/sla-policy-api';
 
 type Labels<T extends string> = Record<T, TranslationKey>;
 
@@ -378,7 +383,10 @@ export const ENUM_LABEL = {
     KYC_AML: 'consPurposeOptKycAml',
     SHARING_WITH_INSURER: 'consPurposeOptSharingWithInsurer',
     OTHER: 'consPurposeOptOther',
-  } satisfies Labels<string>,
+    /* Typed on the union as of decision 59 rather than on `string`: the field is a
+     * Prisma enum, so the stronger form is available and makes a seventh member a
+     * compile error instead of a cell rendering `undefined`. */
+  } satisfies Labels<ConsentPurpose>,
   CrossBorderLegalBasis: {
     statutory_exception: 'cbtBasisStatutoryException',
     standard_contractual_clauses: 'cbtBasisStandardContractualClauses',
@@ -455,6 +463,33 @@ export const ENUM_LABEL = {
     SYSTEM_SECURITY_ADMINISTRATOR: 'roleNameSystemSecurityAdministrator',
     EXTERNAL_AUDITOR: 'roleNameExternalAuditor',
   } satisfies Labels<string>,
+  /*
+   * OWNER DECISION 59. Both `<select>`s on the new-SLA-policy form rendered their raw
+   * stored values, and one option in the source list was ALREADY translated —
+   * `slapSourceRegulatory` sat in Arabic beside four English ones.
+   *
+   * TYPED ON THE UNION, NOT ON `string`, which is stronger than most entries here:
+   * `Labels<string>` lets any key type-check and return `undefined` at runtime, while
+   * these two make a SIXTH member a compile error. Both vocabularies are closed unions
+   * in `lib/sla/sla-policy-api.ts`, so the stronger form is available and is used.
+   */
+  SlaDurationUnit: {
+    MINUTES: 'slapUnitMinutes',
+    HOURS: 'slapUnitHours',
+    BUSINESS_DAYS: 'slapUnitBusinessDays',
+    CALENDAR_DAYS: 'slapUnitCalendarDays',
+    MONTHS: 'slapUnitMonths',
+  } satisfies Labels<SlaDurationUnit>,
+  SlaSourceType: {
+    /* REGULATORY's label pre-dates this decision and is UNCHANGED — it is also the
+     * reason the other four are bare adjectives rather than noun phrases: «نظامي» is
+     * the form the list already had. */
+    REGULATORY: 'slapSourceRegulatory',
+    INTERNAL_POLICY: 'slapSourceInternalPolicy',
+    CONTRACTUAL: 'slapSourceContractual',
+    OPERATIONAL: 'slapSourceOperational',
+    OTHER: 'slapSourceOther',
+  } satisfies Labels<SlaSourceType>,
   TransactionMonitoringPattern: {
     large_premium_payment: 'tmPatternLargePremiumPayment',
     frequent_cancellations: 'tmPatternFrequentCancellations',
@@ -504,3 +539,26 @@ export const ENUM_LABEL = {
     NO_RESPONSE: 'rfqInsurerStatusNoResponse',
   } satisfies Labels<string>,
 } as const;
+
+/**
+ * IS THIS `patternType` ONE OF THE FIVE THE SCHEMA DECLARES?
+ *
+ * `TransactionMonitoringAlert.patternType` is a free `String` in the database — its
+ * vocabulary is declared in the schema's own doc comment
+ * (`large_premium_payment | frequent_cancellations | frequent_refunds |
+ * third_party_payment_source | other`) and nowhere else — so a SIXTH value is
+ * representable and `ENUM_LABEL.TransactionMonitoringPattern[x]` would be `undefined`
+ * for it. Passing that to `t()` is the notification-bell defect: a count with no words.
+ *
+ * So the screen narrows with this and falls back the way owner decision 49 prescribes —
+ * the stored value rendered AS STORED, visibly machine text, under its own tooltip.
+ * `/audit-trail`'s `entityType` is the worked example and this follows it exactly.
+ *
+ * DERIVED FROM THE MAP, never a second list: a sixth label added above is covered here
+ * the moment it is added, which is the whole reason the keys are not restated.
+ */
+export function isDeclaredTransactionPattern(
+  value: string,
+): value is keyof typeof ENUM_LABEL.TransactionMonitoringPattern {
+  return value in ENUM_LABEL.TransactionMonitoringPattern;
+}

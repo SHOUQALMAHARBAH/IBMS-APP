@@ -143,6 +143,39 @@ export const COMPLIANCE_SCREENING = {
     // on the owner's list. A family naming one of five would render the member name for
     // the other four, which is the notification-bell defect this repository has already
     // paid for — so the family is created when her four words arrive, not before.
+    /*
+     * OWNER DECISION 59 — the two `<select>`s on the new-SLA-policy form rendered their
+     * raw stored values, and the sharpest part is that one option in the SOURCE list was
+     * ALREADY translated: `slapSourceRegulatory` = «نظامي» sat beside four English ones.
+     * One Arabic option and four English in a single list, and the calendar `<select>`
+     * immediately beside it was fully translated.
+     *
+     * EVERY WORD HERE IS A CONTIGUOUS SLICE of a string already shipping — verified by
+     * substring check against the dictionary on disk, not by eye. Nine of the ten words
+     * decision 59 needed were already in the product; the only one that was not is
+     * «تقويمية», and the owner ruled it is not needed.
+     *
+     * `slapUnitCalendarDays` IS «أيام» WITH NO QUALIFIER, which is her decision: the two
+     * options are adjacent in one list — «أيام عمل» then «أيام» — so the contrast carries
+     * the distinction, and a word added to mark a difference the list already shows is
+     * cost without gain.
+     *
+     * `slapSourceInternalPolicy` IS «داخلي», NOT a composed «سياسة داخلية». Both halves
+     * ship separately, and joining them would have been a composition rather than a
+     * slice — but it is not needed: `dataClassInternal` ships «داخلي» as a standalone
+     * enum label, and this feature's own `slaDashRegulatoryTitle` already contrasts
+     * «نظامي» with «داخلي» in exactly this sense. It also keeps the list a list of
+     * ADJECTIVES instead of one noun phrase among four.
+     */
+    slapUnitMinutes: 'دقائق',
+    slapUnitHours: 'ساعات',
+    slapUnitBusinessDays: 'أيام عمل',
+    slapUnitCalendarDays: 'أيام',
+    slapUnitMonths: 'أشهر',
+    slapSourceInternalPolicy: 'داخلي',
+    slapSourceContractual: 'تعاقدي',
+    slapSourceOperational: 'تشغيلي',
+    slapSourceOther: 'أخرى',
     slapSourceRegulatory: 'نظامي',
     slapRegulatoryCanAct: 'إنشاء هذه السياسة',
     slapRegulatoryCannotAct: 'تسجيلها كمطلوبة بحكم التنظيم',
@@ -371,6 +404,15 @@ export const COMPLIANCE_SCREENING = {
     slapCreateSourceType: 'Where this SLA comes from',
     // The Arabic half of this key carries the derivation and the reason there is no
     // `ENUM_LABEL.SlaSourceType` family yet. Read it before adding one.
+    slapUnitMinutes: 'Minutes',
+    slapUnitHours: 'Hours',
+    slapUnitBusinessDays: 'Business days',
+    slapUnitCalendarDays: 'Calendar days',
+    slapUnitMonths: 'Months',
+    slapSourceInternalPolicy: 'Internal policy',
+    slapSourceContractual: 'Contractual',
+    slapSourceOperational: 'Operational',
+    slapSourceOther: 'Other',
     slapSourceRegulatory: 'Regulatory',
     slapRegulatoryCanAct: 'create this policy',
     slapRegulatoryCannotAct: 'record it as required by regulation',
