@@ -325,6 +325,103 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
   });
 });
 
+/*
+ * OWNER DECISION 57 — «لا يوجد عملاء بعد» on a register that could never fill.
+ *
+ * Three roles held `customer.read`, so `/customers` opened; the list beneath that gate is
+ * filtered to the customers the actor OWNS, and ownership is creator-assigned with no
+ * transfer path — `customer.create` is SALES alone, `customer.bulk-import` is the two
+ * administrator roles. So for CLAIMS, FINANCE and PLACEMENT the filter returned exactly
+ * zero rows permanently and by construction, and the screen said *there are no customers
+ * yet*: a false statement about the OFFICE rather than a true one about the reader.
+ *
+ * THE FIX IS THE GRANT, NOT THE STRING, and the second test here is why. Rewording the
+ * empty state would have been worse than leaving it: the two administrator roles own
+ * every row they import, so "none of these are yours" becomes false for them the moment
+ * they use the importer.
+ */
+describe("permission grid — owner decision 57, the customer register's empty state", () => {
+  const ALL_OWNERS = "customer.all-owners.read";
+
+  it("«لا يوجد عملاء بعد» — the three roles that could never own a customer hold the cross-owner read, BY NAME", () => {
+    const entry = PERMISSIONS.find((p) => p.code === ALL_OWNERS);
+    expect(entry, `${ALL_OWNERS} must exist in the grid`).toBeDefined();
+    /*
+     * AN EXACT SET, not a `toContain` per role. A containment check passes while a role
+     * nobody decided on arrives beside the seven, and this code is a CROSS-OWNER read:
+     * an extra holder is a disclosure somebody has to have argued for.
+     */
+    expect([...entry!.roles].sort()).toEqual(
+      [
+        RoleName.BRANCH_DEPARTMENT_MANAGER,
+        RoleName.CLAIMS_OFFICER,
+        RoleName.COMPLIANCE_OFFICER,
+        RoleName.EXECUTIVE_MANAGEMENT,
+        RoleName.EXTERNAL_AUDITOR,
+        RoleName.FINANCE_COLLECTIONS_OFFICER,
+        RoleName.PLACEMENT_TECHNICAL_OFFICER,
+      ].sort(),
+    );
+  });
+
+  it("«دفترها دفترها» — SALES and the two importing roles are still withheld it, which is what keeps an empty register TRUE for them", () => {
+    const holders = PERMISSIONS.find((p) => p.code === ALL_OWNERS)!.roles;
+    /*
+     * Asserted as an ABSENCE and separately from the set above, because it is a different
+     * claim: the set says who may read across owners, this says who must NOT — and for
+     * these three an empty list is an honest sentence rather than a gap. SALES sees its
+     * own book by design; the two administrator roles own every row they import, so
+     * `customersNoneYet` is literally true for them until they import one.
+     */
+    for (const role of [
+      RoleName.SALES_RELATIONSHIP_OFFICER,
+      OFFICE_ADMINISTRATOR_ROLE.name,
+      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+    ]) {
+      expect(
+        holders,
+        `${role} must NOT hold ${ALL_OWNERS} — read the note above before changing this`,
+      ).not.toContain(role);
+    }
+  });
+
+  it("no role is left being shown an empty register that can never fill", () => {
+    /*
+     * THE INVARIANT, and it is the one that outlives the three grants.
+     *
+     * A role is lied to by `/customers` when it can OPEN the screen (`customer.read`) and
+     * can neither see across owners nor ever become an owner. Measured before this
+     * decision that set was exactly {CLAIMS, FINANCE, PLACEMENT}; it must now stay empty,
+     * so granting `customer.read` to a fourth role that can do neither fails HERE rather
+     * than being discovered by somebody staring at an empty table.
+     *
+     * The two ways to own are enumerated rather than inferred: `customer.create` writes
+     * the actor as owner, and `customer.bulk-import` does the same for every imported row
+     * (`legacy-import.service.ts`). A third write path would have to be added here, which
+     * is the point — this test is also the list of ways a row gets an owner.
+     */
+    const codesFor = (role: string) => new Set(codesGrantedTo(role));
+    const OWNING_CODES = ["customer.create", "customer.bulk-import"];
+    // `string[]`, not `RoleName[]`: the office administrator is NOT in that enum — it
+    // predates office-scoped roles — and `ROLES.map` narrows to it, so concatenating
+    // the administrator's plain name is a type error rather than an oversight.
+    const everyRole: string[] = [
+      ...ROLES.map((r) => r.name as string),
+      OFFICE_ADMINISTRATOR_ROLE.name,
+    ];
+    const lied = everyRole.filter((role) => {
+      const codes = codesFor(role);
+      if (!codes.has("customer.read")) return false; // a 403, not an empty list
+      if (codes.has(ALL_OWNERS)) return false; // sees every customer
+      return !OWNING_CODES.some((c) => codes.has(c)); // can never own one
+    });
+    expect(
+      lied,
+      "these role(s) can open /customers and can neither read across owners nor ever own a customer, so the register is permanently empty and the screen's «لا يوجد عملاء بعد» is false for them",
+    ).toEqual([]);
+  });
+});
+
 // Office-scoped custom RBAC, PHASE 3 workstream D — the office administrator.
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;

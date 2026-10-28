@@ -213,7 +213,21 @@ test("shows an empty state when there are no customers yet", async ({ page }) =>
 });
 
 test("shows a friendly message when the user lacks read permission", async ({ page }) => {
-  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  /*
+   * POLICY_CHECKING_OFFICER, not CLAIMS_OFFICER — corrected with owner decision 57.
+   *
+   * This test is named *lacks read permission* and drove a role that HOLDS
+   * `customer.read`, so the mocked 403 was a refusal the server never answers for that
+   * actor: it proved the sentence renders, not that it renders to somebody refused.
+   * Decision 57 did not cause that — it made it louder, since CLAIMS now holds the
+   * cross-owner read as well and its real answer is 200 with rows.
+   *
+   * Measured: exactly two seeded roles lack `customer.read`. The DPO is deliberately
+   * not used — its own absence is a separate decision-57 finding (it gets this 403 and
+   * reaches customers through the picker on `dsr.log`), and driving it here would
+   * couple two findings into one test.
+   */
+  await mockAuth(page, ["POLICY_CHECKING_OFFICER"]);
   await page.route("http://localhost:4000/customers", (route) =>
     route.fulfill({
       status: 403,

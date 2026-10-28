@@ -2814,7 +2814,12 @@ else.
   `GET /customers` (`customer.read` since migration `20261105100000` — the narrow list
   code, held by ten of eleven roles, because finding a customer is not reading one) /
   `GET /customers/:id` (`customer.360-view.read`), both owner-scoped like Lead/Prospect
-  plus `customer.all-owners.read`'s Compliance/Manager/Exec/Auditor cross-owner grant,
+  plus `customer.all-owners.read`'s cross-owner grant — **Compliance/Manager/Exec/Auditor,
+  and since owner decision 57 also CLAIMS/FINANCE/PLACEMENT, because those three can
+  never OWN a customer (`customer.create` is SALES alone, `customer.bulk-import` is the
+  two administrator roles) so the owner filter returned exactly zero rows permanently and
+  the screen said *there are no customers yet*. SALES and the two importing roles are
+  withheld it by decision and `permissions.spec.ts` asserts both halves** —
   `POST /customers/:id/ubos` + `GET .../ubos` (`CORPORATE` only), `POST
   /customers/:id/documents` + `GET .../documents` (category fixed to
   `APPLICATION_PROPOSAL` server-side, never caller-chosen), `POST

@@ -2101,7 +2101,47 @@ const crossOwnerVisibility: PermissionSeed[] = [
     module: "customer",
     description:
       "See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design)",
-    roles: [MANAGER, EXEC, COMPLIANCE, AUDITOR],
+    /*
+     * OWNER DECISION 57, 2026-10-28 — CLAIMS, FINANCE and PLACEMENT added, and the
+     * reason is a measurement rather than a preference.
+     *
+     * `/customers` is gated on `customer.read`, which these three hold, and the list
+     * beneath that gate is then filtered to the customers the actor OWNS
+     * (`customer.service.ts`, through `canReadAllCustomerOwners`). Ownership is
+     * creator-assigned: `customer.create` is SALES alone and `customer.bulk-import`
+     * is the two administrator roles, whose import writes `ownerUserId: actorUserId`
+     * (`legacy-import.service.ts`). NONE OF THESE THREE CAN EVER OWN A CUSTOMER, so
+     * the filter returned exactly zero rows, permanently, by construction — and the
+     * screen said «لا يوجد عملاء بعد», *there are no customers yet*, which is a false
+     * statement about the office rather than a true one about the reader.
+     *
+     * SO THE LIE IS CLOSED AT ITS CAUSE AND NOT BY REWORDING THE SYMPTOM. Measured
+     * across all fourteen seeded roles: after this grant not one holds `customer.read`
+     * while being unable both to see all owners and to own a row, so there is no role
+     * left for whom an empty register is a false claim.
+     * `customers-empty-state-is-honest.spec.ts` keeps that set empty.
+     *
+     * OFFICE_ADMINISTRATOR and SYSTEM_SECURITY_ADMINISTRATOR are deliberately NOT
+     * here: they hold `customer.bulk-import`, so they own every row they import and
+     * an empty list genuinely means they have imported none. SALES is deliberately
+     * NOT here either — «دفترها دفترها», its own book is the point of the filter.
+     *
+     * WHAT THIS OPENS, measured rather than assumed, because the near neighbour is a
+     * 46-route disclosure: `customer.all-owners.read` is read at SIX decision sites in
+     * THREE services, all through `rbac-visibility.util.ts`. The detail page, the
+     * field reveal, the UBO register and the 360° timeline are all gated on
+     * `customer.360-view.read`, which none of these three holds, so they stay 403; the
+     * KYC sites sit behind `kyc.capture`/`kyc.approve`/`screening.run`, likewise. It
+     * DOES also widen `GET /customers/search`, the shared picker, which returns a
+     * name, a type, a status and the two cleartext corporate identifiers.
+     *
+     * NOT `customer-file.all-owners.read`, which is a different code one row below:
+     * that is the COMMERCIAL file (risk profile, needs assessment, programme,
+     * opportunity, RFQ, quotation, comparison, client decision) across nine services,
+     * and PLACEMENT already holds it. Confusing the two is how a one-screen fix
+     * becomes a disclosure decision.
+     */
+    roles: [MANAGER, EXEC, COMPLIANCE, AUDITOR, CLAIMS, FINANCE, PLACEMENT],
   },
   {
     code: "customer-file.all-owners.read",
