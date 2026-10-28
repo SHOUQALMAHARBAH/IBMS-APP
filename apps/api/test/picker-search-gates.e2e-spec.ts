@@ -150,6 +150,54 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
     // DATA_PROTECTION_OFFICER holds `dsr.log` and NOT `customer.read`. `/dsr` is their screen, and the
     // field built to replace a search-box-plus-select was unusable by them the day after it shipped.
     const dpo = await makeUser('picker-dpo', 'DATA_PROTECTION_OFFICER');
+
+    /*
+     * A ROW COMES BACK, AND THIS ASSERTION WAS MISSING UNTIL 2026-10-28.
+     *
+     * This test asserted a 200 and nothing about the body — so it passed for the whole period the
+     * DPO could find NOTHING, while its own title said the opposite. The gate was open (`dsr.log`
+     * is in `CUSTOMER_SEARCH_CODES`, which is what this test was written for); the OWNER FILTER
+     * one line below it in `customer.service.ts#search` returned zero rows for every word, because
+     * the DPO can never own a customer. Register row 2.2 in the owner's own words:
+     * «في حقل صاحب البيانات لما أبحث عن عميل موجود بيحكيلي إنه غير متوفر».
+     *
+     * The customer is owned by somebody ELSE, deliberately — that is the whole property. A
+     * customer the DPO owned would come back through the filter rather than past it, and this
+     * role cannot own one anyway (`customer.create` is SALES alone).
+     */
+    const owner = await makeUser(
+      'picker-dpo-owner',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    /*
+     * A WHOLE TOKEN, and my first attempt at this test proved why it matters.
+     *
+     * The name search is `"searchVector" @@ websearch_to_tsquery(...)`, which matches TOKENS
+     * and does NOT prefix-match. I first queried `legalName.slice(0, 12)`, which cut the random
+     * suffix in half — so the term tokenised to `… & 1` against a row holding `… & 1792…` and
+     * matched NOTHING. The assertion failed with `expected [] to include <id>`, which is
+     * exactly what the real defect looks like: I nearly reported the grant as not having
+     * worked. So the distinctive part is its own token and the query is that token entire.
+     */
+    const token = `Dpopicker${runId()}`;
+    const legalName = `${token} Subject`;
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName,
+        ownerUserId: owner.userId,
+      },
+    });
+    const found = await request(app.getHttpServer())
+      .get('/customers/search')
+      .query({ q: token })
+      .set(bearer(dpo.accessToken))
+      .expect(200);
+    expect(
+      (found.body as { id: string }[]).map((r) => r.id),
+      'the DPO searched for a customer that exists and got nothing back — register row 2.2, which is the OWNER FILTER and not the gate',
+    ).toContain(customer.id);
+
     await request(app.getHttpServer())
       .get('/customers/search')
       .query({ q: 'ahm' })
