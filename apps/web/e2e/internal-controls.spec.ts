@@ -107,7 +107,19 @@ test("renders a clean audit with the per-pair breakdown", async ({ page }) => {
   await expect(
     page.getByText("No self-approval violations found. Every pair scanned is clean."),
   ).toBeVisible();
-  await expect(page.getByText("None", { exact: true })).toHaveCount(0);
+  /*
+   * SCOPED, NOT PAGE-WIDE — and `check:absence` is what refused the first version.
+   *
+   * It was `page.getByText("None", { exact: true })).toHaveCount(0)`, which took the budget from
+   * 42 to 43 and failed CI correctly: a page-wide text absence can match an element the test is
+   * not about, which is how a role-name loop once matched a NAV LABEL and failed on a correct
+   * tree. `expectAbsentWithin` takes a Locator — so the compiler refuses a page-wide root — and
+   * asserts the scope VISIBLE first, because scoping fixes the wrong-element failure and NOT the
+   * not-yet-rendered one: `toHaveCount(0)` passes on its first poll.
+   */
+  await expectAbsentWithin(page.locator("main"), (scope) =>
+    scope.getByText("None", { exact: true }),
+  );
   /* RE-POINTED BY OWNER DECISION 53, AND THE REVERSAL IS STATED. This asserted the raw member
      name `KYCRecord` in the by-pair table. That cell now renders the entity's own WORD — the KYC
      queue's heading, which is BROADER than one record and is shipped as such on decision 53's

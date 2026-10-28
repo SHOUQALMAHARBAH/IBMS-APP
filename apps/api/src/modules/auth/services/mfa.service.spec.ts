@@ -54,7 +54,9 @@ describe('MfaService', () => {
      */
     expect(uri).toContain('issuer=WASEET%20360');
     expect(uri).toContain('otpauth://totp/WASEET%20360:');
-    expect(decodeURIComponent(new URL(uri).searchParams.get('issuer') ?? '')).toBe('WASEET 360');
+    expect(
+      decodeURIComponent(new URL(uri).searchParams.get('issuer') ?? ''),
+    ).toBe('WASEET 360');
     expect(uri).toContain(secret);
   });
 
