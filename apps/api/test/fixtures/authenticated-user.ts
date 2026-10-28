@@ -37,14 +37,30 @@ import {
 const ALL_OWNERS_BY_ROLE: Readonly<Record<string, readonly string[]>> = {
   SALES_RELATIONSHIP_OFFICER: [],
   PLACEMENT_TECHNICAL_OFFICER: [
+    // Owner decision 57 — this role can never OWN a customer
+    // (`customer.create` is SALES alone), so the owner filter left
+    // `/customers` permanently empty while the screen said there were none.
+    CUSTOMER_ALL_OWNERS_READ,
     CUSTOMER_FILE_ALL_OWNERS_READ,
     POLICY_ALL_OWNERS_READ,
     ENDORSEMENT_ALL_OWNERS_READ,
     RECOMMENDATION_ALL_OWNERS_READ,
   ],
   POLICY_CHECKING_OFFICER: [POLICY_ALL_OWNERS_READ],
-  CLAIMS_OFFICER: [CLAIM_ALL_OWNERS_READ],
-  FINANCE_COLLECTIONS_OFFICER: [ENDORSEMENT_ALL_OWNERS_READ],
+  CLAIMS_OFFICER: [
+    // Owner decision 57 — this role can never OWN a customer
+    // (`customer.create` is SALES alone), so the owner filter left
+    // `/customers` permanently empty while the screen said there were none.
+    CUSTOMER_ALL_OWNERS_READ,
+    CLAIM_ALL_OWNERS_READ,
+  ],
+  FINANCE_COLLECTIONS_OFFICER: [
+    // Owner decision 57 — this role can never OWN a customer
+    // (`customer.create` is SALES alone), so the owner filter left
+    // `/customers` permanently empty while the screen said there were none.
+    CUSTOMER_ALL_OWNERS_READ,
+    ENDORSEMENT_ALL_OWNERS_READ,
+  ],
   COMPLIANCE_OFFICER: [
     CUSTOMER_ALL_OWNERS_READ,
     RECOMMENDATION_ALL_OWNERS_READ,
