@@ -110,6 +110,28 @@ jobs:
       - name: Every custom property a screen references is defined in the stylesheet
         run: npm run check:css-properties
 
+      # ------------------------------------------------------- THE DESIGN BATCH'S TWO GATES
+      #
+      # The brand was re-anchored on the logo's own #2072B8 / #1A3E66 / #F4A921, and the
+      # instruction was to "re-check every pairing the existing WCAG test covers". Measured:
+      # THERE WAS NO TOKEN-LEVEL WCAG TEST. The accessibility gate is axe over 84 Playwright
+      # specs, which measures RENDERED contrast on whatever a screen happens to paint — the
+      # stronger check for a screen that exists, and silent about a ramp step no screen has
+      # reached yet. That is exactly the hole a palette change falls into: the ramp moves, every
+      # a11y spec stays green because none of them renders the moved step, and the first screen to
+      # use it fails for somebody else months later. This closes it at the token layer.
+      - name: Every declared token pairing clears its WCAG floor in both themes
+        run: npm run check:token-contrast
+
+      # 110 of 111 page files carried inline styling — 1,511 sites against 18 unused primitives
+      # and 140 unused tokens. A flat ban would be a red build across 169 files, which is how a
+      # gate gets switched off, so this is a RATCHET: two budgets, each of which may only fall.
+      # Two rather than one for the reason `typed-identifier-inputs.py` already records — a single
+      # total lets one class be traded for another behind a green gate, and here the trade is
+      # precisely the migration being measured.
+      - name: Inline styling may only fall, in screens and in the primitive set
+        run: npm run check:inline-styles
+
       # ------------------------------------------------------------------ DECISION 34, THE SCREEN PASS
       #
       # THE COUNT NEVER RISES. The owner struck the attrition rule she had been given in batch 4 —
