@@ -40,5 +40,11 @@
     "from": "  const block = new RegExp(`enum ${name} \\\\{([^}]*)\\\\}`).exec(source);\n  if (!block) throw new Error(`enum ${name} not found in schema.prisma`);",
     "to": "  const block = new RegExp(`enum ${name}Z \\\\{([^}]*)\\\\}`).exec(source);\n  if (!block) return [];",
     "why": "THE CLEAN-NOTHING SHAPE, planted at the one place it is fatal. Every totality assertion in this file compares a map's keys against a PARSED set, and an empty parsed set makes *every member is worded* vacuously true - four green results from a parser that read nothing, which is how a measurement comes to libel its own subject or bless it. Planted, the non-vacuity floor fails FIRST (`ConsentPurpose parsed 0 member(s)`) and the four totality tests then fail too, which is the honest ordering: the floor is what tells a reader the parser broke rather than the product being clean."
+  },
+  "the-cell-renders-the-stored-value-unconditionally": {
+    "file": "apps/web/app/(app)/transaction-monitoring/page.tsx",
+    "from": "                      {isDeclaredTransactionPattern(r.patternType) ? (",
+    "to": "                      {false ? (",
+    "why": "THE DEFECT I ACTUALLY SHIPPED, planted so it cannot come back. My edit to this cell silently failed to apply: the predicate and the tooltip key both shipped with ZERO consumers while the cell rendered `third_party_payment_source` raw on an AML alert queue - and the DECLARATION I had just written blessed it as decision 49's fallback, *on purpose*. AND `check:raw-values` COULD NOT SEE IT, which is the honest limit of a declared list: a raw render inside a fallback branch and a raw render with no branch at all are the same text, so the gate reported the identical 5 sites before and after the fix. Only the screen's own source can tell them apart. Planted, it kills `the screen actually REACHES for the predicate and the tooltip key` by name - and `false ?` rather than deleting the branch, because deleting it breaks the page and a plant that breaks the page cannot say which test observes what."
   }
 }

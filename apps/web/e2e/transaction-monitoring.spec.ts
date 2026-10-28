@@ -85,11 +85,21 @@ test("lists transaction-monitoring alerts with the log form and sweep button", a
   await expect(
     page.getByRole("heading", { name: "AML/CFT transaction monitoring" }),
   ).toBeVisible();
+  // RE-POINTED, decision 59, and the reversal is real: both lines asserted the raw
+  // ENUM MEMBER in the Pattern column, which was correct until the labels arrived - all
+  // five had in fact shipped in both languages for months and this cell simply never
+  // reached for them. Asserted as a PAIR (the label present AND the member name gone),
+  // because the label contains no underscore so the stale form would have failed loudly
+  // while the sibling `MARKETING` assertion on `/consent` went on passing against
+  // "Marketing" - substring matching hides exactly half of this class.
   await expect(
-    page.getByRole("cell", { name: "large_premium_payment" }),
+    page.getByRole("cell", { name: "Large premium payment" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("cell", { name: "frequent_cancellations" }),
+    page.getByRole("cell", { name: "large_premium_payment" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("cell", { name: "Frequent cancellations" }),
   ).toBeVisible();
   await expect(page.getByLabel("Pattern")).toBeVisible();
   await expect(page.getByRole("button", { name: "Log alert" })).toBeVisible();
@@ -136,8 +146,10 @@ test("transaction-monitoring screen has no serious/critical accessibility violat
   await mockAlerts(page);
 
   await page.goto("/transaction-monitoring");
+  // Re-pointed with the cell above, decision 59. This is the a11y test's READY ANCHOR
+  // rather than an assertion about wording - a different job, and said so.
   await expect(
-    page.getByRole("cell", { name: "large_premium_payment" }),
+    page.getByRole("cell", { name: "Large premium payment" }),
   ).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(

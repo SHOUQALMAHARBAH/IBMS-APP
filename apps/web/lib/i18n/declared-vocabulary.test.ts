@@ -193,6 +193,39 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
       ).toEqual(documented);
     });
 
+    /*
+     * THE HOLE THIS CLOSES IS ONE I SHIPPED. `raw-stored-values.py` reports `{r.patternType}`
+     * as a shape-A render whether it sits inside the fallback branch or in a bare cell with
+     * no branch at all — a text scanner cannot tell those apart. So when my edit to this
+     * screen silently failed to apply, the DECLARATION I wrote blessed a defect in exactly
+     * the owner's own words, an instrument that looked like it was watching. The screen's
+     * source is the only thing that can see the difference.
+     *
+     * It also refuses the dead-helper class, which this predicate genuinely was for a few
+     * hours: a type predicate and a tooltip key both shipped with ZERO consumers while the
+     * cell they exist for rendered raw.
+     */
+    it('the screen actually REACHES for the predicate and the tooltip key', () => {
+      const screen = readFileSync(
+        join(WEB, 'app/(app)/transaction-monitoring/page.tsx'),
+        'utf8',
+      )
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+      expect(
+        screen.includes('isDeclaredTransactionPattern(r.patternType)'),
+        'the pattern cell does not narrow — it renders the stored value unconditionally',
+      ).toBe(true);
+      expect(
+        screen.includes("t('tmPatternUnlabelled')"),
+        'the fallback renders no tooltip, so the stored value is dressed up as a name',
+      ).toBe(true);
+      expect(
+        screen.includes('ENUM_LABEL.TransactionMonitoringPattern[r.patternType]'),
+        'the declared branch does not reach the label map',
+      ).toBe(true);
+    });
+
     it('the predicate is DERIVED from the map rather than a second list of five', () => {
       for (const key of Object.keys(ENUM_LABEL.TransactionMonitoringPattern)) {
         expect(isDeclaredTransactionPattern(key), `${key} is declared`).toBe(true);

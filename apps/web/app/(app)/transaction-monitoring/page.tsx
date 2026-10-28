@@ -2,7 +2,10 @@
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
-import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
+import {
+  ENUM_LABEL,
+  isDeclaredTransactionPattern,
+} from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -228,7 +231,38 @@ export default function TransactionMonitoringPage() {
                     <td style={cell}>
                       {r.customerName ? <bdi>{r.customerName}</bdi> : '—'}
                     </td>
-                    <td style={cell}>{r.patternType}</td>
+                    {/*
+                      Decision 59 — and the vocabulary cost NOTHING: all five
+                      `TransactionMonitoringPattern` labels have shipped in both languages for
+                      months, and this cell rendered `third_party_payment_source` at an Arabic
+                      reader on an AML alert queue regardless.
+
+                      BUT NOT A TOTAL MAP, because this one genuinely is not closed:
+                      `patternType` is a free `String` in the database whose five values live
+                      only in a schema doc comment, so a sixth is representable TODAY and
+                      `ENUM_LABEL.TransactionMonitoringPattern[x]` would be `undefined` for it.
+                      `t(undefined)` is the notification-bell defect — an AML alert with no
+                      words at all. So it takes OWNER DECISION 49's declared fallback: narrowed
+                      by a type predicate, and the unlisted case rendered AS STORED in monospace
+                      under its own tooltip, visibly machine text rather than dressed up as a
+                      name. `/audit-trail`'s `entityType` is the worked example and this follows
+                      it exactly, down to the two custom properties.
+                    */}
+                    <td style={cell}>
+                      {isDeclaredTransactionPattern(r.patternType) ? (
+                        t(ENUM_LABEL.TransactionMonitoringPattern[r.patternType])
+                      ) : (
+                        <span
+                          title={t('tmPatternUnlabelled')}
+                          style={{
+                            fontFamily: 'var(--font-mono, monospace)',
+                            color: 'var(--ink-secondary)',
+                          }}
+                        >
+                          {r.patternType}
+                        </span>
+                      )}
+                    </td>
                     <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
                     <td style={cell}>{r.escalatedToSuspiciousActivity ? t('commonYes') : t('commonNo')}</td>
                     <td style={cell}>{r.reportedToAuthorityAt ? t('commonYes') : t('commonNo')}</td>
