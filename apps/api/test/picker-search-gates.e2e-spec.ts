@@ -114,6 +114,47 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
     // EXECUTIVE_MANAGEMENT holds `employee-performance.view` and NOT `employee.national-id.reveal`.
     // Before 2026-10-02 this request was a 403 on the screen built for this role.
     const exec = await makeUser('picker-exec', 'EXECUTIVE_MANAGEMENT');
+
+    /*
+     * A ROW COMES BACK — added 2026-10-28, and this test used to assert a 200 alone.
+     *
+     * Its sibling two tests down asserted the same way and WAS hollow: the DPO's customer
+     * search returned 200 with an EMPTY ARRAY for the whole period it was broken, because the
+     * OWNER FILTER sits below the gate. Measured here before adding this: the employee search
+     * is a plain `contains` with NO owner filter (employees have no owner), office-scoped by
+     * RLS — so this test was weak rather than hollow, and nothing was hiding behind it. The
+     * assertion is added anyway, because *weak* was indistinguishable from *hollow* until
+     * somebody read the body.
+     *
+     * `contains`, not a tsquery — unlike the customer search one test below, where a sliced
+     * term matches nothing. A substring of the name is the right query HERE and the wrong one
+     * THERE, which is why each is written against its own repository.
+     */
+    /*
+     * Written with the tenant-scoped client rather than through `POST /employees`, which
+     * would need an admin holding `employee.create`, a department and a branch — none of
+     * which this test is about. `nationalIdEnc` is NOT NULL and is encrypted at the SERVICE
+     * layer rather than by a Prisma extension, so a raw write stores the string given and
+     * nothing here ever reads it back — the shape `conflict-of-interest.e2e-spec.ts`
+     * documents and uses. The compiler is what said so: my first version omitted it.
+     */
+    const employee = await prisma.employee.create({
+      data: {
+        fullName: `Pickeremp ${runId()}`,
+        nationalIdEnc: `not-a-real-national-id-${runId()}`,
+      },
+      select: { id: true },
+    });
+    const found = await request(app.getHttpServer())
+      .get('/employees/search')
+      .query({ q: 'Pickeremp' })
+      .set(bearer(exec.accessToken))
+      .expect(200);
+    expect(
+      (found.body as { id: string }[]).map((r) => r.id),
+      'the Executive searched for an employee that exists and got nothing back — a 200 proves only that the ROUTE admitted them',
+    ).toContain(employee.id);
+
     await request(app.getHttpServer())
       .get('/employees/search')
       .query({ q: 'ah' })
@@ -380,8 +421,43 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
    */
   it('A4 — COMPLIANCE_OFFICER and EXTERNAL_AUDITOR can both reach the customer search', async () => {
     const app = await boot();
+    /*
+     * A ROW COMES BACK FOR BOTH — added 2026-10-28; this asserted a 200 alone.
+     *
+     * Its sibling in this file WAS hollow that way: the DPO's search returned 200 with an
+     * EMPTY ARRAY for the whole period it was broken, because the OWNER FILTER sits below the
+     * gate. Measured before adding this: both these roles hold `customer.all-owners.read`, so
+     * neither was hiding a defect — and a 200 could not have told the difference, which is
+     * the whole reason the assertion is here.
+     *
+     * The customer is owned by a THIRD person, which is what the cross-owner read is about.
+     * A WHOLE token: the name search is a tsquery and does not prefix-match, so a sliced term
+     * matches nothing and looks exactly like the defect.
+     */
+    const owner = await makeUser(
+      'picker-a4-owner',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const token = `Pickera4${runId()}`;
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `${token} Subject`,
+        ownerUserId: owner.userId,
+      },
+      select: { id: true },
+    });
     for (const role of ['COMPLIANCE_OFFICER', 'EXTERNAL_AUDITOR'] as const) {
       const actor = await makeUser(`picker-cust-${role.toLowerCase()}`, role);
+      const found = await request(app.getHttpServer())
+        .get('/customers/search')
+        .query({ q: token })
+        .set(bearer(actor.accessToken))
+        .expect(200);
+      expect(
+        (found.body as { id: string }[]).map((r) => r.id),
+        `${role} searched for a customer that exists, owned by somebody else, and got nothing back`,
+      ).toContain(customer.id);
       await request(app.getHttpServer())
         .get('/customers/search')
         .query({ q: 'ahm' })
