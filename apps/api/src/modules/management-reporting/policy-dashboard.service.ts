@@ -9,7 +9,7 @@ import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { PolicyDashboardRepository } from '../../repositories/policy-dashboard.repository';
 import { parseCalendarDate } from '../../common/calendar-date.util';
 import {
-  previousUtcMonthRange,
+  currentUtcMonthRange,
   type PeriodWindow,
 } from '../../common/period.util';
 import {
@@ -44,7 +44,10 @@ export class PolicyDashboardService {
       query.periodStart,
       query.periodEnd,
     ].filter((v) => v !== undefined).length;
-    if (provided === 0) return previousUtcMonthRange(new Date());
+    // OWNER DECISION 58 — a reader who chose no period is asking about THIS month.
+    // `previousUtcMonthRange` is still the right default for a SCORING JOB and is
+    // deliberately untouched there; see the note in `common/period.util.ts`.
+    if (provided === 0) return currentUtcMonthRange(new Date());
     if (provided !== 3) {
       throw new UnprocessableEntityException(
         'periodLabel, periodStart, and periodEnd must all be supplied together, or all omitted for the previous calendar month',

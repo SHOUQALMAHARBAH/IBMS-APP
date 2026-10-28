@@ -102,7 +102,8 @@ describe('the provenance line is one component, in both languages', () => {
     }
     expect(
       offenders,
-      'A reporting screen is rendering a provenance date itself. Use `ReportProvenance` — eight screens ' +
+      'A reporting screen is rendering a provenance date itself. Use `ReportProvenance` for the LINE ' +
+        'or `FigurePeriod` for a clause beside one figure (owner decision 58) — eight screens ' +
         'did this in hardcoded ENGLISH, which is what the component exists to stop. If a genuinely new ' +
         'sentence is needed, add a SHAPE to that component\'s discriminated union so it is translated ' +
         'once, rather than writing the sentence here.',
@@ -144,5 +145,65 @@ describe('the provenance line is one component, in both languages', () => {
       read(s).includes('ReportProvenance'),
     );
     expect(users.length, 'nothing imports ReportProvenance').toBeGreaterThan(7);
+  });
+});
+
+/*
+ * OWNER DECISION 58 — THE SECOND PROVENANCE COMPONENT, AND THE SAME SINGLE-SOURCE RULE.
+ *
+ * `FigurePeriod` puts the period beside ONE figure rather than once at the top of the
+ * screen, because `/dashboards/sales` already printed the top line and the owner still
+ * read the screen as broken: «قسم العملاء المحتملون بيطلع 0 مع إنه في عملاء محتملون جدد».
+ *
+ * THE PROPERTY GUARDED HERE IS NOT THE WORDING — it is that a screen may not decide
+ * WHICH clause a figure gets. Two of `/dashboards/policy`'s four metrics ignore the
+ * period filter entirely, so the choice between «خلال …» and «كما في …» comes from the
+ * api's `metricScope` on the wire. A screen spelling the key itself would make that
+ * choice locally, and the failure would LOOK like the fix: a period printed beside a
+ * figure that does not obey it, which is a more confident version of the defect decision
+ * 58 exists to remove.
+ *
+ * This is the same argument this file already makes for `ReportProvenance` — «a component
+ * is only the single source while nothing bypasses it» — one level down.
+ */
+const FIGURE_PERIOD_KEYS = ['dashFigureDuringPeriod', 'dashFigureAsOf'];
+
+describe('the per-figure period clause is one component (owner decision 58)', () => {
+  it('no screen spells the clause itself — the clause chooses from `metricScope`, which only the component reads', () => {
+    const offenders: string[] = [];
+    for (const screen of REPORTING_SCREENS) {
+      const src = read(screen);
+      for (const key of FIGURE_PERIOD_KEYS) {
+        if (src.includes(key)) offenders.push(`${screen}  ${key}`);
+      }
+    }
+    expect(
+      offenders,
+      'A screen is rendering the per-figure period clause itself. Use `FigurePeriod` and pass the ' +
+        'api\'s own `metricScope` entry: the screen must not decide whether a figure obeys the ' +
+        'period, because two of /dashboards/policy\'s metrics do not and a period beside one of ' +
+        'those is a false claim.',
+    ).toEqual([]);
+  });
+
+  it('is not vacuous — the component really does use both keys, and the api really does declare the scope', () => {
+    /*
+     * THE FLOOR. The check above passes against a renamed key, a deleted component and a
+     * screen that prints no clause at all — three clean-nothings. So the two keys are
+     * asserted to be live in the component, and the component is asserted to read the
+     * declaration rather than choosing.
+     */
+    const component = fs.readFileSync(
+      path.join(__dirname, '..', 'components', 'ui', 'FigurePeriod.tsx'),
+      'utf8',
+    );
+    for (const key of FIGURE_PERIOD_KEYS) {
+      expect(component, `${key} is not used by FigurePeriod`).toContain(key);
+    }
+    // It renders from the PROP, never from its own judgement about a metric name.
+    expect(component).toContain("scope === 'period'");
+    expect(component, 'FigurePeriod names a metric itself instead of taking the scope').not.toContain(
+      'activePoliciesCount',
+    );
   });
 });

@@ -8113,9 +8113,16 @@ application-only pairs are still three, and all of them are stated in `docs/duty
   officer-ownership concept at all. `insuranceLine` scopes premium/commission
   (`Policy.insuranceLine`) AND cross-sell (`CrossSellOpportunity.gapLine` IS itself a
   line) — NOT leads or up-sell (a Sum-Insured gap, not a line). `insurerId` scopes only
-  premium/commission — nothing pre-placement has an insurer yet. `period` (default: the
-  previous UTC calendar month, the all-or-none #60/#61 shape — 422 on a partial
-  override) applies to every metric via its own date field.
+  premium/commission — nothing pre-placement has an insurer yet. `period` (**default:
+  the CURRENT UTC calendar month since owner decision 58 — it was the PREVIOUS one, and
+  the owner read a correct screen as broken because of it: «قسم العملاء المحتملون بيطلع
+  0», with 120 leads all created in October against a September window that held zero.**
+  The all-or-none #60/#61 shape is unchanged — 422 on a partial override) applies to
+  every metric via its own date field, **which is why this screen needs no `metricScope`
+  declaration while `/dashboards/policy` does: two of that one's four metrics ignore the
+  window entirely.** Two month helpers now exist in `common/period.util.ts` and are NOT
+  interchangeable: `currentUtcMonthRange` for a reader's default, `previousUtcMonthRange`
+  for a SCORING job, which must only score a month that has fully elapsed.
   **"Premium written (new vs. renewal)" splits on `Opportunity.isRenewal`** — a real
   boolean ALREADY on the schema, found by checking rather than assuming new modeling was
   needed. Computed via two separate `Policy.aggregate()` calls with a relation filter (a

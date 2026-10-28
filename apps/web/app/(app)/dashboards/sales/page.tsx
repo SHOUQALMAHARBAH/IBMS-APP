@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { FigurePeriod } from '../../../../components/ui';
 import { ReportProvenance } from '../../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
@@ -189,12 +190,24 @@ export default function SalesDashboardPage() {
               <div>
                 <div style={statStyle}>{summary.leads.newLeadsCount}</div>
                 <div>{t('dsalNewLeads')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.leads}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-leads-new"
+                />
               </div>
               <div>
                 <div style={statStyle}>
                   {summary.leads.convertedToProspectCount}
                 </div>
                 <div>{t('dsalConvertedToProspect')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.leads}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-leads-converted"
+                />
               </div>
               <div>
                 <div style={statStyle}>
@@ -203,6 +216,12 @@ export default function SalesDashboardPage() {
                     : `${summary.leads.conversionRatePercent}%`}
                 </div>
                 <div>{t('dsalConversionRate')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.leads}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-leads-rate"
+                />
               </div>
             </div>
           </section>
@@ -213,14 +232,32 @@ export default function SalesDashboardPage() {
               <div>
                 <div style={statStyle}>{summary.premiumWritten.newJod}</div>
                 <div>{t('dsalNewBusiness')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.premiumWritten}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-premium-new"
+                />
               </div>
               <div>
                 <div style={statStyle}>{summary.premiumWritten.renewalJod}</div>
                 <div>{t('dsalRenewal')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.premiumWritten}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-premium-renewal"
+                />
               </div>
               <div>
                 <div style={statStyle}>{summary.premiumWritten.totalJod}</div>
                 <div>{t('dsalTotal')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.premiumWritten}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-premium-total"
+                />
               </div>
             </div>
           </section>
@@ -230,6 +267,12 @@ export default function SalesDashboardPage() {
             <div style={statStyle}>
               {formatMoney(summary.commissionIncomeJod, language)}
             </div>
+            <FigurePeriod
+              scope={summary.metricScope.commissionIncomeJod}
+              periodLabel={summary.periodLabel}
+              generatedAt={summary.generatedAt}
+              testId="dsal-commission"
+            />
           </section>
 
           <section style={sectionStyle}>
@@ -238,10 +281,22 @@ export default function SalesDashboardPage() {
               <div>
                 <div style={statStyle}>{summary.crossSell.totalCount}</div>
                 <div>{t('dsalOpportunities')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.crossSell}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-crosssell-total"
+                />
               </div>
               <div>
                 <div style={statStyle}>{summary.crossSell.convertedCount}</div>
                 <div>{t('dsalConverted')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.crossSell}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-crosssell-converted"
+                />
               </div>
               <div>
                 <div style={statStyle}>
@@ -250,6 +305,12 @@ export default function SalesDashboardPage() {
                     : `${summary.crossSell.conversionRatePercent}%`}
                 </div>
                 <div>{t('dsalConversionRate')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.crossSell}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-crosssell-rate"
+                />
               </div>
             </div>
           </section>
@@ -260,10 +321,22 @@ export default function SalesDashboardPage() {
               <div>
                 <div style={statStyle}>{summary.upSell.totalCount}</div>
                 <div>{t('dsalRecommendations')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.upSell}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-upsell-total"
+                />
               </div>
               <div>
                 <div style={statStyle}>{summary.upSell.convertedCount}</div>
                 <div>{t('dsalConverted')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.upSell}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-upsell-converted"
+                />
               </div>
               <div>
                 <div style={statStyle}>
@@ -272,6 +345,12 @@ export default function SalesDashboardPage() {
                     : `${summary.upSell.conversionRatePercent}%`}
                 </div>
                 <div>{t('dsalConversionRate')}</div>
+                <FigurePeriod
+                  scope={summary.metricScope.upSell}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dsal-upsell-rate"
+                />
               </div>
             </div>
           </section>

@@ -9,6 +9,7 @@ export { Badge, type BadgeTone } from './Badge';
 export { Card, PageHeader } from './Card';
 export { EmptyState, ErrorState } from './EmptyState';
 export { Field, Select, TextArea, TextInput } from './Field';
+export { FigurePeriod } from './FigurePeriod';
 export { SelectedValueDescription } from './SelectedValueDescription';
 export { Skeleton, SkeletonList } from './Skeleton';
 export { Table, Td, Th, Tr } from './Table';

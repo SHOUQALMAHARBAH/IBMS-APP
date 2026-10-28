@@ -1,4 +1,4 @@
-import type { PeriodWindow } from '../../common/period.util';
+import type { FigureScope, PeriodWindow } from '../../common/period.util';
 
 export const DEFAULT_RENEWAL_WINDOW_DAYS = 90;
 
@@ -64,8 +64,38 @@ export interface CancelledPolicyRow {
   cancelledAt: string;
 }
 
+/**
+ * THE ASYMMETRY THIS FILE'S OWN HEADER DESCRIBES, now as data a screen can read.
+ *
+ * Two of these four ignore the period completely: «Active policies» and «expiring
+ * policies» read `Policy.status` / `Policy.expiryDate` as of `now` regardless of the
+ * `period` filter, because they answer *what does the book look like right now*.
+ * Printing a period beside either would be a false statement about a figure that
+ * does not obey it — and owner decision 58 is about a screen making exactly that
+ * kind of claim, so satisfying its letter here would have broken its purpose.
+ *
+ * The keys are the view's own field names, so a reader checking one against the
+ * other has no mapping to do, and `satisfies` makes a fifth metric a compile error.
+ */
+export const POLICY_DASHBOARD_METRIC_SCOPE = {
+  activePoliciesCount: 'asOf',
+  expiringPoliciesCount: 'asOf',
+  newPoliciesIssuedCount: 'period',
+  cancelledPolicies: 'period',
+} as const satisfies Record<
+  | 'activePoliciesCount'
+  | 'expiringPoliciesCount'
+  | 'newPoliciesIssuedCount'
+  | 'cancelledPolicies',
+  FigureScope
+>;
+
 export interface PolicyDashboardSummary {
   generatedAt: string;
+  /** Owner decision 58 — which figures the period above actually describes.
+   *  A screen renders the period clause beside a `'period'` metric and an AS-OF
+   *  clause beside an `'asOf'` one; it must never decide this for itself. */
+  metricScope: typeof POLICY_DASHBOARD_METRIC_SCOPE;
   periodLabel: string;
   periodStart: string;
   periodEnd: string;
@@ -90,6 +120,7 @@ export function buildPolicyDashboardSummary(input: {
     periodLabel: input.period.periodLabel,
     periodStart: input.period.periodStart.toISOString(),
     periodEnd: input.period.periodEnd.toISOString(),
+    metricScope: POLICY_DASHBOARD_METRIC_SCOPE,
     renewalWindowDays: input.renewalWindowDays,
     activePoliciesCount: input.activePoliciesCount,
     expiringPoliciesCount: input.expiringPoliciesCount,

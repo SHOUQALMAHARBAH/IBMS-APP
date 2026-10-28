@@ -69,6 +69,50 @@ export function formatNumber(value: number, language: Language): string {
   return value.toLocaleString(LOCALE_BY_LANGUAGE[language]);
 }
 
+/**
+ * `'ar-JO-u-nu-latn'` — THE LEVANTINE MONTH NAMES, WITH THIS APP'S WESTERN DIGITS.
+ *
+ * Deliberately NOT `AR_LOCALE`, and deliberately not a change to it. Measured:
+ *
+ *   `ar`                 October -> «أكتوبر»          (Gregorian-Arabic, wrong dialect)
+ *   `ar-JO`              October -> «تشرين الأول»      (right, but the YEAR renders ٢٠٢٦)
+ *   `ar-JO-u-nu-latn`    October -> «تشرين الأول 2026» (right, and Western digits)
+ *
+ * The owner's own example for decision 58 is «خلال تشرين الأول», and only THREE of
+ * the twelve Levantine month names exist anywhere in this product's source — so ICU
+ * under the Jordan tag is what supplies her vocabulary instead of nine Arabic words
+ * being typed, which decision 94 reserves to her.
+ *
+ * `AR_LOCALE` is untouched on purpose: its own note records that a full region tag
+ * switches every numeral in the app to Eastern Arabic-Indic. This tag is used for
+ * ONE job — naming a month — and the `-u-nu-latn` extension is what keeps the year
+ * in the same digits as every reference number on every other screen.
+ */
+const AR_MONTH_LOCALE = 'ar-JO-u-nu-latn';
+
+/**
+ * `'2026-10'` -> «تشرين الأول 2026» / `October 2026`.
+ *
+ * Takes the api's own `periodLabel` so there is no second idea of what period a
+ * figure belongs to. A label that is not `YYYY-MM` is returned UNCHANGED rather than
+ * guessed at: this is read straight off the wire, and a malformed one should be
+ * visible as itself instead of silently becoming January.
+ */
+export function formatPeriodLabel(
+  periodLabel: string,
+  language: Language,
+): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(periodLabel);
+  if (!m) return periodLabel;
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return periodLabel;
+  const at = new Date(Date.UTC(Number(m[1]), month - 1, 1));
+  return new Intl.DateTimeFormat(
+    language === 'AR' ? AR_MONTH_LOCALE : EN_LOCALE,
+    { month: 'long', year: 'numeric', timeZone: 'UTC' },
+  ).format(at);
+}
+
 /** Locale-aware `Date.prototype.toLocaleDateString()` replacement. */
 export function formatDate(value: string | Date, language: Language): string {
   const d = typeof value === 'string' ? new Date(value) : value;

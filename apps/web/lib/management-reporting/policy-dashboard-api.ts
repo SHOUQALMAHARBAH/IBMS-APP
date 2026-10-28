@@ -3,6 +3,10 @@
 
 import { apiGet } from '../auth/api-client';
 
+// ONE definition of the scope vocabulary on this side, imported rather than repeated:
+// two copies would be two answers to *does this figure obey the period*.
+import type { FigureScope } from './sales-dashboard-api';
+
 export interface CancelledPolicyRow {
   policyId: string;
   policyNumber: string | null;
@@ -15,6 +19,15 @@ export interface CancelledPolicyRow {
 
 export interface PolicyDashboardSummary {
   generatedAt: string;
+  /** Owner decision 58. TWO of these four are `'asOf'` — the active and expiring
+   *  counts read `Policy.status`/`Policy.expiryDate` as of now whatever period is
+   *  chosen, which `policy-dashboard.config.ts` calls a deliberate asymmetry. */
+  metricScope: {
+    activePoliciesCount: FigureScope;
+    expiringPoliciesCount: FigureScope;
+    newPoliciesIssuedCount: FigureScope;
+    cancelledPolicies: FigureScope;
+  };
   periodLabel: string;
   periodStart: string;
   periodEnd: string;

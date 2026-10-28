@@ -47,6 +47,26 @@ export const DASHBOARDS = {
     // Item 5 batch 1, violation 1 — the provenance line, previously hardcoded ENGLISH on eight of the
     // sixteen reporting screens. `provGeneratedAt` is when the report was COMPUTED; `provAsOf` is the date
     // the figures are measured TO. Different claims, deliberately different sentences.
+    /*
+     * OWNER DECISION 58 — THE PERIOD BESIDE THE FIGURE, not only at the top of the
+     * screen. Her words: «قسم العملاء المحتملون بيطلع 0 مع إنه في عملاء محتملون جدد»,
+     * and her instruction that a bare «١٢٠» is the defect — «١٢٠ خلال تشرين الأول».
+     *
+     * `/dashboards/sales` ALREADY printed a period line at the top (`provPeriod`) and
+     * she still read the screen as broken, which is the evidence that one line is not
+     * enough: the figure and its period have to be in the same glance.
+     *
+     * TWO CLAUSES, NOT ONE, and the second is what keeps the first honest: a metric
+     * the api declares `'asOf'` IGNORES the period filter, so printing «خلال …»
+     * beside it would be a new false claim of exactly the kind this decision exists
+     * to remove. Which clause a figure gets comes from `metricScope` on the wire.
+     *
+     * Both Arabic clauses are slices of strings already in this file — «خلال {window}»
+     * from `slaDashDueSoonMeaning` and «كما في {at}» from `provAsOf` — so no Arabic
+     * word was written for them.
+     */
+    dashFigureDuringPeriod: 'خلال {period}',
+    dashFigureAsOf: 'كما في {at}',
     provGeneratedAt: 'صُدِّر في {at}.',
     dcmpSelfApprovalViolations: 'حالات موافقة ذاتية',
     dcmpScanAsOf: '(حتى {at})',
@@ -382,6 +402,8 @@ export const DASHBOARDS = {
     commonStatusLabel: 'Status:',
     commonCurrentLabel: 'Current:',
     // Item 5 batch 1, violation 1 — see the Arabic block for why these are two sentences and not one.
+    dashFigureDuringPeriod: 'during {period}',
+    dashFigureAsOf: 'as of {at}',
     provGeneratedAt: 'Generated {at}.',
     dcmpSelfApprovalViolations: 'Self-approval violations',
     dcmpScanAsOf: '(as of {at})',

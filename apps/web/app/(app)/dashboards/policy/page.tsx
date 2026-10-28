@@ -10,6 +10,7 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { FigurePeriod } from '../../../../components/ui';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
@@ -170,16 +171,34 @@ export default function PolicyDashboardPage() {
           <section style={sectionStyle}>
             <h2>{t('dpolActivePolicies')}</h2>
             <div style={statStyle}>{summary.activePoliciesCount}</div>
+            <FigurePeriod
+              scope={summary.metricScope.activePoliciesCount}
+              periodLabel={summary.periodLabel}
+              generatedAt={summary.generatedAt}
+              testId="dpol-active"
+            />
           </section>
 
           <section style={sectionStyle}>
             <h2>{t('dpolExpiringPolicies')}</h2>
             <div style={statStyle}>{summary.expiringPoliciesCount}</div>
+            <FigurePeriod
+              scope={summary.metricScope.expiringPoliciesCount}
+              periodLabel={summary.periodLabel}
+              generatedAt={summary.generatedAt}
+              testId="dpol-expiring"
+            />
           </section>
 
           <section style={sectionStyle}>
             <h2>{t('dpolNewIssued')}</h2>
             <div style={statStyle}>{summary.newPoliciesIssuedCount}</div>
+            <FigurePeriod
+              scope={summary.metricScope.newPoliciesIssuedCount}
+              periodLabel={summary.periodLabel}
+              generatedAt={summary.generatedAt}
+              testId="dpol-new-issued"
+            />
           </section>
 
           <section style={sectionStyle}>
