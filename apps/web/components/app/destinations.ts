@@ -1,4 +1,5 @@
 import type { TranslationKey } from '../../lib/i18n/translations';
+import type { IconName } from '../ui/Icon';
 import { hasAnyPermission } from '../../lib/auth/permissions';
 import type { MeResponse } from '../../lib/auth/auth-api';
 
@@ -40,10 +41,24 @@ export type Destination = {
    * may require both a code and a type, and nothing today requires both.
    */
   organizationTypes?: readonly string[];
+
+  /** Overrides the group's icon. Only where a destination genuinely reads differently. */
+  icon?: IconName;
 };
 
 export type DestinationGroup = {
   labelKey: TranslationKey;
+  /*
+   * ONE ICON PER GROUP, INHERITED BY ITS ITEMS, and REQUIRED so a twelfth group cannot ship
+   * without somebody deciding what it looks like.
+   *
+   * Per GROUP rather than per DESTINATION, and that is a measured choice rather than laziness:
+   * there are 11 groups and 84 destinations, so per-destination would be 84 separate judgements
+   * made in one sitting by whoever happened to be adding the field — and the reference screen's
+   * own groups hold one or two links each, which is why its per-link icons read as per-group
+   * ones. A destination that genuinely needs its own may override with `icon`.
+   */
+  icon: IconName;
   items: readonly Destination[];
 };
 
@@ -76,13 +91,14 @@ export function canReach(
   );
 }
 
-export const HOME: Destination = { href: '/', labelKey: 'navHome' };
+export const HOME: Destination = { href: '/', labelKey: 'navHome', icon: 'layout' };
 
 /** Declaration order is the DEFAULT group order, used by any role without an
  *  entry in NAV_ORDER_BY_ROLE. */
 export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   {
     labelKey: 'navGroupNewBusiness',
+    icon: 'plus',
     items: [
       { href: '/leads', labelKey: 'navLeads', permissions: ['lead.list.read'] },
       {
@@ -168,6 +184,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupClients',
+    icon: 'users',
     items: [
       // `customer.read`, not `customer.360-view.read`: the list moved onto the narrow code, and a nav
       // entry gated on the old one would hide a screen five roles can now open.
@@ -214,6 +231,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupPolicies',
+    icon: 'file',
     items: [
       {
         href: '/policies',
@@ -235,6 +253,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupFinance',
+    icon: 'coins',
     items: [
       {
         href: '/client-accounting',
@@ -270,6 +289,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupService',
+    icon: 'mail',
     items: [
       {
         href: '/service-requests',
@@ -305,6 +325,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupDashboards',
+    icon: 'bars',
     items: [
       {
         href: '/kpi-dashboard',
@@ -350,6 +371,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupPerformance',
+    icon: 'trend',
     items: [
       {
         href: '/sales-performance',
@@ -390,6 +412,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupPrivacy',
+    icon: 'lock',
     items: [
       {
         href: '/consent',
@@ -445,6 +468,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupCompliance',
+    icon: 'shield',
     items: [
       {
         href: '/transaction-monitoring',
@@ -520,6 +544,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupOperations',
+    icon: 'building',
     items: [
       {
         href: '/employees',
@@ -555,6 +580,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupAdmin',
+    icon: 'settings',
     items: [
       {
         href: '/access-recertification',

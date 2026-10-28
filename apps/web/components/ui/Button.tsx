@@ -40,7 +40,10 @@ const VARIANTS: Record<ButtonVariant, CSSProperties> = {
   primary: {
     background: 'var(--brand-600)',
     borderColor: 'var(--brand-600)',
-    color: '#ffffff',
+    // `--on-brand`, not a literal white. The dark theme flips the fill to a light blue, where
+    // white would measure 3.02:1 — the defect reference page B shipped — so the ink has to be a
+    // token the theme can move and `token-contrast.py` can check.
+    color: 'var(--on-brand)',
   },
   secondary: {
     background: 'var(--surface-card)',

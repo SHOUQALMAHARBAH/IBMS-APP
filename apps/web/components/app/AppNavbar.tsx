@@ -9,10 +9,9 @@ import { logout } from '../../lib/auth/auth-api';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { initialsFrom } from '../../lib/i18n/initials';
 import { ThemeToggle } from './ThemeToggle';
+import { Breadcrumb } from './Breadcrumb';
 import {
   avatarStyle,
-  navbarBrandStyle,
-  navbarOrganizationStyle,
   navbarStyle,
   profileDeptStyle,
   profileMenuItemStyle,
@@ -25,12 +24,17 @@ import {
 } from './app.styles';
 
 /*
- * The top bar: wordmark at the leading edge, controls at the trailing edge.
+ * The top bar: WHERE YOU ARE at the leading edge, controls at the trailing edge.
  *
- * Full width, ABOVE the sidebar rather than only over the content column, so
- * the wordmark sits at the true leading edge of the screen. That is why
- * `brandStyle` left `AppNav` — two brand marks stacked diagonally is what the
- * alternative looks like.
+ * Full width, ABOVE the sidebar rather than only over the content column.
+ *
+ * THE BRAND WENT BACK TO THE RAIL, and the note that used to stand here was right about the
+ * reason it left: two brand marks stacked diagonally is what the alternative looks like. What
+ * changed is that there is only ONE now, and the owner named its place — *"where the shell names
+ * the application (the sidebar header, the login screen, the browser tab title)"* — which is also
+ * the arrangement the approved reference screen uses: brand in the rail, where-you-are in the bar.
+ * The organization's own name went with it, as the lockup's subtitle, so the office is named once
+ * rather than twice.
  *
  * Leading/trailing rather than left/right throughout: the whole bar mirrors
  * under `dir="rtl"` for free, the same way `shellStyle`'s plain flex row
@@ -99,16 +103,7 @@ export function AppNavbar() {
 
   return (
     <nav aria-label={t('navbarAria')} style={navbarStyle}>
-      <Link href="/" style={navbarBrandStyle}>
-        IBMS
-      </Link>
-      {organizationName ? (
-        /* `bdi`, not `span`: an Arabic organization name beside the Latin brand is exactly the
-           bidirectional neighbour that reorders a line without it. */
-        <bdi data-organization-name style={navbarOrganizationStyle}>
-          {organizationName}
-        </bdi>
-      ) : null}
+      <Breadcrumb />
 
       <div style={trailingGroupStyle}>
         {/* Item 1b landed: the reserved slot is a real button with a badge,

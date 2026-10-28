@@ -30,7 +30,7 @@ describe('password reset notification', () => {
   it('renders in English for a recipient who chose it', () => {
     const message = renderNotification(RESET, 'EN');
 
-    expect(message.subject).toBe('Reset your IBMS password');
+    expect(message.subject).toBe('Reset your WASEET 360 password');
     expect(message.bodyText).toContain('Hello أحمد الخطيب');
     expect(message.bodyText).toContain('your password has not changed');
   });

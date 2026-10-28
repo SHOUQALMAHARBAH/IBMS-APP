@@ -21,7 +21,7 @@ const WRAP: CSSProperties = {
   justifyItems: 'center',
   textAlign: 'center',
   gap: 'var(--space-2)',
-  padding: 'var(--space-10) var(--space-6)',
+  padding: 'var(--space-5)',
   border: '1px dashed var(--border-strong)',
   borderRadius: 'var(--radius-lg)',
   background: 'var(--surface-card)',

@@ -45,6 +45,18 @@ function navbar(page: Page) {
   return page.getByRole("navigation", { name: /^(Account and settings|الحساب والإعدادات)$/ });
 }
 
+/*
+ * THE RAIL, by its own accessible name in EITHER language — the same shape `navbar()` above
+ * already uses, and for a reason this batch re-learned by getting it wrong: the first version of
+ * the two re-pointed tests below spelled `{ name: "Primary" }`, which matched until the test
+ * switched the interface to Arabic and the landmark's own name became «التنقّل الرئيسي». The
+ * element then "disappeared" — an element-not-found that reads exactly like a removed element and
+ * is not one. Any locator that survives a language switch has to carry both names.
+ */
+function rail(page: Page) {
+  return page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ });
+}
+
 test("the navbar is its own landmark, distinct from the sidebar", async ({ page }) => {
   await openApp(page);
   // Two <nav> landmarks now exist. Each needs its own accessible name or
@@ -54,11 +66,29 @@ test("the navbar is its own landmark, distinct from the sidebar", async ({ page 
   await expect(page.getByRole("navigation")).toHaveCount(2);
 });
 
-test("the wordmark sits in the navbar and no longer in the sidebar", async ({ page }) => {
+/*
+ * RE-POINTED BY THE DESIGN BATCH, and the reversal is the point rather than a detail.
+ *
+ * This test's own title was "the wordmark sits in the navbar and no longer in the sidebar", and it
+ * asserted a link named `IBMS` in the navbar. Both halves moved:
+ *
+ *   * the product is **WASEET 360**; `IBMS` was the internal codename, and this was the THIRD
+ *     user-visible occurrence of it — a hardcoded JSX literal, which is why an i18n grep for the
+ *     codename found only two;
+ *   * the brand went BACK to the rail, where the owner named its place ("the sidebar header") and
+ *     where the approved reference screen puts it. The note that first moved it OUT of the rail was
+ *     right about its reason — two brand marks stacked diagonally is what the alternative looks
+ *     like — and what changed is that there is only one now.
+ *
+ * The property this test exists for is UNCHANGED and is still what it asserts: **one brand mark,
+ * not two.** Only its home moved.
+ */
+test("the brand lockup sits in the sidebar header, and there is only one", async ({ page }) => {
   await openApp(page);
-  await expect(navbar(page).getByRole("link", { name: "IBMS" })).toBeVisible();
-  // The whole point of moving it: one brand mark, not two.
-  await expect(page.getByRole("link", { name: "IBMS" })).toHaveCount(1);
+  await expect(rail(page).getByRole("link", { name: /وسيط 360/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /وسيط 360/ })).toHaveCount(1);
+  // And nowhere does the codename reach a reader.
+  await expect(page.getByRole("link", { name: "IBMS" })).toHaveCount(0);
 });
 
 test("the profile block shows the name and the department under it", async ({ page }) => {
@@ -182,7 +212,11 @@ test("the shell renders the signed-in organization's name, by language", async (
     ...ME,
     organizationName: { en: "GO Global", ar: "جو جلوبال" },
   });
-  const name = navbar(page).locator("[data-organization-name]");
+  // RE-POINTED: the organization's name went with the brand, into the rail's lockup as its
+  // subtitle, so the office is named ONCE rather than twice. The property — resolved at RENDER by
+  // the reader's language, never chosen by the server — is unchanged and is what the two
+  // assertions below still test.
+  const name = rail(page).locator("[data-organization-name]");
   await expect(name).toBeVisible();
   await expect(name).toHaveText("GO Global");
 
@@ -201,8 +235,9 @@ test("the shell renders NO organization name when the field is absent", async ({
   // that never mounted — and the absence is SCOPED to the navbar, never page-wide, which is the
   // rule decision 13 made unwritable.
   await openApp(page, ME);
-  await expect(navbar(page)).toBeVisible();
-  await expect(navbar(page).locator("[data-organization-name]")).toHaveCount(0);
+  const sidebar = rail(page);
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar.locator("[data-organization-name]")).toHaveCount(0);
   // NOT a placeholder: an organization name is the one string here a person reads as
   // authoritative, so inventing one would have the system assert something untrue about her
   // employer. ~80 spec mocks predate the field, which is why absent is a real state.

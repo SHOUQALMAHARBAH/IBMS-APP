@@ -6,6 +6,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { useAuth } from '../../lib/auth/auth-context';
 import { hasAnyPermission } from '../../lib/auth/permissions';
 import { useLanguage } from '../../lib/i18n/language-context';
+import { BrandLockup, Icon, type IconName } from '../ui';
 import { foldedIncludes, foldForSearch } from '../../lib/i18n/fold';
 import type { TranslationKey } from '../../lib/i18n/translations';
 import {
@@ -33,6 +34,8 @@ import {
   navSearchInputStyle,
   navSearchStatusStyle,
   navSearchWrapStyle,
+  brandStyle,
+  navLinkLabelStyle,
   sidebarFooterStyle,
   sidebarStyle,
 } from './app.styles';
@@ -128,12 +131,23 @@ function rankIn(order: readonly string[], value: string): number {
 export function AppNav() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { t, tPlural } = useLanguage();
+  const { t, tPlural, language } = useLanguage();
+
+  /* The office's own name, resolved at render by the reader's language — see the note at the
+   * brand lockup below. */
+  const organizationName =
+    language === 'AR'
+      ? (user?.organizationName?.ar ?? null)
+      : (user?.organizationName?.en ?? null);
 
   const canSee = (item: Destination) => canReach(user, item);
 
   const permitted = DESTINATION_GROUPS.map((group) => ({
     labelKey: group.labelKey,
+    // Carried through BOTH projections, here and in `shownGroups`. A group that loses its icon
+    // on the way to the render is a group whose links quietly stop having one, which is the
+    // half a careless version forgets because the compiler only names one of the two.
+    icon: group.icon,
     items: group.items.filter(canSee),
   })).filter((group) => group.items.length > 0);
 
@@ -147,6 +161,7 @@ export function AppNav() {
     hoist && hoist.length > 0
       ? permitted.map((group) => ({
           labelKey: group.labelKey,
+          icon: group.icon,
           items: [...group.items].sort((a, b) => rankIn(hoist, a.href) - rankIn(hoist, b.href)),
         }))
       : permitted;
@@ -185,6 +200,7 @@ export function AppNav() {
     ? visibleGroups
         .map((group) => ({
           labelKey: group.labelKey,
+          icon: group.icon,
           items: group.items.filter((item) => foldedIncludes(t(item.labelKey), query)),
         }))
         .filter((group) => group.items.length > 0)
@@ -192,8 +208,17 @@ export function AppNav() {
 
   const matchCount = shownGroups.reduce((n, g) => n + g.items.length, 0);
 
-  function renderLink(item: Destination) {
+  /*
+   * EVERY LINK CARRIES AN ICON, and the icon comes from the GROUP unless the destination overrides
+   * it — see the note on `DestinationGroup.icon` for why that is 11 decisions rather than 84.
+   *
+   * It is `aria-hidden` inside the link, so the accessible name is the label alone. An icon beside
+   * its own words is the owner's flyer language; an icon that announces itself would have a screen
+   * reader read every nav item twice.
+   */
+  function renderLink(item: Destination, groupIcon?: IconName) {
     const isActive = item.href === activeHref;
+    const icon = item.icon ?? groupIcon;
     return (
       <Link
         key={item.href}
@@ -201,13 +226,37 @@ export function AppNav() {
         aria-current={isActive ? 'page' : undefined}
         style={isActive ? navLinkActiveStyle : navLinkStyle}
       >
-        {t(item.labelKey)}
+        {icon ? <Icon name={icon} size={16} /> : null}
+        <span style={navLinkLabelStyle}>{t(item.labelKey)}</span>
       </Link>
     );
   }
 
   return (
     <nav aria-label={t('navPrimaryAria')} style={sidebarStyle}>
+      {/*
+        THE BRAND, where the owner named it: *"where the shell names the application (the sidebar
+        header, the login screen, the browser tab title)"*. The office's own name is its SUBTITLE
+        rather than a second line in the top bar — one lockup, the arrangement the approved
+        reference screen uses, and the organization reads as who you are signed in as rather than
+        as somewhere to go.
+
+        Resolved at RENDER by the reader's language, the same way the department is and for the
+        same reason: the server sends both forms and the caller is the one that knows which script
+        it is drawing. Picking server-side pins the language to whatever `me()` was fetched under.
+
+        NOTHING renders for the subtitle when the field is absent. An organization name is the one
+        string here a person reads as authoritative, so a placeholder would have the system assert
+        something untrue about her employer.
+      */}
+      <Link href="/" style={brandStyle}>
+        <BrandLockup
+          subtitle={
+            organizationName ? <bdi data-organization-name>{organizationName}</bdi> : undefined
+          }
+        />
+      </Link>
+
       <div style={navSearchWrapStyle}>
         <TextInput
           type="search"
@@ -245,7 +294,9 @@ export function AppNav() {
           }}
         >
           <summary style={navGroupSummaryStyle}>{t(group.labelKey)}</summary>
-          <div style={navGroupItemsStyle}>{group.items.map(renderLink)}</div>
+          <div style={navGroupItemsStyle}>
+            {group.items.map((item) => renderLink(item, group.icon))}
+          </div>
         </details>
       ))}
 
@@ -260,7 +311,7 @@ export function AppNav() {
         until a user enrols — and it is now reachable two ways, which for the
         one route that can strand a user is a feature rather than a duplicate.
       */}
-      <div style={sidebarFooterStyle}>{renderLink(SECURITY)}</div>
+      <div style={sidebarFooterStyle}>{renderLink(SECURITY, 'lock')}</div>
     </nav>
   );
 }

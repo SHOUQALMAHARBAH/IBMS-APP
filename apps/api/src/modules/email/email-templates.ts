@@ -88,7 +88,7 @@ function passwordReset(
 ): Omit<OutboundMessage, 'to'> {
   if (language === 'EN') {
     return {
-      subject: 'Reset your IBMS password',
+      subject: 'Reset your WASEET 360 password',
       bodyText: [
         `Hello ${p.recipientName},`,
         '',
@@ -122,9 +122,9 @@ function mailboxTest(
 ): Omit<OutboundMessage, 'to'> {
   if (language === 'EN') {
     return {
-      subject: 'IBMS mailbox connection test',
+      subject: 'WASEET 360 mailbox connection test',
       bodyText: [
-        `This is a test message from IBMS for ${p.organizationName}.`,
+        `This is a test message from WASEET 360 for ${p.organizationName}.`,
         '',
         `It was sent from your own connected mailbox, ${p.connectedEmail}.`,
         'Receiving it confirms the connection works and that outbound mail will',
@@ -149,7 +149,7 @@ function organizationAdministratorInvitation(
 ): Omit<OutboundMessage, 'to'> {
   if (language === 'EN') {
     return {
-      subject: `You have been given the first account for ${p.organizationName} on IBMS`,
+      subject: `You have been given the first account for ${p.organizationName} on WASEET 360`,
       bodyText: [
         `Hello ${p.recipientName},`,
         '',

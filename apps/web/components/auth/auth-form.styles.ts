@@ -17,7 +17,7 @@ export const pageStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: 'var(--space-8)',
+  padding: 'var(--space-5)',
   background: 'var(--surface-page)',
 };
 
@@ -46,7 +46,7 @@ export const authPageStyle: CSSProperties = {
 export const cardStyle: CSSProperties = {
   width: '24rem',
   maxWidth: '100%',
-  padding: 'var(--space-8)',
+  padding: 'var(--space-5)',
   background: 'var(--surface-card)',
   // LONGHAND, DELIBERATELY, and never the `border` shorthand: the variant below
   // overrides `borderColor`, and React refuses to update a longhand on a rerender when the
@@ -110,7 +110,7 @@ export const inputStyle: CSSProperties = {
 };
 
 export const buttonStyle: CSSProperties = {
-  marginTop: 'var(--space-6)',
+  marginTop: 'var(--space-4)',
   width: '100%',
   padding: 'var(--space-2) var(--space-4)',
   fontFamily: 'inherit',
@@ -179,4 +179,26 @@ export const manualKeyStyle: CSSProperties = {
   // A long key must wrap rather than widen the card.
   overflowWrap: 'anywhere',
   direction: 'ltr',
+};
+
+/*
+ * THE PRE-SIGN-IN FORM, inside `AuthFrame`'s form panel.
+ *
+ * These three live here rather than inline on the screen for the reason the inline-style ratchet
+ * exists: five auth screens share this shape, and five copies of `display: grid; gap` are five
+ * chances for them to stop agreeing. `--space-4` is the scale's 16px step.
+ */
+export const authFormStyle: CSSProperties = {
+  display: 'grid',
+  gap: 'var(--space-4)',
+};
+
+export const authHeadingStyle: CSSProperties = {
+  fontSize: 'var(--text-xl)',
+};
+
+/** A line of guidance above a field — never `opacity`, which globals.css forbids for text. */
+export const authPromptStyle: CSSProperties = {
+  fontSize: 'var(--text-sm)',
+  color: 'var(--ink-secondary)',
 };

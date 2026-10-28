@@ -1,15 +1,34 @@
 /*
- * IBMS design tokens.
+ * WASEET 360 design tokens.
  *
- * The palette is sampled directly from the approved login-screen design
- * (Screenshot 2026-08-24) rather than invented: the hero gradient
- * (#273a4e -> #33516d), the primary action colour (#3b6790), the page
- * surface (#f4f6fa) and the ink ramp (#26303e / #525e6f) are the literal
- * values measured out of that comp. Keep them that way — a "close enough"
- * brand blue is how a system drifts away from its own design.
+ * THE BRAND IS THREE COLOURS AND THEY ARE READ OUT OF THE LOGO'S OWN SVG SOURCE, not sampled by
+ * eye: `#2072B8` (the blue, 75 occurrences across the logo pack), `#1A3E66` (the navy, 102) and
+ * `#F4A921` (the amber, 44). A fourth, `#4A5868`, appears twice — the tagline grey — and is not a
+ * UI colour. The ramp below is built around the first two.
  *
- * ONE deliberate departure: --ink-muted was sampled at #828c9a, which fails
- * WCAG AA 1.4.3 on every surface in this file — 3.41:1 on a white card, and
+ * WHAT THIS REPLACED, AND WHY THE REPLACEMENT IS MORE ACCESSIBLE RATHER THAN MERELY ON-BRAND. The
+ * old palette was sampled from a login comp (Screenshot 2026-08-24) whose blue was `#3b6790`, and
+ * `--brand-500` was `#4c7ea8` at 4.32:1 on white — which FAILS WCAG AA 1.4.3 for normal text. The
+ * brand blue is 5.05:1 and the navy 10.91:1. Measured per step before any of this was written, and
+ * `scripts/measurements/token-contrast.py` is what re-derives it.
+ *
+ * ONE PAIRING FELL AND IT IS REPORTED RATHER THAN FUDGED: the primary button's own label was white
+ * on `#3b6790` at 5.95:1 and is now white on `#2072B8` at 5.05:1. Both clear AA at every text
+ * size; the difference is the cost of using the company's actual blue, and no colour was adjusted
+ * to hide it. Every other text pairing holds or improves — `--ink-brand` goes 5.95 -> 6.76 — which
+ * is why the fill and the ink are now DIFFERENT steps: `--brand-600` is the fill, `--brand-700` is
+ * brand-coloured TEXT, because `--brand-600` on `--surface-sunken` measures 4.46 and would fail by
+ * 0.04 for a link inside a filter bar.
+ *
+ * THE AMBER IS NEVER TEXT AND NEVER AN AREA BACKGROUND. `#F4A921` on white is **1.99:1** — it
+ * fails every threshold there is, so it cannot be a label, an icon stroke on a light surface, or a
+ * fill behind body copy. It is a solid fill with `--accent-ink` (the navy) written on it at
+ * 5.48:1, or a mark on a dark field: the rail's active indicator, one highlight, the logo. The
+ * owner's own designer used it exactly that way on the flyer — an amber pill with navy text, and
+ * an amber rule under the hero. It is also deliberately NOT a chart colour; see `--chart-*`.
+ *
+ * ONE DELIBERATE DEPARTURE SURVIVES FROM THE OLD PALETTE, unchanged by the re-anchoring:
+ * --ink-muted was sampled at #828c9a, which fails WCAG AA 1.4.3 on every surface in this file — 3.41:1 on a white card, and
  * a card is as light as a background gets, so there was nothing to darken
  * but the ink. It is #656d7b here, the lightest value that clears 4.5:1
  * against all of them (5.22:1 on a card, 4.82:1 on the page, 4.61:1 on the
@@ -21,6 +40,14 @@
  * axe measures the blend, not the token: `opacity: 0.6` on --ink-primary
  * reads as #787f89 over the page surface, which is 3.73:1. Reach for
  * --ink-secondary (6.09:1) or --ink-muted instead.
+ *
+ * SPACING IS FIVE STEPS — 4 · 8 · 12 · 16 · 22 — and the owner's instruction is that no other
+ * value appears between two elements or inside a box. That single rule is most of why the approved
+ * reference pages look composed and the screens before this batch did not: boxes land on the same
+ * lines because their padding is the same number. Lay siblings out with flex or grid and `gap`; a
+ * per-element margin is how a scale stops being a scale. The four steps above 22px are kept with
+ * their values and marked OFF-SCALE, because ten sites still read them — they are migrated as each
+ * screen is reached, not redefined underneath screens nobody has walked yet.
  *
  * Everything downstream (components/*.styles.ts, the primitives in
  * components/ui/) reads these variables and never hard-codes a colour, so a
@@ -35,26 +62,63 @@
 :root {
   color-scheme: light;
 
-  /* --- brand ramp, built around the sampled #3b6790 ------------------- */
-  --brand-50: #eaf0f6;
-  --brand-100: #dde8f2;
-  --brand-200: #c3d5e7;
-  --brand-300: #9bb9d3;
-  --brand-400: #6d97ba;
-  --brand-500: #4c7ea8;
-  --brand-600: #3b6790;
-  --brand-700: #33566f;
-  --brand-800: #2c455a;
-  --brand-900: #243447;
+  /*
+   * --- brand ramp, anchored on the logo's own #2072B8 with #1A3E66 at the dark end -----
+   *
+   * 600 is the INTERACTIVE FILL and 700 is brand-coloured TEXT; they are different steps on
+   * purpose (see the header). 800 is the navy that structures the product — headings and the
+   * rail — and 900 is the rail gradient's far end. The step count and names are unchanged, so
+   * nothing that reads a token breaks: measured first, only 600 (8 sites), 50/200/700 (one each,
+   * all in `Badge.tsx`) and `--ink-brand` (2) are read at all, which is what made re-anchoring
+   * cheap rather than a sweep.
+   */
+  --brand-50: #e8f1f9;
+  --brand-100: #d4e5f3;
+  --brand-200: #c4dbee;
+  --brand-300: #9bc5e7;
+  --brand-400: #5e9fd4;
+  --brand-500: #2f83c6;
+  --brand-600: #2072b8;
+  --brand-700: #1a5e99;
+  --brand-800: #1a3e66;
+  --brand-900: #15314f;
 
-  /* --- the navy hero/nav surface -------------------------------------- */
-  --nav-bg: #243447;
-  --nav-gradient-from: #273a4e;
-  --nav-gradient-to: #33516d;
-  --nav-ink: #f4f6fa;
-  --nav-ink-muted: #9bb9d3;
+  /* The ink that goes ON --brand-600. Named rather than written as `#fff` at the call site so
+     the dark theme can flip it to navy and so `token-contrast.py` can check that it did —
+     reference page B leaves it white over a light blue in dark mode, which measures 3.02:1. */
+  --on-brand: #ffffff;
+
+  /*
+   * --- the amber -------------------------------------------------------
+   * ONE MARK AT A TIME. Never text, never an icon stroke on a light surface, never an area
+   * background: 1.99:1 on white. A solid fill with --accent-ink on it (5.48:1), or a mark on a
+   * dark field. It is not in --chart-* and must not be put there.
+   */
+  --accent: #f4a921;
+  --accent-ink: #1a3e66;
+
+  /*
+   * --- the chart set ---------------------------------------------------
+   * FOUR SLOTS, ASSIGNED IN ORDER, NEVER CYCLED. Validated for colour-vision separation and for
+   * contrast against both surfaces; six earlier candidate sets failed. A screen that needs a
+   * fifth series does not need a fifth colour — fold the tail into "other", or split the chart.
+   * --track is the unfilled part of a ring or a bar, and a series is measured against IT rather
+   * than against the card, because that is the edge a reader has to see.
+   */
+  --chart-1: #2072b8;
+  --chart-2: #17804a;
+  --chart-3: #6b5ca5;
+  --chart-4: #a43a5e;
+  --track: #e6ecf3;
+
+  /* --- the navy rail, which is brand-800 -> brand-900 ------------------ */
+  --nav-bg: var(--brand-800);
+  --nav-gradient-from: var(--brand-800);
+  --nav-gradient-to: var(--brand-900);
+  --nav-ink: #eaf1f8;
+  --nav-ink-muted: #9fbbd6;
   --nav-item-hover: rgba(255, 255, 255, 0.08);
-  --nav-item-active: #3b6790;
+  --nav-item-active: rgba(255, 255, 255, 0.09);
   --nav-divider: rgba(255, 255, 255, 0.12);
 
   /*
@@ -80,7 +144,8 @@
   --ink-secondary: #525e6f;
   --ink-muted: #656d7b;
   --ink-inverse: #f4f6fa;
-  --ink-brand: #3b6790;
+  /* Brand-coloured TEXT is 700, not 600 — 600 on --surface-sunken is 4.46:1. */
+  --ink-brand: var(--brand-700);
 
   /* --- borders --------------------------------------------------------- */
   --border-subtle: #e6e9ef;
@@ -102,18 +167,37 @@
   --danger-border: #efc9c9;
 
   /* --- focus ----------------------------------------------------------- */
-  --focus-ring: 0 0 0 3px rgba(59, 103, 144, 0.35);
+  --focus-ring: 0 0 0 3px rgba(32, 114, 184, 0.4);
 
-  /* --- spacing --------------------------------------------------------- */
+  /*
+   * --- spacing: FIVE STEPS, and no other value -------------------------
+   * 4 · 8 · 12 · 16 · 22 (the owner's scale). --space-5 moved 20px -> 22px; four sites read it.
+   */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
+  --space-5: 1.375rem;
+
+  /*
+   * THERE ARE FIVE STEPS AND THERE IS DELIBERATELY NO SIXTH. `--space-6`, `--space-8`,
+   * `--space-10` and `--space-12` are DELETED rather than kept and deprecated.
+   *
+   * They were going to be kept and migrated per screen, until measuring found only SEVEN sites
+   * read them and every one was in a shared styles module or a primitive — the page frame, the
+   * auth card, `PageHeader`'s bottom margin, `EmptyState`'s padding — so the migration was six
+   * edits rather than a sweep across 110 screens. Deleting them is the form that cannot express
+   * the mistake: a bare reference to a property nobody declares drops the whole declaration, and
+   * `undefined-css-properties.py` is a CI gate that fails by name on it. A deprecated token
+   * somebody can still read is a sixth step waiting to be used.
+   *
+   * AND THAT GATE FLAGGED THIS VERY PARAGRAPH on its first run, because it reads TEXT and cannot
+   * tell a comment from code — the first draft of these lines spelled the deleted token inside a
+   * `var()` call and the gate reported an eighth undefined reference. It is reported here rather
+   * than fixed in the gate: teaching it to strip CSS comments would also blind it to a real
+   * reference sitting inside a commented-out block, which is a trade worth a decision of its own
+   * rather than a change riding along with a design commit.
+   */
 
   /* --- type scale ------------------------------------------------------ */
   --text-xs: 0.75rem;
@@ -146,6 +230,27 @@
   /* --- layout ---------------------------------------------------------- */
   --sidebar-width: 15.5rem;
   --content-max: 78rem;
+
+  /*
+   * --- type faces -------------------------------------------------------
+   *
+   * `--font-waseet` is also set by next/font on <html>, where its value carries the
+   * metric-adjusted fallback ("Tajawal", "Tajawal Fallback") and is therefore the better of the
+   * two. It is declared HERE as well for two reasons: a bare `var()` on an undefined property
+   * drops the whole declaration, so the body would lose its font-family entirely if the loader's
+   * class ever failed to apply; and `undefined-css-properties.py` cannot see a variable set by a
+   * generated class, so without this line the gate fails — correctly, since it cannot tell a
+   * loader-set variable from a typo.
+   *
+   * `--font-mono` fixes a measured latent defect rather than adding a feature: FOUR screens
+   * already ask for `var(--font-mono, monospace)` — the audit trail, the identifier reveal, the
+   * internal-controls report and the SLA dashboard, all of which render machine text under its
+   * own label — and the property has never been defined, so every one of them has been falling
+   * back to whatever the browser calls `monospace`. `undefined-css-properties.py` reports that
+   * class without gating it, which is how it survived.
+   */
+  --font-waseet: 'Tajawal';
+  --font-mono: var(--font-geist-mono, ui-monospace, 'SFMono-Regular', Menlo, monospace);
 
   /* --- motion ---------------------------------------------------------- */
   --transition-fast: 120ms ease;
@@ -185,19 +290,44 @@
     --surface-sunken: #131920;
     --surface-hover: #263141;
 
+    /* The ramp inverts: the pale tints become deep grounds and the deep steps become ink. */
+    --brand-50: #1b3350;
+    --brand-100: #22405f;
+    --brand-200: #2a4d70;
+    --brand-300: #35648c;
+    --brand-400: #3e82bc;
+    --brand-500: #4e9ada;
+    --brand-600: #6bb0e6;
+    --brand-700: #8cc3ec;
+    --brand-800: #d7e7f5;
+    --brand-900: #eaf1f8;
+    /* Navy ON the light blue — white would be 3.02:1, which is the defect reference page B has. */
+    --on-brand: #0e1724;
+
+    --accent: #f4a921;
+    --accent-ink: #10233a;
+
+    --chart-1: #4e9ada;
+    --chart-2: #2fa96b;
+    --chart-3: #9b7bd4;
+    --chart-4: #c9566f;
+    --track: #223246;
+
     --ink-primary: #e8ecf2;
     --ink-secondary: #a9b4c2;
     --ink-muted: #8b95a4;
     --ink-inverse: #1a222c;
-    --ink-brand: #9bb9d3;
+    --ink-brand: var(--brand-700);
 
     --border-subtle: #26303d;
     --border-default: #313d4c;
     --border-strong: #43515f;
 
-    --nav-bg: #131920;
-    --nav-gradient-from: #131920;
-    --nav-gradient-to: #1c2836;
+    --nav-bg: #132940;
+    --nav-gradient-from: #132940;
+    --nav-gradient-to: #0e1f33;
+    --nav-ink: #eaf1f8;
+    --nav-ink-muted: #9fbbd6;
 
     --info-bg: #1c2a38;
     --info-ink: #a8c6e0;
@@ -227,19 +357,44 @@
     --surface-sunken: #131920;
     --surface-hover: #263141;
 
+    /* The ramp inverts: the pale tints become deep grounds and the deep steps become ink. */
+    --brand-50: #1b3350;
+    --brand-100: #22405f;
+    --brand-200: #2a4d70;
+    --brand-300: #35648c;
+    --brand-400: #3e82bc;
+    --brand-500: #4e9ada;
+    --brand-600: #6bb0e6;
+    --brand-700: #8cc3ec;
+    --brand-800: #d7e7f5;
+    --brand-900: #eaf1f8;
+    /* Navy ON the light blue — white would be 3.02:1, which is the defect reference page B has. */
+    --on-brand: #0e1724;
+
+    --accent: #f4a921;
+    --accent-ink: #10233a;
+
+    --chart-1: #4e9ada;
+    --chart-2: #2fa96b;
+    --chart-3: #9b7bd4;
+    --chart-4: #c9566f;
+    --track: #223246;
+
     --ink-primary: #e8ecf2;
     --ink-secondary: #a9b4c2;
     --ink-muted: #8b95a4;
     --ink-inverse: #1a222c;
-    --ink-brand: #9bb9d3;
+    --ink-brand: var(--brand-700);
 
     --border-subtle: #26303d;
     --border-default: #313d4c;
     --border-strong: #43515f;
 
-    --nav-bg: #131920;
-    --nav-gradient-from: #131920;
-    --nav-gradient-to: #1c2836;
+    --nav-bg: #132940;
+    --nav-gradient-from: #132940;
+    --nav-gradient-to: #0e1f33;
+    --nav-ink: #eaf1f8;
+    --nav-ink-muted: #9fbbd6;
 
     --info-bg: #1c2a38;
     --info-ink: #a8c6e0;
@@ -283,8 +438,15 @@ body {
   flex-direction: column;
   color: var(--ink-primary);
   background: var(--surface-page);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans Arabic', 'Segoe UI Arabic', sans-serif;
+  /*
+   * Tajawal, the owner's chosen face (option 1 of the two she was shown). Arabic is this
+   * product's first language, so the ARABIC face is the one chosen for the UI and the Latin
+   * follows it — not the reverse. --font-waseet is set by next/font in the root layout; the
+   * fallback stack is the one that shipped before it, so a failed font load degrades to exactly
+   * what the product looked like yesterday rather than to a serif.
+   */
+  font-family: var(--font-waseet), system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans Arabic', 'Segoe UI Arabic', sans-serif;
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
@@ -296,13 +458,20 @@ a {
   text-decoration: none;
 }
 
+/*
+ * Headings carry the brand navy rather than body ink — the reference pages' own treatment, and
+ * what makes a page read as this product rather than as a default admin template. 10.91:1 on a
+ * card in the light theme and 11.94:1 in the dark one, so it is also the strongest text pairing
+ * in the palette.
+ */
 h1,
 h2,
 h3,
 h4 {
-  color: var(--ink-primary);
+  color: var(--brand-800);
   line-height: var(--leading-tight);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
+  text-wrap: balance;
 }
 
 h1 { font-size: var(--text-2xl); }
@@ -317,6 +486,7 @@ h4 { font-size: var(--text-md); }
  */
 :focus-visible {
   outline: 2px solid var(--brand-600);
+  box-shadow: var(--focus-ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -352,4 +522,124 @@ h4 { font-size: var(--text-md); }
 @keyframes ibms-skeleton-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
+}
+
+/*
+ * ===================================================================================
+ * MOTION — the brand mark's arrival, and the sign-in hero's two ambient glows.
+ * ===================================================================================
+ *
+ * FOUR RULES, AND THEY APPLY TO THE WHOLE PRODUCT RATHER THAN ONLY HERE.
+ *
+ *   1. Motion runs ONCE ON LOAD and then stops, with exactly one slow ambient exception (the
+ *      amber point's pulse, and the two hero glows on the sign-in screen alone). A screen
+ *      somebody opens ten times a day must not perform for them ten times.
+ *
+ *   2. NOTHING IMPORTANT WAITS ON AN ANIMATION. Every element below is readable at rest — the
+ *      animations all end at the state the element would have had anyway, and all of them are
+ *      `forwards`. The animation is how a thing ARRIVES, never whether it arrives. That is why
+ *      the mark is `opacity: 0` only while `data-animate="true"`: the static mark, which is what
+ *      the rail and every other surface render, has no animation and no hidden state at all.
+ *
+ *   3. INTERACTION transitions are short — `--transition-fast` / `--transition-base`, 120 and
+ *      180ms, which already exist. Focus, hover and press are where motion earns its keep.
+ *
+ *   4. `prefers-reduced-motion: reduce` DISABLES ALL OF IT and shows the final state at once.
+ *      The global reduced-motion block above collapses durations to 0.01ms, which lands a
+ *      `forwards` animation on its end state immediately — but it does NOT help an element whose
+ *      resting state is hidden, so the explicit block at the end of this section states each
+ *      final value rather than relying on the collapse. That is the half a careless version
+ *      omits, and its symptom is an invisible logo.
+ */
+
+/* The arc strokes itself in. 250+52 is the logo's own dash pattern, so the drawn length is the
+   mark's real geometry rather than a number tuned to look right. */
+@keyframes waseet-mark-draw {
+  from { stroke-dashoffset: 302; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* A node settles in. The overshoot is slight: this is a logo arriving, not a toy. */
+@keyframes waseet-mark-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes waseet-mark-fade {
+  to { opacity: 1; }
+}
+
+/* THE ONE AMBIENT LOOP. Slow enough to read as breathing rather than blinking. */
+@keyframes waseet-mark-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.waseet-mark[data-animate='true'] .waseet-mark-arc {
+  stroke-dashoffset: 302;
+  animation: waseet-mark-draw 1.15s cubic-bezier(0.65, 0, 0.35, 1) 0.1s forwards;
+}
+
+.waseet-mark[data-animate='true'] .waseet-mark-spoke {
+  opacity: 0;
+  animation: waseet-mark-fade 0.5s ease 0.8s forwards;
+}
+
+.waseet-mark[data-animate='true'] .waseet-mark-node {
+  opacity: 0;
+  /* `fill-box` so the scale pivots on the node's own centre rather than the SVG's origin, which
+     would throw each node across the mark on its way in. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: waseet-mark-pop 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) forwards;
+}
+
+.waseet-mark[data-animate='true'] .waseet-mark-node-1 { animation-delay: 0.85s; }
+.waseet-mark[data-animate='true'] .waseet-mark-node-2 { animation-delay: 0.97s; }
+.waseet-mark[data-animate='true'] .waseet-mark-node-3 { animation-delay: 1.09s; }
+
+.waseet-mark[data-animate='true'] .waseet-mark-hub {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: waseet-mark-pop 0.55s cubic-bezier(0.34, 1.3, 0.64, 1) 1.2s forwards;
+}
+
+.waseet-mark[data-animate='true'] .waseet-mark-point {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    waseet-mark-pop 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) 1.34s forwards,
+    waseet-mark-pulse 3.4s ease-in-out 2.1s infinite;
+}
+
+/* The sign-in hero's two glows. Different durations and directions so they never beat together. */
+@keyframes waseet-glow-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-26px, 22px, 0) scale(1.09); }
+}
+
+@keyframes waseet-glow-b {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(20px, -18px, 0); }
+}
+
+.waseet-glow-a { animation: waseet-glow-a 18s ease-in-out infinite alternate; }
+.waseet-glow-b { animation: waseet-glow-b 22s ease-in-out infinite alternate; }
+
+/*
+ * Rule 4, stated rather than inferred. Every element above whose RESTING state is hidden gets its
+ * final value here, because collapsing a duration does not help something that starts at
+ * `opacity: 0` with no animation left to run.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .waseet-mark[data-animate='true'] .waseet-mark-arc { stroke-dashoffset: 0; }
+  .waseet-mark[data-animate='true'] .waseet-mark-spoke,
+  .waseet-mark[data-animate='true'] .waseet-mark-node,
+  .waseet-mark[data-animate='true'] .waseet-mark-hub,
+  .waseet-mark[data-animate='true'] .waseet-mark-point {
+    opacity: 1;
+    transform: none;
+  }
 }

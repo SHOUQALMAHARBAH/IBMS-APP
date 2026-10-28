@@ -82,7 +82,7 @@ export function PageHeader({
         justifyContent: 'space-between',
         gap: 'var(--space-4)',
         flexWrap: 'wrap',
-        marginBottom: 'var(--space-6)',
+        marginBottom: 'var(--space-5)',
       }}
     >
       <div style={{ minWidth: 0 }}>
