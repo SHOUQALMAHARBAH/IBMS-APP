@@ -233,7 +233,7 @@ export function AppNav() {
   }
 
   return (
-    <nav aria-label={t('navPrimaryAria')} style={sidebarStyle}>
+    <nav aria-label={t('navPrimaryAria')} style={sidebarStyle} data-app-rail>
       {/*
         THE BRAND, where the owner named it: *"where the shell names the application (the sidebar
         header, the login screen, the browser tab title)"*. The office's own name is its SUBTITLE

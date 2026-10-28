@@ -176,6 +176,8 @@ Each is something the pass found and deliberately left, with what it would take 
 | 4b | **`aria-label` over a visible label is the most common defect this pass is finding.** Two of the three pilot screens carried it, FOUR controls in all, and in three of the four the two strings DISAGREED: `pcAccountAria` said four digits where the field accepts two to four; `incTitleLabel` ("Incident title") was better than the visible `incTitleFieldLabel` ("Title"); `incRootCauseLabel` was a placeholder doing a label's job, so a sighted reader had nothing left to read once they typed. An `aria-label` REPLACES the accessible name, so the two readers were told different things and nobody proof-reads the invisible one. | Fixed per screen as the pass reaches them, by making the informative string the VISIBLE label and withdrawing the duplicate key in both languages — four keys withdrawn so far. A gate for the class is worth considering and is not built here. |
 | 4c | **`hardcoded-ui-english.py` reports 0 undeclared and misses two strings on `/internal-controls`** — a governance report an auditor reads. `'None'` was the violations figure when the count was zero: a ternary of bare literals inside a PROP VALUE, which failure mode 8 excludes by design because the identical shape is a `data-*` test hook elsewhere. And `Generated {…}` was a capitalised single word in front of a brace, which `PROSE` misses (it needs two words) and `BARE_TEXT_LINE` misses (its character class excludes braces). | Both instances fixed — the count is `٠` through `formatNumber`, and the generated-at line goes through `ReportProvenance`, which this product already decided on for exactly that line. **Mode 8 is NOT widened**: that script's own header records that tolerating more makes every bare call a finding. |
 | 4d | **`ReportProvenance` was never exported from the `components/ui` barrel.** Found by the compiler when the first screen tried to compose it. | Exported. Worth a line because the component shipped with its own decision record and a `report-provenance` testid and could only be reached by a deep import — which is how a primitive stays unused. |
+| 5b | **The collapsed rail is a STRIP, not a drawer.** Its `<details>` groups stay closed, so it costs about one brand lockup and one search field of height. | A drawer needs a toggle, a focus trap and an escape key — three pieces of BEHAVIOUR, which §4(h) does not allow this batch to add. It is the better answer whenever somebody is allowed to build it. |
+| 5c | **The rail's layout lives in inline styles, which is why the responsive rule needs `!important`.** | Moving it to CSS is a larger change than a responsive fix should carry. Recorded so the `!important` is read as a consequence rather than as carelessness. |
 | 6 | **The two new CI steps are committed locally and NOT PUSHED.** `check:token-contrast` and `check:inline-styles` are wired in `package.json` (so `npm run check:screen-pass` runs both) and their `ci.yml` steps sit in an unpushed commit: GitHub refuses a push touching a workflow file from a token without `workflow` scope, and this machine's keyring token holds `gist, read:org, repo`. **No credential was written to disk to get around it** — the credential-safety hook refuses that and is right to, since it cannot tell a credential store from a leak. | Needs one push with a `workflow`-scoped token, which is the owner's to make. Until then both gates are green locally and runnable by name, and CI simply does not run them. Recorded here rather than left as a silent gap, because a gate nobody runs is the thing this repository has paid for three times. |
 | 5 | **The four other `(auth)` screens do not yet use `AuthFrame`.** `/login` links to `/forgot-password`, which still wears the old card. | They are screens in this batch and adopt the frame when the pass reaches them. |
 
@@ -197,7 +199,23 @@ up pale, with white logo strokes on it and a `--nav-ink-muted` subtitle that van
 > the one pair in the system deliberately dark either way — the rail is navy whichever way a reader
 > sets their machine. A ramp step is for something that should FOLLOW the theme.
 
-**2. `/incidents` rendered a titled, empty card** for a reader whose grants reach no act on that
+**2. THE SHELL NEVER COLLAPSED AT PHONE WIDTH, so all 106 authenticated screens were unusable on a
+phone.** The rail is a fixed `--sidebar-width` column in a flex row and nothing narrowed it: at
+390px the content column was squeezed to roughly a quarter of the screen and every Arabic word
+wrapped character by character. No gate, typecheck or assertion could see it — a Playwright test at
+the default viewport is a desktop — and §11.5 makes it part of done. Fixed in `globals.css` as one
+rule, because it is one property of the frame all 106 render into; a per-screen fix would be 106
+fixes for one defect.
+
+> **AND THE FIRST VERSION OF THAT FIX WAS HALF-APPLIED, which the very next screenshot showed.**
+> `sidebarStyle` is an INLINE style object, and an inline declaration beats any stylesheet rule
+> whatever its specificity. The shell DID become a column — `shellRowStyle` happens not to set
+> `flex-direction` inline — while the rail kept its fixed width and sat across 60% of the screen
+> with the page ground beside it. **A half-applied media query is worse than none, because it looks
+> deliberate.** Every declaration on the rail carries `!important` now, scoped to that one query,
+> with the reason written beside it.
+
+**3. `/incidents` rendered a titled, empty card** for a reader whose grants reach no act on that
 record — a DPO looking at an incident only `incident.contain` can move. A heading over nothing is
 the emptiness this batch exists to remove, and it is the frontend directive's own rule one step up:
 a control a role cannot use does not exist on their screen, so neither does the box it would have

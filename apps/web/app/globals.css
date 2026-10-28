@@ -508,6 +508,67 @@ h4 { font-size: var(--text-md); }
   unicode-bidi: embed;
 }
 
+/*
+ * ===================================================================================
+ * THE SHELL AT PHONE WIDTH — one rule, 106 screens.
+ * ===================================================================================
+ *
+ * FOUND BY LOOKING AT A SCREENSHOT, which is the only thing that could have found it. The rail is
+ * a fixed `--sidebar-width` column in a flex row, and nothing collapsed it: at 390px the content
+ * column was squeezed to roughly a quarter of the screen and every Arabic word wrapped character
+ * by character. Every one of the 106 authenticated screens was unusable on a phone, and no gate,
+ * typecheck or assertion could see it — a Playwright test at the default viewport is a desktop.
+ *
+ * It belongs HERE rather than in any screen, because it is one property of the frame they all
+ * render into. A per-screen fix would be 106 fixes for one defect.
+ *
+ * THE BREAKPOINT IS 64rem, NOT A PIXEL VALUE: the rail is `--sidebar-width` (15.5rem) and the
+ * content needs roughly three times that to hold a table, so the point at which they stop fitting
+ * moves with the reader's own font size. A `px` breakpoint would be correct only at the default
+ * one.
+ *
+ * WHAT THE COLLAPSED RAIL IS, and it is a strip rather than a drawer: the groups stay `<details>`
+ * and stay closed, so the rail costs about one brand lockup and one search field of height and
+ * the screen starts immediately under it. A drawer would need a toggle, a focus trap and an
+ * escape key — three pieces of behaviour, which this batch does not add. Recorded in the register
+ * as the better answer whenever somebody is allowed to build it.
+ *
+ * `position: static` is the load-bearing line. The rail is `sticky` with a `top` derived from the
+ * navbar height and a `max-height` to match; left sticky in a column layout it pins itself over
+ * the content and the page scrolls underneath it.
+ *
+ * AND EVERY DECLARATION ON THE RAIL CARRIES `!important`, WHICH IS NOT A STYLE PREFERENCE — it is
+ * the only thing that works. `sidebarStyle` is an INLINE style object, and an inline declaration
+ * beats any stylesheet rule whatever its specificity. The first version of this block omitted it
+ * and the result was visible in the very next screenshot: the shell DID become a column (because
+ * `shellRowStyle` happens not to set `flex-direction` inline, so that one rule applied) while the
+ * rail kept its fixed `--sidebar-width` and sat as a strip across 60% of the screen with the page
+ * ground showing beside it. A HALF-APPLIED MEDIA QUERY IS WORSE THAN NONE, because it looks
+ * deliberate.
+ *
+ * The honest alternative is to move the rail's layout out of inline styles entirely, which is a
+ * larger change than a responsive fix should carry; `!important` scoped to one media query, with
+ * this note, is the smaller one. `globals.css` already uses it in the reduced-motion block below
+ * for the same reason — overriding declarations it does not own.
+ */
+@media (max-width: 64rem) {
+  [data-app-shell-row] {
+    flex-direction: column !important;
+  }
+
+  [data-app-rail] {
+    flex: none !important;
+    width: 100% !important;
+    position: static !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    /* The separator moves to the edge that now touches the content: the bottom, not the side. */
+    border-inline-end: none !important;
+    border-block-end: 1px solid var(--nav-divider) !important;
+    padding: var(--space-3) !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

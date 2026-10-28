@@ -196,8 +196,19 @@ export default function InternalControlsPage() {
       >
         <div style={declaredHeaderStyle} data-testid="declared-acts">
           {declaredError ? <ErrorState title={declaredError} /> : null}
+          {/*
+            THE HOOK IS ON THE SPAN, NOT ON `Note` — and the first version had it on BOTH, which is
+            worth a line because nothing would have told me.
+
+            `Note` declares its own props and does not take `data-testid`, so the one on the
+            component was SILENTLY DROPPED: TypeScript exempts hyphen-containing JSX attributes
+            from excess-property checking, so `data-anything` on any custom component type-checks
+            and goes nowhere. The spec passed either way, which is exactly the problem — it passed
+            because the span's hook was the only one in the DOM, so a reader of this file would
+            have seen two and believed the wrong one was load-bearing.
+          */}
           {declared ? (
-            <Note tone="neutral" icon="users" data-testid="declared-office-mode">
+            <Note tone="neutral" icon="users">
               <span data-testid="declared-office-mode">
                 {declared.office.mode === 'COMBINED'
                   ? t('icDeclaredOfficeCombined')

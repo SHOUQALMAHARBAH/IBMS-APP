@@ -47,7 +47,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div style={shellStyle}>
       <AppNavbar />
-      <div style={shellRowStyle}>
+      <div style={shellRowStyle} data-app-shell-row>
         <AppNav />
         <div style={contentStyle}>
           {needsEnrolment ? (
