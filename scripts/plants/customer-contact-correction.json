@@ -1,13 +1,13 @@
 {
   "empty-fields-sent-as-empty-strings": {
     "file": "apps/web/lib/customer/customer-api.ts",
-    "from": "    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();",
-    "to": "    if (typeof v === 'string') body[k] = v.trim();"
+    "from": "  // Only the fields actually typed. An empty string would be an instruction to\n  // store an empty string, which is not what a blank box means.\n  const body: Record<string, string> = {};\n  for (const [k, v] of Object.entries(input)) {\n    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();",
+    "to": "  // Only the fields actually typed. An empty string would be an instruction to\n  // store an empty string, which is not what a blank box means.\n  const body: Record<string, string> = {};\n  for (const [k, v] of Object.entries(input)) {\n    if (typeof v === 'string') body[k] = v.trim();"
   },
   "correction-values-sent-untrimmed": {
     "file": "apps/web/lib/customer/customer-api.ts",
-    "from": "    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();",
-    "to": "    if (typeof v === 'string' && v.trim() !== '') body[k] = v;"
+    "from": "  // Only the fields actually typed. An empty string would be an instruction to\n  // store an empty string, which is not what a blank box means.\n  const body: Record<string, string> = {};\n  for (const [k, v] of Object.entries(input)) {\n    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();",
+    "to": "  // Only the fields actually typed. An empty string would be an instruction to\n  // store an empty string, which is not what a blank box means.\n  const body: Record<string, string> = {};\n  for (const [k, v] of Object.entries(input)) {\n    if (typeof v === 'string' && v.trim() !== '') body[k] = v;"
   },
   "dsr-type-sent-without-a-reference": {
     "file": "apps/web/components/customer/CustomerContactCorrection.tsx",

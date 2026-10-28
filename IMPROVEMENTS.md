@@ -6125,7 +6125,8 @@ building it. Building after him is not a delay.
 
 **AML and screening.** § 1.59 (nothing reads a customer's screening standing) · § 1.58
 obligation 2 (no transaction path is screened) · § 3.14's regulatory half · editing any
-screening identifier · a PEP data provider · renaming `sanctions-pep.screen` and
+screening identifier **— STRUCK 2026-10-28 FOR `dateOfBirth` AND `nationality` ONLY, by the
+owner; see the strike below** · a PEP data provider · renaming `sanctions-pep.screen` and
 `aml.monitor`.
 
 **Money.** The payment-methods work in full (types, cheque states, offset, net
@@ -6194,11 +6195,64 @@ Its unreachability means the Compliance Officer cannot record a disclosure at al
 regulatory gap sitting inside a money deferral, and it should be first out when the deferral
 lifts rather than last.
 
+### THE NARROW STRIKE OF 2026-10-28 — `dateOfBirth` AND `nationality` ONLY
+
+**The owner struck her own deferral this far and no further:**
+
+> `dateOfBirth` and `nationality` become correctable through `CustomerIdentifierCorrection`.
+> `legalName`, the four name parts, `nationalId` and `registrationNumber` stay exactly as the
+> 2026-09-28 deferral left them — do not build, do not extend.
+
+**Her reason**: what she refused in September was an *unguarded* edit of a screening identifier,
+and the controlled path did not exist then. What exists now *"records who changed it and when,
+keeps the encrypted before and after, demands a written reason, re-screens, and knocks the KYC
+file back out of its approved state"* — the guarded edit she was holding out for.
+
+**THREE OF THOSE FIVE PROPERTIES DID NOT EXIST, measured before a line was written.** The table
+`CustomerIdentifierCorrection` had carried the COLUMNS since migration `20261102100000`; what it
+had no writer for was most of the mechanism:
+
+| Her premise | State on 2026-10-28, before this work |
+|---|---|
+| records who changed it and when | **EXISTED** — written by the contact-correction path. |
+| keeps the encrypted before and after | **COLUMNS EXISTED**; the contact path deliberately does not read the BEFORE back, and neither target field is encrypted on `Customer`, so the stated reason for encrypting (*not defeating `nationalIdEnc`*) does not apply. Written here anyway. |
+| demands a written reason | **DID NOT EXIST.** `reason?` is `@IsOptional()` and the service defaults it to `'Contact detail corrected'`. That DTO's own comment said of the identifiers *"it will be mandatory"* — future tense. |
+| re-screens | **DID NOT EXIST AS A WRITER.** `priorScreeningResultId` and `kycStatusBefore` appeared exactly ONCE each in the whole api — in the repository signature, with no caller — and `newScreeningResultId` was not in the signature at all. |
+| knocks the file out of `APPROVED` | **NOT REPRESENTABLE, AND NOT SOMETHING THIS SYSTEM DOES FOR ANY TRIGGER.** See below. |
+
+**THE FIFTH IS THE ONE THAT CHANGED THE DESIGN, AND IT IS NOT A GAP IN THIS PATH.**
+`WORKFLOW_TRANSITIONS.KYCRecord` reads `APPROVED: ['PERIODIC_REVIEW_DUE']`, transcribed verbatim
+from the `KYCRecord` model comment's own chain — there is **no backward edge out of `APPROVED`**,
+and `PERIODIC_REVIEW_DUE`'s own comment says what re-KYC is here: *"the actual re-KYC cycle is a
+new KYCRecord for the same Customer, not a loop back onto this one."*
+
+And the system already answers *a new sanctions hit on an already-approved, active customer*:
+`ScreeningService.runRecurringBatch` re-screens every ACTIVE customer whose latest file is
+APPROVED or PERIODIC_REVIEW_DUE, **every four hours**, records the results, queues any match for
+review — and **leaves the file APPROVED**. So a correction-triggered re-screen behaving the same
+way is consistent with the shipped design; a knockback here would be the only place in the
+product where a hit moves a file backwards, and adding one is a change to a compliance state
+machine rather than a feature. **NOT BUILT, and the absence is deliberate.**
+
+What makes that safe is a mechanism built in anticipation of exactly this and already shipped:
+`evaluateScreeningHold` recomputes the subject fingerprint from live rows and raises
+`IDENTITY_CHANGED_SINCE_SCREENING`, whose own message reads *"The identity details on this file
+changed after it was screened — a subject was added, removed, or **corrected**. Re-run screening
+before deciding."* So a correction whose re-screen does not complete **blocks the next decision
+on that file**, which is why the re-screen is best-effort rather than transactional and why
+`rescreened: false` is reported to the caller rather than swallowed.
+
+**ONE ITEM IS OWED TO HER AND IS NOT WRITABLE BY ANYBODY ELSE**: a sentence for the case where
+the correction was recorded and the re-screen did not complete. No Arabic for it exists anywhere
+in the dictionary and composing one is morphology rather than a slice, so the screen says the
+correction was recorded — true in both cases — and makes **no claim about screening at all**,
+which is the one wording that cannot be false.
+
 ### The five safety conditions, and their verified state
 
 | | Condition | State, measured 2026-09-28 |
 |---|---|---|
-| 1 | The screening identifiers stay uneditable | **HOLDS, at three layers.** `UpdateCustomerContactDto` declares only phone, email and registered address, and `forbidNonWhitelisted: true` is set globally — so an identifier arrives as a 400 naming the field. The repository's single `customer.update` write accepts only those three in its TypeScript signature, so even a service bug cannot pass a name. `customer.e2e-spec.ts` refuses six identifiers **one at a time**. `placeOfBirth` and passport are not columns at all. A beneficial owner can be ADDED and READ — there is no PATCH and no DELETE — so none of the six can be edited from anywhere. |
+| 1 | The screening identifiers stay uneditable | **CORRECTED 2026-10-28 — HOLDS FOR SIX OF THE EIGHT, and the owner struck the other two herself.** `dateOfBirth` and `nationality` are now correctable through `PATCH /customers/:id/identifiers`; `legalName`, the four name parts, `nationalId` and `registrationNumber` are unchanged. **All three layers are intact for those six, which is why the strike could be narrow**: the new route has its OWN DTO (so `UpdateCustomerContactDto` is still the three-field class that makes layer 1 structural), its OWN repository write (so `updateContactDetails`'s signature — layer 2 — still cannot carry a name), and `customer.e2e-spec.ts`'s one-at-a-time refusals are kept AND re-asserted on the new route too, so the six are refused in both places rather than one. `customer-identifier-correction.inventory.spec.ts` sweeps the whole api source for a second write path and for any of the six appearing in either DTO. **The original state, which was true when written:** **HOLDS, at three layers.** `UpdateCustomerContactDto` declares only phone, email and registered address, and `forbidNonWhitelisted: true` is set globally — so an identifier arrives as a 400 naming the field. The repository's single `customer.update` write accepts only those three in its TypeScript signature, so even a service bug cannot pass a name. `customer.e2e-spec.ts` refuses six identifiers **one at a time**. `placeOfBirth` and passport are not columns at all. A beneficial owner can be ADDED and READ — there is no PATCH and no DELETE — so none of the six can be edited from anywhere. |
 | 2 | No claim is reintroduced | **HOLDS.** Three AML/PEP appearances in user-facing text, each legitimate: permission-code names inside refusal messages (renaming those is itself deferred); the PEP **negative** claim — *"PEP screening is NOT operational. No customer may be represented as clear of PEP status"* — which is the honesty fix and must stay; and the AML/CFT **transaction monitoring** screen, which describes a sweep that genuinely runs (a nightly `@Cron` plus an on-demand route). Nothing claims a check runs that does not. |
 | 3 | What is built in screening stays and is not extended | **HOLDS.** The sanctions case queue, the watchlist rollback and its audit row, and the sanctions check itself are untouched since they closed. |
 | 4 | The confirmed absence stays written and visible | **DONE.** README § Known gaps now carries *"pre-transaction screening is a regulatory obligation and is not implemented"* with the AMLU citation and the measurement, directly above the screening row, plus a pointer from the top-of-file summary — which previously described screening as *"simulated"*, itself stale. The beneficial-owner gap is recorded beside it. |

@@ -214,6 +214,9 @@ async function startAndScreen(
       contactPhone: '+962-7-9000-0000',
       contactEmail: 'customer@example.test',
       languagePreference: 'AR',
+      // Required before SUBMITTED since 2026-10-28 — see `KycService.submit`.
+      dateOfBirth: '1990-01-01',
+      nationality: 'JO',
     })
     .expect(201);
   const customerId = (customer.body as { id: string }).id;
@@ -810,6 +813,8 @@ describe('Part B §12 — a subject added after screening is not a screened subj
         contactPhone: '+962-7-9000-0000',
         contactEmail: 'customer@example.test',
         languagePreference: 'AR',
+        dateOfBirth: '1990-01-01',
+        nationality: 'JO',
       })
       .expect(201);
 

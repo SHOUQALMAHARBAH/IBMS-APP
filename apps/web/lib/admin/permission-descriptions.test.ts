@@ -64,7 +64,11 @@ const MISSING_DESCRIPTION_BUDGET = 0;
  * What must never happen is this number going up while the CODE COUNT stays the same. That would be
  * a reversion, and it is what the rule is about.
  */
-const CARRIED_ENGLISH_BUDGET = 215;
+// 215 -> 214 on 2026-10-28: `customer.update`'s English was REWRITTEN, because the owner's strike
+// of her own 2026-09-28 deferral made the stored sentence false — it said the permission does not
+// cover date of birth or nationality, and now it does. The ratchet fired for exactly the reason it
+// exists, and lowering it is the half of that rule that stops the list becoming a ceiling.
+const CARRIED_ENGLISH_BUDGET = 214;
 
 /**
  * CODES WHOSE ARABIC IS **NOT** THE OWNER'S, and the balance check that stops this list rotting.

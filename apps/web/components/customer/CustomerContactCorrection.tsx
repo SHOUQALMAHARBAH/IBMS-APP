@@ -35,14 +35,19 @@ import { permissionRefusal } from '../../lib/i18n/permission-refusal';
  *
  * WHAT THIS DELIBERATELY CANNOT CORRECT
  * ------------------------------------
- * Name, date of birth, nationality, national ID. Those are screening identifiers:
- * the AMLU requires a fresh screen on a change to any of them, and that mechanism
- * does not exist yet (§ 1.59 — nothing in the product reads a customer's screening
- * standing, so "re-screening required" would be a state with no consumer). The
- * server refuses them structurally: `UpdateCustomerContactDto` does not declare
- * them, and `forbidNonWhitelisted` turns their presence into a 400 naming the
- * field. This note says so on screen, because an officer who cannot find the name
- * field should be told why rather than left to conclude the form is broken.
+ * Name and national ID. Those are screening identifiers: the AMLU requires a fresh
+ * screen on a change to either, and no re-screening path exists for them. The server
+ * refuses them structurally: `UpdateCustomerContactDto` does not declare them, and
+ * `forbidNonWhitelisted` turns their presence into a 400 naming the field. This note
+ * says so on screen, because an officer who cannot find the name field should be told
+ * why rather than left to conclude the form is broken.
+ *
+ * CORRECTED 2026-10-28 — this block named FOUR fields and said the mechanism "does not
+ * exist yet". The owner struck her own 2026-09-28 deferral for DATE OF BIRTH and
+ * NATIONALITY, and `CustomerIdentifierCorrection` beside this file is that mechanism:
+ * it demands a written reason, records the before and the after, and re-screens. The old
+ * sentence was true when written and is kept here rather than deleted, because it is what
+ * explains why the sibling control exists at all.
  */
 
 const field: CSSProperties = { display: 'grid', gap: '0.2rem' };

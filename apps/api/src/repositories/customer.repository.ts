@@ -120,6 +120,30 @@ export class CustomerRepository {
   }
 
   /**
+   * Correct a customer's two SCREENING DISCRIMINATORS — `dateOfBirth` and `nationality`.
+   *
+   * A SECOND method rather than two more fields on `updateContactDetails`, and that is the whole
+   * point rather than a style choice. The 2026-09-28 deferral's safety condition 1 holds at three
+   * layers, and the second is *"the repository's single `customer.update` write accepts only those
+   * three in its TypeScript signature, so even a service bug cannot pass a name"*. Widening that
+   * signature would retire that layer for all six fields the deferral still covers; a sibling method
+   * accepting only these two retires it for nothing.
+   *
+   * So `legalName`, the four name parts, `nationalId` and `registrationNumber` are still not
+   * expressible in ANY repository write on this model. That is what the owner's strike left standing.
+   *
+   * NEVER CALL THIS WITHOUT RE-SCREENING. `CustomerService.correctIdentifiers` is the only caller and
+   * it re-screens; a second caller that skipped it would be the silent relaxation the AMLU rules
+   * refuse. `customer-identifier-correction.inventory.spec.ts` fails by name on one.
+   */
+  updateIdentifiers(
+    id: string,
+    data: { dateOfBirth?: Date; nationality?: string },
+  ): Promise<Customer> {
+    return this.prisma.client.customer.update({ where: { id }, data });
+  }
+
+  /**
    * Record a correction. The evidence the AMLU requires kept — "the verification mechanism and actions
    * taken … in internal records" — and, when `dsrId` is set, the evidence that a statutory request was
    * actually answered rather than attested to.
@@ -136,10 +160,31 @@ export class CustomerRepository {
     kycRecordId?: string;
     kycStatusBefore?: string;
     priorScreeningResultId?: string;
+    newScreeningResultId?: string;
   }): Promise<{ id: string }> {
     return this.prisma.client.customerIdentifierCorrection.create({
       data: input,
       select: { id: true },
+    });
+  }
+
+  /**
+   * Attach the re-screening result to a correction row already written.
+   *
+   * TWO WRITES RATHER THAN ONE, deliberately. The correction row is the evidence that an identifier
+   * changed, so it is written BEFORE the re-screen rather than after it: if the process dies between
+   * the two, a correction row with a null `newScreeningResultId` is a recoverable inconsistency that
+   * reads as *the re-screen is owed*, whereas a changed date of birth with no correction row at all is
+   * the silent identifier edit this whole mechanism exists to make impossible. The same argument, in
+   * the same words, as `ScreeningHoldService.assertClearToProceed` writing its release row first.
+   */
+  linkNewScreeningResult(
+    correctionIds: readonly string[],
+    newScreeningResultId: string,
+  ): Promise<{ count: number }> {
+    return this.prisma.client.customerIdentifierCorrection.updateMany({
+      where: { id: { in: [...correctionIds] }, newScreeningResultId: null },
+      data: { newScreeningResultId },
     });
   }
 

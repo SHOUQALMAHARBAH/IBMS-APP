@@ -16,6 +16,7 @@ import {
   type Ubo,
 } from '../../../../lib/customer/customer-api';
 import { CustomerContactCorrection } from '../../../../components/customer/CustomerContactCorrection';
+import { CustomerIdentifierCorrection } from '../../../../components/customer/CustomerIdentifierCorrection';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
@@ -409,6 +410,20 @@ export default function CustomerProfilePage() {
           <div style={{ marginTop: '1.25rem' }}>
             <CustomerContactCorrection
               customerId={customer.id}
+              onCorrected={load}
+            />
+          </div>
+
+          {/* Correcting the two SCREENING DISCRIMINATORS — the owner's narrow strike of her own
+            * 2026-09-28 deferral (2026-10-28). A sibling control rather than two more fields on
+            * the form above: the reason is mandatory, the fields are INDIVIDUAL-only, and saving
+            * re-screens. It renders nothing at all on a corporate customer, which is why the
+            * type is passed rather than the condition being written here — the component owns
+            * that decision, and a second copy of it is a second answer. */}
+          <div style={{ marginTop: '1.25rem' }}>
+            <CustomerIdentifierCorrection
+              customerId={customer.id}
+              customerType={customer.customerType}
               onCorrected={load}
             />
           </div>

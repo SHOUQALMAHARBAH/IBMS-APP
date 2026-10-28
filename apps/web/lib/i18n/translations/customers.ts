@@ -110,9 +110,21 @@ export const CUSTOMERS = {
     customerCorrectCancel: "إلغاء",
     customerCorrectError: "تعذّر تسجيل التصحيح — حاول مرة أخرى.",
     customerCorrectRefusalAct: 'تصحيح بيانات الاتصال بالعميل',
+    // CORRECTED 2026-10-28: this named FOUR identifiers as uncorrectable and said the
+    // re-screening mechanism was not built. The owner struck her own 2026-09-28 deferral for TWO
+    // of them, and the mechanism now exists for those two — so the run «وتاريخ الميلاد والجنسية»
+    // is DELETED and nothing else changes. What is left is still true: the name and the national
+    // ID are not corrected anywhere, and no re-screening path exists for them.
     customerCorrectIdentifiersNote:
-      "الاسم وتاريخ الميلاد والجنسية ورقم الهوية لا تُصحَّح من هنا: تغييرها يستوجب " +
+      "الاسم  ورقم الهوية لا تُصحَّح من هنا: تغييرها يستوجب " +
       "إعادة الفحص مقابل قوائم العقوبات، وهذه الآلية لم تُبنَ بعد.",
+    // DERIVED, not typed. «تصحيح» is the first word of `customerCorrectRefusalAct`
+    // above; «تاريخ الميلاد والجنسية» and the clause after the colon are contiguous runs of the
+    // note immediately above, which named both fields and said what changing them requires.
+    customerCorrectIdentifiersOpen: "تصحيح تاريخ الميلاد والجنسية",
+    customerCorrectIdentifiersHeading: "تصحيح تاريخ الميلاد والجنسية",
+    customerCorrectIdentifiersIntro: "تاريخ الميلاد والجنسية: تغييرها يستوجب إعادة الفحص مقابل قوائم العقوبات.",
+    customerCorrectIdentifiersRefusalAct: "تصحيح تاريخ الميلاد والجنسية",
     // SLICED from `customerCorrectIdentifiersNote` above, which names these two
     // fields in one sentence — «الاسم وتاريخ الميلاد والجنسية ورقم الهوية». Not
     // typed. Nationality needs no new key at all: `impFieldNationality` already
@@ -383,10 +395,18 @@ export const CUSTOMERS = {
     customerCorrectCancel: "Cancel",
     customerCorrectError: "Could not record the correction — try again.",
     customerCorrectRefusalAct: "correct a customer's contact details",
+    // CORRECTED 2026-10-28 — see the Arabic side. Two of the four named here are correctable now.
     customerCorrectIdentifiersNote:
-      "Name, date of birth, nationality and national ID are not corrected here: " +
-      "changing one is a screening event against the sanctions lists, and that " +
-      "mechanism is not built yet.",
+      "Name and national ID are not corrected here: changing one is a screening " +
+      "event against the sanctions lists, and that mechanism is not built for them. " +
+      "Date of birth and nationality have their own form, which re-screens.",
+    customerCorrectIdentifiersOpen: "Correct date of birth or nationality",
+    customerCorrectIdentifiersHeading: "Correct date of birth or nationality",
+    customerCorrectIdentifiersIntro:
+      "Date of birth and nationality: changing either requires re-screening " +
+      "against the sanctions lists, which happens when you save.",
+    customerCorrectIdentifiersRefusalAct:
+      "correct a customer's date of birth or nationality",
     // Sliced from the same sentence, capitalised for a label position.
     customerFieldDateOfBirth: "Date of birth",
     customerFieldNatureOfBusiness: "Nature of business",

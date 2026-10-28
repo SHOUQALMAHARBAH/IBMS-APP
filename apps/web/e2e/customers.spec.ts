@@ -270,6 +270,19 @@ async function mockCustomerDetail(page: Page) {
     }
     return route.fulfill({ status: 200, json: CUSTOMER });
   });
+  await page.route(
+    "http://localhost:4000/customers/cust-1/identifiers",
+    (route) => {
+      patches.push({ body: route.request().postDataJSON() });
+      // The api returns the customer PLUS `rescreened`. Supplied here because the screen reads
+      // the response — and a mock cannot drop a field the api dropped, which is why the
+      // `rescreened` contract is asserted in the api e2e rather than here.
+      return route.fulfill({
+        status: 200,
+        json: { ...CUSTOMER, dateOfBirth: "1979-11-02", rescreened: true },
+      });
+    },
+  );
   await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
@@ -871,9 +884,16 @@ test("shows an individual no corporate fields, and a company no national ID", as
   await expect(page.getByText("Contact email")).toBeVisible();
 
   // CUSTOMER is an individual.
-  await expect(page.getByText("National ID")).toBeVisible();
-  await expect(page.getByText("Date of birth")).toBeVisible();
-  await expect(page.getByText("Nationality")).toBeVisible();
+  //
+  // EXACT, and that is a TIGHTENING forced by a real ambiguity rather than a style change. The
+  // identifier-correction control added on 2026-10-28 is labelled "Correct date of birth or
+  // nationality", and `getByText` matches case-insensitive SUBSTRINGS — so two of these three
+  // resolved to the profile field AND that button, and Playwright refused them as strict-mode
+  // violations. The claim is about the PROFILE LABEL, so `exact` is what says so; `.first()`
+  // would have silently asserted about whichever element rendered first.
+  await expect(page.getByText("National ID", { exact: true })).toBeVisible();
+  await expect(page.getByText("Date of birth", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nationality", { exact: true })).toBeVisible();
   // The three that used to render as dashes on this very page.
   const main = page.locator("main");
   await expectAbsentWithin(main, (s) => s.getByText("Registration number"));
@@ -912,4 +932,108 @@ test("shows an individual no corporate fields, and a company no national ID", as
   await expectAbsentWithin(main, (s) => s.getByText("National ID"));
   await expectAbsentWithin(main, (s) => s.getByText("Date of birth"));
   await expectAbsentWithin(main, (s) => s.getByText("Nationality"));
+});
+
+/*
+ * CORRECTING THE TWO SCREENING DISCRIMINATORS — the owner's narrow strike of her own 2026-09-28
+ * deferral (2026-10-28).
+ *
+ * What these cover that the api e2e cannot: the SHAPE of the control. The server refuses a reason
+ * below ten characters, and a screen that lets somebody type nine and press the button has sent a
+ * request it already knew was a 400 — so the floor is a disabled button here, and the assertion has
+ * to type NINE characters rather than none, because an empty form is disabled for a different
+ * reason and cannot tell the two apart.
+ */
+
+test("records an identifier correction, with the reason floor enforced before the request", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const patches = await mockCustomerDetail(page);
+
+  await page.goto("/customers/cust-1");
+  await page.getByTestId("customer-correct-identifiers-open").click();
+
+  // NOT PREFILLED — a decision about this form rather than a property of the data. Both values
+  // arrive IN THE CLEAR (unlike the masked contact fields), so a prefill would be honest; what it
+  // would also be is a form that can be submitted unchanged, which the server refuses with a 422.
+  await expect(page.getByTestId("correct-date-of-birth")).toHaveValue("");
+  await expect(page.getByTestId("correct-nationality")).toHaveValue("");
+  await expect(
+    page.getByTestId("customer-correct-identifiers-submit"),
+  ).toBeDisabled();
+
+  // An identifier WITHOUT a long enough reason is still refused client-side. NINE characters: the
+  // floor is ten, and a test that types nothing cannot distinguish a length floor from a non-empty
+  // check.
+  await page.getByTestId("correct-date-of-birth").fill("1979-11-02");
+  await page.getByTestId("correct-identifiers-reason").fill("too short");
+  await expect(
+    page.getByTestId("customer-correct-identifiers-submit"),
+  ).toBeDisabled();
+
+  // And a reason WITHOUT an identifier, the other half of the same condition.
+  await page.getByTestId("correct-date-of-birth").fill("");
+  await page
+    .getByTestId("correct-identifiers-reason")
+    .fill("Passport copy received from the client.");
+  await expect(
+    page.getByTestId("customer-correct-identifiers-submit"),
+  ).toBeDisabled();
+
+  await page.getByTestId("correct-date-of-birth").fill("1979-11-02");
+  // Typed in lower case and upper-cased as it goes in: the server takes ISO 3166-1 alpha-2 in upper
+  // case and nothing else.
+  await page.getByTestId("correct-nationality").fill("sy");
+  await expect(page.getByTestId("correct-nationality")).toHaveValue("SY");
+
+  await page.getByTestId("customer-correct-identifiers-submit").click();
+  await expect(
+    page.getByTestId("customer-correct-identifiers-open"),
+  ).toBeVisible();
+
+  const sent = patches.at(-1)?.body as Record<string, string>;
+  expect(sent.dateOfBirth).toBe("1979-11-02");
+  expect(sent.nationality).toBe("SY");
+  expect(sent.reason).toBe("Passport copy received from the client.");
+  // The DSR link is sent only alongside a reference, so `answersRequestType` never arrives without
+  // the id it qualifies.
+  expect(sent.answersRequestType).toBeUndefined();
+});
+
+test("offers no identifier correction on a CORPORATE customer, while the contact one stays", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/customers/cust-1", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...CUSTOMER,
+        customerType: "CORPORATE",
+        legalName: "Yarmouk Trading",
+        dateOfBirth: null,
+        nationality: null,
+        registrationNumber: "REG-1",
+      },
+    }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route(
+    "http://localhost:4000/customers/cust-1/documents",
+    (route) => route.fulfill({ status: 200, json: [] }),
+  );
+
+  await page.goto("/customers/cust-1");
+
+  // THE ANCHOR FIRST, from the same render. An absence assertion with no positive read beside it
+  // passes on a page that has not hydrated, which is the vacuous-absence shape this repository has
+  // paid for — and the contact control being PRESENT is also part of the claim: a company has no
+  // date of birth of its own, and that is the only control that goes away.
+  await expect(page.getByTestId("customer-correct-open")).toBeVisible();
+  await expect(
+    page.getByTestId("customer-correct-identifiers-open"),
+  ).toHaveCount(0);
 });
