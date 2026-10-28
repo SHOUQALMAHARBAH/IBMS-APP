@@ -16,6 +16,9 @@ import {
   assignDsr,
   closeDsr,
   createDsr,
+  DSR_INTAKE_CHANNELS,
+  DSR_REQUEST_TEXT_MAX_LENGTH,
+  DSR_REQUEST_TEXT_MIN_LENGTH,
   DSR_TYPES,
   fulfilDsr,
   listDsrs,
@@ -73,6 +76,10 @@ export default function DsrPage() {
   const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [customerId, setCustomerId] = useState('');
+  const [requestText, setRequestText] = useState('');
+  // Defaults to the channel a request most often arrives through here. Not blank: a blank first
+  // option in a REQUIRED select is a field somebody submits without reading.
+  const [intakeChannel, setIntakeChannel] = useState<string>('WEBSITE_FORM');
   const [type, setType] = useState<string>(DSR_TYPES[0]!);
   const [text, setText] = useState<Record<string, string>>({});
   const [reference, setReference] = useState<Record<string, string>>({});
@@ -122,8 +129,14 @@ export default function DsrPage() {
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
     await run(async () => {
-      await createDsr({ customerId: customerId.trim(), type });
+      await createDsr({
+        customerId: customerId.trim(),
+        type,
+        requestText: requestText.trim(),
+        intakeChannel,
+      });
       setCustomerId('');
+      setRequestText('');
     });
   }
 
@@ -164,6 +177,40 @@ export default function DsrPage() {
               {DSR_TYPES.map((opt) => (
                 <option key={opt} value={opt}>
                   {t(ENUM_LABEL.DsrType[opt])}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/*
+            WHAT WAS ASKED FOR, and HOW IT ARRIVED — both REQUIRED by the api's DTO.
+
+            These two inputs ship with the api rather than with the design batch, and that is a
+            stated departure: a required field with no input is not a deferred screen, it is a
+            create path that 400s on every submit. Their PLACEMENT, wording polish and the
+            deadline-and-conditions line that belongs at intake are still the design batch's.
+          */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            {t('dsrRequestTextLabel')}
+            <textarea
+              aria-label={t('dsrRequestTextLabel')}
+              value={requestText}
+              onChange={(e) => setRequestText(e.target.value)}
+              rows={3}
+              required
+              minLength={DSR_REQUEST_TEXT_MIN_LENGTH}
+              maxLength={DSR_REQUEST_TEXT_MAX_LENGTH}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            {t('dsrChannelLabel')}
+            <select
+              aria-label={t('dsrChannelLabel')}
+              value={intakeChannel}
+              onChange={(e) => setIntakeChannel(e.target.value)}
+            >
+              {DSR_INTAKE_CHANNELS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.DsrIntakeChannel[opt])}
                 </option>
               ))}
             </select>

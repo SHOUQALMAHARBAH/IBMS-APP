@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { DataSubjectRequest } from '@ibms/db';
+import type { DsrIntakeChannel, DataSubjectRequest } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
@@ -139,6 +139,16 @@ export class DsrService {
       customerId: dto.customerId ?? null,
       insuredPersonId: dto.insuredPersonId ?? null,
       type: dto.type as DataSubjectRequest['type'],
+      // Already trimmed by `CreateDsrDto`'s `@Transform(trimIfString)`, which runs BEFORE its
+      // length check — the order that matters, because trimming here left three spaces
+      // satisfying `@Length(3, …)` and storing an empty request. One trim, in the one place
+      // where it also guards the floor.
+      requestText: dto.requestText,
+      // Cast to the ENUM, not to `DataSubjectRequest['intakeChannel']`: that is
+      // `DsrIntakeChannel | null`, because the COLUMN is nullable for the requests that
+      // predate it — and the repository's non-null input correctly refused it. The DTO
+      // guarantees a value here; the column's nullability is about history, not about this.
+      intakeChannel: dto.intakeChannel as DsrIntakeChannel,
       slaDueAt,
       dpoHandlerUserId: dto.dpoHandlerUserId ?? null,
     });

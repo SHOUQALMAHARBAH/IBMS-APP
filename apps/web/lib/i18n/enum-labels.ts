@@ -185,6 +185,21 @@ export const ENUM_LABEL = {
     REJECTED: 'dsrStatusRejected',
     CLOSED: 'dsrStatusClosed',
   } satisfies Labels<string>,
+  /**
+   * How a request reached the office. The four Arabic labels are the OWNER'S OWN WORDS.
+   *
+   * `satisfies Labels<string>` matches `DsrType` directly above rather than the tighter
+   * `Labels<Union>` form: these maps are keyed by a value arriving over HTTP, and the api's
+   * `DSR_INTAKE_CHANNELS` is derived from the generated enum, so a fifth channel reaches the
+   * DTO and the screen's `<select>` on the commit that adds it. What catches a missing LABEL is
+   * `dsr-intake-channel.test.ts`, which compares this map against the schema's own enum.
+   */
+  DsrIntakeChannel: {
+    POST: 'dsrChannelPost',
+    TELEPHONE: 'dsrChannelTelephone',
+    IN_PERSON: 'dsrChannelInPerson',
+    WEBSITE_FORM: 'dsrChannelWebsiteForm',
+  } satisfies Labels<string>,
   DsrType: {
     ACCESS: 'dsrTypeAccess',
     CORRECTION: 'dsrTypeCorrection',

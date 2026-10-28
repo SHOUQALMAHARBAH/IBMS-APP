@@ -4906,6 +4906,22 @@ enum DsrType {
   OBJECTION
 }
 
+/// How a data subject request reached the office.
+///
+/// The approved procedure requires a request to be logged the same business day "regardless of
+/// channel" — which `DataSubjectRequest.receivedAt`'s own comment already said, while nothing
+/// stored the value. So the channel is a fact a regulator asks for and the model named the
+/// obligation without recording it.
+///
+/// `POST` is the POSTAL channel («بريد»), not an HTTP verb. The ambiguity is noted because this
+/// codebase is full of the other sense.
+enum DsrIntakeChannel {
+  POST
+  TELEPHONE
+  IN_PERSON
+  WEBSITE_FORM
+}
+
 enum DsrStatus {
   RECEIVED
   IDENTITY_VERIFIED
@@ -4932,6 +4948,24 @@ model DataSubjectRequest {
   insuredPersonId                String?
   insuredPerson                  InsuredPerson?                 @relation("DsrInsuredPerson", fields: [insuredPersonId], references: [id])
   type                           DsrType
+  /// WHAT THE PERSON ACTUALLY ASKED FOR, as received and in their own words.
+  ///
+  /// `type` alone said *access* and nothing about WHICH data, so whoever fulfilled it two weeks
+  /// later could not know what to fulfil.
+  ///
+  /// NULLABLE, and REQUIRED BY `CreateDsrDto` RATHER THAN BY THE DATABASE — the decision is
+  /// *required for new rows; existing rows are not backfilled and must still read, list and
+  /// close*. A NOT NULL would have to be satisfied by inventing what a data subject asked for,
+  /// and a `NOT VALID` CHECK fires on UPDATE, so it would refuse the CLOSURE of the requests
+  /// that predate this column (measured: 18 on db-test, 14 of them OPEN). Migration
+  /// `20261214100000` asserts the absence of both, because that absence is the decision.
+  ///
+  /// NOT COPIED INTO THE AUDIT SNAPSHOT. `AuditLogEntry` is immutable by trigger, so quoting a
+  /// data subject's own words into it would put personal data somewhere an ERASURE request can
+  /// never reach. The snapshot records the channel and the LENGTH instead.
+  requestText                    String?
+  /// How it arrived. See `DsrIntakeChannel`; nullable for the same reason as `requestText`.
+  intakeChannel                  DsrIntakeChannel?
   status                         DsrStatus                      @default(RECEIVED)
   receivedAt                     DateTime                       @default(now()) // logged same business day regardless of channel
   identityVerifiedAt             DateTime?

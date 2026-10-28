@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { DsrStatus, DsrType, Prisma } from '@ibms/db';
+import type { DsrIntakeChannel, DsrStatus, DsrType, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** The one terminal state; everything else is still the DPO's problem. */
@@ -109,6 +109,12 @@ export class DsrRepository {
     customerId: string | null;
     insuredPersonId: string | null;
     type: DsrType;
+    /** REQUIRED here even though the column is nullable, and that asymmetry is the design: the
+     *  column is nullable for the requests that predate it, and this signature is what stops a
+     *  NEW one being written without them. `string | null` here would leave the DTO as the only
+     *  guard at both layers. */
+    requestText: string;
+    intakeChannel: DsrIntakeChannel;
     slaDueAt: Date;
     dpoHandlerUserId: string | null;
   }): Promise<DataSubjectRequestWithAct> {
@@ -117,6 +123,8 @@ export class DsrRepository {
         customerId: input.customerId,
         insuredPersonId: input.insuredPersonId,
         type: input.type,
+        requestText: input.requestText,
+        intakeChannel: input.intakeChannel,
         slaDueAt: input.slaDueAt,
         dpoHandlerUserId: input.dpoHandlerUserId,
         // status defaults to RECEIVED, receivedAt defaults to now()

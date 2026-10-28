@@ -150,7 +150,13 @@ describe('DPO Workspace (e2e) — backlog Part D §5.1, Process #52 item #9', ()
       await request(app.getHttpServer())
         .post('/dsr')
         .set(bearer(dpo.accessToken))
-        .send({ type: 'ACCESS', customerId: customer.id })
+        // `requestText` and `intakeChannel` are REQUIRED by `CreateDsrDto` since 2026-10-28.
+        .send({
+          type: 'ACCESS',
+          customerId: customer.id,
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
+        })
         .expect(201)
     ).body as { id: string };
 

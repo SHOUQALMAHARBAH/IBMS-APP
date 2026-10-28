@@ -148,11 +148,24 @@ describe('DsrService.create (M04)', () => {
   it('422s when neither/both of customerId/insuredPersonId are set', async () => {
     const { service } = makeService();
     await expect(
-      service.create({ type: 'ACCESS' }, 'u-dpo'),
+      service.create(
+        {
+          type: 'ACCESS',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
+        },
+        'u-dpo',
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     await expect(
       service.create(
-        { customerId: 'c', insuredPersonId: 'i', type: 'ACCESS' },
+        {
+          customerId: 'c',
+          insuredPersonId: 'i',
+          type: 'ACCESS',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
+        },
         'u-dpo',
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -164,7 +177,12 @@ describe('DsrService.create (M04)', () => {
     });
     await expect(
       notFoundCustomer.service.create(
-        { customerId: 'nope', type: 'ACCESS' },
+        {
+          customerId: 'nope',
+          type: 'ACCESS',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
+        },
         'u-dpo',
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -178,6 +196,8 @@ describe('DsrService.create (M04)', () => {
           customerId: 'cust-1',
           type: 'ACCESS',
           dpoHandlerUserId: 'nope',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
         },
         'u-dpo',
       ),
@@ -186,7 +206,15 @@ describe('DsrService.create (M04)', () => {
 
   it('routes ACCESS/DELETION to dsr_access_deletion and starts an SLA timer, then audits CREATE (sensitive)', async () => {
     const { service, repo, slaTimer, audit } = makeService();
-    await service.create({ customerId: 'cust-1', type: 'ACCESS' }, 'u-dpo');
+    await service.create(
+      {
+        customerId: 'cust-1',
+        type: 'ACCESS',
+        requestText: 'A copy of everything you hold about me.',
+        intakeChannel: 'WEBSITE_FORM',
+      },
+      'u-dpo',
+    );
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ customerId: 'cust-1', type: 'ACCESS' }),
     );
@@ -206,7 +234,15 @@ describe('DsrService.create (M04)', () => {
 
   it('routes CORRECTION/OBJECTION to dsr_correction_objection', async () => {
     const { service, slaTimer } = makeService();
-    await service.create({ customerId: 'cust-1', type: 'CORRECTION' }, 'u-dpo');
+    await service.create(
+      {
+        customerId: 'cust-1',
+        type: 'CORRECTION',
+        requestText: 'A copy of everything you hold about me.',
+        intakeChannel: 'WEBSITE_FORM',
+      },
+      'u-dpo',
+    );
     expect(slaTimer.startTimer).toHaveBeenCalledWith(
       expect.objectContaining({ workflowName: 'dsr_correction_objection' }),
     );
