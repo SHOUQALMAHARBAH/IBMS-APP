@@ -131,6 +131,13 @@ const EXPECTED = {
   'ALTER TABLE "RoleScopeBranch" DROP CONSTRAINT "RoleScopeBranch_role_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
 
+  // Owner decision 56 — PRIV-SRS-02 types `containment_actions` as a REQUIRED timestamped
+  // LOG, so the actions are a child table, and one office's incident must never carry
+  // another office's containment action: a containment log is the evidence that an incident
+  // was contained, and a cross-office row would attribute one office's response to another.
+  'ALTER TABLE "IncidentContainmentAction" DROP CONSTRAINT "IncidentContainmentAction_incident_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // ---- GIN indexes on `Unsupported("tsvector")` ----
   // Prisma cannot index a field whose type it does not model. `canonicalTokens` is a plain
   // `String[]`, which it CAN index — so that one was declared rather than listed here.

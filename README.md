@@ -1147,7 +1147,25 @@ build actually is today:
   scheduler — no real notification-sending infrastructure exists anywhere in this
   codebase to build one on top of), and independent multi-regulator notification — this
   build is also Part D's M09 (Incident & Breach Management), one build satisfying both
-  backlog references. #56 Internal Controls (Maker/Checker) is built: Part A.5's
+  backlog references. **CORRECTED 2026-10-28 (owner decision 56): the containment and
+  impact-assessment steps of that chain TOOK NO REQUEST BODY and wrote a timestamp
+  each**, so the register said the work had been done and held nothing a person could
+  read back. Both now collect what they claim, with every field transcribed from the
+  approved `PRIV-FRM-06` / `PRIV-SOP-09` / `PRIV-SRS-02` rather than invented:
+  `IncidentContainmentAction` is a timestamped LOG with a mandatory description and
+  the actor resolved BY NAME (decision 48), and the assessment carries step 4's three
+  outputs together — whether personal data is touched, the data categories, and the
+  approximate number of subjects. A trigger (`incident_contained_needs_an_action`)
+  makes a containment stamp with an empty log unrepresentable rather than merely
+  refused. **But `incident.contain` gates FOUR acts of different consequence** — the
+  log append, the statutory assessment, the recovery and the CLOSURE — and the DPO
+  does not hold it, so **PRIV-SOP-09's step 4 is unreachable for the function the
+  procedure assigns it to**, while the DPO can still classify on the strength of an
+  assessment somebody else performed. Measured, pinned by a test, and NOT widened:
+  that is a grant decision and a decision-98 candidate. And `IncidentReport.severity`
+  carries FOUR values against `PRIV-SRS-02`'s three — a DECLARED divergence, recorded in
+  `docs/pcms-dictionary-divergences.md` § 1 with a dated review, because `critical`
+  is the only value that carries a containment deadline. #56 Internal Controls (Maker/Checker) is built: Part A.5's
   `assertDifferentActors` + DB `CHECK` guards were verified intact, plus the new
   periodic self-approval audit report scanning all 15 same-table maker/checker pairs
   and the one cross-table pair (`PolicyChecking`/`Policy`) no single-table `CHECK`

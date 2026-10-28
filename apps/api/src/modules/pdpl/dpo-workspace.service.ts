@@ -90,8 +90,23 @@ export class DpoWorkspaceService {
       };
     });
 
+    /*
+     * OWNER DECISION 56 — the containment log's actor, resolved by name.
+     *
+     * THE SAME MECHANISM FOUND THIS SITE AGAIN. The comment a few lines down records it
+     * happening once already: making a mapper's name parameter REQUIRED named a consumer
+     * nobody knew about. Decision 56 made `actorNames` required on
+     * `deriveIncidentReportView` and the compiler named this register — the DPO's own
+     * incident list — a module away. An optional argument would have shipped a nameless
+     * containment log here while `/incidents` carried names.
+     */
+    const incidentActorNames = await this.users.displayNamesForUserIds(
+      openIncidentRows.flatMap((r) =>
+        r.containmentActions.map((a) => a.actionTakenByUserId),
+      ),
+    );
     const incidentRegister = openIncidentRows.map((r) =>
-      deriveIncidentReportView(r, now),
+      deriveIncidentReportView(r, now, incidentActorNames),
     );
 
     /*

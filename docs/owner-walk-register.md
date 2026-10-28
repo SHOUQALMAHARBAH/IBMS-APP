@@ -34,7 +34,7 @@ is usually the account, not the screen.**
 
 | البند | جملتُها · Her words | الحالة | ما تغيّر · What changed | الشاشة والحساب · Screen + account | Commit |
 |------|--------|------|--------|--------|--------|
-| 1.1 | «لما أضغط ع زر الاحتواء بس بغيّر الحالة إلى تم احتوائه، و لما أضغط ع زر تقييم الأثر بس بظهرلي إنه تم تقييم أثره وأنا كل الي عملته ضغط ع الزر، ما قيّمت ولا عملت شي. فيها عطب و غلط.» | **قرارُك · YOURS** | **لا شيء، بعد. وهي محقّة تماماً: قِيس فتبيّن أنّ الزرّين لا يجمعان شيئاً على الإطلاق** — `contain()` و`assessImpact()` لا يقبلان أيّ حقلٍ في الطلب، ويكتبان طابعاً زمنيّاً فقط (`containedAt` / `impactAssessedAt`). الخياران وتكلفةُ كلٍّ منهما في القسم أدناه، والاختيارُ لك. *Nothing yet — and she is exactly right. Measured: both routes take NO request body and write a timestamp only. The two options and what each costs are below; the choice is hers.* | `/incidents` · `demo.compliance` | — |
+| 1.1 | «لما أضغط ع زر الاحتواء بس بغيّر الحالة إلى تم احتوائه، و لما أضغط ع زر تقييم الأثر بس بظهرلي إنه تم تقييم أثره وأنا كل الي عملته ضغط ع الزر، ما قيّمت ولا عملت شي. فيها عطب و غلط.» | **مُغلَق · CLOSED** | **الفعلان يجمعان الآن ما يدّعيانه، والحقولُ منقولةٌ من نموذجِك المعتمد لا مُختَرَعة** (قرارُك ٥٦، الخيار (أ)). الاحتواءُ صار **سجلّاً** — وصفٌ إلزاميٌّ لكلّ إجراء، يُلحَق ولا يُستبدَل، ويُعرَض على الشاشة بـ**مَن فعله بالاسم ومتى**؛ وتقييمُ الأثر صار **مُخرجاتِ الخطوة ٤ الثلاثَ** معاً: هل يمسُّ بياناتٍ شخصيّة، وفئاتُ البيانات، والعددُ التقريبيُّ للمتأثّرين. و**«لا» و«٠» تُعرَضان جوابَيْن** لا فراغاً: من قيّم فوجد أنّ لا بياناتٍ شخصيّةً مسّت، أو أنّ أحداً لم يتأثّر، قد **قيّم**. وقاعدةُ البيانات ترفض الطابعَ الزمنيَّ بلا إجراءٍ مسجَّل (`IncidentReport_contained_needs_an_action`)، فالحالةُ التي ضغطتِها **لم تبقَ ممكنةً** لا أنّها مُنِعت في الشاشة. *Both acts now collect what they claim, and every field is transcribed from her own approved `PRIV-FRM-06` rather than invented. Containment is a LOG with who-by-name and when; the assessment carries all three of step 4's outputs; `false` and `0` render as ANSWERS; and a trigger makes the stamp-without-an-action state unrepresentable rather than merely refused.* | `/incidents` · `demo.compliance` — واضغطي زرَّ الاحتواء: صار يطلب وصفاً، والسجلُّ تحت العمودِ «الإجراءات الفورية المتخذة» | `(this commit)` |
 | 1.2 | «الأزرار الي فيها مش شغالة، بضغط عليها ما بيظهر الي اشي.» | **مُغلَق · CLOSED** | **الفعلُ كان يعمل.** قِيس: المزامنة تُنزِّل قائمتين عامّتين بمهلة ١٢٠ ثانية ومحاولتين إضافيّتين لكلّ مصدر، فقد تستمرّ **نحو ست دقائق** ولم يكن يتغيّر على الشاشة إلّا تعطيلُ الزرّ. الآن: الزرّ يقول «جارٍ التنفيذ…» أثناء العمل، وسطرٌ معلَنٌ بعده يسمّي كلّ مصدرٍ ونتيجتَه وعددَ سجلّاته، والفشلُ يُعلَن فشلاً لا صمتاً. *The act ran. The screen said nothing for up to six minutes.* | `/watchlist-sync` · `demo.compliance` · اضغطي «مزامنة قوائم الحظر الآن» | `4d1bd64` |
 | 1.3 | «لما نضغط ع الأزرار الموظف رح يشعر بالضياع لأن فش اشي بيظهر اله ولا كأنه عمل اشي… بس بنضغط زر وبنضيع فيه.» | **مُغلَق · CLOSED** | **الفعلُ كان يعمل أيضاً** — يُحدِّث الصفَّ ويعيد قراءة حجز الفحص، فتتغيّر شارةٌ على بعد ثلاثة أعمدة ولا شيء يقول لماذا. الآن: كلُّ صفٍّ يقول «جارٍ التنفيذ…» أثناء الفعل، ثمّ **يسمّي الحالةَ التي صار إليها السجلّ** («الحالة: قيد الفحص») لا كلمةَ «تمّ» وحدها، والرفضُ يُعلَن في صفّه. *The act ran; a badge three columns away changed and nothing said why.* | `/customers/kyc-queue` · `demo.compliance` · اختاري سجلّاً حالتُه «مُرسل» واضغطي «تشغيل الفحص» | `4d1bd64` |
 
@@ -81,16 +81,43 @@ regulator notification and a senior co-sign within the hour. A breach register
 that says the impact was assessed while holding no assessment is a register shown
 to a regulator with nothing behind it.*
 
+> **قرارُك ٥٦، ٢٨/١٠/٢٠٢٦ — الخيارُ (أ)، وما كان «غيرَ محسوم» صار محسوماً بإيجادِ
+> المستند لا بتقديرِه.** هذا الجدولُ يبقى كما كُتِب لأنّ نصفَه الذي أهمّ هو ما قال
+> إنّه لا يستطيع الإجابة: قائمةُ حقولِ `PRIV-FRM-06`. المسارُ المذكورُ في التكليف
+> (`~/mnt/platform-brain-template/`) **لا وجودَ له**، والمستنداتُ الثلاثةُ على
+> `S:\Project\` — وُجِدت باختصارٍ في قائمةِ «المستندات الأخيرة» لا بالتخمين. فحقولُ
+> الفعلين **منقولةٌ** من § III و§ II من نموذجِك ومن الخطوةِ ٤ من `PRIV-SOP-09`،
+> و`PRIV-SRS-02` يُسمّي `containment_actions` **سجلّاً موسوماً بالوقت** — وهذا بالضبط
+> سببُ كونِه جدولاً ابناً لا عمودَ نصّ.
+>
+> *Option (a), and the column that said it could not be answered was answered by
+> FINDING the document rather than estimating it. The brief's path does not exist;
+> the three documents are on `S:`, recovered from an Office shortcut. Every field is
+> transcribed, and `PRIV-SRS-02` types `containment_actions` as a timestamped LOG —
+> which is why it is a child table and not a text column.*
+
 | الخيار · Option | ما يكلّف · What it costs | ما يبقى غيرَ محسوم · What stays open |
 |------|--------|--------|
 | **(أ) يجمعُ ما يدّعيه** — حقلٌ لما فُعِل للاحتواء، وحقلٌ للتقييم نفسه، إلزاميّان كما `rootCauseAnalysis` إلزاميٌّ قبل الإغلاق. *Collect it.* | **ترحيلُ قاعدة بيانات** (عمودان على الأقلّ)، وحقلان في كلٍّ من الطلبين، ونموذجٌ على الشاشة لكلّ زرّ، واختباران. الشكلُ معروفٌ ومُجرَّبٌ في النموذج نفسه. *A migration, two DTO fields, a form behind each button. The shape is proven one field over.* | **ما الحقولُ بالضبط.** `PRIV-FRM-06` هو نموذجُ الخرق المعتمد وليس داخلَ هذا المستودع، فقائمةُ حقولِه ليست عندي — واختراعُها هو ما يرفضه هذا المستودع في كلّ مرّة. *Which fields exactly: `PRIV-FRM-06` is the governing breach form and is not in this repo, so its field list is not available to me, and inventing one is the thing this repo refuses.* |
 | **(ب) يتوقّف عن الادّعاء** — الزرُّ والحالةُ يقولان إنّ أحداً **سجّل** الاحتواء في هذا الوقت، لا إنّ الاحتواء جرى. *Stop claiming it.* | **لا ترحيل**، تعديلُ نصوصٍ فقط — وكلمةٌ عربيّةٌ أو كلمتان قد تُحتاجان وهما لك. *No migration; wording only, and one or two Arabic words that would be yours.* | **يبقى السجلُّ فارغاً.** فالنظامُ يسجّل متى قال أحدٌ إنّه احتوى، ولا يحتفظ بما فُعِل — وهو أصدقُ من الآن، وأضعفُ ممّا يحتاجه مفتّش. *The register stays empty of substance: honest, and weaker than an inspector needs.* |
 
-**ولم يُلمَس `/incidents` في هذه الدفعة إطلاقاً** — ولا حتى صمتُ أزرارِه، وهو عيبُ
-المجموعة نفسِه — لأنّ الفعلَ إن صار يجمع نموذجاً فسطرُ النتيجة يتغيّر معه، وتهذيبُ
-شاشةٍ على وشك أن تتغيّر عملٌ مهدور. */incidents was left entirely alone, including
-its silent-act defect, because an act that gains a form changes its own outcome
-line with it.*
+**وقد صحّ هذا التأجيل:** قيل هنا إنّ `/incidents` لن يُلمَس في تلك الدفعة — ولا حتى
+صمتُ أزرارِه — لأنّ الفعلَ إن صار يجمع نموذجاً فسطرُ النتيجة يتغيّر معه. وهذا ما
+حدث بالحرف: الفعلان صارا يجمعان، **وسطرُ النتيجةِ معهما في الـcommit نفسِه**.
+الاحتواءُ يقول «الإجراءات الفورية المتخذة: ٣» — **الرقمَ الذي تغيّر** لا الحالةَ،
+لأنّ احتواءً ثانياً يُبقي الحالةَ على `CONTAINED` فسطرُ حالةٍ كان ليطبع الجملةَ
+نفسَها قبلَه وبعدَه؛ والتقييمُ يقول «الحالة: تمّ تقييم الأثر». *The deferral was
+right and this is what it was waiting for: both acts now collect, and the outcome
+line moved in the same commit. Containment reports the FIGURE that changed, not the
+state, because a second containment leaves the status where it was.*
+
+**وما بقي صامتاً على هذه الشاشةِ يُقال ولا يُصلَح هنا:** التصنيفُ والتوقيعُ
+والإبلاغاتُ الثلاثةُ والاستعادةُ والإغلاق لا تقول شيئاً حين تنتهي. ولا يصلح لها
+سطرُ الحالةِ نفسُه: الإبلاغاتُ لا تُحرِّك الحالةَ بالضرورة، فسطرٌ يسمّيها سيطبع
+الجملةَ نفسَها قبلَ الفعلِ وبعدَه — وهو الصمتُ عينُه بثوبِ تأكيد. *The other seven
+acts on this screen still say nothing, and the state-label outcome does not fit
+them: the notifications do not necessarily move the status, so it would print the
+same sentence before and after — the silence wearing a confirmation's clothes.*
 
 ---
 
@@ -98,6 +125,7 @@ line with it.*
 
 | البند | السبب · Why |
 |------|--------|
+| **الخطوةُ ٤ لا يصل إليها مسؤولُ حماية البيانات** · PRIV-SOP-09's step 4 is unreachable for the DPO | `PRIV-SOP-09` § 6 يُسنِد الخطوةَ ٣ (الاحتواء) إلى «دائرة تقنية المعلومات» والخطوةَ ٤ (تقييمَ الأثر) إلى «مسؤول حماية البيانات» — وظيفتان. **ولا دورَ لتقنيةِ المعلومات في هذا النظام**، و`incident.contain` يبوِّب **أربعةَ أفعالٍ** مختلفةِ الأثر: إلحاقَ إجراءِ احتواء، وتقييمَ الأثر النظاميَّ، وتسجيلَ الاستعادة، و**إغلاقَ الحادث**. وقِيس: مسؤولُ حماية البيانات يحمل `incident.classify` و`incident.report` و`incident.notify-regulator` و`incident.senior-management.notify` و**لا يحمل `incident.contain`** — فهو **يصنّف** الحادثَ بناءً على تقييمٍ أجراه غيرُه ولا يستطيع إجراءَه. لم يُوسَّع شيء: المنحُ قرارُك، والرمزُ مرشَّحٌ لقرارِك ٩٨ (فعلان برمزٍ واحد) لا عطبٌ يُرقَع من شاشة. **والغيابُ مُثبَّتٌ باختبار** فإن تغيّر تغيّر بقصد. *Measured: the DPO cannot perform its own step 4, and `incident.contain` gates four acts of different consequence including the CLOSURE. Nothing widened — the grant is hers and the code is a decision-98 candidate. The absence is pinned by a test.* |
 | تعميمُ `ActionStatus` على الـ٥٢ + ٤١ موقعاً الباقية · Rolling `ActionStatus` across the remaining 52 + 41 sites | الشاشاتُ الثلاثُ التي ذكرتِها مُغلَقة، والمكوِّنُ موجودٌ فالباقي رخيص — لكنّ ٩٣ موقعاً داخل دفعةِ «صحّة» تعني مراجعةً لا يستطيع أحدٌ قراءتَها. أُعلِن هنا بعدده المقيس ليُقرَّر حجمُه بصراحة. *Her three screens are closed and the mechanism exists, so the rest is cheap — but 93 sites inside a correctness batch is a diff nobody can read. Declared with its measured figure so the size is visible rather than absorbed.* |
 
 ---

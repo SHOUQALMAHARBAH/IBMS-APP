@@ -1,0 +1,14 @@
+{
+  "severity-narrowed-to-the-dictionary-three": {
+    "file": "apps/api/src/modules/compliance-risk/incident.config.ts",
+    "from": "export const INCIDENT_SEVERITIES = [\n  'low',\n  'medium',\n  'high',\n  'critical',\n] as const;",
+    "to": "export const INCIDENT_SEVERITIES = ['low', 'medium', 'high'] as const;",
+    "why": "THE DECLARED DIVERGENCE'S OWN JUSTIFICATION, in the one form that can fail. The owner decided `IncidentReport.severity` keeps FOUR values against PRIV-SRS-02's three, and the whole reason is that `critical` is the only value carrying a containment deadline - so narrowing the list would retire the only containment target in the module as a side effect of a type change. Planted, it kills THREE tests, two of them the ones that carry the reason: 'no member of INCIDENT_SEVERITIES other than `critical` carries a target' and 'removing `critical` would leave the module with NO containment target at all'. Written as prose this reason is a sentence somebody deletes; written as these tests it is a red build. The record is `docs/pcms-dictionary-divergences.md` section 1."
+  },
+  "containment-stamp-without-an-action": {
+    "file": "apps/api/src/modules/compliance-risk/incident.service.ts",
+    "from": "    await this.repo.appendContainmentAction({",
+    "to": "    if (false) await this.repo.appendContainmentAction({",
+    "why": "Her first sentence, «لما أضغط ع زر الاحتواء بس بغيّر الحالة إلى تم احتوائه», in the one place it can come back. Planted, the status stamp would be written with an EMPTY log - which is exactly the state she pressed - and it kills the unit test named after her words plus the ordering test beside it. Against a real database it ALSO fails at the trigger `IncidentReport_contained_needs_an_action`, which is the half that survives any later code path: the defect is unrepresentable rather than merely refused here."
+  }
+}

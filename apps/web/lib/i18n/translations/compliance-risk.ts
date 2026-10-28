@@ -384,6 +384,31 @@ export const COMPLIANCE_RISK = {
     incColStatus: 'الحالة',
     incColClassification: 'التصنيف',
     incColAction: 'الإجراء',
+    /*
+     * OWNER DECISION 56 — the two incident acts collect what they claim.
+     *
+     * EVERY ARABIC STRING BELOW IS A CONTIGUOUS SLICE of the owner's own approved
+     * documents, verified by substring check rather than by eye:
+     *
+     *   PRIV-FRM-06 § III  «وصف أي إجراء احتواء فوري (كعزل نظام أو تعطيل حساب)»
+     *   PRIV-FRM-06 § II   «الأنظمة / البيانات المتأثرة (وتصنيفها إن عُرف)»
+     *                      «عدد أصحاب البيانات المتأثرين تقريباً (إن أمكن تقديره)»
+     *   PRIV-FRM-06        «ثالثاً: …» · «رابعاً: التقييم الأولي» (the headings)
+     *   PRIV-SOP-09 step 4 «… الحادث يمس بيانات شخصية، وتحديد فئات البيانات …»
+     *
+     * So nothing here is composed and decision 94 is not engaged. THE HINTS ARE HER
+     * OWN EXAMPLES: `incContainDescHint` is the parenthetical from her form, which is
+     * why this screen needs no invented placeholder.
+     */
+    incContainmentLogHeading: 'الإجراءات الفورية المتخذة',
+    incContainDescLabel: 'وصف أي إجراء احتواء فوري',
+    incContainDescHint: 'كعزل نظام أو تعطيل حساب',
+    incImpactAssessmentHeading: 'التقييم الأولي',
+    incTouchesPersonalDataLabel: 'الحادث يمس بيانات شخصية',
+    incDataCategoriesLabel: 'فئات البيانات',
+    incDataCategoriesHint: 'وتصنيفها إن عُرف',
+    incSubjectsEstimateLabel: 'عدد أصحاب البيانات المتأثرين تقريباً',
+    incSubjectsEstimateHint: 'إن أمكن تقديره',
     incContainButton: 'احتواء',
     incAssessButton: 'تقييم الأثر',
     incClassifyMaterialButton: 'تصنيف كمادي',
@@ -941,6 +966,15 @@ export const COMPLIANCE_RISK = {
     incColStatus: 'Status',
     incColClassification: 'Classification',
     incColAction: 'Action',
+    incContainmentLogHeading: 'Immediate actions taken',
+    incContainDescLabel: 'Describe the immediate containment action',
+    incContainDescHint: 'such as isolating a system or disabling an account',
+    incImpactAssessmentHeading: 'Initial assessment',
+    incTouchesPersonalDataLabel: 'The incident touches personal data',
+    incDataCategoriesLabel: 'Data categories',
+    incDataCategoriesHint: 'and their classification if known',
+    incSubjectsEstimateLabel: 'Approximate number of affected data subjects',
+    incSubjectsEstimateHint: 'if it can be estimated',
     incContainButton: 'Contain',
     incAssessButton: 'Assess impact',
     incClassifyMaterialButton: 'Classify Material',

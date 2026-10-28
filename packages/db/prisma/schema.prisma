@@ -511,6 +511,7 @@ model Organization {
   endorsements                        Endorsement[]
   escalationRecords                   EscalationRecord[]
   incidentReports                     IncidentReport[]
+  incidentContainmentActions          IncidentContainmentAction[]
   informationAssets                   InformationAsset[]
   insurancePrograms                   InsuranceProgram[]
   insuranceProgramLines               InsuranceProgramLine[]
@@ -954,6 +955,9 @@ model User {
   combinedDutyActs             CombinedDutyAct[]
 
   conflictOfInterestRegisterEntries ConflictOfInterestRegisterEntry[] @relation("ConflictOfInterestDeclaredBy")
+  /// `reported_by` on PRIV-SRS-02's IncidentReport — Optional, «may be anonymous»,
+  /// which is why the FK is nullable rather than defaulted to the caller.
+  reportedIncidents                   IncidentReport[]            @relation("IncidentReportedBy")
 
   @@unique([organizationId, email])
   @@index([email])
@@ -4759,9 +4763,36 @@ model IncidentReport {
   description                     String
   severity                        String // low | medium | high | critical
   status                          IncidentStatus         @default(REPORTED)
+  /// `detected_date` in PRIV-SRS-02 — and it is never caller-suppliable (see
+  /// `CreateIncidentDto`), so it is the moment the OFFICE learned of the incident.
   reportedAt                      DateTime               @default(now())
+  /// `occurred_date` — PRIV-SRS-02 marks it Optional, «occurrence timestamp (if
+  /// known)», and the form asks «تاريخ ووقت الوقوع (إن عُرف)». Distinct from
+  /// `reportedAt` on purpose: an incident discovered on Monday may have happened on
+  /// Friday, and a breach notification clock that cannot tell them apart is wrong
+  /// about which one it is counting from.
+  occurredAt                      DateTime?
+  /// `reported_by` — Optional in PRIV-SRS-02 because «may be anonymous», which is
+  /// why this is nullable rather than defaulted to the caller.
+  reportedByUserId                String?
+  reportedByUser                  User?                  @relation("IncidentReportedBy", fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  /// THE FIRST containment action's instant, and the 4-hour target for `critical`
+  /// severity keys on it. It can no longer be set with an empty log: a trigger
+  /// (`IncidentReport_contained_needs_an_action`) refuses that, which is what makes
+  /// the owner's «أضغط ع زر الاحتواء بس بغيّر الحالة» unrepresentable rather than
+  /// merely refused in a service.
   containedAt                     DateTime? // 4-hour target for critical severity
+  containmentActions              IncidentContainmentAction[]
+  /// PRIV-SOP-09 step 4 — the DPO's THREE outputs: whether personal data is touched,
+  /// the categories, and the approximate number of subjects. The dictionary's rule is
+  /// *Required once impact assessment is complete*, and
+  /// `IncidentReport_impact_assessment_complete` enforces exactly that: with
+  /// `impactAssessedAt` set, all three must be present. NEVER make one of them
+  /// required on its own — the conditional is the rule.
   impactAssessedAt                DateTime?
+  touchesPersonalData             Boolean?
+  dataCategoriesAffected          String?
+  subjectsAffectedEstimate        Int?
   classification                  IncidentClassification @default(NOT_YET_CLASSIFIED)
   classifiedByDpoUserId           String?
   // Material classification irreversible without this — `assertDifferentActors`
@@ -4784,7 +4815,39 @@ model IncidentReport {
   classificationCombinedDutyActId String?
   classificationCombinedDutyAct   CombinedDutyAct?       @relation("IncidentReportClassificationCombinedDuty", fields: [classificationCombinedDutyActId], references: [id], onDelete: Restrict)
 
+  /// What the containment log's composite tenant FK references. Postgres refuses that
+  /// FK by name without it.
+  @@unique([id, organizationId])
   @@index([organizationId])
+}
+
+/// PRIV-SRS-02 `IncidentReport.containment_actions` — **Text (log), REQUIRED**,
+/// «Timestamped containment actions», sourced to PRIV-SOP-09 step 3 («عزل الأنظمة أو
+/// الحسابات المتأثرة فوراً لمنع اتساع الضرر»).
+///
+/// A TABLE RATHER THAN A COLUMN, because the dictionary says LOG and PLURAL: an
+/// incident is routinely contained in more than one action, and a single text column
+/// cannot carry a timestamp and an actor per action. The shape is `ClaimStatusHistory`
+/// minus its `@@unique` — a second containment action is a new entry, not a repeat,
+/// which is also why `IncidentService.contain` APPENDS rather than short-circuiting.
+model IncidentContainmentAction {
+  id                  String         @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String         @default(dbgenerated())
+  organization        Organization   @relation(fields: [organizationId], references: [id])
+  incidentReportId    String
+  incidentReport      IncidentReport @relation(fields: [incidentReportId], references: [id], onDelete: Restrict)
+  /// «وصف أي إجراء احتواء فوري (كعزل نظام أو تعطيل حساب)» — PRIV-FRM-06 § III. At
+  /// least `DECLARATION_REASON_MIN_LENGTH` characters, enforced by
+  /// `IncidentContainmentAction_description_not_blank` as well as by the DTO: a blank
+  /// description would make «تم الاحتواء» mean *somebody pressed a button*.
+  description         String
+  actionTakenByUserId String
+  takenAt             DateTime       @default(now())
+  createdAt           DateTime       @default(now())
+
+  @@index([organizationId])
+  @@index([incidentReportId])
 }
 
 // ============================================================================

@@ -105,6 +105,27 @@ export interface IncidentReportRow {
   recoveredAt: Date | null;
   closedAt: Date | null;
   classificationCombinedDutyAct: CombinedDutyAct | null;
+  /** Owner decision 56 — PRIV-SRS-02's `containment_actions` log. REQUIRED on the
+   *  row type rather than optional, which is what makes the compiler name every
+   *  read path: an optional field would leave one of them projecting an empty log
+   *  while the others carried it, and the screen could not tell that apart from an
+   *  incident nobody has contained. */
+  containmentActions: IncidentContainmentActionRow[];
+  touchesPersonalData: boolean | null;
+  dataCategoriesAffected: string | null;
+  subjectsAffectedEstimate: number | null;
+  occurredAt: Date | null;
+  reportedByUserId: string | null;
+}
+
+/** One entry of PRIV-SRS-02's **Text (log)** — «Timestamped containment actions».
+ *  WHO and WHEN are part of the entry because the dictionary says timestamped and the
+ *  procedure assigns the step to a function; a plain string could carry neither. */
+export interface IncidentContainmentActionRow {
+  id: string;
+  description: string;
+  actionTakenByUserId: string;
+  takenAt: Date;
 }
 
 export interface IncidentReportView {
@@ -133,11 +154,56 @@ export interface IncidentReportView {
   closedAt: string | null;
   /** Derived — see `isContainmentOverdue`. */
   isContainmentOverdue: boolean;
+  /**
+   * OWNER DECISION 56 — WHAT WAS ACTUALLY DONE, newest first.
+   *
+   * Her words were «بس بغيّر الحالة إلى تم احتوائه»: the status changed and nothing
+   * else existed to show. This array is the answer, and the NAME is deliberately
+   * absent — `actionTakenByUserId` is a uuid, resolved to a person by decision 48's
+   * resolver where a screen needs one, and resolving it here would put a second
+   * answer to *who did this* in a config file.
+   */
+  containmentActions: {
+    id: string;
+    description: string;
+    actionTakenByUserId: string;
+    /**
+     * WHO, BY NAME — decision 48, through `UserRepository.displayNamesForUserIds`.
+     *
+     * REQUIRED on this shape rather than optional, which is what makes the compiler
+     * name every projection path. NULL means NO NAME and must never be filled from
+     * the uuid beside it: the id stays on the wire because the list is keyed on
+     * `id`, and what may not reach a reader is the id in place of a person.
+     *
+     * A log that showed only descriptions would discard the two facts the dictionary
+     * types — timestamped, and attributable — which is the whole reason this is a
+     * child table rather than a text column.
+     */
+    actionTakenByName: string | null;
+    takenAt: string;
+  }[];
+  /** PRIV-SOP-09 step 4's three outputs. All three or none — the row-level CHECK
+   *  `IncidentReport_impact_assessment_complete` makes any other combination
+   *  unrepresentable once `impactAssessedAt` is set. */
+  touchesPersonalData: boolean | null;
+  dataCategoriesAffected: string | null;
+  subjectsAffectedEstimate: number | null;
+  /** `occurred_date` — distinct from `reportedAt`, which is `detected_date`. */
+  occurredAt: string | null;
+  reportedByUserId: string | null;
 }
 
 export function deriveIncidentReportView(
   row: IncidentReportRow,
   now: Date,
+  /**
+   * Decision 48's resolved names, keyed by user id. REQUIRED rather than optional:
+   * an optional argument would leave one call path projecting a nameless log while
+   * the others carried names — a name after a CONTAIN and none after a LIST, which is
+   * the `IncidentReport.load()` defect and is invisible to a test that only reads.
+   * The compiler names every site instead.
+   */
+  actorNames: ReadonlyMap<string, string>,
 ): IncidentReportView {
   return {
     id: row.id,
@@ -168,6 +234,20 @@ export function deriveIncidentReportView(
     recoveredAt: row.recoveredAt ? row.recoveredAt.toISOString() : null,
     closedAt: row.closedAt ? row.closedAt.toISOString() : null,
     isContainmentOverdue: isContainmentOverdue(row, now),
+    containmentActions: row.containmentActions.map((a) => ({
+      id: a.id,
+      description: a.description,
+      actionTakenByUserId: a.actionTakenByUserId,
+      // A MISSING KEY IS NO NAME, never the uuid — decision 48's rule in the one
+      // place it can be broken quietly.
+      actionTakenByName: actorNames.get(a.actionTakenByUserId) ?? null,
+      takenAt: a.takenAt.toISOString(),
+    })),
+    touchesPersonalData: row.touchesPersonalData,
+    dataCategoriesAffected: row.dataCategoriesAffected,
+    subjectsAffectedEstimate: row.subjectsAffectedEstimate,
+    occurredAt: row.occurredAt ? row.occurredAt.toISOString() : null,
+    reportedByUserId: row.reportedByUserId,
   };
 }
 

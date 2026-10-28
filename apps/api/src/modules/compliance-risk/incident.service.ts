@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { UserRepository } from '../../repositories/user.repository';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
@@ -15,6 +16,7 @@ import {
 } from '../../repositories/incident.repository';
 import {
   deriveIncidentReportView,
+  type IncidentReportRow,
   incidentReportAuditSnapshot,
   requiresContainmentSla,
   INCIDENT_READ_LIMIT,
@@ -22,6 +24,8 @@ import {
 } from './incident.config';
 import type { CreateIncidentDto } from './dto/create-incident.dto';
 import type { ClassifyIncidentDto } from './dto/classify-incident.dto';
+import type { ContainIncidentDto } from './dto/contain-incident.dto';
+import type { AssessIncidentImpactDto } from './dto/assess-incident-impact.dto';
 import type { NotifyRegulatorsDto } from './dto/notify-regulators.dto';
 import type { CloseIncidentDto } from './dto/close-incident.dto';
 import type { ListIncidentsQueryDto } from './dto/list-incidents-query.dto';
@@ -81,7 +85,47 @@ export class IncidentService {
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
     private readonly dutySegregation: DutySegregationService,
+    /** Decision 48 — the ONE place that answers *who did this*. Used only for the
+     *  containment log's actor; never for an audit-trail row, which records what was
+     *  STORED and must not change its answer when an HR record is corrected. */
+    private readonly users: UserRepository,
   ) {}
+
+  /**
+   * ONE QUERY PER VIEW, and the log's actor resolved through decision 48.
+   *
+   * `deriveIncidentReportView` takes the name map as a REQUIRED argument, which is why
+   * the compiler named all seventeen call sites when it was added rather than leaving one
+   * of them projecting a nameless log. These two helpers are the only places that build
+   * the map, so there is one answer to *who contained this* rather than seventeen.
+   */
+  private async view(row: IncidentReportRow): Promise<IncidentReportView> {
+    return deriveIncidentReportView(
+      row,
+      new Date(),
+      await this.actorNames([row]),
+    );
+  }
+
+  /** The list form — ONE read for every action across every row, because per-row
+   *  resolution on a register is one query per incident. */
+  private async viewMany(
+    rows: readonly IncidentReportRow[],
+    now: Date,
+  ): Promise<IncidentReportView[]> {
+    const names = await this.actorNames(rows);
+    return rows.map((r) => deriveIncidentReportView(r, now, names));
+  }
+
+  private actorNames(
+    rows: readonly IncidentReportRow[],
+  ): Promise<ReadonlyMap<string, string>> {
+    return this.users.displayNamesForUserIds(
+      rows.flatMap((r) =>
+        r.containmentActions.map((a) => a.actionTakenByUserId),
+      ),
+    );
+  }
 
   async create(
     dto: CreateIncidentDto,
@@ -114,38 +158,69 @@ export class IncidentService {
       isSensitiveDataAccess: true,
     });
 
-    return deriveIncidentReportView(row, new Date());
+    return this.view(row);
   }
 
   // --- 2. contain (REPORTED -> CONTAINED) ------------------------------
 
-  async contain(id: string, actorUserId: string): Promise<IncidentReportView> {
+  /**
+   * OWNER DECISION 56. The owner pressed this and reported «بس بغيّر الحالة إلى تم
+   * احتوائه» — the route took no body and wrote a bare timestamp.
+   *
+   * IT APPENDS, AND THE IDEMPOTENT SHORT-CIRCUIT IS GONE. The old first line was
+   * `if (status === 'CONTAINED') return` — which made a SECOND press succeed having done
+   * nothing, a third reading of her sentence that nobody had named. `PRIV-SRS-02` types
+   * `containment_actions` as a timestamped LOG and `PRIV-SOP-09` step 3 is «عزل الأنظمة
+   * أو الحسابات المتأثرة», which is routinely more than one action — isolate the server,
+   * then disable the account. So a second containment action is a NEW ENTRY, not a repeat,
+   * and the only thing that happens once is the STATUS TRANSITION.
+   *
+   * ORDER MATTERS AND IS NOT INCIDENTAL: the action is written FIRST, because
+   * `IncidentReport_contained_needs_an_action` refuses to stamp `containedAt` with an
+   * empty log. The trigger is what makes her sentence unrepresentable rather than merely
+   * refused here.
+   */
+  async contain(
+    id: string,
+    dto: ContainIncidentDto,
+    actorUserId: string,
+  ): Promise<IncidentReportView> {
     const incident = await this.load(id);
-    if (incident.status === 'CONTAINED') {
-      return deriveIncidentReportView(incident, new Date());
-    }
+    const alreadyContained = incident.status === 'CONTAINED';
 
-    try {
-      await this.workflow.transition({
-        entityType: 'IncidentReport',
-        entityId: id,
-        toStatus: 'CONTAINED',
-        actorUserId,
-        data: { containedAt: new Date() },
-        sideEffect: () =>
-          this.resolveSlaTimerBestEffort(
-            id,
-            INCIDENT_CONTAINMENT_WORKFLOW,
-            actorUserId,
-          ),
-      });
-    } catch (err) {
-      if (err instanceof ConflictException) {
-        const now = await this.load(id);
-        if (now.status === 'CONTAINED')
-          return deriveIncidentReportView(now, new Date());
+    // The log entry, always — this is the act, and it is what the dictionary requires.
+    await this.repo.appendContainmentAction({
+      incidentReportId: id,
+      description: dto.description,
+      actionTakenByUserId: actorUserId,
+    });
+
+    if (!alreadyContained) {
+      try {
+        await this.workflow.transition({
+          entityType: 'IncidentReport',
+          entityId: id,
+          toStatus: 'CONTAINED',
+          actorUserId,
+          data: { containedAt: new Date() },
+          sideEffect: () =>
+            this.resolveSlaTimerBestEffort(
+              id,
+              INCIDENT_CONTAINMENT_WORKFLOW,
+              actorUserId,
+            ),
+        });
+      } catch (err) {
+        if (err instanceof ConflictException) {
+          // Another request transitioned it between the load and here. The action above
+          // still belongs on the log, which is why it is not rolled back.
+          const now = await this.load(id);
+          if (now.status === 'CONTAINED') {
+            return this.reloadAndAuditUpdate(id, actorUserId);
+          }
+        }
+        throw err;
       }
-      throw err;
     }
 
     return this.reloadAndAuditUpdate(id, actorUserId);
@@ -153,13 +228,29 @@ export class IncidentService {
 
   // --- 3. assess-impact (CONTAINED -> IMPACT_ASSESSED) -----------------
 
+  /**
+   * OWNER DECISION 56. «بس بظهرلي إنه تم تقييم أثره وأنا ما قيّمت ولا عملت شي» — the
+   * route took no body and wrote a bare `impactAssessedAt`.
+   *
+   * The three fields are `PRIV-SOP-09` step 4's own outputs, not a design: whether
+   * personal data is touched, the categories, and the approximate number of subjects.
+   * They are written IN THE SAME TRANSITION as the timestamp, so
+   * `IncidentReport_impact_assessment_complete` can never see a half-written row.
+   *
+   * THE SHORT-CIRCUIT IS KEPT HERE AND REMOVED FROM `contain`, which is a real asymmetry
+   * rather than an oversight: an impact assessment is ONE conclusion about the incident's
+   * scope, so a second call is a repeat; a containment ACTION is one of several things
+   * somebody did, so a second call is a new entry. Correcting an assessment is a separate
+   * act nobody has asked for, and inventing one here would be the cheap version.
+   */
   async assessImpact(
     id: string,
+    dto: AssessIncidentImpactDto,
     actorUserId: string,
   ): Promise<IncidentReportView> {
     const incident = await this.load(id);
     if (incident.status === 'IMPACT_ASSESSED') {
-      return deriveIncidentReportView(incident, new Date());
+      return this.view(incident);
     }
 
     try {
@@ -168,13 +259,18 @@ export class IncidentService {
         entityId: id,
         toStatus: 'IMPACT_ASSESSED',
         actorUserId,
-        data: { impactAssessedAt: new Date() },
+        data: {
+          impactAssessedAt: new Date(),
+          touchesPersonalData: dto.touchesPersonalData,
+          dataCategoriesAffected: dto.dataCategoriesAffected,
+          subjectsAffectedEstimate: dto.subjectsAffectedEstimate,
+        },
       });
     } catch (err) {
       if (err instanceof ConflictException) {
         const now = await this.load(id);
         if (now.status === 'IMPACT_ASSESSED') {
-          return deriveIncidentReportView(now, new Date());
+          return this.view(now);
         }
       }
       throw err;
@@ -198,7 +294,7 @@ export class IncidentService {
     const incident = await this.load(id);
     if (incident.status === 'CLASSIFIED') {
       if (incident.classification === dto.classification) {
-        return deriveIncidentReportView(incident, new Date());
+        return this.view(incident);
       }
       throw new ConflictException(
         `Incident ${id} is already classified ${incident.classification}, not ${dto.classification}.`,
@@ -236,7 +332,7 @@ export class IncidentService {
           now.status === 'CLASSIFIED' &&
           now.classification === dto.classification
         ) {
-          return deriveIncidentReportView(now, new Date());
+          return this.view(now);
         }
       }
       throw err;
@@ -267,7 +363,7 @@ export class IncidentService {
       );
     }
     if (incident.seniorManagementCoSignUserId) {
-      return deriveIncidentReportView(incident, new Date()); // idempotent
+      return this.view(incident); // idempotent
     }
     // Fail CLOSED, not open — the same #42/M04 "processed but no recorded
     // processor" guard: if somehow classified without a recorded classifier,
@@ -312,7 +408,7 @@ export class IncidentService {
       );
     }
     if (incident.seniorManagementNotifiedAt) {
-      return deriveIncidentReportView(incident, new Date()); // idempotent
+      return this.view(incident); // idempotent
     }
 
     const res = await this.repo.recordSeniorManagementNotified(id, new Date());
@@ -340,7 +436,7 @@ export class IncidentService {
     const incident = await this.load(id);
     if (incident.status === 'NOTIFIED') {
       if (sameRegulatorSet(incident.notifiedRegulators, dto.regulators)) {
-        return deriveIncidentReportView(incident, new Date());
+        return this.view(incident);
       }
       throw new ConflictException(
         `Incident ${id} was already notified to a different set of regulators.`,
@@ -387,7 +483,7 @@ export class IncidentService {
           now.status === 'NOTIFIED' &&
           sameRegulatorSet(now.notifiedRegulators, dto.regulators)
         ) {
-          return deriveIncidentReportView(now, new Date());
+          return this.view(now);
         }
       }
       throw err;
@@ -424,7 +520,7 @@ export class IncidentService {
       );
     }
     if (incident.affectedDataSubjectsNotifiedAt) {
-      return deriveIncidentReportView(incident, new Date()); // idempotent
+      return this.view(incident); // idempotent
     }
 
     const res = await this.repo.recordAffectedSubjectsNotified(id, new Date());
@@ -442,7 +538,7 @@ export class IncidentService {
   async recover(id: string, actorUserId: string): Promise<IncidentReportView> {
     const incident = await this.load(id);
     if (incident.status === 'RECOVERED') {
-      return deriveIncidentReportView(incident, new Date());
+      return this.view(incident);
     }
 
     try {
@@ -456,8 +552,7 @@ export class IncidentService {
     } catch (err) {
       if (err instanceof ConflictException) {
         const now = await this.load(id);
-        if (now.status === 'RECOVERED')
-          return deriveIncidentReportView(now, new Date());
+        if (now.status === 'RECOVERED') return this.view(now);
       }
       throw err;
     }
@@ -475,7 +570,7 @@ export class IncidentService {
     const incident = await this.load(id);
     if (incident.status === 'CLOSED') {
       if (incident.rootCauseAnalysis === dto.rootCauseAnalysis) {
-        return deriveIncidentReportView(incident, new Date());
+        return this.view(incident);
       }
       throw new ConflictException(
         `Incident ${id} is already closed with a different root cause analysis on record.`,
@@ -500,7 +595,7 @@ export class IncidentService {
           now.status === 'CLOSED' &&
           now.rootCauseAnalysis === dto.rootCauseAnalysis
         ) {
-          return deriveIncidentReportView(now, new Date());
+          return this.view(now);
         }
       }
       throw err;
@@ -521,7 +616,7 @@ export class IncidentService {
       afterValue: { incidentReportId: id },
       isSensitiveDataAccess: true,
     });
-    return deriveIncidentReportView(incident, new Date());
+    return this.view(incident);
   }
 
   async list(
@@ -550,7 +645,7 @@ export class IncidentService {
       afterValue: { count: rows.length },
       isSensitiveDataAccess: rows.length > 0,
     });
-    return rows.map((r) => deriveIncidentReportView(r, now));
+    return this.viewMany(rows, now);
   }
 
   // --- helpers -------------------------------------------------
@@ -576,7 +671,7 @@ export class IncidentService {
       afterValue: incidentReportAuditSnapshot(after),
       isSensitiveDataAccess: true,
     });
-    return deriveIncidentReportView(after, new Date());
+    return this.view(after);
   }
 
   private async startSlaTimerBestEffort(

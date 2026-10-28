@@ -55,6 +55,16 @@ const incidentRow = (over: Record<string, unknown> = {}) => ({
   rootCauseAnalysis: null,
   recoveredAt: null,
   closedAt: null,
+  /* OWNER DECISION 56. A CONTAINED incident with an EMPTY log is the historical state the
+   * migration's NOT VALID CHECK leaves readable — so it is the honest fixture here, and it
+   * is also the state that caught this file: `flatMap` over an absent array threw, because
+   * this helper is typed `Record<string, unknown>` and the compiler could not name it. */
+  containmentActions: [],
+  touchesPersonalData: null,
+  dataCategoriesAffected: null,
+  subjectsAffectedEstimate: null,
+  occurredAt: null,
+  reportedByUserId: null,
   ...over,
 });
 

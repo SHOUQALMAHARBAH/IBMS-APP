@@ -4,6 +4,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { IncidentService } from './incident.service';
 import { CreateIncidentDto } from './dto/create-incident.dto';
 import { ClassifyIncidentDto } from './dto/classify-incident.dto';
+import { ContainIncidentDto } from './dto/contain-incident.dto';
+import { AssessIncidentImpactDto } from './dto/assess-incident-impact.dto';
 import { NotifyRegulatorsDto } from './dto/notify-regulators.dto';
 import { CloseIncidentDto } from './dto/close-incident.dto';
 import { ListIncidentsQueryDto } from './dto/list-incidents-query.dto';
@@ -48,19 +50,32 @@ export class IncidentController {
     return this.incidents.get(id, user.id);
   }
 
+  /* OWNER DECISION 56 — both acts take a MANDATORY body now. They took none, which is
+   * why the owner could press either and have the status change with nothing recorded.
+   *
+   * THE PERMISSION IS UNCHANGED AND THE SEGREGATION GAP IS REPORTED RATHER THAN CLOSED:
+   * `PRIV-SOP-09` assigns step 3 (containment) to «دائرة تقنية المعلومات» and step 4 (the
+   * impact assessment) to «مسؤول حماية البيانات» — two different functions. This system
+   * has no IT role, so one holder of `incident.contain` performs both. Minting a role is
+   * outside this batch and the gap is recorded in `docs/owner-walk-register.md`. */
   @RequirePermissions('incident.contain')
   @Post(':id/contain')
-  contain(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.incidents.contain(id, user.id);
+  contain(
+    @Param('id') id: string,
+    @Body() dto: ContainIncidentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.incidents.contain(id, dto, user.id);
   }
 
   @RequirePermissions('incident.contain')
   @Post(':id/assess-impact')
   assessImpact(
     @Param('id') id: string,
+    @Body() dto: AssessIncidentImpactDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.incidents.assessImpact(id, user.id);
+    return this.incidents.assessImpact(id, dto, user.id);
   }
 
   @RequirePermissions('incident.classify')
