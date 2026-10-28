@@ -1519,7 +1519,16 @@ build actually is today:
   and watching it fire:
   - **1. `prisma validate` + `prisma format`** — `db:format` script plus a CI
     step that runs it and fails on any resulting diff (Prisma has no
-    `--check`, so "changes nothing" is the proof).
+    `--check`, so "changes nothing" is the proof). **RUN `npm run db:format`
+    BEFORE PUSHING ANY SCHEMA CHANGE — no local script does, and nothing else
+    can see it.** `npm run typecheck`, `lint`, `db:validate`, `db:checksums`,
+    `db:divergence` and `db:privileges` are all green on an unformatted schema:
+    the alignment is whitespace, so only this gate reads it. It has now cost a
+    red `backend` round trip **twice** — 2026-09-18 on one line of field
+    alignment, and 2026-10-28 on ten lines after a model gained six fields —
+    which is why the instruction is here rather than only in a What's New row.
+    `prisma format` is idempotent (proven: formatted twice, byte-identical), so
+    a diff after running it is always a diff against HEAD.
   - **2. Maker/checker rules tested** — audited all enforcement points; **already
     fully covered, no new tests needed.** Two earlier "gaps" were
     keyword-search false negatives: DSR closure is tested (its comment says

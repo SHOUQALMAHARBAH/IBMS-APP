@@ -208,7 +208,18 @@ check "the one-provider partial unique still carries its WHERE" 1 \
 # cite a legal hold belonging to a different office — which would make the retention of one office
 # depend on a fact it cannot see. Prisma cannot express the pair, so it is also a named entry in the
 # divergence gate's expected set.
-check "composite tenant FKs" 14 \
+#
+# 14 -> 15, owner decision 56: `IncidentContainmentAction_incident_same_org_fkey`, so a containment
+# action cannot be filed against another office's incident — which would put one office's breach
+# response inside another office's register, on a record a regulator reads. Same shape and same
+# reason as the entry above, and Prisma cannot express it either, so it is a named entry in the
+# divergence gate's expected set too.
+#
+# AND THIS PIN IS WHY THE FIGURE IS HERE AT ALL: it fired in CI on the commit that added the FK,
+# because I ran the six database gates and NOT this script. `db:divergence` sees the FK as a
+# DECLARED expected statement and says nothing about the count; only this pin notices that the
+# shape a database reaches from NOTHING has moved.
+check "composite tenant FKs" 15 \
   "$(psql_scratch $'SELECT count(*) FROM pg_constraint WHERE contype = \'f\' AND conname LIKE \'%\\_same\\_org\\_fkey\'')"
 check "the eight reference tables are seeded" 8 \
   "$(psql_scratch 'SELECT count(*) FROM (SELECT 1 FROM "LegalForm" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "LicensingAuthority" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Country" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "City" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Bank" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Currency" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "BusinessModel" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "RatingAgency" HAVING count(*) > 0) t')"

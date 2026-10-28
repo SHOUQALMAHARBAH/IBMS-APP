@@ -957,7 +957,7 @@ model User {
   conflictOfInterestRegisterEntries ConflictOfInterestRegisterEntry[] @relation("ConflictOfInterestDeclaredBy")
   /// `reported_by` on PRIV-SRS-02's IncidentReport — Optional, «may be anonymous»,
   /// which is why the FK is nullable rather than defaulted to the caller.
-  reportedIncidents                   IncidentReport[]            @relation("IncidentReportedBy")
+  reportedIncidents                 IncidentReport[]                  @relation("IncidentReportedBy")
 
   @@unique([organizationId, email])
   @@index([email])
@@ -4754,18 +4754,18 @@ enum IncidentClassification {
 /// critical) -> Impact Assessed -> Classified (Material needs DPO + Senior
 /// Management co-sign) -> Notified -> Recovered -> Closed (RCA mandatory).
 model IncidentReport {
-  id                              String                 @id @default(uuid())
+  id                              String                      @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId                  String                 @default(dbgenerated())
-  organization                    Organization           @relation(fields: [organizationId], references: [id])
+  organizationId                  String                      @default(dbgenerated())
+  organization                    Organization                @relation(fields: [organizationId], references: [id])
   title                           String
   description                     String
   severity                        String // low | medium | high | critical
-  status                          IncidentStatus         @default(REPORTED)
+  status                          IncidentStatus              @default(REPORTED)
   /// `detected_date` in PRIV-SRS-02 — and it is never caller-suppliable (see
   /// `CreateIncidentDto`), so it is the moment the OFFICE learned of the incident.
-  reportedAt                      DateTime               @default(now())
+  reportedAt                      DateTime                    @default(now())
   /// `occurred_date` — PRIV-SRS-02 marks it Optional, «occurrence timestamp (if
   /// known)», and the form asks «تاريخ ووقت الوقوع (إن عُرف)». Distinct from
   /// `reportedAt` on purpose: an incident discovered on Monday may have happened on
@@ -4775,7 +4775,7 @@ model IncidentReport {
   /// `reported_by` — Optional in PRIV-SRS-02 because «may be anonymous», which is
   /// why this is nullable rather than defaulted to the caller.
   reportedByUserId                String?
-  reportedByUser                  User?                  @relation("IncidentReportedBy", fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  reportedByUser                  User?                       @relation("IncidentReportedBy", fields: [reportedByUserId], references: [id], onDelete: Restrict)
   /// THE FIRST containment action's instant, and the 4-hour target for `critical`
   /// severity keys on it. It can no longer be set with an empty log: a trigger
   /// (`IncidentReport_contained_needs_an_action`) refuses that, which is what makes
@@ -4793,7 +4793,7 @@ model IncidentReport {
   touchesPersonalData             Boolean?
   dataCategoriesAffected          String?
   subjectsAffectedEstimate        Int?
-  classification                  IncidentClassification @default(NOT_YET_CLASSIFIED)
+  classification                  IncidentClassification      @default(NOT_YET_CLASSIFIED)
   classifiedByDpoUserId           String?
   // Material classification irreversible without this — `assertDifferentActors`
   // (app-level) + `IncidentReport_classification_maker_checker_distinct` CHECK
@@ -4807,13 +4807,13 @@ model IncidentReport {
   rootCauseAnalysis               String? // mandatory before Closed
   recoveredAt                     DateTime?
   closedAt                        DateTime?
-  createdAt                       DateTime               @default(now())
+  createdAt                       DateTime                    @default(now())
   /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
   /// has declared COMBINED mode. The `IncidentReport_maker_checker_distinct` family of CHECK constraints
   /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
   /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
   classificationCombinedDutyActId String?
-  classificationCombinedDutyAct   CombinedDutyAct?       @relation("IncidentReportClassificationCombinedDuty", fields: [classificationCombinedDutyActId], references: [id], onDelete: Restrict)
+  classificationCombinedDutyAct   CombinedDutyAct?            @relation("IncidentReportClassificationCombinedDuty", fields: [classificationCombinedDutyActId], references: [id], onDelete: Restrict)
 
   /// What the containment log's composite tenant FK references. Postgres refuses that
   /// FK by name without it.
