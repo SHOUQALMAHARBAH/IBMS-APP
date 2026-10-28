@@ -509,7 +509,11 @@ export const COMPLIANCE_RISK = {
     icDeclaredColPair: 'العملية',
     icDeclaredColRoles: 'الأدوار التي تمنح الاعتماد',
     icDeclaredColReason: 'السبب المسجّل',
-    icDeclaredAccessFlag: 'مراجعة صلاحيات نفسه —',
+    /* The trailing separator was DROPPED — a strict substring of what shipped, no word
+       written. It was there to run into the date beside it in running text; the flag
+       sits in a PILL now, where a dangling dash has nothing left to separate and reads
+       as a stray stroke. The screenshot is what showed it. */
+    icDeclaredAccessFlag: 'مراجعة صلاحيات نفسه',
     icDeclaredHatAmbiguous: 'أكثر من دور يمنح الاعتماد',
     icDeclaredTruncated: 'تُعرض أحدث الحالات فقط.',
     icDeclaredLoadError:
@@ -1046,7 +1050,11 @@ export const COMPLIANCE_RISK = {
     icDeclaredColPair: 'Operation',
     icDeclaredColRoles: 'Roles granting the approval',
     icDeclaredColReason: 'Recorded reason',
-    icDeclaredAccessFlag: 'Reviewed their own access —',
+    /* The trailing separator was DROPPED — a strict substring of what shipped, no word
+       written. It was there to run into the date beside it in running text; the flag
+       sits in a PILL now, where a dangling dash has nothing left to separate and reads
+       as a stray stroke. The screenshot is what showed it. */
+    icDeclaredAccessFlag: 'Reviewed their own access',
     icDeclaredHatAmbiguous: 'more than one role grants this',
     icDeclaredTruncated: 'Showing the most recent only.',
     icDeclaredLoadError:

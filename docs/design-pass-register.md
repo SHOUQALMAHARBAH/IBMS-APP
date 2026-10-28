@@ -176,6 +176,7 @@ Each is something the pass found and deliberately left, with what it would take 
 | 4b | **`aria-label` over a visible label is the most common defect this pass is finding.** Two of the three pilot screens carried it, FOUR controls in all, and in three of the four the two strings DISAGREED: `pcAccountAria` said four digits where the field accepts two to four; `incTitleLabel` ("Incident title") was better than the visible `incTitleFieldLabel` ("Title"); `incRootCauseLabel` was a placeholder doing a label's job, so a sighted reader had nothing left to read once they typed. An `aria-label` REPLACES the accessible name, so the two readers were told different things and nobody proof-reads the invisible one. | Fixed per screen as the pass reaches them, by making the informative string the VISIBLE label and withdrawing the duplicate key in both languages — four keys withdrawn so far. A gate for the class is worth considering and is not built here. |
 | 4c | **`hardcoded-ui-english.py` reports 0 undeclared and misses two strings on `/internal-controls`** — a governance report an auditor reads. `'None'` was the violations figure when the count was zero: a ternary of bare literals inside a PROP VALUE, which failure mode 8 excludes by design because the identical shape is a `data-*` test hook elsewhere. And `Generated {…}` was a capitalised single word in front of a brace, which `PROSE` misses (it needs two words) and `BARE_TEXT_LINE` misses (its character class excludes braces). | Both instances fixed — the count is `٠` through `formatNumber`, and the generated-at line goes through `ReportProvenance`, which this product already decided on for exactly that line. **Mode 8 is NOT widened**: that script's own header records that tolerating more makes every bare call a finding. |
 | 4d | **`ReportProvenance` was never exported from the `components/ui` barrel.** Found by the compiler when the first screen tried to compose it. | Exported. Worth a line because the component shipped with its own decision record and a `report-provenance` testid and could only be reached by a deep import — which is how a primitive stays unused. |
+| 4e | **`/internal-controls/combined-duty-acts` is mocked by NO Playwright spec and its declared-acts half has never been exercised in a browser.** Found while writing that screen's capture: there was no working fixture to copy, so the first attempt was paraphrased from the type and silently rendered nothing. | The capture now exercises it. A real assertion on that section belongs with whoever owns COMBINED mode — it is the section the whole mode rests on. |
 | 5b | **The collapsed rail is a STRIP, not a drawer.** Its `<details>` groups stay closed, so it costs about one brand lockup and one search field of height. | A drawer needs a toggle, a focus trap and an escape key — three pieces of BEHAVIOUR, which §4(h) does not allow this batch to add. It is the better answer whenever somebody is allowed to build it. |
 | 5c | **The rail's layout lives in inline styles, which is why the responsive rule needs `!important`.** | Moving it to CSS is a larger change than a responsive fix should carry. Recorded so the `!important` is read as a consequence rather than as carelessness. |
 | 6 | **The two new CI steps are committed locally and NOT PUSHED.** `check:token-contrast` and `check:inline-styles` are wired in `package.json` (so `npm run check:screen-pass` runs both) and their `ci.yml` steps sit in an unpushed commit: GitHub refuses a push touching a workflow file from a token without `workflow` scope, and this machine's keyring token holds `gist, read:org, repo`. **No credential was written to disk to get around it** — the credential-safety hook refuses that and is right to, since it cannot tell a credential store from a leak. | Needs one push with a `workflow`-scoped token, which is the owner's to make. Until then both gates are green locally and runnable by name, and CI simply does not run them. Recorded here rather than left as a silent gap, because a gate nobody runs is the thing this repository has paid for three times. |
@@ -215,7 +216,26 @@ fixes for one defect.
 > deliberate.** Every declaration on the rail carries `!important` now, scoped to that one query,
 > with the reason written beside it.
 
-**3. `/incidents` rendered a titled, empty card** for a reader whose grants reach no act on that
+**3. A `data-testid` ON A CUSTOM COMPONENT IS SILENTLY DROPPED, AND TYPESCRIPT WILL NOT TELL YOU.**
+TypeScript exempts hyphen-containing JSX attributes from excess-property checking, so
+`data-anything` on any custom component type-checks and then goes nowhere. Moving a screen's
+`<tr data-testid=…>` and its empty-state `<p data-testid=…>` onto `Tr` and `EmptyState` killed
+**three hooks** — with `tsc` clean, the screens rendering perfectly, and `internal-controls.spec.ts`
+(the spec for that very screen) still green, because the hooks belong to a DIFFERENT spec.
+
+> The spec that reads them is `self-approval-report.spec.ts`, which I had not run. That is the miss
+> shape this repository keeps recording: *which specs exercise what I touched* and *which specs
+> assert about what I MOVED* are different questions, and the second is the one that bites. Here it
+> was caught by my own screenshot capture failing to find one of the hooks — the pictures earning
+> their keep a third time. `Tr`, `EmptyState`, `ErrorState` and `Note` forward it explicitly now,
+> as a named prop so the support is visible in the signature.
+
+**4. The access-self-review flag carried a dangling em dash inside its new pill.** The string ends
+with a separator because it was written to run into the date beside it in running text. In a pill
+there is nothing left to separate. Fixed by dropping the trailing separator — a strict substring of
+what shipped, no word written.
+
+**5. `/incidents` rendered a titled, empty card** for a reader whose grants reach no act on that
 record — a DPO looking at an incident only `incident.contain` can move. A heading over nothing is
 the emptiness this batch exists to remove, and it is the frontend directive's own rule one step up:
 a control a role cannot use does not exist on their screen, so neither does the box it would have

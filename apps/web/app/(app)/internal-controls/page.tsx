@@ -235,7 +235,11 @@ export default function InternalControlsPage() {
           // "Nobody has done this" is a different claim from "the report could not be read", and the two
           // must not share a blank space.
           <div style={loadingWrapStyle}>
-            <EmptyState title={t('icDeclaredEmpty')} style={emptyStateStyle} />
+            <EmptyState
+              title={t('icDeclaredEmpty')}
+              style={emptyStateStyle}
+              data-testid="declared-empty"
+            />
           </div>
         ) : (
           <>

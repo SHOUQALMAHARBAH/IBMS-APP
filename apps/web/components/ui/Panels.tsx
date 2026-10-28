@@ -178,12 +178,15 @@ export function Note({
   children,
   role,
   style,
+  'data-testid': testId,
 }: {
   tone?: 'info' | 'warning' | 'neutral';
   icon?: IconName;
   children: ReactNode;
   role?: 'status' | 'alert';
   style?: CSSProperties;
+  /** Forwarded explicitly — see the note on `Tr` in `Table.tsx`. */
+  'data-testid'?: string;
 }) {
   const palette =
     tone === 'warning'
@@ -195,6 +198,7 @@ export function Note({
   return (
     <div
       role={role}
+      data-testid={testId}
       style={{
         display: 'flex',
         gap: 'var(--space-2)',

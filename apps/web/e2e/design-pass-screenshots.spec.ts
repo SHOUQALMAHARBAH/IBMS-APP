@@ -260,6 +260,109 @@ test.describe("design pass — screenshots", () => {
     },
   ];
 
+  /* ------------------------------------------------------------------ /internal-controls */
+
+  const AUDIT = {
+    generatedAt: "2026-10-28T22:15:00.000Z",
+    pairsScanned: 16,
+    totalRowsChecked: 4182,
+    violations: [],
+    byPair: [
+      {
+        entityType: "KYCRecord",
+        pairLabel: "capturedBy / approvedBy",
+        rowsChecked: 912,
+        violationCount: 0,
+        dbCheckConstraint: "KYCRecord_maker_checker_distinct",
+        dormant: false,
+        truncated: false,
+      },
+      {
+        entityType: "Refund",
+        pairLabel: "raisedBy / approvedBy",
+        rowsChecked: 38,
+        violationCount: 0,
+        dbCheckConstraint: "Refund_maker_checker_distinct",
+        dormant: false,
+        truncated: false,
+      },
+      {
+        entityType: "DisposalBatch",
+        pairLabel: "nominatedBy / dpoApprovedBy",
+        rowsChecked: 0,
+        violationCount: 0,
+        dbCheckConstraint: "DisposalBatch_maker_checker_distinct",
+        dormant: true,
+        truncated: false,
+      },
+    ],
+  };
+
+  /*
+   * THE SHAPE IS COPIED FROM `CombinedDutyReport`, NOT PARAPHRASED — and the first version was
+   * paraphrased and silently rendered nothing, because it was missing `entityId`, `actorUserId`,
+   * `accessSelfReviewCount` and `totalCount`. `/internal-controls/combined-duty-acts` is mocked by
+   * NO other Playwright spec, so there was no working fixture to copy and no assertion covering
+   * the declared-acts half at all. That is its own small finding: the section the whole COMBINED
+   * mode rests on has never been exercised in a browser.
+   */
+  const DECLARED = {
+    office: {
+      mode: "COMBINED",
+      declaredAt: "2026-09-02T08:00:00.000Z",
+      declaredByUserId: "user-1",
+      declaredByName: "هدى الشوابكة",
+    },
+    accessSelfReviewCount: 1,
+    totalCount: 2,
+    truncated: false,
+    rows: [
+      {
+        id: "act-1",
+        actorUserId: "user-1",
+        entityId: "ari-9",
+        at: "2026-10-21T10:12:00.000Z",
+        actorName: "هدى الشوابكة",
+        entity: "مراجعة صلاحيات الوصول",
+        pair: "AccessRecertificationItem_maker_checker_distinct",
+        roles: ["مسؤولة حماية البيانات"],
+        reason: "المكتب شخص واحد، ولا يوجد زميل آخر يراجع صلاحياتي.",
+        hatAmbiguous: false,
+        accessSelfReview: true,
+      },
+      {
+        id: "act-2",
+        actorUserId: "user-2",
+        entityId: "ref-4",
+        at: "2026-10-18T14:40:00.000Z",
+        actorName: "عمر الرفاعي",
+        entity: "استرداد",
+        pair: "Refund_maker_checker_distinct",
+        roles: ["موظف المالية", "مدير الفرع"],
+        reason: "اعتمدتُ الاسترداد الذي رفعتُه بنفسي بعد مغادرة المدير.",
+        hatAmbiguous: true,
+        accessSelfReview: false,
+      },
+    ],
+  };
+
+  screenshots(
+    "internal-controls",
+    "/internal-controls",
+    ["COMPLIANCE_OFFICER"],
+    async (page) => {
+      await page.route("http://localhost:4000/internal-controls/self-approval-audit**", (route) =>
+        route.fulfill({ status: 200, json: AUDIT }),
+      );
+      await page.route("http://localhost:4000/internal-controls/combined-duty-acts**", (route) =>
+        route.fulfill({ status: 200, json: DECLARED }),
+      );
+    },
+    async (page) => {
+      await page.getByTestId("declared-row-access").waitFor();
+    },
+  );
+
   screenshots(
     "payment-channels",
     "/payment-channels",

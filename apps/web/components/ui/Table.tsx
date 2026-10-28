@@ -88,6 +88,30 @@ export function Td({
   );
 }
 
-export function Tr({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <tr style={style}>{children}</tr>;
+/*
+ * A ROW, AND IT FORWARDS `data-testid` EXPLICITLY — which is not a convenience.
+ *
+ * TypeScript exempts hyphen-containing JSX attributes from excess-property checking, so
+ * `data-anything` on ANY custom component type-checks and then goes nowhere. That is how moving a
+ * screen's `<tr data-testid=…>` onto this component silently killed two hooks
+ * `self-approval-report.spec.ts` reads — with `tsc` clean, the screen rendering perfectly, and the
+ * spec that covers the SAME SCREEN still green because it happens not to use them.
+ *
+ * It is declared as a named prop rather than absorbed by a props spread, so the support is
+ * visible in the signature. A row that needs more than this should render a plain `<tr>`.
+ */
+export function Tr({
+  children,
+  style,
+  'data-testid': testId,
+}: {
+  children: ReactNode;
+  style?: CSSProperties;
+  'data-testid'?: string;
+}) {
+  return (
+    <tr style={style} data-testid={testId}>
+      {children}
+    </tr>
+  );
 }

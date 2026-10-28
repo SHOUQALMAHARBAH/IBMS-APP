@@ -32,14 +32,23 @@ export function EmptyState({
   description,
   action,
   style,
+  'data-testid': testId,
 }: {
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   style?: CSSProperties;
+  /*
+   * FORWARDED EXPLICITLY. TypeScript exempts hyphen-containing JSX attributes from
+   * excess-property checking, so `data-testid` on a custom component type-checks and then
+   * goes NOWHERE — which is how moving a screen's markup onto these primitives silently
+   * killed three test hooks with `tsc` clean and the screens rendering perfectly. Named
+   * rather than absorbed by a props spread, so the support is visible in the signature.
+   */
+  'data-testid'?: string;
 }) {
   return (
-    <div style={{ ...WRAP, ...style }}>
+    <div style={{ ...WRAP, ...style }} data-testid={testId}>
       <p style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'] }}>
         {title}
       </p>
@@ -56,6 +65,7 @@ export function ErrorState({
   description,
   action,
   style,
+  'data-testid': testId,
 }: {
   title: ReactNode;
   /**
@@ -65,10 +75,13 @@ export function ErrorState({
   description?: ReactNode;
   action?: ReactNode;
   style?: CSSProperties;
+  /** Forwarded explicitly — see the note on `EmptyState` above. */
+  'data-testid'?: string;
 }) {
   return (
     <div
       role="alert"
+      data-testid={testId}
       style={{
         ...WRAP,
         border: '1px solid var(--danger-border)',
