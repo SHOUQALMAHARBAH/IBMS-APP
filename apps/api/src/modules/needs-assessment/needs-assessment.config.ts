@@ -14,6 +14,34 @@ import { BadRequestException } from '@nestjs/common';
  * Coverage-line strings are canonical free text (the schema keeps
  * `NeedsAssessment.recommendedCoverageLines` as `String[]`, not an enum —
  * see the model comment listing the same example lines).
+ *
+ * ## DO NOT RENAME THESE TO MATCH `INSURANCE_LINES`. CANCELLED 2026-10-28 BY THE OWNER.
+ *
+ * A brief asked for seven of the thirteen to be renamed so the two vocabularies would read
+ * alike — `Motor Fleet` -> `Motor Comprehensive` among them. The owner CANCELLED it on
+ * measurement, and the reason is written here rather than only in a register, because the next
+ * person to put these thirteen strings beside `INSURANCE_LINES`' thirty-two will reach for
+ * exactly that change:
+ *
+ *   1. THE UNIFICATION ALREADY EXISTS, one module over. `COVERAGE_LINE_MAPPINGS` in
+ *      `insurance-program.config.ts` maps all thirteen of these strings to a catalogue
+ *      `lineCode`, including every one of the seven targets, and its own comment records that
+ *      the two vocabularies differ DELIBERATELY. A rename would not unify anything; it would
+ *      replace a working bridge with a coincidence of spelling.
+ *
+ *   2. IT DESTROYS STORED DATA. `assembleProgramLines` matches the EXACT string, so every
+ *      renamed value drops into the `unknown` branch at `lineCode: null`. Measured on the day
+ *      it was cancelled: **90 of 90 `NeedsAssessment` rows on dev hold one of the seven, and
+ *      all 90 are APPROVED** (db-test: 34 of 51, 27 approved). Rewriting a signed-off
+ *      assessment's recommended cover is not a rename.
+ *
+ *   3. `Motor Fleet` -> `Motor Comprehensive` additionally destroys a distinction the mapping's
+ *      own comment records as load-bearing: a fleet is not a comprehensive private motor policy,
+ *      and collapsing the two changes which cover a client is recommended.
+ *
+ * The guard the brief asked for — every `COVERAGE_LINES` entry existing as an `INSURANCE_LINES`
+ * `nameEn` — would fail on 7 of 13 BY DESIGN. The one that checks the right thing already
+ * exists and is green: `managed-line-writers.e2e-spec.ts`.
  */
 
 export const COVERAGE_LINES = [
