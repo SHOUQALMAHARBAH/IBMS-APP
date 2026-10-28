@@ -49,8 +49,18 @@ const RETIRED_ROLE = {
   status: 'INACTIVE',
 };
 
-const CLAIMS_DEPT = { id: 'dept-1', name: 'Claims', nameAr: 'المطالبات' };
-const IRBID_BRANCH = { id: 'branch-1', name: 'Irbid', nameAr: 'إربد' };
+const CLAIMS_DEPT = {
+  id: 'dept-1',
+  name: 'Claims',
+  nameAr: 'المطالبات',
+  retiredAt: null,
+};
+const IRBID_BRANCH = {
+  id: 'branch-1',
+  name: 'Irbid',
+  nameAr: 'إربد',
+  retiredAt: null,
+};
 
 const EMPLOYEE_ROW = {
   id: 'emp-1',

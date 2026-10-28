@@ -90,7 +90,7 @@ test("the branch filter is a name search, and the id it resolves reaches the req
   await page.route("http://localhost:4000/admin/branches/search**", (route) =>
     route.fulfill({
       status: 200,
-      json: [{ id: "br-7", name: "Amman Main", nameAr: "عمّان الرئيسي" }],
+      json: [{ id: "br-7", name: "Amman Main", nameAr: "عمّان الرئيسي", retiredAt: null }],
     }),
   );
 

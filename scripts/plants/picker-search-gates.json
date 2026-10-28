@@ -7,7 +7,7 @@
   },
   "customer-search-narrowed-back": {
     "file": "apps/api/src/common/picker-search.config.ts",
-    "from": "export const CUSTOMER_SEARCH_CODES = ['customer.read', 'dsr.log'] as const;",
+    "from": "export const CUSTOMER_SEARCH_CODES = [\n  'customer.read',\n  'dsr.log',\n  'consent.manage',\n] as const;",
     "to": "export const CUSTOMER_SEARCH_CODES = ['customer.read'] as const;",
     "why": "The second instance, restored: the DPO cannot find a customer on `/dsr`, which is their own screen. `THE DPO CAN NOW FIND A CUSTOMER` dies. Nothing else does — nine of the ten roles are unaffected, which is exactly why this shipped."
   },

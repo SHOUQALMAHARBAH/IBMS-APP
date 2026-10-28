@@ -93,3 +93,5 @@ verdict, and — where we diverge rather than merely lack a field — the reason
 that pins it.
 
 A row that says only *missing* needs no test. A row that says *differs, deliberately* does.
+
+**IT IS ROUTED TO THE PRIVACY MODULE AND IS NOT MODULE 0-c's — 2026-10-28.** `docs/deferred-register.md` § *RECORDED, NOT BUILT — 2026-10-28, module 0-c group 7* carries the entry, with four measured starting points and one correction to its own premise: the *fourteen entities* figure comes from the brief and was never re-derived, so derive it from the PCMS documents rather than inheriting it. Recorded in both places deliberately — a reader who opens THIS file is looking for the findings, and a reader who opens the register is looking for what is owed; a routing that lives in only one of them is invisible from the other.

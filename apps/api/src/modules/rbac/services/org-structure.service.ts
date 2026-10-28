@@ -20,6 +20,15 @@ export interface OrgUnitView {
   id: string;
   name: string;
   nameAr: string | null;
+  /**
+   * When this unit was retired, or null while it is live.
+   *
+   * Added with the reactivate route, because without it the route is unreachable: the admin read
+   * filtered retired units out, so a retired unit was invisible on the only screen that could bring
+   * it back, and a screen that CAN see them must be able to tell them apart. A count would not do —
+   * a reader deciding whether to reactivate wants to know when it was retired.
+   */
+  retiredAt: string | null;
 }
 
 /**
@@ -66,10 +75,15 @@ export class OrgStructureService {
    * six pickers by number of screens.
    *
    * ITS OWN ROUTE rather than a widened `GET /admin/branches`, and the reason is a disclosure boundary
-   * rather than tidiness: that list is an administrative register returning every branch including the
-   * deactivated ones, and widening its `branch.read` gate to the ten codes these screens carry would
-   * hand nine roles an administration screen's data in order to serve a dropdown. This returns live
-   * branches, two name fields, and nothing else.
+   * rather than tidiness: that list is an administrative register which can be asked for every branch
+   * INCLUDING the retired ones (`?includeRetired=true`), and widening its `branch.read` gate to the ten
+   * codes these screens carry would hand nine roles an administration screen's data in order to serve a
+   * dropdown. This returns live branches, two name fields, and nothing else.
+   *
+   * That sentence used to say the register "returns every branch including the deactivated ones" and
+   * was FALSE when written — both list reads filtered live-only until the reactivate route landed, so
+   * the claim described a capability nothing had. Corrected rather than deleted, because the
+   * disclosure argument it supports is unchanged and is the reason this route exists.
    *
    * NOT AUDITED. A branch is the office's own structure, not a person and not a counterparty; a row
    * recording that somebody typed two letters of their own branch's name would record a non-event.
@@ -84,8 +98,10 @@ export class OrgStructureService {
     return rows.map((b) => ({ id: b.id, name: b.name, nameAr: b.nameAr }));
   }
 
-  async listDepartments(): Promise<OrgUnitView[]> {
-    return (await this.departments.list()).map(toOrgUnitView);
+  /** LIVE departments unless `includeRetired`, which the administration screen passes so a retired
+   *  unit can be brought back. Every other caller — pickers, filters — gets the live list. */
+  async listDepartments(includeRetired = false): Promise<OrgUnitView[]> {
+    return (await this.departments.list(includeRetired)).map(toOrgUnitView);
   }
 
   /**
@@ -168,6 +184,20 @@ export class OrgStructureService {
     return this.deactivate('Branch', id, actorUserId);
   }
 
+  async reactivateDepartment(
+    id: string,
+    actorUserId: string,
+  ): Promise<OrgUnitView> {
+    return this.reactivate('Department', id, actorUserId);
+  }
+
+  async reactivateBranch(
+    id: string,
+    actorUserId: string,
+  ): Promise<OrgUnitView> {
+    return this.reactivate('Branch', id, actorUserId);
+  }
+
   /** One implementation for both, because a department and a branch differ in what they MEAN to the
    *  business and in nothing this service does to them. */
   private async rename(
@@ -241,8 +271,64 @@ export class OrgStructureService {
     return toOrgUnitView(after);
   }
 
-  async listBranches(): Promise<OrgUnitView[]> {
-    return (await this.branches.list()).map(toOrgUnitView);
+  /** LIVE branches unless `includeRetired` — see `listDepartments`. */
+  async listBranches(includeRetired = false): Promise<OrgUnitView[]> {
+    return (await this.branches.list(includeRetired)).map(toOrgUnitView);
+  }
+
+  /**
+   * Bring a retired unit back — the sibling `deactivate` never had, and the asymmetry was live.
+   *
+   * `Role` has had `POST /roles/:id/reactivate` since Phase 3, and `rbac.controller.ts` states the
+   * reason in as many words: a screen that hid retired roles "would leave an office unable to
+   * reactivate one". Org units were hidden AND had no way back, so the two halves of this system
+   * disagreed about the same question.
+   *
+   * ON THE SAME PERMISSION AS `deactivate`, NOT A NEW CODE. That is the role precedent exactly
+   * (`role.deactivate` gates both retire and reactivate) and it is the honest grain: retiring and
+   * un-retiring are one capability — *decide whether this unit is in service* — and minting a code
+   * for the second half would let an office grant the ability to retire without the ability to undo
+   * it, which is the trap, not a separation.
+   *
+   * THE NAME COLLISION IS THE INDEX'S JOB. `<Kind>_one_live_name_per_org` is partial on
+   * `deactivatedAt IS NULL`, so clearing the stamp enters it and a clash with a live unit of the
+   * same name raises P2002 — turned into the same 409 a create gets, through `asNameCollision`. A
+   * pre-check here would be a second answer to a question the database already decides, and it
+   * would be the racy one.
+   */
+  private async reactivate(
+    kind: 'Department' | 'Branch',
+    id: string,
+    actorUserId: string,
+  ): Promise<OrgUnitView> {
+    const repo = kind === 'Department' ? this.departments : this.branches;
+    const before = await repo.findById(id);
+    if (!before) throw new NotFoundException(`${kind} ${id} not found.`);
+    if (!before.deactivatedAt) {
+      // Refused rather than treated as a no-op: "already in service" and "brought back into
+      // service" are different facts, and a silent 200 on the first would make an administrator
+      // believe they had changed something.
+      throw new UnprocessableEntityException(
+        `${kind} ${before.name} is not retired, so there is nothing to bring back.`,
+      );
+    }
+    let after:
+      | Awaited<ReturnType<DepartmentRepository['reactivate']>>
+      | Awaited<ReturnType<BranchRepository['reactivate']>>;
+    try {
+      after = await repo.reactivate(id);
+    } catch (err) {
+      throw this.asNameCollision(err, kind, before.name);
+    }
+    await this.safeAudit({
+      userId: actorUserId,
+      action: 'UPDATE',
+      entityType: kind,
+      entityId: id,
+      beforeValue: { deactivatedAt: before.deactivatedAt },
+      afterValue: { deactivatedAt: null },
+    });
+    return toOrgUnitView(after);
   }
 
   async createBranch(
@@ -285,6 +371,16 @@ function toOrgUnitView(unit: {
   id: string;
   name: string;
   nameAr: string | null;
+  deactivatedAt: Date | null;
 }): OrgUnitView {
-  return { id: unit.id, name: unit.name, nameAr: unit.nameAr };
+  return {
+    id: unit.id,
+    name: unit.name,
+    nameAr: unit.nameAr,
+    // An ISO string, like every other date on the wire here. REQUIRED on the view rather than
+    // optional: a screen that can request retired units has to be able to tell which they are, and
+    // an optional field would let one surface render a retired unit as live — the `IncidentReport`
+    // defect, where a field present on one path and absent on another renders `undefined`.
+    retiredAt: unit.deactivatedAt ? unit.deactivatedAt.toISOString() : null,
+  };
 }

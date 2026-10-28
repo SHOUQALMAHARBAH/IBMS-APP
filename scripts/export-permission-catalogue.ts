@@ -18,6 +18,18 @@
  * The role names here are the SEEDED ones. An office defines its own roles under its own names, so these
  * are the eleven the system ships with plus `OFFICE_ADMINISTRATOR`, not a fixed vocabulary.
  *
+ * AND THAT SENTENCE WAS A CLAIM THIS FILE DID NOT ENFORCE — corrected 2026-10-28. The read below took
+ * EVERY role holding each code, so a leaked e2e fixture role appeared in the "Held by" column of the one
+ * document the owner writes her Arabic descriptions against: regenerating printed
+ * `commission-rate.manage | … , E2E_SCOPED_1792576115054`. Measured at the time: dev holds ZERO
+ * non-`isSystem` roles and db-test holds SIXTEEN, all `E2E_PLATFORM_GRANT_*`/`E2E_SCOPED_*` leftovers —
+ * and this script reads db-test, so the output was machine-specific as well as wrong.
+ *
+ * `isSystem: true` is the filter, which is exactly the correction `generate-role-permissions-fixture.mjs`
+ * already carries one directory over, for the same reason in its own words: without it the output depends
+ * on whatever roles happen to exist on the machine it ran on. A custom role an office really defined is
+ * legitimately absent too — the document's job is the SEEDED grid, which is what the sentence above says.
+ *
  * Usage:  npx dotenv -e .env.test -- npx tsx scripts/export-permission-catalogue.ts
  */
 import { writeFileSync } from 'node:fs';
@@ -72,7 +84,12 @@ async function main(): Promise<void> {
         code: true,
         module: true,
         description: true,
-        roles: { select: { role: { select: { name: true } } } },
+        // SEEDED roles only — see the header. An unfiltered read put a leaked e2e role in
+        // the owner's own working document.
+        roles: {
+          where: { role: { isSystem: true } },
+          select: { role: { select: { name: true } } },
+        },
       },
       orderBy: [{ module: 'asc' }, { code: 'asc' }],
     });

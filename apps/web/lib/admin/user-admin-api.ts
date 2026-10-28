@@ -63,6 +63,14 @@ export interface OrgUnit {
   id: string;
   name: string;
   nameAr: string | null;
+  /**
+   * When this unit was retired, or null while it is live.
+   *
+   * REQUIRED on this interface rather than optional, even though both list reads default to
+   * live-only: this file's interfaces are hand-copied over HTTP and nothing type-checks them against
+   * the api, so an optional field is how a screen comes to render a retired unit as live.
+   */
+  retiredAt: string | null;
 }
 
 export interface ProvisionUserInput {
@@ -115,9 +123,15 @@ export function listDepartments(): Promise<OrgUnit[]> {
   return apiGet('/admin/departments');
 }
 
+/**
+ * `nameAr` is REQUIRED — owner decision, 2026-10-28. It was optional, and the consequence was a
+ * unit with no Arabic name on an Arabic-first platform, rendering as its Latin name to a reader who
+ * does not read it. The api refuses a body without it, so the type is what stops that arriving as a
+ * 400 the screen has to explain.
+ */
 export function createDepartment(input: {
   name: string;
-  nameAr?: string;
+  nameAr: string;
 }): Promise<OrgUnit> {
   return apiPost('/admin/departments', input);
 }
@@ -126,9 +140,10 @@ export function listBranches(): Promise<OrgUnit[]> {
   return apiGet('/admin/branches');
 }
 
+/** `nameAr` is REQUIRED — see `createDepartment`. */
 export function createBranch(input: {
   name: string;
-  nameAr?: string;
+  nameAr: string;
 }): Promise<OrgUnit> {
   return apiPost('/admin/branches', input);
 }
@@ -189,4 +204,55 @@ export function deactivateDepartment(id: string): Promise<OrgUnit> {
 
 export function deactivateBranch(id: string): Promise<OrgUnit> {
   return apiPost(`/admin/branches/${encodeURIComponent(id)}/deactivate`, {});
+}
+
+/**
+ * Brings a retired unit back, on the same permission as retiring it.
+ *
+ * ## THESE TWO HELPERS HAVE NO CALLER YET, AND THAT IS A DECLARED STATE RATHER THAN AN OVERSIGHT
+ *
+ * The reactivate control is the design batch's — a screen gets opened once — so what exists here
+ * today is the api, this client, and no button. Written down because it is the one arrangement that
+ * keeps both halves honest, and because the alternative was worse in both directions:
+ *
+ *   - WITHOUT these helpers, `unreachable-routes.py` counts the two routes as addressed by nothing
+ *     and FAILS (measured: 13 -> 15 by path, 7 -> 8 by controller). Its message is the right rule —
+ *     *a route nothing calls is a capability nobody can exercise* — and raising the budget to get
+ *     past it is forbidden.
+ *   - WITH them, both route budgets stay at 13 and 7, and the gap moves to
+ *     `dead-client-helpers.py`, which exists precisely to report it. That is not hiding the gap; it
+ *     is putting it in the instrument built for it, which is what `CLAUDE.md` records for decision
+ *     47's `getSecurityConfig()`: the route was counted reached by the helper, and the SCREEN is
+ *     what later closed the dead-helper row.
+ *
+ * MEASURED, AND MY OWN PREDICTION WAS WRONG: that report goes **17 -> 21**, not 17 -> 19. I wrote
+ * the smaller figure from the two reactivate helpers and forgot the two reads beside them — four
+ * helpers, four rows (337 -> 341 route-addressing helpers in total). Corrected from the script's own
+ * output rather than from the intention.
+ *
+ * So: when the design batch adds the control, all four stop being dead and that report drops back to
+ * 17. **Do not delete them to quieten `dead-client-helpers.py`** — that re-breaks the route gate.
+ */
+export function reactivateDepartment(id: string): Promise<OrgUnit> {
+  return apiPost(`/admin/departments/${encodeURIComponent(id)}/reactivate`, {});
+}
+
+export function reactivateBranch(id: string): Promise<OrgUnit> {
+  return apiPost(`/admin/branches/${encodeURIComponent(id)}/reactivate`, {});
+}
+
+/**
+ * The administrative reads, asked for the retired units too.
+ *
+ * Separate functions rather than an optional argument on `listDepartments`/`listBranches`: those two
+ * are called by the provisioning form and by `/settings/users`, where a retired unit must never be
+ * offered, and an optional flag on the shared helper is how one of those call sites eventually
+ * passes it. The server defaults to live-only for the same reason.
+ */
+export function listDepartmentsIncludingRetired(): Promise<OrgUnit[]> {
+  return apiGet('/admin/departments?includeRetired=true');
+}
+
+export function listBranchesIncludingRetired(): Promise<OrgUnit[]> {
+  return apiGet('/admin/branches?includeRetired=true');
 }

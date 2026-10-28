@@ -2140,8 +2140,38 @@ const crossOwnerVisibility: PermissionSeed[] = [
      * opportunity, RFQ, quotation, comparison, client decision) across nine services,
      * and PLACEMENT already holds it. Confusing the two is how a one-screen fix
      * becomes a disclosure decision.
+     *
+     * OWNER DECISION, 2026-10-28 — THE DPO IS THE EIGHTH, and it is the same cause one
+     * screen over. Register row 2.2: «في حقل صاحب البيانات لما أبحث عن عميل موجود
+     * بيحكيلي إنه غير متوفر» — *in the data-subject field, when I search for a customer
+     * that exists it tells me it is not available.*
+     *
+     * THE GATE WAS NOT THE PROBLEM, measured: `CUSTOMER_SEARCH_CODES` is
+     * `['customer.read', 'dsr.log']` and the DPO holds `dsr.log`, so it has reached
+     * `GET /customers/search` since that widening shipped FOR this screen. What emptied
+     * the result is the owner filter beneath it, and that is what this grant lifts.
+     *
+     * WHAT IT OPENS IS ONE ROUTE, and the reason is an ABSENCE rather than a judgement:
+     * the DPO holds 27 codes and NOT ONE `customer.*`, `kyc.*` or `screening.*` code, so
+     * five of the six decision sites stay 403 (`customer.read` for the list;
+     * `customer.360-view.read` for the detail, the reveal, the UBO register and the 360°
+     * timeline; `kyc.capture`/`kyc.approve`/`screening.run` for the KYC file).
+     *
+     * THAT ABSENCE IS PINNED IN TWO PLACES, because it is what justifies the grant:
+     * migration `20261213100000` refuses to apply if the DPO holds any of those five, and
+     * `permissions.spec.ts` asserts the same by name. Give the DPO the 360° view and the
+     * statement that justified THIS grant fails, rather than a screen quietly widening.
      */
-    roles: [MANAGER, EXEC, COMPLIANCE, AUDITOR, CLAIMS, FINANCE, PLACEMENT],
+    roles: [
+      MANAGER,
+      EXEC,
+      COMPLIANCE,
+      AUDITOR,
+      CLAIMS,
+      FINANCE,
+      PLACEMENT,
+      DPO,
+    ],
   },
   {
     code: "customer-file.all-owners.read",

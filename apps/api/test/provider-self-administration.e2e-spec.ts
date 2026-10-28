@@ -43,12 +43,38 @@ beforeAll(async () => {
   const office = await rawPrisma.organization.findFirstOrThrow({
     where: { type: 'BROKERAGE_OFFICE' },
   });
+  /*
+   * A SEEDED, ACTIVE role, in a TOTAL order — and all three parts are a fix, not decoration.
+   *
+   * This read was `findFirstOrThrow({ where: { organizationId } })`: no `status` filter, no
+   * `isSystem` filter and NO `orderBy`, so which role it returned was decided by the query plan.
+   * `cannot RETIRE a brokerage office's role` then asserts `status === 'ACTIVE'` after the refused
+   * request — so the moment the plan handed it a role that was already INACTIVE, the test failed
+   * with `expected 'INACTIVE' to be 'ACTIVE'` without the route having written anything.
+   *
+   * MEASURED 2026-10-28: db-test held 14 ACTIVE roles and **15 INACTIVE** ones, every INACTIVE one a
+   * leaked `E2E_PLATFORM_GRANT_*` fixture, plus one leaked ACTIVE `E2E_SCOPED_*`. So the failing
+   * state was not hypothetical — it was the majority of the table. Proven pre-existing by running
+   * this file at HEAD with everything else stashed: it fails identically there.
+   *
+   * `isSystem` is what keeps it pointing at a real seeded role rather than whatever a sibling spec
+   * left behind — the same filter `generate-role-permissions-fixture.mjs` already carries for the
+   * same reason — and the ordering is total so two runs cannot disagree about which role this is.
+   *
+   * THE LEAK ITSELF IS NOT FIXED HERE. Sixteen roles are owed a teardown by whichever spec creates
+   * them, and finding which is its own measurement; this makes the test immune to it rather than
+   * pretending the table is clean.
+   */
   const role = await rawPrisma.role.findFirstOrThrow({
-    where: { organizationId: office.id },
+    where: { organizationId: office.id, isSystem: true, status: 'ACTIVE' },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
   });
   officeRoleId = role.id;
+  // Same three reasons, one axis fewer: a `User` has no `isSystem`, and `isActive` is the field the
+  // sibling assertions below read back.
   const user = await rawPrisma.user.findFirstOrThrow({
-    where: { organizationId: office.id },
+    where: { organizationId: office.id, isActive: true },
+    orderBy: [{ email: 'asc' }, { id: 'asc' }],
   });
   officeUserId = user.id;
 }, 300_000);

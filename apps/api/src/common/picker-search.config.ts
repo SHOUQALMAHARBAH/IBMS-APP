@@ -45,8 +45,44 @@
  * own read code above.
  */
 
-/** `GET /customers/search` — `/dsr` is why `dsr.log` is here. See the header. */
-export const CUSTOMER_SEARCH_CODES = ['customer.read', 'dsr.log'] as const;
+/**
+ * `GET /customers/search` — `/dsr` is why `dsr.log` is here. See the header.
+ *
+ * ## `consent.manage` IS HERE BY THE RULE, AND IT WIDENS THE ROUTE TO NOBODY TODAY
+ *
+ * `/consent` renders the customer picker (`EntitySearch kind="customer"`, the `ownerId` field when
+ * the chosen owner kind is a customer) and the whole screen is gated on `consent.manage`. By the
+ * rule at the top of this file the code belongs in this list, so it is in it.
+ *
+ * **Measured before adding it, and the effect is zero on the seeded grid**: `consent.manage` is held
+ * by CLAIMS_OFFICER, DATA_PROTECTION_OFFICER, PLACEMENT_TECHNICAL_OFFICER and
+ * SALES_RELATIONSHIP_OFFICER, and every one of those already reaches this route — three through
+ * `customer.read` and the DPO through `dsr.log`. So this closes the rule's gap for a CUSTOM office
+ * role holding only `consent.manage`, and changes nothing for any seeded role. It is stated rather
+ * than left to be rediscovered, because "the screen's reader is refused at the gate" was the premise
+ * this was added under and that premise is false here — the DPO's `/consent` picker was emptied by
+ * the OWNER FILTER beneath the gate, which is what the grant in `20261213100000` lifts.
+ *
+ * ## AND THE CODE WAS IN THE WRONG LIST — reported, not silently moved
+ *
+ * `consent.manage` is also in `USER_SEARCH_CODES` below, whose own comment counts `/consent` among
+ * "the five screens that name an OWNER of something ... a consent record". Measured: `/consent`
+ * contains exactly ONE `EntitySearch` and its kind is `customer`. There is no user picker on that
+ * screen, so the code has been gating the USER route for a control that does not exist there while
+ * being absent from the route for the control that does.
+ *
+ * `scripts/measurements/picker-route-permissions.py` reports the same misclassification from the
+ * screen side — it keys on FIELD NAMES (`ownerUserId`, `ownerId`, ...) and so files `/consent`'s
+ * `ownerId` under USER — which is why `picker-route-reachability.mjs` prints `ok consent` under the
+ * USER picker and lists no `/consent` row under CUSTOMER at all. **It is not removed from
+ * `USER_SEARCH_CODES` here**: narrowing a live route is a decision about who may search the office's
+ * staff list, and it is not one a correction to a neighbouring list gets to make.
+ */
+export const CUSTOMER_SEARCH_CODES = [
+  'customer.read',
+  'dsr.log',
+  'consent.manage',
+] as const;
 
 /**
  * `GET /employees/search` — the route that could not be reached by either screen that needs it.

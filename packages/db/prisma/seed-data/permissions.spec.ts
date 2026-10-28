@@ -360,8 +360,54 @@ describe("permission grid — owner decision 57, the customer register's empty s
         RoleName.EXTERNAL_AUDITOR,
         RoleName.FINANCE_COLLECTIONS_OFFICER,
         RoleName.PLACEMENT_TECHNICAL_OFFICER,
+        // The EIGHTH, 2026-10-28 — register row 2.2, the data-subject field. Same cause,
+        // one screen over: the DPO can never own a customer either, so the picker's owner
+        // filter returned zero rows for every word it was given.
+        RoleName.DATA_PROTECTION_OFFICER,
       ].sort(),
     );
+  });
+
+  /*
+   * THE DPO'S GRANT IS JUSTIFIED BY AN ABSENCE, SO THE ABSENCE IS WHAT IS PINNED.
+   *
+   * The owner's condition on this grant: if somebody later gives the DPO the 360° view,
+   * the test that justified the grant must FAIL rather than the grant quietly widening
+   * into a customer-file disclosure.
+   *
+   * `customer.all-owners.read` is evaluated at SIX decision sites in THREE services, all
+   * through `rbac-visibility.util.ts`. FIVE of them sit behind codes the DPO does not
+   * hold, which is why the grant opens exactly one route (`GET /customers/search`) rather
+   * than the customer file:
+   *
+   *   customer.service.ts#search           CUSTOMER_SEARCH_CODES    reached via `dsr.log`
+   *   customer.service.ts#list             customer.read            403
+   *   customer.service.ts#findOwnedOr...   customer.360-view.read   403
+   *   crm.service.ts#findVisibleCustomer   customer.360-view.read   403
+   *   kyc.service.ts#isCrossOwner  x2      kyc.capture / kyc.approve / screening.run  403
+   *
+   * Enumerated per code rather than asserted as one set, so the failure NAMES which door
+   * opened. Migration `20261213100000` refuses to apply on the same condition — two
+   * independent homes for one premise, deliberately, because this one is a disclosure.
+   */
+  it("the DPO's grant rests on it being unable to OPEN a customer file, and that absence is the thing pinned", () => {
+    const codes = new Set(codesGrantedTo(RoleName.DATA_PROTECTION_OFFICER));
+    expect(
+      codes.has(ALL_OWNERS),
+      `${ALL_OWNERS} must reach the DPO, or register row 2.2 reopens`,
+    ).toBe(true);
+    for (const code of [
+      "customer.360-view.read",
+      "customer.read",
+      "kyc.capture",
+      "kyc.approve",
+      "screening.run",
+    ]) {
+      expect(
+        codes.has(code),
+        `the DPO now holds ${code}. That is the absence which justified widening its customer SEARCH to every owner — re-decide the cross-owner grant rather than keeping both.`,
+      ).toBe(false);
+    }
   });
 
   it("«دفترها دفترها» — SALES and the two importing roles are still withheld it, which is what keeps an empty register TRUE for them", () => {

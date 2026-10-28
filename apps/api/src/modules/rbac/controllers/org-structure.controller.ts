@@ -13,7 +13,11 @@ import { OrgStructureService } from '../services/org-structure.service';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/auth.types';
-import { CreateOrgUnitDto, RenameOrgUnitDto } from '../dto/org-structure.dto';
+import {
+  CreateOrgUnitDto,
+  ListOrgUnitsDto,
+  RenameOrgUnitDto,
+} from '../dto/org-structure.dto';
 import { BRANCH_SEARCH_CODES } from '../../../common/picker-search.config';
 import { SearchBranchesDto } from '../../../common/picker-search.dto';
 
@@ -23,8 +27,16 @@ const orgUnitSchema = {
     id: { type: 'string' as const },
     name: { type: 'string' as const },
     nameAr: { type: 'string' as const, nullable: true },
+    retiredAt: {
+      type: 'string' as const,
+      format: 'date-time' as const,
+      nullable: true,
+    },
   },
-  required: ['id', 'name'],
+  // `retiredAt` is REQUIRED on the wire even though its value is nullable: a screen that can ask
+  // for retired units must be able to tell them apart, and a field present on one path and absent
+  // on another is how a retired unit renders as live.
+  required: ['id', 'name', 'retiredAt'],
 };
 
 /**
@@ -37,10 +49,17 @@ const orgUnitSchema = {
  * `UserAdminController`, and deliberately the same `user.manage` permission —
  * see `OrgStructureService` for why this is not a permission of its own.
  *
- * Deliberately create + list only. Renaming or deleting an org unit has
- * consequences for every row pointing at it (a `User.departmentId` FK is
- * `ON DELETE SET NULL`, which would silently empty a required field), and
- * nothing in §4.2.2 asks for it.
+ * ONCE DELIBERATELY CREATE + LIST ONLY, AND THAT IS NO LONGER TRUE — corrected 2026-10-28,
+ * having been false since the four-action pilot added rename and deactivate and more so now.
+ * There are ten routes: read, create, rename, deactivate and REACTIVATE per entity, plus the
+ * branch picker's search.
+ *
+ * THE REASON IT GAVE SURVIVES AND IS WHY NOTHING IS DELETED: an org unit a row points at has
+ * consequences for that row (a `User.departmentId` FK is `ON DELETE SET NULL`, which would
+ * silently empty a required field). So a unit is RETIRED, never removed — every existing
+ * assignment stays readable on the person's record and the unit simply stops being offered for
+ * new ones — and `reactivate` exists because retiring without a way back left the only route
+ * out a hand-written UPDATE.
  */
 @ApiTags('org-structure')
 @Controller('admin')
@@ -105,8 +124,8 @@ export class OrgStructureController {
     description: "This office's departments, by name.",
     schema: { type: 'array', items: orgUnitSchema },
   })
-  listDepartments() {
-    return this.orgStructure.listDepartments();
+  listDepartments(@Query() query: ListOrgUnitsDto) {
+    return this.orgStructure.listDepartments(query.includeRetired === 'true');
   }
 
   @RequirePermissions('department.create')
@@ -148,8 +167,8 @@ export class OrgStructureController {
     description: "This office's branches, by name.",
     schema: { type: 'array', items: orgUnitSchema },
   })
-  listBranches() {
-    return this.orgStructure.listBranches();
+  listBranches(@Query() query: ListOrgUnitsDto) {
+    return this.orgStructure.listBranches(query.includeRetired === 'true');
   }
 
   @RequirePermissions('branch.create')
@@ -217,5 +236,45 @@ export class OrgStructureController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.orgStructure.deactivateBranch(id, user.id);
+  }
+
+  /**
+   * Bring a retired unit back — and the asymmetry this closes was live, not theoretical.
+   *
+   * There were eight administration routes and no reactivate, while both list reads filtered
+   * `deactivatedAt: null`, so a retired unit vanished from the only screen that could show it and
+   * the only way back was a hand-written UPDATE. `Role` has had `POST /roles/:id/reactivate` since
+   * Phase 3, with the reason stated in `rbac.controller.ts`: hiding retired roles "would leave an
+   * office unable to reactivate one". Measured when this shipped, db-test held TWO retired
+   * departments in exactly that state.
+   *
+   * ON `<kind>.deactivate`, NOT A NEW CODE — the role precedent exactly (`role.deactivate` gates
+   * both halves) and the honest grain: retiring and un-retiring are one capability, and a separate
+   * code would let an office grant the power to retire a unit without the power to undo it.
+   */
+  @RequirePermissions('department.deactivate')
+  @Post('departments/:id/reactivate')
+  @ApiOkResponse({
+    description: 'The department, back in service.',
+    schema: orgUnitSchema,
+  })
+  reactivateDepartment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orgStructure.reactivateDepartment(id, user.id);
+  }
+
+  @RequirePermissions('branch.deactivate')
+  @Post('branches/:id/reactivate')
+  @ApiOkResponse({
+    description: 'The branch, back in service.',
+    schema: orgUnitSchema,
+  })
+  reactivateBranch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orgStructure.reactivateBranch(id, user.id);
   }
 }

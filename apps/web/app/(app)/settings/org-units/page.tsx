@@ -166,10 +166,14 @@ export default function OrgUnitsPage() {
     return (e: FormEvent) => {
       e.preventDefault();
       const draft = kind === 'department' ? newDept : newBranch;
-      if (!draft.name.trim()) return;
+      // BOTH names, 2026-10-28. The Arabic used to be omitted when blank, which left a unit with no
+      // Arabic name on an Arabic-first platform — it then rendered as its Latin name to a reader who
+      // does not read it. Guarded here as well as by the input's `required`, because a screen must
+      // not send a request it already knows the api will refuse.
+      if (!draft.name.trim() || !draft.nameAr.trim()) return;
       const payload = {
         name: draft.name.trim(),
-        ...(draft.nameAr.trim() ? { nameAr: draft.nameAr.trim() } : {}),
+        nameAr: draft.nameAr.trim(),
       };
       void run(async () => {
         if (kind === 'department') {
@@ -220,6 +224,7 @@ export default function OrgUnitsPage() {
               <input
                 value={draft.nameAr}
                 onChange={(e) => setDraft({ ...draft, nameAr: e.target.value })}
+                required
                 style={inputStyle}
                 data-new-name-ar={kind}
               />

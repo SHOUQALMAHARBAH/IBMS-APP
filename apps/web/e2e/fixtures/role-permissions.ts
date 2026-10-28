@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 517 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 518 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -203,6 +203,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   "DATA_PROTECTION_OFFICER": [
     'consent.manage',
     'cross-border-transfer.approve',
+    'customer.all-owners.read',
     'dashboard.compliance.view',
     'data-sharing.approve',
     'document.delete-override',

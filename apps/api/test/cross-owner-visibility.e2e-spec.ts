@@ -314,13 +314,20 @@ describe('the unit-test fixture table agrees with the seeded grants', () => {
         `${code} must be granted to someone`,
       ).toBeGreaterThan(0);
     }
-    // The three roles that never had cross-owner reach must still have none —
-    // the administrator most of all, since this phase is also where an
-    // "administrator can see everything" assumption would creep in.
+    // The roles that never had cross-owner reach must still have none — the administrator most of
+    // all, since this phase is also where an "administrator can see everything" assumption would
+    // creep in.
+    //
+    // THIS LIST HELD THREE NAMES AND NOW HOLDS TWO. The owner granted the
+    // DATA_PROTECTION_OFFICER `customer.all-owners.read` on 2026-10-28 (register row 2.2: the
+    // data-subject field reported that a customer who exists was "not available"), so this
+    // assertion became false BY DECISION. Re-stated rather than relaxed, which is this file's own
+    // standing instruction: the DPO is asserted below at EXACTLY ONE cross-owner code, which is a
+    // stronger guard than its old membership here — the old form would have been satisfied by the
+    // DPO holding none, and the new one fails if it gains a second.
     for (const name of [
       'SALES_RELATIONSHIP_OFFICER',
       'SYSTEM_SECURITY_ADMINISTRATOR',
-      'DATA_PROTECTION_OFFICER',
     ]) {
       expect(
         granted
@@ -329,5 +336,29 @@ describe('the unit-test fixture table agrees with the seeded grants', () => {
         `${name} must hold no cross-owner code`,
       ).toEqual([]);
     }
+
+    /*
+     * THE DPO'S ONE CROSS-OWNER CODE, AND ONLY THAT ONE.
+     *
+     * `customer.all-owners.read` lifts the owner filter on `GET /customers/search`, which is the
+     * only one of its six decision sites the DPO can reach — it holds no `customer.*`,
+     * `kyc.*` or `screening.*` code, so the list, the detail, the reveal, the UBO register, the
+     * 360° timeline and the KYC file all stay 403.
+     *
+     * `customer-file.all-owners.read` is the one to watch for and is why this is an EXACT set: that
+     * is the COMMERCIAL file — risk profile, needs assessment, programme, opportunity, RFQ,
+     * quotation, comparison, client decision — across nine services, and it is a different code one
+     * row over in the grid. A containment check would let it arrive here unargued.
+     */
+    expect(
+      [
+        ...new Set(
+          granted
+            .filter((g) => g.role.name === 'DATA_PROTECTION_OFFICER')
+            .map((g) => g.permission.code),
+        ),
+      ].sort(),
+      'the DPO holds exactly ONE cross-owner code by decision — a second is a disclosure somebody has to have argued for',
+    ).toEqual(['customer.all-owners.read']);
   }, 120_000);
 });

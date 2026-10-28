@@ -1,6 +1,6 @@
 # Permission catalogue — دليل الصلاحيات
 
-> **227 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
+> **230 permission codes across 12 modules.** Generated from the seeded database by `npx tsx scripts/export-permission-catalogue.ts`, so this is what the Role screen actually renders — not a separate list that can drift from it.
 >
 > **The English text is the stored description.** It is developer-facing and often terse: a hint at what the code gates, not something to translate word for word.
 >
@@ -96,7 +96,7 @@
 | `up-sell.detect` | Run an on-demand under-insurance scan for a customer | BRANCH_DEPARTMENT_MANAGER, SALES_RELATIONSHIP_OFFICER |
 | `up-sell.read` | List/read up-sell recommendations | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, SALES_RELATIONSHIP_OFFICER |
 
-## compliance-risk — الالتزام والمخاطر  (20)
+## compliance-risk — الالتزام والمخاطر  (21)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -104,6 +104,7 @@
 | `aml.monitor` | Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code | COMPLIANCE_OFFICER |
 | `audit-log.read` | Read the immutable audit log | COMPLIANCE_OFFICER, EXTERNAL_AUDITOR, OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `compliance-calendar.manage` | Manage the regulatory compliance calendar | COMPLIANCE_OFFICER |
+| `conflict-of-interest.register.read` | Read the conflict-of-interest disclosure register — the conflicts this office's people have declared about themselves | BRANCH_DEPARTMENT_MANAGER |
 | `document-history.read` | Read document version/workflow history | COMPLIANCE_OFFICER, EXTERNAL_AUDITOR |
 | `duty-segregation.mode.declare` | Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason | OFFICE_ADMINISTRATOR |
 | `incident.classification.co-sign` | Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it | EXECUTIVE_MANAGEMENT |
@@ -125,7 +126,7 @@
 
 | Code | English description (stored) | Held by |
 |---|---|---|
-| `customer.all-owners.read` | See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design) | BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR |
+| `customer.all-owners.read` | See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design) | BRANCH_DEPARTMENT_MANAGER, CLAIMS_OFFICER, COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR, FINANCE_COLLECTIONS_OFFICER, PLACEMENT_TECHNICAL_OFFICER |
 | `customer.bulk-import` | Load an office legacy customer file (Part III §7) — a bulk write path, distinct from creating one customer | OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR |
 | `customer.national-id.reveal` | Reveal a customer's unmasked national ID with a written justification (Part 10.2 Highly Confidential; the contact fields on the same endpoint stay under customer.360-view.read) | COMPLIANCE_OFFICER |
 
@@ -239,7 +240,7 @@
 | `profitability-analysis.view` | View profitability analysis (commission income vs. cost-to-serve) | EXECUTIVE_MANAGEMENT, FINANCE_COLLECTIONS_OFFICER |
 | `sales-target.manage` | Set and revise sales targets per employee/team | BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT |
 
-## pdpl — حماية البيانات الشخصية  (17)
+## pdpl — حماية البيانات الشخصية  (19)
 
 | Code | English description (stored) | Held by |
 |---|---|---|
@@ -257,8 +258,10 @@
 | `privacy-notice.read` | Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission) | CLAIMS_OFFICER, COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER, PLACEMENT_TECHNICAL_OFFICER, SALES_RELATIONSHIP_OFFICER |
 | `retention-schedule.confirm` | Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
 | `retention-schedule.update` | Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
+| `retention.archive.retrieve` | Read a record that is in the BLOCKED retention phase — past the period its category was given, kept only to satisfy a statutory minimum, and otherwise out of every ongoing report and sweep. Retrieval is permitted on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each retrieval is recorded in an append-only register with the basis, who asked and for what, which cannot afterwards be edited or deleted. Holding this does NOT permit retrieval for the office's own purposes — that is the processing the block exists to prevent | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
 | `retention.dispose.approve` | Give final DPO approval on a disposal batch (checker side of dual control) | DATA_PROTECTION_OFFICER |
 | `retention.dispose.nominate` | Nominate a disposal batch (maker side of dual control) | BRANCH_DEPARTMENT_MANAGER |
+| `retention.extend` | Extend the retention of specific records past the period set for their category, on one of exactly three bases — a named legislative provision, a live legal hold or dispute, or the customer's explicit consent. Free text may accompany a basis; it may not BE one. Every extension is recorded in the register with which records, which basis, who, when and until when, so it can be justified from one place. Extending WITHOUT legislative cover and WITHOUT the customer's consent carries real liability under the PDPL, which is why the basis is a closed list rather than a field | COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER |
 | `ropa.manage` | Maintain the Records of Processing Activities register | DATA_PROTECTION_OFFICER |
 
 ## sla — مستويات الخدمة  (7)
@@ -299,8 +302,8 @@
 
 ## Measured, so the numbers are checkable
 
-- **227** codes, **12** modules.
-- **0** held by no seeded role; **91** held by exactly one.
+- **230** codes, **12** modules.
+- **0** held by no seeded role; **92** held by exactly one.
 - **0** have no stored English description.
 
 Regenerate after any permission change. The sibling file `docs/permission-catalogue-for-descriptions.txt` is the one to TYPE INTO — it carries an `ar:` line per code and is regenerated without destroying what is already written there.
