@@ -82,7 +82,6 @@ export const FINANCE = {
     pcIntro:
       'قنوات الدفع المعتمدة للعملاء (الأموال الواردة، على سند قبض) ولشركات التأمين (الأموال الصادرة، على إشعار توريد). تتولّى المالية صيانة هذه القائمة، وتصبح القناة قابلة للاستخدام فور إضافتها وتظل كذلك حتى تُعطَّل. ولا يُحفظ من رقم الحساب سوى آخر أرقام منه.',
     pcOwnerLabel: 'الجهة المالكة',
-    pcOwnerTypeAria: 'نوع الجهة المالكة',
     pcOwnerFieldLabel: 'المالك',
     pcColOwnerType: 'نوع الجهة المالكة',
     pcOwnerIdAria: 'معرّف الجهة المالكة',
@@ -95,7 +94,6 @@ export const FINANCE = {
     pcBankNameLabel: 'اسم البنك',
     pcBankPlaceholder: 'بنك القاهرة عمّان — دينار أردني',
     pcAccountLabel: 'الحساب (آخر ٢–٤ أرقام)',
-    pcAccountAria: 'آخر أربعة أرقام من الحساب',
     pcColType: 'النوع',
     pcColBank: 'البنك',
     pcColAccount: 'الحساب',
@@ -254,7 +252,6 @@ export const FINANCE = {
     pcIntro:
       'The approved payment channels for customers (money in, on a collection receipt) and insurers (money out, on a remittance). Finance maintains this list; a channel is usable the moment it is added and stays so until it is deactivated. Only the last few digits of an account are ever stored.',
     pcOwnerLabel: 'Owner',
-    pcOwnerTypeAria: 'Owner type',
     pcOwnerFieldLabel: 'Owner',
     pcColOwnerType: 'Owner type',
     pcOwnerIdAria: 'Owner id',
@@ -267,7 +264,6 @@ export const FINANCE = {
     pcBankNameLabel: 'Bank name',
     pcBankPlaceholder: 'Cairo Amman Bank — JOD',
     pcAccountLabel: 'Account (last 2–4 digits)',
-    pcAccountAria: 'Account last 4',
     pcColType: 'Type',
     pcColBank: 'Bank',
     pcColAccount: 'Acct',

@@ -5,6 +5,7 @@ import type { IncidentSeverity } from "../../../lib/compliance-risk/incident-api
 import { ENUM_LABEL } from "../../../lib/i18n/enum-labels";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
+import { Fragment } from "react";
 import { CombinedDutyOnRecord } from "../../../components/ui/CombinedDutyOnRecord";
 import { WorkflowHistoryLink } from "../../../components/ui/WorkflowHistoryLink";
 import {
@@ -29,11 +30,33 @@ import {
   CONTAINMENT_DESCRIPTION_MIN_LENGTH,
   type IncidentReport,
 } from "../../../lib/compliance-risk/incident-api";
-import { ActionStatus } from "../../../components/ui";
+import {
+  ActionStatus,
+  Badge,
+  Button,
+  Card,
+  DetailPanel,
+  DetailSection,
+  EmptyState,
+  ErrorState,
+  Field,
+  KeyValue,
+  PageHeader,
+  Select,
+  SkeletonList,
+  Table,
+  Td,
+  TextArea,
+  TextInput,
+  Th,
+  Tile,
+  Tiles,
+  TimelineLog,
+  Tr,
+} from "../../../components/ui";
 import { formatDateTime, formatNumber } from "../../../lib/i18n/format";
 import { ApiError } from "../../../lib/auth/api-client";
-import { errorStyle } from "../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../components/lead/lead.styles";
+import { pageStackStyle } from "../../../components/lead/lead.styles";
 import { hasAnyPermission } from "../../../lib/auth/permissions";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -45,27 +68,68 @@ const CO_SIGN_ROLES = ["incident.classification.co-sign"];
 const NOTIFY_SENIOR_ROLES = ["incident.senior-management.notify"];
 const NOTIFY_REGULATOR_ROLES = ["incident.notify-regulator"];
 
-const cell: CSSProperties = {
-  padding: "0.4rem 0.75rem",
-  borderBottom: "1px solid var(--border-subtle)",
-  textAlign: "start",
-  verticalAlign: "top",
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
-const formStyle: CSSProperties = {
-  margin: "1rem 0",
+/*
+ * THE SCREEN'S OWN LAYOUT CONSTANTS, and the hand-rolled table they replaced is the finding.
+ *
+ * `cell` and `head` were a table built by hand, and the `<table>` carried `min-width: 92rem` —
+ * SEVEN columns, three of which held a whole log, a three-field assessment and the entire action
+ * apparatus. That is why this screen could not be read without scrolling sideways past the
+ * columns that matter, and it is the crowding the owner named: *«الشاشات الي معجقة و فيها اكثر من
+ * قسم تتزبط و تتنسق عشان الموظف ما يضيع»*. The table is five narrow columns now and the record
+ * opens in place underneath, which is the approved reference screen's own arrangement.
+ *
+ * Every value below is on the five-step spacing scale. Nothing here carries a colour literal.
+ */
+const incidentFormStyle: CSSProperties = {
   display: "grid",
-  gap: "0.4rem",
-  maxWidth: "30rem",
+  gridTemplateColumns: "repeat(auto-fit, minmax(14rem, 1fr))",
+  gap: "var(--space-3)",
+  alignItems: "end",
 };
-const labelStyle: CSSProperties = {
+
+const incidentTitleStyle: CSSProperties = {
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--ink-primary)",
+};
+
+/** The severity bar + its word. The word is always present; the bar never carries it alone. */
+const severityStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  fontSize: "var(--text-sm)",
+};
+
+const severityBarStyle: CSSProperties = {
+  width: "3px",
+  height: "0.9375rem",
+  borderRadius: "var(--radius-sm)",
+  display: "inline-block",
+  flex: "none",
+};
+
+/** The expanded record's own cell — the panel supplies its ground and its padding. */
+const detailCellStyle: CSSProperties = {
+  padding: 0,
+};
+
+const actionStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "var(--space-2)",
+  marginTop: "var(--space-3)",
+};
+
+const buttonRowStyle: CSSProperties = {
   display: "flex",
-  flexDirection: "column",
-  gap: "0.2rem",
+  flexWrap: "wrap",
+  gap: "var(--space-2)",
+};
+
+const checkboxRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  fontSize: "var(--text-sm)",
 };
 
 export default function IncidentsPage() {
@@ -211,630 +275,743 @@ export default function IncidentsPage() {
 
   if (isLoading || !user) return null;
 
-  return (
-    <main style={pageStyle}>
-      <h1>{t("incHeading")}</h1>
-      <p style={{ opacity: 0.75, maxWidth: "46rem" }}>{t("incIntro")}</p>
+  /*
+   * THE FOUR SUMMARY TILES — the thing the owner singled out on the reference screen, in her own
+   * words *«أشيك للموظف في شغله و بكون عنده زي مختصر للمعلومات»*.
+   *
+   * EVERY FIGURE IS A COUNT OVER THE ROWS THIS SCREEN ALREADY READ. Nothing is invented and no
+   * second request was added: `listIncidents()` returns the register and these four partition it
+   * by the states a DPO working the queue actually acts on.
+   *
+   * AND EVERY LABEL IS A STRING ALREADY SHIPPING. Three are the status and classification labels
+   * the table itself renders (`incStatusReported`, `incClassMaterial`, `incStatusClosed`), so a
+   * tile and the cell it counts cannot disagree about what a state is called. The fourth is
+   * `statusContainmentOverdueTile`, the parenthetical marker with its brackets dropped — the same
+   * run of characters, asserted as a substring of its own source. No Arabic was written.
+   */
+  const tiles =
+    incidents === null
+      ? null
+      : {
+          reported: incidents.filter((i) => i.status === 'REPORTED').length,
+          overdue: incidents.filter((i) => i.isContainmentOverdue).length,
+          material: incidents.filter((i) => i.classification === 'MATERIAL').length,
+          closed: incidents.filter((i) => i.status === 'CLOSED').length,
+        };
 
-      {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
-      ) : null}
-      {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+  /*
+   * THE SEVERITY BAR — a state read by its SHAPE before its colour, which is the reference
+   * screen's own treatment and WCAG 1.4.1 besides: colour never carries the meaning alone, and the
+   * word is right beside it in every case.
+   */
+  const SEVERITY_INK: Record<IncidentSeverity, string> = {
+    critical: 'var(--danger-ink)',
+    high: 'var(--warning-ink)',
+    medium: 'var(--ink-brand)',
+    low: 'var(--ink-muted)',
+  };
+
+  const statusTone = (status: string) =>
+    status === 'CLOSED' ? 'success' : status === 'REPORTED' ? 'warning' : 'info';
+
+  return (
+    <main style={pageStackStyle}>
+      <PageHeader title={t('incHeading')} description={t('incIntro')} />
+
+      {actionError ? <ErrorState title={actionError} /> : null}
+
+      {tiles && incidents && incidents.length > 0 ? (
+        <Tiles>
+          <Tile
+            icon="clock"
+            value={formatNumber(tiles.reported, language)}
+            label={t('incStatusReported')}
+          />
+          <Tile
+            icon="alert"
+            tone={tiles.overdue > 0 ? 'alarm' : 'plain'}
+            value={formatNumber(tiles.overdue, language)}
+            label={t('statusContainmentOverdueTile')}
+          />
+          <Tile
+            icon="check"
+            value={formatNumber(tiles.material, language)}
+            label={t('incClassMaterial')}
+          />
+          <Tile
+            icon="calendar"
+            value={formatNumber(tiles.closed, language)}
+            label={t('incStatusClosed')}
+          />
+        </Tiles>
       ) : null}
 
       {canReport ? (
-        <form onSubmit={submit} style={formStyle}>
-          <label style={labelStyle}>
-            {t("incTitleFieldLabel")}
-            <input
-              aria-label={t("incTitleLabel")}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </label>
-          <label style={labelStyle}>
-            {t("incDescriptionLabel")}
-            <input
-              aria-label={t("incDescriptionLabel")}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-            />
-          </label>
-          <label style={labelStyle}>
-            {t("incColSeverity")}
-            <select
-              aria-label={t("incColSeverity")}
-              value={severity}
-              onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
-            >
-              {INCIDENT_SEVERITIES.map((s) => (
-                <option key={s} value={s}>
-                  {t(ENUM_LABEL.IncidentSeverity[s])}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" disabled={busy}>
-            {busy ? t("incSavingButton") : t("incReportButton")}
-          </button>
-        </form>
+        <Card title={t('incReportButton')}>
+          <form onSubmit={submit} style={incidentFormStyle}>
+            {/*
+              `incTitleLabel` IS THE VISIBLE LABEL NOW, and `incTitleFieldLabel` is withdrawn.
+              This input carried `aria-label="Incident title"` over a visible label reading
+              "Title" — and an `aria-label` REPLACES the accessible name, so the two readers were
+              told different things and the ARIA one was the better of the two. The informative
+              string is now what both of them get.
+            */}
+            <Field label={t('incTitleLabel')} required>
+              {(p) => (
+                <TextInput
+                  {...p}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                />
+              )}
+            </Field>
+            <Field label={t('incDescriptionLabel')} required>
+              {(p) => (
+                <TextInput
+                  {...p}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  required
+                />
+              )}
+            </Field>
+            <Field label={t('incColSeverity')}>
+              {(p) => (
+                <Select
+                  {...p}
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
+                >
+                  {INCIDENT_SEVERITIES.map((s) => (
+                    <option key={s} value={s}>
+                      {t(ENUM_LABEL.IncidentSeverity[s])}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Button type="submit" variant="primary" loading={busy}>
+              {busy ? t('incSavingButton') : t('incReportButton')}
+            </Button>
+          </form>
+        </Card>
       ) : null}
 
-      {incidents ? (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", minWidth: "92rem" }}>
+      {loadError ? (
+        <ErrorState title={loadError} />
+      ) : incidents === null ? (
+        <SkeletonList rows={3} label={t('incLoading')} />
+      ) : incidents.length === 0 ? (
+        /*
+         * THE EMPTY STATE THIS SCREEN NEVER HAD — and `incNone` has shipped in both languages,
+         * with ZERO consumers, since before this batch. With no incidents the screen rendered a
+         * table header over nothing.
+         *
+         * `four-states.py` reports this screen as `y y y y`. It is wrong about the empty column,
+         * and the cause is worth knowing: the detector counts a `.length === 0` branch, and this
+         * file has one — `inc.containmentActions.length === 0`, which is a PER-ROW check inside a
+         * cell, nothing to do with the screen having no incidents at all. Found by reading the
+         * screen rather than the count, and recorded in the design register rather than fixed in
+         * the gate, because distinguishing a screen-level empty branch from a per-row one needs
+         * more than a text match.
+         */
+        <EmptyState title={t('incNone')} />
+      ) : (
+        <Card padded={false}>
+          <Table>
             <thead>
-              <tr>
-                <th style={head}>{t("incColTitle")}</th>
-                <th style={head}>{t("incColSeverity")}</th>
-                <th style={head}>{t("incColStatus")}</th>
-                <th style={head}>{t("incColClassification")}</th>
-                {/* PRIV-FRM-06 § III and § IV — her form's own two section titles,
-                    because what the two acts collect is what the form collects. */}
-                <th style={head}>{t("incContainmentLogHeading")}</th>
-                <th style={head}>{t("incImpactAssessmentHeading")}</th>
-                <th style={head}>{t("incColAction")}</th>
-              </tr>
+              <Tr>
+                <Th>{t('incColTitle')}</Th>
+                <Th>{t('incColSeverity')}</Th>
+                <Th>{t('incColStatus')}</Th>
+                <Th>{t('incColClassification')}</Th>
+                <Th>{t('incColAction')}</Th>
+              </Tr>
             </thead>
             <tbody>
               {incidents.map((inc) => (
-                <tr key={inc.id}>
-                  <td style={cell}>{inc.title}</td>
-                  <td style={cell}>
-                    {t(ENUM_LABEL.IncidentSeverity[inc.severity])}
-                    {/* Owner decision 55 — the LONGER form, because this marker sits beside the
+                <Fragment key={inc.id}>
+                  <Tr>
+                    <Td>
+                      <span style={incidentTitleStyle}>{inc.title}</span>
+                    </Td>
+                    <Td>
+                      {/*
+                        Owner decision 55 — the LONGER marker form, because it sits beside the
                         incident's SEVERITY rather than beside a date, so a reader who is not told
-                        WHICH clock expired cannot work it out from the row. */}
-                    {inc.isContainmentOverdue
-                      ? ` ${t("statusContainmentOverdue")}`
-                      : ""}
-                  </td>
-                  <td style={cell}>
-                    {t(ENUM_LABEL.IncidentStatus[inc.status])}
-                  </td>
-                  <td style={cell}>
-                    {t(ENUM_LABEL.IncidentClassification[inc.classification])}
-                    {/*
-                      Part 4 step 5. The classification reads MATERIAL whether the DPO's judgement was
-                      co-signed by somebody else or by the DPO herself, so without this the cell cannot
-                      distinguish them — on the decision that starts the statutory notification clock.
-                    */}
-                    <CombinedDutyOnRecord
-                      act={inc.classificationCombinedDutyAct}
-                      testId={`combined-duty-incident-${inc.id}`}
-                    />
-                  </td>
-                  {/*
-                    OWNER DECISION 56 — «بس بغيّر الحالة إلى تم احتوائه».
-
-                    WHO AND WHEN, PER ACTION. A joined string of descriptions would
-                    discard exactly the two facts `PRIV-SRS-02` types the field with
-                    («Timestamped containment actions»), which is why this is a child
-                    table and why the cell is a list rather than a line.
-
-                    Newest first, as the api sends it — `takenAt desc` in
-                    `INCIDENT_INCLUDE`, not re-sorted here, so there is one answer to
-                    what order the log is in.
-                  */}
-                  <td style={cell} data-testid={`inc-log-${inc.id}`}>
-                    {inc.containmentActions.length === 0 ? (
-                      "—"
-                    ) : (
-                      <ul
-                        style={{
-                          margin: 0,
-                          paddingInlineStart: "1.1rem",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0.35rem",
-                          minWidth: "18rem",
-                        }}
+                        WHICH clock expired cannot work it out from the row.
+                      */}
+                      <span style={severityStyle}>
+                        <i
+                          aria-hidden="true"
+                          style={{ ...severityBarStyle, background: SEVERITY_INK[inc.severity] }}
+                        />
+                        {t(ENUM_LABEL.IncidentSeverity[inc.severity])}
+                        {inc.isContainmentOverdue ? ` ${t('statusContainmentOverdue')}` : ''}
+                      </span>
+                    </Td>
+                    <Td>
+                      <Badge tone={statusTone(inc.status)}>
+                        {t(ENUM_LABEL.IncidentStatus[inc.status])}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <Badge
+                        tone={
+                          inc.classification === 'MATERIAL'
+                            ? 'danger'
+                            : inc.classification === 'NON_MATERIAL'
+                              ? 'neutral'
+                              : 'neutral'
+                        }
                       >
-                        {inc.containmentActions.map((a) => (
-                          <li key={a.id}>
-                            <bdi>{a.description}</bdi>
-                            <br />
-                            <span style={{ opacity: 0.75, fontSize: "0.8rem" }}>
-                              {/* NULL IS NO NAME, never the uuid beside it. The em dash
-                                  here is one of the sites owner decision 60 classifies;
-                                  its class is already known — the id is HELD and did not
-                                  resolve — and the word is hers to choose, so this stays
-                                  as its eleven siblings render it until she has ruled. */}
-                              <bdi>{a.actionTakenByName ?? "—"}</bdi>
-                              {" · "}
-                              {formatDateTime(a.takenAt, language)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </td>
-                  {/*
-                    PRIV-SOP-09 step 4's three outputs — «بس بظهرلي إنه تم تقييم أثره
-                    وأنا ما قيّمت ولا عملت شي».
-
-                    `false` AND `0` ARE ANSWERS. `touchesPersonalData === false` is the
-                    DPO's finding that no personal data is involved, and an estimate of
-                    `0` is the finding that nobody was affected — both are what a
-                    regulator asks for. So the test is `=== null` and never `??` or
-                    `||`: React renders `false` as NOTHING, and `0 || '—'` is an em dash,
-                    so either shortcut turns a recorded finding into a blank cell.
-                  */}
-                  <td style={cell} data-testid={`inc-impact-${inc.id}`}>
-                    {inc.impactAssessedAt === null ? (
-                      "—"
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0.2rem",
-                          minWidth: "14rem",
-                        }}
-                      >
-                        <span data-testid={`inc-touches-${inc.id}`}>
-                          {t("incTouchesPersonalDataLabel")}:{" "}
-                          {inc.touchesPersonalData === null
-                            ? "—"
-                            : t(inc.touchesPersonalData ? "commonYes" : "commonNo")}
-                        </span>
-                        <span data-testid={`inc-categories-${inc.id}`}>
-                          {t("incDataCategoriesLabel")}:{" "}
-                          <bdi>{inc.dataCategoriesAffected ?? "—"}</bdi>
-                        </span>
-                        <span data-testid={`inc-subjects-${inc.id}`}>
-                          {t("incSubjectsEstimateLabel")}:{" "}
-                          {inc.subjectsAffectedEstimate === null
-                            ? "—"
-                            : formatNumber(inc.subjectsAffectedEstimate, language)}
-                        </span>
-                      </div>
-                    )}
-                  </td>
-                  <td style={cell}>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.3rem",
-                        minWidth: "20rem",
-                      }}
-                    >
+                        {t(ENUM_LABEL.IncidentClassification[inc.classification])}
+                      </Badge>
+                      {/*
+                        Part 4 step 5. The classification reads MATERIAL whether the DPO's judgement was
+                        co-signed by somebody else or by the DPO herself, so without this the cell cannot
+                        distinguish them — on the decision that starts the statutory notification clock.
+                      */}
+                      <CombinedDutyOnRecord
+                        act={inc.classificationCombinedDutyAct}
+                        testId={`combined-duty-incident-${inc.id}`}
+                      />
+                    </Td>
+                    <Td>
                       {/* Owner decision 41 — this incident's state history, without a pasted uuid.
                           Renders nothing without `workflow-history.read`. */}
-                      <WorkflowHistoryLink
-                        entityType="IncidentReport"
-                        entityId={inc.id}
-                      />
-                      {/*
-                        REACHABLE WHILE CONTAINED, not only while REPORTED.
+                      <WorkflowHistoryLink entityType="IncidentReport" entityId={inc.id} />
+                    </Td>
+                  </Tr>
 
-                        Containment is PLURAL — `PRIV-SRS-02` types the field as a log
-                        and the api APPENDS, proven by an e2e that contains twice and
-                        reads a two-entry log back. Gating this on REPORTED alone would
-                        leave the second and every later action unreachable from the
-                        product while the route accepted them: a capability nobody can
-                        exercise, which is the class `docs/unreachable-routes-triage.md`
-                        exists for.
-                      */}
-                      {canContain &&
-                      (inc.status === "REPORTED" || inc.status === "CONTAINED") ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "0.2rem",
-                          }}
-                        >
-                          <label style={labelStyle}>
-                            {t("incContainDescLabel")}
-                            <textarea
-                              aria-label={t("incContainDescLabel")}
-                              // HER OWN EXAMPLE, which is why this screen needs no
-                              // invented placeholder: «كعزل نظام أو تعطيل حساب» is the
-                              // parenthetical from PRIV-FRM-06 § III.
-                              placeholder={t("incContainDescHint")}
-                              rows={2}
-                              value={containDrafts[inc.id] ?? ""}
-                              onChange={(e) =>
-                                setContainDrafts((d) => ({
-                                  ...d,
-                                  [inc.id]: e.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            disabled={
-                              busy ||
-                              (containDrafts[inc.id] ?? "").trim().length <
-                                CONTAINMENT_DESCRIPTION_MIN_LENGTH
-                            }
-                            onClick={() =>
-                              void run(
-                                () =>
-                                  containIncident(inc.id, {
-                                    description: (
-                                      containDrafts[inc.id] ?? ""
-                                    ).trim(),
-                                  }),
-                                {
-                                  id: inc.id,
-                                  // THE FIGURE THE ACT PRODUCED, not the state it
-                                  // reached: a second containment leaves the status at
-                                  // CONTAINED, so a status line would print the same
-                                  // sentence before and after and say nothing. The log
-                                  // length is what actually moved.
-                                  describe: (updated) =>
-                                    `${t("incContainmentLogHeading")}: ${formatNumber(
-                                      updated.containmentActions.length,
-                                      language,
-                                    )}`,
-                                },
-                              ).then(() =>
-                                setContainDrafts((d) => ({ ...d, [inc.id]: "" })),
-                              )
-                            }
-                          >
-                            {busy && actingId === inc.id
-                              ? t("commonWorking")
-                              : t("incContainButton")}
-                          </button>
-                        </div>
-                      ) : null}
-                      {/* PRIV-SOP-09 step 4, all three outputs or none — the server
-                          refuses a partial assessment per field, so the button gates on
-                          the same three rather than sending a request it knows will
-                          400. `touches` must be DECIDED: `null` is not `false`. */}
-                      {canContain && inc.status === "CONTAINED" ? (
-                        (() => {
-                          const draft =
-                            impactDrafts[inc.id] ?? {
-                              touches: null,
-                              categories: "",
-                              subjects: "",
-                            };
-                          const set = (
-                            next: Partial<typeof draft>,
-                          ) =>
-                            setImpactDrafts((d) => ({
-                              ...d,
-                              [inc.id]: { ...draft, ...next },
-                            }));
-                          const estimate = Number(draft.subjects);
-                          const ready =
-                            draft.touches !== null &&
-                            draft.categories.trim().length >=
-                              CONTAINMENT_DESCRIPTION_MIN_LENGTH &&
-                            draft.subjects.trim() !== "" &&
-                            Number.isInteger(estimate) &&
-                            estimate >= 0;
-                          return (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "0.2rem",
-                              }}
-                            >
-                              <label
-                                style={{
-                                  display: "flex",
-                                  gap: "0.3rem",
-                                  alignItems: "center",
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  aria-label={t("incTouchesPersonalDataLabel")}
-                                  // `checked` is the DECIDED value; an undecided box is
-                                  // unticked and the button stays disabled, so nobody
-                                  // can submit `false` without having chosen it.
-                                  checked={draft.touches === true}
-                                  onChange={(e) =>
-                                    set({ touches: e.target.checked })
-                                  }
-                                />
-                                {t("incTouchesPersonalDataLabel")}
-                              </label>
-                              <label style={labelStyle}>
-                                {t("incDataCategoriesLabel")}
-                                <input
-                                  aria-label={t("incDataCategoriesLabel")}
-                                  placeholder={t("incDataCategoriesHint")}
-                                  value={draft.categories}
-                                  onChange={(e) =>
-                                    set({ categories: e.target.value })
-                                  }
-                                />
-                              </label>
-                              <label style={labelStyle}>
-                                {t("incSubjectsEstimateLabel")}
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={1}
-                                  aria-label={t("incSubjectsEstimateLabel")}
-                                  placeholder={t("incSubjectsEstimateHint")}
-                                  value={draft.subjects}
-                                  onChange={(e) =>
-                                    set({ subjects: e.target.value })
-                                  }
-                                />
-                              </label>
-                              <button
+                  {/*
+                    THE RECORD, OPENED IN PLACE — the reference screen's own arrangement, and the
+                    answer to this screen's real defect: the containment log, the impact
+                    assessment and the whole action apparatus were crammed into table CELLS, which
+                    is why the table carried `min-width: 92rem` and could not be read without
+                    scrolling sideways past the columns that matter.
+
+                    IT IS ALWAYS RENDERED, not expanded on a toggle, and that is a deliberate
+                    departure from the reference. An expand/collapse is an INTERACTION change,
+                    which this batch does not make — and every assertion in the 479-line spec that
+                    reads a log or an assessment would otherwise have to learn to click first,
+                    which is a design pass quietly weakening a suite. Proposed in the register.
+                  */}
+                  <tr>
+                    <td colSpan={5} style={detailCellStyle}>
+                      <DetailPanel>
+                        {/*
+                          OWNER DECISION 56 — «بس بغيّر الحالة إلى تم احتوائه».
+
+                          WHO AND WHEN, PER ACTION. A joined string of descriptions would discard
+                          exactly the two facts `PRIV-SRS-02` types the field with («Timestamped
+                          containment actions»), which is why this is a child table and why the
+                          section is a log rather than a line.
+
+                          Newest first, as the api sends it — `takenAt desc` in `INCIDENT_INCLUDE`,
+                          not re-sorted here, so there is one answer to what order the log is in.
+                        */}
+                        <DetailSection icon="check" title={t('incContainmentLogHeading')}>
+                          <div data-testid={`inc-log-${inc.id}`}>
+                            {inc.containmentActions.length === 0 ? (
+                              '—'
+                            ) : (
+                              <TimelineLog
+                                entries={inc.containmentActions.map((a) => ({
+                                  when: formatDateTime(a.takenAt, language),
+                                  what: <bdi>{a.description}</bdi>,
+                                  /* NULL IS NO NAME, never the uuid beside it. The em dash here is
+                                     one of the sites owner decision 60 classifies; its class is
+                                     already known — the id is HELD and did not resolve — and the
+                                     word is hers to choose, so this stays as its eleven siblings
+                                     render it until she has ruled. */
+                                  who: <bdi>{a.actionTakenByName ?? '—'}</bdi>,
+                                }))}
+                              />
+                            )}
+                          </div>
+
+                          {/*
+                            REACHABLE WHILE CONTAINED, not only while REPORTED.
+
+                            Containment is PLURAL — `PRIV-SRS-02` types the field as a log and the
+                            api APPENDS, proven by an e2e that contains twice and reads a two-entry
+                            log back. Gating this on REPORTED alone would leave the second and every
+                            later action unreachable from the product while the route accepted them:
+                            a capability nobody can exercise, which is the class
+                            `docs/unreachable-routes-triage.md` exists for.
+                          */}
+                          {canContain &&
+                          (inc.status === 'REPORTED' || inc.status === 'CONTAINED') ? (
+                            <div style={actionStackStyle}>
+                              <Field label={t('incContainDescLabel')}>
+                                {(p) => (
+                                  <TextArea
+                                    {...p}
+                                    // HER OWN EXAMPLE, which is why this screen needs no invented
+                                    // placeholder: «كعزل نظام أو تعطيل حساب» is the parenthetical
+                                    // from PRIV-FRM-06 § III.
+                                    placeholder={t('incContainDescHint')}
+                                    rows={2}
+                                    value={containDrafts[inc.id] ?? ''}
+                                    onChange={(e) =>
+                                      setContainDrafts((d) => ({ ...d, [inc.id]: e.target.value }))
+                                    }
+                                  />
+                                )}
+                              </Field>
+                              <Button
                                 type="button"
-                                disabled={busy || !ready}
+                                size="sm"
+                                variant="primary"
+                                disabled={
+                                  busy ||
+                                  (containDrafts[inc.id] ?? '').trim().length <
+                                    CONTAINMENT_DESCRIPTION_MIN_LENGTH
+                                }
                                 onClick={() =>
                                   void run(
                                     () =>
-                                      assessIncidentImpact(inc.id, {
-                                        touchesPersonalData:
-                                          draft.touches === true,
-                                        dataCategoriesAffected:
-                                          draft.categories.trim(),
-                                        subjectsAffectedEstimate: estimate,
+                                      containIncident(inc.id, {
+                                        description: (containDrafts[inc.id] ?? '').trim(),
                                       }),
                                     {
                                       id: inc.id,
-                                      // The state the record reached — `KycQueue`'s own
-                                      // composition, from this table's status heading
-                                      // and the status badge's own label.
+                                      // THE FIGURE THE ACT PRODUCED, not the state it reached: a
+                                      // second containment leaves the status at CONTAINED, so a
+                                      // status line would print the same sentence before and after
+                                      // and say nothing. The log length is what actually moved.
                                       describe: (updated) =>
-                                        `${t("incColStatus")}: ${t(
-                                          ENUM_LABEL.IncidentStatus[updated.status],
+                                        `${t('incContainmentLogHeading')}: ${formatNumber(
+                                          updated.containmentActions.length,
+                                          language,
                                         )}`,
                                     },
+                                  ).then(() =>
+                                    setContainDrafts((d) => ({ ...d, [inc.id]: '' })),
                                   )
                                 }
                               >
                                 {busy && actingId === inc.id
-                                  ? t("commonWorking")
-                                  : t("incAssessButton")}
-                              </button>
+                                  ? t('commonWorking')
+                                  : t('incContainButton')}
+                              </Button>
                             </div>
-                          );
-                        })()
-                      ) : null}
-                      {canClassify && inc.status === "IMPACT_ASSESSED" ? (
-                        <div style={{ display: "flex", gap: "0.3rem" }}>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              void run(() =>
-                                classifyIncident(inc.id, "MATERIAL"),
-                              )
-                            }
-                          >
-                            {t("incClassifyMaterialButton")}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              void run(() =>
-                                classifyIncident(inc.id, "NON_MATERIAL"),
-                              )
-                            }
-                          >
-                            {t("incClassifyNonMaterialButton")}
-                          </button>
-                        </div>
-                      ) : null}
-                      {canCoSign &&
-                      inc.status === "CLASSIFIED" &&
-                      inc.classification === "MATERIAL" &&
-                      !inc.seniorManagementCoSignUserId
-                        ? (() => {
-                            // Part 4 — the DPO who classified it may also co-sign, in an office that has
-                            // declared COMBINED, only by saying why. Every other case is unchanged: no field,
-                            // no extra click.
-                            const needs = needsCombinedDutyDeclaration({
-                              mode: user.dutySegregationMode,
-                              makerUserId: inc.classifiedByDpoUserId,
-                              currentUserId: user.id,
-                              alreadyDecided: Boolean(
-                                inc.seniorManagementCoSignUserId,
-                              ),
-                            });
-                            const declaration = declarations[inc.id] ?? "";
-                            return (
-                              <>
-                                {needs ? (
-                                  <CombinedDutyReasonField
-                                    id={inc.id}
-                                    value={declaration}
-                                    onChange={(next) =>
-                                      setDeclarations((prev) => ({
-                                        ...prev,
-                                        [inc.id]: next,
-                                      }))
-                                    }
-                                  />
-                                ) : null}
-                                <button
+                          ) : null}
+                        </DetailSection>
+
+                        {/*
+                          PRIV-SOP-09 step 4's three outputs — «بس بظهرلي إنه تم تقييم أثره وأنا ما
+                          قيّمت ولا عملت شي».
+
+                          `false` AND `0` ARE ANSWERS. `touchesPersonalData === false` is the DPO's
+                          finding that no personal data is involved, and an estimate of `0` is the
+                          finding that nobody was affected — both are what a regulator asks for. So
+                          the test is `=== null` and never `??` or `||`: React renders `false` as
+                          NOTHING, and `0 || '—'` is an em dash, so either shortcut turns a recorded
+                          finding into a blank cell.
+                        */}
+                        <DetailSection icon="search" title={t('incImpactAssessmentHeading')}>
+                          <div data-testid={`inc-impact-${inc.id}`}>
+                            {inc.impactAssessedAt === null ? (
+                              '—'
+                            ) : (
+                              <KeyValue
+                                rows={[
+                                  {
+                                    term: t('incTouchesPersonalDataLabel'),
+                                    value: (
+                                      <span data-testid={`inc-touches-${inc.id}`}>
+                                        {inc.touchesPersonalData === null
+                                          ? '—'
+                                          : t(
+                                              inc.touchesPersonalData
+                                                ? 'commonYes'
+                                                : 'commonNo',
+                                            )}
+                                      </span>
+                                    ),
+                                  },
+                                  {
+                                    term: t('incDataCategoriesLabel'),
+                                    value: (
+                                      <span data-testid={`inc-categories-${inc.id}`}>
+                                        <bdi>{inc.dataCategoriesAffected ?? '—'}</bdi>
+                                      </span>
+                                    ),
+                                  },
+                                  {
+                                    term: t('incSubjectsEstimateLabel'),
+                                    value: (
+                                      <span data-testid={`inc-subjects-${inc.id}`}>
+                                        {inc.subjectsAffectedEstimate === null
+                                          ? '—'
+                                          : formatNumber(inc.subjectsAffectedEstimate, language)}
+                                      </span>
+                                    ),
+                                  },
+                                ]}
+                              />
+                            )}
+                          </div>
+
+                          {/* PRIV-SOP-09 step 4, all three outputs or none — the server refuses a
+                              partial assessment per field, so the button gates on the same three
+                              rather than sending a request it knows will 400. `touches` must be
+                              DECIDED: `null` is not `false`. */}
+                          {canContain && inc.status === 'CONTAINED'
+                            ? (() => {
+                                const draft =
+                                  impactDrafts[inc.id] ?? {
+                                    touches: null,
+                                    categories: '',
+                                    subjects: '',
+                                  };
+                                const set = (next: Partial<typeof draft>) =>
+                                  setImpactDrafts((d) => ({
+                                    ...d,
+                                    [inc.id]: { ...draft, ...next },
+                                  }));
+                                const estimate = Number(draft.subjects);
+                                const ready =
+                                  draft.touches !== null &&
+                                  draft.categories.trim().length >=
+                                    CONTAINMENT_DESCRIPTION_MIN_LENGTH &&
+                                  draft.subjects.trim() !== '' &&
+                                  Number.isInteger(estimate) &&
+                                  estimate >= 0;
+                                return (
+                                  <div style={actionStackStyle}>
+                                    <label style={checkboxRowStyle}>
+                                      <input
+                                        type="checkbox"
+                                        aria-label={t('incTouchesPersonalDataLabel')}
+                                        // `checked` is the DECIDED value; an undecided box is
+                                        // unticked and the button stays disabled, so nobody can
+                                        // submit `false` without having chosen it.
+                                        checked={draft.touches === true}
+                                        onChange={(e) => set({ touches: e.target.checked })}
+                                      />
+                                      {t('incTouchesPersonalDataLabel')}
+                                    </label>
+                                    <Field label={t('incDataCategoriesLabel')}>
+                                      {(p) => (
+                                        <TextInput
+                                          {...p}
+                                          placeholder={t('incDataCategoriesHint')}
+                                          value={draft.categories}
+                                          onChange={(e) => set({ categories: e.target.value })}
+                                        />
+                                      )}
+                                    </Field>
+                                    <Field label={t('incSubjectsEstimateLabel')}>
+                                      {(p) => (
+                                        <TextInput
+                                          {...p}
+                                          type="number"
+                                          min={0}
+                                          step={1}
+                                          placeholder={t('incSubjectsEstimateHint')}
+                                          value={draft.subjects}
+                                          onChange={(e) => set({ subjects: e.target.value })}
+                                        />
+                                      )}
+                                    </Field>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="primary"
+                                      disabled={busy || !ready}
+                                      onClick={() =>
+                                        void run(
+                                          () =>
+                                            assessIncidentImpact(inc.id, {
+                                              touchesPersonalData: draft.touches === true,
+                                              dataCategoriesAffected: draft.categories.trim(),
+                                              subjectsAffectedEstimate: estimate,
+                                            }),
+                                          {
+                                            id: inc.id,
+                                            // The state the record reached — `KycQueue`'s own
+                                            // composition, from this table's status heading and
+                                            // the status badge's own label.
+                                            describe: (updated) =>
+                                              `${t('incColStatus')}: ${t(
+                                                ENUM_LABEL.IncidentStatus[updated.status],
+                                              )}`,
+                                          },
+                                        )
+                                      }
+                                    >
+                                      {busy && actingId === inc.id
+                                        ? t('commonWorking')
+                                        : t('incAssessButton')}
+                                    </Button>
+                                  </div>
+                                );
+                              })()
+                            : null}
+                        </DetailSection>
+
+                        {/*
+                          WHAT THIS RECORD IS WAITING FOR. Every remaining act in the chain —
+                          classify, co-sign, the three notifications, recover, close — sits in one
+                          section rather than stacked into the row's last cell, where they were
+                          indistinguishable from the data beside them.
+                        */}
+                        {/*
+                          THE SECTION IS NOT RENDERED WHEN THERE IS NOTHING IN IT, and the
+                          screenshot is what found that. A reader whose grants do not reach any act
+                          on this record — a DPO looking at an incident only `incident.contain` can
+                          move — was shown a titled, empty card. A heading over nothing is the
+                          emptiness this batch exists to remove, and it is also the frontend
+                          directive's own rule one step up: a control a role cannot use does not
+                          exist on their screen, so neither does the box it would have sat in.
+
+                          `ActionStatus` is counted in the condition rather than assumed, because
+                          an act that has just finished must still be able to report what it did
+                          even when the control that started it has since disappeared from the row.
+                        */}
+                        {(() => {
+                          const canAct =
+                            (canClassify && inc.status === 'IMPACT_ASSESSED') ||
+                            (canCoSign &&
+                              inc.status === 'CLASSIFIED' &&
+                              inc.classification === 'MATERIAL' &&
+                              !inc.seniorManagementCoSignUserId) ||
+                            (canNotifySenior &&
+                              inc.classification === 'MATERIAL' &&
+                              !inc.seniorManagementNotifiedAt) ||
+                            (canNotifyRegulators && inc.status === 'CLASSIFIED') ||
+                            (canNotifyRegulators &&
+                              inc.classification !== 'NOT_YET_CLASSIFIED' &&
+                              !inc.affectedDataSubjectsNotifiedAt) ||
+                            (canContain && inc.status === 'NOTIFIED') ||
+                            (canContain && inc.status === 'RECOVERED') ||
+                            inc.status === 'CLOSED' ||
+                            Boolean(outcomes[inc.id]) ||
+                            (busy && actingId === inc.id);
+                          if (!canAct) return null;
+                          return (
+                        <DetailSection icon="alert" title={t('incColAction')}>
+                          <div style={actionStackStyle}>
+                            {canClassify && inc.status === 'IMPACT_ASSESSED' ? (
+                              <div style={buttonRowStyle}>
+                                <Button
                                   type="button"
-                                  disabled={
-                                    busy ||
-                                    (needs && combinedDutyTooShort(declaration))
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(() => classifyIncident(inc.id, 'MATERIAL'))
                                   }
+                                >
+                                  {t('incClassifyMaterialButton')}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(() => classifyIncident(inc.id, 'NON_MATERIAL'))
+                                  }
+                                >
+                                  {t('incClassifyNonMaterialButton')}
+                                </Button>
+                              </div>
+                            ) : null}
+                            {canCoSign &&
+                            inc.status === 'CLASSIFIED' &&
+                            inc.classification === 'MATERIAL' &&
+                            !inc.seniorManagementCoSignUserId
+                              ? (() => {
+                                  // Part 4 — the DPO who classified it may also co-sign, in an office that has
+                                  // declared COMBINED, only by saying why. Every other case is unchanged: no field,
+                                  // no extra click.
+                                  const needs = needsCombinedDutyDeclaration({
+                                    mode: user.dutySegregationMode,
+                                    makerUserId: inc.classifiedByDpoUserId,
+                                    currentUserId: user.id,
+                                    alreadyDecided: Boolean(inc.seniorManagementCoSignUserId),
+                                  });
+                                  const declaration = declarations[inc.id] ?? '';
+                                  return (
+                                    <>
+                                      {needs ? (
+                                        <CombinedDutyReasonField
+                                          id={inc.id}
+                                          value={declaration}
+                                          onChange={(next) =>
+                                            setDeclarations((prev) => ({
+                                              ...prev,
+                                              [inc.id]: next,
+                                            }))
+                                          }
+                                        />
+                                      ) : null}
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={
+                                          busy || (needs && combinedDutyTooShort(declaration))
+                                        }
+                                        onClick={() =>
+                                          void run(() =>
+                                            coSignIncident(
+                                              inc.id,
+                                              needs ? declaration.trim() : undefined,
+                                            ),
+                                          )
+                                        }
+                                      >
+                                        {t('incCoSignButton')}
+                                      </Button>
+                                    </>
+                                  );
+                                })()
+                              : null}
+                            {canNotifySenior &&
+                            inc.classification === 'MATERIAL' &&
+                            !inc.seniorManagementNotifiedAt ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(() => notifyIncidentSeniorManagement(inc.id))
+                                }
+                              >
+                                {t('incNotifySeniorButton')}
+                              </Button>
+                            ) : null}
+                            {canNotifyRegulators && inc.status === 'CLASSIFIED' ? (
+                              <div style={actionStackStyle}>
+                                {INCIDENT_REGULATORS.map((r) => (
+                                  <label key={r} style={checkboxRowStyle}>
+                                    <input
+                                      type="checkbox"
+                                      aria-label={t('incNotifyRoleAria', {
+                                        role: r,
+                                        id: inc.id,
+                                      })}
+                                      checked={(regulatorDrafts[inc.id] ?? []).includes(r)}
+                                      onChange={() => toggleRegulator(inc.id, r)}
+                                    />
+                                    {r}
+                                  </label>
+                                ))}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={busy || (regulatorDrafts[inc.id] ?? []).length === 0}
                                   onClick={() =>
                                     void run(() =>
-                                      coSignIncident(
+                                      notifyIncidentRegulators(
                                         inc.id,
-                                        needs ? declaration.trim() : undefined,
+                                        regulatorDrafts[inc.id] ?? [],
                                       ),
                                     )
                                   }
                                 >
-                                  {t("incCoSignButton")}
-                                </button>
-                              </>
-                            );
-                          })()
-                        : null}
-                      {canNotifySenior &&
-                      inc.classification === "MATERIAL" &&
-                      !inc.seniorManagementNotifiedAt ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(() =>
-                              notifyIncidentSeniorManagement(inc.id),
-                            )
-                          }
-                        >
-                          {t("incNotifySeniorButton")}
-                        </button>
-                      ) : null}
-                      {canNotifyRegulators && inc.status === "CLASSIFIED" ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "0.2rem",
-                          }}
-                        >
-                          {INCIDENT_REGULATORS.map((r) => (
-                            <label
-                              key={r}
-                              style={{
-                                display: "flex",
-                                gap: "0.3rem",
-                                alignItems: "center",
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                aria-label={t("incNotifyRoleAria", {
-                                  role: r,
-                                  id: inc.id,
-                                })}
-                                checked={(
-                                  regulatorDrafts[inc.id] ?? []
-                                ).includes(r)}
-                                onChange={() => toggleRegulator(inc.id, r)}
-                              />
-                              {r}
-                            </label>
-                          ))}
-                          <button
-                            type="button"
-                            disabled={
-                              busy ||
-                              (regulatorDrafts[inc.id] ?? []).length === 0
-                            }
-                            onClick={() =>
-                              void run(() =>
-                                notifyIncidentRegulators(
-                                  inc.id,
-                                  regulatorDrafts[inc.id] ?? [],
-                                ),
-                              )
-                            }
-                          >
-                            {t("incNotifyRegulatorsButton")}
-                          </button>
-                        </div>
-                      ) : null}
-                      {canNotifyRegulators &&
-                      inc.classification !== "NOT_YET_CLASSIFIED" &&
-                      !inc.affectedDataSubjectsNotifiedAt ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(() =>
-                              notifyIncidentAffectedSubjects(inc.id),
-                            )
-                          }
-                        >
-                          {t("incNotifySubjectsButton")}
-                        </button>
-                      ) : null}
-                      {canContain && inc.status === "NOTIFIED" ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(() => recoverIncident(inc.id))
-                          }
-                        >
-                          {t("incRecoverButton")}
-                        </button>
-                      ) : null}
-                      {canContain && inc.status === "RECOVERED" ? (
-                        <div style={{ display: "flex", gap: "0.3rem" }}>
-                          <input
-                            aria-label={t("incRootCauseAria")}
-                            placeholder={t("incRootCauseLabel")}
-                            value={rootCauseDrafts[inc.id] ?? ""}
-                            onChange={(e) =>
-                              setRootCauseDrafts((d) => ({
-                                ...d,
-                                [inc.id]: e.target.value,
-                              }))
-                            }
-                          />
-                          <button
-                            type="button"
-                            disabled={
-                              busy || !(rootCauseDrafts[inc.id] ?? "").trim()
-                            }
-                            onClick={() =>
-                              void run(() =>
-                                closeIncident(
-                                  inc.id,
-                                  (rootCauseDrafts[inc.id] ?? "").trim(),
-                                ),
-                              )
-                            }
-                          >
-                            {t("incCloseButton")}
-                          </button>
-                        </div>
-                      ) : null}
-                      {inc.status === "CLOSED" ? "—" : null}
-                      {/*
-                        The silent-act defect, on one of the six screens the measurement
-                        named. `pending` is keyed on the ROW so a screen-level busy flag
-                        cannot claim every incident is working; `outcome` is what the act
-                        DID and never the word "done"; `error` stays screen-level because
-                        that is where this page already holds it, and the component's own
-                        precedence keeps a previous error off a running act.
-                      */}
-                      <ActionStatus
-                        pending={
-                          busy && actingId === inc.id
-                            ? t("commonWorking")
-                            : undefined
-                        }
-                        outcome={outcomes[inc.id] || undefined}
-                        testId={`incident-${inc.id}`}
-                        style={{ fontSize: "0.75rem" }}
-                      />
-                    </div>
-                  </td>
-                </tr>
+                                  {t('incNotifyRegulatorsButton')}
+                                </Button>
+                              </div>
+                            ) : null}
+                            {canNotifyRegulators &&
+                            inc.classification !== 'NOT_YET_CLASSIFIED' &&
+                            !inc.affectedDataSubjectsNotifiedAt ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(() => notifyIncidentAffectedSubjects(inc.id))
+                                }
+                              >
+                                {t('incNotifySubjectsButton')}
+                              </Button>
+                            ) : null}
+                            {canContain && inc.status === 'NOTIFIED' ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => void run(() => recoverIncident(inc.id))}
+                              >
+                                {t('incRecoverButton')}
+                              </Button>
+                            ) : null}
+                            {canContain && inc.status === 'RECOVERED' ? (
+                              <div style={actionStackStyle}>
+                                {/*
+                                  `incRootCauseAria` IS THE VISIBLE LABEL NOW and
+                                  `incRootCauseLabel` is withdrawn. This input had NO visible label
+                                  at all — an `aria-label` and a placeholder carrying the same
+                                  words, one capitalised and one not — so a sighted reader had
+                                  nothing to read once they started typing and the placeholder
+                                  vanished, which is the one thing a placeholder must never be
+                                  asked to do.
+                                */}
+                                <Field label={t('incRootCauseAria')}>
+                                  {(p) => (
+                                    <TextInput
+                                      {...p}
+                                      value={rootCauseDrafts[inc.id] ?? ''}
+                                      onChange={(e) =>
+                                        setRootCauseDrafts((d) => ({
+                                          ...d,
+                                          [inc.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                  )}
+                                </Field>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="primary"
+                                  disabled={busy || !(rootCauseDrafts[inc.id] ?? '').trim()}
+                                  onClick={() =>
+                                    void run(() =>
+                                      closeIncident(
+                                        inc.id,
+                                        (rootCauseDrafts[inc.id] ?? '').trim(),
+                                      ),
+                                    )
+                                  }
+                                >
+                                  {t('incCloseButton')}
+                                </Button>
+                              </div>
+                            ) : null}
+                            {inc.status === 'CLOSED' ? '—' : null}
+                            {/*
+                              The silent-act defect, on one of the six screens the measurement
+                              named. `pending` is keyed on the ROW so a screen-level busy flag
+                              cannot claim every incident is working; `outcome` is what the act
+                              DID and never the word "done"; `error` stays screen-level because
+                              that is where this page already holds it, and the component's own
+                              precedence keeps a previous error off a running act.
+                            */}
+                            <ActionStatus
+                              pending={
+                                busy && actingId === inc.id ? t('commonWorking') : undefined
+                              }
+                              outcome={outcomes[inc.id] || undefined}
+                              testId={`incident-${inc.id}`}
+                            />
+                          </div>
+                        </DetailSection>
+                          );
+                        })()}
+                      </DetailPanel>
+                    </td>
+                  </tr>
+                </Fragment>
               ))}
             </tbody>
-          </table>
-        </div>
-      ) : loadError ? null : (
-        // The loading state directive §2 requires; this page rendered
-        // nothing at all while fetching. Guarded on loadError so an error
-        // and a "Loading…" line never appear together.
-        <p>{t("incLoading")}</p>
+          </Table>
+        </Card>
       )}
     </main>
   );

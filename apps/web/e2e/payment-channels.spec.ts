@@ -137,8 +137,15 @@ test("lists customer + insurer channels with masked account fragments", async ({
   ).toHaveCount(0);
 
   // Finance sees the add form
-  await expect(page.getByLabel("Owner type")).toBeVisible();
-  await expect(page.getByLabel("Account last 4")).toBeVisible();
+  // RE-POINTED by the design pass: the select carried `aria-label="Owner type"` over a visible
+  // label reading "Owner", and an aria-label REPLACES the accessible name. The key was a
+  // character-for-character duplicate of the column heading and is withdrawn; the control is now
+  // named by its own `<label>`.
+  await expect(page.getByLabel("Owner")).toBeVisible();
+  // RE-POINTED: `aria-label="Account last 4"` said FOUR over a visible label saying two to
+  // four, and the visible one was right. The aria key is withdrawn and the field is named by its
+  // own label.
+  await expect(page.getByLabel("Account (last 2–4 digits)")).toBeVisible();
 });
 
 test("a user without the permission sees a friendly message", async ({
@@ -169,7 +176,7 @@ test("the read code alone shows the list and NEITHER write control", async ({
   // page that never loaded, which cannot tell "the control is correctly withheld" from "nothing rendered".
   await expect(page.getByRole("cell", { name: "••••4321" })).toBeVisible();
 
-  await expectNone(page.getByLabel("Account last 4"), page.getByRole("cell", { name: "••••4321" }));
+  await expectNone(page.getByLabel("Account (last 2–4 digits)"), page.getByRole("cell", { name: "••••4321" }));
   await expectNone(
     page.getByRole("button", { name: "Deactivate" }),
     page.getByRole("cell", { name: "••••4321" }),
@@ -185,10 +192,10 @@ test("the create code adds the form back without the disable button", async ({
   await mockChannels(page);
 
   await page.goto("/payment-channels");
-  await expect(page.getByLabel("Account last 4")).toBeVisible();
+  await expect(page.getByLabel("Account (last 2–4 digits)")).toBeVisible();
   await expectNone(
     page.getByRole("button", { name: "Deactivate" }),
-    page.getByLabel("Account last 4"),
+    page.getByLabel("Account (last 2–4 digits)"),
   );
 });
 

@@ -381,7 +381,6 @@ export const COMPLIANCE_RISK = {
     incIntro:
       'مُبلَّغ عنه ← جرى احتواؤه (بهدف أربع ساعات للحوادث الحرجة) ← جرى تقييم أثره ← مُصنَّف (ويستوجب التصنيف المادي اعتماد مسؤول حماية البيانات مع توقيع منفصل من الإدارة التنفيذية) ← جرى الإبلاغ ← جرى التعافي ← مغلق (وتحليل السبب الجذري إلزامي). وقد يستوجب الحادث الواحد الإبلاغ إلى أكثر من جهة رقابية.',
     incTitleLabel: 'عنوان الحادث',
-    incTitleFieldLabel: 'العنوان',
     incDescriptionLabel: 'وصف الحادث',
     incColTitle: 'العنوان',
     incColSeverity: 'درجة الخطورة',
@@ -423,7 +422,6 @@ export const COMPLIANCE_RISK = {
     incNotifySubjectsButton: 'إبلاغ أصحاب البيانات المتأثرين',
     incRecoverButton: 'تسجيل التعافي',
     incCloseButton: 'إغلاق',
-    incRootCauseLabel: 'تحليل السبب الجذري',
     incReportButton: 'الإبلاغ عن حادث',
     incSavingButton: 'جارٍ الحفظ…',
     incLoading: 'جارٍ التحميل…',
@@ -964,7 +962,6 @@ export const COMPLIANCE_RISK = {
     incIntro:
       "Reported → Contained (4-hour target for critical) → Impact Assessed → Classified (Material needs a Data Protection Officer AND a separate Executive Management co-sign) → Notified → Recovered → Closed (root cause mandatory). One incident may trigger more than one regulator's notification obligation.",
     incTitleLabel: 'Incident title',
-    incTitleFieldLabel: 'Title',
     incDescriptionLabel: 'Incident description',
     incColTitle: 'Title',
     incColSeverity: 'Severity',
@@ -990,7 +987,6 @@ export const COMPLIANCE_RISK = {
     incNotifySubjectsButton: 'Notify affected subjects',
     incRecoverButton: 'Recover',
     incCloseButton: 'Close',
-    incRootCauseLabel: 'root cause analysis',
     incReportButton: 'Report incident',
     incSavingButton: 'Saving…',
     incLoading: 'Loading…',

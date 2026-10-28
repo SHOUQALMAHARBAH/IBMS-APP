@@ -92,7 +92,22 @@ test("renders a clean audit with the per-pair breakdown", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Internal controls — self-approval audit" }),
   ).toBeVisible();
-  await expect(page.getByText("None")).toBeVisible();
+  /*
+   * RE-POINTED BY THE DESIGN PASS, AND THIS TEST WAS ASSERTING THE DEFECT.
+   *
+   * It read `getByText("None")` — the literal English word the violations figure rendered when
+   * the count was zero, on a governance report in an Arabic-first product. `hardcoded-ui-english`
+   * reports 0 undeclared and cannot see it: a ternary of bare literals inside a PROP VALUE is
+   * excluded from failure mode 8 by design.
+   *
+   * The figure is `formatNumber(0)` now, and what says the scan found nothing is the screen's own
+   * sentence — `icClean`, which has shipped in both languages all along. Both halves are asserted,
+   * because a zero on its own is also what a scan that checked nothing would show.
+   */
+  await expect(
+    page.getByText("No self-approval violations found. Every pair scanned is clean."),
+  ).toBeVisible();
+  await expect(page.getByText("None", { exact: true })).toHaveCount(0);
   /* RE-POINTED BY OWNER DECISION 53, AND THE REVERSAL IS STATED. This asserted the raw member
      name `KYCRecord` in the by-pair table. That cell now renders the entity's own WORD — the KYC
      queue's heading, which is BROADER than one record and is shipped as such on decision 53's

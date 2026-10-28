@@ -27,6 +27,10 @@ export const COMMON = {
      * `statusOverdue` for symmetry.
      */
     statusContainmentOverdue: '(فات موعد الاحتواء)',
+    /* DERIVED: the line above with its brackets dropped — the same run of characters,
+       for the summary tile, where a parenthetical would be wrong because the tile is
+       not sitting beside anything. No word was written. */
+    statusContainmentOverdueTile: 'فات موعد الاحتواء',
     /*
      * THE MOST DANGEROUS OF THE ELEVEN, and the wording carries the danger rather than
      * the mechanism. Measured: the loss ratio exceeded `MAX_LOSS_RATIO` (999.9999) and
@@ -309,6 +313,10 @@ export const COMMON = {
     commonSaving: 'Saving…',
     statusOverdue: '(past its deadline)',
     statusContainmentOverdue: '(containment deadline passed)',
+    /* DERIVED: the line above with its brackets dropped — the same run of characters,
+       for the summary tile, where a parenthetical would be wrong because the tile is
+       not sitting beside anything. No word was written. */
+    statusContainmentOverdueTile: 'containment deadline passed',
     statusRatioCapped: '(at the ceiling — the true ratio is higher)',
     statusCoverLapsed: '(cover has ended)',
     statusNoRegulatorySource: '(no regulatory source)',
