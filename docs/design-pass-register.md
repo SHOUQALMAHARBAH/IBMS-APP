@@ -318,6 +318,22 @@ page scroll sideways, reading `documentElement.scrollWidth` — permanently fals
 clips. Both re-pointed at `[data-app-content]`, which is the stronger claim as well as the
 surviving one. Found by asking what the change made VACUOUS rather than what it broke.
 
+**4 · And the capture fix in (2) BLINDED the evidence to a different defect, in the same helper.**
+`!important` was planted away from the phone shell rule — the half-applied media query this
+repository has shipped once and caught IN A SCREENSHOT — and the capture came back **2,189px
+against 2,115px correct**. Noise. The picture could not see it, because growing the viewport to the
+content column's `scrollHeight` produces a whole capture whether the PAGE scrolls or a div inside
+it does.
+
+So `shell-scroll.spec.ts` gained the inverse of its first test: below 64rem the DOCUMENT must
+scroll, and the content column must NOT be its own scroller. Both halves, because they are
+different claims — the document scrolling is what lets a phone browser retract its chrome, and the
+column not scrolling is what stops the strip-plus-inner-scroller arrangement that makes a short
+screen unusable. Under the plant it dies naming exactly that.
+
+**The lesson is narrower than "open a picture": an instrument fixed for one blindness can acquire
+another in the same edit, and only planting against it says which.**
+
 **And the MFA enrolment banner now scrolls away with the page. That is correct** — it is a one-time
 signpost, not a persistent state — and it is said here so nobody "fixes" it later.
 
