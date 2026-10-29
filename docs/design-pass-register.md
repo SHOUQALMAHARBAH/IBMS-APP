@@ -180,6 +180,8 @@ Each is something the pass found and deliberately left, with what it would take 
 | 5b | **The collapsed rail is a STRIP, not a drawer.** Its `<details>` groups stay closed, so it costs about one brand lockup and one search field of height. | A drawer needs a toggle, a focus trap and an escape key — three pieces of BEHAVIOUR, which §4(h) does not allow this batch to add. It is the better answer whenever somebody is allowed to build it. |
 | 5c | **The rail's layout lives in inline styles, which is why the responsive rule needs `!important`.** | Moving it to CSS is a larger change than a responsive fix should carry. Recorded so the `!important` is read as a consequence rather than as carelessness. |
 | 6 | **The two new CI steps are committed locally and NOT PUSHED.** `check:token-contrast` and `check:inline-styles` are wired in `package.json` (so `npm run check:screen-pass` runs both) and their `ci.yml` steps sit in an unpushed commit: GitHub refuses a push touching a workflow file from a token without `workflow` scope, and this machine's keyring token holds `gist, read:org, repo`. **No credential was written to disk to get around it** — the credential-safety hook refuses that and is right to, since it cannot tell a credential store from a leak. | Needs one push with a `workflow`-scoped token, which is the owner's to make. Until then both gates are green locally and runnable by name, and CI simply does not run them. Recorded here rather than left as a silent gap, because a gate nobody runs is the thing this repository has paid for three times. |
+| 7 | **SIXTEEN screens still wrap a `<Table>` in their OWN `overflow-x: auto` div.** `Table` has provided a scroll container since batch 3 **with `tabIndex={0}`**, because a scroll container nothing can focus is a region a keyboard user cannot scroll at all — so an unfocusable one wrapping it is that defect one level out. Measured 17 sites across 10 files; `/screening-health`'s is fixed. **axe is silent**: `scrollable-region-focusable` fires only when a region actually OVERFLOWS, and the inner scroller absorbs the overflow first. `client-accounting`, `financial-report`, `insurer-accounting`, `regulatory-compliance`, `retention-disposal` ×6, `ropa-entries`, `screening-matches`, `sla-dashboard` ×3, `watchlist-sync`. | Sixteen deletions across nine files, each needing its own JSX close matched and its screen's spec re-run. It is a sweep, and the one that was fixed was fixed because this batch's own measurement ran into it. |
+| 8 | **`ProviderHealth.providerName` is English on an Arabic screen** — «الاسم» reads `Built-in watchlist cache (OFAC SDN + UN Consolidated)` beside a TYPE that reads «القائمة المحلية المزامنة». Declared as `readonly name` on each adapter, which is why a sweep over display-FIELD names (`note`, `detail`, …) did not see it. | No Arabic exists for it and inventing one is what the standing rule forbids. Same class and same answer as `ProviderHealth.detail` beside it. |
 | 5 | **The four other `(auth)` screens do not yet use `AuthFrame`.** `/login` links to `/forgot-password`, which still wears the old card. | They are screens in this batch and adopt the frame when the pass reaches them. |
 
 ---
@@ -245,10 +247,14 @@ sat in.
 
 ## Owed to the owner
 
-Rows 1, 2 and 3 are CLOSED — nothing on them was invented while they were open and nothing
-was widened when they closed. Rows 4 to 6 are OPEN and were found by opening captures after
-those three were answered; **nothing on them has been invented either**, which is the only
-thing that makes the list worth keeping.
+**Every row here is ANSWERED except 9b, and nothing on any of them was invented while it was
+open** — which is the only thing that makes the list worth keeping. Rows 4 to 7 were found by
+opening captures after the first three were answered; 8 to 11 came from closing 5 and 6 and
+finding what sat underneath them.
+
+**9b is the one still open, and it is one clause.** It is also the one where the defect is
+UPSTREAM of her: she was given a truncated English sentence and wrote faithful Arabic for the
+truncation.
 
 | # | where | her answer | what it cost |
 |---|---|---|---|
@@ -258,6 +264,11 @@ thing that makes the list worth keeping.
 | 3 | the Arabic email subjects | **they carry «وسيط 360»** — they read as a generic description today, which was correct while the product had no name to show | three subjects, plus one body line as a stated judgement |
 | 5 | `/screening-health`'s capability table | **«العقوبات»** and **«الأشخاص السياسيون (PEP)»** — the NOMINATIVE, which is what a column label takes, against the genitive run inside the sentence already on that screen | `shCapSanctions` / `shCapPep`, in a map TOTAL over a declared union by her own instruction. **BUT THE UNION IS NINE MEMBERS, NOT TWO** — `ProviderCapability`, and every provider reports all nine; **my own capture fixture carried two rows**, which is why her note reads *a third capability*. Seven render their token and are owed |
 | 6 | `/screening-health`'s screening outcomes | **«لا يوجد تطابق، الفحص نظيف», «مطابقة محتملة», «تعذّر الفحص»** — with the `CLEAR` sentence trimmed BY HER after being shown it renders beside a COUNT rather than on one customer's record | **NONE OF THEM WAS NEEDED, and that is the finding.** The keys are `ScreeningAttemptOutcome` — five members, no `CLEAR` and no `ERROR` — and `ENUM_LABEL.ScreeningAttemptOutcome` has mapped all five to bilingual keys the whole time; `screenOutcomeUnableToScreen` IS «تعذّر الفحص», her own word. **Her token names came off my own fixture**, which invented two members that cannot occur. Reported, not swapped in |
+| 8 | `/screening-health`'s nine capability words | **all nine, and «التغطية الإعلامية السلبية» was decided TWICE** — she rejected «الأخبار السلبية» as not clear enough to a clerk and chose the AML term herself | `PROVIDER_CAPABILITY_LABEL_KEY` is TOTAL with no `\| null` left and the screen's fall-through to the raw token is DELETED. The rejected word is the one a later reader would guess, which is why it is written down |
+| 9 | `/screening-health`'s 27 capability NOTES | **26 of the 27, her own Arabic** — grouped by the adapter that builds each, because the same capability means different things per provider | A note is a KEY on the wire now, not a sentence. **The 27th was not in her table**: the built-in SANCTIONS row is a ternary and she was given its FALSE branch, so the note an Arabic reader sees on the DEFAULT provider in the normal case had no word — DERIVED from `wsIntro` as a contiguous run in both languages rather than asked for |
+| 9b | the on-premise PEP note | **ONE CLAUSE IS OWED AND THE DEFECT IS UPSTREAM OF HER.** The shipping English opens *Depends on whether* dataset "{name}" ingested PEP collections; the table she was given dropped that clause, so her Arabic renders the truncation faithfully and ASSERTS what the English HEDGES | Hers ships verbatim — its tail is still *verify before relying on it* — and it renders NOWHERE today, needing `on_premise` with a non-sanctions dataset. One line from her closes it |
+| 10 | the `CLEAR` sentence | **WITHDRAWN BY HER.** `screenOutcomeNoMatch` keeps «لا يوجد تطابق»: *the product can demonstrate that no match was found; it cannot demonstrate that a customer is clean, and on a compliance screen the weaker claim is the true one* | Nothing changed. Recorded as HER decision with that reason, because the label now reads like half a sentence and is not |
+| 11 | the date fields | **GREGORIAN ONLY — «نحسمها ميلادي فقط- حاليا»**, with «حالياً» part of the decision; and a HINT under the label naming which date it is | Recorded where the date-control deferral lives. **The hints are measured, not written**: 12 sites owe one, 28 do not, and the twelve are named above. The MONTH-FIRST format defect a hint cannot reach is proposed separately |
 | 7 | the `Ring` caption | **«١٤ مطالبة مفتوحة من ٦٦»** — *{open} open claims of {total}*, the string `Ring` has required since it was written | `dclmOpenClaimsOfTotal` in `plurals.ts`, and a `Ring` on `/dashboards/claims`. `other` is her run with the numerals replaced; `few` slices `execOpenClaims` verbatim; **`zero`, `one` and `two` are OMITTED** because «مطالبتان» ships nowhere — the «محاولتان» dual again. **And her caption did not fit the space**: it drew as 9px SVG text inside the ring and spilled past the arc, so the COMPONENT moved it under the label. Her words untouched |
 
 ### The shell: the window stops scrolling
@@ -342,7 +353,7 @@ signpost, not a persistent state — and it is said here so nobody "fixes" it la
 Visible on `/client-accounting`'s «كما في» field in all four of its captures: the control renders
 the browser's own **`mm/dd/yyyy`** placeholder beside an Arabic label, on an Arabic-first product.
 
-**MEASURED: 25 files use a native `<input type="date">`**, so this is a property of the control
+**MEASURED: 25 files use a native `<input type="date">`** — **and re-measured 2026-10-29 at 40 inputs across those same 25 files**, classified below — so this is a property of the control
 rather than of one screen. The format hint is BROWSER CHROME — it follows the user agent's locale,
 not the page's `dir` or `lang` — which is why no gate in this repository can see it: there is no
 English string in our source to find, `hardcoded-ui-english.py` is looking at the right files and
@@ -354,6 +365,106 @@ keyboard, locale and calendar decisions attached — and this product has an ope
 Hijri dates (Part F item #5) that such a control would have to answer first. Recorded here so it is
 a decision rather than something nobody noticed.
 
+#### OWNER DECISION, 2026-10-29 — GREGORIAN ONLY, FOR NOW
+
+Her words: *«نحسمها ميلادي فقط- حاليا»*. Every date in this product is Gregorian on display and on
+entry, and nothing converts between calendars.
+
+**«حالياً» — *for now* — IS PART OF THE DECISION**, in the same form as her currency ruling («دينار
+أردني فقط — حالياً»). The code must not ASSUME Gregorian silently, so that opening this later is one
+known place rather than a hunt. **The reopening condition is recorded with it**: a customer document
+whose date of birth is written in Hijri, which is the one case that would force it — and if it ever
+opens, the conversion must be VISIBLE rather than silent.
+
+**THIS DOES NOT AUTHORISE THE DATE CONTROL.** It removes the thing that blocked it; the control
+itself is still not built and is not an engineer's to start.
+
+**AND IT IS NOT THE SAME QUESTION AS THE HIJRI HOLIDAYS**, which was answered long ago and is
+unchanged: the Eid dates are not computed in code, because in Jordan they are set by official
+decision and can differ by a day from any calendar conversion — they are entered by hand each year.
+Nothing here touches that.
+
+#### Her own fix, and the half it does not reach — MEASURED 2026-10-29
+
+She proposed the remedy herself: **a line under the label saying which date it is** — «أدخل تاريخ
+المطالبة» and so on. `Field` already has a `hint` slot wired to `aria-describedby`, so this needs no
+new component and no new mechanism. It needs WORDS, and the words are hers.
+
+**MEASURED FIRST, because a hint on an already-obvious field is noise and noise is how people stop
+reading hints.** `python scripts/measurements/date-input-labels.py` re-derives the list; it reports
+**40 date inputs across 25 files**, classified by whether the VISIBLE label names the date:
+
+| class | count | verdict |
+|---|---|---|
+| **AS-AT** — a bare «كما في» / `As of` | 4 | **a hint is owed.** It says the reading is a snapshot and never of WHAT |
+| **RANGE** — a bare «من» / «بداية الفترة» / `Period end` | 8 | **a hint is owed.** It says which END of a range and never which date |
+| **MEANS** — names what the date means, no date noun («تتوقّف التغطية», «ساري من») | 7 | **read by hand.** Most are already clear and a hint would be noise |
+| **NAMES** — a date noun bound to a subject («تاريخ الميلاد») | 20 | **no hint** |
+| unreadable | 1 | see the finding below |
+
+**THE TWELVE SITES A HINT IS OWED FOR, BY NAME**, because she is the one writing them. The other
+28 are not listed on purpose: naming them invites a hint each, and the whole point of classifying
+was that 20 already say which date they want.
+
+| screen | key | label today | what the date IS |
+|---|---|---|---|
+| `/client-accounting` | `caAsOf` | «كما في» | the balance date the ageing is computed at |
+| `/financial-report` | `frAsOf` | «كما في» | the balance date the report is computed at |
+| `/insurer-accounting` | `iaAsOf` | «كما في» | the balance date the insurer ledger is computed at |
+| `/dashboards/executive` | `execAsOf` | «كما في تاريخ» | the date the whole dashboard is computed at |
+| `/audit-trail` | `atFromLabel` | «من تاريخ» | the earliest ACT to list |
+| `/audit-trail` | `atToLabel` | «إلى تاريخ» | the latest ACT to list |
+| `/employee-performance` | `ipPeriodStartOptionalLabel` | «بداية الفترة (اختياري)» | the first day of the scored period |
+| `/employee-performance` | `ipPeriodEndOptionalLabel` | «نهاية الفترة (اختياري)» | the last day of the scored period |
+| `/insurer-performance` | `ipPeriodStartOptionalLabel` | same key, shared | same |
+| `/insurer-performance` | `ipPeriodEndOptionalLabel` | same key, shared | same |
+| `/sales-performance` | `dashPeriodStart` | «بداية الفترة» | the first day of the sales period |
+| `/sales-performance` | `dashPeriodEnd` | «نهاية الفترة» | the last day of the sales period |
+
+**TWO OF THOSE KEYS ARE SHARED BY TWO SCREENS** (`ipPeriodStartOptionalLabel` /
+`ipPeriodEndOptionalLabel` serve both performance dashboards), so the twelve SITES are ten
+STRINGS — and a hint on a shared key has to be true on both screens, which is why the table lists
+the sites rather than collapsing them.
+
+**THE FIGURE IS 40, NOT 42** — a plain grep reports 42 and two of those are prose inside a doc
+comment in `audit-trail/page.tsx` explaining the end-of-day trap. A small correction, with its
+reason, rather than a number carried across.
+
+**AND MEASURING IT FOUND THE `aria-label`-OVER-VISIBLE-LABEL CLASS AGAIN, on all four AS-AT
+fields.** `/client-accounting`, `/financial-report`, `/insurer-accounting` and
+`/dashboards/executive` each render «كما في» and carry an `aria-label` of «تاريخ الرصيد» — *balance
+date*, which is the BETTER wording and is the one only a screen-reader user hears. An `aria-label`
+REPLACES the accessible name, so the two readers are told different things and nobody proof-reads
+the invisible one; this repository has recorded that class four times, and `incTitleLabel` was the
+same shape (the invisible one better than the visible one). **The hint she is being asked for would
+make the visible label say what the invisible one already says.**
+
+**ONE INPUT HAS NO LABEL AT ALL** — `bcp-dr-plans/page.tsx:202`, a bare `<input type="date">` in a
+table cell with no `<label>`, no `htmlFor` and no `aria-label`. It renders only after *Record test*
+is pressed, which is why the a11y suite has never seen it: axe scans what is on the page.
+
+**AND THE HALF HER FIX DOES NOT REACH, which is the dangerous half.** A hint says WHAT to enter;
+`mm/dd/yyyy` is about HOW, and it is month-first. An employee who types `03/04` meaning 3 April gets
+4 March — **a valid date, silently wrong**, which neither they nor any validation can catch, and on
+a receivables ageing report that moves money between buckets.
+
+**A hint cannot carry the format**, because the format is the user agent's and not ours: the same
+build shows `mm/dd/yyyy` on one machine and `dd/mm/yyyy` on another, so a fixed Arabic «شهر/يوم/سنة»
+would be false for half the readers — worse than the English placeholder.
+
+**PROPOSED, NOT BUILT: echo the chosen date back.** Render the selected value under the field
+through `formatDate`, which already takes the reader's language and already ships. Whatever order
+the employee typed in, they see what the system understood — «7 أيلول 2026». One place, not 40, and
+**no new words at all**, which is what makes it buildable without her.
+
+**Where it belongs is a measurement and it came out AGAINST the `hint` slot.** `Field`'s `hint` is
+wired into `aria-describedby`, and a field may legitimately want BOTH an instruction and an echo —
+so an echo in the `hint` slot would either displace the instruction or have to be concatenated into
+it, and a screen reader would then announce the chosen date as part of the field's description every
+time focus lands. The echo wants its own slot, rendered after the control and NOT in
+`aria-describedby`: the value is already announced by the input itself, so describing it again is a
+duplicate announcement rather than help.
+
 ### What these four answers left OWED, measured
 
 Every row here is a word nobody may invent. Each renders its own member name today, which is
@@ -362,11 +473,20 @@ indistinguishable from a decided one and never gets corrected.
 
 | what | how many | where it renders | why it is not derivable |
 |---|---|---|---|
-| `ProviderCapability` — the seven she did not name | 7 | `/screening-health`'s capability table, every row | `WATCHLIST`, `ADVERSE_MEDIA`, `INDIVIDUAL`, `ENTITY`, `BATCH`, `ONGOING_MONITORING`, `WEBHOOKS`. The union is NINE and every provider reports all nine; her two words came from a capture whose fixture carried two rows. `PROVIDER_CAPABILITY_LABEL_KEY` is total, so a tenth member is a compile error |
-| `ScreeningCaseStatus` | 5 | `/screening-health`'s case-workload table | `OPEN`, `ASSIGNED`, `UNDER_REVIEW`, `ESCALATED`, `CLOSED`. **There is no `ENUM_LABEL` entry at all** — measured, unlike `ScreeningAttemptOutcome` beside it, which had a complete one. Found while reading for rows 5 and 6; not in either |
+| ~~`ProviderCapability` — the seven she did not name~~ | ~~7~~ | — | **CLOSED 2026-10-29.** She named all nine, and `PROVIDER_CAPABILITY_LABEL_KEY` has no `\| null` in its type any more — the screen's fall-through to the raw token is DELETED rather than left unreachable, the same treatment `AR_AGEING_BUCKET_FALLBACK` got. «التغطية الإعلامية السلبية» was decided twice: she rejected «الأخبار السلبية» as not clear enough to a clerk, which is the one a later reader would guess |
+| `ScreeningCaseStatus` | 5 | `/screening-health`'s case-workload table | `OPEN`, `ASSIGNED`, `UNDER_REVIEW`, `ESCALATED`, `CLOSED`. **There is no `ENUM_LABEL` entry at all** — measured, unlike `ScreeningAttemptOutcome` beside it, which had a complete one. Found while reading for rows 5 and 6; not in either. **STILL OPEN** — this batch did not touch it |
 | `dclmOpenClaimsOfTotal` — `zero`, `one`, `two` | 3 forms | the ring caption on `/dashboards/claims` | They fall back to `other`, so 0/1/2 read as «{n} مطالبة مفتوحة». «مطالبتان» ships NOWHERE and a dual is morphology; «مطالبة واحدة» and «لا مطالبات» are constructions rather than slices. **Do not compose them from shipping words** — that is the decision this omission protects |
 
-**And one thing is NOT owed to her and is reported instead.** Her `CLEAR` sentence «لا يوجد تطابق، الفحص نظيف» is not swapped over `screenOutcomeNoMatch`, which ships «لا يوجد تطابق» — the schema's own careful wording, whose comment says `NO_MATCH` is *the only outcome that MAY map to* `ScreeningOutcome.CLEAR`. Hers adds *the screening is clean*, which is the stronger claim; on a compliance screen the weaker one is the true one. Hers is the better sentence for a place that is about ONE customer — this renders beside a count of 388.
+**And one thing was reported rather than decided — ANSWERED 2026-10-29, and the answer is HERS.**
+Her `CLEAR` sentence «لا يوجد تطابق، الفحص نظيف» is **not adopted**, and `screenOutcomeNoMatch` keeps
+the schema's own careful «لا يوجد تطابق». She was shown the reasoning and accepted it: *the product
+can demonstrate that no match was found; it cannot demonstrate that a customer is clean, and on a
+compliance screen the weaker claim is the true one.* `NO_MATCH`'s own schema comment says it is *the
+only outcome that MAY map to* `ScreeningOutcome.CLEAR` — MAY, not DOES.
+
+**This is recorded as HER DECISION, with that reason, because the label now looks unfinished and is
+not.** The next person to read «لا يوجد تطابق» will think half a sentence is missing; this row is
+where they find out it was removed on purpose.
 
 ### Decision 60 — what converted, and what deliberately did not
 
@@ -1213,6 +1333,251 @@ gitignored — evidence to look at, not an artefact to carry in the tree. **Prov
 assumed**: 32 captures written, an unrelated spec run afterwards, 32 still there.
 
 ---
+
+### Batch 12 — the nine capability words, and the twenty-seven English sentences under them
+
+The owner's framing is the finding, and it is about where a string LIVES rather than about this
+screen: closing her capability-label answer gave the table two Arabic words against nine members,
+and **the seven unworded ones were only half of what that row shows.** Under each capability name
+the screen rendered `c.note` — an English sentence built in the api — so an Arabic compliance
+officer read an English token with an English sentence under it, on the screen whose job is to say
+whether customers are actually being screened.
+
+**`hardcoded-ui-english.py` REPORTED 0 AND WAS RIGHT TO.** It reads the web tree, and these strings
+did not exist there. That is the structural class the thirteen risk-questionnaire prompts already
+recorded by name — *a string the api sends and a screen renders verbatim is invisible to a scanner
+that reads source* — and this is the **second instance**.
+
+#### The shape: measured before it was built, which she asked for
+
+| question | answer |
+|---|---|
+| can the api hold the Arabic? | **No.** `Accept-Language` appears NOWHERE in `apps/api/src`; `languagePreference` is a stored user field returned on `/auth/me` and is never consulted when a message is composed. One deployment serves both readers |
+| can a flat string swap carry them? | **No.** Four of the 27 keys interpolate — three name the configured dataset, one lists the missing settings |
+| how many readers does `note` have? | **One.** `/screening-health`'s capability table. Nothing in the api reads it, and `screening-config.controller.ts` passes `capabilities` straight through |
+| could the WEB derive the note instead, needing no wire change? | **No**, and this is the alternative that had to be ruled out. Two of the 28 ROWS are ternaries on api-internal state the wire does not carry — `hasData` on the built-in cache, `sanctionsOnly` on the dataset — and reconstructing either from `operational` is the screen re-deriving what the api knows, which is decision 58's own prohibition one module over |
+
+So: a note KEY plus params on the wire, resolved by the web. `promptAr`'s mechanism, with the
+difference that a prompt is reference DATA (a pair on the wire) while a note is COPY about the
+system itself, whose home is the i18n tree.
+
+**AND `kind` IS ON THE WIRE, by decision 58's argument.** She identified three of these sentences as
+WARNINGS rather than descriptions and asked that each be verified to render as one. The api is the
+only layer that knows which of its own notes is a caution — a screen cannot derive it from three
+booleans, and the commercial one rides a row where all three TICK. Required rather than optional, so
+a 29th note cannot default to the non-warning value.
+
+**A caution renders through `Note tone="warning"`** — this product's own primitive for *something
+worth reading before acting*, with `--warning-bg`, a border and an icon. A description keeps the
+small secondary text it always had. Her words for why: *"a caution that renders as decoration is
+worse than one nobody can read, because the first one looks like it was considered."*
+
+#### THE TWENTY-SEVENTH NOTE, WHICH HER TABLE DID NOT HAVE — and it is the one most readers see
+
+Her table grouped the notes one per capability per adapter, nine for the built-in cache. The
+built-in SANCTIONS row is a **TERNARY**, and her table took the FALSE branch (*the local cache is
+empty*). The TRUE branch — `OFAC SDN + UN Consolidated, synced locally.` — is what an Arabic reader
+sees on the DEFAULT provider in the NORMAL case, because `SCREENING_PROVIDER=built_in` is the only
+configured value anywhere in this repository.
+
+**It is DERIVED rather than asked for.** `wsIntro` on `/watchlist-sync` carries the identical claim
+as a contiguous run in BOTH languages — «تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة
+الأمم المتحدة الموحّدة) محلياً» — asserted as a substring in the edit script, plus a terminal full
+stop, which is the treatment `commonCurrentLabel` already took when its colon was dropped. **No word
+was asked for and none was invented.**
+
+Same shape as `rendered-identifiers.py` reading `??` as a ternary: a branch nobody read is a branch
+nobody counted.
+
+#### The one row whose Arabic and English do not make the same claim — REPORTED, hers to settle
+
+`ON_PREMISE_PEP_VERIFY`. The shipping English opens **`Depends on whether`** dataset "{name}"
+actually ingested PEP collections; **the table she was given dropped that clause**, so her Arabic
+renders the truncation faithfully and reads «مجموعة البيانات «{name}» **تتضمّن فعلاً** بيانات
+الأشخاص السياسيين» — which ASSERTS what the English HEDGES.
+
+Her sentence ships verbatim, because that is the standing rule and because its tail is still *راجع
+قائمة بيانات المحرّك قبل الاعتماد عليها* — verify before relying on it. What is owed is one clause
+from her. **It renders nowhere today**: it needs `on_premise` configured with a non-sanctions
+dataset, and `built_in` is the only configured provider.
+
+By her own criterion for the other three this is the same class as them, so **it is marked a CAUTION
+by this code rather than by her**, and so is `BUILT_IN_CACHE_EMPTY` — an empty cache on the default
+provider means nobody has been screened against anything. Both are named in the api's `cautions()`
+doc comment as judgements rather than her classification, and
+`capability-note-parity.spec.ts` pins the set of five BY NAME so overturning either is a deliberate
+act.
+
+#### «غير مهيّأ» IS THREE SPELLINGS NOW, on one screen — reported, not harmonised
+
+She asked whether the not-configured note is a pointer at `screenOutcomeNotConfigured` rather than a
+new string. **It is a pointer up to ONE DIACRITIC**, which is the honest answer:
+
+| spelling | where |
+|---|---|
+| «غير مُهيّأ» — **with the damma on the م** | `provHealthNotConfigured` and `screenOutcomeNotConfigured`, shipping, rendered in this screen's own status row |
+| «غير مهيّأ» — no damma | hers, this batch, now the capability note four rows below |
+| «غير مهيأ» — no shadda either | `shWhichProviderActuallyPerformsScreening`, the intro paragraph at the top of the same screen |
+
+Hers ships verbatim, because *nothing here is to be reworded* and a divergence is a finding. All
+three render almost identically and compare unequal, which is why this is worth a row at all: a
+search box or a stored value matching one will not match the others.
+
+#### THE PHONE CAPTURE: the caution did not fit the cell, measured rather than squinted at
+
+The desktop capture was right. The phone one looked cramped, so it was MEASURED rather than judged
+from a thumbnail — a throwaway probe at 390px, deleted in the same session:
+
+| at 390px | before | after |
+|---|---|---|
+| the caution's own TEXT | **62px wide, 299px tall** | **219px wide, 104px tall** |
+| the capability column | 143px | 117px |
+| the table against its scroller | 325px in 300px — it overflowed | 300px in 300px — it does not |
+| a DESCRIPTION in that column | 111px wide, 38px tall | 85px wide, 38px tall |
+
+Roughly four Arabic characters per line over twenty-five lines, on a compliance warning. A `Note`
+spends about 47 of those px on its padding, its icon and the gap between them, and that chrome is
+the whole difference between the two rows.
+
+**And the move paid twice**: with the note out of the first cell the column shrank from 143px to
+117px, the table stopped being wider than its scroller, and the horizontal overflow went away — so
+the caution got 3.5× the text width AND the table stopped needing to scroll sideways on a phone.
+
+**So the SPACE changed and not the sentence** — her own rule, and the second time this batch's
+predecessor applied it (the ring caption drew as 9px SVG text inside an 84px circle). The caution
+is its own `<Tr>` spanning all four columns, directly beneath the capability it is about: full
+table width in both layouts, the box kept because it is what makes a caution unmistakable on a
+desktop, and nothing squeezed.
+
+**The three warning tests were RE-POINTED with the reversal stated**, and the nine-words test
+gained the absence that proves the move: `[data-capability="PEP"] [data-note-kind="CAUTION"]` must
+have count 0 and `[data-capability-caution="PEP"]` must be visible. A version that put the box back
+in the cell fails there.
+
+#### AND IT FOUND SEVENTEEN REDUNDANT SCROLLERS — batch 3's keyboard trap, one level out
+
+Measuring the phone width meant reading what constrains the table, and this screen wrapped it in
+its OWN `<div style={{ overflowX: "auto" }}>`. `Table` has provided a scroll container since batch
+3 — **with `tabIndex={0}`**, because *a scroll container nothing can focus is a region a keyboard
+user cannot scroll AT ALL*. An unfocusable scroller wrapping a focusable one is that same defect
+one level out.
+
+**axe cannot see it**, which is why they survived: it raises `scrollable-region-focusable` only
+when a region actually OVERFLOWS, and the outer div rarely does — the inner one absorbs the
+overflow first.
+
+**MEASURED: 17 sites across 10 files.** One fixed (this screen's, which also took `SCREEN_BUDGET`
+1100 → 1099). **The other 16 are counted and NOT swept** — six of them are `/retention-disposal`
+alone, three `/sla-dashboard`:
+
+`client-accounting`, `financial-report`, `insurer-accounting`, `regulatory-compliance`,
+`retention-disposal` ×6, `ropa-entries`, `screening-matches`, `sla-dashboard` ×3, `watchlist-sync`.
+
+#### A FIFTH api display string, seen in the capture: the provider's own NAME
+
+«الاسم» renders `Built-in watchlist cache (OFAC SDN + UN Consolidated)` — English, beside a TYPE
+that reads «القائمة المحلية المزامنة» in Arabic, because `ScreeningProviderKind` was given a label
+map last batch and `ProviderHealth.providerName` was not. The three adapters declare it as
+`readonly name`, so the field-name sweep that found `note` and `detail` did not look at it.
+
+Counted with the others in the class table below, not fixed: it is the same class and the same
+answer — no Arabic exists for it and inventing one is the thing the standing rule forbids.
+
+**And it is the one the sweep could never have found**, which is why it is worth its own heading: a
+sweep over display-FIELD names (`note`, `detail`, `meaning`, …) cannot see a field declared as
+`readonly name`. It took opening the picture.
+
+#### The intro paragraph teaches two token names the screen stopped rendering — reported
+
+`shWhichProviderActuallyPerformsScreening` is the sentence under the heading. Its English reads
+*"**NOT_CONFIGURED** or **UNAVAILABLE** means screening did not happen"* and its Arabic quotes «غير
+مهيأ» and «غير متاح» — but the status row has rendered `ENUM_LABEL.ProviderHealthStatus` since the
+previous batch, so an English reader now sees **Not configured** and **Unavailable** while the
+paragraph above names the raw tokens, and an Arabic reader sees «غير مُهيّأ» against the
+paragraph's undiacriticised «غير مهيأ».
+
+The sentence was exactly right when it was written and the batch that fixed the status row did not
+look up at it. **NOT reworded** — it is product copy nobody has approved a change to, and its
+substance (*screening did not happen; it is not a negative result*) is still true and still the
+most important sentence on the screen. One line for her.
+
+#### `/screening-health` HAD NO `@a11y` TEST AT ALL, and this batch restructured its table
+
+Measured: **84 of 121 specs carry one**, and of the 37 that do not, this screen and `/sla-policies`
+are the only two COMPLIANCE screens.
+
+One is added, in ARABIC, because the batch earned it rather than to widen the pass: the capability
+table gained a `Note` inside a cell and then a second `<Tr>` whose single `<Td>` spans four
+columns. `Table`'s own history here is a keyboard trap that axe raised **only once a region
+actually overflowed** — which is exactly why running axe on a table this batch restructured is
+verifying its own change rather than sweeping.
+
+**`/sla-policies` still has none.** Counted, not written: a spec is not a design change.
+
+#### A VERIFICATION RUN DIED ON THE HOST, NOT ON THE CODE — and the distinction is the point
+
+The last full verification pass failed at its Playwright step with
+`Process from config.webServer was not able to start. Exit code: 3221225794` — `0xC0000142`,
+`STATUS_DLL_INIT_FAILED`, which on Windows is a process that could not INITIALISE rather than one
+that ran and failed. Nothing in the suite executed.
+
+**What makes it diagnosable rather than a mystery is what happened next in the same script**: the
+a11y suite started its OWN web server seconds later and ran 86 tests green. A build that cannot
+start a server and then starts one is a resource problem, not a broken build — this host had been
+running a forced turbo build, three vitest workspaces and a browser pool in quick succession.
+
+Recorded because the failure mode LOOKS like a catastrophic build failure and is not, and because
+this repository has already once resolved a red local run the wrong way on an environment
+explanation that happened to fit. The step was re-run alone.
+
+#### The class she asked me to count, and stop
+
+`note` is a display string in an api response. Measured across all **888** non-spec api files:
+
+| field | sites | renders on | state |
+|---|---|---|---|
+| `CapabilityState.note` | 28 rows / 27 strings | `/screening-health` | **CLOSED by this batch** |
+| `NeedsAssessmentQuestion.prompt` | 13 | `/needs-assessments` | **already closed** — `promptAr` sits beside it, which is the recorded fix and the precedent for this batch's shape |
+| `RetentionScheduleItem` template `note` | 8 | `/retention-disposal` | **OPEN.** Same field name, same class, a second real instance. Counted, NOT fixed |
+| `ProviderHealth.detail` | ~9 in the four screening adapters | `/screening-health`, one card ABOVE the notes | **OPEN.** Several are transport-error text (`(err as Error).message`) which is not api prose and cannot be localised at all |
+| `EmailProviderHealth.detail` | 2 prose + 6 error-text | `/settings/email` | **OPEN**, same split |
+| `ProviderHealth.providerName` | 3 (`readonly name`, one per adapter) | `/screening-health`, under «الاسم» | **OPEN**, and found by OPENING THE CAPTURE rather than by the sweep — a sweep over display-FIELD names cannot see a field declared as `readonly name`. It renders beside a TYPE that reads «القائمة المحلية المزامنة», which `ScreeningProviderKind` gained a label map for last batch |
+
+**`health.detail` is on the SAME screen as the notes and is deliberately left**, which is worth
+saying plainly rather than leaving as an omission: this batch has no Arabic for those sentences, and
+inventing it is the one thing the standing rule forbids. So `/screening-health` still has English
+prose on it, one card above the table this batch translated.
+
+#### THE CAPTURE FIXTURE'S NINE NOTES WERE ALL INVENTED — third instance, same file, same screen
+
+Six of the nine notes in `design-pass-screenshots.spec.ts` were sentences that appear NOWHERE in the
+product: `Local watchlist.`, `Recurring sweep.`, `Four-hourly re-screen.`, `No callback endpoint.`,
+`No PEP source is configured.`, and a mis-cased OFAC line. Three happened to match.
+
+That is the third instance of this class in one file, on one screen, across three batches:
+
+1. `capabilities` carried TWO rows where the product renders NINE;
+2. `byOutcome` named `CLEAR` and `ERROR`, which are not members of `ScreeningAttemptOutcome`;
+3. nine note sentences the api never sends.
+
+**Her table for the notes came off the SOURCE and not off the picture** — it quotes `Only sanctions
+lists are synced.`, which my fixture never contained — so this one cost her nothing. The first two
+cost her words. The fixture's notes are KEYS now, so a wrong one is a compile error against
+`CapabilityNoteKey` rather than a believable picture of a product that does not exist.
+
+#### A comment of mine over-claimed the mechanism, and the parity guard is what makes it true
+
+Last batch I wrote, at `PROVIDER_CAPABILITY_LABEL_KEY`: *"A third capability added to the api should
+be a COMPILE ERROR in the web."* **False for a value arriving over HTTP.** The compile error fires
+when somebody edits the WEB union — the second half of the job, not the first. A member added in the
+api ALONE makes the lookup return `undefined`, `t(undefined)` renders nothing, and the row loses its
+label with nothing failing anywhere.
+
+`packages/db/prisma/capability-note-parity.spec.ts` is what makes it fail, and it is the fifth
+cross-package parity guard here for the reason the other four sit in `packages/db`: it is the only
+place that can SEE both packages. Six tests, planted four ways — a key added in the api alone (kills
+3), a caution demoted to a description (1), a declared key no adapter builds (1), a `null` back in a
+label map (1).
 
 ### Held back — one commit that needs a workflow-scoped push
 
