@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
@@ -37,19 +43,7 @@ const card: CSSProperties = {
   maxWidth: "46rem",
 };
 
-const headCell: CSSProperties = {
-  padding: "0.35rem 0.7rem",
-  textAlign: "start",
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
 
-const bodyCell: CSSProperties = {
-  padding: "0.35rem 0.7rem",
-  textAlign: "start",
-  verticalAlign: "top",
-  borderBottom: "1px solid #f3f4f6",
-};
 
 const row: CSSProperties = {
   display: "flex",
@@ -234,49 +228,47 @@ export default function ScreeningHealthPage() {
               {t('shSupportedMeansTheAdapterImplements')}
             </p>
             <div style={{ overflowX: "auto" }}>
-              <table style={{ borderCollapse: "collapse", minWidth: "34rem" }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>
+                    <Th>
                       {t('shCapability')}
-                    </th>
-                    <th style={headCell}>{t('shSupported')}</th>
-                    <th style={headCell}>
+                    </Th>
+                    <Th>{t('shSupported')}</Th>
+                    <Th>
                       {t('shConfigured')}
-                    </th>
-                    <th style={headCell}>
+                    </Th>
+                    <Th>
                       {t('shOperational')}
-                    </th>
+                    </Th>
                   </tr>
                 </thead>
                 <tbody>
                   {health.capabilities.map((c) => (
-                    <tr key={c.capability} data-capability={c.capability}>
-                      <td style={bodyCell}>
+                    <Tr key={c.capability} data-capability={c.capability}>
+                      <Td>
                         <div style={{ fontWeight: 600 }}>{c.capability}</div>
                         <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
                           {c.note}
                         </div>
-                      </td>
-                      <td style={bodyCell} data-supported={String(c.supported)}>
+                      </Td>
+                      <Td data-supported={String(c.supported)}>
                         {c.supported ? "✓" : "—"}
-                      </td>
-                      <td
-                        style={bodyCell}
+                      </Td>
+                      <Td
                         data-configured={String(c.configured)}
                       >
                         {c.configured ? "✓" : "—"}
-                      </td>
-                      <td
-                        style={bodyCell}
+                      </Td>
+                      <Td
                         data-operational={String(c.operational)}
                       >
                         {c.operational ? "✓" : "—"}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
             {!health.pepOperational ? (
               <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
@@ -410,27 +402,27 @@ export default function ScreeningHealthPage() {
               <h2 style={{ marginTop: 0 }}>
                 {t('shMostRecentFailures')}
               </h2>
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>{t('shOutcome')}</th>
-                    <th style={headCell}>
+                    <Th>{t('shOutcome')}</Th>
+                    <Th>
                       {t('shProvider2')}
-                    </th>
-                    <th style={headCell}>{t('shReason')}</th>
+                    </Th>
+                    <Th>{t('shReason')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {overview.attempts.recentUnresolved.map((row_) => (
-                    <tr key={row_.correlationId}>
-                      <td style={bodyCell}>{t(ENUM_LABEL.ScreeningAttemptOutcome[row_.outcome])}</td>
-                      <td style={bodyCell}>{row_.providerName}</td>
+                    <Tr key={row_.correlationId}>
+                      <Td>{t(ENUM_LABEL.ScreeningAttemptOutcome[row_.outcome])}</Td>
+                      <Td>{row_.providerName}</Td>
                       {/* The reason names the remedy, never the customer. */}
-                      <td style={bodyCell}>{row_.failureReason ?? "—"}</td>
-                    </tr>
+                      <Td>{row_.failureReason ?? "—"}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </section>
           ) : null}
 
@@ -474,19 +466,19 @@ export default function ScreeningHealthPage() {
               >
                 <thead>
                   <tr>
-                    <th style={headCell}>
+                    <Th>
                       {t('shCaseState')}
-                    </th>
-                    <th style={headCell}>{t('shCount')}</th>
+                    </Th>
+                    <Th>{t('shCount')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(overview.caseWorkload).map(
                     ([state, count]) => (
-                      <tr key={state} data-case-state={state}>
-                        <td style={bodyCell}>{state}</td>
-                        <td style={bodyCell}>{count}</td>
-                      </tr>
+                      <Tr key={state} data-case-state={state}>
+                        <Td>{state}</Td>
+                        <Td>{count}</Td>
+                      </Tr>
                     ),
                   )}
                 </tbody>
@@ -520,13 +512,13 @@ export default function ScreeningHealthPage() {
                 {t('shNoGenerationExistsNoSync')}
               </p>
             ) : (
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>{t('shSource')}</th>
-                    <th style={headCell}>{t('shStatus2')}</th>
-                    <th style={headCell}>{t('shRecords')}</th>
-                    <th style={headCell}>{t('shAdded')}</th>
+                    <Th>{t('shSource')}</Th>
+                    <Th>{t('shStatus2')}</Th>
+                    <Th>{t('shRecords')}</Th>
+                    <Th>{t('shAdded')}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -536,8 +528,8 @@ export default function ScreeningHealthPage() {
                       data-dataset-status={d.status}
                       data-dataset-source={d.source}
                     >
-                      <td style={bodyCell}>{t(ENUM_LABEL.WatchlistSource[d.source])}</td>
-                      <td style={bodyCell}>
+                      <Td>{t(ENUM_LABEL.WatchlistSource[d.source])}</Td>
+                      <Td>
                         <span style={statusStyle(d.status)}>{t(ENUM_LABEL.DatasetVersionStatus[d.status])}</span>
                         {d.rejectionReason ? (
                           <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
@@ -550,13 +542,13 @@ export default function ScreeningHealthPage() {
                             {d.rollbackReason}
                           </div>
                         ) : null}
-                      </td>
-                      <td style={bodyCell}>{d.recordCount ?? "—"}</td>
-                      <td style={bodyCell}>{d.addedCount ?? "—"}</td>
+                      </Td>
+                      <Td>{d.recordCount ?? "—"}</Td>
+                      <Td>{d.addedCount ?? "—"}</Td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
           </section>
 
@@ -602,19 +594,19 @@ export default function ScreeningHealthPage() {
                 {t('shNoSyncHasRunYet')}
               </p>
             ) : (
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>{t('shSource2')}</th>
-                    <th style={headCell}>{t('shStatus3')}</th>
-                    <th style={headCell}>{t('shRecords2')}</th>
+                    <Th>{t('shSource2')}</Th>
+                    <Th>{t('shStatus3')}</Th>
+                    <Th>{t('shRecords2')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {overview.listSync.map((r, i) => (
-                    <tr key={`${r.source}-${r.startedAt}-${i}`}>
-                      <td style={bodyCell}>{t(ENUM_LABEL.WatchlistSource[r.source])}</td>
-                      <td style={bodyCell}>
+                    <Tr key={`${r.source}-${r.startedAt}-${i}`}>
+                      <Td>{t(ENUM_LABEL.WatchlistSource[r.source])}</Td>
+                      <Td>
                         {t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}
                         {r.errorMessage ? (
                           <div
@@ -623,12 +615,12 @@ export default function ScreeningHealthPage() {
                             {r.errorMessage}
                           </div>
                         ) : null}
-                      </td>
-                      <td style={bodyCell}>{r.recordCount ?? "—"}</td>
-                    </tr>
+                      </Td>
+                      <Td>{r.recordCount ?? "—"}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
           </section>
         </>

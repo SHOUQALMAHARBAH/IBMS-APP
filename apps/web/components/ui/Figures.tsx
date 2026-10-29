@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import type { DataAttributes } from './data-attributes';
 
 /*
  * THE GEOMETRIC FIGURES — a ring, a ranked bar list, and one segmented bar.
@@ -57,6 +58,7 @@ export function Ring({
   size = 84,
   ariaLabel,
   style,
+  ...dataAttributes
 }: {
   /** The numerator. Used for the arc, so the drawing and the text cannot disagree. */
   value: number;
@@ -75,7 +77,7 @@ export function Ring({
   /** The whole figure as one sentence, for a reader who cannot see the ring. */
   ariaLabel: string;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   const stroke = Math.max(6, Math.round(size * 0.107));
   const radius = (size - stroke) / 2 - 1;
   const centre = size / 2;
@@ -85,6 +87,7 @@ export function Ring({
 
   return (
     <div
+      {...dataAttributes}
       style={{
         background: 'var(--surface-card)',
         border: '1px solid var(--border-default)',
@@ -173,14 +176,18 @@ export function BarList({
   rows,
   slot = 1,
   style,
+  ...dataAttributes
 }: {
   rows: Array<{ name: ReactNode; value: number; valueText: ReactNode }>;
   slot?: ChartSlot;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   const largest = rows.reduce((max, row) => Math.max(max, row.value), 0);
   return (
-    <ul style={{ display: 'grid', gap: 'var(--space-3)', margin: 0, padding: 0, listStyle: 'none', ...style }}>
+    <ul
+      {...dataAttributes}
+      style={{ display: 'grid', gap: 'var(--space-3)', margin: 0, padding: 0, listStyle: 'none', ...style }}
+    >
       {rows.map((row, index) => (
         <li
           key={index}
@@ -249,15 +256,16 @@ export function SegmentedBar({
   segments,
   ariaLabel,
   style,
+  ...dataAttributes
 }: {
   segments: Array<{ name: ReactNode; value: number; slot: ChartSlot }>;
   /** The whole distribution as one sentence — e.g. `سارٍ ٢٦، ينتهي قريباً ٧، منتهٍ ٢، موقوف ١`. */
   ariaLabel: string;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   return (
-    <div style={{ display: 'grid', gap: 'var(--space-3)', minWidth: 0, ...style }}>
+    <div {...dataAttributes} style={{ display: 'grid', gap: 'var(--space-3)', minWidth: 0, ...style }}>
       <div
         role="img"
         aria-label={ariaLabel}

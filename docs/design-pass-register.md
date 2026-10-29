@@ -539,6 +539,84 @@ crowded screens §4(c) is about and want hand work rather than a wider matcher:
 
 ---
 
+### Batch 3 — the crowded screens §4(c) is about
+
+`/retention-disposal` is the exemplar: SIX `<section>`s on one page, each a bare `<h2>` over a
+table that brought its own borders and its own minimum width — 56rem here, 64rem there,
+`width: 100%` somewhere else — so a reader scrolling the page met three different horizontal
+behaviours and nothing said where one block of work ended and the next began. A section is a CARD
+WITH A TITLE now, so the heading and the thing it heads share one surface. On a page with six of
+them that is the difference between a page and a pile.
+
+`scripts/measurements/design-pass-sections.py` is the tool, and it is a SECOND one rather than a
+wider first because the shape is genuinely different. Both closing tags are found by PAIRING with
+a depth count, never by a blanket replace: `</section>` and `</tr>` both nest, and a screen where
+one section converts and another does not would get a `</Card>` closing a `<section>`.
+
+| screen | inline | screen | inline |
+|---|---|---|---|
+| `/client-accounting` | 13 → 4 | `/financial-report` | 18 → 13 |
+| `/insurer-accounting` | 14 → 4 | `/regulatory-compliance` | 25 → 21 |
+| `/retention-disposal` | 70 → 57 | `/rfqs/[id]` | 17 → 17 |
+| `/screening-health` | 37 → 33 | `/screening-matches` | 17 → 16 |
+| `/settings/customer-import` | 18 → 14 | `/settings/roles` | 8 → 6 |
+| `/sla-dashboard` | 22 → 19 |  |  |
+
+**259 → 204 on these 11 files; `SCREEN_BUDGET` 1239 → 1184.**
+
+### THE a11y SUITE FOUND A KEYBOARD TRAP EVERY TABLE IN THE PRODUCT HAD
+
+52 axe violations on `/retention-disposal` the moment its six hand-rolled tables became six
+`Table`s — `scrollable-region-focusable`. The component wraps its table in an `overflow-x: auto`
+div, and **a scroll container nothing can focus is a region a keyboard user cannot scroll at all**:
+everything past the fold is simply unreachable.
+
+**THE HAND-ROLLED TABLES HAD THE SAME DEFECT AND THE SUITE NEVER SAID SO.** Each screen wrote its
+own `<div style={{ overflowX: 'auto' }}>`, and axe raises this only when the region actually
+overflows — so whether it was reported depended on the fixture's data being wide enough. Moving
+every table onto one component is what made one fix reach all of them, and is also what made the
+defect loud enough to see. `tabIndex={0}` is the whole fix; the focus ring goes with it, because a
+thing that takes focus and does not show it leaves a keyboard user with no idea where they are.
+
+No `role="region"`, deliberately: axe is satisfied by the tab stop, and a region needs an
+accessible NAME to be worth announcing — a new string per table, in both languages, on 40-odd
+screens. That is rule 8(d) work and is not this.
+
+### The `data-*` trap, found twice more — so it is a guard now
+
+Batch 2 fixed `ErrorState` and said naming one attribute is always one short. It was: `Tr` still
+named only `data-testid`, so `/retention-disposal`'s `data-notice-for` and `/screening-health`'s
+`data-capability` went nowhere; and `Card` named none at all, so two section hooks did too. That
+is five components in three batches, every one found by a failing test rather than by the compiler.
+
+`apps/web/test/data-attributes.test.ts` ends it: every component in `components/ui` must forward,
+by spreading `...dataAttributes` or by a props type extending an `*HTMLAttributes` interface. The
+exemptions are declared with a reason and the list **fails in both directions**, so a row cannot
+outlive what it was for.
+
+**AND THE GUARD HAD TWO HOLES OF ITS OWN, BOTH FOUND BY PLANTING IT.** The first version checked
+per FILE, so planting the forwarding away from `Card` left `Card.tsx` still containing
+`...dataAttributes` — `PageHeader`'s — and the guard passed on a component that had stopped
+forwarding. The second checked for the bare name, which matches the DESTRUCTURE: a planted `Card`
+that still collected the attributes and no longer spread them passed again. It matches
+`{...dataAttributes}` — the spread onto an element, which is the thing that actually forwards —
+and the plant now dies naming `Card.tsx#Card`.
+
+It also named two things that were findings about the MATCHER rather than the code: two exported
+predicates in `CombinedDutyReasonField.tsx` that return booleans and render nothing, and `Button`,
+whose props are a named interface declared above the function so a per-component slice cannot see
+its `HTMLAttributes` extension. The first is fixed by requiring the body to render markup; the
+second by allowing that one route at file level, with the limit written down.
+
+### Still owed after batch 3
+
+`/retention-disposal` is 70 → 57 and the rest of it is FORMS rather than tables — the biggest
+single remaining screen. Eleven more are reverted-by-compiler or refused and listed above; the four
+`/dashboards/*` are a `KeyValue` shape rather than a `Table`, and §7 says a dashboard needs more
+than a repaint anyway.
+
+---
+
 ---
 
 ## The method, per screen

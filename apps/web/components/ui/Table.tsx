@@ -26,7 +26,31 @@ export function Table({
   ...dataAttributes
 }: { children: ReactNode; style?: CSSProperties } & DataAttributes) {
   return (
-    <div style={{ width: '100%', overflowX: 'auto', ...style }}>
+    <div
+      /*
+       * A SCROLLABLE REGION MUST BE REACHABLE BY KEYBOARD. Without this, a table wider than its
+       * column is content a keyboard user cannot scroll to at all — axe's
+       * `scrollable-region-focusable`, 52 violations on `/retention-disposal` the moment its six
+       * hand-rolled tables became six of these. Every one of those had the same defect; what
+       * changed is that one component now holds the fix for all of them.
+       *
+       * The focus ring is not decoration: a thing that takes focus and does not show it leaves a
+       * keyboard user with no idea where they are.
+       */
+      tabIndex={0}
+      style={{
+        width: '100%',
+        overflowX: 'auto',
+        borderRadius: 'var(--radius-md)',
+        ...style,
+      }}
+      onFocus={(e) => {
+        if (e.target === e.currentTarget) e.currentTarget.style.boxShadow = 'var(--focus-ring)';
+      }}
+      onBlur={(e) => {
+        if (e.target === e.currentTarget) e.currentTarget.style.boxShadow = 'none';
+      }}
+    >
       <table
         {...dataAttributes}
         style={{
@@ -47,15 +71,17 @@ export function Th({
   numeric = false,
   colSpan,
   style,
+  ...dataAttributes
 }: {
   colSpan?: number;
   children?: ReactNode;
   /** Right-aligns in LTR and left-aligns in RTL, via logical `end`. */
   numeric?: boolean;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   return (
     <th
+      {...dataAttributes}
       colSpan={colSpan}
       scope="col"
       style={{
@@ -119,7 +145,7 @@ export function Td({
 }
 
 /*
- * A ROW, AND IT FORWARDS `data-testid` EXPLICITLY — which is not a convenience.
+ * A ROW, AND IT FORWARDS THE WHOLE `data-*` FAMILY — which is not a convenience.
  *
  * TypeScript exempts hyphen-containing JSX attributes from excess-property checking, so
  * `data-anything` on ANY custom component type-checks and then goes nowhere. That is how moving a
@@ -127,14 +153,18 @@ export function Td({
  * `self-approval-report.spec.ts` reads — with `tsc` clean, the screen rendering perfectly, and the
  * spec that covers the SAME SCREEN still green because it happens not to use them.
  *
- * It is declared as a named prop rather than absorbed by a props spread, so the support is
- * visible in the signature. A row that needs more than this should render a plain `<tr>`.
+ * NAMING `data-testid` WAS THE FIRST FIX AND IT WAS ONE NAME SHORT — the fourth time that has been
+ * true in this batch. `/retention-disposal` hangs `data-notice-for` on its rows, `/claims` hangs
+ * `data-claim-status` on a pill, `/insurer-directory` hangs `data-line-error` on a refusal: every
+ * screen uses its own, so a list of names is always missing the next one. The index signature
+ * accepts the family and the spread forwards it, which makes the support a property of the
+ * SIGNATURE rather than something a reader has to go and check in the body.
  */
 export function Tr({
   children,
   variant = 'default',
   style,
-  'data-testid': testId,
+  ...dataAttributes
 }: {
   children: ReactNode;
   /*
@@ -148,10 +178,10 @@ export function Tr({
    */
   variant?: 'default' | 'total';
   style?: CSSProperties;
-  'data-testid'?: string;
-}) {
+} & DataAttributes) {
   return (
     <tr
+      {...dataAttributes}
       style={
         variant === 'total'
           ? {
@@ -162,7 +192,6 @@ export function Tr({
             }
           : style
       }
-      data-testid={testId}
     >
       {children}
     </tr>

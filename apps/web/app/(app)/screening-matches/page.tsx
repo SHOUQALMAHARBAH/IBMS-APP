@@ -1,6 +1,12 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import {
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { useCallback, useEffect, useState } from "react";
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
@@ -30,17 +36,6 @@ const STATUSES: ScreeningMatchStatus[] = ["pending", "confirmed", "cleared"];
  * rejecting a too-short reason after a round trip. */
 const MIN_REASON = 10;
 
-const cell: CSSProperties = {
-  padding: "0.4rem 0.75rem",
-  borderBottom: "1px solid var(--border-subtle)",
-  textAlign: "start",
-  verticalAlign: "top",
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
 
 export default function ScreeningMatchesPage() {
   const router = useRouter();
@@ -210,38 +205,38 @@ export default function ScreeningMatchesPage() {
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", minWidth: "62rem" }}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('smCustomer')}</th>
-                  <th style={head}>
+                  <Th>{t('smCustomer')}</Th>
+                  <Th>
                     {t('smMatchedName')}
-                  </th>
-                  <th style={head}>
+                  </Th>
+                  <Th>
                     {t('smListEntry')}
-                  </th>
-                  <th style={head}>{t('smType')}</th>
-                  <th style={head}>{t('smDetected')}</th>
-                  <th style={head}>{t('smCaseColumn')}</th>
-                  <th style={head}>
+                  </Th>
+                  <Th>{t('smType')}</Th>
+                  <Th>{t('smDetected')}</Th>
+                  <Th>{t('smCaseColumn')}</Th>
+                  <Th>
                     {status === "pending"
                       ? t('smDecision')
                       : t('smReview')}
-                  </th>
+                  </Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    <Td>
                       {r.customerLegalName}
                       {r.isEdd ? (
                         <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
                           {t('smEdd')}
                         </div>
                       ) : null}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {r.subjectName}
                       {/*
                         DOOR FOUR'S WAY IN. An open screening case assigned to this officer opens
@@ -259,8 +254,8 @@ export default function ScreeningMatchesPage() {
                           {t('smViewCustomerRfqs')}
                         </a>
                       </div>
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {r.listEntryName}
                       <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
                         {r.listSource}
@@ -270,10 +265,10 @@ export default function ScreeningMatchesPage() {
                           {t('smNoLongerOnTheSource')}
                         </div>
                       ) : null}
-                    </td>
-                    <td style={cell}>{r.matchType}</td>
-                    <td style={cell}>{r.detectedAt.slice(0, 10)}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{r.matchType}</Td>
+                    <Td>{r.detectedAt.slice(0, 10)}</Td>
+                    <Td>
                       {canReview && r.status === "pending" ? (
                         <ScreeningCasePanel
                           match={r}
@@ -283,8 +278,8 @@ export default function ScreeningMatchesPage() {
                       ) : (
                         t(screeningCaseStatusKey(r.caseStatus))
                       )}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {r.status !== "pending" ? (
                         <div style={{ fontSize: "0.85rem" }}>
                           <strong>{t(ENUM_LABEL.ScreeningMatchStatus[r.status])}</strong>
@@ -337,11 +332,11 @@ export default function ScreeningMatchesPage() {
                           {t('smComplianceOfficerOnly')}
                         </span>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )
       ) : loadError ? null : (

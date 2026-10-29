@@ -53,8 +53,18 @@ import {
   type RetentionExtensionRegisterRow,
   type RetentionNotice,
 } from '../../../lib/pdpl/retention-disposal-api';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import {
@@ -187,14 +197,6 @@ const ARCHIVE_BASIS_MEANING: Partial<
   { when: TranslationKey; kinds?: TranslationKey; write: TranslationKey; example: TranslationKey }
 >;
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const sectionStyle: CSSProperties = { margin: '2rem 0' };
 /*
  * The basis explanation. A bordered block rather than muted body text, deliberately: it is four
  * sentences in a form and has to read as guidance attached to the field above it rather than as
@@ -597,21 +599,14 @@ export default function RetentionDisposalPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('rdHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('rdIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('rdHeading')} description={t('rdIntro')} />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {/* --- Retention schedule --- */}
@@ -626,8 +621,7 @@ export default function RetentionDisposalPage() {
         article set the floor, what date the count ran from, and that no hold stands.
       */}
       {canSeeNotices ? (
-        <section style={sectionStyle}>
-          <h2>{t('rdNoticeHeading')}</h2>
+        <Card title={t('rdNoticeHeading')}>
           {/*
             THE BACKUP LIMITATION, on the screen that offers destruction. The owner's policy paper
             records that deleting from the primary database is not destruction while a backup holds
@@ -678,24 +672,24 @@ export default function RetentionDisposalPage() {
           {notices === null ? (
             <p>{t('rdNoticeLoading')}</p>
           ) : notices.length === 0 ? (
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoticeNone')}</p>
+            <EmptyState title={t('rdNoticeNone')} />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('rdNoticeColCategory')}</th>
-                    <th style={head}>{t('rdNoticeColElapsed')}</th>
-                    <th style={head}>{t('rdNoticeColBasis')}</th>
-                    <th style={head}>{t('rdNoticeColCountedFrom')}</th>
-                    <th style={head}>{t('rdNoticeColChoices')}</th>
+                    <Th>{t('rdNoticeColCategory')}</Th>
+                    <Th>{t('rdNoticeColElapsed')}</Th>
+                    <Th>{t('rdNoticeColBasis')}</Th>
+                    <Th>{t('rdNoticeColCountedFrom')}</Th>
+                    <Th>{t('rdNoticeColChoices')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {notices.map((n) => (
-                    <tr key={n.recordCategory} data-notice-for={n.recordCategory}>
-                      <td style={cell}>{n.recordCategory}</td>
-                      <td style={cell}>
+                    <Tr key={n.recordCategory} data-notice-for={n.recordCategory}>
+                      <Td>{n.recordCategory}</Td>
+                      <Td>
                         {/*
                           AN UNRESOLVABLE CATEGORY SAYS SO, LOUDLY, ON ITS OWN ROW — decision 28's
                           family. An office that set a period for a category it named itself and is
@@ -709,14 +703,14 @@ export default function RetentionDisposalPage() {
                             {t('rdNoticeUnwatched')}
                           </span>
                         )}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {n.floor
                           ? `${n.floor.instrument}, ${n.floor.article} — ${n.floor.operativeText}`
                           : '—'}
-                      </td>
-                      <td style={cell}>{n.countedFrom ?? '—'}</td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>{n.countedFrom ?? '—'}</Td>
+                      <Td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                           <span style={{ color: 'var(--ink-secondary)' }}>
                             {n.noLegalHoldStatement}
@@ -730,11 +724,11 @@ export default function RetentionDisposalPage() {
                             </button>
                           ) : null}
                         </div>
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           )}
           {extendFor ? (
@@ -748,7 +742,7 @@ export default function RetentionDisposalPage() {
                 borderRadius: '0.25rem',
               }}
             >
-              <h3 style={{ margin: '0 0 0.5rem' }}>
+              <h3>
                 {t('rdNoticeExtendHeading')} — {extendFor}
               </h3>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -841,7 +835,7 @@ export default function RetentionDisposalPage() {
               </button>
             </div>
           ) : null}
-        </section>
+        </Card>
       ) : null}
 
       {/*
@@ -855,8 +849,7 @@ export default function RetentionDisposalPage() {
         phase IS.
       */}
       {canRetrieve ? (
-        <section style={sectionStyle} data-testid="retention-retrieve-section">
-          <h2>{t('rdRetrieveHeading')}</h2>
+        <Card title={t('rdRetrieveHeading')} data-testid="retention-retrieve-section">
           <p role="status" style={{ color: 'var(--ink-secondary)' }}>
             {t('rdRetrieveAppendOnly')}
           </p>
@@ -1022,30 +1015,27 @@ export default function RetentionDisposalPage() {
 
           <h3>{t('rdRetrieveRegisterHeading')}</h3>
           {retrievals === null ? (
-            <p>{t('rdLoading')}</p>
+            <SkeletonList rows={3} label={t('rdLoading')} />
           ) : retrievals.length === 0 ? (
             <p style={{ color: 'var(--ink-secondary)' }}>
               {t('rdRetrieveNone')}
             </p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table
-                data-testid="retrieve-register-table"
-                style={{ borderCollapse: 'collapse', width: '100%' }}
-              >
+              <Table data-testid="retrieve-register-table">
                 <thead>
                   <tr>
-                    <th style={head}>{t('rdNoticeColCategory')}</th>
-                    <th style={head}>{t('rdRetrieveColBasis')}</th>
-                    <th style={head}>{t('rdRetrieveColNote')}</th>
-                    <th style={head}>{t('rdRetrieveColWho')}</th>
-                    <th style={head}>{t('rdRetrieveColWhen')}</th>
+                    <Th>{t('rdNoticeColCategory')}</Th>
+                    <Th>{t('rdRetrieveColBasis')}</Th>
+                    <Th>{t('rdRetrieveColNote')}</Th>
+                    <Th>{t('rdRetrieveColWho')}</Th>
+                    <Th>{t('rdRetrieveColWhen')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {retrievals.map((r) => (
-                    <tr key={r.id} data-retrieval-for={r.recordId}>
-                      <td style={cell}>{r.recordCategory}</td>
+                    <Tr key={r.id} data-retrieval-for={r.recordId}>
+                      <Td>{r.recordCategory}</Td>
                       {/*
                         THE RECORD'S OWN ID IS NOT RENDERED, and that is rule 2 rather than an
                         omission. The identifier-budget guard fired on the first version (29 -> 30)
@@ -1068,17 +1058,17 @@ export default function RetentionDisposalPage() {
                         basis would have been mislabelled as a Central Bank audit on the register
                         that exists to say why a blocked record was opened.
                       */}
-                      <td style={cell}>{basisLabel(r.basis)}</td>
-                      <td style={cell}>{r.note}</td>
-                      <td style={cell}>{r.retrievedByName ?? '—'}</td>
-                      <td style={cell}>{r.retrievedAt.slice(0, 10)}</td>
-                    </tr>
+                      <Td>{basisLabel(r.basis)}</Td>
+                      <Td>{r.note}</Td>
+                      <Td>{r.retrievedByName ?? '—'}</Td>
+                      <Td>{r.retrievedAt.slice(0, 10)}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           )}
-        </section>
+        </Card>
       ) : null}
 
       {/*
@@ -1112,13 +1102,19 @@ export default function RetentionDisposalPage() {
         register exists for is intact; what is missing is a handle for the person reading it, and
         that is register entry 94's deferred family.
       */}
+      {/* A CARD, like every other top-level section on this page — the retrieval register above
+          is an `h3` INSIDE the retrieval card rather than a card of its own, which is what says it
+          belongs to that section rather than standing beside it.
+
+          THE COMMENT SITS ABOVE THE TERNARY, not inside its branch: a JSX comment as the first
+          child of a branch is parsed as an OBJECT LITERAL, which is `TS1005` and three more errors
+          downstream. Recorded in the pilot and met again here — and the fix for it then went wrong
+          a second way, because a JSX comment cannot itself contain the two characters that end
+          one, so quoting the shape inside the explanation closed the comment early. */}
       {canSeeNotices ? (
-        <section style={sectionStyle} data-testid="retention-extension-section">
-          {/* `h2`, like every other top-level section on this page — the retrieval register above is
-              an `h3` because it sits INSIDE the retrieval section, under its own `h2`. */}
-          <h2>{t('rdExtRegisterHeading')}</h2>
+        <Card title={t('rdExtRegisterHeading')} data-testid="retention-extension-section">
           {extensions === null ? (
-            <p>{t('rdLoading')}</p>
+            <SkeletonList rows={3} label={t('rdLoading')} />
           ) : extensions.length === 0 ? (
             <p
               data-testid="retention-extension-none"
@@ -1128,27 +1124,24 @@ export default function RetentionDisposalPage() {
             </p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table
-                data-testid="retention-extension-table"
-                style={{ borderCollapse: 'collapse', width: '100%' }}
-              >
+              <Table data-testid="retention-extension-table">
                 <thead>
                   <tr>
-                    <th style={head}>{t('rdNoticeColCategory')}</th>
-                    <th style={head}>{t('rdExtColRecord')}</th>
-                    <th style={head}>{t('rdExtColUntil')}</th>
-                    <th style={head}>{t('rdRetrieveColBasis')}</th>
-                    <th style={head}>{t('rdRetrieveColNote')}</th>
-                    <th style={head}>{t('rdNoticeInstrumentLabel')}</th>
-                    <th style={head}>{t('rdNoticeArticleLabel')}</th>
-                    <th style={head}>{t('rdNoticeHoldLabel')}</th>
-                    <th style={head}>{t('rdExtColWho')}</th>
-                    <th style={head}>{t('rdRetrieveColWhen')}</th>
+                    <Th>{t('rdNoticeColCategory')}</Th>
+                    <Th>{t('rdExtColRecord')}</Th>
+                    <Th>{t('rdExtColUntil')}</Th>
+                    <Th>{t('rdRetrieveColBasis')}</Th>
+                    <Th>{t('rdRetrieveColNote')}</Th>
+                    <Th>{t('rdNoticeInstrumentLabel')}</Th>
+                    <Th>{t('rdNoticeArticleLabel')}</Th>
+                    <Th>{t('rdNoticeHoldLabel')}</Th>
+                    <Th>{t('rdExtColWho')}</Th>
+                    <Th>{t('rdRetrieveColWhen')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {extensions.map((x) => (
-                    <tr key={x.id} data-extension-for={x.recordId}>
+                    <Tr key={x.id} data-extension-for={x.recordId}>
                       {/*
                         WHICH RECORD — owner decision 44, and the id is STILL not rendered. The
                         reference is the real one the record carries (a client bank reference, a
@@ -1162,7 +1155,7 @@ export default function RetentionDisposalPage() {
                         cannot say which, but a cell crowded with that sentence stops being a
                         reference.
                       */}
-                      <td style={cell} data-extension-handle={x.recordHandle.state}>
+                      <Td data-extension-handle={x.recordHandle.state}>
                         {x.recordHandle.state === 'RECORDED' ? (
                           <bdi title={x.recordHandle.description}>
                             {x.recordHandle.value}
@@ -1178,41 +1171,40 @@ export default function RetentionDisposalPage() {
                         ) : (
                           t('rdExtRecordGone')
                         )}
-                      </td>
-                      <td style={cell}>{x.recordCategory}</td>
-                      <td style={cell}>{x.extendedUntil.slice(0, 10)}</td>
-                      <td style={cell}>{t(EXTENSION_BASIS_LABEL[x.basis])}</td>
-                      <td style={cell}>{x.note}</td>
+                      </Td>
+                      <Td>{x.recordCategory}</Td>
+                      <Td>{x.extendedUntil.slice(0, 10)}</Td>
+                      <Td>{t(EXTENSION_BASIS_LABEL[x.basis])}</Td>
+                      <Td>{x.note}</Td>
                       {/*
                         An em dash rather than an omitted row where the basis did not need an
                         instrument: "this extension cites no statute" and "somebody left it blank"
                         are different facts, and a missing cell says neither.
                       */}
-                      <td style={cell}>{x.legislativeInstrument ?? '—'}</td>
-                      <td style={cell}>{x.legislativeArticle ?? '—'}</td>
+                      <Td>{x.legislativeInstrument ?? '—'}</Td>
+                      <Td>{x.legislativeArticle ?? '—'}</Td>
                       {/*
                         THE HOLD'S SCOPE AND REASON, never its id — which is both rule 2 and the
                         useful half: a reader checking whether an extension is justified needs to
                         know WHAT was held and why, and a uuid tells them neither.
                       */}
-                      <td style={cell}>
+                      <Td>
                         {x.legalHold === null
                           ? '—'
                           : `${x.legalHold.scope} — ${x.legalHold.reason}`}
-                      </td>
-                      <td style={cell}>{x.extendedByName ?? '—'}</td>
-                      <td style={cell}>{x.extendedAt.slice(0, 10)}</td>
-                    </tr>
+                      </Td>
+                      <Td>{x.extendedByName ?? '—'}</Td>
+                      <Td>{x.extendedAt.slice(0, 10)}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           )}
-        </section>
+        </Card>
       ) : null}
 
-      <section style={sectionStyle}>
-        <h2>{t('rdScheduleHeading')}</h2>
+      <Card title={t('rdScheduleHeading')}>
         {canManageSchedule ? (
           <form
             onSubmit={submitSchedule}
@@ -1272,7 +1264,7 @@ export default function RetentionDisposalPage() {
               background: 'var(--surface-sunken)',
             }}
           >
-            <h3 style={{ margin: '0 0 0.5rem' }}>{t('rdNoFloorHeading')}</h3>
+            <h3>{t('rdNoFloorHeading')}</h3>
             {/* The owner's sentence, rendered verbatim and sent back verbatim to be recorded. */}
             <p style={{ margin: '0 0 0.75rem' }} data-testid="retention-no-floor-notice">
               {noFloorNotice}
@@ -1340,25 +1332,24 @@ export default function RetentionDisposalPage() {
         ) : null}
         {schedule ? (
           schedule.length === 0 ? (
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoScheduleItems')}</p>
+            <EmptyState title={t('rdNoScheduleItems')} />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table
-                data-testid="retention-schedule-table" style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+              <Table data-testid="retention-schedule-table">
                 <thead>
                   <tr>
-                    <th style={head}>{t('rdColCategory')}</th>
-                    <th style={head}>{t('rdColMonths')}</th>
-                    <th style={head}>{t('rdColLegalBasis')}</th>
-                    <th style={head}>{t('rdColConfirmed')}</th>
-                    <th style={head}>{t('rdColAction')}</th>
+                    <Th>{t('rdColCategory')}</Th>
+                    <Th>{t('rdColMonths')}</Th>
+                    <Th>{t('rdColLegalBasis')}</Th>
+                    <Th>{t('rdColConfirmed')}</Th>
+                    <Th>{t('rdColAction')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {schedule.map((s) => (
-                    <tr key={s.id}>
-                      <td style={cell}>{s.recordCategory}</td>
-                      <td style={cell}>
+                    <Tr key={s.id}>
+                      <Td>{s.recordCategory}</Td>
+                      <Td>
                         {canManageSchedule && !s.isConfirmed ? (
                           <input
                             aria-label={t('rdMonthsAria', { name: s.recordCategory })}
@@ -1405,9 +1396,9 @@ export default function RetentionDisposalPage() {
                             {t('rdInertNothingMeasured')}
                           </span>
                         ) : null}
-                      </td>
-                      <td style={cell}>{s.legalBasis ?? '—'}</td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>{s.legalBasis ?? '—'}</Td>
+                      <Td>
                         {/* `commonYes`, not a hardcoded 'Yes' — an Arabic reader was seeing the
                             English word in this cell. The key already existed in both languages. */}
                         {s.isConfirmed ? t('commonYes') : t('rdDraftPending')}
@@ -1419,8 +1410,8 @@ export default function RetentionDisposalPage() {
                           act={s.combinedDutyAct}
                           testId={`retention-schedule-combined-duty-${s.id}`}
                         />
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
                           {canManageSchedule && !s.isConfirmed && editMonths[s.id] ? (
                             <button
@@ -1463,21 +1454,20 @@ export default function RetentionDisposalPage() {
                             </button>
                           ) : null}
                         </div>
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           )
         ) : loadError ? null : (
-          <p>{t('rdLoading')}</p>
+          <SkeletonList rows={3} label={t('rdLoading')} />
         )}
-      </section>
+      </Card>
 
       {/* --- Legal holds --- */}
-      <section style={sectionStyle}>
-        <h2>{t('rdHoldsHeading')}</h2>
+      <Card title={t('rdHoldsHeading')}>
         {canManageHolds ? (
           <form
             onSubmit={submitHold}
@@ -1530,28 +1520,28 @@ export default function RetentionDisposalPage() {
         ) : null}
         {holds ? (
           holds.length === 0 ? (
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoHolds')}</p>
+            <EmptyState title={t('rdNoHolds')} />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('rdScopeLabel')}</th>
-                    <th style={head}>{t('rdColCategory')}</th>
-                    <th style={head}>{t('rdColSubject')}</th>
-                    <th style={head}>{t('rdColNextReviewDue')}</th>
-                    <th style={head}>{t('rdColStatus')}</th>
-                    <th style={head}>{t('rdColAction')}</th>
+                    <Th>{t('rdScopeLabel')}</Th>
+                    <Th>{t('rdColCategory')}</Th>
+                    <Th>{t('rdColSubject')}</Th>
+                    <Th>{t('rdColNextReviewDue')}</Th>
+                    <Th>{t('rdColStatus')}</Th>
+                    <Th>{t('rdColAction')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {holds.map((h) => (
-                    <tr key={h.id}>
-                      <td style={cell}>{h.scope}</td>
-                      <td style={cell}>
+                    <Tr key={h.id}>
+                      <Td>{h.scope}</Td>
+                      <Td>
                         {h.retentionScheduleItemId ? h.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {/*
                           * RULE 2 — WHOSE records are frozen, by name. This rendered
                           * `Customer <8 chars of a uuid>`, so a DPO working the six-monthly
@@ -1569,10 +1559,10 @@ export default function RetentionDisposalPage() {
                         ) : (
                           '—'
                         )}
-                      </td>
-                      <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>
-                      <td style={cell}>{h.isActive ? t('rdHoldInForce') : t('rdReleased')}</td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>{h.nextReviewDueAt.slice(0, 10)}</Td>
+                      <Td>{h.isActive ? t('rdHoldInForce') : t('rdReleased')}</Td>
+                      <Td>
                         {canManageHolds && h.isActive ? (
                           <div style={{ display: 'flex', gap: '0.35rem' }}>
                             <button
@@ -1593,21 +1583,20 @@ export default function RetentionDisposalPage() {
                         ) : (
                           '—'
                         )}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           )
         ) : loadError ? null : (
-          <p>{t('rdLoading')}</p>
+          <SkeletonList rows={3} label={t('rdLoading')} />
         )}
-      </section>
+      </Card>
 
       {/* --- Disposal batches --- */}
-      <section style={sectionStyle}>
-        <h2>{t('rdBatchesHeading')}</h2>
+      <Card title={t('rdBatchesHeading')}>
         {canNominate ? (
           <form
             onSubmit={submitNominate}
@@ -1628,26 +1617,26 @@ export default function RetentionDisposalPage() {
         ) : null}
         {batches ? (
           batches.length === 0 ? (
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoBatches')}</p>
+            <EmptyState title={t('rdNoBatches')} />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('rdColCategory')}</th>
-                    <th style={head}>{t('rdColStatus')}</th>
-                    <th style={head}>{t('rdColSlaDue')}</th>
-                    <th style={head}>{t('rdColCertificate')}</th>
-                    <th style={head}>{t('rdColAction')}</th>
+                    <Th>{t('rdColCategory')}</Th>
+                    <Th>{t('rdColStatus')}</Th>
+                    <Th>{t('rdColSlaDue')}</Th>
+                    <Th>{t('rdColCertificate')}</Th>
+                    <Th>{t('rdColAction')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {batches.map((b) => (
-                    <tr key={b.id}>
-                      <td style={cell}>
+                    <Tr key={b.id}>
+                      <Td>
                         {b.retentionScheduleItemId ? b.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {t(ENUM_LABEL.DisposalBatchStatus[b.status])}
                         {/* Part 4 step 5 — in the STATUS cell, because the status says DPO_APPROVED
                             whether one person or two agreed, and this pair authorises irreversible
@@ -1656,10 +1645,10 @@ export default function RetentionDisposalPage() {
                           act={b.combinedDutyAct}
                           testId={`combined-duty-disposal-${b.id}`}
                         />
-                      </td>
-                      <td style={cell}>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</td>
-                      <td style={cell}>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</Td>
+                      <Td>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</Td>
+                      <Td>
                         {/* Owner decision 41 — this batch's state history, without a pasted uuid.
                             Outside the CLOSED ternary deliberately: a CLOSED batch is exactly the one
                             whose history somebody comes to read, and the branch below renders an
@@ -1762,17 +1751,17 @@ export default function RetentionDisposalPage() {
                             ) : null}
                           </div>
                         )}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           )
         ) : loadError ? null : (
-          <p>{t('rdLoading')}</p>
+          <SkeletonList rows={3} label={t('rdLoading')} />
         )}
-      </section>
+      </Card>
     </main>
   );
 }

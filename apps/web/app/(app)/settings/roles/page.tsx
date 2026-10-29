@@ -1,6 +1,13 @@
 'use client';
 
 import {
+  Card,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
+import {
   type CSSProperties,
   type FormEvent,
   useCallback,
@@ -63,17 +70,6 @@ const STATUS_ORDER: Record<DutySegregationReadiness['status'], number> = {
  *  office defines is deliberately NOT one of these. */
 type LegacyRoleName = keyof typeof ENUM_LABEL.RoleName;
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
@@ -573,8 +569,7 @@ export default function RoleAdminPage() {
 
 
       {canCreate ? (
-        <section style={sectionStyle}>
-          <h2>{t('roleCreateHeading')}</h2>
+        <Card title={t('roleCreateHeading')}>
           <form onSubmit={onCreate} style={formStyle}>
             {/* English name FIRST, because the machine name is derived from it and a person should
                 see the cause before the effect. Required — owner decision, 2026-09-24 — precisely
@@ -645,7 +640,7 @@ export default function RoleAdminPage() {
               {busy ? t('roleCreating') : t('roleCreateButton')}
             </button>
           </form>
-        </section>
+        </Card>
       ) : null}
 
       {/* THE TWO-PERSON-OPERATIONS GRID SITS BELOW THE CREATE FORM, moved 2026-10-16 on the
@@ -669,13 +664,13 @@ export default function RoleAdminPage() {
           <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>
             {t('dutySegIntro')}
           </p>
-          <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
+          <Table>
             <thead>
               <tr>
-                <th style={head}>{t('dutySegColOperation')}</th>
-                <th style={head}>{t('dutySegColPermission')}</th>
-                <th style={head}>{t('dutySegColHolders')}</th>
-                <th style={head}>{t('dutySegColStatus')}</th>
+                <Th>{t('dutySegColOperation')}</Th>
+                <Th>{t('dutySegColPermission')}</Th>
+                <Th>{t('dutySegColHolders')}</Th>
+                <Th>{t('dutySegColStatus')}</Th>
               </tr>
             </thead>
             <tbody>
@@ -693,22 +688,22 @@ export default function RoleAdminPage() {
                     key={row.constraint ?? row.entityType + row.pairLabel}
                     data-duty-row={row.status}
                   >
-                    <td style={cell}>{row.entityType}</td>
-                    <td style={cell}>
+                    <Td>{row.entityType}</Td>
+                    <Td>
                       <code>{row.checkerPermission}</code>
-                    </td>
-                    <td style={cell}>{row.holderCount}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{row.holderCount}</Td>
+                    <Td>
                       {row.status === 'NOBODY'
                         ? t('dutySegStatusNobody')
                         : row.status === 'SINGLE_HOLDER'
                           ? t('dutySegStatusSingle')
                           : t('dutySegStatusReady')}
-                    </td>
+                    </Td>
                   </tr>
                 ))}
             </tbody>
-          </table>
+          </Table>
         </section>
       ) : null}
 
@@ -938,23 +933,23 @@ export default function RoleAdminPage() {
 
       {roles && roles.length > 0 ? (
         <section style={sectionStyle}>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <Table>
             <thead>
               <tr>
-                <th style={head}>{t('roleTableName')}</th>
-                <th style={head}>{t('roleTableStatus')}</th>
-                <th style={head}>{t('roleTableHolders')}</th>
-                <th style={head}>{t('roleTablePermissions')}</th>
-                <th style={head}>{t('roleTableMfa')}</th>
+                <Th>{t('roleTableName')}</Th>
+                <Th>{t('roleTableStatus')}</Th>
+                <Th>{t('roleTableHolders')}</Th>
+                <Th>{t('roleTablePermissions')}</Th>
+                <Th>{t('roleTableMfa')}</Th>
                 {canActOnRow ? (
-                  <th style={head}>{t('roleTableActions')}</th>
+                  <Th>{t('roleTableActions')}</Th>
                 ) : null}
               </tr>
             </thead>
             <tbody>
               {roles.map((role) => (
-                <tr key={role.id} data-role={role.name}>
-                  <td style={cell}>
+                <Tr key={role.id} data-role={role.name}>
+                  <Td>
                     <bdi>{roleLabel(role)}</bdi>
                     {role.isSystem ? (
                       <span
@@ -965,19 +960,19 @@ export default function RoleAdminPage() {
                         {t('roleSystemBadge')}
                       </span>
                     ) : null}
-                  </td>
-                  <td style={cell} data-status={role.status}>
+                  </Td>
+                  <Td data-status={role.status}>
                     {role.status === 'ACTIVE'
                       ? t('roleStatusActive')
                       : t('roleStatusInactive')}
-                  </td>
-                  <td style={cell}>{role.holderCount}</td>
-                  <td style={cell}>{role.permissionCount}</td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>{role.holderCount}</Td>
+                  <Td>{role.permissionCount}</Td>
+                  <Td>
                     {role.requiresMfaAlways ? t('roleMfaAlwaysLabel') : '—'}
-                  </td>
+                  </Td>
                   {canActOnRow ? (
-                    <td style={cell}>
+                    <Td>
                       <button
                         type="button"
                         onClick={() => void openMatrix(role.id)}
@@ -1011,12 +1006,12 @@ export default function RoleAdminPage() {
                           {t('roleDeleteButton')}
                         </button>
                       ) : null}
-                    </td>
+                    </Td>
                   ) : null}
-                </tr>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </section>
       ) : null}
 

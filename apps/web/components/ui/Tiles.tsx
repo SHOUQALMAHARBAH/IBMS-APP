@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import type { DataAttributes } from './data-attributes';
 import { IconBadge, type IconName } from './Icon';
 
 /*
@@ -24,9 +25,14 @@ import { IconBadge, type IconName } from './Icon';
  *      never decided by the screen.
  */
 
-export function Tiles({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Tiles({
+  children,
+  style,
+  ...dataAttributes
+}: { children: ReactNode; style?: CSSProperties } & DataAttributes) {
   return (
     <div
+      {...dataAttributes}
       style={{
         display: 'grid',
         /*
@@ -51,6 +57,7 @@ export function Tile({
   meta,
   tone = 'plain',
   style,
+  ...dataAttributes
 }: {
   icon: IconName;
   /** The figure itself. Already formatted — `formatNumber` decides the numerals, not this file. */
@@ -66,10 +73,11 @@ export function Tile({
    */
   tone?: 'plain' | 'alarm';
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   const alarm = tone === 'alarm';
   return (
     <div
+      {...dataAttributes}
       style={{
         background: alarm ? 'var(--warning-bg)' : 'var(--surface-card)',
         border: `1px solid ${alarm ? 'var(--warning-border)' : 'var(--border-default)'}`,

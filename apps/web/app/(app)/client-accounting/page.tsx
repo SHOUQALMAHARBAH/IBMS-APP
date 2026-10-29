@@ -1,6 +1,12 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -23,16 +29,6 @@ function oldest(daysOverdue: number, dueDate: string | null, language: Language)
   return '—';
 }
 
-const cellStyle: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'end',
-};
-const headCellStyle: CSSProperties = {
-  ...cellStyle,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function ClientAccountingPage() {
   const router = useRouter();
@@ -104,59 +100,60 @@ export default function ClientAccountingPage() {
           <p style={{ color: 'var(--ink-secondary)' }}>{t('caNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('caColClient')}</th>
+                  <Th>{t('caColClient')}</Th>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
-                    <th key={k} style={headCellStyle}>
+                    <Th key={k}>
                       {AR_AGEING_BUCKET_LABEL[k]}
-                    </th>
+                    </Th>
                   ))}
-                  <th style={headCellStyle}>{t('caColOutstanding')}</th>
-                  <th style={headCellStyle}>{t('caColInvoices')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('caColOldest')}</th>
+                  <Th>{t('caColOutstanding')}</Th>
+                  <Th>{t('caColInvoices')}</Th>
+                  <Th>{t('caColOldest')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
-                  <tr key={r.customerId}>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                  <Tr key={r.customerId}>
+                    <Td>
                       <bdi>{r.customerLegalName}</bdi>
-                    </td>
+                    </Td>
                     {AR_AGEING_BUCKET_KEYS.map((k) => (
-                      <td key={k} style={cellStyle}>
+                      <Td key={k}>
                         {formatMoney(r[k], language)}
-                      </td>
+                      </Td>
                     ))}
-                    <td style={cellStyle}>{formatMoney(r.outstandingTotal, language)}</td>
-                    <td style={cellStyle}>{r.invoiceCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                    <Td>{formatMoney(r.outstandingTotal, language)}</Td>
+                    <Td>{r.invoiceCount}</Td>
+                    <Td>
                       {oldest(r.oldestDaysOverdue, r.oldestDueDate, language)}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
-                <tr>
-                  <td
-                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
-                  >
-                    {t('caColTotal')}
-                  </td>
+                {/* THE TOTALS ROW IS A ROW, not eight bold cells. It carried
+                    `{ ...cellStyle, fontWeight: 600 }` once per column — eight inline style
+                    objects all saying one thing about the row they are in — and `Tr`'s `total`
+                    variant says it once, with the rule and the sunken ground that tell a reader
+                    this line is not one of the things in the list. */}
+                <Tr variant="total">
+                  <Td>{t('caColTotal')}</Td>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
-                    <td key={k} style={{ ...cellStyle, fontWeight: 600 }}>
+                    <Td key={k} numeric>
                       {formatMoney(data.totals[k], language)}
-                    </td>
+                    </Td>
                   ))}
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  <Td numeric>
                     {formatMoney(data.totals.outstandingTotal, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {data.totals.invoiceCount}
-                  </td>
-                  <td style={cellStyle} />
-                </tr>
+                  </Td>
+                  <Td />
+                </Tr>
               </tbody>
-            </table>
+            </Table>
           </div>
         )
       ) : loadError ? null : (

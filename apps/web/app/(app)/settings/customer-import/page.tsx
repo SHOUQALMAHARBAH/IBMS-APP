@@ -35,6 +35,12 @@
  * what makes them readable tomorrow, which is the whole reason `LegacyImportBatch` exists.
  */
 
+import {
+  Card,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
@@ -344,8 +350,8 @@ export default function CustomerImportPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'start' }}>{t('impColLine')}</th>
-                    <th style={{ textAlign: 'start' }}>{t('impColReason')}</th>
+                    <Th>{t('impColLine')}</Th>
+                    <Th>{t('impColReason')}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -356,16 +362,16 @@ export default function CustomerImportPage() {
                       line number the office sees in their own spreadsheet, which is why the API
                       counts the header as line 1. */}
                   {result.issues.map((row, i) => (
-                    <tr
+                    <Tr
                       key={`${row.lineNumber}-${i}`}
                       data-import-issue={row.lineNumber}
                       data-import-issue-kind={row.kind}
                     >
-                      <td>{row.lineNumber}</td>
-                      <td>
+                      <Td>{row.lineNumber}</Td>
+                      <Td>
                         {kindLabel(row.kind)} — {row.detail}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
               </table>
@@ -387,8 +393,7 @@ export default function CustomerImportPage() {
         things about one import. The file name is the BUTTON that opens the lines — no new label, and
         the counts beside it are the affordance that says there is something to open.
       */}
-      <section style={sectionStyle} data-testid="import-register">
-        <h2>{t('impPastHeading')}</h2>
+      <Card title={t('impPastHeading')} data-testid="import-register">
         {batchesError !== null ? (
           <p role="alert" style={errorStyle} data-testid="import-register-error">
             {batchesError}
@@ -476,26 +481,26 @@ export default function CustomerImportPage() {
                       >
                         <thead>
                           <tr>
-                            <th style={{ textAlign: 'start' }}>
+                            <Th>
                               {t('impColLine')}
-                            </th>
-                            <th style={{ textAlign: 'start' }}>
+                            </Th>
+                            <Th>
                               {t('impColReason')}
-                            </th>
+                            </Th>
                           </tr>
                         </thead>
                         <tbody>
                           {openIssues.map((row, i) => (
-                            <tr
+                            <Tr
                               key={`${row.lineNumber}-${i}`}
                               data-import-issue={row.lineNumber}
                               data-import-issue-kind={row.kind}
                             >
-                              <td>{row.lineNumber}</td>
-                              <td>
+                              <Td>{row.lineNumber}</Td>
+                              <Td>
                                 {kindLabel(row.kind)} — {row.detail}
-                              </td>
-                            </tr>
+                              </Td>
+                            </Tr>
                           ))}
                         </tbody>
                       </table>
@@ -506,7 +511,7 @@ export default function CustomerImportPage() {
             ))}
           </ul>
         )}
-      </section>
+      </Card>
     </main>
   );
 }

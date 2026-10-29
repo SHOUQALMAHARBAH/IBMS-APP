@@ -1,5 +1,11 @@
 'use client';
 
+import {
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
@@ -72,17 +78,6 @@ const NOTICE_LABEL = {
   TranslationKey
 >;
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 /* A WARNING, not an error. Module 0 item (d) requires the admin be told to verify a non-31-December
  * expiry and NOT be blocked, so this is visually and semantically distinct from `errorStyle`: the
  * same shape `settings/roles` uses for its duty-segregation warning. */
@@ -361,12 +356,12 @@ export default function RegulatoryCompliancePage() {
       ) : null}
       {license ? (
         <div style={{ margin: '0.5rem 0' }}>
-          <table style={{ borderCollapse: 'collapse' }}>
+          <Table>
             <tbody>
-              <tr>
-                <td style={cell}>{t('rcLicenseNumberLabel')}</td>
-                <td style={cell}>{license.licenseNumber}</td>
-              </tr>
+              <Tr>
+                <Td>{t('rcLicenseNumberLabel')}</Td>
+                <Td>{license.licenseNumber}</Td>
+              </Tr>
               {/*
                 THE DERIVED STANDING, where a STORED FLAG used to be — and the old row was the
                 three-answer defect made visible: it rendered `status` (two values, stored) and then
@@ -376,9 +371,9 @@ export default function RegulatoryCompliancePage() {
                 Now it shows the six-state derivation the GATE enforces, so what the screen says and
                 what the system refuses are the same value.
               */}
-              <tr>
-                <td style={cell}>{t('rcStandingHeading')}</td>
-                <td style={cell} data-testid="rc-standing">
+              <Tr>
+                <Td>{t('rcStandingHeading')}</Td>
+                <Td data-testid="rc-standing">
                   {/*
                     `== null`, LOOSE, so `undefined` lands here too — which is what a field the api
                     stopped sending looks like. It was `=== null`, and an absent `standing` then
@@ -400,34 +395,34 @@ export default function RegulatoryCompliancePage() {
                       {standing.standingActDecisionRef}
                     </>
                   )}
-                </td>
-              </tr>
-              <tr>
-                <td style={cell}>{t('rcExpires')}</td>
-                <td style={cell}>{license.expiresAt.slice(0, 10)}</td>
-              </tr>
-              <tr>
-                <td style={cell}>{t('rcRenewalDueBy')}</td>
-                <td style={cell}>{license.renewalDueBy.slice(0, 10)}</td>
-              </tr>
-              <tr>
-                <td style={cell}>{t('rcColRenewalFiled')}</td>
-                <td style={cell}>
+                </Td>
+              </Tr>
+              <Tr>
+                <Td>{t('rcExpires')}</Td>
+                <Td>{license.expiresAt.slice(0, 10)}</Td>
+              </Tr>
+              <Tr>
+                <Td>{t('rcRenewalDueBy')}</Td>
+                <Td>{license.renewalDueBy.slice(0, 10)}</Td>
+              </Tr>
+              <Tr>
+                <Td>{t('rcColRenewalFiled')}</Td>
+                <Td>
                   {license.renewalRequestedAt
                     ? license.renewalRequestedAt.slice(0, 10)
                     : t('rcNotFiled')}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
               {license.expectedExpiryForThreeYearTerm ? (
-                <tr>
-                  <td style={cell}>{t('rcExpectedThreeYearExpiry')}</td>
-                  <td style={cell}>
+                <Tr>
+                  <Td>{t('rcExpectedThreeYearExpiry')}</Td>
+                  <Td>
                     {license.expectedExpiryForThreeYearTerm.slice(0, 10)}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ) : null}
             </tbody>
-          </table>
+          </Table>
 
           {/* Art. 10/b. A warning to VERIFY, never a refusal — the date is entered as printed on
               the certificate and the certificate is the authority. */}
@@ -637,32 +632,29 @@ export default function RegulatoryCompliancePage() {
               {/* A stable hook: this screen renders three tables (the current term, this series,
                   and the compliance calendar), so a positional locator in a test would silently
                   follow whichever happens to be last. */}
-              <table
-                data-testid="licence-terms"
-                style={{ borderCollapse: 'collapse' }}
-              >
+              <Table data-testid="licence-terms">
                 <thead>
                   <tr>
-                    <th style={cell}>{t('rcLicenseNumberLabel')}</th>
-                    <th style={cell}>{t('rcIssuedAtLabel')}</th>
-                    <th style={cell}>{t('rcExpiresAtLabel')}</th>
-                    <th style={cell}>{t('rcColStatus')}</th>
-                    <th style={cell}>{t('rcColRenewalFiled')}</th>
+                    <Th>{t('rcLicenseNumberLabel')}</Th>
+                    <Th>{t('rcIssuedAtLabel')}</Th>
+                    <Th>{t('rcExpiresAtLabel')}</Th>
+                    <Th>{t('rcColStatus')}</Th>
+                    <Th>{t('rcColRenewalFiled')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {terms.map((term) => (
-                    <tr key={term.id}>
-                      <td style={cell}>
+                    <Tr key={term.id}>
+                      <Td>
                         {term.licenseNumber}
                         {term.id === license.id
                           ? ` (${t('rcCurrentTerm')})`
                           : ''}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {term.issuedAt ? term.issuedAt.slice(0, 10) : '—'}
-                      </td>
-                      <td style={cell}>{term.expiresAt.slice(0, 10)}</td>
+                      </Td>
+                      <Td>{term.expiresAt.slice(0, 10)}</Td>
                       {/*
                         A TERM HAS NO STATUS OF ITS OWN ANY MORE. The column it rendered is dropped,
                         and nothing is lost: `pickCurrentTerm` decides which term governs by LATEST
@@ -671,15 +663,15 @@ export default function RegulatoryCompliancePage() {
                         What a reader needs per term is the period, which the two cells beside this
                         one already give.
                       */}
-                      <td style={cell}>
+                      <Td>
                         {term.renewalRequestedAt
                           ? term.renewalRequestedAt.slice(0, 10)
                           : t('rcNotFiled')}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </div>
           ) : null}
         </div>
@@ -751,22 +743,22 @@ export default function RegulatoryCompliancePage() {
             >
               <thead>
                 <tr>
-                  <th style={cell}>{t('rcScopeColBranch')}</th>
-                  <th style={cell}>{t('rcScopeColType')}</th>
-                  {canManage ? <th style={cell} /> : null}
+                  <Th>{t('rcScopeColBranch')}</Th>
+                  <Th>{t('rcScopeColType')}</Th>
+                  {canManage ? <Th /> : null}
                 </tr>
               </thead>
               <tbody>
                 {scope.branches.map((branch) => (
-                  <tr key={branch.id}>
-                    <td style={cell}>
+                  <Tr key={branch.id}>
+                    <Td>
                       {language === 'AR' ? branch.nameAr : branch.nameEn}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {t(ENUM_LABEL.InsuranceLineCategory[branch.category])}
-                    </td>
+                    </Td>
                     {canManage ? (
-                      <td style={cell}>
+                      <Td>
                         <button
                           type="button"
                           disabled={busy}
@@ -776,9 +768,9 @@ export default function RegulatoryCompliancePage() {
                         >
                           {t('rcScopeRemove')}
                         </button>
-                      </td>
+                      </Td>
                     ) : null}
-                  </tr>
+                  </Tr>
                 ))}
               </tbody>
             </table>
@@ -857,20 +849,20 @@ export default function RegulatoryCompliancePage() {
           <p role="status" data-testid="capital-counting-unit-unverified">
             {t('rcCapitalCountingUnitUnverified')}
           </p>
-          <table style={{ borderCollapse: 'collapse' }}>
+          <Table>
             <tbody>
-              <tr>
-                <td style={cell}>{t('rcCapitalRequired')}</td>
-                <td style={cell} data-required-capital="">
+              <Tr>
+                <Td>{t('rcCapitalRequired')}</Td>
+                <Td data-required-capital="">
                   {scope.capital.requiredCapital}
-                </td>
-              </tr>
-              <tr>
-                <td style={cell}>{t('rcCapitalPaidUp')}</td>
-                <td style={cell}>{scope.capital.paidUpCapital ?? '—'}</td>
-              </tr>
+                </Td>
+              </Tr>
+              <Tr>
+                <Td>{t('rcCapitalPaidUp')}</Td>
+                <Td>{scope.capital.paidUpCapital ?? '—'}</Td>
+              </Tr>
             </tbody>
-          </table>
+          </Table>
 
           {/* Three STATES, not two. "Nothing recorded" is a missing fact about the office;
               "recorded and short" is a finding about its capital. Conflating them would tell an
@@ -982,31 +974,31 @@ export default function RegulatoryCompliancePage() {
           <table>
             <tbody>
               {notice.daysToExpiry === null ? null : (
-                <tr>
-                  <td style={cell}>
+                <Tr>
+                  <Td>
                     {/* Two labels, because "3 days remaining" and "3 days since it expired" are
                         different facts and one of them is a block that is already in force. */}
                     {notice.daysToExpiry < 0
                       ? t('rcNoticeDaysSince')
                       : t('rcNoticeDays')}
-                  </td>
-                  <td style={cell}>{Math.abs(notice.daysToExpiry)}</td>
-                </tr>
+                  </Td>
+                  <Td>{Math.abs(notice.daysToExpiry)}</Td>
+                </Tr>
               )}
-              <tr>
-                <td style={cell}>{t('rcExpires')}</td>
-                <td style={cell}>
+              <Tr>
+                <Td>{t('rcExpires')}</Td>
+                <Td>
                   {notice.expiresAt ? notice.expiresAt.slice(0, 10) : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td style={cell}>{t('rcNoticeApplicationDueBy')}</td>
-                <td style={cell}>
+                </Td>
+              </Tr>
+              <Tr>
+                <Td>{t('rcNoticeApplicationDueBy')}</Td>
+                <Td>
                   {notice.applicationDueBy
                     ? notice.applicationDueBy.slice(0, 10)
                     : '—'}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             </tbody>
           </table>
           {/* A FILING IS NOT A DECISION — said in full, because an office that applied on time and
@@ -1072,25 +1064,25 @@ export default function RegulatoryCompliancePage() {
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('rcObligationLabel')}</th>
-                  <th style={head}>{t('rcColDue')}</th>
-                  <th style={head}>{t('rcColStatus')}</th>
-                  <th style={head}>{t('rcColEvidence')}</th>
-                  <th style={head}>{t('rcColAction')}</th>
+                  <Th>{t('rcObligationLabel')}</Th>
+                  <Th>{t('rcColDue')}</Th>
+                  <Th>{t('rcColStatus')}</Th>
+                  <Th>{t('rcColEvidence')}</Th>
+                  <Th>{t('rcColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((it) => (
-                  <tr key={it.id}>
-                    <td style={cell}>{it.obligationName}</td>
-                    <td style={cell}>
+                  <Tr key={it.id}>
+                    <Td>{it.obligationName}</Td>
+                    <Td>
                       {it.dueDate.slice(0, 10)}
                       {it.isOverdue ? ` ${t('statusOverdue')}` : ''}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {/* Owner decision 55 — «لم يُقدَّم», NOT «قيد الانتظار»: the English said `pending`,
                           which reads as BEING PROCESSED, while `isSubmitted` false means nothing has
                           been filed at all. Different facts, and the second is the one a regulator
@@ -1098,9 +1090,9 @@ export default function RegulatoryCompliancePage() {
                       {it.isSubmitted
                         ? t('statusSubmitted')
                         : t('statusNotSubmitted')}
-                    </td>
-                    <td style={cell}>{it.evidenceOfSubmissionRef ?? '—'}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{it.evidenceOfSubmissionRef ?? '—'}</Td>
+                    <Td>
                       {canManage && !it.isSubmitted ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
@@ -1133,11 +1125,11 @@ export default function RegulatoryCompliancePage() {
                           </button>
                         </div>
                       ) : null}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )
       ) : itemsLoadError ? null : (

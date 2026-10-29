@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import type { DataAttributes } from './data-attributes';
 import { Icon, type IconName } from './Icon';
 
 /*
@@ -21,14 +22,16 @@ export function FilterBar({
   children,
   actions,
   style,
+  ...dataAttributes
 }: {
   children: ReactNode;
   /** Controls that act on the filtered set rather than define it — Apply, Clear. */
   actions?: ReactNode;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   return (
     <div
+      {...dataAttributes}
       style={{
         display: 'flex',
         flexWrap: 'wrap',
@@ -56,9 +59,14 @@ export function FilterBar({
  * It is `auto-fit` with a floor rather than a fixed two-column grid, so one section fills the
  * width, two sit side by side, and the phone gets one column with no media query.
  */
-export function DetailPanel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function DetailPanel({
+  children,
+  style,
+  ...dataAttributes
+}: { children: ReactNode; style?: CSSProperties } & DataAttributes) {
   return (
     <div
+      {...dataAttributes}
       style={{
         background: 'var(--surface-sunken)',
         borderTop: '1px solid var(--border-subtle)',
@@ -81,14 +89,16 @@ export function DetailSection({
   title,
   children,
   style,
+  ...dataAttributes
 }: {
   icon?: IconName;
   title: ReactNode;
   children: ReactNode;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   return (
     <section
+      {...dataAttributes}
       style={{
         background: 'var(--surface-card)',
         border: '1px solid var(--border-default)',
@@ -138,12 +148,14 @@ export function DetailSection({
 export function KeyValue({
   rows,
   style,
+  ...dataAttributes
 }: {
   rows: Array<{ term: ReactNode; value: ReactNode }>;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   return (
     <dl
+      {...dataAttributes}
       style={{
         display: 'grid',
         gridTemplateColumns: 'auto 1fr',
@@ -178,16 +190,14 @@ export function Note({
   children,
   role,
   style,
-  'data-testid': testId,
+  ...dataAttributes
 }: {
   tone?: 'info' | 'warning' | 'neutral';
   icon?: IconName;
   children: ReactNode;
   role?: 'status' | 'alert';
   style?: CSSProperties;
-  /** Forwarded explicitly — see the note on `Tr` in `Table.tsx`. */
-  'data-testid'?: string;
-}) {
+} & DataAttributes) {
   const palette =
     tone === 'warning'
       ? { background: 'var(--warning-bg)', border: 'var(--warning-border)', color: 'var(--warning-ink)' }
@@ -198,7 +208,7 @@ export function Note({
   return (
     <div
       role={role}
-      data-testid={testId}
+      {...dataAttributes}
       style={{
         display: 'flex',
         gap: 'var(--space-2)',
@@ -230,12 +240,13 @@ export function Note({
 export function TimelineLog({
   entries,
   style,
+  ...dataAttributes
 }: {
   entries: Array<{ when: ReactNode; what: ReactNode; who?: ReactNode }>;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   return (
-    <ul style={{ display: 'grid', margin: 0, padding: 0, listStyle: 'none', minWidth: 0, ...style }}>
+    <ul {...dataAttributes} style={{ display: 'grid', margin: 0, padding: 0, listStyle: 'none', minWidth: 0, ...style }}>
       {entries.map((entry, index) => (
         <li
           key={index}

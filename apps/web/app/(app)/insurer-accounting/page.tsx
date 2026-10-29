@@ -1,6 +1,12 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -25,16 +31,6 @@ function oldest(
   return '—';
 }
 
-const cellStyle: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'end',
-};
-const headCellStyle: CSSProperties = {
-  ...cellStyle,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function InsurerAccountingPage() {
   const router = useRouter();
@@ -108,54 +104,51 @@ export default function InsurerAccountingPage() {
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('iaColInsurer')}</th>
-                  <th style={headCellStyle}>{t('iaColOutstanding')}</th>
-                  <th style={headCellStyle}>{t('iaColInvoices')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('iaColOldest')}</th>
-                  <th style={headCellStyle}>{t('iaColRemittedToDate')}</th>
-                  <th style={headCellStyle}>{t('iaColRemittances')}</th>
+                  <Th>{t('iaColInsurer')}</Th>
+                  <Th>{t('iaColOutstanding')}</Th>
+                  <Th>{t('iaColInvoices')}</Th>
+                  <Th>{t('iaColOldest')}</Th>
+                  <Th>{t('iaColRemittedToDate')}</Th>
+                  <Th>{t('iaColRemittances')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
-                  <tr key={r.insurerId}>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                  <Tr key={r.insurerId}>
+                    <Td>
                       <bdi>{r.insurerName}</bdi>
-                    </td>
-                    <td style={cellStyle}>{formatMoney(r.outstandingAmount, language)}</td>
-                    <td style={cellStyle}>{r.outstandingCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                    </Td>
+                    <Td>{formatMoney(r.outstandingAmount, language)}</Td>
+                    <Td>{r.outstandingCount}</Td>
+                    <Td>
                       {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt, language)}
-                    </td>
-                    <td style={cellStyle}>{formatMoney(r.remittedAmount, language)}</td>
-                    <td style={cellStyle}>{r.remittedCount}</td>
-                  </tr>
+                    </Td>
+                    <Td>{formatMoney(r.remittedAmount, language)}</Td>
+                    <Td>{r.remittedCount}</Td>
+                  </Tr>
                 ))}
-                <tr>
-                  <td
-                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
-                  >
-                    {t('iaColTotal')}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                {/* THE TOTALS ROW IS A ROW — see the same note on `/client-accounting`. */}
+                <Tr variant="total">
+                  <Td>{t('iaColTotal')}</Td>
+                  <Td numeric>
                     {formatMoney(data.totals.outstandingAmount, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {data.totals.outstandingCount}
-                  </td>
-                  <td style={cellStyle} />
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td />
+                  <Td numeric>
                     {formatMoney(data.totals.remittedAmount, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {data.totals.remittedCount}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               </tbody>
-            </table>
+            </Table>
           </div>
         )
       ) : loadError ? null : (
