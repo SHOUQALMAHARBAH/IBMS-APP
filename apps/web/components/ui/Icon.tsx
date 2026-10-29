@@ -137,6 +137,22 @@ const PATHS = {
       <path d="m3 7 9 6 9-6" />
     </>
   ),
+  /**
+   * ONE CHANNEL REACHING SEVERAL COUNTERPARTIES — a hub with three spokes.
+   *
+   * It is the BRAND'S OWN MARK rather than a shape chosen here: the logo is a node joined to three
+   * points, and both flyers draw this same figure beside *«قناة موحّدة مع شركات التأمين»* / *One
+   * channel to every insurer*. Using anything else beside that line would put a second visual
+   * vocabulary next to the one on the panel above it.
+   */
+  network: (
+    <>
+      <circle cx="12" cy="7" r="2.5" />
+      <circle cx="5.5" cy="17.5" r="2.5" />
+      <circle cx="18.5" cy="17.5" r="2.5" />
+      <path d="M10.4 9 7.1 15.4M13.6 9l3.3 6.4M8 17.5h8" />
+    </>
+  ),
   /** Add the one thing this screen is for. */
   plus: <path d="M12 5v14M5 12h14" />,
   /** Search, or look one record up. */

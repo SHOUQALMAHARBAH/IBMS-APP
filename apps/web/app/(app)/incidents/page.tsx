@@ -521,12 +521,16 @@ export default function IncidentsPage() {
                                 entries={inc.containmentActions.map((a) => ({
                                   when: formatDateTime(a.takenAt, language),
                                   what: <bdi>{a.description}</bdi>,
-                                  /* NULL IS NO NAME, never the uuid beside it. The em dash here is
-                                     one of the sites owner decision 60 classifies; its class is
-                                     already known — the id is HELD and did not resolve — and the
-                                     word is hers to choose, so this stays as its eleven siblings
-                                     render it until she has ruled. */
-                                  who: <bdi>{a.actionTakenByName ?? '—'}</bdi>,
+                                  /* NULL IS NO NAME, never the uuid beside it. The owner
+                                     ruled on this site by name on 2026-10-29: the id is HELD and
+                                     did not resolve, which is the third of her three cases, and
+                                     «غير متوفّر» is her word for it. On a containment log that
+                                     matters more than it looks — the log exists to say WHO acted,
+                                     so a reader needs to know the name is gone rather than that
+                                     the column is decorative. */
+                                  who: (
+                                    <bdi>{a.actionTakenByName ?? t('commonNameNotResolved')}</bdi>
+                                  ),
                                 }))}
                               />
                             )}
@@ -614,8 +618,14 @@ export default function IncidentsPage() {
                         */}
                         <DetailSection icon="search" title={t('incImpactAssessmentHeading')}>
                           <div data-testid={`inc-impact-${inc.id}`}>
+                            {/* NEVER PERFORMED, said in words — owner decision 60's first
+                                case, and the one her own complaint names: «بس بظهرلي إنه تم تقييم
+                                أثره وأنا ما قيّمت ولا عملت شي». An em dash on a statutory impact
+                                assessment is the worst place in the product for *was this
+                                forgotten, or does it not apply?*, because the answer decides
+                                whether somebody has to go and do it. */}
                             {inc.impactAssessedAt === null ? (
-                              '—'
+                              t('commonNotAssessedYet')
                             ) : (
                               <KeyValue
                                 rows={[

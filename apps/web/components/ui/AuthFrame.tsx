@@ -9,20 +9,18 @@ import { BrandLockup } from './BrandMark';
  * *«مش تكون بيسك هيك اشي عادي ولا انها تبين اوفر»*. Reference page B is that screen and this is
  * its implementation.
  *
- * THERE IS NO PROSE IN THE BRAND PANEL, AND THAT IS DELIBERATE RATHER THAN UNFINISHED.
+ * THE PANEL'S PROSE IS THE OWNER'S BRAND PACK, AND IT ARRIVED AFTER THE PILOT.
  *
- * Reference page B carries a pitch sentence and three capability chips. Those words are not the
- * owner's — the reference pages were drafted for her to LOOK AT, and what she approved in writing
- * is the appearance and the motion («حلو جميل», «بدي هيك يكونوا الشاشات فيهم حياة و حركة»). This
- * batch's standing rule is that no Arabic word is written here: it is sliced from a string already
- * shipping, or it is hers. Measured before deciding: the i18n tree holds NO product tagline to
- * slice — nine strings mention «المنصّة» and every one is about a specific screen — so there is
- * nothing to derive and a sentence of mine on the first screen a client reads would be exactly the
- * thing the rule exists to prevent.
+ * The pilot shipped this panel with the mark and the name and no prose, and recorded why: the
+ * reference page's sentence and chips were drafted for her to LOOK AT, the i18n tree held no
+ * product tagline to slice, and a sentence written here on the first screen a client reads is
+ * exactly what rule 8(d) exists to prevent. That reasoning held, and she answered it by pointing
+ * at the source it was missing: her own bilingual flyers, and reference page B, which composes
+ * three of their capability lines into this panel. `BrandPitch` carries the provenance.
  *
- * So the panel carries the mark, the product's name, and the brand's own ground. The sentence and
- * the three chips are on the owner's list. The layout is built so they drop into `pitch` without
- * moving anything when she writes them.
+ * `pitch` STAYS OPTIONAL. The other four `(auth)` screens — forgot-password, reset-password,
+ * sign-up and the invitation — are not a product pitch: a reader who is already resetting a
+ * password does not need selling to, and the panel there is the mark alone.
  *
  * THE MOTION IS THE MARK'S OWN and runs once on load, with one slow ambient loop — the amber point
  * — plus the two glows, which are the only continuously-moving thing in the whole product and are

@@ -24,6 +24,7 @@ export { Table, Td, Th, Tr } from './Table';
 /* --- the design batch's composition layer ------------------------------------------------- */
 export { AuthFrame } from './AuthFrame';
 export { BrandLockup, BrandMark } from './BrandMark';
+export { BrandPitch } from './BrandPitch';
 export { BarList, Ring, SegmentedBar, type ChartSlot } from './Figures';
 export { Icon, IconBadge, IconLabel, type IconName } from './Icon';
 export { IconField } from './IconField';

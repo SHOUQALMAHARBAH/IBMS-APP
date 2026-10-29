@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { isMustChangePassword, login, verifyMfaChallenge } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { useAuth } from '../../../lib/auth/auth-context';
-import { AuthFrame, Button, IconField } from '../../../components/ui';
+import { AuthFrame, BrandPitch, Button, IconField } from '../../../components/ui';
 import {
   authFormStyle,
   authHeadingStyle,
@@ -26,8 +26,11 @@ import {
  * `auth.spec.ts` is what holds that claim.
  *
  * WHAT CHANGED IS THE FRAME AND THE FIELDS: a brand panel whose mark draws itself in on load, and
- * fields whose icon sits inside the control. `AuthFrame` carries the reasoning, including why the
- * brand panel holds no prose.
+ * fields whose icon sits inside the control. `AuthFrame` carries the reasoning.
+ *
+ * THE PANEL'S PROSE ARRIVED AFTER THE PILOT and is the owner's own brand pack rather than words
+ * written here — see `BrandPitch`. The pilot shipped this panel deliberately wordless and said so;
+ * that was correct then and is no longer the state.
  */
 export default function LoginPage() {
   const { t } = useLanguage();
@@ -90,7 +93,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthFrame>
+    <AuthFrame pitch={<BrandPitch />}>
       <h1 style={authHeadingStyle}>{t('authSignInHeading')}</h1>
 
       {mfaChallengeToken ? (

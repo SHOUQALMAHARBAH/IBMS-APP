@@ -64,7 +64,13 @@ SCREEN_BUDGET = 1418
 # (one takes children, the other takes props), so they belong in the set; what the gate refused
 # was leaving a shared frame in the bucket that measures improvisation, which would have punished
 # exactly the refactor it exists to encourage.
-UI_BUDGET = 120
+#
+# 126 with `BrandPitch` — the eighth primitive, and the one the pilot deliberately could not write.
+# The sign-in brand panel shipped wordless because the i18n tree held no product sentence to slice
+# and rule 8(d) forbids writing one; the owner answered that on 2026-10-29 by pointing at her own
+# bilingual flyers and the reference page that composes three of their capability lines. Six sites:
+# the panel's own grid, its two paragraphs, the chip list, a chip, and the chip icon's colour.
+UI_BUDGET = 126
 
 UI_DIR = pathlib.Path("apps/web/components/ui")
 

@@ -191,6 +191,27 @@ export default function PaymentChannelsPage() {
       ? t(ENUM_LABEL.PaymentChannelType[kind as (typeof CHANNEL_TYPES)[number]])
       : kind;
 
+  /*
+   * ONE EMPTY CELL, TWO DIFFERENT FACTS — owner decision 60, and her own worked example.
+   *
+   * A blank bank name on a CASH channel means there is no bank to name; a blank one on a transfer
+   * means somebody did not write it down. Those are not the same statement, and an em dash says
+   * neither — which is exactly the question her walk kept running into: *was this forgotten, or
+   * does it not apply?*
+   *
+   * ONLY `cash` IS TREATED AS NOT-APPLICABLE, and that is deliberately narrow. A cheque has a
+   * drawee bank and a card has an issuer, so for those two a blank really is a gap. An unrecognised
+   * type falls to the em dash as well: `channelType` is a free `String` whose vocabulary lives in a
+   * schema doc comment, so a fifth value is representable, and defaulting an unknown type to *does
+   * not apply* would be the system asserting something it cannot know.
+   *
+   * THE OTHER SIDE OF THE RULING IS WHY THIS IS NOT A GENERAL HELPER: *not recorded* has no word
+   * yet, so the transfer case keeps its dash and is recorded in the register rather than being
+   * cleared by stretching one of her three words onto it.
+   */
+  const absentBankDetail = (channelType: string) =>
+    channelType === 'cash' ? t('commonNotApplicable') : '—';
+
   return (
     <main style={pageStackStyle}>
       <PageHeader title={t('pcHeading')} description={t('pcIntro')} />
@@ -341,14 +362,23 @@ export default function PaymentChannelsPage() {
                 <Tr key={r.id}>
                   <Td>{ownerKindLabel(r.ownerType)}</Td>
                   {/* ITEM 1 — the owner's name, whichever kind of owner it is, resolved by
-                      the api through each entity's own resolver. An em dash where the owning row
-                      is gone: `PaymentChannel` carries no FK to either, so that is a real state,
-                      and "we hold no name" is not "the name is this uuid". */}
-                  <Td>{r.ownerName ? <bdi>{r.ownerName}</bdi> : '—'}</Td>
+                      the api through each entity's own resolver. `PaymentChannel` carries no FK to
+                      either kind, so the owning row being GONE is a real state — and "we hold no
+                      name" is still never "the name is this uuid".
+
+                      Owner decision 60 gives that state its word: the id is HELD and does not
+                      resolve, which is the third of her three cases exactly. */}
+                  <Td>
+                    {r.ownerName ? <bdi>{r.ownerName}</bdi> : t('commonNameNotResolved')}
+                  </Td>
                   <Td>{channelTypeLabel(r.channelType)}</Td>
                   <Td>{r.label}</Td>
-                  <Td>{r.bankName ?? '—'}</Td>
-                  <Td>{r.accountLast4 ? `••••${r.accountLast4}` : '—'}</Td>
+                  <Td>{r.bankName ?? absentBankDetail(r.channelType)}</Td>
+                  <Td>
+                    {r.accountLast4
+                      ? `••••${r.accountLast4}`
+                      : absentBankDetail(r.channelType)}
+                  </Td>
                   <Td>
                     {/*
                       A STATE READ BY ITS SHAPE BEFORE ITS COLOUR. `<strong>Active</strong>` beside

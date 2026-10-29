@@ -243,17 +243,81 @@ sat in.
 
 ---
 
-## Owed to the owner — words only she can write
+## Owed to the owner — ANSWERED 2026-10-29
 
-Nothing here was invented. Each row is a place the product needs a word that is neither already
-shipping nor derivable by slicing a shipping string.
+Every row on this list is closed. Nothing on it was invented while it was open, and nothing was
+widened when it closed.
 
-| # | where | what is needed | measured |
+| # | where | her answer | what it cost |
 |---|---|---|---|
-| 1 | the sign-in brand panel | the product's own sentence, and three capability chips | the i18n tree holds no product tagline; nine strings mention «المنصّة» and all are screen-specific |
-| 2 | `/payment-channels`, three cells | what an em dash stands for: the owner's name where the owning row is gone; a bank name NOT RECORDED on a transfer and NOT APPLICABLE on a cash channel; the account digits | no general "not recorded" phrase exists to slice; the nearest, `rcNoRenewalRequest`, is a whole sentence about a renewal request |
-| 2b | `/incidents`, two cells | the containment log's actor where the id is HELD and did not resolve, and the impact assessment where it was never performed | the class is known (decision 60 already classifies the first); the WORD is hers, so both render as their eleven siblings do until she rules |
-| 3 | the Arabic email subjects | whether they should carry «وسيط 360» | they describe the system generically today («نظام إدارة الوساطة التأمينية»), which is correct and never carried the codename — so this is a branding choice, not a defect |
+| 1 | the sign-in brand panel | **it needed no word from her** — it is in her own brand pack. The Arabic and English flyers carry the headline, the product sentence and six capability lines; reference page B composes three of them into this panel | `BrandPitch`, five key pairs. **The Arabic bytes came from the reference page's HTML, not from my reading of the flyer PNG** — transcribing Arabic from an image is where the shadda/vowel trap bites, and the reference is text that can be copied exactly |
+| 2 · 2b | the five em-dash cells | **three words, not one** — «لم يُقيَّم بعد» (not done yet), «لا ينطبق» (does not apply), «غير متوفّر» (held, unresolvable), with the instruction that a site which does not fit one of the three KEEPS ITS DASH | three keys; **three of the five sites converted and two did not** — see the table below |
+| 3 | the Arabic email subjects | **they carry «وسيط 360»** — they read as a generic description today, which was correct while the product had no name to show | three subjects, plus one body line as a stated judgement |
+
+### Decision 60 — what converted, and what deliberately did not
+
+Her instruction is half the decision: *do not substitute a different word, and do not widen these
+three into a general vocabulary. If a site does not fall cleanly into one of the three, leave the em
+dash and record the site.* A count cleared by stretching a word onto a site it does not fit is worse
+than a count that stands.
+
+| site | class | outcome |
+|---|---|---|
+| `/payment-channels` — owner name | the id is HELD and the owning row is gone | **«غير متوفّر»** — her third case verbatim |
+| `/payment-channels` — bank name, `cash` channel | there is no bank to name | **«لا ينطبق»** — her own worked example |
+| `/payment-channels` — bank name, transfer/cheque/card | nobody wrote it down | **DASH KEPT** — *not recorded* is not one of the three, and a cheque has a drawee bank and a card an issuer, so a blank there really is a gap |
+| `/payment-channels` — account digits | same split, same treatment | `cash` → «لا ينطبق»; otherwise **DASH KEPT** |
+| `/incidents` — containment actor | the id is HELD and did not resolve | **«غير متوفّر»** — her third case, named in her own table |
+| `/incidents` — impact assessment never performed | the thing has not been DONE yet | **«لم يُقيَّم بعد»** — her first case, and the one her walk complained about by name |
+| `/incidents` — empty containment log | no action taken yet | **DASH KEPT** — her first word is assessment-specific (*not ASSESSED yet*); *no action taken yet* is a different verb |
+| `/incidents` — the three assessment fields, individually null | the assessment WAS performed and this field was not filled | **DASH KEPT** ×3 — reachable only on a row predating the `NOT VALID` completeness CHECK, and *assessed but blank* is none of the three |
+
+**An unrecognised channel type falls to the dash, not to «لا ينطبق».** `channelType` is a free
+`String` whose vocabulary lives in a schema doc comment, so a fifth value is representable, and
+defaulting an unknown type to *does not apply* would be the system asserting something it cannot
+know.
+
+**AND THE NFC GUARD FIRED ON MY OWN TYPING OF HER WORD.** «لم يُقيَّم بعد» came out with the SHADDA
+before the FATHA (`064A 0651 064E`); NFC orders by combining class, so the vowel (30) sorts before
+the shadda (33) — `064A 064E 0651`. The two render identically and compare unequal. Normalising is
+not editing her word (NFC is canonical equivalence, so it is the same text), and the reordering is
+printed by the script that made the change rather than happening silently. This is the third time
+that trap has been paid for here, and the first time a guard caught it before it reached a file.
+
+---
+
+## The commit that could not be pushed — RESOLVED 2026-10-29
+
+`b804579` wires `check:token-contrast` and `check:inline-styles` into `ci.yml`, and GitHub refuses a
+workflow-file push from a credential without `workflow` scope. **Its commit message still says
+`UNPUSHED` and that is now false** — corrected here rather than by rewriting it, which is this
+repository's own convention: a claim that was true when written is corrected beside itself, and
+amending would have discarded the CI run that verifies the commit.
+
+Two things worth keeping from the attempts:
+
+**`git -c credential.helper=…` APPENDS to the existing list.** The first attempt supplied a
+credential and GitHub still answered *refusing to allow an OAuth App … without `workflow` scope* —
+the OAuth helper already configured on this machine answered FIRST and the supplied one was never
+consulted. Clearing the list with an empty `-c credential.helper=` before adding one is what makes
+the supplied credential the only source, and the error changed to a flat 403, which is how it became
+diagnosable at all.
+
+**A flat 403 and the workflow-scope message are different diagnoses.** `GET /repos/{owner}/{repo}`
+reported `push: true`, which is about the ACCOUNT's access to the repo and not the credential's
+grants — so it reads as permission the push does not have. What settled it was the shape of the
+refusal: GitHub names `workflow` scope by name when that is the only thing missing, so a refusal
+that does NOT name it means write access is absent entirely. That was fed back and corrected, and
+the push then landed first try.
+
+**The credential-safety hook refused two commands and both refusals were sound in shape.** Its
+matcher is `(echo|printf|cat) … (SECRET|TOKEN|PASSWORD|…) … >`, and both commands genuinely
+contained all three — once from a credential helper printing `password=` with a `2>&1` after it, and
+once from `echo "=== token-contrast ==="` beside the same stream merge. Neither wrote anything to
+disk; the `>` was a stream merge in both. It is reported rather than routed around, and the
+measurement that matters is the one taken afterwards: `.git/config` holds no credential, no local
+helper was configured, and `git grep` finds nothing in the worktree. The `-c` flags are transient by
+construction.
 
 ---
 

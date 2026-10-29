@@ -7,6 +7,19 @@
 // never called `useLanguage`.
 export const AUTH = {
   AR: {
+    /* THE BRAND PANEL'S OWN WORDS — the owner's brand pack, not written here.
+       Her flyers carry the headline, the product sentence and the capability lines in BOTH
+       languages; reference page B, which she approved, composes three of them into this
+       panel, and she instructed that the wording be taken from there. The Arabic was read
+       byte for byte out of that page's HTML rather than transcribed from the flyer PNG,
+       because transcribing Arabic from an image is where the shadda/vowel-order trap bites:
+       the two orders render identically and compare unequal. NFC asserted when written. */
+    authBrandHeadline: 'تحوّل رقميّ، بامتثال كامل.',
+    authBrandPitch: 'المنصّة المحوكمة المصمَّمة خصيصاً لوسطاء التأمين — من أوّل لقاء مع العميل حتى إشعار التجديد.',
+    authBrandChipAudit: 'سجلّ تدقيق كامل',
+    authBrandChipChannel: 'قناة موحّدة مع شركات التأمين',
+    authBrandChipPrivacy: 'خصوصيّة مدمجة',
+
     authSignInHeading: 'تسجيل الدخول',
     authMfaPrompt: 'أدخل الرمز المكوَّن من ٦ أرقام من تطبيق المصادقة.',
     authMfaCodeLabel: 'رمز المصادقة',
@@ -68,6 +81,19 @@ export const AUTH = {
     authChangeMissingToken: 'انتهت صلاحية هذه الخطوة. سجّل الدخول مرة أخرى للبدء من جديد.',
   },
   EN: {
+    /* THE BRAND PANEL'S OWN WORDS — the owner's brand pack, not written here.
+       Her flyers carry the headline, the product sentence and the capability lines in BOTH
+       languages; reference page B, which she approved, composes three of them into this
+       panel, and she instructed that the wording be taken from there. The Arabic was read
+       byte for byte out of that page's HTML rather than transcribed from the flyer PNG,
+       because transcribing Arabic from an image is where the shadda/vowel-order trap bites:
+       the two orders render identically and compare unequal. NFC asserted when written. */
+    authBrandHeadline: 'Go digital. Stay compliant.',
+    authBrandPitch: 'The governed digital platform built for insurance brokers — from the first client meeting to the renewal notice.',
+    authBrandChipAudit: 'Complete audit trail',
+    authBrandChipChannel: 'One channel to every insurer',
+    authBrandChipPrivacy: 'Privacy by design',
+
     authSignInHeading: 'Sign in',
     authMfaPrompt: 'Enter the 6-digit code from your authenticator app.',
     authMfaCodeLabel: 'Authentication code',

@@ -102,7 +102,7 @@ function passwordReset(
     };
   }
   return {
-    subject: 'إعادة تعيين كلمة المرور — نظام إدارة الوساطة التأمينية',
+    subject: 'إعادة تعيين كلمة المرور — وسيط 360',
     bodyText: [
       `مرحباً ${p.recipientName}،`,
       '',
@@ -133,9 +133,15 @@ function mailboxTest(
     };
   }
   return {
-    subject: 'اختبار الاتصال ببريد المكتب — نظام إدارة الوساطة التأمينية',
+    subject: 'اختبار الاتصال ببريد المكتب — وسيط 360',
     bodyText: [
-      `هذه رسالة اختبار من النظام لمكتب ${p.organizationName}.`,
+      // BEYOND THE LETTER OF THE RULING, AND REPORTED AS SUCH. The owner's 2026-10-29 decision
+      // names the SUBJECTS. This is a BODY — and its English sibling four lines up has always read
+      // *from WASEET 360*, so leaving «النظام» here would have the same message name the product in
+      // one language and describe it generically in the other, which is the asymmetry her ruling
+      // exists to close. One line, same substitution, same reason; it is in the register as a
+      // judgement rather than as something she asked for.
+      `هذه رسالة اختبار من وسيط 360 لمكتب ${p.organizationName}.`,
       '',
       `أُرسلت من صندوق بريد المكتب نفسه: ${p.connectedEmail}.`,
       'وصولها يؤكد نجاح الاتصال وأن الرسائل الصادرة ستظهر باسم عنوان مكتبكم.',
@@ -166,7 +172,7 @@ function organizationAdministratorInvitation(
     };
   }
   return {
-    subject: `حساب الإدارة الأول لـ ${p.organizationName} — نظام إدارة الوساطة التأمينية`,
+    subject: `حساب الإدارة الأول لـ ${p.organizationName} — وسيط 360`,
     bodyText: [
       `مرحباً ${p.recipientName}،`,
       '',

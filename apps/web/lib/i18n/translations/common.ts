@@ -7,6 +7,30 @@
 // 6-key dictionary established.
 export const COMMON = {
   AR: {
+    /*
+     * OWNER DECISION 60's THREE WORDS, AND THERE ARE ONLY THREE.
+     *
+     * A bare em dash leaves a reader asking *was this forgotten, or does it not apply?* —
+     * which is the confusion this pass exists to remove. Her ruling gives a word to exactly
+     * three cases and leaves every other em dash alone:
+     *
+     *   commonNotAssessedYet    the thing has not been DONE yet — an impact assessment never
+     *                           performed. The verb is assessment-specific on purpose; a
+     *                           record that was never WRITTEN is a different claim.
+     *   commonNotApplicable     it does not apply AT ALL — a bank name on a cash channel.
+     *   commonNameNotResolved   the value is HELD and does not resolve — an actor id whose
+     *                           name is gone. Named for a NAME deliberately, so it cannot be
+     *                           reached for by a site that is merely empty.
+     *
+     * DO NOT ADD A FOURTH, AND DO NOT STRETCH ONE ONTO A SITE IT DOES NOT FIT. Her
+     * instruction with the words was that a site which does not fall cleanly into one of the
+     * three keeps its em dash and is RECORDED — a count cleared by widening a word is worse
+     * than a count that stands. `docs/design-pass-register.md` carries the sites left alone.
+     */
+    commonNotApplicable: 'لا ينطبق',
+    commonNotAssessedYet: 'لم يُقيَّم بعد',
+    commonNameNotResolved: 'غير متوفّر',
+
     commonLoading: 'جارٍ التحميل…',
     commonWorking: 'جارٍ التنفيذ…',
     commonSaving: 'جارٍ الحفظ…',
@@ -308,6 +332,30 @@ export const COMMON = {
       'أنت من سجّل هذا الطلب، ومكتبك أعلن السماح لك باعتماده أيضاً. اذكر السبب — يُحفَظ بشكل دائم ويظهر في تقرير الاعتمادات الذاتية.',
   },
   EN: {
+    /*
+     * OWNER DECISION 60's THREE WORDS, AND THERE ARE ONLY THREE.
+     *
+     * A bare em dash leaves a reader asking *was this forgotten, or does it not apply?* —
+     * which is the confusion this pass exists to remove. Her ruling gives a word to exactly
+     * three cases and leaves every other em dash alone:
+     *
+     *   commonNotAssessedYet    the thing has not been DONE yet — an impact assessment never
+     *                           performed. The verb is assessment-specific on purpose; a
+     *                           record that was never WRITTEN is a different claim.
+     *   commonNotApplicable     it does not apply AT ALL — a bank name on a cash channel.
+     *   commonNameNotResolved   the value is HELD and does not resolve — an actor id whose
+     *                           name is gone. Named for a NAME deliberately, so it cannot be
+     *                           reached for by a site that is merely empty.
+     *
+     * DO NOT ADD A FOURTH, AND DO NOT STRETCH ONE ONTO A SITE IT DOES NOT FIT. Her
+     * instruction with the words was that a site which does not fall cleanly into one of the
+     * three keeps its em dash and is RECORDED — a count cleared by widening a word is worse
+     * than a count that stands. `docs/design-pass-register.md` carries the sites left alone.
+     */
+    commonNotApplicable: 'not applicable',
+    commonNotAssessedYet: 'not assessed yet',
+    commonNameNotResolved: 'not available',
+
     commonLoading: 'Loading…',
     commonWorking: 'Working…',
     commonSaving: 'Saving…',
