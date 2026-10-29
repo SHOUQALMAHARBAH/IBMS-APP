@@ -18,6 +18,7 @@ import {
   Tiles,
   Tr,
   BarList,
+  Ring,
 } from '../../../../components/ui';
 import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useCallback, useEffect, useState } from 'react';
@@ -90,7 +91,7 @@ function LossRatioTable({
 }
 
 export default function ClaimsDashboardPage() {
-  const { t, language } = useLanguage();
+  const { t, tPlural, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -206,27 +207,61 @@ export default function ClaimsDashboardPage() {
         <>
           <ReportProvenance kind="asOf" at={summary.asOf} />
 
-          {/* THE THREE HEADLINE FIGURES, in one row rather than three stacked sections.
-              Each is the same figure from the same field as before — §7's limit is ordering and
-              grouping, and nothing about what is DISPLAYED has changed. What changed is that a
-              figure now has the weight of a figure instead of being slightly larger text.
+          {/* OPEN VERSUS CLOSED IS A PROPORTION, AND IT HAS A RING NOW.
+              My own note here said there was no ring because `Ring` REQUIRES a caption carrying
+              the raw count and no such string shipped — the nearest, `providerOfficesUsersValue`,
+              reads *{active} active of {total}* and carries the word ACTIVE, a different claim
+              about a claim. The owner wrote the caption (answer 4): *{open} open claims of
+              {total}*, which is `dclmOpenClaimsOfTotal` in `plurals.ts`.
 
-              NO `Ring` FOR OPEN-VERSUS-CLOSED, and that is a measurement rather than a
-              preference: it is a proportion and the component exists for one, but `Ring`
-              REQUIRES a caption carrying the raw count, and no such string ships. The nearest,
-              `providerOfficesUsersValue`, reads *{active} active of {total}* and carries the
-              word ACTIVE — a different claim about a claim. Writing one is the owner's. */}
+              THE RULE THAT COMES WITH IT IS HERS: a ring is permitted wherever a caption of this
+              shape can be written from words that ship. Where it cannot, there is still no ring
+              and two tiles remain the honest answer — so the other six dashboards are NOT fitted
+              with rings in this batch. One dashboard, one caption, measured.
+
+              The count word goes through the plural machinery rather than being written beside the
+              figure: Arabic has six forms and a hand-written «مطالبة» is wrong for four of them.
+              The denominator is open + closed, which is what the proportion is of; `label` is
+              `dclmOpenVsClosed`, already this section's own heading. */}
+          <Ring
+            value={summary.openClaimsCount}
+            total={summary.openClaimsCount + summary.closedClaimsCount}
+            percentText={`${formatNumber(
+              summary.openClaimsCount + summary.closedClaimsCount > 0
+                ? Math.round(
+                    (summary.openClaimsCount * 100) /
+                      (summary.openClaimsCount + summary.closedClaimsCount),
+                  )
+                : 0,
+              language,
+            )}%`}
+            caption={tPlural(
+              'dclmOpenClaimsOfTotal',
+              summary.openClaimsCount,
+              {
+                total: formatNumber(
+                  summary.openClaimsCount + summary.closedClaimsCount,
+                  language,
+                ),
+              },
+            )}
+            label={t('dclmOpenVsClosed')}
+            ariaLabel={tPlural(
+              'dclmOpenClaimsOfTotal',
+              summary.openClaimsCount,
+              {
+                total: formatNumber(
+                  summary.openClaimsCount + summary.closedClaimsCount,
+                  language,
+                ),
+              },
+            )}
+            data-testid="claims-open-ring"
+          />
+
+          {/* THE REMAINING HEADLINE FIGURES. Open and closed moved into the ring above, which is
+              where a proportion belongs; what is left is a money figure, which is not one. */}
           <Tiles>
-            <Tile
-              icon="file"
-              value={formatNumber(summary.openClaimsCount, language)}
-              label={t('dclmOpen')}
-            />
-            <Tile
-              icon="check"
-              value={formatNumber(summary.closedClaimsCount, language)}
-              label={t('dclmClosed')}
-            />
             <Tile
               icon="coins"
               value={formatMoney(summary.outstandingClaimsValueJod, language)}
