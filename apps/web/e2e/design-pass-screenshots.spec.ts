@@ -240,9 +240,14 @@ test.describe("design pass — screenshots", () => {
   /* ------------------------------------------------------------------ /client-accounting */
 
   /*
-   * THE MONEY SHAPE, and the one screen whose COLUMN HEADERS changed language in this batch: four
-   * of the five ageing buckets now read in Arabic, and `1–30 days` is still English because the
-   * word for that range is owed. The capture is the evidence for both halves at once.
+   * THE MONEY SHAPE, and the screen whose COLUMN HEADERS changed language. Four of the five
+   * ageing buckets converted in one batch and the fifth was left in English, because the nearest
+   * shipping string covered DAY ZERO — which on a receivables report is the `current` column one
+   * place to the left, so pointing at it would have been a false label rather than an English one.
+   *
+   * ALL FIVE READ IN ARABIC NOW (owner answer 1, `caAgeing1To30`), and her word turned out to be
+   * byte-identical to `frAgeing1To30`, which had been on `/financial-report` the whole time. The
+   * capture is the evidence.
    */
   const AGEING = {
     asOf: "2026-09-03T00:00:00.000Z",

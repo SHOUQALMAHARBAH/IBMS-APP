@@ -820,6 +820,12 @@ The header row now reads with four Arabic words and one English one. That looks 
 it IS, and it is still strictly better than five English headers. **The word for *1–30 days* on a
 receivables ageing report is owed to the owner.**
 
+> **CLOSED 2026-10-29 — owner answer 1, and the reasoning above is why it was worth asking rather
+> than guessing.** «من ١ إلى ٣٠ يوماً», as `caAgeing1To30`, a NEW key by her instruction. **And it
+> was already in the product**: `frAgeing1To30` on `/financial-report` is BYTE-IDENTICAL, so the
+> value was copied rather than typed. The near-match that made this a question is exactly ONE
+> codepoint — `dclmAgeing0To30` is U+0660 where hers is U+0661.
+
 #### The last seven keep their headings, deliberately
 
 `/company-record`, `/insurance-programs/[id]`, `/leads/[id]`, `/policies/[id]`, `/provider-offices`,
