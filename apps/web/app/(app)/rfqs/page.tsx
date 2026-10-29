@@ -1,13 +1,18 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { listRfqs, type Rfq } from '../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import {
   rfqBadgeStyle,
   rfqCardStyle,
@@ -54,12 +59,10 @@ function RfqList({
 
   if (loadError) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!rfqs) return <p>{t('commonLoading')}</p>;
+  if (!rfqs) return <SkeletonList rows={4} label={t('commonLoading')} />;
   if (rfqs.length === 0) {
     return (
       <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
@@ -81,7 +84,7 @@ function RfqList({
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              gap: '1rem',
+              gap: 'var(--space-4)',
               flexWrap: 'wrap',
             }}
           >
@@ -161,8 +164,8 @@ export default function RfqsPage() {
    */
   if (!hasPermission(user, 'rfq.read')) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('rfqListHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('rfqListHeading')} />
         <p role="status" data-permission-refusal>
           {permissionRefusal(t, 'rfqListRefusalAct', 'rfq.read')}
         </p>
@@ -171,8 +174,8 @@ export default function RfqsPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('rfqListHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('rfqListHeading')} />
       <Suspense fallback={null}>
         <RfqsFlow />
       </Suspense>

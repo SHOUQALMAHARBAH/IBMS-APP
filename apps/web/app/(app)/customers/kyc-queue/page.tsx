@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -9,8 +10,12 @@ import {
   type KycRecord,
 } from '../../../../lib/kyc/kyc-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { KycQueue } from '../../../../components/customer/KycQueue';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
@@ -80,9 +85,11 @@ export default function KycQueuePage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('kycQueuePageHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('kycQueuePageIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('kycQueuePageHeading')}
+        description={t('kycQueuePageIntro')}
+      />
       {/* TWO alerts on this screen contain the phrase "work the KYC queue" — this
           reduced-capability note and the load refusal below — because the act is named in both by
           design. Each carries its own hook so a test can address the one it means: scoping the
@@ -97,11 +104,9 @@ export default function KycQueuePage() {
           )}
         </p>
       ) : null}
-      {items === null && !loadError ? <p>{t('commonLoading')}</p> : null}
+      {items === null && !loadError ? <SkeletonList rows={4} label={t('commonLoading')} /> : null}
       {loadError ? (
-        <p role="alert" style={errorStyle} data-kyc-load-error="">
-          {loadError}
-        </p>
+        <ErrorState title={loadError} data-kyc-load-error="" />
       ) : null}
       {items !== null && !loadError ? (
         <KycQueue items={items} onItemChanged={handleItemChanged} />

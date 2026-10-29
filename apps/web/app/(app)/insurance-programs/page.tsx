@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -10,8 +11,12 @@ import {
   type InsuranceProgram,
 } from '../../../lib/insurance-program/insurance-program-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import { programListCardStyle } from '../../../components/insurance-program/insurance-program.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
@@ -49,12 +54,10 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
 
   if (loadError) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!programs) return <p>{t('iprogLoading')}</p>;
+  if (!programs) return <SkeletonList rows={4} label={t('iprogLoading')} />;
 
   if (programs.length === 0) {
     return (
@@ -125,9 +128,11 @@ export default function InsuranceProgramsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('iprogHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('iprogIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('iprogHeading')}
+        description={t('iprogIntro')}
+      />
       <Suspense fallback={null}>
         <InsuranceProgramsFlow />
       </Suspense>

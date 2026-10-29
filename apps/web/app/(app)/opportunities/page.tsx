@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -9,8 +10,12 @@ import {
   type OpportunityStatus,
 } from '../../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import { rfqBadgeStyle, rfqCardStyle } from '../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
@@ -61,12 +66,10 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
 
   if (loadError) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!opportunities) return <p>{t('commonLoading')}</p>;
+  if (!opportunities) return <SkeletonList rows={4} label={t('commonLoading')} />;
 
   if (opportunities.length === 0) {
     return (
@@ -87,7 +90,7 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              gap: '1rem',
+              gap: 'var(--space-4)',
               flexWrap: 'wrap',
             }}
           >
@@ -143,9 +146,11 @@ export default function OpportunitiesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('oppListHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('oppListIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('oppListHeading')}
+        description={t('oppListIntro')}
+      />
       <Suspense fallback={null}>
         <OpportunitiesFlow />
       </Suspense>

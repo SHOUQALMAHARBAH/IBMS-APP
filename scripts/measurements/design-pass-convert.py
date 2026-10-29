@@ -165,8 +165,11 @@ def convert(path, quote, prefix, expect):
     #
     # This walks the openers in order and converts the close that actually belongs to each one,
     # counting nested `<tr`/`</tr>` so the pairing is real rather than nearest-match.
-    opened = len(re.findall(r"<Tr[ >]", t))
-    if opened:
+    # ONLY THE UNCLOSED ONES. A screen may already carry `<Tr>…</Tr>` from an earlier tool, and
+    # counting every opener made the scan look for `</tr>` tags that no longer exist — the file
+    # was refused with "2 row(s) opened, 0 closed" when nothing was wrong with it.
+    opened = len(re.findall(r"<Tr[ >]", t)) - len(re.findall(r"</Tr>", t))
+    if opened > 0:
         out, i, converted = [], 0, 0
         while True:
             m = re.compile(r"<Tr[ >]").search(t, i)

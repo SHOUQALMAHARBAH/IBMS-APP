@@ -35,8 +35,12 @@
  * what makes them readable tomorrow, which is the whole reason `LegacyImportBatch` exists.
  */
 
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
   Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
   Td,
   Th,
   Tr,
@@ -47,8 +51,7 @@ import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
+import { pageStackStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import {
   getImportBatch,
   importCustomers,
@@ -207,12 +210,12 @@ export default function CustomerImportPage() {
     URL.revokeObjectURL(url);
   }
 
-  if (isLoading) return <main style={pageStyle}>{t('impLoading')}</main>;
+  if (isLoading) return <main style={pageStackStyle}>{t('impLoading')}</main>;
 
   if (!canImport) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('impHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('impHeading')} />
         <p role="alert" style={errorStyle}>
           {permissionRefusal(t, 'impRefusalAct', 'customer.bulk-import')}
         </p>
@@ -221,8 +224,8 @@ export default function CustomerImportPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('impHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('impHeading')} />
       <p style={{ color: 'var(--ink-secondary)', maxWidth: '50rem' }}>
         {t('impIntro')}
       </p>
@@ -295,9 +298,7 @@ export default function CustomerImportPage() {
           )}
 
           {error !== null && (
-            <p role="alert" style={errorStyle}>
-              {error}
-            </p>
+            <ErrorState title={error} />
           )}
 
           <button
@@ -395,11 +396,9 @@ export default function CustomerImportPage() {
       */}
       <Card title={t('impPastHeading')} data-testid="import-register">
         {batchesError !== null ? (
-          <p role="alert" style={errorStyle} data-testid="import-register-error">
-            {batchesError}
-          </p>
+          <ErrorState title={batchesError} data-testid="import-register-error" />
         ) : batches === null ? (
-          <p>{t('impLoading')}</p>
+          <SkeletonList rows={4} label={t('impLoading')} />
         ) : batches.length === 0 ? (
           <p
             data-testid="import-register-none"
@@ -468,7 +467,7 @@ export default function CustomerImportPage() {
                 </p>
                 {openBatch === b.id ? (
                   openIssues === null ? (
-                    <p>{t('impLoading')}</p>
+                    <SkeletonList rows={4} label={t('impLoading')} />
                   ) : openIssues.length === 0 ? (
                     <p style={{ color: 'var(--ink-secondary)' }}>
                       {t('impScreeningClear', { screened: String(b.screened) })}

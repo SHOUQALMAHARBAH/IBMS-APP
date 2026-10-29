@@ -1,6 +1,8 @@
 'use client';
 
+import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
+  ErrorState,
   Table,
   Td,
   Th,
@@ -29,8 +31,7 @@ import {
 } from '../../../lib/sla/sla-timer-api';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
 import { slaEntityLabel } from '../../../lib/audit-trail/record-entity-types';
 
@@ -191,14 +192,12 @@ export default function SlaDashboardPage() {
   const t = summary?.totals;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>{tr('slaDashHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{tr('slaDashIntro')}</p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {!summary ? (
@@ -208,7 +207,7 @@ export default function SlaDashboardPage() {
       ) : (
         <>
           <section style={sectionStyle}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
               <Stat label={tr('slaDashColTimers')} value={t!.total} />
               <Stat label={tr('slaDashOnTrack')} value={t!.onTrack} />
               <Stat label={tr('slaDashDueSoon')} value={t!.dueSoon} />

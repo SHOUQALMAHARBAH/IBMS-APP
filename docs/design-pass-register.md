@@ -617,6 +617,62 @@ than a repaint anyway.
 
 ---
 
+### Batch 4 — 19 screens, and the two tools learned to run after each other
+
+Ten of these were batch 3's own screens: `design-pass-sections.py` converts sections and tables
+and deliberately leaves the page wrapper alone, so they kept `<main style={pageStyle}>` and their
+heading. Running the list converter over them afterwards is what finished them — and doing that
+exposed three ways the two tools get in each other's way, each found by `tsc`:
+
+**The row-pairing scan counted every `<Tr` opener**, including ones a previous tool had already
+closed, so it went looking for `</tr>` tags that no longer existed and refused a file with
+*"2 row(s) opened, 0 closed"* when nothing was wrong with it. It counts the UNCLOSED ones now.
+
+**Both tools added their own `components/ui` import block**, and every name they shared became
+`TS2300: Duplicate identifier`. `design-pass-imports.py` MERGES first, so it is idempotent — the
+same tool run twice, or after a sibling, leaves one block.
+
+**And the import-restore anchored on `^import .*$`**, which matches the first LINE of a
+multi-line block — so the new statement was spliced inside an open `import {` on seven screens.
+Repaired by a pass that finds that exact shape; the lesson is the same one the error transform
+taught, that a pattern assuming a tree's shape reads it wrong.
+
+| screen | inline | screen | inline |
+|---|---|---|---|
+| `/access-recertification` | 2 → 1 | `/client-accounting` | 4 → 2 |
+| `/customers/kyc-queue` | 1 → 0 | `/customers/new` | 1 → 0 |
+| `/employees/reveal` | 2 → 2 | `/financial-report` | 13 → 11 |
+| `/insurance-programs` | 3 → 2 | `/insurer-accounting` | 4 → 3 |
+| `/insurers/new` | 7 → 6 | `/opportunities` | 5 → 4 |
+| `/prospects/new` | 1 → 0 | `/regulatory-compliance` | 21 → 20 |
+| `/rfqs` | 4 → 4 | `/screening-health` | 33 → 33 |
+| `/screening-matches` | 16 → 16 | `/settings/customer-import` | 14 → 14 |
+| `/settings/email` | 4 → 4 | `/settings/roles` | 6 → 6 |
+| `/sla-dashboard` | 19 → 19 |  |  |
+
+**160 → 147 on these 19 files; `SCREEN_BUDGET` 1184 → 1171.**
+
+### A notice that is not an error is wearing the error token — recorded, not converted
+
+Fifteen screens use `style={errorStyle}` for something that is NOT a failure: a REDUCED-CAPABILITY
+notice (*you can see this list, you cannot approve from it*) and permission refusals. The converter
+removed their import and the compiler named every one, which is how this surfaced.
+
+**They were NOT converted to `ErrorState`.** That would put a red danger box around a sentence
+telling somebody the system is working as intended for their role — the opposite of what the
+four-states work is for. The import is restored and the class is recorded: a reader cannot tell a
+refusal they can do nothing about from a failure they should report, and `Note tone="info"` is the
+shape this product already has for it. Choosing per site is a per-screen judgement rather than a
+sweep, and it is owed.
+
+### `/opportunities` HAS NO PLAYWRIGHT SPEC
+
+The second screen found with none, after `/renewal-cases` — again by running the filters through
+`node scripts/playwright-specs.mjs`, which refuses a filter matching nothing where
+`npx playwright test` would have run a smaller suite and still passed. Recorded, not written.
+
+---
+
 ---
 
 ## The method, per screen

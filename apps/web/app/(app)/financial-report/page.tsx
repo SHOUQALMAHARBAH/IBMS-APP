@@ -2,6 +2,10 @@
 
 import {
   Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
   Table,
   Td,
   Th,
@@ -15,8 +19,7 @@ import {
   type FinancialReportSummary,
 } from '../../../lib/finance/financial-report-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatMoney } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -81,11 +84,11 @@ export default function FinancialReportPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('frHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('frIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('frHeading')}
+        description={t('frIntro')}
+      />
 
       <label
         style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
@@ -101,14 +104,12 @@ export default function FinancialReportPage() {
       </label>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {!data ? (
         loadError ? null : (
-          <p>{t('frLoading')}</p>
+          <SkeletonList rows={4} label={t('frLoading')} />
         )
       ) : (
         <>
@@ -213,7 +214,7 @@ function ProfitTable({
 }) {
   const { language, t } = useLanguage();
   if (rows.length === 0)
-    return <p style={{ color: 'var(--ink-secondary)' }}>{t('frNoPolicies')}</p>;
+    return <EmptyState title={t('frNoPolicies')} />;
   return (
     <div style={{ overflowX: 'auto' }}>
       <Table>

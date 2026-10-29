@@ -1,6 +1,10 @@
 'use client';
 
+import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
   Table,
   Td,
   Th,
@@ -36,8 +40,7 @@ import {
   type ComplianceCalendarItem,
 } from '../../../lib/compliance-risk/compliance-calendar-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
@@ -96,13 +99,13 @@ const noteStyle: CSSProperties = {
 const formStyle: CSSProperties = {
   margin: '1rem 0',
   display: 'grid',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   maxWidth: '30rem',
 };
 const labelStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.2rem',
+  gap: 'var(--space-1)',
 };
 
 export default function RegulatoryCompliancePage() {
@@ -339,15 +342,15 @@ export default function RegulatoryCompliancePage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('rcHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('rcIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('rcHeading')}
+        description={t('rcIntro')}
+      />
 
       <h2>{t('rcLicenseHeading')}</h2>
       {licenseLoadError ? (
-        <p role="alert" style={errorStyle}>
-          {licenseLoadError}
-        </p>
+        <ErrorState title={licenseLoadError} />
       ) : null}
       {licenseLoaded && !license ? (
         <p role="alert" style={errorStyle}>
@@ -1047,14 +1050,10 @@ export default function RegulatoryCompliancePage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {itemsLoadError ? (
-        <p role="alert" style={errorStyle}>
-          {itemsLoadError}
-        </p>
+        <ErrorState title={itemsLoadError} />
       ) : null}
 
       {items ? (
@@ -1094,7 +1093,7 @@ export default function RegulatoryCompliancePage() {
                     <Td>{it.evidenceOfSubmissionRef ?? '—'}</Td>
                     <Td>
                       {canManage && !it.isSubmitted ? (
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                           <input
                             aria-label={t('rcEvidenceRefAria', {
                               name: it.obligationName,
@@ -1136,7 +1135,7 @@ export default function RegulatoryCompliancePage() {
         // The loading state directive §2 requires; this page rendered
         // nothing at all while fetching. Guarded on loadError so an error
         // and a "Loading…" line never appear together.
-        <p>{t('rcLoading')}</p>
+        <SkeletonList rows={4} label={t('rcLoading')} />
       )}
     </main>
   );

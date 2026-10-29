@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { CustomerOnboardingWizard } from '../../../../components/customer/CustomerOnboardingWizard';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
@@ -25,9 +28,11 @@ export default function NewCustomerPage() {
   const canCreateCustomer = hasPermission(user, 'customer.create');
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('customerNewHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('customerNewIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('customerNewHeading')}
+        description={t('customerNewIntro')}
+      />
       {canCreateCustomer ? (
         <CustomerOnboardingWizard />
       ) : (

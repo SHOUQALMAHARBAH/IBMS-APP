@@ -1,6 +1,8 @@
 "use client";
 
+import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
+  ErrorState,
   Table,
   Td,
   Th,
@@ -25,8 +27,7 @@ import {
   ScreeningCasePanel,
 } from "../../../components/screening/ScreeningCasePanel";
 import { ApiError } from "../../../lib/auth/api-client";
-import { errorStyle } from "../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../components/lead/lead.styles";
+import { pageStackStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import { hasPermission } from '../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -138,7 +139,7 @@ export default function ScreeningMatchesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>
         {t('smSanctionsMatchReview')}
       </h1>
@@ -155,7 +156,7 @@ export default function ScreeningMatchesPage() {
         </p>
       ) : null}
 
-      <div style={{ display: "flex", gap: "0.4rem", margin: "1rem 0" }}>
+      <div style={{ display: "flex", gap: 'var(--space-2)', margin: "1rem 0" }}>
         {STATUSES.map((s) => (
           <button
             key={s}
@@ -186,14 +187,10 @@ export default function ScreeningMatchesPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
@@ -286,7 +283,7 @@ export default function ScreeningMatchesPage() {
                           <div style={{ opacity: 0.75 }}>{r.reviewReason}</div>
                         </div>
                       ) : canReview ? (
-                        <div style={{ display: "grid", gap: "0.3rem" }}>
+                        <div style={{ display: "grid", gap: 'var(--space-2)' }}>
                           <textarea
                             aria-label={t('smReviewReasonAria', { name: r.subjectName })}
                             value={reasons[r.id] ?? ""}
@@ -302,7 +299,7 @@ export default function ScreeningMatchesPage() {
                             }
                             style={{ minWidth: "18rem" }}
                           />
-                          <div style={{ display: "flex", gap: "0.3rem" }}>
+                          <div style={{ display: "flex", gap: 'var(--space-2)' }}>
                             <button
                               type="button"
                               disabled={

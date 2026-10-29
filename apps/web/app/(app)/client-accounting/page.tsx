@@ -1,6 +1,10 @@
 'use client';
 
 import {
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
   Table,
   Td,
   Th,
@@ -16,8 +20,7 @@ import {
   type ReceivablesAgeingReport,
 } from '../../../lib/client-accounting/ageing-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { Language } from '../../../lib/i18n/translations';
@@ -70,11 +73,11 @@ export default function ClientAccountingPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('caHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        {t('caIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('caHeading')}
+        description={t('caIntro')}
+      />
 
       <label
         style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
@@ -90,14 +93,12 @@ export default function ClientAccountingPage() {
       </label>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('caNone')}</p>
+          <EmptyState title={t('caNone')} />
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <Table>
@@ -157,7 +158,7 @@ export default function ClientAccountingPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>{t('caLoading')}</p>
+        <SkeletonList rows={4} label={t('caLoading')} />
       )}
     </main>
   );

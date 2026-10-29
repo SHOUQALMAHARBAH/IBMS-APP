@@ -1,5 +1,6 @@
 'use client';
 
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
   type CSSProperties,
   type FormEvent,
@@ -16,8 +17,12 @@ import {
   type EmployeeSearchResult,
 } from '../../../../lib/supporting-operations/employee-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
@@ -61,13 +66,13 @@ const row: CSSProperties = {
 const formStyle: CSSProperties = {
   margin: '1rem 0',
   display: 'grid',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   maxWidth: '30rem',
 };
 const labelStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.2rem',
+  gap: 'var(--space-1)',
 };
 const revealedStyle: CSSProperties = {
   fontFamily: 'var(--font-mono, monospace)',
@@ -138,7 +143,7 @@ export default function EmployeeRevealPage() {
     }
   }
 
-  if (isLoading) return <p>{t('empRevealLoading')}</p>;
+  if (isLoading) return <SkeletonList rows={4} label={t('empRevealLoading')} />;
   if (!user) return null;
 
   // A role without the grant does not get a search box that will 403. This page exists ONLY to exercise
@@ -146,8 +151,8 @@ export default function EmployeeRevealPage() {
   // missing permission helps rather than confuses.
   if (!canReveal) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('empRevealHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('empRevealHeading')} />
         <p role="alert" style={errorStyle}>
           {permissionRefusal(t, 'empRevealRefusalAct', 'employee.national-id.reveal')}
         </p>
@@ -158,8 +163,8 @@ export default function EmployeeRevealPage() {
   const termTooShort = term.trim().length < 2;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('empRevealHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('empRevealHeading')} />
       <p>{t('empRevealIntro')}</p>
 
       <form onSubmit={onSearch} style={formStyle}>
@@ -184,14 +189,10 @@ export default function EmployeeRevealPage() {
       </form>
 
       {searchError ? (
-        <p role="alert" style={errorStyle}>
-          {searchError}
-        </p>
+        <ErrorState title={searchError} />
       ) : null}
       {revealError ? (
-        <p role="alert" style={errorStyle}>
-          {revealError}
-        </p>
+        <ErrorState title={revealError} />
       ) : null}
 
       {/*
@@ -240,7 +241,7 @@ export default function EmployeeRevealPage() {
                   {t('empRevealNationalIdLabel')} {revealed[r.id]}
                 </span>
               ) : reasonFor === r.id ? (
-                <div style={{ display: 'grid', gap: '0.3rem' }}>
+                <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
                   <label style={labelStyle}>
                     {t('empRevealReasonLabel')}
                     <textarea

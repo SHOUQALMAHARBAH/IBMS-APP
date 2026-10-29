@@ -1,7 +1,10 @@
 'use client';
 
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
   Card,
+  ErrorState,
+  PageHeader,
   Table,
   Td,
   Th,
@@ -46,8 +49,7 @@ import {
   type RoleAdminEntry,
   type RoleWithGrants,
 } from '../../../../lib/admin/role-admin-api';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   listDutySegregationReadiness,
   type DutySegregationReadiness,
@@ -74,10 +76,10 @@ const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
   display: 'grid',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   maxWidth: '30rem',
 };
-const labelStyle: CSSProperties = { display: 'grid', gap: '0.2rem' };
+const labelStyle: CSSProperties = { display: 'grid', gap: 'var(--space-1)' };
 const badgeStyle: CSSProperties = {
   display: 'inline-block',
   padding: '0.1rem 0.4rem',
@@ -527,14 +529,12 @@ export default function RoleAdminPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('roleHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('roleHeading')} />
       <p>{t('roleIntro')}</p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle} data-testid="roles-load-error">
-          {loadError}
-        </p>
+        <ErrorState title={loadError} data-testid="roles-load-error" />
       ) : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
 

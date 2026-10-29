@@ -85,8 +85,9 @@ def convert(path: pathlib.Path) -> None:
         lambda m: '<Table data-testid="%s">' % m.group(1))
     sub("table-bare",
         r"<table style=\{\{ borderCollapse: ['\"]collapse['\"][^}]*\}\}>", "<Table>")
-    opened = len(re.findall(r"<Table[ >]", t))
-    if opened:
+    # Only the UNCLOSED ones — a screen may already carry converted tables from the sibling tool.
+    opened = len(re.findall(r"<Table[ >]", t)) - len(re.findall(r"</Table>", t))
+    if opened > 0:
         t, n = pair(t, re.compile(r"<Table[ >]"), r"<table[ >]", r"</table>", "</Table>")
         if n != opened:
             sys.exit("REFUSED %s: %d table(s) opened, %d closed" % (path, opened, n))
@@ -112,8 +113,8 @@ def convert(path: pathlib.Path) -> None:
 
     sub("tr-open", r"<tr key=", "<Tr key=")
     sub("tr-bare", r"<tr>(\s*\n\s*<Td)", lambda m: "<Tr>%s" % m.group(1))
-    opened = len(re.findall(r"<Tr[ >]", t))
-    if opened:
+    opened = len(re.findall(r"<Tr[ >]", t)) - len(re.findall(r"</Tr>", t))
+    if opened > 0:
         t, n = pair(t, re.compile(r"<Tr[ >]"), r"<tr[ >]", r"</tr>", "</Tr>")
         if n != opened:
             sys.exit("REFUSED %s: %d row(s) opened, %d closed" % (path, opened, n))

@@ -1,6 +1,8 @@
 "use client";
 
+import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
+  ErrorState,
   Table,
   Td,
   Th,
@@ -11,8 +13,7 @@ import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { ApiError } from "../../../lib/auth/api-client";
-import { errorStyle } from "../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../components/lead/lead.styles";
+import { pageStackStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import {
   loadIndependently,
@@ -48,7 +49,7 @@ const card: CSSProperties = {
 const row: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: "1rem",
+  gap: 'var(--space-4)',
   padding: "0.3rem 0",
   borderBottom: "1px solid #f3f4f6",
 };
@@ -146,7 +147,7 @@ export default function ScreeningHealthPage() {
   };
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>
         {t('shScreeningHealth')}
       </h1>
@@ -155,9 +156,7 @@ export default function ScreeningHealthPage() {
       </p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {!loaded ? (

@@ -1,6 +1,9 @@
 'use client';
 
 import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
   Table,
   Td,
   Th,
@@ -14,8 +17,7 @@ import {
   type InsurerPayablesReport,
 } from '../../../lib/insurer-accounting/payables-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { Language } from '../../../lib/i18n/translations';
@@ -72,11 +74,11 @@ export default function InsurerAccountingPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('iaHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        {t('iaIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('iaHeading')}
+        description={t('iaIntro')}
+      />
 
       <label
         style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
@@ -92,9 +94,7 @@ export default function InsurerAccountingPage() {
       </label>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {data ? (
@@ -152,7 +152,7 @@ export default function InsurerAccountingPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>{t('iaLoading')}</p>
+        <SkeletonList rows={4} label={t('iaLoading')} />
       )}
     </main>
   );

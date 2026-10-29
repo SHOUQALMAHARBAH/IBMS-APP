@@ -24,6 +24,10 @@ NL = "\n"
 COMPONENTS = ("Badge", "Button", "Card", "EmptyState", "ErrorState", "Field", "FilterBar",
               "Icon", "KeyValue", "Note", "PageHeader", "Select", "SkeletonList", "Table",
               "Td", "TextArea", "TextInput", "Th", "Tile", "Tiles", "Tr")
+UI_BLOCK = re.compile(
+    r"import \{\n((?:\s+\w+,\n)+)\} from ['\"][^'\"]*/components/ui['\"];"
+)
+
 DEAD = ("errorStyle", "cellStyle", "cell", "head", "bodyCell", "headCell", "sectionStyle",
         "pageStyle")
 
@@ -37,9 +41,22 @@ def convert(path: pathlib.Path) -> None:
     depth = path.as_posix().count("/") - 2
     prefix = "/".join([".."] * depth)
 
+    # MERGE FIRST, SO THE TOOL IS IDEMPOTENT. Running it twice — or running it after a sibling tool
+    # that already added a block — otherwise leaves two `components/ui` imports, and every name the
+    # two share becomes `TS2300: Duplicate identifier`. One block, in the position of the first.
+    blocks = list(UI_BLOCK.finditer(t))
+    if len(blocks) > 1:
+        names = sorted({n for b in blocks for n in re.findall(r"\w+", b.group(1))})
+        merged = "import {\n%s\n} from '%s/components/ui';" % (
+            "\n".join("  %s," % n for n in names), prefix)
+        for b in reversed(blocks[1:]):
+            t = t[: b.start()] + t[b.end() :].lstrip("\n")
+        first = UI_BLOCK.search(t)
+        t = t[: first.start()] + merged + t[first.end() :]
+
     body = re.sub(r"/\*.*?\*/|//[^\n]*", "", t, flags=re.S)
     used = [c for c in COMPONENTS if re.search(r"<%s[ />\n]" % c, body)]
-    already = re.search(r"import \{\n((?:\s+\w+,\n)+)\} from ['\"][^'\"]*/components/ui['\"];", t)
+    already = UI_BLOCK.search(t)
     have = set(re.findall(r"\w+", already.group(1))) if already else set()
     missing = [c for c in used if c not in have]
 
