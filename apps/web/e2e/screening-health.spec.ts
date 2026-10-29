@@ -325,7 +325,18 @@ test("renders in Arabic with RTL direction", async ({ page }) => {
   await page.goto("/screening-health");
 
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.getByText("غير مهيأ", { exact: true })).toBeVisible();
+  /*
+   * «غير مُهيّأ», WITH THE SHADDA — and this assertion failing is the proof of the defect it was
+   * pinning. It read «غير مهيأ» exactly, which was the LOCAL map this screen hand-wrote; the
+   * screen reads `ENUM_LABEL.ProviderHealthStatus` now, which has shipped
+   * `provHealthNotConfigured` in both languages the whole time. Two spellings of one word, the
+   * undiacriticised one live only because a screen kept its own copy — and an exact-match
+   * assertion on the copy is what held it in place.
+   *
+   * The test's own property is untouched: this screen must say NOT CONFIGURED in Arabic, and it
+   * does. What changed is which of the two spellings is the product's.
+   */
+  await expect(page.getByText("غير مُهيّأ", { exact: true })).toBeVisible();
   await expect(page.locator('[data-capability="PEP"]')).toBeVisible();
 });
 

@@ -784,7 +784,7 @@ holds the money* is the whole question on that desk; and the three loss-ratio br
 `Card`, so by-client, by-line and by-insurer read as three cuts of one thing rather than three
 screens.
 
-**NO `Ring` FOR OPEN-VERSUS-CLOSED, and that is a measurement.** It is a proportion and the
+**NO `Ring` FOR OPEN-VERSUS-CLOSED, and that is a measurement.** **CLOSED 2026-10-29 — owner answer 4 supplied the one thing this was waiting on, so the reasoning below stands and only its conclusion moved.** It is a proportion and the
 component exists for one — but `Ring` REQUIRES a caption carrying the raw count, and no such string
 ships. The nearest, `providerOfficesUsersValue`, reads *{active} active of {total}* and carries the
 word ACTIVE, which is a different claim about a claim. Two tiles say the same two numbers with no

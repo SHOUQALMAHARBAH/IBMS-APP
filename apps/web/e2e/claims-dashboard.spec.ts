@@ -55,8 +55,22 @@ test("renders every metric section with real figures", async ({ page }) => {
 
   await page.goto("/dashboards/claims");
   await expect(page.getByRole("heading", { name: "Claims Dashboard" })).toBeVisible();
-  await expect(page.getByText("14", { exact: true })).toBeVisible();
-  await expect(page.getByText("52", { exact: true })).toBeVisible();
+  /*
+   * THE RING, NOT TWO TILES. This asserted `14` and `52` as exact text — the open- and
+   * closed-claims TILE values — and owner answer 4 moved that proportion into a `Ring`. `14` now
+   * appears only inside the caption and `52` does not render as a figure at all: the closed count
+   * survives as part of the denominator, 66.
+   *
+   * Re-pointed at the ring's own content rather than weakened, and it is the stronger claim. The
+   * percentage and the caption TOGETHER are what the component exists to make checkable — a
+   * percentage that hides its denominator is a figure nobody can check, which is why `caption` is
+   * a required prop — so asserting both is asserting the thing the ring is for.
+   */
+  const ring = page.locator('[data-testid="claims-open-ring"]');
+  await expect(ring).toBeVisible();
+  await expect(ring).toContainText("21%");
+  await expect(ring).toContainText("14");
+  await expect(ring).toContainText("66");
   await expect(page.getByText("JOD 37,500.000")).toBeVisible();
   await expect(page.getByText("National Insurance")).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
