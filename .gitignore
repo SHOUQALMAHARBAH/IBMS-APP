@@ -57,3 +57,7 @@ server-message-identifiers.txt
 # cp1252 and a row carrying Arabic or an em dash kills the run. A snapshot to read,
 # never an artefact to keep.
 em-dash-sites.txt
+
+# The design-pass screenshots. NOT under `test-results/`, which Playwright clears at the
+# start of every run - these have to survive one. Evidence to look at, not an artefact.
+design-pass-captures/

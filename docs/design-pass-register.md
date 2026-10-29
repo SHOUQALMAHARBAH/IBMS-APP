@@ -1076,6 +1076,24 @@ stands behind this one is the CI run that found it and the ones that come after.
 
 ---
 
+### Batch 11c — the captures were being written where Playwright deletes them
+
+Found by looking for them. **`test-results/` is Playwright's own output directory and it is CLEARED
+at the start of every run**, so the 36 captures survived exactly until the next
+`npx playwright test` — which in this batch was the full suite. I opened several, and then they
+were gone.
+
+**That is a defect in the EVIDENCE rather than a tidiness question.** The owner's stated reason for
+these is that they are how she reviews 113 screens without opening 113 screens, and a file that any
+later command silently deletes cannot be that. It also fails in the quietest possible direction:
+**an empty folder looks exactly like a capture run that was never taken.**
+
+They move to `design-pass-captures/` at the repo root, which Playwright does not manage. Still
+gitignored — evidence to look at, not an artefact to carry in the tree. **Proven rather than
+assumed**: 32 captures written, an unrelated spec run afterwards, 32 still there.
+
+---
+
 ---
 
 ## The method, per screen

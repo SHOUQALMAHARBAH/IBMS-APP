@@ -23,8 +23,9 @@ import { ROLE_PERMISSIONS, permissionsForRoles } from "./fixtures/role-permissio
  * made and for the same reason: this is proof of existence for a human reviewer, not a pixel-diff
  * test, and a pixel baseline on a bilingual RTL app fails noisily on cross-platform font rendering.
  *
- * Saved under `test-results/design-pass/<screen>/<theme>-<width>.png`, which the existing
- * `test-results/` gitignore entry already covers — the same treatment Playwright's own traces get.
+ * Saved under `design-pass-captures/<screen>/<theme>-<width>.png` at the repo root — NOT under
+ * `test-results/`, which Playwright CLEARS at the start of every run. Gitignored all the same:
+ * these are evidence to look at, not an artefact to carry in the tree.
  * `docs/design-pass-register.md` links to the folder.
  */
 
@@ -72,7 +73,11 @@ async function seedTheme(page: Page, theme: Theme) {
 
 async function capture(page: Page, screen: string, theme: Theme, width: Width) {
   await page.screenshot({
-    path: `test-results/design-pass/${screen}/${theme}-${width}.png`,
+    // NOT `test-results/` — Playwright CLEARS that directory at the start of every run, so
+    // captures written there survive only until the next `npx playwright test`. These are
+    // the owner's review of 113 screens; a file a later command silently deletes cannot be
+    // that, and an empty folder looks exactly like a run that was never taken.
+    path: `../../design-pass-captures/${screen}/${theme}-${width}.png`,
     fullPage: true,
   });
 }
