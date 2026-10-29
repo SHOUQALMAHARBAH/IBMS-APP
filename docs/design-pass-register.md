@@ -851,6 +851,60 @@ stretching a word onto a site it does not fit is worse than a count that stands.
 
 ---
 
+### Batch 8 — the record shape, and a contrast defect no gate in this repository could see
+
+`/customers/[id]` joined the capture set as the RECORD shape — the one shape missing from it, and
+the screen a person spends most of their day on. Opening the picture found that the screen had
+**kept its own markup**: eight `<section>`s with a bare `<h2>` and no surface behind any of them,
+nine browser-default `<button>`s rendering as tiny grey boxes, and the record's own facts — the
+masked national id, the contact phone and email, the reveal controls — sitting on the bare page
+between two cards.
+
+`design-pass-sections.py` had REFUSED that file with *nothing changed*, correctly: its markup is a
+shape the converter does not recognise. That is the honest limit of a converter and the reason the
+captures exist at all.
+
+| | before | after |
+|---|---|---|
+| sections with a surface | 0 of 8 | 8 of 8 |
+| bare `<button>` | 9 | 0 |
+| the facts grid | on the page background | on a `Card` |
+| correction forms | two unstyled toggles | `Button` + `Card`, in their own components |
+
+**`SCREEN_BUDGET` 1132 → 1115**, and the ratchet is what produced the number: it refuses a budget
+left ABOVE the real figure, because a ceiling that absorbs the next regression silently is worse
+than no gate.
+
+#### `opacity` as muting — the recorded contrast regression, in a second form
+
+Eight of this screen's sites read `style={{ opacity: 0.8 }}` on body text. Measured from this
+product's own tokens rather than asserted:
+
+| pairing | 1.00 | 0.85 | 0.80 | 0.75 | 0.70 |
+|---|---|---|---|---|---|
+| `--ink-secondary` on `--surface-card` | 6.58 | 4.60 | **4.10** | **3.68** | **3.31** |
+| `--ink-secondary` on `--surface-page` | 6.09 | **4.32** | **3.90** | **3.50** | **3.14** |
+| `--ink-muted` on `--surface-card` | 5.22 | **3.82** | **3.47** | **3.13** | **2.87** |
+
+`opacity` composites the text INTO its background, so muted text written that way drops below AA's
+4.5 on a token that passes comfortably. `--ink-muted` fails at every value this tree uses.
+
+**The a11y suite is silent about it, and that is why it needed a measure of its own**: axe
+composites the colours it can resolve and reports the rest as INCOMPLETE, while the gate reads
+serious/critical VIOLATIONS — so 85/85 green says nothing at all about this class.
+
+**130 sites across 69 files tree-wide, now 120.** `scripts/measurements/opacity-as-muting.py`
+carries the table in its own header and is a CI gate beside the other two design ratchets. It is a
+ratchet rather than a ban because a reduced opacity on an icon, a divider or a disabled control is
+legitimate and is not a contrast question — the rows are candidates to read. Planted: one more site
+takes it to 121 and it exits 1 naming the class.
+
+**And my own arithmetic was wrong by two.** I counted eight removals with `grep -c` and the script
+measured six: two of the eight were inside COMMENTS, which the script strips and a `grep` does not.
+The budget is the measurement, 120, not the 122 I predicted.
+
+---
+
 ---
 
 ## The method, per screen

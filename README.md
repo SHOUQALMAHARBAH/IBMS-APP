@@ -111,12 +111,24 @@ already give).
   was nothing to darken but the ink). It is `#656d7b` — 5.22 / 4.82 / 4.61 on
   card / page / sunken; dark is `#8b95a4`, worst case 4.98. Primary and secondary are
   untouched.
-* **Never mute text with `opacity`.** It composites toward whatever is behind the
-  element, so the rendered colour is one no token declares and axe measures the blend:
-  `opacity: 0.6` on `--ink-primary` reads as `#787f89` over the page surface, 3.73:1.
-  That pattern was 20 of the 51 contrast violations the first full `test:a11y` run
-  found. Use `--ink-secondary` (6.09:1) or `--ink-muted`. `opacity` on a *disabled
-  control* is fine — axe exempts those, and `components/ui/Button.tsx` still uses it.
+* **Never mute text with `opacity` — and `npm run check:opacity-muting` is the gate.**
+  It composites toward whatever is behind the element, so the rendered colour is one no
+  token declares: `opacity: 0.6` on `--ink-primary` reads as `#787f89` over the page
+  surface, 3.73:1. That pattern was 20 of the 51 contrast violations the first full
+  `test:a11y` run found. Use `--ink-secondary` (6.09:1) or `--ink-muted`. `opacity` on a
+  *disabled control* is fine — axe exempts those, and `components/ui/Button.tsx` still
+  uses it.
+  **THIS RULE WAS WRITTEN HERE AND ENFORCED BY NOTHING, AND 130 SITES ACROSS 69 FILES
+  BROKE IT** (measured 2026-10-29, now 120). `--ink-secondary` on `--surface-card` is
+  6.58 at full strength and **4.10 at `opacity: 0.8`** — below AA; on `--surface-page`
+  it fails from 0.85, and `--ink-muted` fails at every value this tree uses. The full
+  table is in `scripts/measurements/opacity-as-muting.py`'s own header.
+  **THE a11y SUITE CANNOT SEE IT**, which is why the gate is separate: axe composites
+  the colours it can resolve and reports the rest as INCOMPLETE, while `test:a11y` reads
+  serious/critical VIOLATIONS — so 85/85 green says nothing at all about this class. The
+  gate is a RATCHET rather than a ban, because a reduced opacity on an icon, a divider
+  or a disabled control is legitimate and is not a contrast question; its rows are
+  candidates to read, and **the budget may only fall**.
 * **The `(auth)` screens carry the comp's hero gradient**, via `authPageStyle` /
   `authCardStyle` in `components/auth/auth-form.styles.ts`. Both are **additive**:
   `pageStyle` and `cardStyle` in that same file are imported by **86 authenticated

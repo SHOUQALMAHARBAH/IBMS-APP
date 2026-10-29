@@ -237,6 +237,82 @@ test.describe("design pass — screenshots", () => {
     },
   );
 
+  /* ------------------------------------------------------------------ /customers/[id] */
+
+  /*
+   * THE RECORD SHAPE. Copied from `customers.spec.ts` rather than approximated — the two
+   * screening discriminators, the masked contact fields and the DRAFT KYC record are all the
+   * states this screen exists to show at once.
+   */
+  const CUSTOMER = {
+    id: "cust-1",
+    prospectId: null,
+    customerType: "INDIVIDUAL",
+    legalName: "أحمد الفلاني",
+    givenName: "أحمد",
+    fatherName: null,
+    grandfatherName: null,
+    familyName: "الفلاني",
+    dateOfBirth: "1988-02-29",
+    nationality: "JO",
+    registrationNumber: null,
+    taxRegistrationNumber: null,
+    registeredAddress: null,
+    natureOfBusiness: null,
+    languagePreference: "AR",
+    status: "PENDING_KYC",
+    classification: "CONFIDENTIAL",
+    ownerUserId: "user-1",
+    createdAt: "2026-08-26T00:00:00.000Z",
+    updatedAt: "2026-08-26T00:00:00.000Z",
+    nationalId: "******2345",
+    contactPhone: "***-7890",
+    contactEmail: "***@example.test",
+  };
+
+  const KYC_RECORD = {
+    id: "kyc-1",
+    customerId: "cust-1",
+    status: "DRAFT",
+    isEdd: false,
+    submittedAt: null,
+    createdByUserId: "user-1",
+    approvedByUserId: null,
+    combinedDutyAct: null,
+    approvedAt: null,
+    nextReviewDueAt: null,
+    createdAt: "2026-08-26T00:00:00.000Z",
+    updatedAt: "2026-08-26T00:00:00.000Z",
+  };
+
+  screenshots(
+    "customer-record",
+    "/customers/cust-1",
+    ["SALES_RELATIONSHIP_OFFICER"],
+    async (page) => {
+      await page.route("http://localhost:4000/customers/cust-1", (route) =>
+        route.fulfill({ status: 200, json: CUSTOMER }),
+      );
+      await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+        route.fulfill({ status: 200, json: [] }),
+      );
+      await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+        route.fulfill({ status: 200, json: [] }),
+      );
+      await page.route("http://localhost:4000/kyc/customers/cust-1**", (route) =>
+        route.fulfill({ status: 200, json: KYC_RECORD }),
+      );
+      // Anything else this record page reads answers EMPTY rather than hanging: a capture of a
+      // screen still waiting on a request is a capture of a skeleton.
+      await page.route("http://localhost:4000/customers/cust-1/**", (route) =>
+        route.fulfill({ status: 200, json: [] }),
+      );
+    },
+    async (page) => {
+      await page.getByText("أحمد الفلاني").first().waitFor();
+    },
+  );
+
   /* ------------------------------------------------------------------ /incidents */
 
   const INCIDENTS = [

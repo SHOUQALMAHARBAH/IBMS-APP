@@ -6,6 +6,7 @@ import {
   updateCustomerContactDetails,
   type CustomerContactCorrection as CorrectionInput,
 } from '../../lib/customer/customer-api';
+import { Button, Card } from '../ui';
 import { ApiError } from '../../lib/auth/api-client';
 import { useAuth } from '../../lib/auth/auth-context';
 import { useLanguage } from '../../lib/i18n/language-context';
@@ -114,8 +115,8 @@ export function CustomerContactCorrection({
 
   if (!open) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         data-testid="customer-correct-open"
         onClick={() => {
           setOpen(true);
@@ -123,16 +124,16 @@ export function CustomerContactCorrection({
         }}
       >
         {t('customerCorrectOpen')}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <section
-      style={{ display: 'grid', gap: '0.5rem', maxWidth: '32rem' }}
+    <Card
+      title={t('customerCorrectHeading')}
+      style={{ display: 'grid', gap: 'var(--space-2)', maxWidth: '32rem' }}
       data-testid="customer-correct-form"
     >
-      <h3 style={{ margin: 0 }}>{t('customerCorrectHeading')}</h3>
       <p style={muted}>{t('customerCorrectIntro')}</p>
 
       {error && (
@@ -195,9 +196,8 @@ export function CustomerContactCorrection({
         {t('customerCorrectIdentifiersNote')}
       </p>
 
-      <div style={{ display: 'flex', gap: '0.4rem' }}>
-        <button
-          type="button"
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <Button
           data-testid="customer-correct-submit"
           // At least one of the three values: the service refuses an empty
           // correction with a 422, and a screen must not send one.
@@ -205,9 +205,9 @@ export function CustomerContactCorrection({
           onClick={() => void submit()}
         >
           {t('customerCorrectSubmit')}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
           data-testid="customer-correct-cancel"
           onClick={() => {
             setOpen(false);
@@ -216,8 +216,8 @@ export function CustomerContactCorrection({
           }}
         >
           {t('customerCorrectCancel')}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }
