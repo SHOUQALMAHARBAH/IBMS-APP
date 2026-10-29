@@ -18,8 +18,17 @@ import {
   type RoleCatalogueEntry,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
@@ -32,17 +41,6 @@ import {
  *  an office defines is deliberately NOT one of these. */
 type LegacyRoleName = keyof typeof ENUM_LABEL.RoleName;
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const noRolesBadgeStyle: CSSProperties = {
   display: 'inline-block',
   padding: '0.1rem 0.4rem',
@@ -271,11 +269,11 @@ export default function UserAdminPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('usrUsersRoles')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('usrSelfServiceSignupCreatesAn')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('usrUsersRoles')}
+        description={t('usrSelfServiceSignupCreatesAn')}
+      />
 
       {isAdmin ? (
         <form
@@ -283,11 +281,11 @@ export default function UserAdminPage() {
           style={{
             margin: '1rem 0',
             display: 'grid',
-            gap: '0.4rem',
+            gap: 'var(--space-2)',
             maxWidth: '34rem',
           }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrFullName')}
             <input
               aria-label={t('usrFullName')}
@@ -296,7 +294,7 @@ export default function UserAdminPage() {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrEmail')}
             <input
               aria-label={t('usrEmail')}
@@ -306,7 +304,7 @@ export default function UserAdminPage() {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrPasswordMin12CharsWith')}
             <input
               aria-label={t('usrPasswordAria')}
@@ -317,7 +315,7 @@ export default function UserAdminPage() {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrDepartment')}
             <select
               aria-label={t('usrDepartment')}
@@ -348,7 +346,7 @@ export default function UserAdminPage() {
             What is left here is the account with NO person behind it — the external auditor — which is
             the only case this screen was ever the right place for.
           */}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrBranch')}
             <select
               aria-label={t('usrBranch')}
@@ -404,9 +402,7 @@ export default function UserAdminPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {listsMissing ? (
         <p role="status" data-lists-missing style={{ color: 'var(--ink-muted)' }}>
@@ -414,9 +410,7 @@ export default function UserAdminPage() {
         </p>
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
@@ -431,30 +425,30 @@ export default function UserAdminPage() {
                 ? `${rows.length} من ${total}`
                 : `${rows.length} of ${total}`}
             </p>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+            <Card padded={false}>
+            <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('usrName')}</th>
-                    <th style={head}>{t('usrEmail2')}</th>
-                    <th style={head}>{t('usrHrRecordColumn')}</th>
-                    <th style={head}>{t('usrRoles2')}</th>
-                    <th style={head}>{t('usrActive')}</th>
-                    <th style={head}>{t('usrAction')}</th>
+                    <Th>{t('usrName')}</Th>
+                    <Th>{t('usrEmail2')}</Th>
+                    <Th>{t('usrHrRecordColumn')}</Th>
+                    <Th>{t('usrRoles2')}</Th>
+                    <Th>{t('usrActive')}</Th>
+                    <Th>{t('usrAction')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((u) => (
-                    <tr key={u.id}>
-                      <td style={cell}>{u.fullName}</td>
-                      <td style={cell}>{u.email}</td>
+                    <Tr key={u.id}>
+                      <Td>{u.fullName}</Td>
+                      <Td>{u.email}</Td>
                       {/* The link is the organising idea, not a field on a form:
                           `User.employeeId` is unique, and once linked the HR
                           record's four-part official name becomes the display
                           name everywhere. An account with no HR record is a real
                           and visible state — somebody still owes this person an
                           employee record. */}
-                      <td style={cell} data-hr-link={u.employeeId ? 'linked' : 'none'}>
+                      <Td data-hr-link={u.employeeId ? 'linked' : 'none'}>
                         {u.employeeId ? (
                           <a href={`/employees/${u.employeeId}`}>
                             {t('usrHrRecordOpen')}
@@ -464,8 +458,8 @@ export default function UserAdminPage() {
                             {t('usrHrRecordNone')}
                           </span>
                         )}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {u.roles.length === 0 ? (
                           /* A badge, not the word "None". An account with no
                              roles can sign in and reach NOTHING, which reads as a
@@ -498,18 +492,18 @@ export default function UserAdminPage() {
                             </span>
                           ))
                         )}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {u.isActive
                           ? t('usrYes')
                           : t('usrNo')}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {isAdmin ? (
                           <div
                             style={{
                               display: 'flex',
-                              gap: '0.3rem',
+                              gap: 'var(--space-2)',
                               flexWrap: 'wrap',
                             }}
                           >
@@ -565,16 +559,16 @@ export default function UserAdminPage() {
                             </button>
                           </div>
                         ) : null}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
+            </Card>
           </>
         )
       ) : loadError ? null : (
-        <p>{t('usrLoading')}</p>
+        <SkeletonList rows={4} label={t('usrLoading')} />
       )}
     </main>
   );

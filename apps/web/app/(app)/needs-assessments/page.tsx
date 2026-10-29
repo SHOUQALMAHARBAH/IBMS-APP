@@ -9,11 +9,15 @@ import {
   type NeedsAssessment,
 } from '../../../lib/needs-assessment/needs-assessment-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
 import {
   cardMetaStyle,
   cardStyle,
-  pageStyle,
+  pageStackStyle,
 } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/needs-assessment/needs-assessment.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
@@ -59,15 +63,15 @@ export default function NeedsAssessmentsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('naHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('naIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('naHeading')}
+        description={t('naIntro')}
+      />
 
-      {assessments === null && !loadError ? <p>{t('naLoading')}</p> : null}
+      {assessments === null && !loadError ? <SkeletonList rows={4} label={t('naLoading')} /> : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {assessments !== null && !loadError ? (
         assessments.length === 0 ? (

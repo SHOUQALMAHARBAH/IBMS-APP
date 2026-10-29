@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -13,24 +13,23 @@ import {
   type ReconciliationException,
 } from '../../../lib/finance/reconciliation-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 
-const cellStyle: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const headCellStyle: CSSProperties = {
-  ...cellStyle,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 /** Parse a textarea of `invoiceId, amount` lines into detect-request lines. */
 function parseLines(
@@ -127,11 +126,11 @@ export default function BankReconciliationPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('brHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('brIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('brHeading')}
+        description={t('brIntro')}
+      />
 
       {canReconcile ? (
         <form onSubmit={runDetect} style={{ margin: '1rem 0' }}>
@@ -160,14 +159,10 @@ export default function BankReconciliationPage() {
         </form>
       ) : null}
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {detectResult ? (
@@ -184,39 +179,39 @@ export default function BankReconciliationPage() {
       <h2>{t('brOpenExceptions')}</h2>
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('brNone')}</p>
+          <EmptyState title={t('brNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={headCellStyle}>{t('brColInvoice')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>
+                  <Th>{t('brColInvoice')}</Th>
+                  <Th numeric>
                     {t('brColStatement')}
-                  </th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>{t('brColBroker')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>
+                  </Th>
+                  <Th numeric>{t('brColBroker')}</Th>
+                  <Th numeric>
                     {t('brColVariance')}
-                  </th>
-                  <th style={headCellStyle}>{t('brColStatus')}</th>
-                  <th style={headCellStyle}>{t('brColAction')}</th>
+                  </Th>
+                  <Th>{t('brColStatus')}</Th>
+                  <Th>{t('brColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cellStyle}>{r.invoiceId ?? '—'}</td>
-                    <td style={{ ...cellStyle, textAlign: 'end' }}>
+                  <Tr key={r.id}>
+                    <Td>{r.invoiceId ?? '—'}</Td>
+                    <Td numeric>
                       {r.insurerStatementAmount}
-                    </td>
-                    <td style={{ ...cellStyle, textAlign: 'end' }}>
+                    </Td>
+                    <Td numeric>
                       {r.brokerRecordAmount}
-                    </td>
-                    <td style={{ ...cellStyle, textAlign: 'end' }}>
+                    </Td>
+                    <Td numeric>
                       <strong>{r.varianceAmount}</strong>
-                    </td>
-                    <td style={cellStyle}>{t(ENUM_LABEL.ReconciliationExceptionStatus[r.status])}</td>
-                    <td style={cellStyle}>
+                    </Td>
+                    <Td>{t(ENUM_LABEL.ReconciliationExceptionStatus[r.status])}</Td>
+                    <Td>
                       {canReconcile ? (
                         <div
                           style={{
@@ -277,15 +272,15 @@ export default function BankReconciliationPage() {
                           </button>
                         </div>
                       ) : null}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('brLoading')}</p>
+        <SkeletonList rows={4} label={t('brLoading')} />
       )}
     </main>
   );

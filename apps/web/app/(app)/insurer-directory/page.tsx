@@ -13,12 +13,16 @@ import {
 } from '../../../lib/insurer/insurance-line-api';
 import { STRUCTURE_LABEL_KEY } from '../../../lib/insurer/insurer-api';
 import { ApiError, isMfaEnrolmentError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
 import {
   cardMetaStyle,
   cardStyle,
   formRowStyle,
-  pageStyle,
+  pageStackStyle,
 } from '../../../components/lead/lead.styles';
 import {
   lineChipOfficeStyle,
@@ -140,9 +144,11 @@ export default function InsurerDirectoryPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('insDirHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('insDirIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('insDirHeading')}
+        description={t('insDirIntro')}
+      />
       <p
         style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', maxWidth: '46rem' }}
         data-boundary-note=""
@@ -179,14 +185,10 @@ export default function InsurerDirectoryPage() {
       </form>
 
       {lineError ? (
-        <p role="alert" style={errorStyle} data-line-error="">
-          {lineError}
-        </p>
+        <ErrorState title={lineError} data-line-error="" />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {entries ? (
@@ -265,7 +267,7 @@ export default function InsurerDirectoryPage() {
           </>
         )
       ) : loadError || lineError ? null : (
-        <p>{t('insDirLoading')}</p>
+        <SkeletonList rows={4} label={t('insDirLoading')} />
       )}
     </main>
   );

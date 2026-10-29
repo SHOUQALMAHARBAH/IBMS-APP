@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -15,8 +15,18 @@ import {
   type InsuranceLine,
 } from '../../../lib/insurer/insurance-line-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -27,16 +37,6 @@ function pct(v: string): string {
   return Number.isFinite(n) ? `${n.toFixed(2)}%` : v;
 }
 
-const cellStyle: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const headCellStyle: CSSProperties = {
-  ...cellStyle,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function CommissionRatesPage() {
   const router = useRouter();
@@ -130,11 +130,11 @@ export default function CommissionRatesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('crateHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        {t('crateIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('crateHeading')}
+        description={t('crateIntro')}
+      />
 
       {canManage ? (
         <form
@@ -142,7 +142,7 @@ export default function CommissionRatesPage() {
           style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '0.75rem',
+            gap: 'var(--space-3)',
             alignItems: 'end',
             margin: '1rem 0',
           }}
@@ -223,64 +223,60 @@ export default function CommissionRatesPage() {
         </form>
       ) : null}
       {formError ? (
-        <p role="alert" style={errorStyle}>
-          {formError}
-        </p>
+        <ErrorState title={formError} />
       ) : null}
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('crateNone')}</p>
+          <EmptyState title={t('crateNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '42rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={headCellStyle}>{t('crateInsurerLabel')}</th>
-                  <th style={headCellStyle}>{t('crateLineLabel')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>{t('crateColRate')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>{t('crateColVat')}</th>
-                  <th style={headCellStyle}>{t('crateEffectiveFromLabel')}</th>
-                  <th style={headCellStyle}>{t('crateColEffectiveTo')}</th>
-                  <th style={headCellStyle}>{t('crateColStatus')}</th>
+                  <Th>{t('crateInsurerLabel')}</Th>
+                  <Th>{t('crateLineLabel')}</Th>
+                  <Th numeric>{t('crateColRate')}</Th>
+                  <Th numeric>{t('crateColVat')}</Th>
+                  <Th>{t('crateEffectiveFromLabel')}</Th>
+                  <Th>{t('crateColEffectiveTo')}</Th>
+                  <Th>{t('crateColStatus')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cellStyle}>
+                  <Tr key={r.id}>
+                    <Td>
                       <bdi>{r.insurerName}</bdi>
-                    </td>
-                    <td style={cellStyle}>
+                    </Td>
+                    <Td>
                       <bdi>{r.insuranceLine}</bdi>
-                    </td>
-                    <td style={{ ...cellStyle, textAlign: 'end' }}>
+                    </Td>
+                    <Td numeric>
                       {pct(r.ratePercent)}
-                    </td>
-                    <td style={{ ...cellStyle, textAlign: 'end' }}>
+                    </Td>
+                    <Td numeric>
                       {pct(r.vatRatePercent)}
-                    </td>
-                    <td style={cellStyle}>{r.effectiveFrom.slice(0, 10)}</td>
-                    <td style={cellStyle}>
+                    </Td>
+                    <Td>{r.effectiveFrom.slice(0, 10)}</Td>
+                    <Td>
                       {r.effectiveTo ? r.effectiveTo.slice(0, 10) : '—'}
-                    </td>
-                    <td style={cellStyle}>
+                    </Td>
+                    <Td>
                       {r.isOpen ? <strong>{t('crateOpen')}</strong> : 'Closed'}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('crateLoading')}</p>
+        <SkeletonList rows={4} label={t('crateLoading')} />
       )}
     </main>
   );

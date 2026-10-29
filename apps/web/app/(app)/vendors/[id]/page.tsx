@@ -28,21 +28,19 @@ import {
 } from "../../../../lib/supporting-operations/vendor-api";
 import { ApiError } from "../../../../lib/auth/api-client";
 import { CombinedDutyOnRecord } from "../../../../components/ui/CombinedDutyOnRecord";
-import { errorStyle } from "../../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../../components/lead/lead.styles";
+import {
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Td,
+  Th,
+  Tr,
+} from "../../../../components/ui";
+import { pageStackStyle } from "../../../../components/lead/lead.styles";
 import { useLanguage } from "../../../../lib/i18n/language-context";
 import { permissionMayBeMissing, permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
-const cell: CSSProperties = {
-  padding: "0.35rem 0.75rem",
-  borderBottom: "1px solid var(--border-subtle)",
-  textAlign: "start",
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
 const sectionStyle: CSSProperties = { margin: "1.75rem 0" };
 
 export default function VendorDetailPage() {
@@ -194,18 +192,14 @@ export default function VendorDetailPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t("vendHeading")}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t("vendHeading")} />
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
 
       {vendor ? (
@@ -299,15 +293,15 @@ export default function VendorDetailPage() {
               >
                 <thead>
                   <tr>
-                    <th style={head}>{t("vendColSigned")}</th>
-                    <th style={head}>{t("vendColDpoApproved")}</th>
-                    <th style={head} />
+                    <Th>{t("vendColSigned")}</Th>
+                    <Th>{t("vendColDpoApproved")}</Th>
+                    <Th />
                   </tr>
                 </thead>
                 <tbody>
                   {dpas.map((dpa) => (
-                    <tr key={dpa.id}>
-                      <td style={cell}>
+                    <Tr key={dpa.id}>
+                      <Td>
                         {dpa.signedAt
                           ? dpa.signedAt.slice(0, 10)
                           : t("vendUnsigned")}
@@ -322,8 +316,8 @@ export default function VendorDetailPage() {
                             <bdi>{dpa.assessedByName}</bdi>
                           </div>
                         ) : null}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {dpa.dpoApprovedByUserId ? t("vendYes") : t("vendNo")}
                         {/*
                           ITEM 4(a) — WHO APPROVED IT, which this register did not say.
@@ -365,8 +359,8 @@ export default function VendorDetailPage() {
                           act={dpa.combinedDutyAct}
                           testId={`combined-duty-dpa-${dpa.id}`}
                         />
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {!dpa.signedAt ? (
                           <button
                             type="button"
@@ -418,13 +412,13 @@ export default function VendorDetailPage() {
                               );
                             })()
                           : null}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <p style={{ color: "var(--ink-secondary)" }}>{t("vendNoDpas")}</p>
+              <EmptyState title={t("vendNoDpas")} />
             )}
           </section>
 
@@ -439,7 +433,7 @@ export default function VendorDetailPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>{t("vendLoading")}</p>
+        <SkeletonList rows={4} label={t("vendLoading")} />
       )}
     </main>
   );

@@ -15,8 +15,13 @@ import {
   errorStyle,
 } from '../../../../components/auth/auth-form.styles';
 import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../../components/ui';
+import {
   cardMetaStyle,
-  pageStyle,
+  pageStackStyle,
 } from '../../../../components/lead/lead.styles';
 import { insurerPickerStyle } from '../../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
@@ -86,12 +91,10 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
 
   if (loadError) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!insurers) return <p>{t('commonLoading')}</p>;
+  if (!insurers) return <SkeletonList rows={4} label={t('commonLoading')} />;
 
   const canSubmit =
     insuranceLine.trim().length >= 2 && selected.size > 0 && !submitting;
@@ -171,9 +174,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       </div>
 
       {submitError ? (
-        <p role="alert" style={errorStyle}>
-          {submitError}
-        </p>
+        <ErrorState title={submitError} />
       ) : null}
     </form>
   );
@@ -232,8 +233,8 @@ export default function NewRfqPage() {
    */
   if (!hasPermission(user, 'rfq.create')) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('rfqNewHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('rfqNewHeading')} />
         <p role="status" data-permission-refusal>
           {permissionRefusal(t, 'rfqNewRefusalAct', 'rfq.create')}
         </p>
@@ -242,9 +243,11 @@ export default function NewRfqPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('rfqNewHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('rfqNewIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('rfqNewHeading')}
+        description={t('rfqNewIntro')}
+      />
       <Suspense fallback={null}>
         <NewRfqFlow />
       </Suspense>

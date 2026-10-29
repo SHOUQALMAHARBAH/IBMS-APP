@@ -24,7 +24,12 @@ import {
   inputStyle,
   labelStyle,
 } from '../../../components/auth/auth-form.styles';
-import { pageStyle, sectionStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { pageStackStyle, sectionStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import {
   siteCardStyle,
@@ -184,19 +189,15 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
    */
   if (loadError && !profiles) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!profiles) return <p>{t('rpLoading')}</p>;
+  if (!profiles) return <SkeletonList rows={4} label={t('rpLoading')} />;
 
   return (
     <>
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {consolidated && profiles.length > 0 ? (
@@ -269,9 +270,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
             {creating ? t('rpAddingButton') : t('rpAddSiteButton')}
           </button>
           {createError ? (
-            <p role="alert" style={errorStyle}>
-              {createError}
-            </p>
+            <ErrorState title={createError} />
           ) : null}
         </form>
       ) : null}
@@ -312,11 +311,11 @@ export default function RiskProfilesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('rpSurveysHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('rpSurveysIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('rpSurveysHeading')}
+        description={t('rpSurveysIntro')}
+      />
       <Suspense fallback={null}>
         <RiskProfilesFlow />
       </Suspense>

@@ -5,7 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { RiskSurvey } from '../../../../components/risk-profile/RiskSurvey';
 import type { RiskProfileWithSurvey } from '../../../../lib/risk-profile/risk-profile-api';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 
@@ -27,7 +30,7 @@ export default function RiskProfileSurveyPage() {
   const canEdit = hasPermission(user, 'risk-profile.create');
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>

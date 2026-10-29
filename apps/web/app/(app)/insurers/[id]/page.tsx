@@ -14,8 +14,11 @@ import {
   type InsurerStatusImpact,
 } from '../../../../lib/insurer/insurer-api';
 import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import {
   detailGridStyle,
   fieldLabelStyle,
@@ -155,13 +158,11 @@ export default function InsurerDetailPage() {
 
   if (loadError)
     return (
-      <main style={pageStyle}>
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+      <main style={pageStackStyle}>
+        <ErrorState title={loadError} />
       </main>
     );
-  if (!insurer) return <main style={pageStyle}>{t('insListLoading')}</main>;
+  if (!insurer) return <main style={pageStackStyle}>{t('insListLoading')}</main>;
 
   const dash = t('insDetailEmptyField');
   const field = (labelKey: TranslationKey, value: string | null) => (
@@ -174,7 +175,7 @@ export default function InsurerDetailPage() {
   );
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>
         <bdi>{language === 'AR' ? (insurer.nameAr ?? insurer.name) : insurer.name}</bdi>
         <DeactivatedInsurerBadge isActive={insurer.isActive} />
@@ -297,9 +298,7 @@ export default function InsurerDetailPage() {
               </button>
             ) : null}
             {ratingError !== null ? (
-              <p role="alert" style={errorStyle} data-testid="insurer-rating-error">
-                {ratingError}
-              </p>
+              <ErrorState title={ratingError} data-testid="insurer-rating-error" />
             ) : null}
           </div>
           {field('insDetailRfqContactLabel', insurer.rfqContactName)}
@@ -336,11 +335,9 @@ export default function InsurerDetailPage() {
                     {t('insImpactIntro')}
                   </p>
                   {impactError ? (
-                    <p role="alert" style={errorStyle}>
-                      {impactError}
-                    </p>
+                    <ErrorState title={impactError} />
                   ) : impact === null ? (
-                    <p>{t('insImpactLoading')}</p>
+                    <SkeletonList rows={4} label={t('insImpactLoading')} />
                   ) : (
                     <dl style={{ margin: 0 }}>
                       <div style={impactRowStyle}>
@@ -407,9 +404,7 @@ export default function InsurerDetailPage() {
               </label>
 
               {statusError ? (
-                <p role="alert" style={errorStyle}>
-                  {statusError}
-                </p>
+                <ErrorState title={statusError} />
               ) : null}
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>

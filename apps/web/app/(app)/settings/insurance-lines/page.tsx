@@ -57,12 +57,6 @@ import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
  * does not, because a missing button with no explanation reads as a broken screen.
  */
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
 const muted: CSSProperties = {
   fontSize: '0.8rem',
   color: 'var(--ink-secondary)',

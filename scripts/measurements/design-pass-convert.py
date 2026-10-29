@@ -75,12 +75,27 @@ def convert(path, quote, prefix, expect):
     # 2. the page wrapper
     sub("page-style", r"<main style=\{pageStyle\}>", "<main style={pageStackStyle}>")
 
-    # 3. the heading pair -> PageHeader. `opacity` as muting is the defect; the component
-    #    carries a real colour token and the right type scale.
+    # 3. THE HEADING, IN THE THREE SHAPES THIS PRODUCT SHIPS.
+    #
+    # Measured across the screens that still carry `pageStyle`: 19 use a muted paragraph with a
+    # `maxWidth`, 14 use `opacity: 0.8` with nothing else, and 3 have an `<h1>` and no description
+    # at all. The remainder have a DYNAMIC heading — a customer's name, a claim number — which is
+    # not a page title in the same sense and is left alone.
+    #
+    # `opacity` as muting is the defect in all of them: it dims the BACKGROUND through the text,
+    # which is what caused this product's recorded contrast regression, and `PageHeader` carries a
+    # real token with a measured ratio.
     sub("page-header",
-        r"<h1>\{t\(" + q + r"(\w+)" + q + r"\)\}</h1>\s*\n\s*<p style=\{\{ opacity: 0\.75[^}]*\}\}>\s*\n?\s*\{t\(" + q + r"(\w+)" + q + r"\)\}\s*\n?\s*</p>",
-        lambda m: "<PageHeader\n        title={t(%s%s%s)}\n        description={t(%s%s%s)}\n      />"
+        r"<h1>\{t\(" + q + r"(\w+)" + q + r"\)\}</h1>\s*\n\s*"
+        r"<p style=\{\{ opacity: 0\.\d+[^}]*\}\}>\s*\n?\s*"
+        r"\{t\(" + q + r"(\w+)" + q + r"\)\}\s*\n?\s*</p>",
+        lambda m: "<PageHeader\n        title={t(%s%s%s)}\n"
+                  "        description={t(%s%s%s)}\n      />"
                   % (q, m.group(1), q, q, m.group(2), q))
+    # An `<h1>` with no description — run SECOND, so it cannot steal a pair from the rule above.
+    sub("page-header-bare",
+        r"<h1>\{t\(" + q + r"(\w+)" + q + r"\)\}</h1>",
+        lambda m: "<PageHeader title={t(%s%s%s)} />" % (q, m.group(1), q))
 
     # 4. THE RAW TABLE, IN ITS TWO SHIPPED SHAPES. Most screens wrap it in an overflow div and
     #    some do not — and the ones that do not are the defect, because a 30rem table with no
@@ -132,6 +147,8 @@ def convert(path, quote, prefix, expect):
             r"<%s style=\{\{ \.\.\.\w+(?:, textAlign: %s(?:start|left)%s)? \}\}" % (tag, q, q),
             "<%s" % comp)
         sub(tag, r"<%s style=\{\w+\}" % tag, "<%s" % comp)
+        # Prettier wraps a cell that carries two attributes, so the style lands on its own line.
+        sub(tag + "-wrapped", r"<%s\n(\s*)style=\{\w+\}\n" % tag, lambda m: "<%s\n" % comp)
         sub(tag + "-close", r"</%s>" % tag, "</%s>" % comp)
     sub("tr-open", r"<tr key=", "<Tr key=")
     # A BODY ROW WITH NO KEY — the *nothing matched* row several screens render inside the table.
@@ -181,13 +198,22 @@ def convert(path, quote, prefix, expect):
             raise SystemExit(1)
         applied.append("tr-close x%d" % converted)
 
-    # 5. the error paragraph -> the state component
+    # 5. THE ERROR PARAGRAPH -> THE STATE COMPONENT, in ONE transform rather than four.
+    #
+    # The first version grew a variant per shape — bare, inline, carrying a `data-testid`, carrying
+    # some other `data-` hook, wearing `{{ ...errorStyle, marginTop }}` — and each new screen found
+    # one more. A list of shapes that grows by one per file is a matcher that has not understood
+    # what it is matching.
+    #
+    # So it matches the PARAGRAPH: `role="alert"` plus a style that mentions `errorStyle`, whatever
+    # else it carries. Any surviving attributes ride across — `ErrorState` forwards `data-*`
+    # explicitly, which is why those hooks are not lost — and a `marginTop` override is DROPPED on
+    # purpose, because `pageStackStyle`'s own gap is what spaces a screen's children now.
     sub("error-state",
-        r"<p role=\"alert\" style=\{errorStyle\}>\s*\n\s*\{(\w+)\}\s*\n\s*</p>",
-        lambda m: "<ErrorState title={%s} />" % m.group(1))
-    sub("error-state-inline",
-        r"<p role=\"alert\" style=\{errorStyle\}>\{(\w+)\}</p>",
-        lambda m: "<ErrorState title={%s} />" % m.group(1))
+        r"<p role=\"alert\" style=\{(?:errorStyle|\{ \.\.\.errorStyle[^}]*\})\}([^>]*)>"
+        r"\s*(?:\{/\*.*?\*/\}\s*)?\{(\w+)\}\s*</p>",
+        lambda m: "<ErrorState title={%s}%s />" % (m.group(2), m.group(1).rstrip()),
+        re.S)
 
     # 6. the empty paragraph -> the state component
     sub("empty-state",
@@ -223,9 +249,29 @@ def convert(path, quote, prefix, expect):
             if re.search(r"<%s[ />\n]" % n, t)]
     ui_import = ("import {\n%s\n} from %s%s/components/ui%s;"
                  % ("\n".join("  %s," % n for n in used), q, prefix, q))
+    # THE IMPORT MAY CARRY MORE THAN `pageStyle` — `{ cardMetaStyle, pageStyle }` is common, and
+    # the first version required the name to be alone, so four screens refused for a reason that
+    # had nothing to do with their shape. The name is swapped INSIDE the list and the UI import is
+    # added above it, which leaves the other names untouched.
     sub("import-page-style",
-        r"import \{ pageStyle \} from " + q + r"([^" + q + r"]*lead\.styles)" + q + r";",
-        lambda m: "%s\nimport { pageStackStyle } from %s%s%s;" % (ui_import, q, m.group(1), q))
+        r"import \{ ([^}]*\b)pageStyle(\b[^}]*) \} from " + q + r"([^" + q + r"]*lead\.styles)" + q + r";",
+        lambda m: "%s\nimport { %spageStackStyle%s } from %s%s%s;"
+                  % (ui_import, m.group(1), m.group(2), q, m.group(3), q))
+    # AND THE MULTI-LINE IMPORT BLOCK prettier produces once the list is long enough.
+    #
+    # TWO STEPS, NOT ONE, and that is the fix for a real defect: the first version did both at the
+    # name's own line, so the UI import was spliced INSIDE the open `import {` block — three
+    # screens with a half-written statement and `TS1003` at the line above. The name is swapped
+    # where it sits; the new statement goes BEFORE the one that contains it, found by walking back
+    # to its `import {`.
+    if "import-page-style" not in " ".join(applied):
+        swapped, n = re.subn(r"^(\s*)pageStyle,$", lambda m: "%spageStackStyle," % m.group(1),
+                             t, count=1, flags=re.M)
+        if n:
+            at = swapped.index("pageStackStyle,")
+            start = swapped.rindex("import {", 0, at)
+            t = swapped[:start] + ui_import + "\n" + swapped[start:]
+            applied.append("import-page-style-multiline x1")
     sub("import-error-style",
         r"import \{ errorStyle \} from " + q + r"[^" + q + r"]*auth-form\.styles" + q + r";\n",
         "")
@@ -248,8 +294,14 @@ def convert(path, quote, prefix, expect):
 
 # `th` is NOT required: a table with no header row exists in this product and is its own
 # defect, but refusing to convert such a screen would leave it with raw markup as well.
-MUST = {"page-style", "page-header", "td",
-        "error-state", "import-page-style", "import-error-style"}
+# `page-header` and `td` are NOT required. A screen whose heading is DYNAMIC — a customer's
+# name, a claim number — has no page title to convert, and a screen with no table has no
+# cells; refusing either would leave the rest of that screen on raw markup for no gain.
+# `page-style` stays required: a file that does not open with it is not this shape at all.
+MUST = {"page-style"}
+# The import transform has two shapes (single-line and the block prettier makes once the list is
+# long enough); requiring either by name would refuse a file whose import simply uses the other.
+# A file that converts `pageStyle` in the body and not in the import fails `tsc`, loudly.
 
 
 def quote_of(src):

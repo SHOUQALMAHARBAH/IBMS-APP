@@ -6,8 +6,12 @@ import { useAuth } from '../../../lib/auth/auth-context';
 import { listCustomers, type Customer } from '../../../lib/customer/customer-api';
 import { Pagination } from '../../../components/ui/Pagination';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, cardStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/prospect/prospect.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
@@ -95,9 +99,11 @@ export default function CustomersPage() {
   const canOpenProfile = hasPermission(user, 'customer.360-view.read');
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('customersHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('customersProcessIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('customersHeading')}
+        description={t('customersProcessIntro')}
+      />
 
       {canCreateCustomer ? (
         <button type="button" onClick={() => router.push('/customers/new')} style={{ cursor: 'pointer' }}>
@@ -121,11 +127,9 @@ export default function CustomersPage() {
         </button>
       </form>
 
-      {customers === null && !loadError ? <p>{t('commonLoading')}</p> : null}
+      {customers === null && !loadError ? <SkeletonList rows={4} label={t('commonLoading')} /> : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {customers !== null && !loadError ? (
         customers.length === 0 ? (

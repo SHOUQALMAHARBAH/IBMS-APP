@@ -6,12 +6,16 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listInsurers, type Insurer } from '../../../lib/insurer/insurer-api';
 import { ApiError, isMfaEnrolmentError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
 import {
   cardMetaStyle,
   cardStyle,
   formRowStyle,
-  pageStyle,
+  pageStackStyle,
 } from '../../../components/lead/lead.styles';
 import {
   lineChipOfficeStyle,
@@ -95,9 +99,11 @@ export default function InsurersPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('insListHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('insListIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('insListHeading')}
+        description={t('insListIntro')}
+      />
 
       <form onSubmit={onSearchSubmit} style={formRowStyle}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -134,9 +140,7 @@ export default function InsurersPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {insurers ? (
@@ -186,7 +190,7 @@ export default function InsurersPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>{t('insListLoading')}</p>
+        <SkeletonList rows={4} label={t('insListLoading')} />
       )}
     </main>
   );

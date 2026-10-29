@@ -14,10 +14,13 @@ import {
   type DutySegregationMode,
   type DutySegregationModeView,
 } from '../../../../lib/admin/duty-segregation-api';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   buttonStyle,
-  errorStyle,
   labelStyle,
   successStyle,
 } from '../../../../components/auth/auth-form.styles';
@@ -124,16 +127,14 @@ export default function DutySegregationPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dutyModeHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('dutyModeHeading')} />
       <p style={{ color: 'var(--ink-secondary)', maxWidth: '44rem' }}>
         {t('dutyModeIntro')}
       </p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {view ? (
@@ -217,9 +218,7 @@ export default function DutySegregationPage() {
           </p>
 
           {formError ? (
-            <p role="alert" style={errorStyle}>
-              {formError}
-            </p>
+            <ErrorState title={formError} />
           ) : null}
           {saved ? (
             <p role="status" style={successStyle}>

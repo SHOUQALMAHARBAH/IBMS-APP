@@ -18,8 +18,11 @@ import {
 import { CustomerContactCorrection } from '../../../../components/customer/CustomerContactCorrection';
 import { CustomerIdentifierCorrection } from '../../../../components/customer/CustomerIdentifierCorrection';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
+import {
+  EmptyState,
+  ErrorState,
+} from '../../../../components/ui';
+import { pageStackStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -200,15 +203,13 @@ export default function CustomerProfilePage() {
   const canRevealNationalId = hasPermission(user, 'customer.national-id.reveal');
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button type="button" onClick={() => router.push('/customers')} style={{ cursor: 'pointer' }}>
         {t('customerProfileBackButton')}
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {customer ? (
@@ -397,9 +398,7 @@ export default function CustomerProfilePage() {
                 {t('customerRevealConfirmButton')}
               </button>
               {revealError ? (
-                <p role="alert" style={{ ...errorStyle, marginTop: '0.4rem' }}>
-                  {revealError}
-                </p>
+                <ErrorState title={revealError} />
               ) : null}
             </div>
           ) : null}
@@ -431,7 +430,7 @@ export default function CustomerProfilePage() {
           {customer.customerType === 'CORPORATE' ? (
             <section style={{ marginTop: '2rem' }}>
               <h2>{t('customerUbosHeading')}</h2>
-              {ubos.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUbosNone')}</p> : null}
+              {ubos.length === 0 ? <EmptyState title={t('customerUbosNone')} /> : null}
               {ubos.map((u) => (
                 <div key={u.id} style={repeatableRowStyle}>
                   <strong>
@@ -446,7 +445,7 @@ export default function CustomerProfilePage() {
 
           <section style={{ marginTop: '2rem' }}>
             <h2>{t('customerDocumentsHeading')}</h2>
-            {documents.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerDocumentsNone')}</p> : null}
+            {documents.length === 0 ? <EmptyState title={t('customerDocumentsNone')} /> : null}
             {documents.map((d) => (
               <div key={d.id} style={repeatableRowStyle}>
                 <strong>{d.fileName}</strong> — {t(ENUM_LABEL.DocumentClassification[d.classification])}

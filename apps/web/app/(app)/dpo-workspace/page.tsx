@@ -9,25 +9,22 @@ import {
   type DpoWorkspaceSummary,
 } from '../../../lib/pdpl/dpo-workspace-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 const ROLES = ['dpo-workspace.view'];
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '2rem 0' };
 
 export default function DpoWorkspacePage() {
@@ -68,19 +65,19 @@ export default function DpoWorkspacePage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dpowHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dpowIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('dpowHeading')}
+        description={t('dpowIntro')}
+      />
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {!canView ? null : !summary ? (
         loadError ? null : (
-          <p>{t('dpowLoading')}</p>
+          <SkeletonList rows={4} label={t('dpowLoading')} />
         )
       ) : (
         <>
@@ -113,28 +110,28 @@ export default function DpoWorkspacePage() {
                 >
                   <thead>
                     <tr>
-                      <th style={head}>{t('dpowColType')}</th>
-                      <th style={head}>{t('dpowColStatus')}</th>
-                      <th style={head}>{t('dpowColSlaDue')}</th>
-                      <th style={head}>{t('dpowColDaysUntilDue')}</th>
+                      <Th>{t('dpowColType')}</Th>
+                      <Th>{t('dpowColStatus')}</Th>
+                      <Th>{t('dpowColSlaDue')}</Th>
+                      <Th>{t('dpowColDaysUntilDue')}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.dsrQueue.map((d) => (
-                      <tr key={d.id}>
-                        <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
-                        <td style={cell}>
+                      <Tr key={d.id}>
+                        <Td>{t(ENUM_LABEL.DsrType[d.type])}</Td>
+                        <Td>
                           {t(ENUM_LABEL.DsrStatus[d.status])}
-                        </td>
-                        <td style={cell}>{d.slaDueAt.slice(0, 10)}</td>
-                        <td style={cell}>
+                        </Td>
+                        <Td>{d.slaDueAt.slice(0, 10)}</Td>
+                        <Td>
                           {d.daysUntilDue < 0
                             ? t('dpowOverdueBy', {
                                 days: Math.abs(d.daysUntilDue),
                               })
                             : t('dpowDaysLeft', { days: d.daysUntilDue })}
-                        </td>
-                      </tr>
+                        </Td>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>
@@ -155,22 +152,22 @@ export default function DpoWorkspacePage() {
                 >
                   <thead>
                     <tr>
-                      <th style={head}>{t('dpowColTitle')}</th>
-                      <th style={head}>{t('dpowColSeverity')}</th>
-                      <th style={head}>{t('dpowColStatus')}</th>
+                      <Th>{t('dpowColTitle')}</Th>
+                      <Th>{t('dpowColSeverity')}</Th>
+                      <Th>{t('dpowColStatus')}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.incidentRegister.map((i) => (
-                      <tr key={i.id}>
-                        <td style={cell}>{i.title}</td>
-                        <td style={cell}>
+                      <Tr key={i.id}>
+                        <Td>{i.title}</Td>
+                        <Td>
                           {t(ENUM_LABEL.IncidentSeverity[i.severity])}
-                        </td>
-                        <td style={cell}>
+                        </Td>
+                        <Td>
                           {t(ENUM_LABEL.IncidentStatus[i.status])}
-                        </td>
-                      </tr>
+                        </Td>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>
@@ -191,24 +188,24 @@ export default function DpoWorkspacePage() {
                 >
                   <thead>
                     <tr>
-                      <th style={head}>{t('dpowColSubject')}</th>
-                      <th style={head}>{t('dpowColOutcome')}</th>
-                      <th style={head}>{t('dpowColReviewDue')}</th>
+                      <Th>{t('dpowColSubject')}</Th>
+                      <Th>{t('dpowColOutcome')}</Th>
+                      <Th>{t('dpowColReviewDue')}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.dpiaRegister.map((d) => (
-                      <tr key={d.id}>
-                        <td style={cell}>{d.subjectDescription}</td>
-                        <td style={cell}>
+                      <Tr key={d.id}>
+                        <Td>{d.subjectDescription}</Td>
+                        <Td>
                           {t(ENUM_LABEL.DpiaOutcome[d.outcome])}
-                        </td>
-                        <td style={cell}>
+                        </Td>
+                        <Td>
                           {d.dpoReviewDueAt
                             ? d.dpoReviewDueAt.slice(0, 10)
                             : '—'}
-                        </td>
-                      </tr>
+                        </Td>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>
@@ -229,16 +226,16 @@ export default function DpoWorkspacePage() {
                 >
                   <thead>
                     <tr>
-                      <th style={head}>{t('dpowColScope')}</th>
-                      <th style={head}>{t('dpowColNextReviewDue')}</th>
+                      <Th>{t('dpowColScope')}</Th>
+                      <Th>{t('dpowColNextReviewDue')}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.legalHoldRegister.map((h) => (
-                      <tr key={h.id}>
-                        <td style={cell}>{h.scope}</td>
-                        <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>
-                      </tr>
+                      <Tr key={h.id}>
+                        <Td>{h.scope}</Td>
+                        <Td>{h.nextReviewDueAt.slice(0, 10)}</Td>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>
@@ -249,7 +246,7 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowCbtRegister')}</h2>
             {summary.crossBorderTransferRegister.length === 0 ? (
-              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoCbt')}</p>
+              <EmptyState title={t('dpowNoCbt')} />
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table
@@ -257,18 +254,18 @@ export default function DpoWorkspacePage() {
                 >
                   <thead>
                     <tr>
-                      <th style={head}>{t('dpowColDestination')}</th>
-                      <th style={head}>{t('dpowColLegalBasis')}</th>
-                      <th style={head}>{t('dpowColTransferredAt')}</th>
+                      <Th>{t('dpowColDestination')}</Th>
+                      <Th>{t('dpowColLegalBasis')}</Th>
+                      <Th>{t('dpowColTransferredAt')}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.crossBorderTransferRegister.map((t) => (
-                      <tr key={t.id}>
-                        <td style={cell}>{t.destinationCountry}</td>
-                        <td style={cell}>{t.legalBasis}</td>
-                        <td style={cell}>{t.transferredAt.slice(0, 10)}</td>
-                      </tr>
+                      <Tr key={t.id}>
+                        <Td>{t.destinationCountry}</Td>
+                        <Td>{t.legalBasis}</Td>
+                        <Td>{t.transferredAt.slice(0, 10)}</Td>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>

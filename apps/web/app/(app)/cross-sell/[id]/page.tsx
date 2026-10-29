@@ -13,9 +13,11 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
-  errorStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -94,7 +96,7 @@ export default function CrossSellOpportunityDetailPage() {
   const canConvert = hasPermission(user, 'cross-sell.convert');
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>
@@ -110,9 +112,7 @@ export default function CrossSellOpportunityDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {opportunity ? (
@@ -230,9 +230,7 @@ export default function CrossSellOpportunityDetailPage() {
           ) : null}
 
           {actionError ? (
-            <p role="alert" style={errorStyle}>
-              {actionError}
-            </p>
+            <ErrorState title={actionError} />
           ) : null}
         </>
       ) : null}

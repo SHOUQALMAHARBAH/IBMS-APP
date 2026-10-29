@@ -21,7 +21,18 @@ import {
 } from '../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle, successStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import {
   loadIndependently,
@@ -29,17 +40,11 @@ import {
 } from '../../../lib/load-independently';
 import { permissionRefusal, reducedCapability } from '../../../lib/i18n/permission-refusal';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '26rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 const sectionStyle: CSSProperties = {
   display: 'grid',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   border: '1px solid var(--border-subtle)',
   padding: '0.75rem',
   margin: '0.5rem 0',
@@ -275,11 +280,11 @@ export default function EmployeesPage() {
   const orgUnitsReady = departments.length > 0 && branches.length > 0;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('empHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('empIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('empHeading')}
+        description={t('empIntro')}
+      />
 
       {listsMissing ? (
         <p role="status" data-lists-missing style={{ color: 'var(--ink-muted)' }}>
@@ -287,9 +292,7 @@ export default function EmployeesPage() {
         </p>
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       <form onSubmit={onCreate} style={formStyle}>
@@ -444,7 +447,7 @@ export default function EmployeesPage() {
         {canIssueLogin ? (
           <section style={sectionStyle} data-account-section>
             <h3>{t('empAccountHeading')}</h3>
-            <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
               <input
                 type="checkbox"
                 checked={withLogin}
@@ -500,7 +503,7 @@ export default function EmployeesPage() {
                     roles.map((r) => (
                       <label
                         key={r.id}
-                        style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}
+                        style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}
                       >
                         <input
                           type="checkbox"
@@ -546,9 +549,7 @@ export default function EmployeesPage() {
         )}
 
         {createError ? (
-          <p role="alert" style={errorStyle}>
-            {createError}
-          </p>
+          <ErrorState title={createError} />
         ) : null}
         {message ? (
           <p role="status" style={successStyle}>
@@ -562,39 +563,41 @@ export default function EmployeesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('empNone')}</p>
+          <EmptyState title={t('empNone')} />
         ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('empColName')}</th>
-                <th style={head}>{t('empColPosition')}</th>
-                <th style={head}>{t('empColLicensedRole')}</th>
-                <th style={head}>{t('empColHireDate')}</th>
-                <th style={head}>{t('empColTerminated')}</th>
-                <th style={head} />
+                <Th>{t('empColName')}</Th>
+                <Th>{t('empColPosition')}</Th>
+                <Th>{t('empColLicensedRole')}</Th>
+                <Th>{t('empColHireDate')}</Th>
+                <Th>{t('empColTerminated')}</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} data-employee-row={row.id}>
-                  <td style={cell}>
+                <Tr key={row.id} data-employee-row={row.id}>
+                  <Td>
                     <bdi>{row.fullName}</bdi>
-                  </td>
-                  <td style={cell}>{row.position ?? '—'}</td>
-                  <td style={cell}>{row.licensedRole ?? '—'}</td>
-                  <td style={cell}>{row.hireDate?.slice(0, 10) ?? '—'}</td>
-                  <td style={cell}>{row.terminationDate ? t('commonYes') : t('commonNo')}</td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>{row.position ?? '—'}</Td>
+                  <Td>{row.licensedRole ?? '—'}</Td>
+                  <Td>{row.hireDate?.slice(0, 10) ?? '—'}</Td>
+                  <Td>{row.terminationDate ? t('commonYes') : t('commonNo')}</Td>
+                  <Td>
                     <Link href={`/employees/${row.id}`}>{t('empViewButton')}</Link>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('empLoading')}</p>
+        <SkeletonList rows={4} label={t('empLoading')} />
       )}
 
     </main>

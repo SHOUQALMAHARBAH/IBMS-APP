@@ -13,7 +13,12 @@ import {
 import { assembleInsuranceProgram } from '../../../../lib/insurance-program/insurance-program-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import {
   coverageTagListStyle,
@@ -79,12 +84,10 @@ function AssembleFlow() {
 
   if (loadError) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!assessment) return <p>{t('iprognLoading')}</p>;
+  if (!assessment) return <SkeletonList rows={4} label={t('iprognLoading')} />;
 
   const isApproved = assessment.status === 'APPROVED';
 
@@ -139,9 +142,7 @@ function AssembleFlow() {
       </button>
 
       {assembleError ? (
-        <p role="alert" style={errorStyle}>
-          {assembleError}
-        </p>
+        <ErrorState title={assembleError} />
       ) : null}
     </>
   );
@@ -171,8 +172,8 @@ export default function NewInsuranceProgramPage() {
    */
   if (!hasPermission(user, 'program.assemble')) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('iprognHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('iprognHeading')} />
         <p role="status" style={{ marginTop: '1rem' }}>
           {permissionRefusal(t, 'iprognRefusalAct', 'program.assemble')}
         </p>
@@ -181,7 +182,7 @@ export default function NewInsuranceProgramPage() {
   }
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() => router.back()}
@@ -189,7 +190,7 @@ export default function NewInsuranceProgramPage() {
       >
         ← {t('commonBack')}
       </button>
-      <h1>{t('iprognHeading')}</h1>
+      <PageHeader title={t('iprognHeading')} />
       <Suspense fallback={null}>
         <AssembleFlow />
       </Suspense>

@@ -10,8 +10,13 @@ import {
   type Policy,
   type PolicyStatus,
 } from '../../../lib/policy/policy-api';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, cardStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/prospect/prospect.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import {
@@ -103,9 +108,9 @@ export default function PoliciesPage() {
   const isFiltered = Boolean(searchTerm || status);
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('policiesListHeading')}</h1>
-      <p style={{ color: 'var(--ink-secondary)' }}>{t('policiesListIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('policiesListHeading')} />
+      <EmptyState title={t('policiesListIntro')} />
 
       <form
         onSubmit={onSearchSubmit}
@@ -150,12 +155,10 @@ export default function PoliciesPage() {
       </form>
 
       {/* The four states, in the order every other list screen uses. */}
-      {policies === null && !loadError ? <p>{t('policyCommonLoading')}</p> : null}
+      {policies === null && !loadError ? <SkeletonList rows={4} label={t('policyCommonLoading')} /> : null}
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {policies !== null && !loadError ? (

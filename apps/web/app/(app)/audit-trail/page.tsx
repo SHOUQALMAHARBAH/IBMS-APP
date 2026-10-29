@@ -69,12 +69,6 @@ function endOfDayIso(day: string): string {
   return new Date(`${day}T23:59:59.999Z`).toISOString();
 }
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = {
   display: 'flex',

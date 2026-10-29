@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listLeads, type Lead, type LeadStatus } from '../../../lib/lead/lead-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { LeadIntakeForm } from '../../../components/lead/LeadIntakeForm';
 import { LeadPipelineBoard } from '../../../components/lead/LeadPipelineBoard';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -72,19 +76,19 @@ export default function LeadsPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('leadsHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('leadsProcessIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('leadsHeading')}
+        description={t('leadsProcessIntro')}
+      />
 
       {canCreateLead ? <LeadIntakeForm onLeadCreated={handleLeadCreated} /> : null}
 
       <section style={{ marginTop: '2rem' }}>
         <h2>{t('leadsPipelineHeading')}</h2>
-        {leads === null && !loadError ? <p>{t('commonLoading')}</p> : null}
+        {leads === null && !loadError ? <SkeletonList rows={4} label={t('commonLoading')} /> : null}
         {loadError ? (
-          <p role="alert" style={errorStyle}>
-            {loadError}
-          </p>
+          <ErrorState title={loadError} />
         ) : null}
         {leads !== null && !loadError ? (
           <LeadPipelineBoard

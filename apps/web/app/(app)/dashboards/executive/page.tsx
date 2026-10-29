@@ -8,8 +8,12 @@ import {
   type ExecutiveDashboardSummary,
 } from '../../../../lib/management-reporting/executive-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
@@ -89,11 +93,11 @@ export default function ExecutiveDashboardPage() {
   const h = summary?.headlines;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('execExecutiveDashboard')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('execTheSalesPolicyClaimsFinancial')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('execExecutiveDashboard')}
+        description={t('execTheSalesPolicyClaimsFinancial')}
+      />
 
       <form
         onSubmit={applyFilters}
@@ -112,7 +116,7 @@ export default function ExecutiveDashboardPage() {
           label={t('execBranchId')}
         />
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('execInsuranceLine')}
           <input
@@ -122,7 +126,7 @@ export default function ExecutiveDashboardPage() {
           />
         </label>
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('execAsOf')}
           <input
@@ -136,9 +140,7 @@ export default function ExecutiveDashboardPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary && h ? (
@@ -226,7 +228,7 @@ export default function ExecutiveDashboardPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

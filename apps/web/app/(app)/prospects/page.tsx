@@ -6,8 +6,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listProspects, type Prospect } from '../../../lib/prospect/prospect-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, cardStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/prospect/prospect.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -59,11 +63,11 @@ export default function ProspectsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('prosHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('prosIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('prosHeading')}
+        description={t('prosIntro')}
+      />
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
         <label htmlFor="prospect-search" style={{ marginInlineEnd: '0.5rem' }}>
@@ -81,11 +85,9 @@ export default function ProspectsPage() {
         </button>
       </form>
 
-      {prospects === null && !loadError ? <p>{t('prosLoading')}</p> : null}
+      {prospects === null && !loadError ? <SkeletonList rows={4} label={t('prosLoading')} /> : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {prospects !== null && !loadError ? (
         prospects.length === 0 ? (

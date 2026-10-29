@@ -463,6 +463,82 @@ column: six inline style objects all saying one thing about the row they are in.
 
 ---
 
+### Batch 2 — 40 screens, driven by the compiler
+
+The converter grew five shapes it had not seen, each found by a screen refusing or by `tsc`
+naming it: a heading with `opacity: 0.8` and no `maxWidth`; an `<h1>` with no description at all;
+an import carrying `pageStyle` alongside other names; the MULTI-LINE import block prettier makes
+once that list is long enough; and a cell whose style sits on its own line because it carries two
+attributes.
+
+**The error-paragraph transform was REPLACED rather than widened a fifth time.** It had grown a
+variant per shape — bare, inline, carrying `data-testid`, carrying some other `data-` hook, wearing
+`{{ ...errorStyle, marginTop }}` — and every new screen found one more. A list of shapes that grows
+by one per file is a matcher that has not understood what it is matching. One rule now matches the
+PARAGRAPH (`role="alert"` plus a style mentioning `errorStyle`, whatever else it carries), rides
+any surviving attributes across, and DROPS a `marginTop` override on purpose, because
+`pageStackStyle`'s own gap is what spaces a screen's children now.
+
+**And the group was driven with automatic revert-on-failure.** The converter already refuses a file
+whose shape it does not recognise; this covers the other half — a file it DOES recognise and gets
+wrong — by letting the compiler arbitrate. Convert a group, typecheck once, revert exactly the
+screens `tsc` names, repeat until it is quiet. **22 screens were reverted this way and are still
+owed**, untouched, rather than shipped half-converted.
+
+| screen | inline | screen | inline |
+|---|---|---|---|
+| `/audit-trail` | 1 → 1 | `/bank-reconciliation` | 15 → 5 |
+| `/claims/[id]` | 2 → 2 | `/commission` | 14 → 6 |
+| `/crm` | 13 → 12 | `/cross-sell/[id]` | 9 → 9 |
+| `/cross-sell` | 11 → 10 | `/customers/[id]` | 38 → 35 |
+| `/customers` | 8 → 7 | `/dashboards/executive` | 7 → 6 |
+| `/dashboards/sales` | 10 → 9 | `/dpo-workspace` | 17 → 15 |
+| `/employees/[id]` | 9 → 8 | `/employees` | 7 → 4 |
+| `/insurance-programs/new` | 6 → 6 | `/insurer-directory` | 9 → 8 |
+| `/insurers/[id]` | 10 → 10 | `/insurers` | 7 → 6 |
+| `/leads` | 2 → 1 | `/needs-assessments/[id]` | 9 → 9 |
+| `/needs-assessments/new` | 7 → 6 | `/needs-assessments` | 3 → 2 |
+| `/opportunities/[id]` | 8 → 7 | `/policies` | 8 → 7 |
+| `/prospects/[id]` | 2 → 2 | `/prospects` | 6 → 5 |
+| `/provider-register-insurer` | 10 → 10 | `/provider-register-office` | 14 → 14 |
+| `/rfqs/new` | 12 → 11 | `/risk-profiles/[id]` | 2 → 2 |
+| `/risk-profiles` | 7 → 6 | `/sales-performance` | 7 → 5 |
+| `/settings/duty-segregation` | 13 → 13 | `/settings/insurance-lines` | 10 → 10 |
+| `/settings/org-units` | 0 → 0 | `/settings/users` | 19 → 16 |
+| `/sla-policies` | 14 → 12 | `/up-sell/[id]` | 9 → 9 |
+| `/up-sell` | 11 → 10 | `/vendors/[id]` | 4 → 3 |
+
+**370 → 319 on these 40 files; `SCREEN_BUDGET` 1290 → 1239.**
+
+### The `data-*` trap, for the THIRD time — and this one cost a test
+
+`ErrorState` named `data-testid` explicitly, which was the pilot's own fix after three hooks were
+silently dropped. **It was not enough.** Converting `/insurer-directory`'s error paragraph carried
+its `data-line-error` across faithfully, into a component that dropped it — `tsc` clean, the screen
+rendering perfectly, and the only thing that said so was a Playwright assertion looking for the
+attribute.
+
+The lesson is that naming ONE attribute does not close this class: a screen hangs its OWN hook on a
+refusal, a pill, a cell. `Badge`, `Table`, `Td`, `Th`, `EmptyState` and `ErrorState` now all take
+`{ [key: \`data-${string}\`]: string | undefined }` and spread it, so the forwarding is a property
+of the SIGNATURE rather than a list somebody has to extend.
+
+### Still owed after batch 2
+
+22 screens reverted by the compiler, plus the ones that refused outright. The heaviest are the
+crowded screens §4(c) is about and want hand work rather than a wider matcher:
+
+`/retention-disposal` (70 sites), `/regulatory-compliance` (25), `/financial-report` (18),
+`/settings/customer-import` (18), `/screening-matches` (17), `/rfqs/[id]` (17),
+`/dashboards/policy` (17), `/dashboards/claims` (15), `/sla-dashboard` (22),
+`/screening-health` (37), `/dashboards/financial` (18), `/dashboards/compliance`,
+`/client-accounting`, `/insurer-accounting`, `/access-recertification`, `/customers/kyc-queue`,
+`/customers/new`, `/employees/reveal`, `/insurance-programs`, `/insurance-programs/[id]`,
+`/insurers/new`, `/opportunities`, `/prospects/new`, `/provider-offices`, `/rfqs`,
+`/settings/email`, `/settings/roles`, `/company-record`.
+
+---
+
 ---
 
 ## The method, per screen

@@ -27,28 +27,36 @@ const WRAP: CSSProperties = {
   background: 'var(--surface-card)',
 };
 
+/**
+ * `data-*` IS FORWARDED, AND THE TYPE IS WHAT MAKES THAT VISIBLE.
+ *
+ * Both components started with `data-testid` named explicitly, after the pilot found three hooks
+ * silently dropped. THAT WAS NOT ENOUGH: a screen hangs its OWN hook on a refusal —
+ * `data-line-error`, `data-permission-refusal` — and TypeScript exempts hyphen-containing JSX
+ * attributes from excess-property checking, so every one of those type-checks and goes NOWHERE.
+ *
+ * It cost a real test. Converting `/insurer-directory`'s error paragraph carried its
+ * `data-line-error` across faithfully, into a component that dropped it, and the only thing that
+ * said so was a Playwright assertion looking for the attribute — `tsc` was clean and the screen
+ * rendered perfectly. The index signature accepts the family and the spread forwards it, so the
+ * support is a property of the SIGNATURE rather than a list of names somebody has to extend.
+ */
+type DataAttributes = { [key: `data-${string}`]: string | undefined };
+
 export function EmptyState({
   title,
   description,
   action,
   style,
-  'data-testid': testId,
+  ...dataAttributes
 }: {
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   style?: CSSProperties;
-  /*
-   * FORWARDED EXPLICITLY. TypeScript exempts hyphen-containing JSX attributes from
-   * excess-property checking, so `data-testid` on a custom component type-checks and then
-   * goes NOWHERE — which is how moving a screen's markup onto these primitives silently
-   * killed three test hooks with `tsc` clean and the screens rendering perfectly. Named
-   * rather than absorbed by a props spread, so the support is visible in the signature.
-   */
-  'data-testid'?: string;
-}) {
+} & DataAttributes) {
   return (
-    <div style={{ ...WRAP, ...style }} data-testid={testId}>
+    <div style={{ ...WRAP, ...style }} {...dataAttributes}>
       <p style={{ fontSize: 'var(--text-md)', fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'] }}>
         {title}
       </p>
@@ -65,7 +73,7 @@ export function ErrorState({
   description,
   action,
   style,
-  'data-testid': testId,
+  ...dataAttributes
 }: {
   title: ReactNode;
   /**
@@ -75,13 +83,11 @@ export function ErrorState({
   description?: ReactNode;
   action?: ReactNode;
   style?: CSSProperties;
-  /** Forwarded explicitly — see the note on `EmptyState` above. */
-  'data-testid'?: string;
-}) {
+} & DataAttributes) {
   return (
     <div
       role="alert"
-      data-testid={testId}
+      {...dataAttributes}
       style={{
         ...WRAP,
         border: '1px solid var(--danger-border)',

@@ -21,7 +21,11 @@ import {
   renameDepartment,
   type OrgUnit,
 } from '../../../../lib/admin/user-admin-api';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   buttonStyle,
   errorStyle,
@@ -323,8 +327,8 @@ export default function OrgUnitsPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('orgUnitHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('orgUnitHeading')} />
       <p>{t('orgUnitIntro')}</p>
 
       {noAccess ? (
@@ -333,9 +337,7 @@ export default function OrgUnitsPage() {
         </p>
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
       {message ? (

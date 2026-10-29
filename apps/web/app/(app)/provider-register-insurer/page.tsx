@@ -7,8 +7,11 @@ import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import {
   getReferenceData,
   listStandardInsuranceLines,
@@ -60,7 +63,7 @@ const legendStyle: CSSProperties = { fontWeight: 600, padding: '0 0.4rem' };
 const fieldRow: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(16rem, 1fr))',
-  gap: '0.75rem',
+  gap: 'var(--space-3)',
   marginBottom: '0.5rem',
 };
 const noteStyle: CSSProperties = {
@@ -166,8 +169,8 @@ export default function RegisterInsuranceCompanyPage() {
 
   if (!canRegister) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('regInsHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('regInsHeading')} />
         <p role="status">
           {permissionRefusal(t, 'regInsRefusalAct', 'provider.insurer.register')}
         </p>
@@ -284,8 +287,8 @@ export default function RegisterInsuranceCompanyPage() {
 
   if (result) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('regInsSuccessHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('regInsSuccessHeading')} />
         <p data-testid="registered-company">
           {result.legalNameAr} · {result.legalName} ({result.code})
         </p>
@@ -305,17 +308,15 @@ export default function RegisterInsuranceCompanyPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('regInsHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('regInsHeading')} />
       <p>{t('regInsIntro')}</p>
       <p role="status" data-testid="tenant-warning">
         {t('regInsTenantWarning')}
       </p>
 
       {loadError && (
-        <p role="alert" style={errorStyle} data-testid="reference-load-error">
-          {loadError}
-        </p>
+        <ErrorState title={loadError} data-testid="reference-load-error" />
       )}
 
       <form onSubmit={onSubmit}>
@@ -503,9 +504,7 @@ export default function RegisterInsuranceCompanyPage() {
         </fieldset>
 
         {submitError && (
-          <p role="alert" style={errorStyle} data-testid="submit-error">
-            {submitError}
-          </p>
+          <ErrorState title={submitError} data-testid="submit-error" />
         )}
 
         <button type="submit" disabled={submitting}>

@@ -10,8 +10,12 @@ import {
   type SalesDashboardSummary,
 } from '../../../../lib/management-reporting/sales-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
@@ -96,9 +100,11 @@ export default function SalesDashboardPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dsalHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dsalIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('dsalHeading')}
+        description={t('dsalIntro')}
+      />
 
       <form
         onSubmit={applyFilters}
@@ -117,7 +123,7 @@ export default function SalesDashboardPage() {
           label={t('dashBranchIdLabel')}
         />
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('dashInsuranceLineLabel')}
           <input
@@ -134,7 +140,7 @@ export default function SalesDashboardPage() {
           label={t('dashInsurerIdLabel')}
         />
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('dashPeriodLabel')}
           <input
@@ -145,7 +151,7 @@ export default function SalesDashboardPage() {
           />
         </label>
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('dashPeriodStart')}
           <input
@@ -156,7 +162,7 @@ export default function SalesDashboardPage() {
           />
         </label>
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('dashPeriodEnd')}
           <input
@@ -170,9 +176,7 @@ export default function SalesDashboardPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary ? (
@@ -356,7 +360,7 @@ export default function SalesDashboardPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

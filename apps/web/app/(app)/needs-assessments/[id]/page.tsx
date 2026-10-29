@@ -17,9 +17,12 @@ import { NeedsAssessmentReviewPanel } from '../../../../components/needs-assessm
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
-  errorStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   coveragePreviewStyle,
   coverageTagListStyle,
@@ -132,7 +135,7 @@ export default function NeedsAssessmentDetailPage() {
     assessment?.status === 'REVIEWED';
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() => router.push('/needs-assessments')}
@@ -142,14 +145,12 @@ export default function NeedsAssessmentDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {assessment ? (
         <>
-          <h1>{t('nadHeading')}</h1>
+          <PageHeader title={t('nadHeading')} />
           <p style={{ margin: '0 0 1rem' }}>
             <WorkflowHistoryLink entityType='NeedsAssessment' entityId={assessment.id} />
           </p>
@@ -243,9 +244,7 @@ export default function NeedsAssessmentDetailPage() {
                 {submitting ? t('nadSubmitting') : t('nadSubmitButton')}
               </button>
               {actionError ? (
-                <p role="alert" style={errorStyle}>
-                  {actionError}
-                </p>
+                <ErrorState title={actionError} />
               ) : null}
             </>
           ) : null}
