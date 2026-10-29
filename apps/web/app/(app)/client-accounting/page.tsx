@@ -23,13 +23,37 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
-import { formatDate, formatMoney } from '../../../lib/i18n/format';
-import type { Language } from '../../../lib/i18n/translations';
+import { formatDate, formatMoney, formatNumber } from '../../../lib/i18n/format';
+import type { Language, TranslationKey } from '../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-function oldest(daysOverdue: number, dueDate: string | null, language: Language): string {
-  if (daysOverdue > 0) return `${daysOverdue}d overdue`;
-  if (dueDate) return `due ${formatDate(dueDate, language)}`;
+/**
+ * THE OLDEST OUTSTANDING INVOICE, IN THE SIBLING SCREEN'S OWN TREATMENT.
+ *
+ * This read `${daysOverdue}d overdue` and `due ${date}` — two English runs on the screen that says
+ * what clients owe the office, on an Arabic-first product. `hardcoded-ui-english.py` reports 0 for
+ * them because its template-literal pattern needs TWO words and each of these has one.
+ *
+ * `/sla-dashboard` renders the same concept as `${overdueDays}d` with the meaning in its column
+ * heading, so the figure stays a figure and the meaning comes from `statusOverdue` — owner
+ * decision 55's marker, already serving three screens, whose job is exactly to sit beside a date
+ * or a figure and say the deadline has passed.
+ *
+ * The not-yet-due case renders the DATE ALONE: `caColOldest` («الأقدم») already says what the
+ * column is, and the English `due ` prefix carried nothing on top of it. The third case keeps its
+ * em dash — *nothing is outstanding* is not one of owner decision 60's three cases, and her
+ * instruction with those words was that a site which does not fit one of them keeps the dash.
+ */
+function oldest(
+  daysOverdue: number,
+  dueDate: string | null,
+  language: Language,
+  t: (key: TranslationKey) => string,
+): string {
+  if (daysOverdue > 0) {
+    return `${formatNumber(daysOverdue, language)}d ${t('statusOverdue')}`;
+  }
+  if (dueDate) return formatDate(dueDate, language);
   return '—';
 }
 
@@ -132,7 +156,7 @@ export default function ClientAccountingPage() {
                     <Td>{formatMoney(r.outstandingTotal, language)}</Td>
                     <Td>{r.invoiceCount}</Td>
                     <Td>
-                      {oldest(r.oldestDaysOverdue, r.oldestDueDate, language)}
+                      {oldest(r.oldestDaysOverdue, r.oldestDueDate, language, t)}
                     </Td>
                   </Tr>
                 ))}

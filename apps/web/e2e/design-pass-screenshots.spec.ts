@@ -1,5 +1,5 @@
 import { test, type Page } from "@playwright/test";
-import { permissionsForRoles } from "./fixtures/role-permissions";
+import { ROLE_PERMISSIONS, permissionsForRoles } from "./fixtures/role-permissions";
 
 /*
  * THE DESIGN PASS'S OWN EVIDENCE — one capture per screen, per theme, per width, in ARABIC.
@@ -90,6 +90,21 @@ function screenshots(
   prepare: (page: Page) => Promise<void>,
   settle: (page: Page) => Promise<void>,
 ) {
+  // A ROLE NAME THAT DOES NOT EXIST YIELDS NO PERMISSIONS, SILENTLY - and a capture has no
+  // expected value, so the picture shows a reader holding nothing and looks like the product.
+  // `FINANCE_OFFICER` was passed on TWO screens for a batch; the seeded name is
+  // `FINANCE_COLLECTIONS_OFFICER`, and the nav in both captures was two links long. Refusing by
+  // name is the only thing that could have caught it - the same property the api e2e helper
+  // already asserts one layer down, where a mistyped CODE must grant nothing.
+  for (const role of roles) {
+    if (!ROLE_PERMISSIONS[role]) {
+      throw new Error(
+        `design-pass screenshots: "${role}" is not a seeded role, so this capture would show a ` +
+          `reader holding NOTHING. Known: ${Object.keys(ROLE_PERMISSIONS).join(", ")}`,
+      );
+    }
+  }
+
   for (const theme of ["light", "dark"] as Theme[]) {
     for (const width of ["desktop", "phone"] as Width[]) {
       test(`${name} — ${theme}, ${width}`, async ({ page }) => {
@@ -226,7 +241,7 @@ test.describe("design pass — screenshots", () => {
   screenshots(
     "client-accounting",
     "/client-accounting",
-    ["FINANCE_OFFICER"],
+    ["FINANCE_COLLECTIONS_OFFICER"],
     async (page) => {
       await page.route("http://localhost:4000/client-accounting/ageing**", (route) =>
         route.fulfill({ status: 200, json: AGEING }),
@@ -555,7 +570,7 @@ test.describe("design pass — screenshots", () => {
   screenshots(
     "payment-channels",
     "/payment-channels",
-    ["FINANCE_OFFICER"],
+    ["FINANCE_COLLECTIONS_OFFICER"],
     async (page) => {
       await page.route("http://localhost:4000/payment-channels**", (route) =>
         route.fulfill({ status: 200, json: CHANNELS }),

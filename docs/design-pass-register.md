@@ -905,6 +905,55 @@ The budget is the measurement, 120, not the 122 I predicted.
 
 ---
 
+### Batch 9 — two English runs on the money screen, and a fixture of mine that was lying
+
+Both found by opening `/client-accounting`'s capture, which batch 5 had changed and nobody had
+looked at since.
+
+#### `125d overdue` and `due 2026-08-20`, on the screen that says what clients owe
+
+Built by a helper in the screen itself, so `hardcoded-ui-english.py` DOES scan the file — and still
+reports 0, for a different reason from the `lib/` blind spot one batch earlier: its
+`TEMPLATE_PROSE` pattern needs backticks **and two words**, and each of these carries exactly one
+word beside an interpolation. **A one-word template literal is a ninth blind spot**, recorded
+rather than fixed in the script — widening the word floor to one is how that gate starts flagging
+every `${id}px` in the tree.
+
+**The treatment is the sibling screen's, not a new one.** `/sla-dashboard` renders exactly this
+concept — *how far past its deadline is the oldest one* — as `${overdueDays}d` with the meaning in
+its column heading. So the figure stays a figure and the meaning comes from `statusOverdue`
+(«(فات موعده)»), owner decision 55's own marker, already serving three screens, whose recorded job
+is to sit beside a date or a figure and say the deadline has passed. The not-yet-due case renders
+the DATE ALONE — `caColOldest` («الأقدم») already says what the column is and the English `due `
+prefix added nothing. The third case keeps its em dash: *nothing is outstanding* is not one of
+decision 60's three, and her instruction was that a site which does not fit keeps its dash.
+
+**And the day count now goes through `formatNumber`**, which it did not — every other figure on
+that screen does, and a bare `${n}` is the one place a digit could render differently from the
+money beside it.
+
+**A stale assertion was PINNING the English**, and it is re-pointed as a PAIR (the marker present
+AND the English run gone) with the reversal stated in the test, rather than relaxed.
+
+#### A role name that does not exist, in two of my own captures
+
+`/client-accounting` and `/payment-channels` were both captured as `FINANCE_OFFICER`. **That role
+does not exist** — the seeded name is `FINANCE_COLLECTIONS_OFFICER` — and `permissionsForRoles`
+answers an unknown name with an EMPTY LIST rather than refusing. So both pictures were of a reader
+holding nothing, with a two-link nav, and **they looked like pictures of the product.**
+
+That is the recorded class this repository already asserts against one layer down, where the api
+e2e helper carries a test whose only job is that *a mistyped code grants nothing*. Here the same
+mistake sat in a FIXTURE, where nothing asserts at all — **a screenshot has no expected value,
+which is exactly what makes a wrong one so quiet.** `screenshots()` now refuses an unknown role by
+name and prints the twelve; planted, it fails the run.
+
+**It also says something about the valve.** The instruction is to keep opening the captures, and
+this is the second time opening one found a defect in the capture rather than in the screen. A
+picture that cannot be wrong is not evidence either.
+
+---
+
 ---
 
 ## The method, per screen

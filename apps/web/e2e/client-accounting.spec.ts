@@ -90,7 +90,16 @@ test("shows the ageing report worst-first with a totals row", async ({ page }) =
   // worst-first: Acme (125d) is the first data row
   const firstRowCells = page.locator("tbody tr").first().locator("td");
   await expect(firstRowCells.first()).toHaveText("Acme Ltd");
-  await expect(page.getByRole("cell", { name: "125d overdue" })).toBeVisible();
+  // RE-POINTED, and this is a real reversal rather than a rename: this asserted
+  // `125d overdue` — two English words built by a template literal on the screen that says what
+  // clients owe the office, on an Arabic-first product, and the assertion was PINNING them. The
+  // figure stays a figure and the meaning now comes from `statusOverdue`, the marker owner
+  // decision 55 already has serving three screens. Asserted as a PAIR so a revert fails: the
+  // marker present AND the English run gone.
+  await expect(
+    page.getByRole("cell", { name: "125d (past its deadline)" }),
+  ).toBeVisible();
+  await expect(page.locator("tbody")).not.toContainText("125d overdue");
   await expect(
     page.getByRole("cell", { name: "JOD 115,350.000" }).first(),
   ).toBeVisible();
