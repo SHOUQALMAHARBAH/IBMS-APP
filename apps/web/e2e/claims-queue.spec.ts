@@ -242,7 +242,7 @@ test("the queue shows a friendly message when the caller lacks claim.read", asyn
     }),
   );
   await page.goto("/claims");
-  await expect(page.locator('p[role="alert"]')).toContainText("claim.read");
+  await expect(page.locator('main [role="alert"]')).toContainText("claim.read");
 });
 
 test("an empty queue explains what belongs there", async ({ page }) => {
@@ -264,7 +264,7 @@ test("a claim outside the caller's book reads as not found, not as an empty scre
     route.fulfill({ status: 404, json: { message: "Claim not found" } }),
   );
   await page.goto("/claims/clm-1");
-  await expect(page.locator('p[role="alert"]')).toContainText("your book");
+  await expect(page.locator('main [role="alert"]')).toContainText("your book");
 });
 
 test("the queue renders in Arabic with translated status labels", async ({

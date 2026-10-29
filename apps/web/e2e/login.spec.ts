@@ -63,7 +63,7 @@ test("shows a server-provided error message on invalid credentials", async ({ pa
   await page.getByRole("button", { name: "Sign in" }).click();
   // `getByRole("alert")` also matches Next.js's route-announcer div — scope
   // to the form's own error paragraph instead.
-  await expect(page.locator('p[role="alert"]')).toHaveText("Invalid email or password");
+  await expect(page.locator('main [role="alert"]')).toHaveText("Invalid email or password");
 });
 
 test("switches to the MFA challenge step when the server requires it", async ({ page }) => {

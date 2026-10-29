@@ -212,7 +212,7 @@ for (const lang of LANGS) {
     // error
     await page.route(LEADS_URL, (route) => route.fulfill(FORBIDDEN));
     await page.goto("/leads");
-    await expect(page.locator('p[role="alert"]').first()).toBeVisible();
+    await expect(page.locator('main [role="alert"]').first()).toBeVisible();
     await capture(page, "lead", lang, "error");
   });
 }
@@ -297,7 +297,7 @@ for (const lang of LANGS) {
     // error
     await page.route(POLICIES_URL, (route) => route.fulfill(FORBIDDEN));
     await page.goto("/policies");
-    await expect(page.locator('p[role="alert"]').first()).toBeVisible();
+    await expect(page.locator('main [role="alert"]').first()).toBeVisible();
     await capture(page, "policy", lang, "error");
   });
 }
@@ -497,7 +497,7 @@ for (const lang of LANGS) {
     // which is the failure this block's own alert exists for.
     await page.route(CLAIMS_URL, (route) => route.fulfill(FORBIDDEN));
     await page.goto("/opportunities/opp-1");
-    await expect(page.locator('p[role="alert"]').first()).toBeVisible();
+    await expect(page.locator('main [role="alert"]').first()).toBeVisible();
     await capture(page, "claim", lang, "error");
   });
 }
@@ -590,7 +590,7 @@ for (const lang of LANGS) {
     // error
     await page.route(RENEWAL_URL, (route) => route.fulfill(FORBIDDEN));
     await page.goto("/renewal-cases");
-    await expect(page.locator('p[role="alert"]').first()).toBeVisible();
+    await expect(page.locator('main [role="alert"]').first()).toBeVisible();
     await capture(page, "renewal", lang, "error");
   });
 }

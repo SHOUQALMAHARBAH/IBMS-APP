@@ -366,6 +366,103 @@ not *which suite exercises what I touched*.
 
 | **`/internal-controls`** | THREE hand-rolled tables on one screen, each with its own `min-width`, so a governance report scrolled sideways in three independent ways; a local `Stat` re-implementing `Tile` with `opacity: 0.7`, a literal `border-radius: 8` and a `margin`-based section rhythm; the violations heading coloured with the literal `#b91c1c`, which on a dark card is close to unreadable; `Generated {ISO-string-sliced-by-hand}.` as the provenance line; the literal English `'None'` for a zero count; `<p>Loading…</p>` twice | one `Table` primitive three times; `Tiles`/`Tile` with the violations tile going to the ALARM tone on a non-zero count; `ReportProvenance` for the generated-at line; the access-self-review row FLAGGED by a warning pill rather than by font weight alone; `SkeletonList` for both loading states; the page's four blocks on `pageStackStyle`'s single gap. **Not one colour literal and not one opacity left** | `PageHeader`, `Tiles`, `Tile`, `Card`, `Button`, `Badge`, `Note`, `Table`, `ReportProvenance`, `SkeletonList`, `EmptyState`, `ErrorState` | 19 → 2 | `internal-controls.spec.ts` | `f23fcbe` / `cf05491` |
 
+
+### Batch 1 — 33 screens, and the converter that made them affordable
+
+These share one shape and were converted together: `<main style={pageStyle}>`, an `<h1>` over a
+`<p style={{ opacity: 0.75 }}>`, a hand-rolled `<table>` with its own borders and its own minimum
+width, two `<p role="alert">` blocks, and a bare `<p>` for loading. Every one of those is a real
+defect rather than a style preference:
+
+* **`opacity` as muting is what `globals.css` itself bans.** It dims the BACKGROUND through the
+  text and is the cause of this product's recorded a11y contrast regression. `--ink-secondary` is
+  a colour with a measured ratio behind it.
+* **A hand-rolled table carries its own `minWidth`**, so no two screens here agreed on when a
+  table starts scrolling — and two of them had NO scroll container at all, which pushes the whole
+  page sideways on a phone.
+* **`0.2rem`, `0.3rem`, `0.4rem`, `0.75rem`, `1.75rem`** are all off the owner's five-step scale.
+* **A bare `<p>` for a load error** is the fourth state done as an afterthought.
+
+`scripts/measurements/` carries the converter used (committed with this batch). It is EXACT-MATCH
+and REFUSES a file where a transform it was told to apply does not match — so a screen whose shape
+differs is handed back whole rather than half-converted. Seven screens refused and are listed below
+as still owed.
+
+| screen | inline before → after | spec that asserts about it |
+|---|---|---|
+| `/claims` | 11 → 7 | `claims-queue.spec.ts` |
+| `/complaints` | 13 → 5 | `complaints.spec.ts` |
+| `/service-requests` | 10 → 6 | `customer-service.spec.ts` |
+| `/communications` | 11 → 7 | `customer-service.spec.ts` |
+| `/feedback` | 9 → 5 | `customer-service.spec.ts` |
+| `/retention-cases` | 8 → 4 | `customer-service.spec.ts` |
+| `/vendors` | 6 → 4 | `vendors.spec.ts` |
+| `/documents` | 6 → 3 | `documents.spec.ts` |
+| `/knowledge-base` | 3 → 0 | `knowledge-base.spec.ts` |
+| `/information-assets` | 3 → 0 | `information-assets.spec.ts` |
+| `/bcp-dr-plans` | 3 → 1 | `bcp-dr-plans.spec.ts` |
+| `/internal-audit-findings` | 6 → 2 | `internal-audit-findings.spec.ts` |
+| `/watchlist-sync` | 5 → 2 | `watchlist-sync.spec.ts` |
+| `/privacy-notices` | 10 → 6 | `privacy-notices.spec.ts` |
+| `/ropa-entries` | 11 → 8 | `ropa-entries.spec.ts` |
+| `/data-sharing-approvals` | 11 → 7 | `data-sharing-approvals.spec.ts` |
+| `/cross-border-transfers` | 9 → 5 | `cross-border-transfers.spec.ts` |
+| `/dpia-screenings` | 8 → 4 | `dpia-screenings.spec.ts` |
+| `/operational-pi-risk` | 8 → 4 | `operational-pi-risk.spec.ts` |
+| `/renewal-cases` | 7 → 4 | **none — see below** |
+| `/portfolio-analysis` | 3 → 0 | `portfolio-analysis.spec.ts` |
+| `/profitability-analysis` | 3 → 0 | `profitability-analysis.spec.ts` |
+| `/planning-export` | 6 → 2 | `planning-export.spec.ts` |
+| `/kpi-dashboard` | 10 → 7 | `kpi-dashboard.spec.ts` |
+| `/claims-analytics` | 13 → 1 | `claims-analytics.spec.ts` |
+| `/insurer-performance` | 8 → 5 | `insurer-performance.spec.ts` |
+| `/employee-performance` | 8 → 5 | `employee-performance.spec.ts` |
+| `/dashboards/insurer-employee-performance` | 5 → 2 | `dashboards.spec.ts` |
+| `/consent` | 16 → 12 | `consent.spec.ts` |
+| `/transaction-monitoring` | 11 → 7 | `transaction-monitoring.spec.ts` |
+| `/dsr` | 13 → 9 | `dsr.spec.ts` |
+| `/audit-trail` | 6 → 1 | `audit-trail.spec.ts` |
+| `/settings/insurance-lines` | 13 → 10 | `insurance-lines.spec.ts` |
+
+**273 → 145 on these 33 screens.** `SCREEN_BUDGET` **1418 → 1290**.
+
+**`/renewal-cases` HAS NO PLAYWRIGHT SPEC AT ALL** — found by running the filters through
+`node scripts/playwright-specs.mjs`, which refuses a filter matching nothing, where
+`npx playwright test` would have silently run a smaller suite and still passed. Recorded rather
+than fixed: writing a spec for a screen is not a design change, and inventing one mid-batch is how
+a batch stops being reviewable.
+
+### Three screens got more than the mechanical pass
+
+**`/claims`** — all three badges rendered in the identical grey pill, so the state a desk is
+INFORMED of (the claim's status) looked exactly like the two it must ACT on (an unanswered insurer
+follow-up, documentation not complete). This screen exists to answer *what needs me next*, and a
+queue whose urgent rows look like its calm ones answers that no better than a list. Status stays
+neutral; the two signals take `warning` and keep their words, because a colour is a second carrier
+and never the only one.
+
+**`/complaints`** — four `aria-label`s withdrawn, **two of them actively wrong**:
+`complaintsCategoryAria` said «التصنيف» where the visible label says «التصنيف (اختياري)», so a
+screen-reader user was NOT told the field is optional. That is the fourth and fifth instance of
+this class in the batch. And a real defect: `c.escalations.length || "—"` rendered an em dash for
+ZERO, so a complaint that was never escalated read identically to one whose count nobody knows.
+`0 || x` is `x` — the recorded shortcut this product has now paid for three times.
+
+**`/claims-analytics`** — its totals row carried `{ ...cellStyle, fontWeight: 600 }` once per
+column: six inline style objects all saying one thing about the row they are in. `Tr` gained a
+`total` variant, so a totals row is now a property of the row.
+
+### Seven screens refused the converter and are still owed
+
+| screen | why it refused |
+|---|---|
+| `/dashboards/claims`, `/dashboards/policy`, `/dashboards/financial`, `/dashboards/compliance` | their tables are tiny inline-styled key/count pairs with no local style constant — a `KeyValue` shape rather than a `Table`, and §7 says a dashboard needs more than a repaint anyway |
+| `/employees` | no `errorStyle` import to convert; its error path is shaped differently |
+| `/sla-policies` | its heading is not the `<h1>` + muted `<p>` pair |
+| `/retention-disposal`, `/regulatory-compliance`, `/settings/users`, `/financial-report`, `/bank-reconciliation`, `/commission`, `/insurer-accounting`, `/client-accounting` | not yet attempted — the four heaviest are the crowded screens §4(c) is about and want hand work |
+
+---
+
 ---
 
 ## The method, per screen

@@ -129,7 +129,7 @@ test('shows a friendly message when the user lacks the permission', async ({
   );
 
   await page.goto('/policies');
-  const alert = page.locator('p[role="alert"]');
+  const alert = page.locator('main [role="alert"]');
   await expect(alert).toBeVisible();
   await expect(alert).toContainText('policy.read');
 });

@@ -15,8 +15,17 @@ import {
   type InsuranceLine,
 } from '../../../../lib/insurer/insurance-line-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 /*
@@ -54,17 +63,12 @@ const cell: CSSProperties = {
   textAlign: 'start',
   verticalAlign: 'top',
 };
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const muted: CSSProperties = {
   fontSize: '0.8rem',
   color: 'var(--ink-secondary)',
   margin: 0,
 };
-const fieldStyle: CSSProperties = { display: 'grid', gap: '0.2rem' };
+const fieldStyle: CSSProperties = { display: 'grid', gap: 'var(--space-1)' };
 
 type Draft = { nameEn: string; nameAr: string; category: 'GENERAL' | 'LIFE' };
 
@@ -149,19 +153,17 @@ export default function InsuranceLinesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('lineAdminHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '50rem' }}>{t('lineAdminIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('lineAdminHeading')}
+        description={t('lineAdminIntro')}
+      />
 
       {loadError && (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       )}
       {actionError && (
-        <p role="alert" style={errorStyle} data-testid="line-admin-error">
-          {actionError}
-        </p>
+        <ErrorState title={actionError} data-testid="line-admin-error" />
       )}
 
       {canCreate ? (
@@ -243,25 +245,25 @@ export default function InsuranceLinesPage() {
 
       {rows == null ? (
         loadError ? null : (
-          <p>{t('lineAdminLoading')}</p>
+          <SkeletonList rows={4} label={t('lineAdminLoading')} />
         )
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
+        <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('lineAdminColName')}</th>
-                <th style={head}>{t('lineAdminColCategory')}</th>
-                <th style={head}>{t('lineAdminColOrigin')}</th>
-                {canUpdate && <th style={head}>{t('lineAdminColActions')}</th>}
+                <Th>{t('lineAdminColName')}</Th>
+                <Th>{t('lineAdminColCategory')}</Th>
+                <Th>{t('lineAdminColOrigin')}</Th>
+                {canUpdate && <Th>{t('lineAdminColActions')}</Th>}
               </tr>
             </thead>
             <tbody>
               {rows.map((l) => (
-                <tr key={l.id} data-testid={`line-${l.id}`}>
-                  <td style={cell}>
+                <Tr key={l.id} data-testid={`line-${l.id}`}>
+                  <Td>
                     {editingId === l.id ? (
-                      <div style={{ display: 'grid', gap: '0.3rem' }}>
+                      <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
                         <input
                           type="text"
                           aria-label={t('lineAdminNameEn')}
@@ -287,8 +289,8 @@ export default function InsuranceLinesPage() {
                         <div style={muted}>{l.nameAr}</div>
                       </>
                     )}
-                  </td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>
                     {editingId === l.id ? (
                       <select
                         aria-label={t('lineAdminCategory')}
@@ -311,8 +313,8 @@ export default function InsuranceLinesPage() {
                     ) : (
                       l.category
                     )}
-                  </td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>
                     {l.isStandard ? (
                       <>
                         {t('lineAdminStandard')}
@@ -323,15 +325,15 @@ export default function InsuranceLinesPage() {
                     ) : (
                       t('lineAdminOwn')
                     )}
-                  </td>
+                  </Td>
                   {canUpdate && (
-                    <td style={cell}>
+                    <Td>
                       {l.isStandard ? (
                         <span style={muted} data-testid={`line-locked-${l.id}`}>
                           {t('lineAdminStandardLocked')}
                         </span>
                       ) : editingId === l.id ? (
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                           <button
                             type="button"
                             data-testid={`line-save-${l.id}`}
@@ -373,13 +375,13 @@ export default function InsuranceLinesPage() {
                           {t('lineAdminEdit')}
                         </button>
                       )}
-                    </td>
+                    </Td>
                   )}
-                </tr>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </Card>
       )}
     </main>
   );

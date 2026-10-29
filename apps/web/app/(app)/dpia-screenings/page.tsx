@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -13,8 +13,18 @@ import {
   type DpiaScreening,
 } from '../../../lib/pdpl/dpia-screening-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
@@ -23,14 +33,6 @@ import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 const ROLES = [
   'dpia.review',
 ];
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 
 
 const INITIAL_ANSWERS = {
@@ -122,29 +124,25 @@ export default function DpiaScreeningsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dpiaHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('dpiaIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('dpiaHeading')}
+        description={t('dpiaIntro')}
+      />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {canManage ? (
         <form
           onSubmit={(ev) => void submit(ev)}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('dpiaSubjectFieldLabel')}
             <input
               aria-label={t('dpiaSubjectLabel')}
@@ -154,7 +152,7 @@ export default function DpiaScreeningsPage() {
             />
           </label>
           {QUESTIONS.map((q) => (
-            <label key={q.key} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <label key={q.key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <input
                 type="checkbox"
                 checked={answers[q.key]}
@@ -171,25 +169,25 @@ export default function DpiaScreeningsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('dpiaNone')}</p>
+          <EmptyState title={t('dpiaNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('dpiaColSubject')}</th>
-                  <th style={head}>{t('dpiaColOutcome')}</th>
-                  <th style={head}>{t('dpiaColReviewDue')}</th>
-                  <th style={head}>{t('dpiaColAction')}</th>
+                  <Th>{t('dpiaColSubject')}</Th>
+                  <Th>{t('dpiaColOutcome')}</Th>
+                  <Th>{t('dpiaColReviewDue')}</Th>
+                  <Th>{t('dpiaColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.subjectDescription}</td>
-                    <td style={cell}>{t(ENUM_LABEL.DpiaOutcome[r.outcome])}</td>
-                    <td style={cell}>{r.dpoReviewDueAt ? r.dpoReviewDueAt.slice(0, 10) : '—'}</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    <Td>{r.subjectDescription}</Td>
+                    <Td>{t(ENUM_LABEL.DpiaOutcome[r.outcome])}</Td>
+                    <Td>{r.dpoReviewDueAt ? r.dpoReviewDueAt.slice(0, 10) : '—'}</Td>
+                    <Td>
                       {!canManage ? (
                         '—'
                       ) : r.outcome === 'AUTO_APPROVED' && !r.dpoSpotCheckedAt ? (
@@ -220,15 +218,15 @@ export default function DpiaScreeningsPage() {
                       ) : (
                         '—'
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('dpiaLoading')}</p>
+        <SkeletonList rows={4} label={t('dpiaLoading')} />
       )}
     </main>
   );

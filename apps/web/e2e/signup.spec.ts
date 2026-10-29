@@ -46,7 +46,7 @@ test("shows the server's password-policy violations on a rejected signup", async
   await page.getByRole("button", { name: "Sign up" }).click();
   // `getByRole("alert")` also matches Next.js's route-announcer div — scope
   // to the form's own error paragraph instead.
-  await expect(page.locator('p[role="alert"]')).toContainText("Password must include a digit");
+  await expect(page.locator('main [role="alert"]')).toContainText("Password must include a digit");
 });
 
 test("redirects to /login after a successful signup", async ({ page }) => {

@@ -17,8 +17,18 @@ import {
 } from '../../../lib/supporting-operations/document-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { actionErrorText } from '../../../lib/i18n/action-error';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionMayBeMissing, permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
@@ -29,8 +39,8 @@ const cell: CSSProperties = {
   textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '28rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '28rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 export default function DocumentsPage() {
   const { t, tPlural } = useLanguage();
@@ -152,11 +162,11 @@ export default function DocumentsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('docHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('docIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('docHeading')}
+        description={t('docIntro')}
+      />
 
       <form onSubmit={onLookup} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
         <EntitySearch
@@ -170,40 +180,37 @@ export default function DocumentsPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
 
       {documents ? (
         documents.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('docNone')}</p>
+          <EmptyState title={t('docNone')} />
         ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('docColFile')}</th>
-                <th style={head}>{t('docColCategory')}</th>
-                <th style={head}>{t('docColClassification')}</th>
-                <th style={head}>{t('docColVersion')}</th>
-                <th style={head}>{t('docColDeletion')}</th>
+                <Th>{t('docColFile')}</Th>
+                <Th>{t('docColCategory')}</Th>
+                <Th>{t('docColClassification')}</Th>
+                <Th>{t('docColVersion')}</Th>
+                <Th>{t('docColDeletion')}</Th>
                 <th style={head} />
               </tr>
             </thead>
             <tbody>
               {documents.map((doc) => (
-                <tr key={doc.id}>
-                  <td style={cell}>{doc.fileName}</td>
-                  <td style={cell}>{t(ENUM_LABEL.DocumentCategory[doc.category])}</td>
-                  <td style={cell}>{t(ENUM_LABEL.DataClassification[doc.classification])}</td>
-                  <td style={cell}>{doc.versionNumber}</td>
-                  <td style={cell}>{doc.deletionLocked ? t('docLocked') : t('docUnlocked')}</td>
-                  <td style={cell}>
+                <Tr key={doc.id}>
+                  <Td>{doc.fileName}</Td>
+                  <Td>{t(ENUM_LABEL.DocumentCategory[doc.category])}</Td>
+                  <Td>{t(ENUM_LABEL.DataClassification[doc.classification])}</Td>
+                  <Td>{doc.versionNumber}</Td>
+                  <Td>{doc.deletionLocked ? t('docLocked') : t('docUnlocked')}</Td>
+                  <Td>
                     {versioningId === doc.id ? null : (
                       <button type="button" onClick={() => startVersion(doc)}>
                         {t('docNewVersionButton')}
@@ -218,11 +225,12 @@ export default function DocumentsPage() {
                         {t('commonDelete')}
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         )
       ) : null}
 
@@ -283,9 +291,7 @@ export default function DocumentsPage() {
         />
         <button type="submit">{t('docComputeButton')}</button>
         {summaryError ? (
-          <p role="alert" style={errorStyle}>
-            {summaryError}
-          </p>
+          <ErrorState title={summaryError} />
         ) : null}
         {summary ? (
           <p>
@@ -306,7 +312,7 @@ export default function DocumentsPage() {
             opened, for ever. Nothing is rendered before a lookup: the field's own
             label and the paragraph above it already say what to do, and an
             invented prompt would be a sentence nobody decided. */}
-        {summaryBusy ? <p>{t('docLoading')}</p> : null}
+        {summaryBusy ? <SkeletonList rows={4} label={t('docLoading')} /> : null}
       </form>
     </main>
   );

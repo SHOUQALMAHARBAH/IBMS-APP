@@ -26,8 +26,17 @@ import {
   type PiRiskEvent,
 } from '../../../lib/compliance-risk/pi-risk-event-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -39,15 +48,8 @@ const PI_POLICY_ROLE = [
   'pi-policy.manage',
 ];
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '30rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 
 export default function OperationalPiRiskPage() {
@@ -189,23 +191,19 @@ export default function OperationalPiRiskPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('opHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('opIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('opHeading')}
+        description={t('opIntro')}
+      />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
 
       <h2>{t('opRegisterHeading')}</h2>
       {risksError ? (
-        <p role="alert" style={errorStyle}>
-          {risksError}
-        </p>
+        <ErrorState title={risksError} />
       ) : null}
       {canManageRiskRegister ? (
         <form onSubmit={submitRisk} style={formStyle}>
@@ -238,33 +236,34 @@ export default function OperationalPiRiskPage() {
         </form>
       ) : null}
       {risks ? (
-        <table style={{ borderCollapse: 'collapse', minWidth: '50rem' }}>
+        <Card padded={false}>
+            <Table>
           <thead>
             <tr>
-              <th style={head}>{t('opColType')}</th>
-              <th style={head}>{t('opRiskDescriptionLabel')}</th>
-              <th style={head}>{t('opColMitigation')}</th>
-              <th style={head}>{t('opColStatus')}</th>
-              <th style={head}>{t('opColAction')}</th>
+              <Th>{t('opColType')}</Th>
+              <Th>{t('opRiskDescriptionLabel')}</Th>
+              <Th>{t('opColMitigation')}</Th>
+              <Th>{t('opColStatus')}</Th>
+              <Th>{t('opColAction')}</Th>
             </tr>
           </thead>
           <tbody>
             {risks.length === 0 ? (
-              <tr>
-                <td style={cell} colSpan={5}>
+              <Tr>
+                <Td colSpan={5}>
                   {t('opNoRisks')}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             ) : null}
             {risks.map((r) => (
-              <tr key={r.id}>
-                <td style={cell}>{r.riskType}</td>
-                <td style={cell}>{r.description}</td>
-                <td style={cell}>{r.mitigationAction ?? '—'}</td>
-                <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
-                <td style={cell}>
+              <Tr key={r.id}>
+                <Td>{r.riskType}</Td>
+                <Td>{r.description}</Td>
+                <Td>{r.mitigationAction ?? '—'}</Td>
+                <Td>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</Td>
+                <Td>
                   {canManageRiskRegister && r.status === 'open' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '14rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '14rem' }}>
                       <input
                         aria-label={t('opMitigationRowAria')}
                         placeholder={t('opMitigationActionLabel')}
@@ -273,7 +272,7 @@ export default function OperationalPiRiskPage() {
                           setMitigationDrafts((d) => ({ ...d, [r.id]: e.target.value }))
                         }
                       />
-                      <div style={{ display: 'flex', gap: '0.3rem' }}>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                         <button
                           type="button"
                           disabled={busy || !(mitigationDrafts[r.id] ?? '').trim()}
@@ -297,18 +296,17 @@ export default function OperationalPiRiskPage() {
                   ) : (
                     '—'
                   )}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </Table>
+          </Card>
       ) : null}
 
       <h2>{t('opPiHeading')}</h2>
       {policiesError ? (
-        <p role="alert" style={errorStyle}>
-          {policiesError}
-        </p>
+        <ErrorState title={policiesError} />
       ) : null}
       {canManagePiPolicy ? (
         <form onSubmit={submitPolicy} style={formStyle}>
@@ -348,34 +346,35 @@ export default function OperationalPiRiskPage() {
         </form>
       ) : null}
       {policies ? (
-        <table style={{ borderCollapse: 'collapse', minWidth: '55rem' }}>
+        <Card padded={false}>
+            <Table>
           <thead>
             <tr>
-              <th style={head}>{t('opColInsurer')}</th>
-              <th style={head}>{t('opColCoverageLimit')}</th>
-              <th style={head}>{t('opExpires')}</th>
-              <th style={head}>{t('opColClaimsHistory')}</th>
-              <th style={head}>{t('opColStatus')}</th>
-              {canManagePiPolicy ? <th style={head}>{t('opColAction')}</th> : null}
+              <Th>{t('opColInsurer')}</Th>
+              <Th>{t('opColCoverageLimit')}</Th>
+              <Th>{t('opExpires')}</Th>
+              <Th>{t('opColClaimsHistory')}</Th>
+              <Th>{t('opColStatus')}</Th>
+              {canManagePiPolicy ? <Th>{t('opColAction')}</Th> : null}
             </tr>
           </thead>
           <tbody>
             {policies.length === 0 ? (
-              <tr>
-                <td style={cell} colSpan={5}>
+              <Tr>
+                <Td colSpan={5}>
                   {t('opNoPiPolicy')}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             ) : null}
             {policies.map((p) => (
-              <tr key={p.id}>
-                <td style={cell}>
+              <Tr key={p.id}>
+                <Td>
                   <bdi>{p.insurerName}</bdi>
-                </td>
-                <td style={cell}>{p.coverageLimit}</td>
-                <td style={cell}>{p.expiresAt.slice(0, 10)}</td>
-                <td style={cell}>{p.claimsHistorySummary ?? '—'}</td>
-                <td style={cell}>
+                </Td>
+                <Td>{p.coverageLimit}</Td>
+                <Td>{p.expiresAt.slice(0, 10)}</Td>
+                <Td>{p.claimsHistorySummary ?? '—'}</Td>
+                <Td>
                   {/* OWNER DECISION 55's WORDING TRAP, and it must not be 'improved' away: a PI record
                       can be the CURRENT one while its cover has LAPSED — which is exactly the state
                       the marker below reports. «الحالية» speaks about the RECORD; «سارية» would
@@ -383,10 +382,10 @@ export default function OperationalPiRiskPage() {
                       line. */}
                   {p.isCurrent ? t('statusRecordCurrent') : t('statusRecordPast')}
                   {p.isCurrentlyLapsed ? ` ${t('statusCoverLapsed')}` : ''}
-                </td>
+                </Td>
                 {canManagePiPolicy ? (
-                  <td style={cell}>
-                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                  <Td>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                       <input
                         aria-label={t('opClaimsHistoryRowAria')}
                         placeholder={t('opClaimsHistoryLabel')}
@@ -407,19 +406,18 @@ export default function OperationalPiRiskPage() {
                         {t('opSaveButton')}
                       </button>
                     </div>
-                  </td>
+                  </Td>
                 ) : null}
-              </tr>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </Table>
+          </Card>
       ) : null}
 
       <h2>{t('opEventsHeading')}</h2>
       {eventsError ? (
-        <p role="alert" style={errorStyle}>
-          {eventsError}
-        </p>
+        <ErrorState title={eventsError} />
       ) : null}
       {canManagePiPolicy ? (
         <form onSubmit={submitEvent} style={formStyle}>
@@ -446,35 +444,36 @@ export default function OperationalPiRiskPage() {
         </form>
       ) : null}
       {events ? (
-        <table style={{ borderCollapse: 'collapse', minWidth: '55rem' }}>
+        <Card padded={false}>
+            <Table>
           <thead>
             <tr>
-              <th style={head}>{t('opRiskDescriptionLabel')}</th>
-              <th style={head}>{t('opColSource')}</th>
-              <th style={head}>{t('opColMitigation')}</th>
-              {canManagePiPolicy ? <th style={head}>{t('opColAction')}</th> : null}
+              <Th>{t('opRiskDescriptionLabel')}</Th>
+              <Th>{t('opColSource')}</Th>
+              <Th>{t('opColMitigation')}</Th>
+              {canManagePiPolicy ? <Th>{t('opColAction')}</Th> : null}
             </tr>
           </thead>
           <tbody>
             {events.length === 0 ? (
-              <tr>
-                <td style={cell} colSpan={4}>
+              <Tr>
+                <Td colSpan={4}>
                   {t('opNoEvents')}
-                </td>
-              </tr>
+                </Td>
+              </Tr>
             ) : null}
             {events.map((ev) => (
-              <tr key={ev.id}>
-                <td style={cell}>{ev.description}</td>
-                <td style={cell}>
+              <Tr key={ev.id}>
+                <Td>{ev.description}</Td>
+                <Td>
                   {ev.isAutoLogged
                     ? t('opSourcePolicyCheckingDiscrepancy')
                     : t('opSourceManual')}
-                </td>
-                <td style={cell}>{ev.mitigationAction ?? '—'}</td>
+                </Td>
+                <Td>{ev.mitigationAction ?? '—'}</Td>
                 {canManagePiPolicy ? (
-                  <td style={cell}>
-                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                  <Td>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                       <input
                         aria-label={t('opEventMitigationAria')}
                         placeholder={t('opMitigationActionLabel')}
@@ -498,17 +497,18 @@ export default function OperationalPiRiskPage() {
                         {t('commonSave')}
                       </button>
                     </div>
-                  </td>
+                  </Td>
                 ) : null}
-              </tr>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </Table>
+          </Card>
       ) : eventsError ? null : (
         // The loading state directive §2 requires; this page rendered
         // nothing at all while fetching. Guarded on loadError so an error
         // and a "Loading…" line never appear together.
-        <p>{t('opLoading')}</p>
+        <SkeletonList rows={4} label={t('opLoading')} />
       )}
     </main>
   );

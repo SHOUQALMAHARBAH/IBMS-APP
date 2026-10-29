@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -13,24 +13,22 @@ import {
 import { WatchlistGenerations } from '../../../components/compliance-risk/WatchlistGenerations';
 import { ActionStatus } from '../../../components/ui';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function WatchlistSyncPage() {
   const router = useRouter();
@@ -129,11 +127,11 @@ export default function WatchlistSyncPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('wsHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('wsIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('wsHeading')}
+        description={t('wsIntro')}
+      />
 
       {canManage ? (
         <div style={{ display: 'flex', gap: '0.6rem', margin: '1rem 0' }}>
@@ -156,47 +154,47 @@ export default function WatchlistSyncPage() {
         testId="ws-action"
       />
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {runs ? (
         runs.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('wsNone')}</p>
+          <EmptyState title={t('wsNone')} />
         ) : (
           <div style={{ overflowX: 'auto' }} data-testid="watchlist-runs">
-            <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+            <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('wsColSource')}</th>
-                  <th style={head}>{t('wsColStatus')}</th>
-                  <th style={head}>{t('wsColRecords')}</th>
-                  <th style={head}>{t('wsColStarted')}</th>
-                  <th style={head}>{t('wsColCompleted')}</th>
+                  <Th>{t('wsColSource')}</Th>
+                  <Th>{t('wsColStatus')}</Th>
+                  <Th>{t('wsColRecords')}</Th>
+                  <Th>{t('wsColStarted')}</Th>
+                  <Th>{t('wsColCompleted')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {runs.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{t(ENUM_LABEL.WatchlistSource[r.source])}</td>
-                    <td style={cell}>{t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}</td>
-                    <td style={cell}>{r.recordCount ?? '—'}</td>
-                    <td style={cell}>{r.startedAt.slice(0, 16).replace('T', ' ')}</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    <Td>{t(ENUM_LABEL.WatchlistSource[r.source])}</Td>
+                    <Td>{t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}</Td>
+                    <Td>{r.recordCount ?? '—'}</Td>
+                    <Td>{r.startedAt.slice(0, 16).replace('T', ' ')}</Td>
+                    <Td>
                       {r.completedAt ? r.completedAt.slice(0, 16).replace('T', ' ') : '—'}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
+          </Card>
           </div>
         )
       ) : loadError ? null : (
         // The loading state directive §2 requires; this page rendered
         // nothing at all while fetching. Guarded on loadError so an error
         // and a "Loading…" line never appear together.
-        <p>{t('wsLoading')}</p>
+        <SkeletonList rows={4} label={t('wsLoading')} />
       )}
 
       {/* The generations behind the runs above, and the way back to an earlier

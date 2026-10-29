@@ -229,7 +229,7 @@ test("shows a friendly message when the user lacks review permission", async ({
 
   await page.goto("/access-recertification");
 
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     "(access-recertification.review)",
   );
 });

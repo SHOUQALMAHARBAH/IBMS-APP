@@ -515,7 +515,7 @@ test('ITEM 8 — one refused panel is NAMED and the other two still render', asy
   await page.goto('/retention-disposal');
   // Scoped to `main`: Next renders its own empty `role="alert"` route announcer, and a page-wide
   // `.first()` matches THAT — the trap IMPROVEMENTS § 1.85 records.
-  const alert = page.locator('main p[role="alert"]');
+  const alert = page.locator('main [role="alert"]');
   await expect(alert).toContainText('the retention schedule');
   // The non-vacuity half: a panel the reader DOES hold is on screen.
   await expect(page.getByRole('heading', { name: 'Legal holds' })).toBeVisible();

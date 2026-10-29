@@ -9,21 +9,24 @@ import {
   type EmployeePerformanceRecord,
 } from '../../../lib/management-reporting/employee-performance-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', margin: '1rem 0' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '26rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -116,11 +119,11 @@ export default function EmployeePerformancePage() {
   const latest = history && history.length > 0 ? history[0] : null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('epHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('epIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('epHeading')}
+        description={t('epIntro')}
+      />
 
       <form onSubmit={onLookup} style={formStyle}>
         <h2>{t('epLookUp')}</h2>
@@ -135,9 +138,7 @@ export default function EmployeePerformancePage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {latest ? (
@@ -175,41 +176,43 @@ export default function EmployeePerformancePage() {
           </p>
 
           <h2>{t('dashHistory')}</h2>
-          <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('dashColPeriod')}</th>
-                <th style={head}>{t('diepNewClients')}</th>
-                <th style={head}>{t('diepPremiumWritten')}</th>
-                <th style={head}>{t('diepCommissionEarned')}</th>
-                <th style={head}>{t('diepRenewalRate')}</th>
-                <th style={head}>{t('diepCrossSellRate')}</th>
+                <Th>{t('dashColPeriod')}</Th>
+                <Th>{t('diepNewClients')}</Th>
+                <Th>{t('diepPremiumWritten')}</Th>
+                <Th>{t('diepCommissionEarned')}</Th>
+                <Th>{t('diepRenewalRate')}</Th>
+                <Th>{t('diepCrossSellRate')}</Th>
               </tr>
             </thead>
             <tbody>
               {history!.map((row) => (
-                <tr key={row.id}>
-                  <td style={cell}>{row.periodLabel}</td>
-                  <td style={cell}>{displayOrDash(row.newClients)}</td>
-                  <td style={cell}>{displayOrDash(row.premiumWrittenJod)}</td>
-                  <td style={cell}>{displayOrDash(row.commissionEarnedJod)}</td>
-                  <td style={cell}>
+                <Tr key={row.id}>
+                  <Td>{row.periodLabel}</Td>
+                  <Td>{displayOrDash(row.newClients)}</Td>
+                  <Td>{displayOrDash(row.premiumWrittenJod)}</Td>
+                  <Td>{displayOrDash(row.commissionEarnedJod)}</Td>
+                  <Td>
                     {row.renewalRatePercent === null
                       ? '—'
                       : `${row.renewalRatePercent}%`}
-                  </td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>
                     {row.crossSellRatePercent === null
                       ? '—'
                       : `${row.crossSellRatePercent}%`}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         </>
       ) : hasLookedUp && !loadError ? (
-        <p style={{ color: 'var(--ink-secondary)' }}>{t('epNoRecord')}</p>
+        <EmptyState title={t('epNoRecord')} />
       ) : null}
 
       <form onSubmit={onCompute} style={formStyle}>
@@ -244,9 +247,7 @@ export default function EmployeePerformancePage() {
           {t('epComputeButton')}
         </button>
         {computeError ? (
-          <p role="alert" style={errorStyle}>
-            {computeError}
-          </p>
+          <ErrorState title={computeError} />
         ) : null}
         {computeMessage ? <p>{computeMessage}</p> : null}
       </form>

@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -10,8 +10,18 @@ import {
   type RopaEntry,
 } from '../../../lib/pdpl/ropa-entry-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -19,14 +29,6 @@ import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 const ROLES = [
   'ropa.manage',
 ];
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 
 
 function splitList(value: string): string[] {
@@ -133,21 +135,17 @@ export default function RopaEntriesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('ropaHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('ropaIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('ropaHeading')}
+        description={t('ropaIntro')}
+      />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {exportedCount !== null ? (
         <p role="status" style={{ opacity: 0.75 }}>
@@ -161,7 +159,7 @@ export default function RopaEntriesPage() {
             onSubmit={(ev) => void submit(ev)}
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {t('ropaActivityLabel')}
               <input
                 aria-label={t('ropaActivityLabel')}
@@ -170,7 +168,7 @@ export default function RopaEntriesPage() {
                 required
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {t('ropaDataCategoriesLabel')}
               <input
                 aria-label={t('ropaColDataCategories')}
@@ -179,7 +177,7 @@ export default function RopaEntriesPage() {
                 required
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {t('ropaPurposeLabel')}
               <input
                 aria-label={t('ropaPurposeLabel')}
@@ -188,7 +186,7 @@ export default function RopaEntriesPage() {
                 required
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {t('ropaRecipientsLabel')}
               <input
                 aria-label={t('ropaColRecipients')}
@@ -197,7 +195,7 @@ export default function RopaEntriesPage() {
                 required
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {t('ropaRetentionMonthsLabel')}
               <input
                 aria-label={t('ropaRetentionMonthsLabel')}
@@ -219,35 +217,37 @@ export default function RopaEntriesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('ropaNone')}</p>
+          <EmptyState title={t('ropaNone')} />
         ) : (
           <div style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={t('ropaHeading')}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
+            <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('ropaColActivity')}</th>
-                  <th style={head}>{t('ropaColDataCategories')}</th>
-                  <th style={head}>{t('ropaPurposeLabel')}</th>
-                  <th style={head}>{t('ropaColRecipients')}</th>
-                  <th style={head}>{t('ropaColRetentionMonths')}</th>
+                  <Th>{t('ropaColActivity')}</Th>
+                  <Th>{t('ropaColDataCategories')}</Th>
+                  <Th>{t('ropaPurposeLabel')}</Th>
+                  <Th>{t('ropaColRecipients')}</Th>
+                  <Th>{t('ropaColRetentionMonths')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.processingActivity}</td>
-                    <td style={cell}>{r.categoriesOfData.join(', ')}</td>
-                    <td style={cell}>{r.purpose}</td>
-                    <td style={cell}>{r.recipients.join(', ')}</td>
-                    <td style={cell}>{r.retentionPeriodMonths ?? '—'}</td>
-                  </tr>
+                  <Tr key={r.id}>
+                    <Td>{r.processingActivity}</Td>
+                    <Td>{r.categoriesOfData.join(', ')}</Td>
+                    <Td>{r.purpose}</Td>
+                    <Td>{r.recipients.join(', ')}</Td>
+                    <Td>{r.retentionPeriodMonths ?? '—'}</Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
+          </Card>
           </div>
         )
       ) : loadError ? null : (
-        <p>{t('ropaLoading')}</p>
+        <SkeletonList rows={4} label={t('ropaLoading')} />
       )}
     </main>
   );

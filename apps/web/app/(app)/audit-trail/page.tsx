@@ -20,8 +20,16 @@ import {
   type DocumentHistory,
 } from '../../../lib/audit-trail/audit-trail-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -67,11 +75,6 @@ const cell: CSSProperties = {
   textAlign: 'start',
   verticalAlign: 'top',
 };
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = {
   display: 'flex',
@@ -95,31 +98,31 @@ function messageFor(
 function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
   const { t } = useLanguage();
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>
+    <Card padded={false}>
+            <Table>
         <thead>
           <tr>
-            <th style={head}>{t('atColOccurred')}</th>
-            <th style={head}>{t('atColAction')}</th>
-            <th style={head}>{t('atColEntity')}</th>
-            <th style={head}>{t('atColUser')}</th>
-            <th style={head}>{t('atColSensitive')}</th>
+            <Th>{t('atColOccurred')}</Th>
+            <Th>{t('atColAction')}</Th>
+            <Th>{t('atColEntity')}</Th>
+            <Th>{t('atColUser')}</Th>
+            <Th>{t('atColSensitive')}</Th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr>
-              <td style={cell} colSpan={5}>
+            <Tr>
+              <Td colSpan={5}>
                 {t('atNone')}
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ) : (
             rows.map((r) => (
-              <tr key={r.id}>
-                <td style={cell}>
+              <Tr key={r.id}>
+                <Td>
                   {r.occurredAt.replace('T', ' ').slice(0, 19)}
-                </td>
-                <td style={cell}>{t(ENUM_LABEL.AuditAction[r.action])}</td>
+                </Td>
+                <Td>{t(ENUM_LABEL.AuditAction[r.action])}</Td>
                 {/*
                   * OWNER DECISION 49 — THE TYPE IN ARABIC PLUS THE NUMBER, NEVER A NAME.
                   *
@@ -146,7 +149,7 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                   * look the record up, and the budget keeps counting it — which the ruling
                   * accepts. What changed is that the reader now knows WHAT KIND of record it is.
                   */}
-                <td style={cell}>
+                <Td>
                   {isWorkflowEntityType(r.entityType) ? (
                     t('atEntityRef', {
                       type: t(WORKFLOW_ENTITY_LABEL[r.entityType]),
@@ -163,8 +166,8 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                       {r.entityType} · {r.entityId}
                     </span>
                   )}
-                </td>
-                <td style={cell} data-audit-actor={r.userId}>
+                </Td>
+                <Td data-audit-actor={r.userId}>
                   {/*
                     The name, falling back to the id.
 
@@ -186,14 +189,14 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                     `scripts/measurements/rendered-identifiers.py` on that class.
                   */}
                   <bdi>{r.actorName}</bdi>
-                </td>
-                <td style={cell}>{r.isSensitiveDataAccess ? t('commonYes') : ''}</td>
-              </tr>
+                </Td>
+                <Td>{r.isSensitiveDataAccess ? t('commonYes') : ''}</Td>
+              </Tr>
             ))
           )}
         </tbody>
-      </table>
-    </div>
+      </Table>
+    </Card>
   );
 }
 
@@ -363,9 +366,11 @@ function AuditTrailScreen() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('atHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('atIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('atHeading')}
+        description={t('atIntro')}
+      />
 
       <section style={sectionStyle}>
         <h2>{t('atAuditLogHeading')}</h2>
@@ -443,9 +448,7 @@ function AuditTrailScreen() {
           </button>
         </form>
         {browseError ? (
-          <p role="alert" style={errorStyle}>
-            {browseError}
-          </p>
+          <ErrorState title={browseError} />
         ) : null}
         {browseRows ? (
           <>
@@ -544,9 +547,7 @@ function AuditTrailScreen() {
           </button>
         </form>
         {wfError ? (
-          <p role="alert" style={errorStyle}>
-            {wfError}
-          </p>
+          <ErrorState title={wfError} />
         ) : null}
         {wfRows ? <AuditLogTable rows={wfRows} /> : null}
       </section>
@@ -589,55 +590,52 @@ function AuditTrailScreen() {
           </button>
         </form>
         {docError ? (
-          <p role="alert" style={errorStyle}>
-            {docError}
-          </p>
+          <ErrorState title={docError} />
         ) : null}
         {docHistory ? (
           <>
             <h3>{t('atColVersions')}</h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table
-                data-testid="document-versions" style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+            <Card padded={false}>
+              <Table data-testid="document-versions">
                 <thead>
                   <tr>
-                    <th style={head}>{t('atColVersion')}</th>
-                    <th style={head}>{t('atColFile')}</th>
-                    <th style={head}>{t('atColCategory')}</th>
-                    <th style={head}>{t('atColClassification')}</th>
-                    <th style={head}>{t('atColUploadedBy')}</th>
-                    <th style={head}>{t('atColCreated')}</th>
+                    <Th>{t('atColVersion')}</Th>
+                    <Th>{t('atColFile')}</Th>
+                    <Th>{t('atColCategory')}</Th>
+                    <Th>{t('atColClassification')}</Th>
+                    <Th>{t('atColUploadedBy')}</Th>
+                    <Th>{t('atColCreated')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {docHistory.versions.map((v) => (
-                    <tr key={v.id}>
-                      <td style={cell}>
+                    <Tr key={v.id}>
+                      <Td>
                         v{v.versionNumber}
                         {v.isRequestedVersion ? ` ${t('statusRequestedVersion')}` : ''}
-                      </td>
-                      <td style={cell}>{v.fileName}</td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>{v.fileName}</Td>
+                      <Td>
                         {t(ENUM_LABEL.DocumentCategory[v.category])}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {t(ENUM_LABEL.DataClassification[v.classification])}
-                      </td>
+                      </Td>
                       {/*
                         * RULE 2 — WHO filed this version, by name. It rendered the raw uuid, which
                         * on a document history identifies nobody: the column exists to say which
                         * colleague uploaded it. The em dash is real — that column carries no
                         * foreign key, so the account can be gone.
                         */}
-                      <td style={cell}>
+                      <Td>
                         {v.uploadedByName ? <bdi>{v.uploadedByName}</bdi> : '—'}
-                      </td>
-                      <td style={cell}>{v.createdAt.slice(0, 10)}</td>
-                    </tr>
+                      </Td>
+                      <Td>{v.createdAt.slice(0, 10)}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
+            </Card>
             <h3>{t('atHeading')}</h3>
             <AuditLogTable rows={docHistory.auditTrail} />
           </>

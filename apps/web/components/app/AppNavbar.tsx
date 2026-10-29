@@ -77,24 +77,6 @@ export function AppNavbar() {
       ? (user.department?.nameAr ?? user.department?.name ?? null)
       : (user.department?.name ?? null);
 
-  /*
-   * BATCH 1 ITEM 4 COMPLETED — the signed-in organization's own name.
-   *
-   * Resolved at RENDER by the reader's language, the same way `department` above is and for the
-   * same reason: the server sends both forms and the caller is the one that knows which script it
-   * is drawing. Picking server-side pins the language to whatever `me()` was fetched under, which
-   * is the defect `EntitySearch` was built to fix.
-   *
-   * NOTHING renders when the field is absent. An organization name is the one string on this page
-   * a person reads as authoritative, so a placeholder would have the system assert something
-   * untrue about her employer — and the field is optional on the type only because ~80 spec mocks
-   * predate it.
-   */
-  const organizationName =
-    language === 'AR'
-      ? (user.organizationName?.ar ?? null)
-      : (user.organizationName?.en ?? null);
-
   async function handleSignOut() {
     await logout();
     clearUser();

@@ -46,7 +46,7 @@ SITE = re.compile(r"style=\{\{")
 # SCREEN_BUDGET is improvisation: everything outside the primitive set. IT MAY ONLY FALL.
 # The baseline was the measurement taken before this batch wrote a line — 1,511 total, of which 56
 # were already inside `components/ui/`, so 1,455 of screen improvisation.
-SCREEN_BUDGET = 1418
+SCREEN_BUDGET = 1290
 
 # UI_BUDGET is the primitive set itself — where a style is SUPPOSED to live. It is gated rather
 # than merely reported, because a primitive that grows a hundred one-off objects has stopped being

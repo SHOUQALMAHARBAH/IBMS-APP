@@ -15,8 +15,18 @@ import {
   type InformationAsset,
 } from '../../../lib/supporting-operations/information-asset-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
@@ -27,8 +37,8 @@ const cell: CSSProperties = {
   textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '26rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 export default function InformationAssetsPage() {
   const { t } = useLanguage();
@@ -108,16 +118,14 @@ export default function InformationAssetsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('iassetHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('iassetIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('iassetHeading')}
+        description={t('iassetIntro')}
+      />
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       <form onSubmit={onCreate} style={formStyle}>
@@ -157,31 +165,30 @@ export default function InformationAssetsPage() {
           </select>
         </label>
         {formError ? (
-          <p role="alert" style={errorStyle}>
-            {formError}
-          </p>
+          <ErrorState title={formError} />
         ) : null}
         <button type="submit">{t('iassetSubmitButton')}</button>
       </form>
 
       {assets ? (
         assets.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('iassetNone')}</p>
+          <EmptyState title={t('iassetNone')} />
         ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('iassetColName')}</th>
-                <th style={head}>{t('iassetColType')}</th>
-                <th style={head}>{t('iassetColClassification')}</th>
-                <th style={head}>{t('iassetColOwner')}</th>
+                <Th>{t('iassetColName')}</Th>
+                <Th>{t('iassetColType')}</Th>
+                <Th>{t('iassetColClassification')}</Th>
+                <Th>{t('iassetColOwner')}</Th>
                 <th style={head} />
               </tr>
             </thead>
             <tbody>
               {assets.map((asset) => (
-                <tr key={asset.id}>
-                  <td style={cell}>
+                <Tr key={asset.id}>
+                  <Td>
                     {editingId === asset.id ? (
                       <input
                         value={editingName}
@@ -190,16 +197,16 @@ export default function InformationAssetsPage() {
                     ) : (
                       asset.name
                     )}
-                  </td>
-                  <td style={cell}>{asset.assetType}</td>
-                  <td style={cell}>{t(ENUM_LABEL.DataClassification[asset.classification])}</td>
+                  </Td>
+                  <Td>{asset.assetType}</Td>
+                  <Td>{t(ENUM_LABEL.DataClassification[asset.classification])}</Td>
                   {/* ITEM 1 — the accountable colleague by NAME. This is the register whose whole
                       purpose is saying WHO is accountable for a classified asset, and it was
                       naming them by uuid. */}
-                  <td style={cell}>
+                  <Td>
                     {asset.ownerName ? <bdi>{asset.ownerName}</bdi> : '—'}
-                  </td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>
                     {editingId === asset.id ? (
                       <button type="button" onClick={() => saveEdit(asset.id)}>
                         {t('commonSave')}
@@ -209,14 +216,15 @@ export default function InformationAssetsPage() {
                         {t('commonRename')}
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('iassetLoading')}</p>
+        <SkeletonList rows={4} label={t('iassetLoading')} />
       )}
 
     </main>

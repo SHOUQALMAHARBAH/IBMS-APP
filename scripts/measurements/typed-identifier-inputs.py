@@ -51,8 +51,17 @@ SCREENS = ROOT / 'apps' / 'web' / 'app' / '(app)'
 
 # `value={employeeId}` / `value={form.insurerId}` — the trailing segment must end in Id.
 VALUE_BINDING = re.compile(r'value=\{([A-Za-z0-9_.]*?[A-Za-z0-9_]*[Ii]d)\}')
-INPUT_OPEN = re.compile(r'<input\b')
-SELECT_OPEN = re.compile(r'<select\b')
+# THE PRIMITIVE COUNTS AS WELL AS THE RAW ELEMENT, and that is not a convenience.
+#
+# A screen converted onto `Field` + `TextInput` no longer contains `<input`, so a field that still
+# asks a person to type a record id by hand became INVISIBLE to this gate — and the budget fell,
+# reporting the blindness as progress. That is the worst failure a ratchet has, because it looks
+# exactly like the work being done.
+#
+# Both forms are matched rather than one replacing the other: most screens still use the raw
+# element, and a gate that stopped seeing those would have the same defect pointing the other way.
+INPUT_OPEN = re.compile(r'<(?:input|TextInput)\b')
+SELECT_OPEN = re.compile(r'<(?:select|Select)\b')
 
 # See the header: an identifier the person typing it genuinely knows. Judgements, not patterns.
 HAND_VERIFIED_CORRECT = {

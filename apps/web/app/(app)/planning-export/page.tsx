@@ -10,60 +10,62 @@ import {
   type PlanningExportSummary,
 } from '../../../lib/management-reporting/planning-export-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
   display: 'grid',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   maxWidth: '26rem',
 };
 const labelStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.2rem',
+  gap: 'var(--space-1)',
 };
 
 function BreakdownTable({ rows }: { rows: PlanningExportBreakdownRow[] }) {
   const { t } = useLanguage();
   if (rows.length === 0) {
     return (
-      <p style={{ color: 'var(--ink-secondary)' }}>{t('pexNoPolicies')}</p>
+      <EmptyState title={t('pexNoPolicies')} />
     );
   }
   return (
-    <table style={{ borderCollapse: 'collapse', minWidth: '26rem' }}>
+    <Card padded={false}>
+            <Table>
       <thead>
         <tr>
-          <th style={head}>{t('dashColKey')}</th>
-          <th style={head}>{t('dashColPolicies')}</th>
-          <th style={head}>{t('dashTotalIssuedPremium')}</th>
+          <Th>{t('dashColKey')}</Th>
+          <Th>{t('dashColPolicies')}</Th>
+          <Th>{t('dashTotalIssuedPremium')}</Th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.key}>
-            <td style={cell}>{row.key}</td>
-            <td style={cell}>{row.policyCount}</td>
-            <td style={cell}>{row.totalIssuedPremiumJod}</td>
-          </tr>
+          <Tr key={row.key}>
+            <Td>{row.key}</Td>
+            <Td>{row.policyCount}</Td>
+            <Td>{row.totalIssuedPremiumJod}</Td>
+          </Tr>
         ))}
       </tbody>
-    </table>
+    </Table>
+          </Card>
   );
 }
 
@@ -104,9 +106,11 @@ export default function PlanningExportPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('pexHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('pexIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('pexHeading')}
+        description={t('pexIntro')}
+      />
 
       <form onSubmit={onGenerate} style={formStyle}>
         <label style={labelStyle}>
@@ -126,9 +130,7 @@ export default function PlanningExportPage() {
       </form>
 
       {error ? (
-        <p role="alert" style={errorStyle}>
-          {error}
-        </p>
+        <ErrorState title={error} />
       ) : null}
 
       {summary ? (
@@ -166,37 +168,39 @@ export default function PlanningExportPage() {
                 {t('pexNoInsurerScores')}
               </p>
             ) : (
-              <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
+              <Card padded={false}>
+            <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('diepColInsurer')}</th>
-                    <th style={head}>{t('diepQuoteResponse')}</th>
-                    <th style={head}>{t('diepClaimsService')}</th>
-                    <th style={head}>{t('diepPrice')}</th>
-                    <th style={head}>{t('diepServiceQuality')}</th>
+                    <Th>{t('diepColInsurer')}</Th>
+                    <Th>{t('diepQuoteResponse')}</Th>
+                    <Th>{t('diepClaimsService')}</Th>
+                    <Th>{t('diepPrice')}</Th>
+                    <Th>{t('diepServiceQuality')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.market.map((row) => (
-                    <tr key={row.id}>
+                    <Tr key={row.id}>
                       {/* ITEM 1 — the company's name. This export's portfolio section beside it
                           already resolved one; the market section rendered a uuid. */}
-                      <td style={cell}>
+                      <Td>
                         {row.insurerName ? <bdi>{row.insurerName}</bdi> : '—'}
-                      </td>
-                      <td style={cell}>{row.quoteResponseScore}</td>
-                      <td style={cell}>{row.claimsServiceScore}</td>
-                      <td style={cell}>{row.priceScore}</td>
-                      <td style={cell}>{row.serviceQualityScore}</td>
-                    </tr>
+                      </Td>
+                      <Td>{row.quoteResponseScore}</Td>
+                      <Td>{row.claimsServiceScore}</Td>
+                      <Td>{row.priceScore}</Td>
+                      <Td>{row.serviceQualityScore}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
+          </Card>
             )}
           </section>
         </>
       ) : error ? null : (
-        <p>{t('pexLoading')}</p>
+        <SkeletonList rows={4} label={t('pexLoading')} />
       )}
     </main>
   );

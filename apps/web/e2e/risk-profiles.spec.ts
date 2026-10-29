@@ -172,7 +172,7 @@ test("prompts to pick a customer when none is in the URL", async ({ page }) => {
   await mockRiskProfiles(page);
 
   await page.goto("/risk-profiles");
-  await expect(page.locator('p[role="alert"]')).toContainText("No customer selected");
+  await expect(page.locator('main [role="alert"]')).toContainText("No customer selected");
 });
 
 test("shows a friendly message when the user lacks read permission", async ({ page }) => {
@@ -181,7 +181,7 @@ test("shows a friendly message when the user lacks read permission", async ({ pa
   await mockRiskProfiles(page, { listStatus: 403 });
 
   await page.goto("/risk-profiles?customerId=cust-1");
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     "(risk-profile.read)",
   );
 });
@@ -198,7 +198,7 @@ test("ITEM 8 — one refused read names ITSELF and leaves the other rendered", a
   // The list that arrived is on screen...
   await expect(page.getByText("Head office")).toBeVisible();
   // ...and the one that did not is NAMED, not described as a permission problem.
-  const alert = page.locator('p[role="alert"]');
+  const alert = page.locator('main [role="alert"]');
   await expect(alert).toContainText("the consolidated summary");
   await expect(alert).not.toContainText("(risk-profile.read)");
 });

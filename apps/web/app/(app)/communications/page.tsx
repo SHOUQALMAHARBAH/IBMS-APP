@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
@@ -14,8 +14,18 @@ import {
   type MarketingConsentStatus,
 } from '../../../lib/customer-service/communication-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
@@ -30,18 +40,6 @@ const CHANNEL_LABEL_KEY: Record<string, TranslationKey> = {
   OTHER: 'commChannelOther',
 };
 
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function CommunicationsPage() {
   const router = useRouter();
@@ -132,11 +130,11 @@ export default function CommunicationsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('commHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('commIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('commHeading')}
+        description={t('commIntro')}
+      />
 
       {canSend ? (
         <form
@@ -144,7 +142,7 @@ export default function CommunicationsPage() {
           style={{
             margin: '1rem 0',
             display: 'grid',
-            gap: '0.4rem',
+            gap: 'var(--space-2)',
             maxWidth: '34rem',
           }}
         >
@@ -156,7 +154,7 @@ export default function CommunicationsPage() {
             required
           />
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('commChannelLabel')}
             <select
@@ -172,7 +170,7 @@ export default function CommunicationsPage() {
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
             <input
               type="checkbox"
               aria-label={t('commColMarketing')}
@@ -182,7 +180,7 @@ export default function CommunicationsPage() {
             {t('commMarketingLabel')}
           </label>
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('commSubjectLabel')}
             <input
@@ -192,7 +190,7 @@ export default function CommunicationsPage() {
             />
           </label>
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('commMessageLabel')}
             <textarea
@@ -227,44 +225,38 @@ export default function CommunicationsPage() {
             </p>
           ) : null}
           {consentError ? (
-            <p role="alert" style={errorStyle}>
-              {consentError}
-            </p>
+            <ErrorState title={consentError} />
           ) : null}
         </form>
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('commNone')}</p>
+          <EmptyState title={t('commNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('commColCustomer')}</th>
-                  <th style={head}>{t('commColChannel')}</th>
-                  <th style={head}>{t('commColLang')}</th>
-                  <th style={head}>{t('commColMarketing')}</th>
-                  <th style={head}>{t('commColSubject')}</th>
-                  <th style={head}>{t('commColSent')}</th>
+                  <Th>{t('commColCustomer')}</Th>
+                  <Th>{t('commColChannel')}</Th>
+                  <Th>{t('commColLang')}</Th>
+                  <Th>{t('commColMarketing')}</Th>
+                  <Th>{t('commColSubject')}</Th>
+                  <Th>{t('commColSent')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    <Td>
                       {/* RULE 2 — the name, never the id. The em dash covers a log against
                           no customer AND one whose customerId resolves to nothing: this is
                           the one model in the group whose column has no foreign key, so both
@@ -274,22 +266,22 @@ export default function CommunicationsPage() {
                       ) : (
                         <bdi>{r.customerName}</bdi>
                       )}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {CHANNEL_LABEL_KEY[r.channel] ? t(CHANNEL_LABEL_KEY[r.channel]) : r.channel}
-                    </td>
-                    <td style={cell}>{r.languageUsed ?? '—'}</td>
-                    <td style={cell}>{r.isMarketing ? t('commYes') : t('commNo')}</td>
-                    <td style={cell}>{r.subject ?? '—'}</td>
-                    <td style={cell}>{r.sentAt.slice(0, 10)}</td>
-                  </tr>
+                    </Td>
+                    <Td>{r.languageUsed ?? '—'}</Td>
+                    <Td>{r.isMarketing ? t('commYes') : t('commNo')}</Td>
+                    <Td>{r.subject ?? '—'}</Td>
+                    <Td>{r.sentAt.slice(0, 10)}</Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('commLoading')}</p>
+        <SkeletonList rows={4} label={t('commLoading')} />
       )}
     </main>
   );

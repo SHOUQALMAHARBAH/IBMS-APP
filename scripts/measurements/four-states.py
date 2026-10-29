@@ -54,7 +54,11 @@ EMPTY = re.compile(r'None(?:Yet|Match)?\b|\bEmpty\b|\.length\s*===\s*0')
 ERROR = re.compile(r'\b\w*(?:[Ee]rror|[Ff]ailed)\b\s*\?|\{\s*\w*(?:[Ee]rror|[Ff]ailed)\s*\}')
 REFUSAL = re.compile(r'permissionRefusal(?:AnyOf|AllOf)?\(')
 FORM = re.compile(r'<form\b')
-TABLE = re.compile(r'<table\b')
+# `<Table>` COUNTS TOO — see the note in `typed-identifier-inputs.py`. Rule 1 compares where
+# the first form sits against where the first table sits, so a screen moved onto the primitive
+# would read as having NO table and the rule would quietly stop being checkable on exactly the
+# screens the design pass has reached.
+TABLE = re.compile(r'<[Tt]able\b')
 # A CREATE form, told apart from a FILTER form by its submit handler. This is the fifth false-positive class
 # the formal pass documented — "a filter form was mistaken for a create form" — and correcting for it is what
 # hid two REAL violations: a filter form above the table satisfied a first-form-vs-first-table comparison

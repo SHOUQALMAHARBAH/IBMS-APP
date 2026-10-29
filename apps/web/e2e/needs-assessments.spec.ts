@@ -145,7 +145,7 @@ test('shows a friendly message when the user lacks read permission', async ({
   );
 
   await page.goto('/needs-assessments');
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     "(needs-assessment.read)",
   );
 });

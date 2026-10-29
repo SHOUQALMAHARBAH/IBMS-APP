@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -10,8 +10,18 @@ import {
   type LossRatioGroupBy,
 } from '../../../lib/claims-analytics/analytics-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import { formatMoney } from '../../../lib/i18n/format';
@@ -30,17 +40,6 @@ function ratioPct(v: string): string {
   return Number.isFinite(n) ? `${(n * 100).toFixed(1)}%` : v;
 }
 
-const cellStyle: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'end',
-};
-const headCellStyle: CSSProperties = {
-  ...cellStyle,
-  textAlign: 'end',
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function ClaimsAnalyticsPage() {
   const router = useRouter();
@@ -81,11 +80,11 @@ export default function ClaimsAnalyticsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('claHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        {t('claIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('claHeading')}
+        description={t('claIntro')}
+      />
 
       <label style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}>
         {t('claGroupBy')}
@@ -103,76 +102,77 @@ export default function ClaimsAnalyticsPage() {
       </label>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('claNone')}</p>
+          <EmptyState title={t('claNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>
+                  <Th>
                     {t(GROUP_LABEL_KEY[data.groupBy])}
-                  </th>
-                  <th style={headCellStyle}>{t('claLossRatio')}</th>
-                  <th style={headCellStyle}>{t('claClaimsPaid')}</th>
-                  <th style={headCellStyle}>{t('claWrittenPremium')}</th>
-                  <th style={headCellStyle}>{t('claColClaims')}</th>
-                  <th style={headCellStyle}>{t('claColPolicies')}</th>
+                  </Th>
+                  <Th>{t('claLossRatio')}</Th>
+                  <Th>{t('claClaimsPaid')}</Th>
+                  <Th>{t('claWrittenPremium')}</Th>
+                  <Th>{t('claColClaims')}</Th>
+                  <Th>{t('claColPolicies')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
-                  <tr key={r.key}>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                  <Tr key={r.key}>
+                    <Td>
                       <bdi>{r.label}</bdi>
-                    </td>
-                    <td style={cellStyle}>
+                    </Td>
+                    <Td>
                       {ratioPct(r.ratio)}
                       {/* OWNER DECISION 55 — THE MOST DANGEROUS OF THE ELEVEN. The ratio exceeded
                           `MAX_LOSS_RATIO` and was CLAMPED to fit `Decimal(7, 4)`, so the figure on
                           screen IS THE CEILING, NOT THE RATIO — and the renewal workflow depends on
                           that number. An Arabic reader was reading a clamped ratio as the true one. */}
                       {r.ratioCapped ? ` ${t('statusRatioCapped')}` : ''}
-                    </td>
-                    <td style={cellStyle}>{formatMoney(r.periodClaims, language)}</td>
-                    <td style={cellStyle}>{formatMoney(r.periodPremium, language)}</td>
-                    <td style={cellStyle}>{r.claimCount}</td>
-                    <td style={cellStyle}>{r.policyCount}</td>
-                  </tr>
+                    </Td>
+                    <Td>{formatMoney(r.periodClaims, language)}</Td>
+                    <Td>{formatMoney(r.periodPremium, language)}</Td>
+                    <Td>{r.claimCount}</Td>
+                    <Td>{r.policyCount}</Td>
+                  </Tr>
                 ))}
-                <tr>
-                  <td style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}>
+                {/* THE TOTALS ROW IS A ROW, not six bold cells. It used to carry
+                    `{ ...cellStyle, fontWeight: 600 }` once per column — six inline style
+                    objects saying one thing about the row they are in. */}
+                <Tr variant="total">
+                  <Td>
                     {t('claColTotal')}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {ratioPct(data.totals.ratio)}
                     {data.totals.ratioCapped ? ` ${t('statusRatioCapped')}` : ''}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {formatMoney(data.totals.periodClaims, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {formatMoney(data.totals.periodPremium, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {data.totals.claimCount}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
+                  </Td>
+                  <Td numeric>
                     {data.totals.policyCount}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('claLoading')}</p>
+        <SkeletonList rows={4} label={t('claLoading')} />
       )}
     </main>
   );

@@ -12,8 +12,16 @@ import {
   type EmployeePerformanceRecord,
 } from '../../../../lib/management-reporting/employee-performance-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import {
   loadIndependently,
@@ -23,9 +31,6 @@ import { permissionRefusalAllOf } from '../../../../lib/i18n/permission-refusal'
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const cell: CSSProperties = { padding: '0.35rem 0.75rem', borderBottom: '1px solid var(--border-subtle)', textAlign: 'start' };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-
 function previousUtcMonthLabel(): string {
   const now = new Date();
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
@@ -116,17 +121,17 @@ export default function InsurerEmployeePerformanceDashboardPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('diepHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('diepIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('diepHeading')}
+        description={t('diepIntro')}
+      />
 
       <form
         onSubmit={applyFilters}
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
       >
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           {t('dashPeriodLabel')}
           <input
             aria-label={t('dashPeriodLabel')}
@@ -151,9 +156,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       <section style={sectionStyle}>
@@ -161,33 +164,35 @@ export default function InsurerEmployeePerformanceDashboardPage() {
         {insurerScores === null ? null : insurerScores.length === 0 ? (
           <p>{t('diepNoInsurerScores')}</p>
         ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('diepColInsurer')}</th>
-                <th style={head}>{t('diepQuoteResponse')}</th>
-                <th style={head}>{t('diepClaimsService')}</th>
-                <th style={head}>{t('diepPrice')}</th>
-                <th style={head}>{t('diepServiceQuality')}</th>
+                <Th>{t('diepColInsurer')}</Th>
+                <Th>{t('diepQuoteResponse')}</Th>
+                <Th>{t('diepClaimsService')}</Th>
+                <Th>{t('diepPrice')}</Th>
+                <Th>{t('diepServiceQuality')}</Th>
               </tr>
             </thead>
             <tbody>
               {insurerScores.map((row) => (
-                <tr key={row.id}>
+                <Tr key={row.id}>
                   {/* ITEM 1 — the company's name, resolved by the api. An em dash where the
                       insurer row is gone: "we hold no name" and "the name is this uuid" are
                       different claims and only the first one is true. */}
-                  <td style={cell}>
+                  <Td>
                     {row.insurerName ? <bdi>{row.insurerName}</bdi> : '—'}
-                  </td>
-                  <td style={cell}>{row.quoteResponseScore}</td>
-                  <td style={cell}>{row.claimsServiceScore}</td>
-                  <td style={cell}>{row.priceScore}</td>
-                  <td style={cell}>{row.serviceQualityScore}</td>
-                </tr>
+                  </Td>
+                  <Td>{row.quoteResponseScore}</Td>
+                  <Td>{row.claimsServiceScore}</Td>
+                  <Td>{row.priceScore}</Td>
+                  <Td>{row.serviceQualityScore}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         )}
       </section>
 
@@ -196,33 +201,35 @@ export default function InsurerEmployeePerformanceDashboardPage() {
         {employeeRecords === null ? null : employeeRecords.length === 0 ? (
           <p>{t('diepNoEmployeeRecords')}</p>
         ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('diepColEmployee')}</th>
-                <th style={head}>{t('diepNewClients')}</th>
-                <th style={head}>{t('diepPremiumWritten')}</th>
-                <th style={head}>{t('diepCommissionEarned')}</th>
-                <th style={head}>{t('diepRenewalRate')}</th>
-                <th style={head}>{t('diepCrossSellRate')}</th>
+                <Th>{t('diepColEmployee')}</Th>
+                <Th>{t('diepNewClients')}</Th>
+                <Th>{t('diepPremiumWritten')}</Th>
+                <Th>{t('diepCommissionEarned')}</Th>
+                <Th>{t('diepRenewalRate')}</Th>
+                <Th>{t('diepCrossSellRate')}</Th>
               </tr>
             </thead>
             <tbody>
               {employeeRecords.map((row) => (
-                <tr key={row.id}>
+                <Tr key={row.id}>
                   {/* ITEM 1 — the colleague's name from their HR record, resolved by the api. */}
-                  <td style={cell}>
+                  <Td>
                     {row.employeeName ? <bdi>{row.employeeName}</bdi> : '—'}
-                  </td>
-                  <td style={cell}>{displayOrDash(row.newClients)}</td>
-                  <td style={cell}>{displayOrDash(row.premiumWrittenJod)}</td>
-                  <td style={cell}>{displayOrDash(row.commissionEarnedJod)}</td>
-                  <td style={cell}>{row.renewalRatePercent === null ? '—' : `${row.renewalRatePercent}%`}</td>
-                  <td style={cell}>{row.crossSellRatePercent === null ? '—' : `${row.crossSellRatePercent}%`}</td>
-                </tr>
+                  </Td>
+                  <Td>{displayOrDash(row.newClients)}</Td>
+                  <Td>{displayOrDash(row.premiumWrittenJod)}</Td>
+                  <Td>{displayOrDash(row.commissionEarnedJod)}</Td>
+                  <Td>{row.renewalRatePercent === null ? '—' : `${row.renewalRatePercent}%`}</Td>
+                  <Td>{row.crossSellRatePercent === null ? '—' : `${row.crossSellRatePercent}%`}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         )}
       </section>
     </main>

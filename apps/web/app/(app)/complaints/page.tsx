@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EntitySearch } from "../../../components/ui/EntitySearch";
 import { WorkflowHistoryLink } from "../../../components/ui/WorkflowHistoryLink";
 import { ENUM_LABEL } from "../../../lib/i18n/enum-labels";
@@ -27,9 +27,27 @@ import {
 } from "../../../lib/customer-service/complaint-api";
 import { ApiError } from "../../../lib/auth/api-client";
 import { actionErrorText } from '../../../lib/i18n/action-error';
-import { errorStyle } from "../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../components/lead/lead.styles";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Field,
+  Icon,
+  PageHeader,
+  Select,
+  SkeletonList,
+  Table,
+  Td,
+  TextArea,
+  TextInput,
+  Th,
+  Tr,
+} from "../../../components/ui";
+import { pageStackStyle } from "../../../components/lead/lead.styles";
 import { hasAnyPermission } from "../../../lib/auth/permissions";
+import { formatNumber } from "../../../lib/i18n/format";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import type { TranslationKey } from "../../../lib/i18n/translations";
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -46,18 +64,6 @@ import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 const LOG_PERMISSIONS = ["complaint.log"];
 const ESCALATE_ROLES = ["complaint.escalate"];
 const CLOSE_ROLES = ["complaint.close"];
-
-const cell: CSSProperties = {
-  padding: "0.4rem 0.75rem",
-  borderBottom: "1px solid var(--border-subtle)",
-  textAlign: "start",
-  verticalAlign: "top",
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
 
 /** ComplaintStatus -> label key. Typed against the union so a new status is
  * a compile error rather than a raw token on screen. */
@@ -85,7 +91,7 @@ function slaLabel(
 export default function ComplaintsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const canLog = hasAnyPermission(user, LOG_PERMISSIONS);
   const canEscalate = hasAnyPermission(user, ESCALATE_ROLES);
   const canClose = hasAnyPermission(user, CLOSE_ROLES);
@@ -189,113 +195,135 @@ export default function ComplaintsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t("complaintsHeading")}</h1>
-      <p style={{ opacity: 0.75, maxWidth: "46rem" }}>{t("complaintsIntro")}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t("complaintsHeading")}
+        description={t("complaintsIntro")}
+      />
 
+      {/* THE FORM COMES FIRST AND IT IS A CARD, which is this product's own rule (B.7 rule 1:
+          a create form sits above the list it adds to) — what changed is that it now reads as
+          one piece of work rather than four loose controls floating under a heading.
+
+          FOUR `aria-label`s WERE WITHDRAWN HERE and two of them were actively WRONG, which is
+          the commonest defect this pass keeps finding: an `aria-label` REPLACES the accessible
+          name, so where it disagrees with the visible label the two readers are told different
+          things and nobody proof-reads the invisible one. `complaintsCategoryAria` said
+          «التصنيف» where the visible label says «التصنيف (اختياري)», so a screen-reader user was
+          NOT told the field is optional; the issue and claim fields duplicated their own visible
+          labels verbatim, which buys nothing and is one more string to drift. `Field` associates
+          the visible label with its control, which is what the attribute was standing in for. */}
       {canLog ? (
-        <form
-          onSubmit={submit}
-          style={{
-            margin: "1rem 0",
-            display: "grid",
-            gap: "0.4rem",
-            maxWidth: "32rem",
-          }}
-        >
-          <EntitySearch
-            kind="customer"
-            value={customerId}
-            onChange={setCustomerId}
-            label={t("complaintsCustomerIdLabel")}
-            required
-          />
-          <label
-            style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}
+        <Card title={t("complaintsLogButton")}>
+          <form
+            onSubmit={submit}
+            style={{ display: "grid", gap: "var(--space-3)", maxWidth: "34rem" }}
           >
-            {t("complaintsIssueLabel")}
-            <textarea
-              aria-label={t("complaintsIssueLabel")}
-              dir="auto"
-              value={issue}
-              onChange={(e) => setIssue(e.target.value)}
+            <EntitySearch
+              kind="customer"
+              value={customerId}
+              onChange={setCustomerId}
+              label={t("complaintsCustomerIdLabel")}
               required
-              rows={2}
             />
-          </label>
-          <label
-            style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}
-          >
-            {t("complaintsCategoryLabel")}
-            <select
-              aria-label={t("complaintsCategoryAria")}
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value="">—</option>
-              {COMPLAINT_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {t(ENUM_LABEL.ComplaintCategory[c])}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label
-            style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}
-          >
-            {t("complaintsClaimIdLabel")}
-            <input
-              aria-label={t("complaintsClaimIdLabel")}
-              value={claimId}
-              onChange={(e) => setClaimId(e.target.value)}
-            />
-          </label>
-          <button type="submit" disabled={busy} style={{ marginTop: "0.3rem" }}>
-            {busy ? t("complaintsSavingButton") : t("complaintsLogButton")}
-          </button>
-        </form>
+
+            <Field label={t("complaintsIssueLabel")} required>
+              {(props) => (
+                <TextArea
+                  {...props}
+                  dir="auto"
+                  value={issue}
+                  onChange={(e) => setIssue(e.target.value)}
+                  required
+                  rows={2}
+                />
+              )}
+            </Field>
+
+            <Field label={t("complaintsCategoryLabel")}>
+              {(props) => (
+                <Select
+                  {...props}
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  {/* THE EM DASH STAYS, and that is decision 60's classify-then-convert rather
+                      than a site missed. It is a CHOICE PLACEHOLDER — *no category selected* —
+                      and none of her three words is that: it has not failed to be done, it is
+                      not inapplicable, and nothing is held and unresolvable. The nearest shipping
+                      phrase, `commChannelDefaultOption` («التفضيل المسجّل»), is about a recorded
+                      channel preference and would be a false statement here. Recorded in the
+                      register rather than cleared by stretching a word onto it. */}
+                  <option value="">—</option>
+                  {COMPLAINT_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {t(ENUM_LABEL.ComplaintCategory[c])}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+
+            <Field label={t("complaintsClaimIdLabel")}>
+              {(props) => (
+                <TextInput
+                  {...props}
+                  value={claimId}
+                  onChange={(e) => setClaimId(e.target.value)}
+                />
+              )}
+            </Field>
+
+            <div>
+              <Button type="submit" loading={busy}>
+                <Icon name="plus" size={14} />
+                {busy ? t("complaintsSavingButton") : t("complaintsLogButton")}
+              </Button>
+            </div>
+          </form>
+        </Card>
       ) : null}
 
-      {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
-      ) : null}
-      {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
-      ) : null}
+      {/* THE TWO ERRORS ARE KEPT APART, deliberately. An ACTION error belongs beside the thing
+          that failed and a LOAD error replaces the list; collapsing them would put a failed
+          button press where the register should be. */}
+      {actionError ? <ErrorState title={actionError} /> : null}
+      {loadError ? <ErrorState title={loadError} /> : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: "var(--ink-secondary)" }}>{t("complaintsNone")}</p>
+          <EmptyState title={t("complaintsNone")} />
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", minWidth: "52rem" }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t("complaintsColCustomer")}</th>
-                  <th style={head}>{t("complaintsColIssue")}</th>
-                  <th style={head}>{t("complaintsColStatus")}</th>
-                  <th style={head}>{t("complaintsColSla")}</th>
-                  <th style={head}>{t("complaintsColEscalations")}</th>
-                  <th style={head}>{t("complaintsColAction")}</th>
+                  <Th>{t("complaintsColCustomer")}</Th>
+                  <Th>{t("complaintsColIssue")}</Th>
+                  <Th>{t("complaintsColStatus")}</Th>
+                  <Th>{t("complaintsColSla")}</Th>
+                  <Th numeric>{t("complaintsColEscalations")}</Th>
+                  <Th>{t("complaintsColAction")}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((c) => (
-                  <tr key={c.id}>
+                  <Tr key={c.id}>
                     {/* RULE 2 — the name, never the id. `bdi` because a legal name may be in
                         the other script from the page it is rendered on. */}
-                    <td style={cell}>
+                    <Td>
                       <bdi>{c.customerName}</bdi>
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       <bdi>{c.issue}</bdi>
-                    </td>
-                    <td style={cell}>
-                      {t(STATUS_LABEL_KEY[c.status])}
+                    </Td>
+                    <Td>
+                      <Badge
+                        tone={c.isClosed ? "success" : "neutral"}
+                        data-complaint-status={c.status}
+                      >
+                        {t(STATUS_LABEL_KEY[c.status])}
+                      </Badge>
                       {/*
                         Part 4 step 5. CLOSED is what the status reads whether one person or two signed the
                         closure off, so without this the cell cannot distinguish them.
@@ -304,21 +332,28 @@ export default function ComplaintsPage() {
                         act={c.closureCombinedDutyAct}
                         testId={`combined-duty-complaint-${c.id}`}
                       />
-                    </td>
-                    <td style={cell}>{slaLabel(c, t)}</td>
-                    <td style={cell}>{c.escalations.length || "—"}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{slaLabel(c, t)}</Td>
+                    {/* ZERO IS AN ANSWER — and this read `c.escalations.length || "—"`, so a
+                        complaint that was never escalated rendered the SAME CELL as one whose
+                        escalation count nobody knows. `0 || x` is `x` in JavaScript, which is
+                        the recorded defect this product has already paid for twice (`?? ` passing
+                        `false` through to React, and `0 || '—'` on an incident's affected-subject
+                        estimate). *Never escalated* is a fact about a complaint, and on a
+                        register a regulator reads it is the fact that matters most. */}
+                    <Td numeric>{formatNumber(c.escalations.length, language)}</Td>
+                    <Td>
                       {/* Owner decision 41 — fills `/audit-trail`'s workflow-history fields from
                           here, so reading this complaint's state history no longer needs a uuid
                           pasted by hand. Renders nothing without `workflow-history.read`. */}
-                      <div style={{ marginBottom: "0.4rem" }}>
+                      <div style={{ marginBottom: "var(--space-2)" }}>
                         <WorkflowHistoryLink entityType="Complaint" entityId={c.id} />
                       </div>
                       {canLog ? (
                         <button
                           type="button"
                           onClick={() => void downloadAcknowledgement(c.id)}
-                          style={{ marginBottom: "0.4rem" }}
+                          style={{ marginBottom: "var(--space-2)" }}
                         >
                           {t("complaintsDownloadAckButton")}
                         </button>
@@ -330,7 +365,7 @@ export default function ComplaintsPage() {
                           style={{
                             display: "flex",
                             flexDirection: "column",
-                            gap: "0.3rem",
+                            gap: "var(--space-2)",
                             minWidth: "16rem",
                           }}
                         >
@@ -345,7 +380,7 @@ export default function ComplaintsPage() {
                             style={{
                               display: "flex",
                               flexWrap: "wrap",
-                              gap: "0.3rem",
+                              gap: "var(--space-2)",
                             }}
                           >
                             {canLog && c.status === "LOGGED" ? (
@@ -473,15 +508,15 @@ export default function ComplaintsPage() {
                           </div>
                         </div>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t("complaintsLoading")}</p>
+        <SkeletonList rows={4} label={t("complaintsLoading")} />
       )}
     </main>
   );

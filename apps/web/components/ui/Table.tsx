@@ -9,10 +9,26 @@ import type { CSSProperties, ReactNode } from 'react';
  * The wrapper scrolls horizontally on its own rather than letting the page
  * scroll sideways — a wide financial table must not push the whole layout.
  */
-export function Table({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+/**
+ * `data-*` IS FORWARDED BY EVERY PART OF THIS TABLE, and the type is what makes that visible.
+ *
+ * TypeScript exempts hyphen-containing JSX attributes from excess-property checking, so
+ * `data-anything` on any custom component type-checks and then goes NOWHERE. A table cell is
+ * exactly where a screen hangs its machine hook, and naming one attribute the way `Tr` names
+ * `data-testid` is not enough because every screen uses its own. The template-literal index
+ * signature accepts the family and the spread forwards it.
+ */
+type DataAttributes = { [key: `data-${string}`]: string | undefined };
+
+export function Table({
+  children,
+  style,
+  ...dataAttributes
+}: { children: ReactNode; style?: CSSProperties } & DataAttributes) {
   return (
     <div style={{ width: '100%', overflowX: 'auto', ...style }}>
       <table
+        {...dataAttributes}
         style={{
           width: '100%',
           borderCollapse: 'collapse',
@@ -29,8 +45,10 @@ export function Table({ children, style }: { children: ReactNode; style?: CSSPro
 export function Th({
   children,
   numeric = false,
+  colSpan,
   style,
 }: {
+  colSpan?: number;
   children?: ReactNode;
   /** Right-aligns in LTR and left-aligns in RTL, via logical `end`. */
   numeric?: boolean;
@@ -38,6 +56,7 @@ export function Th({
 }) {
   return (
     <th
+      colSpan={colSpan}
       scope="col"
       style={{
         padding: 'var(--space-3) var(--space-4)',
@@ -61,14 +80,25 @@ export function Th({
 export function Td({
   children,
   numeric = false,
+  colSpan,
   style,
+  ...dataAttributes
 }: {
   children?: ReactNode;
   numeric?: boolean;
+  /*
+   * A CELL THAT SPANS THE TABLE — which is how several screens render *nothing matched* INSIDE
+   * the table rather than above it, so the message lands under the headings it belongs to
+   * instead of floating beside them. Without this the attribute type-checks (it is a plain prop,
+   * not a `data-`) and is simply dropped, leaving a one-column cell in a five-column table.
+   */
+  colSpan?: number;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   return (
     <td
+      {...dataAttributes}
+      colSpan={colSpan}
       /*
        * Numbers stay LTR even in an Arabic layout — a premium or a policy
        * number reads identically in both languages (see globals.css).
@@ -102,15 +132,38 @@ export function Td({
  */
 export function Tr({
   children,
+  variant = 'default',
   style,
   'data-testid': testId,
 }: {
   children: ReactNode;
+  /*
+   * A TOTALS ROW IS A DIFFERENT KIND OF ROW AND SHOULD LOOK LIKE ONE.
+   *
+   * Screens here hand-rolled it per CELL — `{ ...cellStyle, fontWeight: 600 }` repeated once per
+   * column — so a six-column total carried six inline style objects, and no two screens agreed on
+   * the weight or on whether a rule sat above it. It is one property of the ROW, so it belongs on
+   * the row: a rule to separate it from the data, a heavier weight, and the sunken surface the
+   * rest of the product already uses to mean *this is not one of the things in the list*.
+   */
+  variant?: 'default' | 'total';
   style?: CSSProperties;
   'data-testid'?: string;
 }) {
   return (
-    <tr style={style} data-testid={testId}>
+    <tr
+      style={
+        variant === 'total'
+          ? {
+              background: 'var(--surface-sunken)',
+              fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+              borderTop: '2px solid var(--border-default)',
+              ...style,
+            }
+          : style
+      }
+      data-testid={testId}
+    >
       {children}
     </tr>
   );

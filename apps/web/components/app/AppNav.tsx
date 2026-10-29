@@ -4,11 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useSyncExternalStore } from 'react';
 import { useAuth } from '../../lib/auth/auth-context';
-import { hasAnyPermission } from '../../lib/auth/permissions';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { BrandLockup, Icon, type IconName } from '../ui';
 import { foldedIncludes, foldForSearch } from '../../lib/i18n/fold';
-import type { TranslationKey } from '../../lib/i18n/translations';
 import {
   canReach,
   DEFAULT_NAV_ORDER,

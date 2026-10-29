@@ -13,8 +13,18 @@ import {
   type KnowledgeBaseArticle,
 } from '../../../lib/supporting-operations/knowledge-base-article-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
@@ -24,8 +34,8 @@ const cell: CSSProperties = {
   textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '32rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '32rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 export default function KnowledgeBasePage() {
   const { t } = useLanguage();
@@ -117,16 +127,14 @@ export default function KnowledgeBasePage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('kbHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('kbIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('kbHeading')}
+        description={t('kbIntro')}
+      />
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       <form onSubmit={onCreate} style={formStyle}>
@@ -158,31 +166,30 @@ export default function KnowledgeBasePage() {
           <textarea dir="rtl" value={bodyAr} onChange={(e) => setBodyAr(e.target.value)} rows={4} />
         </label>
         {formError ? (
-          <p role="alert" style={errorStyle}>
-            {formError}
-          </p>
+          <ErrorState title={formError} />
         ) : null}
         <button type="submit">{t('kbPublishButton')}</button>
       </form>
 
       {articles ? (
         articles.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('kbNone')}</p>
+          <EmptyState title={t('kbNone')} />
         ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('kbColTitle')}</th>
-                <th style={head}>العنوان</th>
-                <th style={head}>{t('kbColCategory')}</th>
-                <th style={head}>{t('kbColPublished')}</th>
+                <Th>{t('kbColTitle')}</Th>
+                <Th>العنوان</Th>
+                <Th>{t('kbColCategory')}</Th>
+                <Th>{t('kbColPublished')}</Th>
                 <th style={head} />
               </tr>
             </thead>
             <tbody>
               {articles.map((article) => (
-                <tr key={article.id}>
-                  <td style={cell}>
+                <Tr key={article.id}>
+                  <Td>
                     {editingId === article.id ? (
                       <input
                         value={editingTitle}
@@ -191,8 +198,14 @@ export default function KnowledgeBasePage() {
                     ) : (
                       article.title
                     )}
-                  </td>
-                  <td style={cell} dir="rtl">
+                  </Td>
+                  {/* `bdi` RATHER THAN `dir="rtl"` ON THE CELL. The column holds an Arabic
+                      title inside an otherwise bidirectional table, and a hard `dir` forces every
+                      descendant — including a future Latin-script value — right-to-left. `bdi`
+                      isolates the run and lets the browser resolve each value's own direction,
+                      which is this product's established treatment for a name that may be in
+                      either script. */}
+                  <Td>
                     {editingId === article.id ? (
                       <input
                         dir="rtl"
@@ -200,12 +213,12 @@ export default function KnowledgeBasePage() {
                         onChange={(e) => setEditingTitleAr(e.target.value)}
                       />
                     ) : (
-                      article.titleAr ?? '—'
+                      <bdi>{article.titleAr ?? '—'}</bdi>
                     )}
-                  </td>
-                  <td style={cell}>{t(ENUM_LABEL.KbCategory[article.category])}</td>
-                  <td style={cell}>{article.publishedAt.slice(0, 10)}</td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>{t(ENUM_LABEL.KbCategory[article.category])}</Td>
+                  <Td>{article.publishedAt.slice(0, 10)}</Td>
+                  <Td>
                     {editingId === article.id ? (
                       <button type="button" onClick={() => saveEdit(article.id)}>
                         {t('commonSave')}
@@ -215,14 +228,15 @@ export default function KnowledgeBasePage() {
                         {t('commonEdit')}
                       </button>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('kbLoading')}</p>
+        <SkeletonList rows={4} label={t('kbLoading')} />
       )}
 
     </main>
