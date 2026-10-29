@@ -954,6 +954,59 @@ picture that cannot be wrong is not evidence either.
 
 ---
 
+### Batch 10 — `/screening-health`, and CI caught a stale assertion in a file named after dates
+
+`/screening-health` was the heaviest screen left after `/retention-disposal` at 33 inline sites: it
+is the screen that answers *is sanctions screening actually working*, and it carried its own local
+`card` style with a `1px solid` border and a hand-set `6px` radius off the scale.
+
+| | before | after |
+|---|---|---|
+| sections | 10 `<section style={card}>` + an `<h2 style={{ marginTop: 0 }}>` | 10 `Card`s |
+| muted text | 12 `opacity: 0.75` / `0.7` | `--ink-secondary` |
+| error paragraphs | 6 `<p role="alert" style={errorStyle}>` | 6 `ErrorState`s |
+| the local `card` | a second answer to what a surface looks like | deleted |
+
+**`SCREEN_BUDGET` 1115 → 1100 and `opacity-as-muting` 120 → 108**, both ratchets refusing to be left
+above the real figure.
+
+**The count check found a sixth error paragraph I had not seen.** My pass asserted four single-line
+sites, found a multi-line one it had not matched, and **refused with the file untouched**. A pass
+that wrote what it could and reported success would have left two paragraphs behind on a screen
+that now looks converted. One of the six carries a `data-testid`, which is why `ErrorState`
+forwarding `data-*` matters — three hooks were lost to that trap earlier in this pass.
+
+**And my comment-preserving branch produced invalid JSX**: a `{/* … */}` is a JSX EXPRESSION and
+cannot sit inside an attribute value. The comment is worth keeping — it records why three strings
+that bypassed the dictionary became one key — so it moved ABOVE the element, where it reads as what
+it is.
+
+#### CI caught a stale assertion in `locale-formatting.spec.ts`
+
+Batch 9 removed the English `due ` prefix from `/client-accounting`'s oldest column. I ran the
+specs that exercise that SCREEN — `client-accounting.spec.ts`, 3 of 3 green — and the spec that
+mattered asserts about the THING I MOVED: a date rendered through two locales, in a file named
+after dates. **`frontend` went red on the full Playwright step with three assertions pinning
+`due 07/09/2026`.**
+
+*Which specs exercise what I touched* and *which specs assert about what I moved* are different
+questions, and CI keeps answering the second one. All three re-pointed with the reversal stated;
+**the test's own property survives intact** — it proves the date genuinely re-renders through the
+Arabic locale (D/M/YYYY, no leading zeros) rather than re-using the English string, and that the
+MONEY deliberately does not, because `AR_LOCALE` is `'ar'` and not `'ar-JO'`. What came off each
+assertion is the two English characters in front.
+
+**The full suite is 915/915 now**, which is the gate this change needed and the one the recorded
+rule already names for a cross-cutting web change.
+
+#### Recorded, not done
+
+`/screening-health`'s `row` style — a flex label/value pair used about thirty times — stays. `Note`
+and `KeyValue` are the primitives for it, but thirty swaps is a second screen's worth of work and
+the valve says a screen that needs more than a design pass gets recorded.
+
+---
+
 ---
 
 ## The method, per screen

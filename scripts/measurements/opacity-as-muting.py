@@ -37,11 +37,15 @@ import sys
 
 ROOTS = ("apps/web/app", "apps/web/components")
 
-# MEASURED 2026-10-29 AT 120, after `/customers/[id]` and its two correction components were
+# MEASURED 2026-10-29 AT 108, after `/customers/[id]`, its two correction components and
+# `/screening-health` were converted. It was 120 at the gate's own first commit and 130 when
+# the class was first measured; the ratchet is what keeps those three figures honest - it
+# refuses a budget left ABOVE the real count, so a ceiling cannot absorb the next regression.
+# THE ORIGINAL NOTE: measured at 120, after `/customers/[id]` and its two correction components were
 # converted. 130 before, and the arithmetic predicted 122 - two of the eight sites I removed were
 # inside COMMENTS, which this script strips and the `grep -c` I counted with does not. A ratchet,
 # never a target: it may only FALL.
-BUDGET = 120
+BUDGET = 108
 
 OPACITY = re.compile(r"opacity:\s*0\.\d+")
 COMMENT = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)

@@ -1,7 +1,7 @@
 "use client";
 
-import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
+  Card,
   ErrorState,
   Table,
   Td,
@@ -35,16 +35,6 @@ import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
  * simply found nothing — which is the failure this whole part of the build is
  * about.
  */
-
-const card: CSSProperties = {
-  border: "1px solid var(--border-default)",
-  borderRadius: 6,
-  padding: "1rem",
-  marginBottom: "1rem",
-  maxWidth: "46rem",
-};
-
-
 
 const row: CSSProperties = {
   display: "flex",
@@ -151,7 +141,7 @@ export default function ScreeningHealthPage() {
       <h1>
         {t('shScreeningHealth')}
       </h1>
-      <p style={{ opacity: 0.75, maxWidth: "46rem" }}>
+      <p style={{ color: 'var(--ink-secondary)', maxWidth: "46rem" }}>
         {t('shWhichProviderActuallyPerformsScreening')}
       </p>
 
@@ -167,10 +157,7 @@ export default function ScreeningHealthPage() {
 
       {health ? (
         <>
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shProvider')}
-            </h2>
+          <Card title={t('shProvider')}>
             <div style={row}>
               <span>{t('shStatus')}</span>
               <span
@@ -204,26 +191,23 @@ export default function ScreeningHealthPage() {
               <span>{t('shName')}</span>
               <span>{health.providerName}</span>
             </div>
-            <p style={{ marginBottom: 0, opacity: 0.85 }}>{health.detail}</p>
+            <p style={{ marginBottom: 0, color: 'var(--ink-secondary)' }}>{health.detail}</p>
 
             {health.missing.length > 0 ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {/*
-                  Was an `isArabic ? … : …` ternary. BOTH languages were present, so this was never a
-                  missing translation — it was three strings the i18n parity guard and the collision check
-                  could not see, because they bypassed the dictionary. Moved in so they are audited with
-                  the rest.
-                */}
-                {t('shMissingConfig', { missing: health.missing.join(', ') })}
-              </p>
+              /*
+                Was an `isArabic ? … : …` ternary. BOTH languages were present, so this was never a
+                missing translation — it was three strings the i18n parity guard and the collision
+                check could not see, because they bypassed the dictionary. Moved in so they are
+                audited with the rest.
+              */
+              <ErrorState
+                title={t('shMissingConfig', { missing: health.missing.join(', ') })}
+              />
             ) : null}
-          </section>
+          </Card>
 
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shCapabilities')}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shCapabilities')}>
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shSupportedMeansTheAdapterImplements')}
             </p>
             <div style={{ overflowX: "auto" }}>
@@ -247,7 +231,7 @@ export default function ScreeningHealthPage() {
                     <Tr key={c.capability} data-capability={c.capability}>
                       <Td>
                         <div style={{ fontWeight: 600 }}>{c.capability}</div>
-                        <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                        <div style={{ fontSize: "0.8rem", color: 'var(--ink-secondary)' }}>
                           {c.note}
                         </div>
                       </Td>
@@ -270,16 +254,11 @@ export default function ScreeningHealthPage() {
               </Table>
             </div>
             {!health.pepOperational ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {t('shPepScreeningIsNotOperational')}
-              </p>
+              <ErrorState title={t('shPepScreeningIsNotOperational')} />
             ) : null}
-          </section>
+          </Card>
 
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shDataset')}
-            </h2>
+          <Card title={t('shDataset')}>
             <div style={row}>
               <span>{t('shVersion')}</span>
               <span>{health.datasetVersion ?? "—"}</span>
@@ -296,13 +275,10 @@ export default function ScreeningHealthPage() {
               <span>{t('shCheckedAt')}</span>
               <span>{health.checkedAt.slice(0, 16).replace("T", " ")}</span>
             </div>
-          </section>
+          </Card>
 
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shMatchingRules')}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shMatchingRules')}>
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shTheseThresholdsAreConfigurableAnd')}
             </p>
             <div style={row}>
@@ -328,25 +304,20 @@ export default function ScreeningHealthPage() {
               </span>
             </div>
             {health.thresholdProblems.length > 0 ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {health.thresholdProblems.join("; ")}
-              </p>
+              <ErrorState title={health.thresholdProblems.join("; ")} />
             ) : null}
-          </section>
+          </Card>
         </>
       ) : null}
       {overview ? (
         <>
           {/* ---------------- screening volume ---------------- */}
-          <section style={card} data-testid="ops-attempts">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shScreeningAttempts', { days: overview.windowDays })}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shScreeningAttempts', { days: overview.windowDays })} data-testid="ops-attempts">
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shAHealthCheckAnswersWhether')}
             </p>
             {overview.attempts.total === 0 ? (
-              <p data-testid="ops-attempts-empty" style={{ opacity: 0.7 }}>
+              <p data-testid="ops-attempts-empty" style={{ color: 'var(--ink-secondary)' }}>
                 {t('shNoScreeningAttemptsRecordedIn')}
               </p>
             ) : (
@@ -384,23 +355,15 @@ export default function ScreeningHealthPage() {
                   ),
                 )}
                 {overview.attempts.unresolved > 0 ? (
-                  <p
-                    role="alert"
-                    style={{ ...errorStyle, marginTop: "0.75rem" }}
-                  >
-                    {t('shTheseCustomersWereNotScreened')}
-                  </p>
+                  <ErrorState title={t('shTheseCustomersWereNotScreened')} />
                 ) : null}
               </>
             )}
-          </section>
+          </Card>
 
           {/* ---------------- failures ---------------- */}
           {overview.attempts.recentUnresolved.length > 0 ? (
-            <section style={card} data-testid="ops-failures">
-              <h2 style={{ marginTop: 0 }}>
-                {t('shMostRecentFailures')}
-              </h2>
+            <Card title={t('shMostRecentFailures')} data-testid="ops-failures">
               <Table>
                 <thead>
                   <tr>
@@ -422,14 +385,11 @@ export default function ScreeningHealthPage() {
                   ))}
                 </tbody>
               </Table>
-            </section>
+            </Card>
           ) : null}
 
           {/* ---------------- holds and case workload ---------------- */}
-          <section style={card} data-testid="ops-holds">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shHoldsAndCaseWorkload')}
-            </h2>
+          <Card title={t('shHoldsAndCaseWorkload')} data-testid="ops-holds">
             <div style={row}>
               <span>
                 {t('shDecidableFilesCurrentlyHeld')}
@@ -483,33 +443,22 @@ export default function ScreeningHealthPage() {
                 </tbody>
               </table>
             ) : (
-              <p style={{ opacity: 0.7 }} data-testid="ops-cases-empty">
+              <p style={{ color: 'var(--ink-secondary)' }} data-testid="ops-cases-empty">
                 {t('shNoOpenCases')}
               </p>
             )}
             {overview.holds.configurationProblems.length > 0 ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {overview.holds.configurationProblems.join(" ")}
-              </p>
+              <ErrorState title={overview.holds.configurationProblems.join(" ")} />
             ) : null}
-          </section>
+          </Card>
 
           {/* ---------------- dataset generations ---------------- */}
-          <section style={card} data-testid="ops-datasets">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shSanctionsListGenerations')}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shSanctionsListGenerations')} data-testid="ops-datasets">
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shAScreeningReadsOnlyThe')}
             </p>
             {overview.datasets.length === 0 ? (
-              <p
-                role="alert"
-                style={errorStyle}
-                data-testid="ops-datasets-empty"
-              >
-                {t('shNoGenerationExistsNoSync')}
-              </p>
+              <ErrorState title={t('shNoGenerationExistsNoSync')} data-testid="ops-datasets-empty" />
             ) : (
               <Table>
                 <thead>
@@ -531,12 +480,12 @@ export default function ScreeningHealthPage() {
                       <Td>
                         <span style={statusStyle(d.status)}>{t(ENUM_LABEL.DatasetVersionStatus[d.status])}</span>
                         {d.rejectionReason ? (
-                          <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                          <div style={{ fontSize: "0.75rem", color: 'var(--ink-secondary)' }}>
                             {d.rejectionReason}
                           </div>
                         ) : null}
                         {d.rollbackReason ? (
-                          <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                          <div style={{ fontSize: "0.75rem", color: 'var(--ink-secondary)' }}>
                             {t('shRolledBack')}
                             {d.rollbackReason}
                           </div>
@@ -549,13 +498,10 @@ export default function ScreeningHealthPage() {
                 </tbody>
               </Table>
             )}
-          </section>
+          </Card>
 
           {/* ---------------- schedules ---------------- */}
-          <section style={card} data-testid="ops-schedules">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shRecurringWork')}
-            </h2>
+          <Card title={t('shRecurringWork')} data-testid="ops-schedules">
             <div style={row}>
               <span>
                 {t('shRecurringReScreen')}
@@ -581,15 +527,12 @@ export default function ScreeningHealthPage() {
                   (t('shNever'))}
               </span>
             </div>
-          </section>
+          </Card>
 
           {/* ---------------- sync history ---------------- */}
-          <section style={card} data-testid="ops-sync-history">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shSyncHistory')}
-            </h2>
+          <Card title={t('shSyncHistory')} data-testid="ops-sync-history">
             {overview.listSync.length === 0 ? (
-              <p style={{ opacity: 0.7 }} data-testid="ops-sync-empty">
+              <p style={{ color: 'var(--ink-secondary)' }} data-testid="ops-sync-empty">
                 {t('shNoSyncHasRunYet')}
               </p>
             ) : (
@@ -621,7 +564,7 @@ export default function ScreeningHealthPage() {
                 </tbody>
               </Table>
             )}
-          </section>
+          </Card>
         </>
       ) : null}
     </main>
