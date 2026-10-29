@@ -175,8 +175,12 @@ test("the sidebar still starts below the navbar rather than under it", async ({ 
   const sidebarBox = await page.getByRole("navigation", { name: "Primary" }).boundingBox();
   if (!barBox || !sidebarBox) throw new Error("no bounding box");
 
-  // sidebarStyle is sticky; with `top: 0` it would park underneath the bar.
-  // Both offsets derive from NAVBAR_HEIGHT, and this is what proves they agree.
+  // THE ASSERTION STANDS AND ITS REASON MOVED. This used to read "sidebarStyle is sticky; with
+  // `top: 0` it would park underneath the bar — both offsets derive from NAVBAR_HEIGHT, and this
+  // is what proves they agree." Neither offset exists now: the shell is the viewport, the rail is
+  // a full-height cell in a flex row below the bar, and it starts below the bar by FLOW rather
+  // than by a sticky offset agreeing with a max-height. Kept rather than deleted, because the
+  // property a reader cares about — the rail does not sit under the bar — is the same one.
   expect(sidebarBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height - 1);
 });
 

@@ -10,12 +10,28 @@ import type { CSSProperties } from 'react';
 // rather than a default admin template. All values are tokens from
 // globals.css; nothing here hard-codes a colour.
 
-/** The whole authenticated frame: navbar across the top, then everything
- *  else. The inner row is `shellRowStyle`. */
+/**
+ * THE WHOLE AUTHENTICATED FRAME, AND IT IS THE VIEWPORT.
+ *
+ * The owner asked for this after walking the captures: *«بدي يكون الناف بار و السايد بار ستاتيك
+ * يعني ثابتين محلهم و بس البادي هو الي بيتحرك بالسكرول»* — the bar and the rail stay put, only the
+ * body moves. Both used to be `position: sticky` with the WINDOW as the scroller, which keeps them
+ * in view and still lets the page scrollbar run the full document height.
+ *
+ * `height` AND `overflow: hidden` TOGETHER ARE WHAT MAKE THE CONTENT COLUMN THE ONLY SCROLLER —
+ * neither alone does it. `minHeight` would let the frame grow past the viewport again.
+ *
+ * `100dvh` RATHER THAN `100vh`, AND THAT IS NOT A PREFERENCE. On a mobile browser `100vh` is the
+ * viewport WITHOUT the retracting chrome, so `100vh` plus `overflow: hidden` clips the last
+ * 60–100px permanently — a bar at the bottom of a screen nobody can ever reach. The phone does not
+ * use this lock at all (see the 64rem block in `globals.css`), and the unit is still `dvh` so that
+ * the one case where it is used below the breakpoint cannot be the one that bites.
+ */
 export const shellStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  minHeight: '100vh',
+  height: '100dvh',
+  overflow: 'hidden',
 };
 
 /** Sidebar + content. Was `shellStyle` itself until the navbar landed above
@@ -29,10 +45,14 @@ export const shellRowStyle: CSSProperties = {
 };
 
 /**
- * The navbar's own height, as a token rather than a literal, because THREE
- * things have to agree on it: the bar itself, the sidebar's sticky offset, and
- * the sidebar's max-height. Get them out of step and the sidebar either slides
- * under the bar or grows a phantom scrollbar exactly one bar tall.
+ * The navbar's own height, as a token rather than a literal.
+ *
+ * IT HAS ONE READER NOW, WHICH IS THE POINT. This used to say THREE things had to agree on it —
+ * the bar, the sidebar's sticky offset and the sidebar's max-height — and that the three going out
+ * of step either parks the rail under the bar or grows it a phantom scrollbar exactly one bar
+ * tall. Making the shell the viewport retired both of the other two: nothing offsets anything any
+ * more, because nothing overlaps. The constant stays because the bar still has a height; the
+ * agreement problem is gone rather than kept in step.
  */
 export const NAVBAR_HEIGHT = '3.5rem';
 
@@ -48,8 +68,10 @@ export const navbarStyle: CSSProperties = {
   // Logical: the divider belongs on the edge touching the content below,
   // which is the same reasoning as `sidebarStyle`'s borderInlineEnd.
   borderBlockEnd: '1px solid var(--nav-divider)',
-  position: 'sticky',
-  top: 0,
+  // NOT `position: sticky`. It was, while the window scrolled; in a non-scrolling column it is a
+  // fixed-height flex row that cannot move, so sticky means nothing — and a leftover `sticky` is
+  // a thing the next reader reasons from. `zIndex` stays: the bar still sits over the content's
+  // own stacking context, which is what keeps a dropdown in the bar above the body.
   zIndex: 20,
 };
 
@@ -208,14 +230,13 @@ export const sidebarStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.1rem',
-  // The nav is taller than the viewport for a broadly-permissioned role, so
-  // it scrolls itself rather than the page.
-  position: 'sticky',
-  // Not 0: the navbar is sticky at the top of the same scroll container, so a
-  // zero offset parks the rail underneath it. Both values are derived from
-  // NAVBAR_HEIGHT rather than restating it — the height exists in one place.
-  top: NAVBAR_HEIGHT,
-  maxHeight: `calc(100vh - ${NAVBAR_HEIGHT})`,
+  // The nav is taller than the viewport for a broadly-permissioned role, so it scrolls ITSELF —
+  // which is now the only thing it has to do. It was `sticky` with `top: NAVBAR_HEIGHT` and
+  // `maxHeight: calc(100vh - NAVBAR_HEIGHT)`, both derived from the bar's height because the bar
+  // was sticky in the same window scroller and a zero offset parked the rail underneath it. With
+  // the shell as the viewport the rail is simply a full-height cell in a row that cannot scroll,
+  // so the offset and the subtraction are both gone: `height: 100%` is the whole of it.
+  height: '100%',
   overflowY: 'auto',
 };
 
@@ -358,9 +379,24 @@ export const navLinkActiveStyle: CSSProperties = {
   fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
 };
 
+/**
+ * THE ONLY SCROLLER IN THE AUTHENTICATED APP.
+ *
+ * `minHeight: 0` is load-bearing and is the half that is easy to drop: a flex child's default
+ * `min-height: auto` refuses to shrink below its content, so without it this column grows to fit
+ * the page and the `overflow-y` never engages — the frame would then be clipped by
+ * `shellStyle`'s own `overflow: hidden` and the bottom of every long screen would be unreachable.
+ *
+ * `data-app-content` is the hook, and it has two readers rather than one: the 64rem block in
+ * `globals.css` hands the scroller back to the page on a phone, and the layout resets this
+ * element's `scrollTop` on a route change — which the browser used to do for free when the
+ * document was the scroller.
+ */
 export const contentStyle: CSSProperties = {
   flex: '1 1 auto',
   minWidth: 0,
+  minHeight: 0,
+  overflowY: 'auto',
   background: 'var(--surface-page)',
 };
 

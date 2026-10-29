@@ -552,6 +552,29 @@ h4 { font-size: var(--text-md); }
  * for the same reason — overriding declarations it does not own.
  */
 @media (max-width: 64rem) {
+  /*
+   * AND THE PHONE KEEPS THE PAGE SCROLLER — the inverse of the desktop lock, deliberately.
+   *
+   * Above this breakpoint the shell is `100dvh` with `overflow: hidden` and the content column is
+   * the only scroller, which is what the owner asked for. Below it that is WORSE than the page
+   * scroller for two measured reasons: the collapsed rail is a strip that eats fixed height off a
+   * short screen, and the browser's own address-bar retraction — the thing that gives a phone
+   * reader their screen back — only happens when the PAGE scrolls, never when a div does.
+   *
+   * `!important` for the reason written below about the rail: these are INLINE style objects and
+   * an inline declaration beats any stylesheet rule whatever its specificity. Check it in a
+   * capture rather than in your head — a half-applied version of this block has shipped here once
+   * and the screenshot is what caught it.
+   */
+  [data-app-shell] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  [data-app-content] {
+    overflow-y: visible !important;
+  }
+
   [data-app-shell-row] {
     flex-direction: column !important;
   }
