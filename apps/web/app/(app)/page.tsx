@@ -3,9 +3,9 @@
 import { useEffect } from 'react';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import Link from 'next/link';
+import { pageStackStyle } from '../../components/lead/lead.styles';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
-import { pageStyle } from '../../components/lead/lead.styles';
 import {
   homeCardBlurbStyle,
   homeCardStyle,
@@ -76,7 +76,7 @@ export default function HomePage() {
   ];
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>{t('homeWelcome', { name: user.fullName })}</h1>
       <p style={{ opacity: 0.8 }}>
         {t('homeSignedInAs', {

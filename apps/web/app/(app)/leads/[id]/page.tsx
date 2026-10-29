@@ -1,13 +1,15 @@
 'use client';
 
+import {
+  ErrorState,
+} from '../../../../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
-  pageStyle,
+  pageStackStyle,
   smallButtonStyle,
 } from '../../../../components/lead/lead.styles';
 import {
@@ -82,7 +84,7 @@ export default function LeadDetailPage() {
 
   if (isLoading2) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStackStyle}>
         <p>{t('leaddLoading')}</p>
       </div>
     );
@@ -90,7 +92,7 @@ export default function LeadDetailPage() {
 
   if (loadError) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStackStyle}>
         {/*
           `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
           role, so a sighted reader saw the error and a screen-reader user was never told — the screen
@@ -98,9 +100,7 @@ export default function LeadDetailPage() {
           other screen in this app announces it; `test/load-error-alert.test.ts` now fails a load-error
           branch that does not.
         */}
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
         <button
           type="button"
           style={smallButtonStyle}
@@ -114,7 +114,7 @@ export default function LeadDetailPage() {
 
   if (!lead) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStackStyle}>
         <p>{t('leaddNotFound2')}</p>
       </div>
     );
@@ -127,8 +127,8 @@ export default function LeadDetailPage() {
   const displayStatus = statusKey ? t(statusKey) : lead.status;
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: '1.5rem' }}>
+    <div style={pageStackStyle}>
+      <h1>
         {t('leaddLeadDetails')} — <bdi>{lead.fullName}</bdi>
       </h1>
       <p style={{ margin: '0 0 1rem' }}>

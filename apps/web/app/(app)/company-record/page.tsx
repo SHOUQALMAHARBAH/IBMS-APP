@@ -1,13 +1,15 @@
 'use client';
 
+import {
+  ErrorState,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
 import {
   fetchOwnRecord,
   type CompanyRecord,
@@ -136,14 +138,12 @@ export default function CompanyRecordPage() {
   if (!user) return null;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>{t('companyRecordHeading')}</h1>
       <p style={noteStyle}>{t('companyRecordIntro')}</p>
 
       {loadError && (
-        <p role="alert" style={errorStyle} data-testid="company-record-error">
-          {loadError}
-        </p>
+        <ErrorState title={loadError} data-testid="company-record-error" />
       )}
 
       {!loadError && !record && (

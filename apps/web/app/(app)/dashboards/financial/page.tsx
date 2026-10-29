@@ -10,8 +10,17 @@ import {
   type ProfitabilityRow,
 } from '../../../../lib/management-reporting/financial-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
@@ -34,44 +43,44 @@ function ProfitabilityTable({
       {rows.length === 0 ? (
         <p>{t('dashNoData')}</p>
       ) : (
-        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <Table>
           <thead>
             <tr>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+              <Th>
                 {t('dashColGroup')}
-              </th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+              </Th>
+              <Th>
                 {t('dfinColPremium')}
-              </th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+              </Th>
+              <Th>
                 {t('dfinColClaims')}
-              </th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+              </Th>
+              <Th>
                 {t('dfinColCommission')}
-              </th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>
+              </Th>
+              <Th>
                 {t('dfinColNetPosition')}
-              </th>
+              </Th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key}>
-                <td style={{ padding: '0.25rem 0.5rem' }}>
+              <Tr key={r.key}>
+                <Td>
                   <bdi>{r.label}</bdi>
-                </td>
-                <td style={{ padding: '0.25rem 0.5rem' }}>
+                </Td>
+                <Td>
                   {r.premiumWritten}
-                </td>
-                <td style={{ padding: '0.25rem 0.5rem' }}>{r.claimsPaid}</td>
-                <td style={{ padding: '0.25rem 0.5rem' }}>
+                </Td>
+                <Td>{r.claimsPaid}</Td>
+                <Td>
                   {r.commissionEarned}
-                </td>
-                <td style={{ padding: '0.25rem 0.5rem' }}>{r.netPosition}</td>
-              </tr>
+                </Td>
+                <Td>{r.netPosition}</Td>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </Table>
       )}
     </section>
   );
@@ -136,9 +145,11 @@ export default function FinancialDashboardPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dfinHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dfinIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('dfinHeading')}
+        description={t('dfinIntro')}
+      />
 
       <form
         onSubmit={applyFilters}
@@ -157,7 +168,7 @@ export default function FinancialDashboardPage() {
           label={t('dashBranchIdLabel')}
         />
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('dashInsuranceLineLabel')}
           <input
@@ -174,7 +185,7 @@ export default function FinancialDashboardPage() {
           label={t('dashInsurerIdLabel')}
         />
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('dashAsOf')}
           <input
@@ -188,17 +199,14 @@ export default function FinancialDashboardPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary ? (
         <>
           <ReportProvenance kind="asOf" at={summary.asOf} />
 
-          <section style={sectionStyle}>
-            <h2>{t('dfinReceivables')}</h2>
+          <Card title={t('dfinReceivables')}>
             <div style={statStyle}>
               {formatMoney(
                 summary.receivables.totals.outstandingTotal,
@@ -214,10 +222,9 @@ export default function FinancialDashboardPage() {
               <div>61-90d: {summary.receivables.totals.d61_90}</div>
               <div>90+d: {summary.receivables.totals.d90_plus}</div>
             </div>
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('dfinPayables')}</h2>
+          <Card title={t('dfinPayables')}>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>
@@ -246,10 +253,9 @@ export default function FinancialDashboardPage() {
                 </div>
               </div>
             </div>
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('dfinCommissionIncome')}</h2>
+          <Card title={t('dfinCommissionIncome')}>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>
@@ -270,10 +276,9 @@ export default function FinancialDashboardPage() {
                 <div>{t('dfinPaid')}</div>
               </div>
             </div>
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('dfinProfitability')}</h2>
+          <Card title={t('dfinProfitability')}>
             <ProfitabilityTable
               title={t('dfinByLine')}
               rows={summary.profitability.byLine}
@@ -282,10 +287,10 @@ export default function FinancialDashboardPage() {
               title={t('dfinByClientSegment')}
               rows={summary.profitability.bySegment}
             />
-          </section>
+          </Card>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

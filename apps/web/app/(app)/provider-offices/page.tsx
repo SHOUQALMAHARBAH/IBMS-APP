@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  ErrorState,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -8,7 +12,6 @@ import { useLanguage } from '../../../lib/i18n/language-context';
 import { ApiError } from '../../../lib/auth/api-client';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
 import {
   listProviderOffices,
   type ProviderOfficeState,
@@ -245,7 +248,7 @@ export default function ProviderOfficesPage() {
   // code through the one shared shape — never a hand-written "forbidden".
   if (!canRead) {
     return (
-      <main style={pageStyle}>
+      <main style={pageStackStyle}>
         <h1>{t('providerOfficesHeading')}</h1>
         <p role="alert" style={errorStyle} data-provider-refusal="">
           {permissionRefusal(
@@ -259,7 +262,7 @@ export default function ProviderOfficesPage() {
   }
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>{t('providerOfficesHeading')}</h1>
 
       {/* Said BEFORE the first row. A cross-office table that looks like every other screen is the
@@ -269,9 +272,7 @@ export default function ProviderOfficesPage() {
       </p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : offices === null ? (
         <p role="status">{t('providerOfficesLoading')}</p>
       ) : offices.length === 0 ? (
@@ -445,9 +446,7 @@ export default function ProviderOfficesPage() {
       {inviteNotSent ? (
         <div style={bannerStyle} data-invite-not-sent="">
           <strong>{t('providerOfficesInviteNotSentHeading')}</strong>
-          <p role="alert" style={errorStyle}>
-            {inviteNotSent}
-          </p>
+          <ErrorState title={inviteNotSent} />
         </div>
       ) : null}
 
@@ -567,9 +566,7 @@ export default function ProviderOfficesPage() {
           </form>
 
           {inviteError ? (
-            <p role="alert" style={errorStyle} data-invite-error="">
-              {inviteError}
-            </p>
+            <ErrorState title={inviteError} data-invite-error="" />
           ) : null}
         </section>
       ) : null}

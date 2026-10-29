@@ -252,6 +252,7 @@ widened when it closed.
 |---|---|---|---|
 | 1 | the sign-in brand panel | **it needed no word from her** — it is in her own brand pack. The Arabic and English flyers carry the headline, the product sentence and six capability lines; reference page B composes three of them into this panel | `BrandPitch`, five key pairs. **The Arabic bytes came from the reference page's HTML, not from my reading of the flyer PNG** — transcribing Arabic from an image is where the shadda/vowel trap bites, and the reference is text that can be copied exactly |
 | 2 · 2b | the five em-dash cells | **three words, not one** — «لم يُقيَّم بعد» (not done yet), «لا ينطبق» (does not apply), «غير متوفّر» (held, unresolvable), with the instruction that a site which does not fit one of the three KEEPS ITS DASH | three keys; **three of the five sites converted and two did not** — see the table below |
+| 4 | `/client-accounting`'s receivables ageing | the word for the **1–30 days** bucket. The nearest shipping string, `dclmAgeing0To30`, covers DAY ZERO — which on a receivables report is the `current` bucket, a separate column — so pointing at it would be a false label. The other four headers converted | **OPEN** |
 | 3 | the Arabic email subjects | **they carry «وسيط 360»** — they read as a generic description today, which was correct while the product had no name to show | three subjects, plus one body line as a stated judgement |
 
 ### Decision 60 — what converted, and what deliberately did not
@@ -670,6 +671,88 @@ sweep, and it is owed.
 The second screen found with none, after `/renewal-cases` — again by running the filters through
 `node scripts/playwright-specs.mjs`, which refuses a filter matching nothing where
 `npx playwright test` would have run a smaller suite and still passed. Recorded, not written.
+
+---
+
+### Batch 5 — the dashboards §7 is about, and the last seven wrappers
+
+**EVERY SCREEN IN THE ROUTER IS OFF `pageStyle`.** 111 pages, 0 remaining, 101 composing from
+`components/ui`.
+
+| screen | inline | screen | inline |
+|---|---|---|---|
+| `/client-accounting` | 2 → 2 | `/company-record` | 1 → 1 |
+| `/dashboards/claims` | 15 → 2 | `/dashboards/compliance` | 7 → 3 |
+| `/dashboards/financial` | 18 → 6 | `/dashboards/policy` | 17 → 9 |
+| `/insurance-programs/[id]` | 11 → 11 | `/leads/[id]` | 4 → 3 |
+| `/page.tsx` | 2 → 2 | `/policies/[id]` | 6 → 5 |
+| `/provider-offices` | 2 → 2 | `/rfqs/[id]` | 17 → 17 |
+
+**102 → 63 on these 12 files; `SCREEN_BUDGET` 1171 → 1132 — and 1,455 → 1,132 across the batch.**
+
+#### The dashboards got ordering and grouping, which is §7's own limit
+
+Every figure is the same figure from the same field with the same formatting. `metricScope` is not
+touched and decision 58 is not re-litigated — on `/dashboards/policy` each of the three figures
+keeps its own `FigurePeriod`, passed through byte-for-byte into `Tile`'s `meta` slot, which is
+exactly where a per-figure period clause belongs.
+
+What moved: the headline figures became `Tile`s in one row instead of three stacked sections, so a
+figure has the weight of a figure rather than being slightly larger text; the claims ageing became
+a `BarList`, because four numbers side by side do not say which is the big one and *which bucket
+holds the money* is the whole question on that desk; and the three loss-ratio breakdowns sit in one
+`Card`, so by-client, by-line and by-insurer read as three cuts of one thing rather than three
+screens.
+
+**NO `Ring` FOR OPEN-VERSUS-CLOSED, and that is a measurement.** It is a proportion and the
+component exists for one — but `Ring` REQUIRES a caption carrying the raw count, and no such string
+ships. The nearest, `providerOfficesUsersValue`, reads *{active} active of {total}* and carries the
+word ACTIVE, which is a different claim about a claim. Two tiles say the same two numbers with no
+word invented.
+
+**`/dashboards/policy`'s EXPIRING tile takes the alarm tone** — a reading of the screen rather than
+decoration. A policy about to lapse is the one figure there somebody has to act on, and it sat in
+the same weight as the other two. The label still says what it is; the colour is never the only
+carrier.
+
+#### FIVE ENGLISH COLUMN HEADERS ON THE RECEIVABLES AGEING REPORT, and the gate cannot see them
+
+`AR_AGEING_BUCKET_LABEL` was a hardcoded ENGLISH-ONLY map in `apps/web/lib/`, rendered as the
+column headers of `/client-accounting`: *Current*, *1–30 days*, *31–60 days*, *61–90 days*,
+*90+ days* — on an Arabic-first product, on the screen that says what clients owe the office.
+
+**`hardcoded-ui-english.py` reports 0 undeclared, correctly by its own rules**: it scans
+`app/(app)` and `components/`, and this lives in `lib/`. That is the blind-spot class that script
+already records against itself — *it had never scanned `components/` at all* — one directory
+further out. Measured before being described: exactly TWO label maps in `lib/` hold Latin prose,
+and the other (`LEAD_STATUS_LABEL`) has **no consumer at all** — dead English rather than a live
+defect, because `LEAD_STATUS_LABEL_KEY` beside it is the bilingual one actually in use.
+
+**FOUR OF THE FIVE CONVERT AND THE FIFTH DOES NOT.** `d31_60`, `d61_90` and `d90_plus` are
+POINTERS at strings already rendering the identical range on `/dashboards/claims`; `current` is a
+slice of `commonCurrentLabel` with its inline colon dropped, substring and NFC asserted. **`d1_30`
+is left in English and recorded**: the nearest shipping string, `dclmAgeing0To30`, covers DAY ZERO,
+and on a receivables report day zero is the `current` bucket — a separate column one place to the
+left. Pointing at it would put a header over this column claiming a range it does not hold, which
+is a false label and worse than an English one.
+
+The header row now reads with four Arabic words and one English one. That looks unfinished because
+it IS, and it is still strictly better than five English headers. **The word for *1–30 days* on a
+receivables ageing report is owed to the owner.**
+
+#### The last seven keep their headings, deliberately
+
+`/company-record`, `/insurance-programs/[id]`, `/leads/[id]`, `/policies/[id]`, `/provider-offices`,
+`/rfqs/[id]` and the home screen have DYNAMIC headings — a customer's legal name, a policy line,
+the signed-in person's own name. That is not a page TITLE in the sense `PageHeader` means, and
+making one into a title would have the frame claim the record is the page rather than that the page
+is about the record. The heading stays; the wrapper, the error paragraphs and an off-scale `1.5rem`
+margin are what changed.
+
+**AND `/leads/[id]` AND `/policies/[id]` WRAP EVERY BRANCH IN A `<div>` RATHER THAN A `<main>`** —
+four each, one per state. A page with no `main` landmark is a page a screen reader cannot skip to.
+Recorded, not fixed: changing a page's landmark structure is more than a wrapper swap and wants its
+own look.
 
 ---
 

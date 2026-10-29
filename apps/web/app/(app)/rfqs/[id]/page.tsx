@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ErrorState,
   Td,
   Th,
   Tr,
@@ -25,8 +26,8 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { QuotationsSection } from '../../../../components/quotation/QuotationsSection';
 import { ComparisonSection } from '../../../../components/comparison/ComparisonSection';
-import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
+import { buttonStyle } from '../../../../components/auth/auth-form.styles';
+import { cardMetaStyle, pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   commBodyStyle,
   insurerPickerStyle,
@@ -228,7 +229,7 @@ export default function RfqDetailPage() {
   );
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>
@@ -242,9 +243,7 @@ export default function RfqDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rfq ? (
@@ -341,9 +340,7 @@ export default function RfqDetailPage() {
           )}
 
           {rowError ? (
-            <p role="alert" style={errorStyle}>
-              {rowError}
-            </p>
+            <ErrorState title={rowError} />
           ) : null}
 
           {isPlacement ? (
@@ -352,9 +349,7 @@ export default function RfqDetailPage() {
                 <div style={{ width: '100%' }}>
                   <strong>{t('rfqAddInsurersHeading')}</strong>
                   {addError ? (
-                    <p role="alert" style={errorStyle}>
-                      {addError}
-                    </p>
+                    <ErrorState title={addError} />
                   ) : null}
                   {insurers === null ? (
                     <p>{t('commonLoading')}</p>
@@ -442,9 +437,7 @@ export default function RfqDetailPage() {
           <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('rfqCorrespondenceIntro')}</p>
 
           {commsError ? (
-            <p role="alert" style={errorStyle}>
-              {commsError}
-            </p>
+            <ErrorState title={commsError} />
           ) : null}
 
           {comms === null ? (
@@ -491,9 +484,7 @@ export default function RfqDetailPage() {
             <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
               <strong>{t('rfqLogExchangeHeading')}</strong>
               {commError ? (
-                <p role="alert" style={errorStyle}>
-                  {commError}
-                </p>
+                <ErrorState title={commError} />
               ) : null}
               <div style={rfqFieldStyle}>
                 <label htmlFor="comm-direction">{t('rfqDirectionLabel')}</label>

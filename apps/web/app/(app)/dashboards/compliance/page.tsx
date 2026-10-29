@@ -8,8 +8,16 @@ import {
   type ComplianceDashboardSummary,
 } from '../../../../lib/management-reporting/compliance-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
@@ -28,16 +36,16 @@ function BreakdownTable({
   return (
     <section style={sectionStyle}>
       <h3>{title}</h3>
-      <table style={{ borderCollapse: 'collapse' }}>
+      <Table>
         <tbody>
           {entries.map(([key, count]) => (
-            <tr key={key}>
-              <td style={{ padding: '0.15rem 0.75rem 0.15rem 0' }}>{key}</td>
-              <td style={{ padding: '0.15rem 0', fontWeight: 600 }}>{count}</td>
-            </tr>
+            <Tr key={key}>
+              <Td>{key}</Td>
+              <Td numeric>{count}</Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
+      </Table>
     </section>
   );
 }
@@ -94,9 +102,11 @@ export default function ComplianceDashboardPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dcmpHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('dcmpIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('dcmpHeading')}
+        description={t('dcmpIntro')}
+      />
 
       <form
         onSubmit={applyFilters}
@@ -118,9 +128,7 @@ export default function ComplianceDashboardPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary ? (
@@ -139,8 +147,7 @@ export default function ComplianceDashboardPage() {
             rows={summary.complaints.byCategory}
           />
 
-          <section style={sectionStyle}>
-            <h2>{t('dcmpExceptions')}</h2>
+          <Card title={t('dcmpExceptions')}>
             <div
               style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}
             >
@@ -179,10 +186,9 @@ export default function ComplianceDashboardPage() {
               title={t('dcmpAmlByPattern')}
               rows={summary.complianceExceptions.amlByPatternType}
             />
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('dcmpRegulatoryFiling')}</h2>
+          <Card title={t('dcmpRegulatoryFiling')}>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>
@@ -203,19 +209,17 @@ export default function ComplianceDashboardPage() {
                 <div>{t('dcmpOverdue')}</div>
               </div>
             </div>
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('dcmpOpenDsrs')}</h2>
+          <Card title={t('dcmpOpenDsrs')}>
             <div style={statStyle}>{summary.dsr.openCount}</div>
             <BreakdownTable
               title={t('dcmpByStatus')}
               rows={summary.dsr.byStatus}
             />
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('dcmpBreachRegister')}</h2>
+          <Card title={t('dcmpBreachRegister')}>
             <div style={statStyle}>
               {tPlural('dcmpBreachesOpen', summary.breachRegister.openCount)}
             </div>
@@ -223,10 +227,9 @@ export default function ComplianceDashboardPage() {
               title={t('dcmpByStatus')}
               rows={summary.breachRegister.byStatus}
             />
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('dcmpDpiaBacklog')}</h2>
+          <Card title={t('dcmpDpiaBacklog')}>
             <div style={statStyle}>
               {summary.dpiaBacklog.pendingReviewCount}
             </div>
@@ -234,10 +237,10 @@ export default function ComplianceDashboardPage() {
               title={t('dcmpByOutcome')}
               rows={summary.dpiaBacklog.byOutcome}
             />
-          </section>
+          </Card>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

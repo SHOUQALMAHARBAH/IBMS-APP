@@ -1,5 +1,8 @@
 'use client';
 
+import {
+  ErrorState,
+} from '../../../../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { PolicyCheckingBlock } from '../../../../components/policy/PolicyCheckingBlock';
 import { NotifyClaimForm } from '../../../../components/claim/NotifyClaimForm';
@@ -14,9 +17,8 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { policyStatusLabelKey } from '../../../../lib/policy/policy-status';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
-  pageStyle,
+  pageStackStyle,
   smallButtonStyle,
 } from '../../../../components/lead/lead.styles';
 import {
@@ -102,7 +104,7 @@ export default function PolicyDetailPage() {
 
   if (isLoading2) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStackStyle}>
         <p>{t('poldLoading')}</p>
       </div>
     );
@@ -110,7 +112,7 @@ export default function PolicyDetailPage() {
 
   if (loadError) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStackStyle}>
         {/*
           `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
           role, so a sighted reader saw the error and a screen-reader user was never told — the screen
@@ -118,9 +120,7 @@ export default function PolicyDetailPage() {
           other screen in this app announces it; `test/load-error-alert.test.ts` now fails a load-error
           branch that does not.
         */}
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
         <button
           type="button"
           style={smallButtonStyle}
@@ -134,7 +134,7 @@ export default function PolicyDetailPage() {
 
   if (!policy) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStackStyle}>
         <p>{t('poldNotFound2')}</p>
       </div>
     );
@@ -149,8 +149,8 @@ export default function PolicyDetailPage() {
   const displayStatus = statusKey ? t(statusKey) : policy.status;
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: '1.5rem' }}>
+    <div style={pageStackStyle}>
+      <h1>
         {t('poldPolicyDetails')}{' '}
         {policy.policyNumber && `— ${policy.policyNumber}`}
       </h1>

@@ -29,6 +29,23 @@ fault (3), one judgement sweep for fault (4), and three loose ends.
 
 ### Fault (4) is blind to every SERVER-SUPPLIED display string — added 2026-10-28
 
+### Fault (4) also does not scan `apps/web/lib/` — found 2026-10-29
+
+Its two roots are `app/(app)` and `components/`. A label map that lives in `lib/` is invisible to
+it, and one was: `AR_AGEING_BUCKET_LABEL` held five literal English strings and was rendered as the
+column headers of `/client-accounting` — the receivables ageing report — while the gate said 0
+undeclared throughout. This is the same class as *it had never scanned `components/` at all*, one
+directory further out.
+
+**Measured rather than feared**: exactly TWO label maps under `lib/` hold Latin prose, and the
+second (`LEAD_STATUS_LABEL`) has NO CONSUMER — dead English, because the bilingual
+`LEAD_STATUS_LABEL_KEY` beside it is the one in use. So the live exposure was one map, and it is
+fixed. **The root is NOT widened**, for the reason the script's own header already gives about
+mode 8: `lib/` is full of legitimate English — route paths, enum member names, permission codes,
+field names — and a scanner pointed at it would report findings faster than anyone could triage,
+which is how a gate gets switched off. What closes the class is reading where a label map LIVES
+before trusting a 0 for a screen that renders one.
+
 `hardcoded-ui-english.py` reads SOURCE. A string the api sends and a screen renders verbatim is
 therefore invisible to it, however English it is, and that is a property of the instrument rather
 than a pattern it is missing: no widening of its fourteen failure modes can reach a value that

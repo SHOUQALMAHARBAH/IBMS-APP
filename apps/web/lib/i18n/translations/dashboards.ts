@@ -17,6 +17,11 @@
 // they were generated from the English.
 export const DASHBOARDS = {
   AR: {
+    /* DERIVED: `commonCurrentLabel` with its trailing colon dropped — the same run of
+       characters. The source is used INLINE before a figure, where the colon belongs; a
+       column header takes the words alone. No word was written. */
+    commonCurrentHeading: 'الحالي',
+
     // ---- shared dashboard chrome ----------------------------------------
     // WITHDRAWN with the fourteen pickers: `dashBranchIdFilterAria` and
     // `dashInsurerIdFilterAria` were the `aria-label` on the raw inputs, and
@@ -385,6 +390,11 @@ export const DASHBOARDS = {
       'الاستثناءات = تنبيهات غسل الأموال المفتوحة + سجل الاختراقات المفتوح.',
   },
   EN: {
+    /* DERIVED: `commonCurrentLabel` with its trailing colon dropped — the same run of
+       characters. The source is used INLINE before a figure, where the colon belongs; a
+       column header takes the words alone. No word was written. */
+    commonCurrentHeading: 'Current',
+
     dashBranchIdLabel: 'Show one branch only',
     dashInsuranceLineLabel: 'Insurance line',
     dashInsuranceLineFilterAria: 'Insurance line filter',

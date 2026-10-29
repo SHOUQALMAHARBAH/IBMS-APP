@@ -1,6 +1,20 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tile,
+  Tiles,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
+import { formatNumber } from '../../../../lib/i18n/format';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -8,18 +22,14 @@ import {
   type PolicyDashboardSummary,
 } from '../../../../lib/management-reporting/policy-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
 import { FigurePeriod } from '../../../../components/ui';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
-const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
 export default function PolicyDashboardPage() {
-  const { t, tPlural } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -81,7 +91,7 @@ export default function PolicyDashboardPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>{t('dpolHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
         {t('dpolIntro')}
@@ -152,9 +162,7 @@ export default function PolicyDashboardPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary ? (
@@ -168,57 +176,71 @@ export default function PolicyDashboardPage() {
             {tPlural('dpolRenewalWindowDays', summary.renewalWindowDays)}
           </p>
 
-          <section style={sectionStyle}>
-            <h2>{t('dpolActivePolicies')}</h2>
-            <div style={statStyle}>{summary.activePoliciesCount}</div>
-            <FigurePeriod
-              scope={summary.metricScope.activePoliciesCount}
-              periodLabel={summary.periodLabel}
-              generatedAt={summary.generatedAt}
-              testId="dpol-active"
+          {/* THREE FIGURES IN ONE ROW, each keeping its own period clause.
+              `Tile`'s `meta` slot is where that clause belongs — owner decision 58 says a figure
+              carries its own period because two of this screen's four metrics ignore the filter,
+              and every `scope`, `periodLabel`, `generatedAt` and `testId` is passed through
+              unchanged. Nothing about WHICH figure is shown or what it is scoped to has moved. */}
+          <Tiles>
+            <Tile
+              icon="file"
+              value={formatNumber(summary.activePoliciesCount, language)}
+              label={t('dpolActivePolicies')}
+              meta={
+                <FigurePeriod
+                  scope={summary.metricScope.activePoliciesCount}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dpol-active"
+                />
+              }
             />
-          </section>
-
-          <section style={sectionStyle}>
-            <h2>{t('dpolExpiringPolicies')}</h2>
-            <div style={statStyle}>{summary.expiringPoliciesCount}</div>
-            <FigurePeriod
-              scope={summary.metricScope.expiringPoliciesCount}
-              periodLabel={summary.periodLabel}
-              generatedAt={summary.generatedAt}
-              testId="dpol-expiring"
+            <Tile
+              icon="clock"
+              tone="alarm"
+              value={formatNumber(summary.expiringPoliciesCount, language)}
+              label={t('dpolExpiringPolicies')}
+              meta={
+                <FigurePeriod
+                  scope={summary.metricScope.expiringPoliciesCount}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dpol-expiring"
+                />
+              }
             />
-          </section>
-
-          <section style={sectionStyle}>
-            <h2>{t('dpolNewIssued')}</h2>
-            <div style={statStyle}>{summary.newPoliciesIssuedCount}</div>
-            <FigurePeriod
-              scope={summary.metricScope.newPoliciesIssuedCount}
-              periodLabel={summary.periodLabel}
-              generatedAt={summary.generatedAt}
-              testId="dpol-new-issued"
+            <Tile
+              icon="plus"
+              value={formatNumber(summary.newPoliciesIssuedCount, language)}
+              label={t('dpolNewIssued')}
+              meta={
+                <FigurePeriod
+                  scope={summary.metricScope.newPoliciesIssuedCount}
+                  periodLabel={summary.periodLabel}
+                  generatedAt={summary.generatedAt}
+                  testId="dpol-new-issued"
+                />
+              }
             />
-          </section>
+          </Tiles>
 
-          <section style={sectionStyle}>
-            <h2>{t('dpolCancelled')}</h2>
+          <Card title={t('dpolCancelled')} padded={false}>
             {summary.cancelledPolicies.length === 0 ? (
-              <p>{t('dpolNoCancellations')}</p>
+              <EmptyState title={t('dpolNoCancellations')} style={{ margin: 'var(--space-4)' }} />
             ) : (
-              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColPolicy')}</th>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColLine')}</th>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColReason')}</th>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColCancelledAt')}</th>
+                    <Th>{t('dpolColPolicy')}</Th>
+                    <Th>{t('dpolColLine')}</Th>
+                    <Th>{t('dpolColReason')}</Th>
+                    <Th>{t('dpolColCancelledAt')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.cancelledPolicies.map((c) => (
-                    <tr key={c.policyId}>
-                      <td style={{ padding: '0.25rem 0.5rem' }}>
+                    <Tr key={c.policyId}>
+                      <Td>
                         {/*
                           * OWNER DECISION 50 — a policy with no number yet is named by its
                           * CUSTOMER plus a state word, never by its internal id. This was the one
@@ -233,23 +255,23 @@ export default function PolicyDashboardPage() {
                           {c.policyNumber ??
                             t('dpolBeforeIssuance', { customer: c.customerName })}
                         </bdi>
-                      </td>
-                      <td style={{ padding: '0.25rem 0.5rem' }}>
+                      </Td>
+                      <Td>
                         <bdi>{c.insuranceLine}</bdi>
-                      </td>
-                      <td style={{ padding: '0.25rem 0.5rem' }}>
+                      </Td>
+                      <Td>
                         <bdi>{c.reason}</bdi>
-                      </td>
-                      <td style={{ padding: '0.25rem 0.5rem' }}>{c.cancelledAt.slice(0, 10)}</td>
-                    </tr>
+                      </Td>
+                      <Td>{c.cancelledAt.slice(0, 10)}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
-          </section>
+          </Card>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={3} label={t('dashLoading')} />
       )}
     </main>
   );
