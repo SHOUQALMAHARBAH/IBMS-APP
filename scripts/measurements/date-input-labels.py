@@ -36,11 +36,19 @@ import io
 import os
 import re
 import sys
+import tempfile
 
 WEB = os.path.join("apps", "web")
 APP = os.path.join(WEB, "app")
 COMPONENTS = os.path.join(WEB, "components")
-OUT = os.path.join(os.environ.get("TMP", "."), "date-input-labels.txt")
+# The output goes to the system temp directory, NOT into the repo: this console is cp1252 and
+# cannot print Arabic, so the report has to be a UTF-8 FILE. The fallback was `.`, which wrote
+# `date-input-labels.txt` into the repo root on a run where TMP was unset — a measurement script
+# that can silently drop a file into the tree is a measurement script somebody commits by accident.
+OUT = os.path.join(
+    os.environ.get("TMP") or os.environ.get("TEMP") or tempfile.gettempdir(),
+    "date-input-labels.txt",
+)
 
 DATE_INPUT = re.compile(r'type="date"')
 
