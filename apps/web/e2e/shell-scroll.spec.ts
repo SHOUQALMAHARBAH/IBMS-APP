@@ -134,6 +134,45 @@ test("the bar and the rail do not move when the body scrolls", async ({ page }) 
   expect(railAfter.y, "the rail moved when the body scrolled").toBeCloseTo(railBefore.y, 0);
 });
 
+test("BELOW 64rem THE PAGE SCROLLER COMES BACK — the lock is desktop-only", async ({
+  page,
+}) => {
+  /*
+   * THE INVERSE OF THE FIRST TEST, AND IT EXISTS BECAUSE A SCREENSHOT CAN NO LONGER SEE THIS.
+   *
+   * Above 64rem the shell is `100dvh` with `overflow: hidden`. Below it that is worse than the
+   * page scroller — the collapsed rail strip eats fixed height off a short screen, and the
+   * address-bar retraction that gives a phone reader their screen back only happens when the PAGE
+   * scrolls, never when a div does. `globals.css` hands it back, and every declaration there needs
+   * `!important` because `shellStyle` is an INLINE object.
+   *
+   * A HALF-APPLIED VERSION OF THAT BLOCK HAS SHIPPED HERE ONCE AND A SCREENSHOT IS WHAT CAUGHT
+   * IT. It cannot catch this one: the design-pass capture helper now grows the viewport to the
+   * content column's own `scrollHeight` before the shot, so a phone capture comes out whole
+   * whether the page scrolls or a div does. Planted — `!important` dropped from the shell rule —
+   * the capture was 2,189px against 2,115px correct, which is noise. The evidence that used to
+   * find this stopped being able to, so the assertion has to.
+   */
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openApp(page);
+
+  const docOverflow = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(
+    docOverflow,
+    "the document does not scroll on a phone — the 64rem block did not apply, so the shell is " +
+      "still locked and the browser chrome will never retract",
+  ).toBeGreaterThan(100);
+
+  // And the content column must NOT be its own scroller here, which is the other half: a page
+  // that scrolls while a div inside it also scrolls is two scrollbars, not one.
+  const columnScrolls = await content(page).evaluate(
+    (el) => el.scrollHeight > el.clientHeight + 1,
+  );
+  expect(columnScrolls, "the content column is still a scroller on a phone").toBe(false);
+});
+
 test("a route change puts the reader back at the top of the new screen", async ({ page }) => {
   await openApp(page);
 
