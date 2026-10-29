@@ -124,6 +124,119 @@ test.describe("design pass — screenshots", () => {
     }
   }
 
+  /* ------------------------------------------------------------------ /dashboards/claims */
+
+  /*
+   * THE FIGURES SHAPE. Three tiles, the ageing as one distribution, and three breakdown tables in
+   * one card — the figures are byte-for-byte the ones the api sends, which is §7's limit.
+   */
+  const CLAIMS_SUMMARY = {
+    generatedAt: "2026-09-07T00:00:00.000Z",
+    asOf: "2026-09-07T00:00:00.000Z",
+    openClaimsCount: 14,
+    closedClaimsCount: 52,
+    outstandingClaimsValueJod: "37500.000",
+    ageing: {
+      d0_30: { count: 6, valueJod: "12000.000" },
+      d31_60: { count: 4, valueJod: "9500.000" },
+      d61_90: { count: 2, valueJod: "8000.000" },
+      d90_plus: { count: 2, valueJod: "8000.000" },
+    },
+    lossRatioByClient: [
+      { key: "cus-1", label: "شركة الأمل للتجارة", periodClaims: "20000.000", periodPremium: "40000.000", ratio: "0.5000", ratioCapped: false, claimCount: 2, policyCount: 1 },
+      { key: "cus-2", label: "مؤسسة النور", periodClaims: "6000.000", periodPremium: "30000.000", ratio: "0.2000", ratioCapped: false, claimCount: 1, policyCount: 2 },
+    ],
+    lossRatioByLine: [
+      { key: "motor", label: "مركبات", periodClaims: "20000.000", periodPremium: "40000.000", ratio: "0.5000", ratioCapped: false, claimCount: 2, policyCount: 1 },
+    ],
+    lossRatioByInsurer: [
+      { key: "ins-1", label: "الشركة الوطنية للتأمين", periodClaims: "20000.000", periodPremium: "40000.000", ratio: "0.5000", ratioCapped: false, claimCount: 2, policyCount: 1 },
+    ],
+  };
+
+  screenshots(
+    "dashboards-claims",
+    "/dashboards/claims",
+    ["BRANCH_DEPARTMENT_MANAGER"],
+    async (page) => {
+      await page.route("http://localhost:4000/dashboards/claims**", (route) =>
+        route.fulfill({ status: 200, json: CLAIMS_SUMMARY }),
+      );
+    },
+    async (page) => {
+      // WESTERN DIGITS, even in Arabic — `AR_LOCALE` is `'ar'` rather than `'ar-JO'` precisely
+      // so every figure in the product reads in Western numerals, which `format.ts` records.
+      // Waiting for `٥٢` here timed out and confirmed that decision is live.
+      await page.getByText("52", { exact: true }).first().waitFor();
+    },
+  );
+
+  /* ------------------------------------------------------------------ /client-accounting */
+
+  /*
+   * THE MONEY SHAPE, and the one screen whose COLUMN HEADERS changed language in this batch: four
+   * of the five ageing buckets now read in Arabic, and `1–30 days` is still English because the
+   * word for that range is owed. The capture is the evidence for both halves at once.
+   */
+  const AGEING = {
+    asOf: "2026-09-03T00:00:00.000Z",
+    currency: "JOD",
+    rows: [
+      {
+        customerId: "acme",
+        customerLegalName: "شركة الأمل للتجارة",
+        currency: "JOD",
+        current: "0.000",
+        d1_30: "0.000",
+        d31_60: "0.000",
+        d61_90: "0.000",
+        d90_plus: "115350.000",
+        outstandingTotal: "115350.000",
+        invoiceCount: 1,
+        oldestDueDate: "2026-05-01T00:00:00.000Z",
+        oldestDaysOverdue: 125,
+      },
+      {
+        customerId: "noor",
+        customerLegalName: "مؤسسة النور",
+        currency: "JOD",
+        current: "4000.000",
+        d1_30: "2000.000",
+        d31_60: "0.000",
+        d61_90: "0.000",
+        d90_plus: "0.000",
+        outstandingTotal: "6000.000",
+        invoiceCount: 2,
+        oldestDueDate: "2026-08-20T00:00:00.000Z",
+        oldestDaysOverdue: 14,
+      },
+    ],
+    totals: {
+      current: "4000.000",
+      d1_30: "2000.000",
+      d31_60: "0.000",
+      d61_90: "0.000",
+      d90_plus: "115350.000",
+      outstandingTotal: "121350.000",
+      invoiceCount: 3,
+      customerCount: 2,
+    },
+  };
+
+  screenshots(
+    "client-accounting",
+    "/client-accounting",
+    ["FINANCE_OFFICER"],
+    async (page) => {
+      await page.route("http://localhost:4000/client-accounting/ageing**", (route) =>
+        route.fulfill({ status: 200, json: AGEING }),
+      );
+    },
+    async (page) => {
+      await page.getByText("مؤسسة النور").first().waitFor();
+    },
+  );
+
   /* ------------------------------------------------------------------ /incidents */
 
   const INCIDENTS = [

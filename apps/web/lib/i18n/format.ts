@@ -65,6 +65,31 @@ export function formatMoney(
  * separators follow the locale — which is what every other figure in this app
  * does and what the placeholders deliberately do not fight.
  */
+/**
+ * A LOSS RATIO AS A PERCENTAGE — the one home, and it was not the first home.
+ *
+ * THREE screens render a loss ratio and before this they rendered it TWO ways: `/claims-analytics`
+ * held this function privately and read `50.0%`, while `/dashboards/claims` and `/renewal-cases`
+ * printed the raw `0.5000` the api sends. The considered treatment already existed; what was
+ * missing was one place to keep it.
+ *
+ * NO LANGUAGE ARGUMENT, and that is deliberate rather than an omission: `AR_LOCALE` is `'ar'` and
+ * not `'ar-JO'` — see `formatNumber`'s own note — specifically so every figure in this product
+ * renders in Western digits, which is what `toFixed` already gives.
+ *
+ * A NON-FINITE VALUE FALLS BACK TO THE STORED STRING rather than to a dash: the api sends a
+ * `Decimal` as text, and printing an em dash for something it DID send would report "no ratio
+ * recorded" about a ratio that is on the wire.
+ *
+ * IT SAYS NOTHING ABOUT CLAMPING. Owner decision 55's `statusRatioCapped` marker is the caller's,
+ * because only the caller knows whether its own view carries `ratioCapped` — `/renewal-cases` does
+ * not, which is why that screen is still raw and is recorded as owed rather than converted.
+ */
+export function formatLossRatio(value: string): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${(n * 100).toFixed(1)}%` : value;
+}
+
 export function formatNumber(value: number, language: Language): string {
   return value.toLocaleString(LOCALE_BY_LANGUAGE[language]);
 }

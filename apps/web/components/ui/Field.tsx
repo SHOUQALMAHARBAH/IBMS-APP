@@ -12,7 +12,15 @@ import type { CSSProperties, InputHTMLAttributes, ReactNode, SelectHTMLAttribute
  * directive's "name the exact field and the exact problem" (§2) only holds
  * if the association is real.
  */
-const CONTROL: CSSProperties = {
+/**
+ * THE ONE CONTROL APPEARANCE, exported so the picker can wear it too.
+ *
+ * `EntitySearch` rendered a bare `<input>` with no style at all and therefore the browser's own
+ * control chrome — beside one of these, two controls from two different applications, and on a
+ * dark screen a light UA-painted box. Exporting it is what makes "an input looks like an input"
+ * one fact rather than two.
+ */
+export const CONTROL: CSSProperties = {
   width: '100%',
   padding: 'var(--space-2) var(--space-3)',
   fontFamily: 'inherit',

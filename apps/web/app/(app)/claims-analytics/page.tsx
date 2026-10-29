@@ -24,7 +24,7 @@ import {
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
-import { formatMoney } from '../../../lib/i18n/format';
+import { formatLossRatio, formatMoney } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
 // Module scope has no translator, so this maps to label KEYS and the
@@ -35,10 +35,6 @@ const GROUP_LABEL_KEY: Record<LossRatioGroupBy, TranslationKey> = {
   line: 'claInsuranceLine',
 };
 
-function ratioPct(v: string): string {
-  const n = Number(v);
-  return Number.isFinite(n) ? `${(n * 100).toFixed(1)}%` : v;
-}
 
 
 export default function ClaimsAnalyticsPage() {
@@ -130,7 +126,7 @@ export default function ClaimsAnalyticsPage() {
                       <bdi>{r.label}</bdi>
                     </Td>
                     <Td>
-                      {ratioPct(r.ratio)}
+                      {formatLossRatio(r.ratio)}
                       {/* OWNER DECISION 55 — THE MOST DANGEROUS OF THE ELEVEN. The ratio exceeded
                           `MAX_LOSS_RATIO` and was CLAMPED to fit `Decimal(7, 4)`, so the figure on
                           screen IS THE CEILING, NOT THE RATIO — and the renewal workflow depends on
@@ -151,7 +147,7 @@ export default function ClaimsAnalyticsPage() {
                     {t('claColTotal')}
                   </Td>
                   <Td numeric>
-                    {ratioPct(data.totals.ratio)}
+                    {formatLossRatio(data.totals.ratio)}
                     {data.totals.ratioCapped ? ` ${t('statusRatioCapped')}` : ''}
                   </Td>
                   <Td numeric>

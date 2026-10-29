@@ -756,6 +756,47 @@ own look.
 
 ---
 
+### Batch 6 — what the two new captures showed, which no gate could
+
+Three defects, all found by OPENING a screenshot rather than by any check, on screens that were
+already converted and already green.
+
+| What the picture showed | What it was | What changed |
+|---|---|---|
+| The two pickers in the filter row were a different colour from the two text fields beside them | `EntitySearch` rendered a bare `<input>` with **no `style` prop at all**, so the browser painted its own control chrome — a light box on a dark screen | `Field`'s `CONTROL` is exported and the picker wears it |
+| `40000.000` and `20000.000` in a table, four centimetres under a tile reading `JOD 37,500.000` | The loss-ratio breakdowns printed the api's raw `Decimal` strings while the same screen's tiles went through `formatMoney` | Both money columns go through the money formatter |
+| `0.5000` where a loss ratio belongs | THREE screens render a loss ratio and already rendered it TWO ways — `/claims-analytics` carried a private `ratioPct` reading `50.0%` | `formatLossRatio` in `lib/i18n/format.ts`; the private copy is gone and both readers point at it |
+
+#### The ratio measurement inverted the first reading, which is why it is written down
+
+The obvious move was to invent a percentage rendering for the dashboard. Measuring first found that
+the considered treatment ALREADY EXISTED one screen over, carrying decision 55's capped marker in
+the same cell — so this is the decision-42 shape resolved the right way round: one home for one
+fact, rather than a third reading of it.
+
+**`/renewal-cases` IS DELIBERATELY NOT CONVERTED, and that is a finding rather than a scoping
+line.** Its wire carries `{ periodClaims, periodPremium, ratio }` and **no `ratioCapped`**, so that
+screen cannot render the capped marker at all — and `CLAUDE.md`'s own record of decision 55 says
+`(capped)` is the most dangerous of the eleven precisely BECAUSE the renewal workflow depends on
+that number. Turning a clamped ceiling into a confident `100000.0%` there would make it read *more*
+precise, not less. **Owed to the renewal module: `ratioCapped` on that view, before the screen can
+say anything about it.**
+
+#### «حسب الفرع» over a table of insurance lines, beside a filter for physical branches
+
+Register entry 1's noun collision, live on one screen. `/dashboards/claims` carries both senses of
+«فرع» at once: `dashBranchIdLabel` («اعرض فرعاً واحداً فقط») is a physical office,
+`dashInsuranceLineLabel` («فرع التأمين») is a line, and `dclmByLine` read «حسب الفرع» — unqualified,
+four centimetres below the branch filter, over rows reading «مركبات».
+
+The other two are each unambiguous in themselves; the heading was the one that reads either way.
+**No Arabic was typed**: «حسب» is `dclmByClient`'s own first word and «فرع التأمين» is
+`dashInsuranceLineLabel` entire — both already rendering on this same screen — so the value is two
+shipping runs joined, with both halves asserted as substrings and the result asserted NFC. The
+English is written rather than sliced, the ordinary asymmetry.
+
+---
+
 ---
 
 ## The method, per screen

@@ -31,7 +31,11 @@ import {
 } from '../../../../lib/management-reporting/claims-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { useLanguage } from '../../../../lib/i18n/language-context';
-import { formatMoney, formatNumber } from '../../../../lib/i18n/format';
+import {
+  formatLossRatio,
+  formatMoney,
+  formatNumber,
+} from '../../../../lib/i18n/format';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
@@ -42,7 +46,7 @@ function LossRatioTable({
   title: string;
   rows: LossRatioBreakdownRow[];
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   return (
     <section>
       <h3 style={{ marginBottom: 'var(--space-2)' }}>{title}</h3>
@@ -64,10 +68,14 @@ function LossRatioTable({
                 <Td>
                   <bdi>{r.label}</bdi>
                 </Td>
-                <Td numeric>{r.periodClaims}</Td>
-                <Td numeric>{r.periodPremium}</Td>
+                {/* Money through the money formatter — this table sat under a tile reading
+                    `JOD 37,500.000` while printing `40000.000` itself. */}
+                <Td numeric>{formatMoney(r.periodClaims, language)}</Td>
+                <Td numeric>{formatMoney(r.periodPremium, language)}</Td>
                 <Td numeric>
-                  {r.ratio}
+                  {/* `/claims-analytics` has read this as a percentage all along; this cell printed
+                      the raw `0.5000`. One home now — `formatLossRatio`. */}
+                  {formatLossRatio(r.ratio)}
                   {/* Owner decision 55 — the displayed ratio is the CEILING, not the ratio. See
                       `statusRatioCapped`. */}
                   {r.ratioCapped ? ` ${t('statusRatioCapped')}` : ''}

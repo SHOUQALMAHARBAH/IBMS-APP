@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { CONTROL } from './Field';
 import { useLanguage } from '../../lib/i18n/language-context';
 import type { TranslationKey } from '../../lib/i18n/translations';
 import { searchCustomers } from '../../lib/customer/customer-api';
@@ -787,6 +788,17 @@ export function EntitySearch({
           }}
           placeholder={t(source.placeholder)}
           data-entity-search-term={kind}
+          /*
+           * THE PRODUCT'S OWN CONTROL APPEARANCE. This input had NO style prop, so it rendered in
+           * the browser's own control chrome — and beside a `Field`-wrapped `TextInput` the two
+           * looked like controls from two different applications. On a dark screen the user agent
+           * paints a light box, which is how it was found: by opening a screenshot of
+           * `/dashboards/claims`, whose filter row holds two pickers and two text fields.
+           *
+           * Nothing but the appearance changes — the combobox role, every ARIA attribute, the
+           * required-on-the-visible-input decision and the keyboard handling are untouched.
+           */
+          style={CONTROL}
         />
         {selected ? (
           <button type="button" onClick={clear} data-entity-search-clear={kind}>
