@@ -71,7 +71,39 @@ async function seedTheme(page: Page, theme: Theme) {
   );
 }
 
+/** A capture may not be taller than this. A screen whose content runs past it is a finding in
+ *  itself, and a 40,000px PNG is not a thing anybody reviews. */
+const MAX_CAPTURE_HEIGHT = 12_000;
+
 async function capture(page: Page, screen: string, theme: Theme, width: Width) {
+  /*
+   * THE VIEWPORT IS GROWN TO THE CONTENT COLUMN BEFORE THE SHOT, AND THAT IS NOT COSMETIC.
+   *
+   * `fullPage: true` captures the DOCUMENT'S scrollable extent. The shell is `100dvh` with
+   * `overflow: hidden` now, so on a desktop the document is exactly one viewport and `fullPage`
+   * silently became a viewport shot — every desktop capture in this set stopped showing anything
+   * below the fold, with nothing failing and the files still being written. The phone keeps the
+   * page scroller (the 64rem block in `globals.css`), so half the set was unaffected, which is
+   * why a glance at a phone capture would have said everything was fine.
+   *
+   * Growing the viewport rather than taking an ELEMENT screenshot of `[data-app-content]`: the
+   * rail and the top bar are a third of what is being reviewed, and an element shot drops them.
+   */
+  const needed = await page.evaluate(() => {
+    const col = document.querySelector("[data-app-content]");
+    if (!col) return 0; // the sign-in screen has no shell
+    return col.scrollHeight - col.clientHeight;
+  });
+  if (needed > 0) {
+    const size = page.viewportSize();
+    if (size) {
+      await page.setViewportSize({
+        width: size.width,
+        height: Math.min(size.height + needed, MAX_CAPTURE_HEIGHT),
+      });
+    }
+  }
+
   await page.screenshot({
     // NOT `test-results/` — Playwright CLEARS that directory at the start of every run, so
     // captures written there survive only until the next `npx playwright test`. These are
@@ -184,10 +216,24 @@ test.describe("design pass — screenshots", () => {
       );
     },
     async (page) => {
-      // WESTERN DIGITS, even in Arabic — `AR_LOCALE` is `'ar'` rather than `'ar-JO'` precisely
-      // so every figure in the product reads in Western numerals, which `format.ts` records.
-      // Waiting for `٥٢` here timed out and confirmed that decision is live.
-      await page.getByText("52", { exact: true }).first().waitFor();
+      // THE RING'S CAPTION, which is what this capture is now for. The anchor was `52` — the
+      // closed-claims TILE's value — and owner answer 4 moved open-and-closed into a `Ring`, so
+      // that text no longer exists on the screen. The caption is the stronger anchor anyway: it
+      // is the half of the component that cannot be rendered without the denominator, which is
+      // the whole reason `caption` is a required prop.
+      //
+      // `66` is the denominator and appears nowhere else on this screen. The fixture's own
+      // 14 open / 52 closed makes it 14 of 66 — the owner's example verbatim — so the capture is
+      // a picture of her own sentence.
+      //
+      // WESTERN DIGITS, even in Arabic: `AR_LOCALE` is `'ar'` rather than `'ar-JO'` precisely so
+      // every figure in the product reads in Western numerals, which `format.ts` records. Waiting
+      // for the Arabic-Indic form here timed out once and confirmed that decision is live.
+      await page
+        .locator('[data-testid="claims-open-ring"]')
+        .getByText("66", { exact: false })
+        .first()
+        .waitFor();
     },
   );
 

@@ -65,7 +65,6 @@ export default function ScreeningHealthPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { language, t } = useLanguage();
-  const isArabic = language === "AR";
 
   const [health, setHealth] = useState<ScreeningHealth | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

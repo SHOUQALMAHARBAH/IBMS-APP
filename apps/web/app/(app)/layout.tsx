@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
@@ -28,28 +28,34 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useLanguage();
   const { user, isLoading } = useAuth();
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
 
   /*
-   * THE SCROLL RESET, WHICH IS THE DEFECT THE SHELL CHANGE WOULD OTHERWISE INTRODUCE.
+   * THERE IS NO SCROLL RESET HERE, AND THAT IS A MEASUREMENT RATHER THAN AN OMISSION.
    *
-   * The browser restores and resets scroll on the DOCUMENT scroller. The content column is the
-   * scroller now, so without this, navigating from halfway down a long table lands you halfway
-   * down the next screen — with its page header, its one line saying what the screen is for, and
-   * its primary action all above the fold. Invisible in every screenshot; obvious to the first
-   * person who uses it, which is why `shell-scroll.spec.ts` asserts it.
+   * Moving the scroller off the document looks like it must stop route changes resetting the
+   * scroll — the browser does that on the DOCUMENT scroller — so an effect was written for it,
+   * `shell-scroll.spec.ts` was written to assert it, and then the effect was PLANTED AWAY. All
+   * three tests still passed.
    *
-   * `scrollTop = 0` rather than `scrollTo({ behavior: 'smooth' })`: a route change is not a
-   * movement within a page, and animating it would show the reader the bottom of a screen they
-   * never asked for on the way up.
+   * MEASURED IN `next/dist/client/components/layout-router.js`: on a navigation with no hash the
+   * App Router works out whether the new segment's node is in view, sets
+   * `documentElement.scrollTop = 0`, and if the node is still out of view calls
+   * `instance.scrollIntoView()` — which scrolls EVERY scrollable ancestor, this column included.
+   * The framework has always done it; the document being the scroller was never what made it work.
+   *
+   * AND THE EFFECT WAS THE WORSE OF THE TWO, which is why it is gone rather than kept beside it.
+   * It fired on `[pathname]`, which changes on a BACK navigation too, so it would have forced
+   * `scrollTop = 0` and destroyed the position the reader was returning to. Next's path checks the
+   * target state first and exits early when the node is already in view — exactly the Back case.
+   *
+   * `shell-scroll.spec.ts` pins the framework's behaviour instead, so a Next upgrade that stops
+   * resetting a nested scroll container fails there rather than being found by a reader landing
+   * halfway down a screen.
    */
-  useEffect(() => {
-    if (contentRef.current) contentRef.current.scrollTop = 0;
-  }, [pathname]);
 
   if (isLoading || !user) return null;
 
@@ -67,7 +73,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <AppNavbar />
       <div style={shellRowStyle} data-app-shell-row>
         <AppNav />
-        <div style={contentStyle} data-app-content ref={contentRef}>
+        <div style={contentStyle} data-app-content>
           {needsEnrolment ? (
             <div style={mfaBannerStyle} role="status" data-mfa-enrolment-banner>
               <strong style={mfaBannerTitleStyle}>{t('mfaBannerTitle')}</strong>

@@ -46,6 +46,12 @@ function slotColour(slot: ChartSlot): string {
  * form that cannot express the mistake, rather than a convention somebody has to remember. Both
  * strings are formatted BY THE CALLER through `formatNumber`, so the numerals follow the reader's
  * language rather than being decided here.
+ *
+ * AND IT IS DRAWN BESIDE THE RING, NOT INSIDE IT. It used to be an SVG `<text>` under the
+ * percentage at roughly 9px, which suits the `٣١ من ٣٦` shape this header first imagined and
+ * breaks for a caption written as a sentence — the owner's first one spilled past both edges of
+ * the circle. Beside the label it has the card's width and a readable size. Do not move it back
+ * to make a short caption look tidier; the short case reads perfectly well out here too.
  */
 export function Ring({
   value,
@@ -135,14 +141,6 @@ export function Ring({
         >
           {percentText}
         </text>
-        <text
-          x={centre}
-          y={centre + Math.round(size * 0.17)}
-          textAnchor="middle"
-          style={{ fontSize: `${Math.round(size * 0.107)}px`, fill: 'var(--ink-muted)' }}
-        >
-          {caption}
-        </text>
       </svg>
       <span style={{ minWidth: 0 }}>
         <span
@@ -154,6 +152,29 @@ export function Ring({
           }}
         >
           {label}
+        </span>
+        {/*
+          THE CAPTION SITS HERE RATHER THAN INSIDE THE RING, and that is a correction.
+
+          It used to be an SVG `<text>` centred under the percentage at `size * 0.107` — about 9px
+          on the default ring. That holds for the example in this file's own header, `٣١ من ٣٦`,
+          and it does NOT hold for a caption written as a sentence: the owner's first one reads
+          «14 مطالبة مفتوحة من 66» and spilled past both edges of the circle, overlapping the arc,
+          which is what the design-pass capture showed.
+
+          Out here it has the width of the card, reads at `--text-sm` instead of 9px, and uses
+          `--ink-secondary` rather than `--ink-muted` — a token this product has already recorded
+          as failing contrast wherever it is weakened. The figure now reads in the order a person
+          says it: the percentage, what it is of, then the raw count.
+        */}
+        <span
+          style={{
+            display: 'block',
+            fontSize: 'var(--text-sm)',
+            color: 'var(--ink-secondary)',
+          }}
+        >
+          {caption}
         </span>
         {meta ? (
           <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--ink-muted)' }}>{meta}</span>

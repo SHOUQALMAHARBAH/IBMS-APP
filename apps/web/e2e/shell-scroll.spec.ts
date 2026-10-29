@@ -2,19 +2,28 @@ import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
 /*
- * THE SHELL SCROLLS THE BODY AND NOTHING ELSE — and the one defect that change introduces.
+ * THE SHELL SCROLLS THE BODY AND NOTHING ELSE.
  *
  * The owner asked for this after walking the captures: *«بدي يكون الناف بار و السايد بار ستاتيك
  * يعني ثابتين محلهم و بس البادي هو الي بيتحرك بالسكرول»* — the top bar and the rail stay put, only
  * the body moves. `shellStyle` is `100dvh` with `overflow: hidden` and the content column is the
  * only scroller.
  *
- * WHAT THIS SPEC IS FOR IS THE SECOND HALF. The browser resets scroll on the DOCUMENT scroller;
- * move the scroller into a div and that stops, so navigating from halfway down a long table lands
- * the reader halfway down the next screen — page header, the line saying what the screen is for,
- * and the primary action all above the fold. That is invisible in every screenshot (a capture is
- * taken at the top) and obvious to the first person who uses the product, which is the class of
- * fault that needs an assertion rather than an eye.
+ * WHAT THE THIRD TEST PINS IS THE FRAMEWORK, AND THAT IS NOT HOW IT STARTED. Moving the scroller
+ * off the document looks like it must stop route changes resetting the scroll, so an effect was
+ * written in the layout to do it and this spec was written to assert that effect. The effect was
+ * then planted away and ALL THREE TESTS STILL PASSED.
+ *
+ * Measured in `next/dist/client/components/layout-router.js`: the App Router calls
+ * `instance.scrollIntoView()` on the new segment when it is out of view, and that scrolls every
+ * scrollable ancestor — this column included. So the effect was a second answer to one question,
+ * and the worse one: it fired on `[pathname]`, which changes on a BACK navigation too, and would
+ * have destroyed the position a reader was returning to. It is gone.
+ *
+ * What survives is the assertion the shell change actually needed. If a Next upgrade stops
+ * resetting a nested scroll container, this fails — rather than being discovered by somebody
+ * landing halfway down a screen with its header, its explaining line and its primary action all
+ * above the fold, which is invisible in every capture because a capture is taken at the top.
  *
  * THE TALLNESS IS INJECTED RATHER THAN MOCKED, AND THAT IS DELIBERATE. What is under test is a
  * property of the FRAME, which every one of the 106 authenticated screens renders into — so
@@ -48,15 +57,21 @@ const ME = {
 };
 
 async function openApp(page: Page) {
-  await page.route("**/auth/refresh", (route) =>
-    route.fulfill({ status: 200, json: { accessToken: "token" } }),
-  );
-  await page.route("**/auth/me", (route) => route.fulfill({ status: 200, json: ME }));
+  // THE CATCH-ALL IS REGISTERED FIRST, AND THAT ORDER IS LOAD-BEARING: Playwright matches the
+  // MOST RECENTLY ADDED route first, so a blanket handler registered last swallows `/auth/me`
+  // too — which answers `[]`, leaves `user` null, and renders no shell at all. The first version
+  // of this helper did exactly that and all three tests timed out waiting for the rail, which
+  // reads like a broken locator and is not one.
+  //
   // Every list this role's screens reach answers empty: the shell is what is under test, and a
   // screen's own data would only make the frame's behaviour depend on a fixture.
   await page.route("http://localhost:4000/**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("**/auth/refresh", (route) =>
+    route.fulfill({ status: 200, json: { accessToken: "token" } }),
+  );
+  await page.route("**/auth/me", (route) => route.fulfill({ status: 200, json: ME }));
   await page.goto("/leads");
   await page.getByRole("navigation", { name: "Primary" }).waitFor();
 
@@ -132,9 +147,9 @@ test("a route change puts the reader back at the top of the new screen", async (
     .toBeGreaterThan(100);
 
   // Through the rail, because that is how a reader changes screen. A `page.goto` would reload the
-  // document and reset the scroll for free, proving nothing about the effect in the layout — and
+  // document and reset the scroll for free, proving nothing about the client-side navigation — and
   // it would also drop the injected tallness, leaving a short destination whose `scrollTop` is 0
-  // whatever the code does.
+  // whatever anything does.
   await page.getByRole("link", { name: "Prospects" }).first().click();
   await expect(page).toHaveURL(/\/prospects/);
 
