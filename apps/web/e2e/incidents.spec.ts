@@ -297,7 +297,21 @@ test("«ما قيّمت ولا عملت شي» is NOT what `false` and 0 mean �
 
   // THE DISCRIMINATOR. Without this the test above passes against a cell that renders
   // the same thing for every row: a never-assessed incident must still read as a gap.
-  await expect(page.getByTestId("inc-impact-incident-21")).toHaveText("—");
+  //
+  // RE-POINTED 2026-10-29, AND IT IS A REAL REVERSAL: this asserted the em dash, which
+  // was the right assertion while the word did not exist. Owner decision 60 gives this
+  // exact case a word — «لم يُقيَّم بعد», *not assessed yet* — because a bare dash on a
+  // statutory impact assessment leaves the reader asking *was this forgotten, or does it
+  // not apply?*, and the answer decides whether somebody has to go and perform one.
+  //
+  // The property under test has NOT moved: a never-assessed incident must still read
+  // DIFFERENTLY from one whose finding was `false` or `0`. What changed is that the
+  // difference is now a sentence rather than a stroke. The absence of the dash is
+  // asserted too, so a regression that reverts the word fails here rather than passing
+  // on a substring.
+  const neverAssessed = page.getByTestId("inc-impact-incident-21");
+  await expect(neverAssessed).toHaveText("not assessed yet");
+  await expect(neverAssessed).not.toContainText("—");
 
   // And the positive side, so neither assertion above is passing on a hardcoded word.
   await expect(page.getByTestId("inc-touches-incident-1")).toContainText("Yes");

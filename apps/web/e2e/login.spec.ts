@@ -20,6 +20,39 @@ test("renders the sign-in form", async ({ page }) => {
   await expect(page.getByLabel("Password")).toBeVisible();
 });
 
+test("the brand panel says what the product is, in the reader's own language", async ({
+  page,
+}) => {
+  /*
+   * THE PILOT SHIPPED THIS PANEL WORDLESS ON PURPOSE and said so: the i18n tree held no product
+   * sentence to slice, and writing one here is what rule 8(d) forbids. The owner closed that on
+   * 2026-10-29 by naming the source — her own bilingual flyers, and the reference page that
+   * composes three of their capability lines.
+   *
+   * ASSERTED IN BOTH LANGUAGES, because the failure this guards is not a missing element but a
+   * HALF-TRANSLATED one: a key that exists in EN and not in AR renders as its own key name, and
+   * the first screen a client sees is the worst place in the product for that. The i18n parity
+   * unit test covers the key SET; this covers the panel actually reaching for it.
+   */
+  await page.goto("/login");
+  await expect(page.getByText("Go digital. Stay compliant.")).toBeVisible();
+  await expect(page.getByText("built for insurance brokers", { exact: false })).toBeVisible();
+
+  for (const chip of ["Complete audit trail", "One channel to every insurer", "Privacy by design"]) {
+    await expect(page.getByText(chip, { exact: true })).toBeVisible();
+  }
+
+  // The Arabic side, which is the one that ships by default. `getByText` on the headline is
+  // enough of an anchor that the chips below it are asserted against a rendered panel rather
+  // than against an empty page.
+  await page.addInitScript(() => {
+    localStorage.setItem('ibms.languagePreference', 'AR');
+  });
+  await page.goto("/login");
+  await expect(page.getByText("تحوّل رقميّ، بامتثال كامل.")).toBeVisible();
+  await expect(page.getByText("سجلّ تدقيق كامل", { exact: true })).toBeVisible();
+});
+
 test("shows a server-provided error message on invalid credentials", async ({ page }) => {
   await page.route("**/auth/login", (route) =>
     route.fulfill({ status: 401, json: { message: "Invalid email or password" } }),
