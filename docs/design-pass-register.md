@@ -254,10 +254,86 @@ thing that makes the list worth keeping.
 |---|---|---|---|
 | 1 | the sign-in brand panel | **it needed no word from her** — it is in her own brand pack. The Arabic and English flyers carry the headline, the product sentence and six capability lines; reference page B composes three of them into this panel | `BrandPitch`, five key pairs. **The Arabic bytes came from the reference page's HTML, not from my reading of the flyer PNG** — transcribing Arabic from an image is where the shadda/vowel trap bites, and the reference is text that can be copied exactly |
 | 2 · 2b | the five em-dash cells | **three words, not one** — «لم يُقيَّم بعد» (not done yet), «لا ينطبق» (does not apply), «غير متوفّر» (held, unresolvable), with the instruction that a site which does not fit one of the three KEEPS ITS DASH | three keys; **three of the five sites converted and two did not** — see the table below |
-| 4 | `/client-accounting`'s receivables ageing | the word for the **1–30 days** bucket. The nearest shipping string, `dclmAgeing0To30`, covers DAY ZERO — which on a receivables report is the `current` bucket, a separate column — so pointing at it would be a false label. The other four headers converted | **OPEN** |
+| 4 | `/client-accounting`'s receivables ageing | **«من ١ إلى ٣٠ يوماً», as a NEW key and not a pointer** — `dclmAgeing0To30` reads «من ٠ إلى ٣٠ يوماً» and covers DAY ZERO, which on a receivables report is the `current` bucket one column to the left | `caAgeing1To30`. **AND HER WORD WAS ALREADY IN THE PRODUCT**: `frAgeing1To30` on `/financial-report` is BYTE-IDENTICAL (both NFC, 17 codepoints, compared one at a time), so the value was copied from it rather than typed. The near-match she warned about is exactly ONE codepoint — U+0660 against U+0661. `AR_AGEING_BUCKET_FALLBACK` is DELETED rather than emptied |
 | 3 | the Arabic email subjects | **they carry «وسيط 360»** — they read as a generic description today, which was correct while the product had no name to show | three subjects, plus one body line as a stated judgement |
-| 5 | `/screening-health`'s capability table | the words for **`SANCTIONS`** and **`PEP`**, which render as raw tokens. The Arabic for PEP exists on that same screen, but only INSIDE a sentence («فحص الأشخاص السياسيين (PEP)») — lifting a genitive run out of a sentence to label a table row is morphology, and this repository has refused that once already by name (the «محاولتان» dual) | **OPEN** |
-| 6 | `/screening-health`'s screening outcomes | the words for **`CLEAR`**, **`POTENTIAL_MATCH`** and **`ERROR`**. Measured before being described: these are NOT `ScreeningOutcome`'s members — that Prisma enum is `CLEAR \| HIT \| PENDING_INVESTIGATION` — so there is no label map to reach for and no slice to take | **OPEN** |
+| 5 | `/screening-health`'s capability table | **«العقوبات»** and **«الأشخاص السياسيون (PEP)»** — the NOMINATIVE, which is what a column label takes, against the genitive run inside the sentence already on that screen | `shCapSanctions` / `shCapPep`, in a map TOTAL over a declared union by her own instruction. **BUT THE UNION IS NINE MEMBERS, NOT TWO** — `ProviderCapability`, and every provider reports all nine; **my own capture fixture carried two rows**, which is why her note reads *a third capability*. Seven render their token and are owed |
+| 6 | `/screening-health`'s screening outcomes | **«لا يوجد تطابق، الفحص نظيف», «مطابقة محتملة», «تعذّر الفحص»** — with the `CLEAR` sentence trimmed BY HER after being shown it renders beside a COUNT rather than on one customer's record | **NONE OF THEM WAS NEEDED, and that is the finding.** The keys are `ScreeningAttemptOutcome` — five members, no `CLEAR` and no `ERROR` — and `ENUM_LABEL.ScreeningAttemptOutcome` has mapped all five to bilingual keys the whole time; `screenOutcomeUnableToScreen` IS «تعذّر الفحص», her own word. **Her token names came off my own fixture**, which invented two members that cannot occur. Reported, not swapped in |
+| 7 | the `Ring` caption | **«١٤ مطالبة مفتوحة من ٦٦»** — *{open} open claims of {total}*, the string `Ring` has required since it was written | `dclmOpenClaimsOfTotal` in `plurals.ts`, and a `Ring` on `/dashboards/claims`. `other` is her run with the numerals replaced; `few` slices `execOpenClaims` verbatim; **`zero`, `one` and `two` are OMITTED** because «مطالبتان» ships nowhere — the «محاولتان» dual again. **And her caption did not fit the space**: it drew as 9px SVG text inside the ring and spilled past the arc, so the COMPONENT moved it under the label. Her words untouched |
+
+### The shell: the window stops scrolling
+
+Her words, after walking the captures: *«بدي يكون الناف بار و السايد بار ستاتيك يعني ثابتين محلهم و
+بس البادي هو الي بيتحرك بالسكرول»* — the top bar and the rail stay put; only the body moves.
+
+**What was there.** Both were `position: sticky` and THE SCROLLER WAS THE WINDOW. Sticky keeps them
+in view, which is close — but the page scrollbar ran the full document height and the content's own
+top was never a fixed edge.
+
+**What it is now.** `shellStyle` is `height: 100dvh` with `overflow: hidden`; the navbar drops
+`sticky`/`top`; the rail drops `sticky`, `top` and `max-height` and becomes `height: 100%`; the
+content column gains `overflow-y: auto`, `min-height: 0` and a `data-app-content` hook.
+
+**AND THE ARITHMETIC DISAPPEARS RATHER THAN BEING KEPT IN STEP**, which is the part worth carrying
+forward. `NAVBAR_HEIGHT`'s own comment said THREE things had to agree on it — the bar, the rail's
+sticky offset and the rail's max-height — and that going out of step either parks the rail under
+the bar or grows it a phantom scrollbar exactly one bar tall. Two of those three readers are gone:
+nothing offsets anything, because nothing overlaps.
+
+**`100dvh` is not a preference.** On a mobile browser `100vh` is the viewport WITHOUT the
+retracting chrome, so `100vh` plus `overflow: hidden` clips the last 60–100px permanently.
+
+**THE PHONE KEEPS THE PAGE SCROLLER**, which is the inverse and is deliberate. Below 64rem the lock
+is worse: the collapsed rail strip eats fixed height off a short screen, and the address-bar
+retraction that gives a phone reader their screen back only happens when the PAGE scrolls. With
+`!important`, for the reason already written above that block — these are INLINE style objects.
+
+#### Measured before touching it, as she asked
+
+| question | answer |
+|---|---|
+| `window.scrollTo` / `window.scrollY` in web source | **0** |
+| `scrollIntoView` in web source | **1** (`settings/roles`), works on any scrolling ancestor — unaffected |
+| Playwright assertions that scroll the page or wait on page scroll | **0** |
+| `position: sticky` anywhere in the web tree | **2**, and they are the two this change removes — so there is no sticky table header or toolbar to re-check |
+
+#### Three things the change nearly cost, none of which failed a gate
+
+**1 · The scroll reset I predicted does not need writing, and mine was the worse of two.** I wrote
+the effect, wrote the test, then PLANTED THE EFFECT AWAY — and all three tests still passed.
+Measured in `next/dist/client/components/layout-router.js`: the App Router calls
+`instance.scrollIntoView()` on the new segment when it is out of view, and that scrolls every
+scrollable ancestor. Mine fired on `[pathname]`, which changes on a BACK navigation too, so it
+would have destroyed the position a reader was returning to. Removed. `shell-scroll.spec.ts` stays
+and now pins the FRAMEWORK on this shell shape.
+
+**2 · Every desktop capture was silently clipped at the viewport.** All 32 passed; the desktop ones
+were one viewport tall and cut off mid-row while the phone ones were still 2,755px of full page,
+because `fullPage: true` captures the DOCUMENT'S extent and the document is now exactly `100dvh`.
+The viewport is grown to the content column's `scrollHeight` before the shot, so the rail and bar
+stay in frame. **Found by opening a picture. Nothing failed.**
+
+**3 · Two live assertions would have become unable to fail.**
+`permission-description-length.spec.ts` asserts twice that a long description does not make the
+page scroll sideways, reading `documentElement.scrollWidth` — permanently false once the shell
+clips. Both re-pointed at `[data-app-content]`, which is the stronger claim as well as the
+surviving one. Found by asking what the change made VACUOUS rather than what it broke.
+
+**And the MFA enrolment banner now scrolls away with the page. That is correct** — it is a one-time
+signpost, not a persistent state — and it is said here so nobody "fixes" it later.
+
+### What these four answers left OWED, measured
+
+Every row here is a word nobody may invent. Each renders its own member name today, which is
+visibly unfinished — the established treatment, because a plausible invented word is
+indistinguishable from a decided one and never gets corrected.
+
+| what | how many | where it renders | why it is not derivable |
+|---|---|---|---|
+| `ProviderCapability` — the seven she did not name | 7 | `/screening-health`'s capability table, every row | `WATCHLIST`, `ADVERSE_MEDIA`, `INDIVIDUAL`, `ENTITY`, `BATCH`, `ONGOING_MONITORING`, `WEBHOOKS`. The union is NINE and every provider reports all nine; her two words came from a capture whose fixture carried two rows. `PROVIDER_CAPABILITY_LABEL_KEY` is total, so a tenth member is a compile error |
+| `ScreeningCaseStatus` | 5 | `/screening-health`'s case-workload table | `OPEN`, `ASSIGNED`, `UNDER_REVIEW`, `ESCALATED`, `CLOSED`. **There is no `ENUM_LABEL` entry at all** — measured, unlike `ScreeningAttemptOutcome` beside it, which had a complete one. Found while reading for rows 5 and 6; not in either |
+| `dclmOpenClaimsOfTotal` — `zero`, `one`, `two` | 3 forms | the ring caption on `/dashboards/claims` | They fall back to `other`, so 0/1/2 read as «{n} مطالبة مفتوحة». «مطالبتان» ships NOWHERE and a dual is morphology; «مطالبة واحدة» and «لا مطالبات» are constructions rather than slices. **Do not compose them from shipping words** — that is the decision this omission protects |
+
+**And one thing is NOT owed to her and is reported instead.** Her `CLEAR` sentence «لا يوجد تطابق، الفحص نظيف» is not swapped over `screenOutcomeNoMatch`, which ships «لا يوجد تطابق» — the schema's own careful wording, whose comment says `NO_MATCH` is *the only outcome that MAY map to* `ScreeningOutcome.CLEAR`. Hers adds *the screening is clean*, which is the stronger claim; on a compliance screen the weaker one is the true one. Hers is the better sentence for a place that is about ONE customer — this renders beside a count of 388.
 
 ### Decision 60 — what converted, and what deliberately did not
 
@@ -1106,15 +1182,31 @@ runs locally. **Its CI step is written and is NOT on the branch**: GitHub refuse
 creates or updates a workflow file without `workflow` scope, and the credential this machine
 defaults to does not carry it.
 
-It is held as a single 13-line commit on the local branch **`wire-opacity-gate-into-ci`**
-(`b9794f4`), rather than sitting in the working tree where it would be the most losable thing in
-the repository. It was kept OFF `module-0b/provider-registration` deliberately: any commit touching
-`ci.yml` blocks the push of the entire branch, so leaving it in line would have held four later
-commits hostage to one line.
+It is held as a single 13-line commit on the local branch **`wire-opacity-gate-into-ci`**,
+rather than sitting in the working tree where it would be the most losable thing in the repository.
+It was kept OFF `module-0b/provider-registration` deliberately: any commit touching `ci.yml` blocks
+the push of the ENTIRE branch, so leaving it in line would hold every later commit hostage to one
+line.
+
+**RETRIED AFTER THE OWNER GRANTED `Contents: Read and write`, AND STILL REFUSED — with the same
+message, which is the diagnosis.** The refusal NAMES `workflow`, and this repository's own recorded
+rule is the discriminator: *a 403 that names `workflow` is a scope problem and a flat one is a
+write-access problem.* So the write access she granted is present and working — four other commits
+pushed on this same credential in this same batch — and what is missing is a different permission:
+
+* on a **fine-grained** token, the **Workflows** repository permission. It is its own row and is
+  NOT implied by Contents, which is why granting Contents changed nothing here.
+* on a **classic** token, the `workflow` scope checkbox.
+
+**AND THE BRANCH WAS REBASED ONTO THE CURRENT TIP WHILE THIS WAS BEING CHECKED.** It still sat on
+`ea991cd`, three commits behind, so merging it in that state would have brought back the previous
+versions of sixteen files — the whole of the batch before this one, reverted. It is one commit on
+the tip now, so a merge brings exactly the thirteen lines and nothing else. The hash moves whenever
+it is rebased, so it is named by BRANCH here rather than by commit; the previous note pinned
+`b9794f4` and that hash is already stale.
 
 **Until it lands, the gate is in the unwired-script state this repository already records against
-itself** — a number nobody can trust, because nothing runs it where it matters. Push that branch
-with a workflow-scoped token and merge it.
+itself** — a number nobody can trust, because nothing runs it where it matters.
 
 ---
 
