@@ -194,7 +194,7 @@ export default function PoliciesPage() {
                     </strong>
                     <div style={cardMetaStyle}>
                       {t('policiesCustomerLabel')}:{' '}
-                      <bdi>{policy.customer?.legalName ?? '—'}</bdi>
+                      <bdi>{policy.customer?.legalName ?? t('commonNameNotResolved')}</bdi>
                     </div>
                     <div style={cardMetaStyle}>
                       {t('policiesLineLabel')}: <bdi>{policy.insuranceLine}</bdi>

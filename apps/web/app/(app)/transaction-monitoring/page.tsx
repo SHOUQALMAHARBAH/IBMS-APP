@@ -223,7 +223,7 @@ export default function TransactionMonitoringPage() {
                       * behind it — and NOT a name the api failed to send.
                       */}
                     <Td>
-                      {r.customerName ? <bdi>{r.customerName}</bdi> : '—'}
+                      {r.customerName ? <bdi>{r.customerName}</bdi> : t('commonNameNotResolved')}
                     </Td>
                     {/*
                       Decision 59 — and the vocabulary cost NOTHING: all five

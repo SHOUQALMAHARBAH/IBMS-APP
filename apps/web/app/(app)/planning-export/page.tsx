@@ -185,7 +185,7 @@ export default function PlanningExportPage() {
                       {/* ITEM 1 — the company's name. This export's portfolio section beside it
                           already resolved one; the market section rendered a uuid. */}
                       <Td>
-                        {row.insurerName ? <bdi>{row.insurerName}</bdi> : '—'}
+                        {row.insurerName ? <bdi>{row.insurerName}</bdi> : t('commonNameNotResolved')}
                       </Td>
                       <Td>{row.quoteResponseScore}</Td>
                       <Td>{row.claimsServiceScore}</Td>

@@ -219,7 +219,7 @@ export default function InternalControlsPage() {
                       // name could not be resolved — the `?? id` fallback decision 48
                       // forbids by name, on the self-approval report. The api already
                       // sends the resolved name; a missing one reports NO NAME.
-                      who: declared.office.declaredByName ?? '—',
+                      who: declared.office.declaredByName ?? t('commonNameNotResolved'),
                     })
                   : t('icDeclaredOfficeNeverDeclared')}
               </span>
@@ -417,7 +417,7 @@ export default function InternalControlsPage() {
                           gone: that is a real state here (this scan's actor has no protecting
                           foreign key the way the audit trail's does), and "we hold no name" is
                           not "the name is this uuid". */}
-                      <Td>{v.userName ? <bdi>{v.userName}</bdi> : '—'}</Td>
+                      <Td>{v.userName ? <bdi>{v.userName}</bdi> : t('commonNameNotResolved')}</Td>
                     </Tr>
                   ))}
                 </tbody>

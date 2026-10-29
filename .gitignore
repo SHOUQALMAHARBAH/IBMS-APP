@@ -52,3 +52,8 @@ apps/api/scripts/seed-demo-report.json
 # because this host's console is cp1252 and cannot print them. Re-run the script rather than
 # committing its output.
 server-message-identifiers.txt
+
+# scripts/measurements/em-dash-sites.py writes its rows here, because this console is
+# cp1252 and a row carrying Arabic or an em dash kills the run. A snapshot to read,
+# never an artefact to keep.
+em-dash-sites.txt

@@ -182,7 +182,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
                       insurer row is gone: "we hold no name" and "the name is this uuid" are
                       different claims and only the first one is true. */}
                   <Td>
-                    {row.insurerName ? <bdi>{row.insurerName}</bdi> : '—'}
+                    {row.insurerName ? <bdi>{row.insurerName}</bdi> : t('commonNameNotResolved')}
                   </Td>
                   <Td>{row.quoteResponseScore}</Td>
                   <Td>{row.claimsServiceScore}</Td>
@@ -218,7 +218,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
                 <Tr key={row.id}>
                   {/* ITEM 1 — the colleague's name from their HR record, resolved by the api. */}
                   <Td>
-                    {row.employeeName ? <bdi>{row.employeeName}</bdi> : '—'}
+                    {row.employeeName ? <bdi>{row.employeeName}</bdi> : t('commonNameNotResolved')}
                   </Td>
                   <Td>{displayOrDash(row.newClients)}</Td>
                   <Td>{displayOrDash(row.premiumWrittenJod)}</Td>

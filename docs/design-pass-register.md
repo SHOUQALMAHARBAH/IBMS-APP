@@ -797,6 +797,60 @@ English is written rather than sliced, the ordinary asymmetry.
 
 ---
 
+### Batch 7 — owner decision 60's three words, and the 91 sites that keep their em dash
+
+**16 of 107 converted.** `scripts/measurements/em-dash-sites.py` re-derives both figures; it writes
+its rows to a gitignored UTF-8 file because this console is cp1252 and a row carrying Arabic or an
+em dash kills the run — the treatment `server-message-identifiers.py` already takes, and exactly
+how this script failed on its own first run.
+
+#### The one class a matcher can recognise, and why only that one converted
+
+Her ruling was classify-then-convert and her instruction with the words was explicit: *do not
+substitute a different word, do not widen these three into a general vocabulary, and a site that
+does not fall cleanly into one of the three keeps its em dash and is recorded.*
+
+The three cases are distinguished by what the FIELD MEANS, which no matcher can read — `?? '—'` on
+a name that did not resolve and `?? '—'` on a field that does not apply to this row are the same
+five characters. One class is the exception, and it is the exception because **decision 48 already
+settled it**: `displayNamesForUserIds` and its three siblings take IDS and return a Map, and a
+MISSING KEY MEANS NO NAME AND MUST NEVER BECOME THE UUID. So wherever a view carries
+`<something>Name` beside the id it was resolved from, a null is precisely *the value is held and
+its name is unavailable* — «غير متوفّر», and not *never recorded* and not *does not apply*.
+
+All sixteen were read; one needed checking rather than assuming. `/policies` renders
+`policy.customer?.legalName`, which is an INCLUDE and not a resolver — measured,
+`customer: { id; legalName } | null` on the wire while `customerId` is NOT NULL and always present,
+so the id is held and the name is absent. Same case, different mechanism.
+
+**Three of the sixteen are not JSX at all.** `/internal-controls`, `/settings/duty-segregation` and
+`DpoAssignmentSection` interpolate the value into a translated sentence as `who`, so the em dash was
+landing INSIDE prose — where a dash reads worse than anywhere else, because a sentence with a dash
+in the middle of it does not read as a missing value.
+
+#### The guard fired on its own first run, and both findings were my matcher
+
+`declared-vocabulary.test.ts` gained decision 60's three properties beside decision 59's — there are
+exactly three keys and the Arabic is hers verbatim; no FOURTH key carries one of the words; no
+screen spells one as a literal. Its first run reported two offenders for «لا ينطبق» and **both were
+legitimate strings**: `providerOfficesLicenceNotApplicable` reads «لا ينطبق — ليست مكتب وساطة»,
+which is the richer string the owner herself named as where the word already ships, and a dashboard
+paragraph uses «ولا ينطبق» as ordinary prose.
+
+The matcher used CONTAINMENT where the hazard is EQUALITY: a second key whose value **is** the word
+is a duplicate free to be reworded alone, while a longer sentence built from it is a different
+string doing a different job. Corrected, and both plants then kill their own test by name — a fourth
+key, and a screen spelling the literal.
+
+#### The 91 that keep the em dash
+
+Dates never recorded, free text nobody wrote, figures not yet captured, ids that resolve to nothing.
+Telling *not recorded yet* from *does not apply to this row* needs the field's own meaning, which
+her ruling reserves to a reader. They are listed by `em-dash-sites.py`, and a count cleared by
+stretching a word onto a site it does not fit is worse than a count that stands.
+
+---
+
 ---
 
 ## The method, per screen

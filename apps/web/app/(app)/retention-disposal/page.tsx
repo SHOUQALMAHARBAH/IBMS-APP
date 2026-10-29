@@ -1060,7 +1060,7 @@ export default function RetentionDisposalPage() {
                       */}
                       <Td>{basisLabel(r.basis)}</Td>
                       <Td>{r.note}</Td>
-                      <Td>{r.retrievedByName ?? '—'}</Td>
+                      <Td>{r.retrievedByName ?? t('commonNameNotResolved')}</Td>
                       <Td>{r.retrievedAt.slice(0, 10)}</Td>
                     </Tr>
                   ))}
@@ -1193,7 +1193,7 @@ export default function RetentionDisposalPage() {
                           ? '—'
                           : `${x.legalHold.scope} — ${x.legalHold.reason}`}
                       </Td>
-                      <Td>{x.extendedByName ?? '—'}</Td>
+                      <Td>{x.extendedByName ?? t('commonNameNotResolved')}</Td>
                       <Td>{x.extendedAt.slice(0, 10)}</Td>
                     </Tr>
                   ))}

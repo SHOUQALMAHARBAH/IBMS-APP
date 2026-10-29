@@ -166,7 +166,7 @@ export function DpoAssignmentSection({ canDeclare }: { canDeclare: boolean }) {
           style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem', margin: '0.3rem 0' }}
         >
           {t('dpoAssignAcknowledgedOn', {
-            who: view?.acknowledgedByName ?? '—',
+            who: view?.acknowledgedByName ?? t('commonNameNotResolved'),
             when: formatDateTime(view?.acknowledgedAt ?? '', language),
           })}
         </p>

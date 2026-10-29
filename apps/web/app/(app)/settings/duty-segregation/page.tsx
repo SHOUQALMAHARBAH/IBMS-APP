@@ -149,7 +149,7 @@ export default function DutySegregationPage() {
             {view.declaredAt
               ? t('dutyModeDeclaredBy', {
                   // The same `?? id` fallback as /internal-controls, found beside it.
-                  who: view.declaredByName ?? '—',
+                  who: view.declaredByName ?? t('commonNameNotResolved'),
                   when: formatDateTime(view.declaredAt, language),
                 })
               : t('dutyModeNeverDeclared')}

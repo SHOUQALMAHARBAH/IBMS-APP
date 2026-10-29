@@ -200,7 +200,7 @@ export default function CrossBorderTransfersPage() {
                       * before anybody approved it.
                       */}
                     <Td>
-                      {r.approvedByName ? <bdi>{r.approvedByName}</bdi> : '—'}
+                      {r.approvedByName ? <bdi>{r.approvedByName}</bdi> : t('commonNameNotResolved')}
                     </Td>
                     <Td>{r.transferredAt.slice(0, 10)}</Td>
                   </Tr>

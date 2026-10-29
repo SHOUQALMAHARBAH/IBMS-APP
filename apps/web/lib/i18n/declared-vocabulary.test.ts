@@ -237,3 +237,89 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
     });
   });
 });
+
+/**
+ * OWNER DECISION 60 — THREE WORDS FOR THE EM DASH, AND ONLY THREE.
+ *
+ * A bare em dash leaves a reader asking *was this forgotten, or does it not apply?* Her ruling
+ * gives a word to exactly three cases and leaves every other em dash alone, and her instruction
+ * with the words was explicit: do not substitute a different word, do not widen these three into a
+ * general vocabulary, and a site that does not fall cleanly into one of them keeps its dash and is
+ * RECORDED. 16 sites of 107 converted on that basis; the other 91 are in
+ * `docs/design-pass-register.md` and `scripts/measurements/em-dash-sites.py` re-derives them.
+ */
+describe('owner decision 60: three words for the em dash, and only three', () => {
+  /** Hers, verbatim. Written once here so the assertions below cannot drift apart. */
+  const DECISION_60: Record<string, string> = {
+    commonNotAssessedYet: 'لم يُقيَّم بعد',
+    commonNotApplicable: 'لا ينطبق',
+    commonNameNotResolved: 'غير متوفّر',
+  };
+
+  it('ships all three in BOTH languages, and the Arabic is hers verbatim', () => {
+    for (const language of LANGUAGES) {
+      for (const key of Object.keys(DECISION_60)) {
+        expect(lookupOptional(language, key), `${key} is missing in ${language}`).toBeTruthy();
+      }
+    }
+    for (const [key, word] of Object.entries(DECISION_60)) {
+      expect(lookupOptional('AR', key), `${key}'s Arabic is not hers`).toBe(word);
+    }
+  });
+
+  it('has no FOURTH key carrying one of the three words', () => {
+    // A fourth key type-checks perfectly, which is why the compiler cannot see this. Her
+    // instruction was not to widen the three into a general vocabulary; a second key is how a
+    // vocabulary of three quietly becomes one of six, each free to be reworded alone.
+    const dir = join(__dirname, 'translations');
+    for (const [owner, word] of Object.entries(DECISION_60)) {
+      const carriers: string[] = [];
+      for (const file of readdirSync(dir)) {
+        if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
+        for (const line of readFileSync(join(dir, file), 'utf8').split('\n')) {
+          const code = line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
+          // EQUALITY, NOT CONTAINMENT, and the first run is why. A `includes` check reported two
+          // offenders and BOTH were legitimate: `providerOfficesLicenceNotApplicable` reads
+          // «لا ينطبق — ليست مكتب وساطة», which is the richer string the OWNER herself named as
+          // where this word already ships, and a dashboard paragraph uses «ولا ينطبق» as ordinary
+          // prose. The hazard is a second key whose value IS the word — a duplicate free to be
+          // reworded alone — not a longer sentence built from it or a sentence that mentions it.
+          const entry = /^\s*([A-Za-z0-9_]+)\s*:\s*'([^']*)'/.exec(code);
+          if (!entry || entry[2] !== word) continue;
+          carriers.push(entry[1]);
+        }
+      }
+      expect(carriers, `«${word}» belongs to ${owner} alone`).toEqual([owner]);
+    }
+  });
+
+  it('is never spelled as a literal on a screen', () => {
+    // A literal is a second home for the word — the «التعديلات»/«الملحقات» divergence class.
+    // Comments are stripped for the reason decision 59's own version records: `common.ts`'s
+    // header quotes all three while explaining which case each is for, and screens quote them
+    // too; a word named only in a comment is not a second home.
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          if (entry === 'node_modules' || entry === '.next') continue;
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry)) continue;
+        const code = readFileSync(full, 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, ' ')
+          .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+        for (const word of Object.values(DECISION_60)) {
+          if (code.includes(word)) {
+            offenders.push(`${full.slice(WEB.length + 1).replace(/\\/g, '/')} spells «${word}»`);
+          }
+        }
+      }
+    };
+    walk(join(WEB, 'app'));
+    walk(join(WEB, 'components'));
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+});

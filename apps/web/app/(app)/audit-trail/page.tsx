@@ -622,7 +622,7 @@ function AuditTrailScreen() {
                         * foreign key, so the account can be gone.
                         */}
                       <Td>
-                        {v.uploadedByName ? <bdi>{v.uploadedByName}</bdi> : '—'}
+                        {v.uploadedByName ? <bdi>{v.uploadedByName}</bdi> : t('commonNameNotResolved')}
                       </Td>
                       <Td>{v.createdAt.slice(0, 10)}</Td>
                     </Tr>

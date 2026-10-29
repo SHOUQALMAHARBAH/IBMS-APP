@@ -204,7 +204,7 @@ export default function InformationAssetsPage() {
                       purpose is saying WHO is accountable for a classified asset, and it was
                       naming them by uuid. */}
                   <Td>
-                    {asset.ownerName ? <bdi>{asset.ownerName}</bdi> : '—'}
+                    {asset.ownerName ? <bdi>{asset.ownerName}</bdi> : t('commonNameNotResolved')}
                   </Td>
                   <Td>
                     {editingId === asset.id ? (
