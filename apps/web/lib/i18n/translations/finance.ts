@@ -27,6 +27,21 @@ export const FINANCE = {
     caColOutstanding: 'المستحق',
     caColInvoices: 'الفواتير',
     caColOldest: 'الأقدم',
+    /*
+     * THE `1–30 days` AGEING BUCKET — owner answer 1, and this is NOT `dclmAgeing0To30`.
+     *
+     * That string reads «من ٠ إلى ٣٠ يوماً» and covers DAY ZERO, which on a receivables
+     * report is the `current` bucket — a separate column one place to the left. The two
+     * differ by exactly ONE codepoint (U+0660 against U+0661), which is the whole reason
+     * this row was opened rather than closed with a pointer: a header claiming a range its
+     * column does not hold is a false label, and worse than an English one.
+     *
+     * The bytes are the owner's and were already in the product — `frAgeing1To30` on
+     * `/financial-report` is byte-identical, and this value was copied from it rather than
+     * retyped. `dclmAgeing31To60` / `frAgeing31To60` are already byte-identical siblings, so
+     * one ageing heading per screen family is this dictionary's own shape.
+     */
+    caAgeing1To30: 'من ١ إلى ٣٠ يوماً',
     caColTotal: 'الإجمالي',
     caNone: 'لا توجد ذمم مدينة قائمة.',
     caLoading: 'جارٍ التحميل…',
@@ -200,6 +215,7 @@ export const FINANCE = {
     caColOutstanding: 'Outstanding',
     caColInvoices: 'Invoices',
     caColOldest: 'Oldest',
+    caAgeing1To30: '1–30 days',
     caColTotal: 'Total',
     caNone: 'No outstanding receivables to report.',
     caLoading: 'Loading…',

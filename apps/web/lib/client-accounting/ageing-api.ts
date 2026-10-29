@@ -28,27 +28,24 @@ export type ArAgeingBucketKey = (typeof AR_AGEING_BUCKET_KEYS)[number];
  * `current` is a slice of `commonCurrentLabel` with its inline colon dropped — decision 41's
  * mechanism, which is why no word was written for any of them.
  *
- * `d1_30` IS DELIBERATELY STILL ENGLISH. The nearest shipping string, `dclmAgeing0To30`, covers
- * DAY ZERO — and on a receivables report day zero is the `current` bucket, which is a separate
- * column one place to the left. Pointing at it would put a header over this column claiming a
- * range it does not hold, which is a false label and worse than an English one. The word is owed;
- * see `docs/design-pass-register.md`.
+ * `d1_30` IS `caAgeing1To30` AND NOT `dclmAgeing0To30` — owner answer 1, and the distinction is
+ * one codepoint. That string covers DAY ZERO (U+0660 against U+0661), and on a receivables report
+ * day zero is the `current` bucket, a separate column one place to the left; pointing at it would
+ * put a header over this column claiming a range it does not hold. The new key's own comment in
+ * `translations/finance.ts` says so, because the two strings differing by one character is exactly
+ * the near-match a later reader in a hurry points at.
+ *
+ * THE MAP IS TOTAL AND NO LONGER CARRIES A `null`. There was a one-entry
+ * `AR_AGEING_BUCKET_FALLBACK` beside it, for the one bucket with no word, carrying *"Never widen
+ * this"* — it is DELETED rather than emptied: with every bucket worded it has no live member left,
+ * and a fallback that still exists is a fallback something can be added to.
  */
-export const AR_AGEING_BUCKET_LABEL_KEY: Record<ArAgeingBucketKey, TranslationKey | null> = {
+export const AR_AGEING_BUCKET_LABEL_KEY: Record<ArAgeingBucketKey, TranslationKey> = {
   current: 'commonCurrentHeading',
-  d1_30: null,
+  d1_30: 'caAgeing1To30',
   d31_60: 'dclmAgeing31To60',
   d61_90: 'dclmAgeing61To90',
   d90_plus: 'dclmAgeing90Plus',
-};
-
-/** The fallback for the one bucket with no shipping word. Never widen this. */
-export const AR_AGEING_BUCKET_FALLBACK: Record<ArAgeingBucketKey, string> = {
-  current: '',
-  d1_30: '1–30 days',
-  d31_60: '',
-  d61_90: '',
-  d90_plus: '',
 };
 
 export type ArAgeingBucketAmounts = Record<ArAgeingBucketKey, string>;

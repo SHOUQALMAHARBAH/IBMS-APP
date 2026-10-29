@@ -15,7 +15,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   AR_AGEING_BUCKET_KEYS,
-  AR_AGEING_BUCKET_FALLBACK,
   AR_AGEING_BUCKET_LABEL_KEY,
   getReceivablesAgeing,
   type ReceivablesAgeingReport,
@@ -132,9 +131,7 @@ export default function ClientAccountingPage() {
                   <Th>{t('caColClient')}</Th>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
                     <Th key={k}>
-                      {AR_AGEING_BUCKET_LABEL_KEY[k]
-                        ? t(AR_AGEING_BUCKET_LABEL_KEY[k])
-                        : AR_AGEING_BUCKET_FALLBACK[k]}
+                      {t(AR_AGEING_BUCKET_LABEL_KEY[k])}
                     </Th>
                   ))}
                   <Th>{t('caColOutstanding')}</Th>
