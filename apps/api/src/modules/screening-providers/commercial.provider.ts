@@ -9,7 +9,7 @@ import type {
 } from './screening-provider.types';
 import type { ScreeningProviderConfig } from './screening-provider.config';
 import { classifyList } from './list-classification.config';
-import { capability } from './screening-provider.types';
+import { capability, cautions, describes } from './screening-provider.types';
 import type { CapabilityState } from './screening-provider.types';
 
 /**
@@ -208,8 +208,10 @@ export class CommercialScreeningProvider extends BaseScreeningProvider {
    * adapter must not assert PEP coverage on the strength of a vendor name.
    */
   capabilities(operational = false): CapabilityState[] {
-    const contractNote =
-      'Actual coverage depends on the contracted product — verify against the provider agreement before relying on it.';
+    // HER CAUTION, and the one that rides a row with THREE TICKS — which is why the screen
+    // renders a caution as a warning region rather than as grey text under the name. Two
+    // customers of the same vendor can have different list access.
+    const contractNote = cautions('COMMERCIAL_CONTRACT_COVERAGE');
     return [
       capability('SANCTIONS', true, true, operational, contractNote),
       capability('PEP', true, true, operational, contractNote),
@@ -220,29 +222,35 @@ export class CommercialScreeningProvider extends BaseScreeningProvider {
         true,
         true,
         operational,
-        'Individual screening.',
+        describes('COMMERCIAL_INDIVIDUAL'),
       ),
-      capability('ENTITY', true, true, operational, 'Entity screening.'),
+      capability(
+        'ENTITY',
+        true,
+        true,
+        operational,
+        describes('COMMERCIAL_ENTITY'),
+      ),
       capability(
         'BATCH',
         true,
         true,
         operational,
-        'Sequential fan-out; switch to a native batch endpoint if the provider has one.',
+        describes('COMMERCIAL_BATCH_FAN_OUT'),
       ),
       capability(
         'ONGOING_MONITORING',
         true,
         false,
         false,
-        'Requires provider-side monitoring enrolment, which is a contract decision — not enabled by this adapter alone.',
+        describes('COMMERCIAL_MONITORING_ENROLMENT'),
       ),
       capability(
         'WEBHOOKS',
         true,
         false,
         false,
-        'Requires a verified callback endpoint and a shared secret; not configured.',
+        describes('COMMERCIAL_WEBHOOKS_NOT_CONFIGURED'),
       ),
     ];
   }

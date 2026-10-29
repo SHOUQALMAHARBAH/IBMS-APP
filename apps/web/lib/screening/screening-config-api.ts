@@ -39,37 +39,127 @@ export type ProviderCapability =
   | 'WEBHOOKS';
 
 /**
- * THE CAPABILITY LABELS — owner answer 2, and it is TOTAL over the union by her own instruction:
- * *"A third capability added to the api should be a COMPILE ERROR in the web."* A tenth member
- * therefore cannot be added without deciding its word, and nothing falls through to the token by
- * accident.
+ * THE CAPABILITY LABELS — all NINE of them, the owner's words, and TOTAL with no `null` left.
  *
- * TWO OF THE NINE HAVE A WORD AND SEVEN DO NOT. She gave `SANCTIONS` and `PEP` — the two her
- * capture showed, because the capture's own fixture carried two rows where the product renders
- * nine. The other seven render their member name, which is visibly unfinished: the established
- * treatment here (decision 41, `WORKFLOW_ENTITY_LABEL`) is that an English token in an Arabic
- * table is obviously owed, where a plausible invented word is indistinguishable from a decided one
- * and never gets corrected. The seven are in `docs/design-pass-register.md`.
+ * The `| null` is GONE and so is the screen's fall-through to the raw token: a `null` here was
+ * the honest treatment while seven words were owed, and keeping one once they arrived would be a
+ * fallback something can be added to. The same reasoning retired `AR_AGEING_BUCKET_FALLBACK`.
  *
  * `PEP`'s FORM IS HERS AND IS NOT THE ONE ON THIS SCREEN. The Arabic already here reads «فحص
  * الأشخاص السياسيين (PEP)» — genitive, inside a sentence — and hers is the nominative a column
  * label takes. Lifting the genitive run out of that sentence is morphology, which this repository
  * has refused once already by name (the «محاولتان» dual), and is the entire reason this was her
  * decision rather than a slice.
+ *
+ * `ADVERSE_MEDIA` WAS DECIDED TWICE: she rejected «الأخبار السلبية» as not clear enough to a
+ * clerk and chose «التغطية الإعلامية السلبية», which is the AML term. The rejected one is the one
+ * a later reader would guess.
+ *
+ * AND A TENTH MEMBER IS A COMPILE ERROR HERE ONLY IF SOMEBODY EDITS THIS UNION. My own comment
+ * at this spot used to claim a capability added in the api alone would fail the build; it would
+ * not — the value arrives over HTTP, so the lookup would return `undefined` and the row would
+ * lose its label silently. `packages/db/prisma/capability-note-parity.spec.ts` is what makes it
+ * fail, being the only place that can see both packages.
  */
 export const PROVIDER_CAPABILITY_LABEL_KEY: Record<
   ProviderCapability,
-  TranslationKey | null
+  TranslationKey
 > = {
   SANCTIONS: 'shCapSanctions',
   PEP: 'shCapPep',
-  WATCHLIST: null,
-  ADVERSE_MEDIA: null,
-  INDIVIDUAL: null,
-  ENTITY: null,
-  BATCH: null,
-  ONGOING_MONITORING: null,
-  WEBHOOKS: null,
+  WATCHLIST: 'shCapWatchlist',
+  ADVERSE_MEDIA: 'shCapAdverseMedia',
+  INDIVIDUAL: 'shCapIndividual',
+  ENTITY: 'shCapEntity',
+  BATCH: 'shCapBatch',
+  ONGOING_MONITORING: 'shCapOngoingMonitoring',
+  WEBHOOKS: 'shCapWebhooks',
+};
+
+/**
+ * WHICH SENTENCE SITS UNDER A CAPABILITY NAME — mirrored from the api's `CapabilityNoteKey`.
+ *
+ * Until this batch the api sent the sentence itself, in English, and this screen rendered it
+ * verbatim: an Arabic compliance officer read an English token with an English sentence under it,
+ * on the screen whose job is to say whether customers are actually being screened.
+ * `hardcoded-ui-english.py` reported 0 and was right to — it reads this tree, and these strings
+ * did not exist here. That is the structural class the thirteen risk-questionnaire prompts already
+ * recorded by name, met for the SECOND time.
+ */
+export type CapabilityNoteKey =
+  | 'BUILT_IN_SANCTIONS_SYNCED'
+  | 'BUILT_IN_CACHE_EMPTY'
+  | 'BUILT_IN_NO_PEP_DATA'
+  | 'BUILT_IN_SANCTIONS_ONLY'
+  | 'BUILT_IN_ADVERSE_MEDIA_UNAVAILABLE'
+  | 'BUILT_IN_INDIVIDUAL_NAMES'
+  | 'BUILT_IN_ENTITY_LEGAL_NAMES'
+  | 'BUILT_IN_BATCH_LOCAL'
+  | 'BUILT_IN_MONITORING_SCHEDULE'
+  | 'BUILT_IN_WEBHOOKS_NOT_APPLICABLE'
+  | 'COMMERCIAL_CONTRACT_COVERAGE'
+  | 'COMMERCIAL_INDIVIDUAL'
+  | 'COMMERCIAL_ENTITY'
+  | 'COMMERCIAL_BATCH_FAN_OUT'
+  | 'COMMERCIAL_MONITORING_ENROLMENT'
+  | 'COMMERCIAL_WEBHOOKS_NOT_CONFIGURED'
+  | 'ON_PREMISE_DATASET'
+  | 'ON_PREMISE_PEP_VERIFY'
+  | 'ON_PREMISE_PEP_SANCTIONS_ONLY'
+  | 'ON_PREMISE_ADVERSE_MEDIA_UNAVAILABLE'
+  | 'ON_PREMISE_PERSON_SCHEMA'
+  | 'ON_PREMISE_ORGANIZATION_SCHEMA'
+  | 'ON_PREMISE_BATCH_FAN_OUT'
+  | 'ON_PREMISE_MONITORING_SCHEDULER'
+  | 'ON_PREMISE_WEBHOOKS_UNSUPPORTED'
+  | 'NOT_CONFIGURED'
+  | 'NOT_CONFIGURED_MISSING';
+
+/**
+ * WHAT THE NOTE IS, declared by the api and never derived here.
+ *
+ * Decision 58's shape: the api is the only layer that knows whether one of its own sentences
+ * describes a capability or cautions against relying on it. Three of the five cautions are the
+ * owner's own classification; two are declared in the api's `cautions()` doc comment as this
+ * code's judgement, with the reason.
+ */
+export type CapabilityNoteKind = 'DESCRIPTION' | 'CAUTION';
+
+export interface CapabilityNote {
+  key: CapabilityNoteKey;
+  params?: Record<string, string>;
+  kind: CapabilityNoteKind;
+}
+
+/** TOTAL over the union. No `null`, no fall-through, and no English left on this path. */
+export const CAPABILITY_NOTE_LABEL_KEY: Record<CapabilityNoteKey, TranslationKey> = {
+  BUILT_IN_SANCTIONS_SYNCED: 'shNoteBuiltInSanctionsSynced',
+  BUILT_IN_CACHE_EMPTY: 'shNoteBuiltInCacheEmpty',
+  BUILT_IN_NO_PEP_DATA: 'shNoteBuiltInNoPepData',
+  BUILT_IN_SANCTIONS_ONLY: 'shNoteBuiltInSanctionsOnly',
+  BUILT_IN_ADVERSE_MEDIA_UNAVAILABLE: 'shNoteBuiltInAdverseMediaUnavailable',
+  BUILT_IN_INDIVIDUAL_NAMES: 'shNoteBuiltInIndividualNames',
+  BUILT_IN_ENTITY_LEGAL_NAMES: 'shNoteBuiltInEntityLegalNames',
+  BUILT_IN_BATCH_LOCAL: 'shNoteBuiltInBatchLocal',
+  BUILT_IN_MONITORING_SCHEDULE: 'shNoteBuiltInMonitoringSchedule',
+  BUILT_IN_WEBHOOKS_NOT_APPLICABLE: 'shNoteBuiltInWebhooksNotApplicable',
+  COMMERCIAL_CONTRACT_COVERAGE: 'shNoteCommercialContractCoverage',
+  COMMERCIAL_INDIVIDUAL: 'shNoteCommercialIndividual',
+  COMMERCIAL_ENTITY: 'shNoteCommercialEntity',
+  COMMERCIAL_BATCH_FAN_OUT: 'shNoteCommercialBatchFanOut',
+  COMMERCIAL_MONITORING_ENROLMENT: 'shNoteCommercialMonitoringEnrolment',
+  COMMERCIAL_WEBHOOKS_NOT_CONFIGURED: 'shNoteCommercialWebhooksNotConfigured',
+  ON_PREMISE_DATASET: 'shNoteOnPremiseDataset',
+  ON_PREMISE_PEP_VERIFY: 'shNoteOnPremisePepVerify',
+  ON_PREMISE_PEP_SANCTIONS_ONLY: 'shNoteOnPremisePepSanctionsOnly',
+  ON_PREMISE_ADVERSE_MEDIA_UNAVAILABLE: 'shNoteOnPremiseAdverseMediaUnavailable',
+  ON_PREMISE_PERSON_SCHEMA: 'shNoteOnPremisePersonSchema',
+  ON_PREMISE_ORGANIZATION_SCHEMA: 'shNoteOnPremiseOrganizationSchema',
+  ON_PREMISE_BATCH_FAN_OUT: 'shNoteOnPremiseBatchFanOut',
+  ON_PREMISE_MONITORING_SCHEDULER: 'shNoteOnPremiseMonitoringScheduler',
+  ON_PREMISE_WEBHOOKS_UNSUPPORTED: 'shNoteOnPremiseWebhooksUnsupported',
+  NOT_CONFIGURED: 'shNoteNotConfigured',
+  NOT_CONFIGURED_MISSING: 'shNoteNotConfiguredMissing',
 };
 
 export type DatasetVersionStatus =
@@ -122,7 +212,7 @@ export interface ScreeningHealth {
     supported: boolean;
     configured: boolean;
     operational: boolean;
-    note: string;
+    note: CapabilityNote;
   }[];
   /** Is PEP screening genuinely OPERATIONAL — not merely supported. */
   pepOperational: boolean;

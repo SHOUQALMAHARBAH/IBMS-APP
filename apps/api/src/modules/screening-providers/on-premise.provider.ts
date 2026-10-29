@@ -9,7 +9,7 @@ import type {
 } from './screening-provider.types';
 import type { ScreeningProviderConfig } from './screening-provider.config';
 import { classifyList } from './list-classification.config';
-import { capability } from './screening-provider.types';
+import { capability, cautions, describes } from './screening-provider.types';
 import type { CapabilityState } from './screening-provider.types';
 
 /**
@@ -190,7 +190,7 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
         true,
         true,
         reachable,
-        'Dataset "' + dataset + '".',
+        describes('ON_PREMISE_DATASET', { name: dataset }),
       ),
       capability(
         'PEP',
@@ -198,49 +198,64 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
         pepConfigured,
         pepConfigured && reachable,
         pepConfigured
-          ? 'Depends on whether dataset "' +
-              dataset +
-              '" actually ingested PEP collections — verify against the engine dataset listing before relying on it.'
-          : 'Dataset "' +
-              dataset +
-              '" is scoped to sanctions; no PEP data is searched.',
+          ? // CLASSIFIED A CAUTION BY THIS CODE, NOT BY THE OWNER, and it is the one row in this
+            // batch whose Arabic and English do not make the same claim. The English opens
+            // *Depends on whether* and the table she was given dropped that clause, so her sentence
+            // renders the truncation faithfully and ASSERTS what the English hedges. Its tail is
+            // still *verify before relying on it*, which is an instruction not to rely on it — so
+            // it renders as a caution, and the wording is in the register for her to settle.
+            cautions('ON_PREMISE_PEP_VERIFY', { name: dataset })
+          : // HER CAUTION: a sanctions-scoped dataset searches no PEP data at all.
+            cautions('ON_PREMISE_PEP_SANCTIONS_ONLY', { name: dataset }),
       ),
       capability(
         'WATCHLIST',
         true,
         true,
         reachable,
-        'Dataset "' + dataset + '".',
+        describes('ON_PREMISE_DATASET', { name: dataset }),
       ),
       capability(
         'ADVERSE_MEDIA',
         false,
         false,
         false,
-        'Not provided by this engine.',
+        describes('ON_PREMISE_ADVERSE_MEDIA_UNAVAILABLE'),
       ),
-      capability('INDIVIDUAL', true, true, reachable, 'Person schema.'),
-      capability('ENTITY', true, true, reachable, 'Organization schema.'),
+      capability(
+        'INDIVIDUAL',
+        true,
+        true,
+        reachable,
+        describes('ON_PREMISE_PERSON_SCHEMA'),
+      ),
+      capability(
+        'ENTITY',
+        true,
+        true,
+        reachable,
+        describes('ON_PREMISE_ORGANIZATION_SCHEMA'),
+      ),
       capability(
         'BATCH',
         true,
         true,
         reachable,
-        'Fanned out sequentially to respect the engine.',
+        describes('ON_PREMISE_BATCH_FAN_OUT'),
       ),
       capability(
         'ONGOING_MONITORING',
         true,
         true,
         reachable,
-        'Via the re-screening scheduler, not a provider push.',
+        describes('ON_PREMISE_MONITORING_SCHEDULER'),
       ),
       capability(
         'WEBHOOKS',
         false,
         false,
         false,
-        'The engine does not push events.',
+        describes('ON_PREMISE_WEBHOOKS_UNSUPPORTED'),
       ),
     ];
   }

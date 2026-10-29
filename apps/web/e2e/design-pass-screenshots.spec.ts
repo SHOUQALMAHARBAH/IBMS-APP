@@ -396,7 +396,20 @@ test.describe("design pass — screenshots", () => {
     provider: "built_in",
     providerName: "Built-in watchlist cache (OFAC SDN + UN Consolidated)",
     status: "HEALTHY",
-    detail: "Sanctions cache refreshed 2h ago.",
+    /*
+     * THE PRODUCER'S OWN STRING, not a shortened one. This read `Sanctions cache refreshed
+     * 2h ago.` and dropped the clause the built-in adapter actually sends — *Covers SANCTIONS
+     * only … no PEP source is configured* — so the capture showed a shorter and less alarming
+     * health line than the product does, on a compliance screen. Fourth fixture defect in this
+     * file; found by checking it against the producer, which is the question that found the
+     * nine invented notes one field down.
+     *
+     * IT IS ALSO STILL ENGLISH, deliberately: `ProviderHealth.detail` is the api display-string
+     * class this batch counted and did not close, and the capture should show that rather than
+     * hide it.
+     */
+    detail:
+      "Sanctions cache refreshed 2h ago. Covers SANCTIONS only (OFAC SDN + UN Consolidated) — no PEP source is configured.",
     datasetVersion: "local-2026-09-10T00:00:00.000Z",
     datasetUpdatedAt: "2026-09-10T00:00:00.000Z",
     checkedAt: "2026-09-10T12:00:00.000Z",
@@ -414,15 +427,27 @@ test.describe("design pass — screenshots", () => {
      * carried too; without them the table showed a dash and an empty cell in every row.
      */
     capabilities: [
-      { capability: "SANCTIONS", supported: true, configured: true, operational: true, note: "OFAC SDN + UN consolidated, synced." },
-      { capability: "PEP", supported: false, configured: false, operational: false, note: "No PEP source is configured." },
-      { capability: "WATCHLIST", supported: true, configured: true, operational: true, note: "Local watchlist." },
-      { capability: "ADVERSE_MEDIA", supported: false, configured: false, operational: false, note: "Not available." },
-      { capability: "INDIVIDUAL", supported: true, configured: true, operational: true, note: "Names are matched." },
-      { capability: "ENTITY", supported: true, configured: true, operational: true, note: "Legal names are matched." },
-      { capability: "BATCH", supported: true, configured: true, operational: true, note: "Recurring sweep." },
-      { capability: "ONGOING_MONITORING", supported: true, configured: true, operational: true, note: "Four-hourly re-screen." },
-      { capability: "WEBHOOKS", supported: false, configured: false, operational: false, note: "No callback endpoint." },
+      /*
+       * THE NOTES ARE KEYS NOW, AND THE NINE THAT WERE HERE WERE ALL INVENTED. Six of them --
+       * `Local watchlist.`, `Recurring sweep.`, `Four-hourly re-screen.`, `No callback endpoint.`,
+       * `No PEP source is configured.` and a mis-cased OFAC line -- are sentences that appear
+       * NOWHERE in the product. Third instance of this class in this file on this screen: two
+       * capability rows where the product renders nine, three outcome tokens that are not members
+       * of the enum, and nine notes the api never sends.
+       *
+       * These are what `built-in-watchlist.provider.ts` actually builds, in its order, and a wrong
+       * key is now a compile error rather than a believable picture of a product that does not
+       * exist.
+       */
+      { capability: "SANCTIONS", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_SANCTIONS_SYNCED", kind: "DESCRIPTION" } },
+      { capability: "PEP", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_NO_PEP_DATA", kind: "CAUTION" } },
+      { capability: "WATCHLIST", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_SANCTIONS_ONLY", kind: "DESCRIPTION" } },
+      { capability: "ADVERSE_MEDIA", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_ADVERSE_MEDIA_UNAVAILABLE", kind: "DESCRIPTION" } },
+      { capability: "INDIVIDUAL", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_INDIVIDUAL_NAMES", kind: "DESCRIPTION" } },
+      { capability: "ENTITY", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_ENTITY_LEGAL_NAMES", kind: "DESCRIPTION" } },
+      { capability: "BATCH", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_BATCH_LOCAL", kind: "DESCRIPTION" } },
+      { capability: "ONGOING_MONITORING", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_MONITORING_SCHEDULE", kind: "DESCRIPTION" } },
+      { capability: "WEBHOOKS", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_WEBHOOKS_NOT_APPLICABLE", kind: "DESCRIPTION" } },
     ],
   };
 

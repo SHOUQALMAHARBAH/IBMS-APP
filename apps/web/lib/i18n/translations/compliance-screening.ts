@@ -211,6 +211,66 @@ export const COMPLIANCE_SCREENING = {
      */
     shCapSanctions: 'العقوبات',
     shCapPep: 'الأشخاص السياسيون (PEP)',
+    /*
+     * AND THE OTHER SEVEN, also hers. `PROVIDER_CAPABILITY_LABEL_KEY` is TOTAL with no `null`
+     * left, so the screen's fall-through to the raw token is DELETED rather than left
+     * unreachable — the same treatment `AR_AGEING_BUCKET_FALLBACK` got.
+     *
+     * «التغطية الإعلامية السلبية» WAS DECIDED TWICE. She rejected «الأخبار السلبية» as not clear
+     * enough to a clerk and chose this, which is the AML term. The rejected one is the one a
+     * later reader would guess, which is why it is written down here and in the register.
+     */
+    shCapWatchlist: 'قوائم المراقبة',
+    shCapAdverseMedia: 'التغطية الإعلامية السلبية',
+    shCapIndividual: 'فحص الأفراد',
+    shCapEntity: 'فحص الكيانات',
+    shCapBatch: 'الفحص بالدفعات',
+    shCapOngoingMonitoring: 'المراقبة المستمرة',
+    shCapWebhooks: 'إشعارات فورية',
+    /*
+     * THE TWENTY-SEVEN CAPABILITY NOTES — the sentence under each capability name, which until
+     * this batch was English prose the api sent and this screen rendered verbatim. An Arabic
+     * compliance officer read an English token with an English sentence under it, on the screen
+     * whose job is to say whether customers are actually being screened.
+     *
+     * `hardcoded-ui-english.py` reported 0 and was right to: it reads the WEB tree and these
+     * strings did not exist here. That is the structural class the thirteen risk-questionnaire
+     * prompts already recorded by name, met for the SECOND time.
+     *
+     * The api now names a `CapabilityNoteKey` and the web resolves it, so the FOUR keys that
+     * interpolate carry their parameter rather than their sentence. Every value below is the
+     * owner's own Arabic except `shNoteBuiltInSanctionsSynced`, which her table did not have
+     * because the built-in SANCTIONS row is a TERNARY and she was given its false branch — it is
+     * a contiguous run of `wsIntro` on `/watchlist-sync`, asserted as a substring rather than
+     * asked for.
+     */
+    shNoteBuiltInSanctionsSynced: 'تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة الأمم المتحدة الموحّدة) محلياً.',
+    shNoteBuiltInCacheEmpty: 'مهيّأ، لكن القوائم المحفوظة داخلياً فارغة — لم تكتمل أي مزامنة بعد.',
+    shNoteBuiltInNoPepData: 'لا تتوفّر لدى هذا المزوّد أي بيانات عن الأشخاص السياسيين. فحصهم يحتاج مزوّداً تجارياً، أو محرّكاً مركَّباً لدى المكتب تتضمّن بياناته هذه الفئة.',
+    shNoteBuiltInSanctionsOnly: 'تُزامَن قوائم العقوبات فقط.',
+    shNoteBuiltInAdverseMediaUnavailable: 'غير متوفّرة.',
+    shNoteBuiltInIndividualNames: 'تُطابَق أسماء الأشخاص.',
+    shNoteBuiltInEntityLegalNames: 'تُطابَق الأسماء القانونية للشركات.',
+    shNoteBuiltInBatchLocal: 'يجري الفحص داخلياً على دفعات، ولا يوجد حدّ خارجي لعدد الطلبات.',
+    shNoteBuiltInMonitoringSchedule: 'إعادة فحص كل أربع ساعات، وإعادة فحص فور تحديث القوائم.',
+    shNoteBuiltInWebhooksNotApplicable: 'لا تنطبق على قوائم محفوظة داخل النظام.',
+    shNoteCommercialContractCoverage: 'التغطية الفعلية تعتمد على المنتج المتعاقَد عليه — راجع اتفاقية المزوّد قبل الاعتماد عليها.',
+    shNoteCommercialIndividual: 'فحص أفراد.',
+    shNoteCommercialEntity: 'فحص كيانات.',
+    shNoteCommercialBatchFanOut: 'تُرسَل الأسماء واحداً تلو الآخر؛ يُستبدَل ذلك بواجهة دفعات لدى المزوّد إن توفّرت.',
+    shNoteCommercialMonitoringEnrolment: 'تتطلّب اشتراك مراقبة لدى المزوّد، وهو قرار تعاقدي — لا يُفعَّل من النظام وحده.',
+    shNoteCommercialWebhooksNotConfigured: 'تتطلّب عنوان استقبال مُوثَّقاً ومفتاحاً مشتركاً؛ غير مهيّأة.',
+    shNoteOnPremiseDataset: 'مجموعة البيانات «{name}».',
+    shNoteOnPremisePepVerify: 'مجموعة البيانات «{name}» تتضمّن فعلاً بيانات الأشخاص السياسيين — راجع قائمة بيانات المحرّك قبل الاعتماد عليها.',
+    shNoteOnPremisePepSanctionsOnly: 'مجموعة البيانات «{name}» مقتصرة على العقوبات؛ لا تُفحَص بيانات الأشخاص السياسيين.',
+    shNoteOnPremiseAdverseMediaUnavailable: 'لا يوفّرها هذا المحرّك.',
+    shNoteOnPremisePersonSchema: 'وفق نموذج بيانات الأشخاص.',
+    shNoteOnPremiseOrganizationSchema: 'وفق نموذج بيانات المنشآت.',
+    shNoteOnPremiseBatchFanOut: 'تُرسَل الأسماء واحداً تلو الآخر مراعاةً لطاقة المحرّك.',
+    shNoteOnPremiseMonitoringScheduler: 'عبر مجدوِل إعادة الفحص، لا عبر إشعار من المزوّد.',
+    shNoteOnPremiseWebhooksUnsupported: 'المحرّك لا يرسل إشعارات.',
+    shNoteNotConfigured: 'غير مهيّأ.',
+    shNoteNotConfiguredMissing: 'غير مهيّأ — ناقص: {list}.',
     shScreeningHealth: 'حالة فحص العقوبات',
     shWhichProviderActuallyPerformsScreening:
       'يوضّح هذا الجدول أي مزوّد يُجري الفحص فعلياً، وما إذا كانت بياناته حديثة، وما الذي يغطيه. «غير مهيأ» أو «غير متاح» تعني أنّ الفحص لم يجرِ — وهي ليست نتيجة سلبية.',
@@ -450,6 +510,57 @@ export const COMPLIANCE_SCREENING = {
     shListOverview: 'the last 30 days of screening figures',
     shCapSanctions: 'Sanctions',
     shCapPep: 'Politically exposed persons (PEP)',
+    shCapWatchlist: 'Watchlists',
+    shCapAdverseMedia: 'Adverse media',
+    shCapIndividual: 'Individual screening',
+    shCapEntity: 'Entity screening',
+    shCapBatch: 'Batch screening',
+    shCapOngoingMonitoring: 'Ongoing monitoring',
+    shCapWebhooks: 'Webhooks',
+    /*
+     * THE TWENTY-SEVEN CAPABILITY NOTES — the sentence under each capability name, which until
+     * this batch was English prose the api sent and this screen rendered verbatim. An Arabic
+     * compliance officer read an English token with an English sentence under it, on the screen
+     * whose job is to say whether customers are actually being screened.
+     *
+     * `hardcoded-ui-english.py` reported 0 and was right to: it reads the WEB tree and these
+     * strings did not exist here. That is the structural class the thirteen risk-questionnaire
+     * prompts already recorded by name, met for the SECOND time.
+     *
+     * The api now names a `CapabilityNoteKey` and the web resolves it, so the FOUR keys that
+     * interpolate carry their parameter rather than their sentence.
+     *
+     * EVERY ENGLISH VALUE BELOW IS THE API'S OWN FORMER STRING, verbatim — asserted against
+     * `git show HEAD` by the edit that moved them. What changed is WHERE the sentence lives, not
+     * what it says, so no English was written on this path.
+     */
+    shNoteBuiltInSanctionsSynced: 'OFAC SDN + UN Consolidated, synced locally.',
+    shNoteBuiltInCacheEmpty: 'Configured, but the local cache is empty — the sync has never completed.',
+    shNoteBuiltInNoPepData: 'This provider has NO PEP data. PEP screening requires a commercial provider or an on-premise dataset that includes PEP data.',
+    shNoteBuiltInSanctionsOnly: 'Only sanctions lists are synced.',
+    shNoteBuiltInAdverseMediaUnavailable: 'Not available.',
+    shNoteBuiltInIndividualNames: 'Names are matched.',
+    shNoteBuiltInEntityLegalNames: 'Legal names are matched.',
+    shNoteBuiltInBatchLocal: 'Batched locally; no external rate limit applies.',
+    shNoteBuiltInMonitoringSchedule: 'The 4-hourly re-screening batch plus re-screening on list update.',
+    shNoteBuiltInWebhooksNotApplicable: 'Not applicable to a local cache.',
+    shNoteCommercialContractCoverage: 'Actual coverage depends on the contracted product — verify against the provider agreement before relying on it.',
+    shNoteCommercialIndividual: 'Individual screening.',
+    shNoteCommercialEntity: 'Entity screening.',
+    shNoteCommercialBatchFanOut: 'Sequential fan-out; switch to a native batch endpoint if the provider has one.',
+    shNoteCommercialMonitoringEnrolment: 'Requires provider-side monitoring enrolment, which is a contract decision — not enabled by this adapter alone.',
+    shNoteCommercialWebhooksNotConfigured: 'Requires a verified callback endpoint and a shared secret; not configured.',
+    shNoteOnPremiseDataset: 'Dataset "{name}".',
+    shNoteOnPremisePepVerify: 'Depends on whether dataset "{name}" actually ingested PEP collections — verify against the engine dataset listing before relying on it.',
+    shNoteOnPremisePepSanctionsOnly: 'Dataset "{name}" is scoped to sanctions; no PEP data is searched.',
+    shNoteOnPremiseAdverseMediaUnavailable: 'Not provided by this engine.',
+    shNoteOnPremisePersonSchema: 'Person schema.',
+    shNoteOnPremiseOrganizationSchema: 'Organization schema.',
+    shNoteOnPremiseBatchFanOut: 'Fanned out sequentially to respect the engine.',
+    shNoteOnPremiseMonitoringScheduler: 'Via the re-screening scheduler, not a provider push.',
+    shNoteOnPremiseWebhooksUnsupported: 'The engine does not push events.',
+    shNoteNotConfigured: 'Not configured.',
+    shNoteNotConfiguredMissing: 'Not configured — missing {list}.',
     shScreeningHealth: 'Screening health',
     shWhichProviderActuallyPerformsScreening:
       'Which provider actually performs screening, whether its data is current, and what it covers. NOT_CONFIGURED or UNAVAILABLE means screening did not happen — it is not a negative result.',

@@ -3,12 +3,13 @@
 import {
   Card,
   ErrorState,
+  Note,
   Table,
   Td,
   Th,
   Tr,
 } from '../../../components/ui';
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { Fragment, type CSSProperties, useCallback, useEffect, useState } from "react";
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
@@ -21,6 +22,7 @@ import {
   namedFailures,
 } from '../../../lib/load-independently';
 import {
+  CAPABILITY_NOTE_LABEL_KEY,
   getScreeningHealth,
   getScreeningOverview,
   PROVIDER_CAPABILITY_LABEL_KEY,
@@ -217,8 +219,15 @@ export default function ScreeningHealthPage() {
             <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shSupportedMeansTheAdapterImplements')}
             </p>
-            <div style={{ overflowX: "auto" }}>
-              <Table>
+            {/*
+              NO SECOND SCROLLER. This screen used to wrap the table in its own
+              `overflow-x: auto` div, and `Table` has provided one since batch 3 — WITH
+              `tabIndex={0}`, because a scroll container nothing can focus is a region a keyboard
+              user cannot scroll at all. An unfocusable scroller around a focusable one is that
+              same defect one level out, and axe is silent about it because the OUTER div rarely
+              overflows. Measured: 17 sites across 10 files still do this.
+            */}
+            <Table>
                 <thead>
                   <tr>
                     <Th>
@@ -235,19 +244,25 @@ export default function ScreeningHealthPage() {
                 </thead>
                 <tbody>
                   {health.capabilities.map((c) => (
-                    <Tr key={c.capability} data-capability={c.capability}>
+                    <Fragment key={c.capability}>
+                    <Tr data-capability={c.capability}>
                       <Td>
-                        <div style={{ fontWeight: 600 }}>
-                          {/* OWNER ANSWER 2. A `null` renders the member name on purpose: seven
-                              of the nine capabilities have no word yet, and a token in an Arabic
-                              table is visibly unfinished where an invented word is not. */}
-                          {PROVIDER_CAPABILITY_LABEL_KEY[c.capability]
-                            ? t(PROVIDER_CAPABILITY_LABEL_KEY[c.capability]!)
-                            : c.capability}
+                        <div
+                          style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}
+                        >
+                          {t(PROVIDER_CAPABILITY_LABEL_KEY[c.capability])}
                         </div>
-                        <div style={{ fontSize: "0.8rem", color: 'var(--ink-secondary)' }}>
-                          {c.note}
-                        </div>
+                        {c.note.kind === 'CAUTION' ? null : (
+                          <div
+                            style={{ fontSize: "0.8rem", color: 'var(--ink-secondary)' }}
+                            data-note-kind={c.note.kind}
+                          >
+                            {t(
+                              CAPABILITY_NOTE_LABEL_KEY[c.note.key],
+                              c.note.params,
+                            )}
+                          </div>
+                        )}
                       </Td>
                       <Td data-supported={String(c.supported)}>
                         {c.supported ? "✓" : "—"}
@@ -263,10 +278,45 @@ export default function ScreeningHealthPage() {
                         {c.operational ? "✓" : "—"}
                       </Td>
                     </Tr>
+                    {/*
+                      A CAUTION IS NOT A FOOTNOTE, AND IT DOES NOT FIT ONE CELL.
+
+                      Three of these sentences were named by the owner as WARNINGS rather than
+                      descriptions, and the commercial one rides a row whose three columns all
+                      tick — so grey text under the name would make a caution look like
+                      decoration, which is the defect she named by hand.
+
+                      It spans the row because MEASURED on a 390px phone the capability column is
+                      111px, a `Note` spends ~47 of that on padding, icon and gap, and the text
+                      then rendered at 62px wide and 299px TALL. Her own rule for the ring
+                      caption: where a thing does not fit the space, change the SPACE.
+
+                      NO `role`, deliberately. A live region is for content that UPDATES; these
+                      are static from first render and are reached in document order. What tells
+                      a reader who cannot see the box is the SENTENCE, which says the thing
+                      explicitly — the icon is decorative and carries no label, so the colour is
+                      redundant encoding rather than the only encoding.
+                    */}
+                    {c.note.kind === 'CAUTION' ? (
+                      <Tr data-capability-caution={c.capability}>
+                        <Td colSpan={4}>
+                          <Note
+                            tone="warning"
+                            icon="alert"
+                            data-note-kind={c.note.kind}
+                          >
+                            {t(
+                              CAPABILITY_NOTE_LABEL_KEY[c.note.key],
+                              c.note.params,
+                            )}
+                          </Note>
+                        </Td>
+                      </Tr>
+                    ) : null}
+                    </Fragment>
                   ))}
                 </tbody>
-              </Table>
-            </div>
+            </Table>
             {!health.pepOperational ? (
               <ErrorState title={t('shPepScreeningIsNotOperational')} />
             ) : null}

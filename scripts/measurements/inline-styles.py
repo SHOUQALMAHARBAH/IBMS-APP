@@ -46,7 +46,12 @@ SITE = re.compile(r"style=\{\{")
 # SCREEN_BUDGET is improvisation: everything outside the primitive set. IT MAY ONLY FALL.
 # The baseline was the measurement taken before this batch wrote a line — 1,511 total, of which 56
 # were already inside `components/ui/`, so 1,455 of screen improvisation.
-SCREEN_BUDGET = 1100
+# 1100 -> 1099 on 2026-10-29: `/screening-health` wrapped its capability table in its OWN
+# `overflow-x: auto` div, and `Table` has provided a FOCUSABLE one since batch 3. An
+# unfocusable scroller around a focusable one is batch 3's keyboard trap one level out, and
+# axe is silent because the outer div rarely overflows. 16 more sites across 9 files still
+# do it — counted, not swept.
+SCREEN_BUDGET = 1099
 
 # UI_BUDGET is the primitive set itself — where a style is SUPPOSED to live. It is gated rather
 # than merely reported, because a primitive that grows a hundred one-off objects has stopped being
