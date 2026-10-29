@@ -478,10 +478,13 @@ test("populated: states when the recurring work next runs", async ({
   await mockOverview(page, overviewBody());
   await page.goto("/screening-health");
 
-  await expect(page.getByTestId("ops-next-rescreen")).toContainText(
-    "2026-09-11",
-  );
-  await expect(page.getByTestId("ops-next-sync")).toContainText("2026-09-11");
+  // RE-POINTED: these asserted the RAW ISO string `2026-09-11`, which is what the screen was
+  // printing — a machine string on a compliance screen, four centimetres below a panel that
+  // formatted its own dates a third way. Both now go through `formatDate`, the product's one
+  // answer, which renders DD/MM/YYYY for an English reader. The property this test is about —
+  // that the screen STATES when the recurring work next runs — is unchanged.
+  await expect(page.getByTestId("ops-next-rescreen")).toContainText("11/09/2026");
+  await expect(page.getByTestId("ops-next-sync")).toContainText("11/09/2026");
   // Never run is stated as such rather than shown blank.
   await expect(page.getByTestId("ops-last-sync-success")).toContainText(
     "never",

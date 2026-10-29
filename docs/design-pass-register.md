@@ -243,10 +243,12 @@ sat in.
 
 ---
 
-## Owed to the owner — ANSWERED 2026-10-29
+## Owed to the owner
 
-Every row on this list is closed. Nothing on it was invented while it was open, and nothing was
-widened when it closed.
+Rows 1, 2 and 3 are CLOSED — nothing on them was invented while they were open and nothing
+was widened when they closed. Rows 4 to 6 are OPEN and were found by opening captures after
+those three were answered; **nothing on them has been invented either**, which is the only
+thing that makes the list worth keeping.
 
 | # | where | her answer | what it cost |
 |---|---|---|---|
@@ -254,6 +256,8 @@ widened when it closed.
 | 2 · 2b | the five em-dash cells | **three words, not one** — «لم يُقيَّم بعد» (not done yet), «لا ينطبق» (does not apply), «غير متوفّر» (held, unresolvable), with the instruction that a site which does not fit one of the three KEEPS ITS DASH | three keys; **three of the five sites converted and two did not** — see the table below |
 | 4 | `/client-accounting`'s receivables ageing | the word for the **1–30 days** bucket. The nearest shipping string, `dclmAgeing0To30`, covers DAY ZERO — which on a receivables report is the `current` bucket, a separate column — so pointing at it would be a false label. The other four headers converted | **OPEN** |
 | 3 | the Arabic email subjects | **they carry «وسيط 360»** — they read as a generic description today, which was correct while the product had no name to show | three subjects, plus one body line as a stated judgement |
+| 5 | `/screening-health`'s capability table | the words for **`SANCTIONS`** and **`PEP`**, which render as raw tokens. The Arabic for PEP exists on that same screen, but only INSIDE a sentence («فحص الأشخاص السياسيين (PEP)») — lifting a genitive run out of a sentence to label a table row is morphology, and this repository has refused that once already by name (the «محاولتان» dual) | **OPEN** |
+| 6 | `/screening-health`'s screening outcomes | the words for **`CLEAR`**, **`POTENTIAL_MATCH`** and **`ERROR`**. Measured before being described: these are NOT `ScreeningOutcome`'s members — that Prisma enum is `CLEAR \| HIT \| PENDING_INVESTIGATION` — so there is no label map to reach for and no slice to take | **OPEN** |
 
 ### Decision 60 — what converted, and what deliberately did not
 
@@ -1004,6 +1008,71 @@ rule already names for a cross-cutting web change.
 `/screening-health`'s `row` style — a flex label/value pair used about thirty times — stays. `Note`
 and `KeyValue` are the primitives for it, but thirty swaps is a second screen's worth of work and
 the valve says a screen that needs more than a design pass gets recorded.
+
+---
+
+### Batch 11 — `/screening-health`'s capture, and two vocabularies that are the owner's
+
+The screen converted in batch 10 went into the capture set as the SMALL-FACTS shape — ten stacked
+panels of label/value rows, nothing a table and nothing a tile, where the thing that matters most
+is whether any panel is saying something is wrong. Opening it found two more things.
+
+#### Three raw ISO timestamps, four centimetres below a panel formatting its own dates a third way
+
+The scheduled-tasks panel printed `2026-09-11T00:00:00.000Z` three times — a machine string on a
+compliance screen — while the provider panel above rendered `2026-09-10 00:00` through its own
+hand-rolled `.slice(0, 16).replace("T", " ")`. **Two treatments of one kind of value on one screen,
+and neither was the product's.**
+
+`formatDate` is the product's: every other date-bearing screen reads it, it takes the reader's
+language, and it is the single reason `locale-formatting.spec.ts` can assert that a date
+re-renders in Arabic while the money deliberately does not. **All five sites moved, not the three
+that looked worst** — leaving the two sliced ones would be the same screen with two answers instead
+of three. A stale assertion pinning the raw ISO string is re-pointed with the reversal stated; the
+property it is about, that the screen STATES when the recurring work next runs, is unchanged.
+
+The `?? t('shUnknown')` fallbacks stay exactly as they were: *no next run is scheduled* is a real
+state with its own word already shipping, and it is not one of decision 60's three.
+
+#### Two vocabularies render raw, and both need a word that is hers
+
+| what renders | where it comes from | why it is not converted here |
+|---|---|---|
+| `SANCTIONS`, `PEP` | `capability: string` on the wire — **not** a Prisma enum | The Arabic for PEP exists only INSIDE a sentence on this same screen («فحص الأشخاص السياسيين (PEP)»), and lifting a genitive run out of a sentence to label a table row is Arabic morphology, which her rule reserves to her |
+| `CLEAR`, `POTENTIAL_MATCH`, `ERROR` | the keys of `attempts.byOutcome` | **They are NOT `ScreeningOutcome`'s members** — that Prisma enum is `CLEAR \| HIT \| PENDING_INVESTIGATION`. This is a second, undeclared vocabulary with no label map anywhere, so three words are owed rather than one map being reached for |
+
+`check:raw-values` reports 0 undeclared over both, correctly by its own rules: it keys on PRISMA
+ENUM field names, and neither of these is one. That is the same structural limit the gate already
+records against `/payment-channels`, met on a second screen.
+
+**Measured before being described**, because the first reading was wrong: `byOutcome`'s keys look
+like `ScreeningOutcome` and are not, and had they been, this would have been the pure-oversight
+class (a complete bilingual map shipping while the screen does not reach for it) rather than three
+words owed.
+
+---
+
+### Batch 11b — a flake CI found, and the one class of fix a plant cannot prove
+
+The full suite went 918 of 919 on a spec nothing in this batch touches:
+`duty-segregation-mode.spec.ts` asserts a captured POST body immediately after the click that
+sends it, and in a 919-test run the array was EMPTY. **7 of 7 in isolation**, which is what a
+timing assertion always looks like.
+
+**It is the recorded class rather than a new one** — *a console assertion must WAIT for the
+console*, a snapshot taken after the clicks passing or failing on which side of an async round trip
+it lands, which is how a green local run once reached a red CI here. The array is a captured
+request body rather than a console; the shape is identical.
+
+Three sites, all three hardened with `await expect.poll(() => posted.length).toBe(1)` before the
+original assertion, which is unchanged. **Two of the three were not failing and are hardened
+anyway**: a timing assertion that happens to win is the same assertion, and leaving two to be found
+by a future red CI is choosing to pay for this twice.
+
+**AND THE PLANT PROVES NOTHING, WHICH IS WORTH SAYING RATHER THAN HIDING.** Removing the poll
+leaves the test passing in isolation — that IS the failure mode. A timing fix is the one class
+whose plant cannot demonstrate anything locally, because *it passes locally* is the defect. What
+stands behind this one is the CI run that found it and the ones that come after.
 
 ---
 

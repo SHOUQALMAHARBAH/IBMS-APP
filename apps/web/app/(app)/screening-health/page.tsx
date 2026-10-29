@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { ApiError } from "../../../lib/auth/api-client";
 import { pageStackStyle } from "../../../components/lead/lead.styles";
+import { formatDate } from '../../../lib/i18n/format';
 import { useLanguage } from "../../../lib/i18n/language-context";
 import {
   loadIndependently,
@@ -267,13 +268,13 @@ export default function ScreeningHealthPage() {
               <span>{t('shLastUpdated')}</span>
               <span>
                 {health.datasetUpdatedAt
-                  ? health.datasetUpdatedAt.slice(0, 16).replace("T", " ")
+                  ? formatDate(health.datasetUpdatedAt, language)
                   : "—"}
               </span>
             </div>
             <div style={row}>
               <span>{t('shCheckedAt')}</span>
-              <span>{health.checkedAt.slice(0, 16).replace("T", " ")}</span>
+              <span>{formatDate(health.checkedAt, language)}</span>
             </div>
           </Card>
 
@@ -507,15 +508,17 @@ export default function ScreeningHealthPage() {
                 {t('shRecurringReScreen')}
               </span>
               <span data-testid="ops-next-rescreen">
-                {overview.schedules.rescreenBatch.nextRunAt ??
-                  (t('shUnknown'))}
+                {overview.schedules.rescreenBatch.nextRunAt
+                  ? formatDate(overview.schedules.rescreenBatch.nextRunAt, language)
+                  : t('shUnknown')}
               </span>
             </div>
             <div style={row}>
               <span>{t('shListSync')}</span>
               <span data-testid="ops-next-sync">
-                {overview.schedules.listSync.nextRunAt ??
-                  (t('shUnknown2'))}
+                {overview.schedules.listSync.nextRunAt
+                  ? formatDate(overview.schedules.listSync.nextRunAt, language)
+                  : t('shUnknown2')}
               </span>
             </div>
             <div style={row}>
@@ -523,8 +526,9 @@ export default function ScreeningHealthPage() {
                 {t('shLastSuccessfulSync')}
               </span>
               <span data-testid="ops-last-sync-success">
-                {overview.schedules.listSync.lastSuccessAt ??
-                  (t('shNever'))}
+                {overview.schedules.listSync.lastSuccessAt
+                  ? formatDate(overview.schedules.listSync.lastSuccessAt, language)
+                  : t('shNever')}
               </span>
             </div>
           </Card>

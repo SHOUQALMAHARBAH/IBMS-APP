@@ -328,6 +328,88 @@ test.describe("design pass — screenshots", () => {
     },
   );
 
+  /* ------------------------------------------------------------------ /screening-health */
+
+  /*
+   * THE SMALL-FACTS SHAPE. Ten stacked panels of label/value rows, no tables and no tiles, where
+   * the thing that matters most is whether any panel is saying something is wrong. The fixture is
+   * `screening-health.spec.ts`'s own, with a threshold problem and an unresolved screening left in
+   * so the capture shows both an ordinary panel and an alarmed one.
+   */
+  const SCREENING_HEALTH = {
+    provider: "built_in",
+    providerName: "Built-in watchlist cache (OFAC SDN + UN Consolidated)",
+    status: "HEALTHY",
+    detail: "Sanctions cache refreshed 2h ago.",
+    datasetVersion: "local-2026-09-10T00:00:00.000Z",
+    datasetUpdatedAt: "2026-09-10T00:00:00.000Z",
+    checkedAt: "2026-09-10T12:00:00.000Z",
+    thresholds: { high: 0.9, review: 0.7, low: 0.5 },
+    missing: [],
+    thresholdProblems: [],
+    sendIdentifiers: false,
+    state: "HEALTHY",
+    authenticationValid: null,
+    capabilities: [
+      { capability: "SANCTIONS", supported: true, configured: true },
+      { capability: "PEP", supported: false, configured: false },
+    ],
+  };
+
+  const SCREENING_OVERVIEW = {
+    windowDays: 30,
+    since: "2026-08-11T00:00:00.000Z",
+    attempts: {
+      total: 412,
+      byOutcome: { CLEAR: 388, POTENTIAL_MATCH: 21, ERROR: 3 },
+      byProvider: { built_in: 412 },
+      unresolved: 3,
+      unresolvedRate: 0.0073,
+      recentUnresolved: [],
+    },
+    matchQueue: {
+      pending: 4,
+      pendingByAlgorithmVersion: { "2.0.0": 4 },
+      currentAlgorithmVersion: "2.0.0",
+    },
+    caseWorkload: {},
+    datasets: [],
+    schedules: {
+      rescreenBatch: { cron: "0 */4 * * *", nextRunAt: "2026-09-11T00:00:00.000Z" },
+      listSync: {
+        cron: "0 */12 * * *",
+        nextRunAt: "2026-09-11T00:00:00.000Z",
+        lastSuccessAt: "2026-09-10T00:00:00.000Z",
+      },
+    },
+    holds: {
+      activeHolds: 2,
+      decidableFiles: 1,
+      releasedInWindow: 5,
+      policy: {},
+      staleAfterDays: 7,
+      configurationProblems: [],
+    },
+    listSync: [],
+  };
+
+  screenshots(
+    "screening-health",
+    "/screening-health",
+    ["COMPLIANCE_OFFICER"],
+    async (page) => {
+      await page.route("**/screening/providers/health", (route) =>
+        route.fulfill({ status: 200, json: SCREENING_HEALTH }),
+      );
+      await page.route("**/screening/overview*", (route) =>
+        route.fulfill({ status: 200, json: SCREENING_OVERVIEW }),
+      );
+    },
+    async (page) => {
+      await page.getByTestId("ops-attempts").waitFor();
+    },
+  );
+
   /* ------------------------------------------------------------------ /incidents */
 
   const INCIDENTS = [

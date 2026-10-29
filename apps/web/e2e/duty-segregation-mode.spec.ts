@@ -182,6 +182,10 @@ test.describe("declaring the office's separation of duties", () => {
     await expect(declare).toBeEnabled();
     await declare.click();
 
+    // WAIT for the POST to land before reading what was posted. A snapshot taken straight
+    // after the click passes or fails on which side of the round trip it lands — the class
+    // this repository already paid for on a console assertion, met here on a request array.
+    await expect.poll(() => posted.length).toBe(1);
     expect(posted).toEqual([{ mode: "SEGREGATED", reason: REASON }]);
     // The screen reflects the declaration it just made: who and when, not only the mode.
     await expect(page.getByText(/Declared by Office Administrator/)).toBeVisible();
@@ -278,6 +282,8 @@ test.describe("the DPO assignment", () => {
     await page.getByTestId("dpo-assign-save").click();
     // AND NO DECLARATION IS SENT. A screen that sent one anyway would record an acknowledgement of a
     // notice nobody was shown.
+    // The one CI caught: `posted` was empty in a 919-test run and 7 of 7 in isolation.
+    await expect.poll(() => posted.length).toBe(1);
     expect(posted).toEqual([{ dataProtectionOfficerName: SOMEBODY_ELSE }]);
   });
 
@@ -314,6 +320,7 @@ test.describe("the DPO assignment", () => {
 
     // THE SENT BODY AGAINST THE RENDERED ELEMENT — decision 28's precedent, and the only form that
     // can catch the server being sent a sentence nobody saw.
+    await expect.poll(() => posted.length).toBe(1);
     expect(posted).toHaveLength(1);
     const sent = posted[0].combinedAssignmentDeclaration;
     expect(sent?.acknowledged).toBe(true);
