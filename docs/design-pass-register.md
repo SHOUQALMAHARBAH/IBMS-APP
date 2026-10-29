@@ -337,6 +337,23 @@ another in the same edit, and only planting against it says which.**
 **And the MFA enrolment banner now scrolls away with the page. That is correct** — it is a one-time
 signpost, not a persistent state — and it is said here so nobody "fixes" it later.
 
+### Recorded from the captures, not fixed — the native date input is in English on every Arabic screen
+
+Visible on `/client-accounting`'s «كما في» field in all four of its captures: the control renders
+the browser's own **`mm/dd/yyyy`** placeholder beside an Arabic label, on an Arabic-first product.
+
+**MEASURED: 25 files use a native `<input type="date">`**, so this is a property of the control
+rather than of one screen. The format hint is BROWSER CHROME — it follows the user agent's locale,
+not the page's `dir` or `lang` — which is why no gate in this repository can see it: there is no
+English string in our source to find, `hardcoded-ui-english.py` is looking at the right files and
+correctly reports nothing, and axe has no opinion about a date format.
+
+Not fixed, and the reason is that both honest answers are bigger than a design pass. Setting `lang`
+on each input is not reliable across engines; a custom date control is a new primitive with
+keyboard, locale and calendar decisions attached — and this product has an open question about
+Hijri dates (Part F item #5) that such a control would have to answer first. Recorded here so it is
+a decision rather than something nobody noticed.
+
 ### What these four answers left OWED, measured
 
 Every row here is a word nobody may invent. Each renders its own member name today, which is
