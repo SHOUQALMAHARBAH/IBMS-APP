@@ -1094,6 +1094,25 @@ assumed**: 32 captures written, an unrelated spec run afterwards, 32 still there
 
 ---
 
+### Held back — one commit that needs a workflow-scoped push
+
+`check:opacity-muting` is wired into `package.json` and into `npm run check:screen-pass`, so it
+runs locally. **Its CI step is written and is NOT on the branch**: GitHub refuses a push that
+creates or updates a workflow file without `workflow` scope, and the credential this machine
+defaults to does not carry it.
+
+It is held as a single 13-line commit on the local branch **`wire-opacity-gate-into-ci`**
+(`b9794f4`), rather than sitting in the working tree where it would be the most losable thing in
+the repository. It was kept OFF `module-0b/provider-registration` deliberately: any commit touching
+`ci.yml` blocks the push of the entire branch, so leaving it in line would have held four later
+commits hostage to one line.
+
+**Until it lands, the gate is in the unwired-script state this repository already records against
+itself** — a number nobody can trust, because nothing runs it where it matters. Push that branch
+with a workflow-scoped token and merge it.
+
+---
+
 ---
 
 ## The method, per screen
