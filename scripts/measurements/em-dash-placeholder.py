@@ -39,6 +39,18 @@ ROOTS = (
 # text. Not a comment, and not an em dash inside prose (which is this codebase's ordinary
 # punctuation and appears in hundreds of comments).
 FALLBACK = re.compile(r"\?\?\s*'—'|\?\s*'—'|:\s*'—'|>\s*—\s*<|'—'")
+
+# A NAME THAT IS HELD AND DOES NOT RESOLVE is the ONE class a matcher can recognise, and it is
+# recognisable only because decision 48 settled it: `displayNamesForUserIds` and its three siblings
+# take IDS and return a Map, and A MISSING KEY MEANS NO NAME AND MUST NEVER BECOME THE UUID. So a
+# `<something>Name` falling back to a dash is precisely *the value is held and its name is
+# unavailable* — owner decision 60's «غير متوفّر», and neither of her other two words.
+#
+# It is REPORTED as a candidate, never acted on by this script: `knowledge-base`'s `titleAr` is a
+# name and is NOT this case, which is why a person reads the rows. Added here rather than in a
+# second script — `em-dash-sites.py` was written without finding this one, the two disagreed 145
+# against 91, and two instruments answering one question is the defect this measurement is for.
+NAMEISH = re.compile(r"\w*Name")
 CODE_PREFIX = ('//', '*', '/*')
 MINIMUM_FILES = 120
 

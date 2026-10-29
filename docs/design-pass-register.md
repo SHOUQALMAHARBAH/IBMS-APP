@@ -803,10 +803,15 @@ English is written rather than sliced, the ordinary asymmetry.
 
 ### Batch 7 — owner decision 60's three words, and the 91 sites that keep their em dash
 
-**16 of 107 converted.** `scripts/measurements/em-dash-sites.py` re-derives both figures; it writes
-its rows to a gitignored UTF-8 file because this console is cp1252 and a row carrying Arabic or an
-em dash kills the run — the treatment `server-message-identifiers.py` already takes, and exactly
-how this script failed on its own first run.
+**16 of 107 converted.** **CORRECTED 2026-10-29: 16 of 145, of which my matcher could see 107.**
+`scripts/measurements/em-dash-placeholder.py` ALREADY EXISTED, from module 0-c group 7, and answers
+exactly this question — I did not find it before writing a second one, and the two then disagreed
+**145 against 91**. The existing one also matches a bare `'—'` literal and a JSX text dash
+(`> — <`), so it is the broader and correct denominator and mine saw a SUBSET. **The disagreement
+is the finding rather than either figure**, and it is the defect this batch keeps reporting — two
+answers to one question — found in my own work. The second script is DELETED; the one thing it
+contributed, the NAME-shaped column that made decision 60's convertible class recognisable, moved
+into the one that already existed.
 
 #### The one class a matcher can recognise, and why only that one converted
 
@@ -850,7 +855,7 @@ key, and a screen spelling the literal.
 
 Dates never recorded, free text nobody wrote, figures not yet captured, ids that resolve to nothing.
 Telling *not recorded yet* from *does not apply to this row* needs the field's own meaning, which
-her ruling reserves to a reader. They are listed by `em-dash-sites.py`, and a count cleared by
+her ruling reserves to a reader. They are listed by `em-dash-placeholder.py`, and a count cleared by
 stretching a word onto a site it does not fit is worse than a count that stands.
 
 ---

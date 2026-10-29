@@ -53,10 +53,6 @@ apps/api/scripts/seed-demo-report.json
 # committing its output.
 server-message-identifiers.txt
 
-# scripts/measurements/em-dash-sites.py writes its rows here, because this console is
-# cp1252 and a row carrying Arabic or an em dash kills the run. A snapshot to read,
-# never an artefact to keep.
-em-dash-sites.txt
 
 # The design-pass screenshots. NOT under `test-results/`, which Playwright clears at the
 # start of every run - these have to survive one. Evidence to look at, not an artefact.
