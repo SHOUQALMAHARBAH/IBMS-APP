@@ -201,6 +201,16 @@ export const COMPLIANCE_SCREENING = {
     shCouldNotLoadScreeningHealth: 'تعذّر تحميل حالة الفحص — حاول مرة أخرى.',
     shListHealth: 'حالة مزوّد الفحص',
     shListOverview: 'إحصاءات الفحص لآخر ٣٠ يوماً',
+    /*
+     * OWNER ANSWER 2 — the two capability words, hers verbatim.
+     *
+     * «الأشخاص السياسيون (PEP)» is the NOMINATIVE, which is what a column label takes. The
+     * Arabic already on this screen reads «فحص الأشخاص السياسيين (PEP)» — genitive, inside a
+     * sentence — and agreeing that run back to the nominative is morphology rather than a
+     * slice. That difference is why this was her decision; do not "harmonise" the two.
+     */
+    shCapSanctions: 'العقوبات',
+    shCapPep: 'الأشخاص السياسيون (PEP)',
     shScreeningHealth: 'حالة فحص العقوبات',
     shWhichProviderActuallyPerformsScreening:
       'يوضّح هذا الجدول أي مزوّد يُجري الفحص فعلياً، وما إذا كانت بياناته حديثة، وما الذي يغطيه. «غير مهيأ» أو «غير متاح» تعني أنّ الفحص لم يجرِ — وهي ليست نتيجة سلبية.',
@@ -438,6 +448,8 @@ export const COMPLIANCE_SCREENING = {
     shCouldNotLoadScreeningHealth: 'Could not load screening health — try again.',
     shListHealth: 'the screening provider status',
     shListOverview: 'the last 30 days of screening figures',
+    shCapSanctions: 'Sanctions',
+    shCapPep: 'Politically exposed persons (PEP)',
     shScreeningHealth: 'Screening health',
     shWhichProviderActuallyPerformsScreening:
       'Which provider actually performs screening, whether its data is current, and what it covers. NOT_CONFIGURED or UNAVAILABLE means screening did not happen — it is not a negative result.',

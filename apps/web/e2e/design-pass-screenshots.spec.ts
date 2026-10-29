@@ -355,9 +355,23 @@ test.describe("design pass — screenshots", () => {
     sendIdentifiers: false,
     state: "HEALTHY",
     authenticationValid: null,
+    /*
+     * ALL NINE, because the product renders all nine — every provider adapter reports the whole
+     * `ProviderCapability` union. The two-row version of this fixture is what the owner walked,
+     * and it is why her note reads "a THIRD capability": a capture with fewer rows than the screen
+     * has is a believable picture of a product that does not exist. `operational` and `note` are
+     * carried too; without them the table showed a dash and an empty cell in every row.
+     */
     capabilities: [
-      { capability: "SANCTIONS", supported: true, configured: true },
-      { capability: "PEP", supported: false, configured: false },
+      { capability: "SANCTIONS", supported: true, configured: true, operational: true, note: "OFAC SDN + UN consolidated, synced." },
+      { capability: "PEP", supported: false, configured: false, operational: false, note: "No PEP source is configured." },
+      { capability: "WATCHLIST", supported: true, configured: true, operational: true, note: "Local watchlist." },
+      { capability: "ADVERSE_MEDIA", supported: false, configured: false, operational: false, note: "Not available." },
+      { capability: "INDIVIDUAL", supported: true, configured: true, operational: true, note: "Names are matched." },
+      { capability: "ENTITY", supported: true, configured: true, operational: true, note: "Legal names are matched." },
+      { capability: "BATCH", supported: true, configured: true, operational: true, note: "Recurring sweep." },
+      { capability: "ONGOING_MONITORING", supported: true, configured: true, operational: true, note: "Four-hourly re-screen." },
+      { capability: "WEBHOOKS", supported: false, configured: false, operational: false, note: "No callback endpoint." },
     ],
   };
 
@@ -366,7 +380,19 @@ test.describe("design pass — screenshots", () => {
     since: "2026-08-11T00:00:00.000Z",
     attempts: {
       total: 412,
-      byOutcome: { CLEAR: 388, POTENTIAL_MATCH: 21, ERROR: 3 },
+      /*
+       * THE REAL MEMBERS. This read `{ CLEAR: 388, POTENTIAL_MATCH: 21, ERROR: 3 }` — and `CLEAR`
+       * and `ERROR` are not members of `ScreeningAttemptOutcome` at all. The owner read those
+       * three token names off the picture this fixture produced and wrote Arabic for two tokens
+       * that cannot occur. A screenshot has no expected value, which is exactly what makes a wrong
+       * one so quiet.
+       */
+      byOutcome: {
+        NO_MATCH: 388,
+        POTENTIAL_MATCH: 21,
+        SCREENING_FAILED: 2,
+        UNABLE_TO_SCREEN: 1,
+      },
       byProvider: { built_in: 412 },
       unresolved: 3,
       unresolvedRate: 0.0073,

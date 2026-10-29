@@ -174,6 +174,9 @@ export const ENUMS = {
     rrStatusOpen: 'مفتوح',
     rrStatusClosed: 'مغلق',
     // ScreeningAttemptOutcome
+    screenProviderBuiltIn: 'القائمة المحلية المزامنة',
+    screenProviderOnPremise: 'محرك فحص محلي',
+    screenProviderCommercial: 'مزوّد تجاري',
     screenOutcomeNoMatch: 'لا يوجد تطابق',
     screenOutcomePotentialMatch: 'تطابق محتمل',
     screenOutcomeNotConfigured: 'غير مُهيّأ',
@@ -503,6 +506,9 @@ export const ENUMS = {
     rrStatusOpen: 'Open',
     rrStatusClosed: 'Closed',
     // ScreeningAttemptOutcome
+    screenProviderBuiltIn: 'Synced local list',
+    screenProviderOnPremise: 'On-premise screening engine',
+    screenProviderCommercial: 'Commercial provider',
     screenOutcomeNoMatch: 'No match',
     screenOutcomePotentialMatch: 'Potential match',
     screenOutcomeNotConfigured: 'Not configured',

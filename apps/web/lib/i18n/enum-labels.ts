@@ -315,6 +315,14 @@ export const ENUM_LABEL = {
     open: 'rrStatusOpen',
     closed: 'rrStatusClosed',
   } satisfies Labels<string>,
+  /** Which screening implementation answered. The three Arabic words moved here verbatim from a
+   *  local map inside `/screening-health`, which returned the RAW TOKEN (`built_in`) to an English
+   *  reader — the same dead-vocabulary shape owner answer 2 is about, one map over. */
+  ScreeningProviderKind: {
+    built_in: 'screenProviderBuiltIn',
+    on_premise: 'screenProviderOnPremise',
+    commercial: 'screenProviderCommercial',
+  } satisfies Labels<string>,
   ScreeningAttemptOutcome: {
     NO_MATCH: 'screenOutcomeNoMatch',
     POTENTIAL_MATCH: 'screenOutcomePotentialMatch',

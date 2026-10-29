@@ -23,8 +23,12 @@ import {
 import {
   getScreeningHealth,
   getScreeningOverview,
+  PROVIDER_CAPABILITY_LABEL_KEY,
+  type ProviderHealthStatus,
+  type ScreeningAttemptOutcome,
   type ScreeningHealth,
   type ScreeningOverview,
+  type ScreeningProviderKind,
 } from "../../../lib/screening/screening-config-api";
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
@@ -116,26 +120,29 @@ export default function ScreeningHealthPage() {
 
   if (isLoading || !user) return null;
 
-  const statusLabel = (status: string): string => {
-    if (!isArabic) return status;
-    const ar: Record<string, string> = {
-      HEALTHY: "سليم",
-      DEGRADED: "متدهور",
-      UNAVAILABLE: "غير متاح",
-      NOT_CONFIGURED: "غير مهيأ",
-    };
-    return ar[status] ?? status;
-  };
+  /*
+   * BOTH OF THESE WERE LOCAL ARABIC MAPS THAT RETURNED THE RAW TOKEN TO AN ENGLISH READER.
+   *
+   * Each opened `if (!isArabic) return status`, so on a compliance screen an English reader saw
+   * `HEALTHY` and `built_in` verbatim — and the four health words were a second, undiacriticised
+   * copy of `ENUM_LABEL.ProviderHealthStatus`, which has shipped both languages the whole time.
+   * The same dead-vocabulary shape owner answer 2 is about, two maps over, found by reading the
+   * file for the two rows she named.
+   *
+   * AND THERE IS NO FALL-THROUGH LEFT, which is better than what replaced them first. My own
+   * first version typed both parameters `string` and kept a `?? token` fallback, with a note
+   * claiming the fields "arrive over HTTP as `string`". `tsc` refused it (TS7053) and was right:
+   * this client has declared `ProviderHealthStatus` and `ScreeningProviderKind` all along, and
+   * `health.status` / `health.provider` are already typed with them — only my two signatures said
+   * `string`. Taking the unions makes each lookup TOTAL, so a fifth member is a compile error in
+   * `ENUM_LABEL` rather than a raw token on a compliance screen. That is owner answer 2's own
+   * mechanism, applied to the two maps she did not name.
+   */
+  const statusLabel = (status: ProviderHealthStatus): string =>
+    t(ENUM_LABEL.ProviderHealthStatus[status]);
 
-  const providerLabel = (kind: string): string => {
-    if (!isArabic) return kind;
-    const ar: Record<string, string> = {
-      built_in: "القائمة المحلية المزامنة",
-      on_premise: "محرك فحص محلي",
-      commercial: "مزوّد تجاري",
-    };
-    return ar[kind] ?? kind;
-  };
+  const providerLabel = (kind: ScreeningProviderKind): string =>
+    t(ENUM_LABEL.ScreeningProviderKind[kind]);
 
   return (
     <main style={pageStackStyle}>
@@ -231,7 +238,14 @@ export default function ScreeningHealthPage() {
                   {health.capabilities.map((c) => (
                     <Tr key={c.capability} data-capability={c.capability}>
                       <Td>
-                        <div style={{ fontWeight: 600 }}>{c.capability}</div>
+                        <div style={{ fontWeight: 600 }}>
+                          {/* OWNER ANSWER 2. A `null` renders the member name on purpose: seven
+                              of the nine capabilities have no word yet, and a token in an Arabic
+                              table is visibly unfinished where an invented word is not. */}
+                          {PROVIDER_CAPABILITY_LABEL_KEY[c.capability]
+                            ? t(PROVIDER_CAPABILITY_LABEL_KEY[c.capability]!)
+                            : c.capability}
+                        </div>
                         <div style={{ fontSize: "0.8rem", color: 'var(--ink-secondary)' }}>
                           {c.note}
                         </div>
@@ -347,14 +361,22 @@ export default function ScreeningHealthPage() {
                     {Math.round(overview.attempts.unresolvedRate * 100)}%)
                   </strong>
                 </div>
-                {Object.entries(overview.attempts.byOutcome).map(
-                  ([outcome, count]) => (
-                    <div key={outcome} style={row} data-outcome={outcome}>
-                      <span>{outcome}</span>
-                      <span>{count}</span>
-                    </div>
-                  ),
-                )}
+                {/* OWNER ANSWER 3, AND IT NEEDED NO WORD. These keys are
+                    `ScreeningAttemptOutcome` members — there is no `CLEAR` and no `ERROR` on
+                    this wire — and `ENUM_LABEL.ScreeningAttemptOutcome` has mapped all five to
+                    bilingual keys since before this screen rendered one raw. Her own `ERROR`
+                    word, «تعذّر الفحص», IS `screenOutcomeUnableToScreen`. */}
+                {(
+                  Object.entries(overview.attempts.byOutcome) as [
+                    ScreeningAttemptOutcome,
+                    number,
+                  ][]
+                ).map(([outcome, count]) => (
+                  <div key={outcome} style={row} data-outcome={outcome}>
+                    <span>{t(ENUM_LABEL.ScreeningAttemptOutcome[outcome])}</span>
+                    <span>{count}</span>
+                  </div>
+                ))}
                 {overview.attempts.unresolved > 0 ? (
                   <ErrorState title={t('shTheseCustomersWereNotScreened')} />
                 ) : null}

@@ -1,3 +1,4 @@
+import type { TranslationKey } from '../i18n/translations';
 import { apiGet } from "../auth/api-client";
 
 // Screening provider configuration + data health (task §23, §32, §33).
@@ -15,6 +16,61 @@ export type ScreeningAttemptOutcome =
   | 'NOT_CONFIGURED'
   | 'SCREENING_FAILED'
   | 'UNABLE_TO_SCREEN';
+
+/**
+ * WHAT A SCREENING PROVIDER CAN DO — nine capabilities, mirrored from the api's own
+ * `ProviderCapability`. Declared here rather than typed `string`, because the capability table on
+ * `/screening-health` labels each row and a `Record<string, …>` lookup that falls through renders
+ * the raw token, which is the defect owner answer 2 exists to close.
+ *
+ * EVERY PROVIDER REPORTS ALL NINE. The built-in, on-premise and commercial adapters each build
+ * nine rows and `not-configured` maps over a nine-element list, so this table is always nine rows
+ * long whatever is configured.
+ */
+export type ProviderCapability =
+  | 'SANCTIONS'
+  | 'PEP'
+  | 'WATCHLIST'
+  | 'ADVERSE_MEDIA'
+  | 'INDIVIDUAL'
+  | 'ENTITY'
+  | 'BATCH'
+  | 'ONGOING_MONITORING'
+  | 'WEBHOOKS';
+
+/**
+ * THE CAPABILITY LABELS — owner answer 2, and it is TOTAL over the union by her own instruction:
+ * *"A third capability added to the api should be a COMPILE ERROR in the web."* A tenth member
+ * therefore cannot be added without deciding its word, and nothing falls through to the token by
+ * accident.
+ *
+ * TWO OF THE NINE HAVE A WORD AND SEVEN DO NOT. She gave `SANCTIONS` and `PEP` — the two her
+ * capture showed, because the capture's own fixture carried two rows where the product renders
+ * nine. The other seven render their member name, which is visibly unfinished: the established
+ * treatment here (decision 41, `WORKFLOW_ENTITY_LABEL`) is that an English token in an Arabic
+ * table is obviously owed, where a plausible invented word is indistinguishable from a decided one
+ * and never gets corrected. The seven are in `docs/design-pass-register.md`.
+ *
+ * `PEP`'s FORM IS HERS AND IS NOT THE ONE ON THIS SCREEN. The Arabic already here reads «فحص
+ * الأشخاص السياسيين (PEP)» — genitive, inside a sentence — and hers is the nominative a column
+ * label takes. Lifting the genitive run out of that sentence is morphology, which this repository
+ * has refused once already by name (the «محاولتان» dual), and is the entire reason this was her
+ * decision rather than a slice.
+ */
+export const PROVIDER_CAPABILITY_LABEL_KEY: Record<
+  ProviderCapability,
+  TranslationKey | null
+> = {
+  SANCTIONS: 'shCapSanctions',
+  PEP: 'shCapPep',
+  WATCHLIST: null,
+  ADVERSE_MEDIA: null,
+  INDIVIDUAL: null,
+  ENTITY: null,
+  BATCH: null,
+  ONGOING_MONITORING: null,
+  WEBHOOKS: null,
+};
 
 export type DatasetVersionStatus =
   | 'DOWNLOADED'
@@ -62,7 +118,7 @@ export interface ScreeningHealth {
    *   operational — it works right now
    */
   capabilities: {
-    capability: string;
+    capability: ProviderCapability;
     supported: boolean;
     configured: boolean;
     operational: boolean;
@@ -109,7 +165,15 @@ export interface ScreeningOverview {
   since: string;
   attempts: {
     total: number;
-    byOutcome: Record<string, number>;
+    /*
+     * KEYED ON THE ENUM, NOT ON `string`. This was `Record<string, number>`, and that is what
+     * made `/screening-health` render `NO_MATCH` raw beside a complete bilingual label map it
+     * never reached — `ENUM_LABEL.ScreeningAttemptOutcome` has shipped all five members in both
+     * languages the whole time. `Partial` because the api sends only the outcomes that actually
+     * occurred in the window, so an absent key means zero attempts of that kind rather than an
+     * unknown outcome; a SIXTH member added to the enum is a compile error in the label map.
+     */
+    byOutcome: Partial<Record<ScreeningAttemptOutcome, number>>;
     byProvider: Record<string, number>;
     unresolved: number;
     unresolvedRate: number;
