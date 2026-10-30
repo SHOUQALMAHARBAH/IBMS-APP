@@ -2175,7 +2175,9 @@ run where one request escaped the mocks cannot pass as a clean a11y result over 
 branch's own diff confirms it: `5a17f08` adds exactly one step, and *"Inline styling may only fall"*
 appears in it as unchanged CONTEXT. So only **`check:opacity-muting`** was absent.
 
-It is wired now, with `check:literal-colours` beside it. The held branch `wire-opacity-gate-into-ci`
+Both steps are WRITTEN and **NEITHER IS PUSHED**: the push was refused a second time, naming
+`workflow` — so they are held on `wire-both-design-gates-into-ci`, named for what it does rather
+than by a hash that moves. The previously held branch `wire-opacity-gate-into-ci`
 is **superseded** — it sat four commits behind and carried the same 13 lines.
 
 ### 10 · What stays deferred, and why
