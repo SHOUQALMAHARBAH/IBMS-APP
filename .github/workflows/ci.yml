@@ -132,6 +132,32 @@ jobs:
       - name: Inline styling may only fall, in screens and in the primitive set
         run: npm run check:inline-styles
 
+      # `opacity` COMPOSITES TEXT INTO ITS BACKGROUND, so muted text written as `opacity: 0.8`
+      # drops below AA on a token that passes comfortably: `--ink-secondary` on `--surface-card`
+      # is 6.58 at full strength and 4.10 at 0.8, and `--ink-muted` fails at every value this tree
+      # uses. The full table is in the script's own header.
+      #
+      # THE a11y SUITE CANNOT SEE IT, which is why this is a gate of its own rather than a note:
+      # axe composites what it can resolve and reports the rest as INCOMPLETE, and that gate reads
+      # serious/critical VIOLATIONS — so a green a11y run says nothing about this class. It is the
+      # recorded `--ink-muted`-plus-opacity regression in a second form, 130 sites wide when first
+      # measured. A ratchet rather than a ban, for the same reason as the one above.
+      - name: Opacity used to mute text may only fall
+        run: npm run check:opacity-muting
+ 
+      # A LITERAL COLOUR DOES NOT FOLLOW THE THEME, and the defect is arithmetic rather than taste.
+      # Measured on the sweep that emptied this: `#b91c1c` is 6.47:1 on a light card and 2.33:1 on
+      # a dark one, where `--danger-ink` is 6.76; `#2a7` fails the other way round at 2.96:1 in
+      # LIGHT, so a policy that passed QC rendered its own clean marker below AA for every
+      # light-theme reader. The worst single site was the SIGN-IN button's own label at 2.34:1 in
+      # dark, and `Button`'s `primary` variant already carried a comment naming that exact defect.
+      #
+      # It fails in BOTH directions: an undeclared literal, and a declared exception that no longer
+      # occurs. The nine that remain are a solid badge, a modal scrim and two decorative gradients —
+      # each with what it is for beside it, because adding a token to empty the list is not the fix.
+      - name: No hand-written colour outside the token set
+        run: npm run check:literal-colours
+        
       # ------------------------------------------------------------------ DECISION 34, THE SCREEN PASS
       #
       # THE COUNT NEVER RISES. The owner struck the attrition rule she had been given in batch 4 —
