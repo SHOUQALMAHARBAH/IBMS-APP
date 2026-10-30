@@ -12,7 +12,7 @@ already obvious is noise, and noise is how people stop reading hints -- so the c
 "this one is fine" is as much of the answer as the list of candidates, and the script refuses to
 collapse the two.
 
-IT JUDGES THE **VISIBLE** LABEL, which is the finding that came out of writing it. Four of these
+IT JUDGES THE **VISIBLE** LABEL, which is the finding that came out of writing it. FIVE of these
 inputs carry an `aria-label` that says something DIFFERENT from the text beside them -- «تاريخ
 الرصيد» spoken against «كما في» seen -- and an `aria-label` REPLACES the accessible name, so the
 two readers are told different things and nobody proof-reads the invisible one. That is a class
@@ -51,18 +51,30 @@ OUT = os.path.join(
 )
 
 DATE_INPUT = re.compile(r'type="date"')
+# Every tag a control's attributes can hang off, so `element_bounds` works for a `<select>` and a
+# `<TextInput>` as well as a bare `<input>` -- `aria-vs-visible-label.py` imports this resolver and
+# asks it about every aria-bearing control in the tree, not only the date ones.
+OPENS_A_CONTROL = re.compile(
+    r"<(input|select|textarea|button|TextInput|Select|TextArea|EntitySearch|Field)\b"
+)
 
 LABEL_KEY = re.compile(r"(?<!aria-)label=\{t\(\s*['\"]([A-Za-z0-9_]+)['\"]")
 ARIA_KEY = re.compile(r"aria-label=\{t\(\s*['\"]([A-Za-z0-9_]+)['\"]")
 # A JSX TEXT NODE on its own line -- the `<label>{t('k')}<input/></label>` shape.
 #
-# ANCHORED AT BOTH ENDS, and the anchoring is the whole point: an unanchored `\{t\(…\)\}` also
-# matches the tail of `aria-label={t('k')}`, and because the backward scan starts at the
-# `type="date"` line and walks UP it reached the aria attribute FIRST -- so the invisible label was
-# being reported as the visible one on exactly the screens whose two labels disagree, which is the
-# divergence this script exists to find. Caught by printing the per-line matches rather than by
-# reading the pattern.
-BARE_KEY = re.compile(r"^\s*\{t\(\s*['\"]([A-Za-z0-9_]+)['\"]\s*\)\}\s*$")
+# ANCHORED AT ITS START, and the anchoring is the whole point: an UNanchored `\{t\(…\)\}` also
+# matches the tail of `aria-label={t('k')}`, and because the backward scan walks UP from the input
+# it reached the aria attribute FIRST -- so the invisible label was reported as the visible one on
+# exactly the screens whose two labels disagree, which is the divergence this script exists to
+# find.
+#
+# CORRECTED: it was first anchored at BOTH ends, which fixed that and broke the other direction --
+# `{t('atFromLabel')}{' '}` is a text node followed by a JSX space, so `/audit-trail`'s two inputs
+# were reported as having NO VISIBLE LABEL when they have one, and that false reading reached the
+# owner's own table of what to change. A START anchor is sufficient and is all that was ever
+# needed: a line reading `aria-label={t(` cannot match `^\s*\{t\(`, because it begins with the
+# attribute name.
+BARE_KEY = re.compile(r"^\s*\{t\(\s*['\"]([A-Za-z0-9_]+)['\"]")
 # Shapes four and five, both on one line: `<label htmlFor="x">{t('k')}</label>` and the
 # `<label><span style={…}>{t('k')}</span><input/></label>` wrapper. Five shapes for one job is
 # itself worth knowing -- `Field` exists and 18 of these 40 inputs do not go through it.
@@ -136,21 +148,45 @@ def strip_comments(src):
     return "".join(out)
 
 
+def element_bounds(lines, n):
+    """The line range of the `<input …>` element containing line `n`.
+
+    The aria-label is searched within the ELEMENT rather than FORWARD from `type="date"`, because
+    attribute order is the author's choice: `/operational-pi-risk` and `/dashboards/executive`
+    both write `aria-label` ABOVE `type="date"` and were both reported as having no divergence at
+    all. A forward-only window answers a question about where somebody happened to put an
+    attribute rather than a question about the control.
+    """
+    start = n
+    for back in range(n, max(-1, n - 10), -1):
+        if OPENS_A_CONTROL.search(lines[back]):
+            start = back
+            break
+    end = start
+    for fwd in range(start, min(len(lines), start + 14)):
+        end = fwd
+        if "/>" in lines[fwd] or lines[fwd].rstrip().endswith(">"):
+            break
+    return start, end
+
+
 def labels_for(lines, n):
     """(visible key, aria key) for the date input on line `n`.
 
     FIVE shapes, all five live in this app: `<Field label={t('k')}>`, a
     `<label>{t('k')}<input/></label>` wrapper, `<label htmlFor="x">{t('k')}</label>`,
     `<label><span>{t('k')}</span><input/></label>`, and an `aria-label` on the input itself --
-    which sits AFTER `type="date"`, not before it, so it is searched FORWARD.
+    searched across the whole `<input …>` ELEMENT -- it sits AFTER `type="date"` at some sites
+    and BEFORE it at others.
 
     The aria-label WINS when both exist, because it REPLACES the accessible name. But the VISIBLE
     label is what the verdict is computed from, since that is where a hint would render; the
     disagreement between them is reported instead of being resolved.
     """
     aria = None
-    for fwd in range(n, min(len(lines), n + 7)):
-        m = ARIA_KEY.search(lines[fwd])
+    lo, hi = element_bounds(lines, n)
+    for i in range(lo, hi + 1):
+        m = ARIA_KEY.search(lines[i])
         if m:
             aria = m.group(1)
             break
@@ -170,6 +206,29 @@ def labels_for(lines, n):
             visible = m.group(1)
             break
     return visible, aria
+
+
+def ariaVerdict(ar, en, visible, aria):
+    """What this control's `aria-label` does to its accessible name.
+
+    COMPARED ON TEXT, NOT ON KEYS. Keying it reported three inputs on `/regulatory-compliance` as
+    having an aria that OVERRIDES the visible label when both keys hold «تاريخ الإصدار» -- two keys
+    and one sentence, which is a drift risk and not a defect. Three outcomes, named apart, because
+    they are three different things to do about them.
+    """
+    if not aria:
+        return ""
+    if not visible:
+        return "ARIA IS THE ONLY NAME -- no visible text beside the control"
+    if aria == visible:
+        return "REDUNDANT: the aria-label repeats the visible label's own key (%s)" % aria
+    same = ar.get(aria, "") == ar.get(visible, "") and en.get(aria, "") == en.get(visible, "")
+    if same:
+        return "DUPLICATE: two keys, one sentence -- spoken (%s), seen (%s)" % (aria, visible)
+    return (
+        "DIVERGENT -- ARIA OVERRIDES THE VISIBLE LABEL: spoken «%s» (%s), seen «%s» (%s)"
+        % (ar.get(aria, ""), aria, ar.get(visible, ""), visible)
+    )
 
 
 def classify(text):
@@ -205,15 +264,7 @@ def main():
                 (path, n, key, "", "", "", "key not in the dictionaries")
             )
             continue
-        divergence = ""
-        if aria and visible and aria != visible:
-            aa = ar.get(aria, "")
-            divergence = (
-                "ARIA OVERRIDES THE VISIBLE LABEL: spoken «%s» (%s), seen «%s» (%s)"
-                % (aa, aria, a, visible)
-            )
-        elif aria and not visible:
-            divergence = "aria-label only -- no visible text beside the control"
+        divergence = ariaVerdict(ar, en, visible, aria)
         buckets[classify(a or e)].append((path, n, key, a, e, aria or "", divergence))
 
     out = io.open(OUT, "w", encoding="utf-8", newline="\n")
@@ -269,4 +320,8 @@ def main():
     )
 
 
-main()
+# GUARDED, because `aria-vs-visible-label.py` imports the resolver from this file: without the
+# guard the import ran this whole measurement as a side effect and wrote its report, so the two
+# scripts' outputs interleaved and a reader could not tell which figure came from which run.
+if __name__ == "__main__":
+    main()
