@@ -508,7 +508,23 @@ been run at all.
 
 ## The ten numbered finding sections
 
-**Moved to [`docs/findings-register.md`](docs/findings-register.md) on 2026-10-30** — §§ 1-10, 6,700 lines, from CI and test-infrastructure failures through the 2026-09-07 audit. Entry numbers are unchanged, so an existing `§ 1.85`-style reference still resolves.
+**Moved to [`docs/findings-register.md`](docs/findings-register.md) on 2026-10-30** — §§ 1-10, 6,700 lines, from CI and test-infrastructure failures through the 2026-09-07 audit.
+
+> ## A numbered reference anywhere in this repository means `docs/findings-register.md`
+>
+> **ENTRY NUMBERS ARE UNCHANGED, so `IMPROVEMENTS.md § 1.40` and
+> `docs/findings-register.md § 1.40` are the same entry.** That sentence is here rather than swept
+> through the tree: **30 references to a numbered section exist in code comments, assertion
+> messages and `docs/`** (26 under `apps`/`packages`/`scripts`, 4 in documentation), every one of
+> which would otherwise resolve to nothing — grepping THIS file for `1.40` returns 0.
+>
+> A comment-only sweep across ~29 api and web files inside a documentation batch is exactly the
+> change that gets mixed in and then cannot be told apart from a real one, so the pointer is made
+> true once instead. **THE THREE EXCEPTIONS WERE REPOINTED DIRECTLY**, because they are messages a
+> developer reads while a test is RED and will grep rather than browse: `test-app.ts`
+> (§§ 1.11/1.22/1.31), `managed-line-writers.e2e-spec.ts` (§ 1.40), and `scripts/audit-check.mjs`
+> (§ 1.82) — the last inside a security acknowledgement, where a record citing a section nobody can
+> find is the same failure the record itself is about.
 
 **What stayed here is the method**, which is what the sections above are: the blind instrument, the flaky test recorded rather than explained away, anchoring a negative on a container that does not hold the thing, computing a rate before treating a case, a completion claim made without running the gate that would have checked it, and the standing rule for every number this file publishes.
 

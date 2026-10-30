@@ -15,7 +15,7 @@ modules — **Domain A, Processes 1–10**: Lead Management (#1 — create/list/
 — convert a qualified Lead, capture its qualification profile, a profile screen), Customer
 Acquisition/Onboarding (#3-4 — individual/corporate Customer creation, UBO capture, KYC
 lifecycle with sanctions screening (real lists; PEP and pre-transaction screening are
-NOT implemented — see § Known gaps) and maker/checker approval, a
+NOT implemented — see `docs/scope-and-gaps.md` § Known gaps) and maker/checker approval, a
 step-by-step wizard + Compliance queue), Needs Assessment (#5 — a structured risk
 questionnaire that derives a recommended coverage list, with a review + approval gate),
 Risk Assessment (#6 — a per-site asset survey deriving Sum Insured + indemnity period,
@@ -34,10 +34,10 @@ until Domains B/C/E land).
 This paragraph predates Domains B–H (policy,
 claims, finance, service, compliance/risk, management, supporting ops) and Parts D–F
 (PDPL/DSR/retention, dashboards, bilingual/RTL UI), all of which have since been built —
-**§ Scope status below is the authority, not this summary.** Part G's final verification
+**`docs/scope-and-gaps.md` § Scope status is the authority, not this summary.** Part G's final verification
 checklist is **complete** — all seven items closed, each guarded by a test that fails when
-the property stops holding. See § Scope status
-for the full picture and § Known gaps for the
+the property stops holding. See `docs/scope-and-gaps.md` § Scope status
+for the full picture and its § Known gaps for the
 deferred edges of each built item; `meta/context/data-model.md` in ibms-brain is the
 logical data model this is built against. A minimal signed-in navigation shell (a sidebar
 plus a `Welcome` landing at `/`) ties the built screens together; the original `/`
@@ -570,7 +570,7 @@ file's hash at that moment and any later edit to it drifts.
    tests (`bash scripts/smoke.sh api` — boots the real service and hits `/health` +
    `/health/db`) → build → boots the built service again and runs an OWASP ZAP baseline
    scan against it (DAST, A.10/Part 10.4-10.5) — passive-only, informational
-   (`fail_action: false`) for now, see § Known gaps, A.10.
+   (`fail_action: false`) for now, see `docs/scope-and-gaps.md` § Known gaps, A.10.
 3. **docker** — builds (does not push) the `api` and `web` images, to catch Dockerfile
    regressions. No registry/push step exists yet — the production deployment target is
    still TBD, so there's nowhere authorized to push to.

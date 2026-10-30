@@ -95,7 +95,7 @@ passes. Three committed plants cover both premises and the floor.
 THE 2026-09 HISTORY IS WHY THAT TEST EXISTS RATHER THAN A COMMENT. Four multer
 advisories were accepted here on these same two grounds and the reachability half had
 ALREADY BEEN FALSE for sixteen days, because a FileInterceptor route landed four days
-after the acknowledgement was written (IMPROVEMENTS.md section 1.82). A record whose
+after the acknowledgement was written (docs/findings-register.md section 1.82). A record whose
 premise nothing checks is a record that goes quietly false.
 
 RULE 1, NO UPGRADE PATH, AND THIS IS A WAIT WITH A DATE RATHER THAN AN EXEMPTION. The

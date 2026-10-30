@@ -118,7 +118,7 @@ async function assertOneOrganization(): Promise<void> {
       `crash. Leftover: ${extra}.`,
       'FIX (engineer): re-run the spec that owns that id — it sweeps on entry, BEFORE',
       'createTestApp, so it heals itself — or remove the row, then run again. See',
-      'IMPROVEMENTS.md § 1.11, § 1.22 and § 1.31.',
+      'docs/findings-register.md § 1.11, § 1.22 and § 1.31.',
       // The second line the first real reader needed and did not get. `seed-demo.script.ts`
       // no longer routes here at all (it passes `multipleOrganizationsAreExpected`), so this
       // is now a backstop rather than her likely path — but a shared entry point should never

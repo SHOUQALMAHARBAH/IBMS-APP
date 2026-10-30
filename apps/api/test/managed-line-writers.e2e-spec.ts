@@ -385,7 +385,7 @@ describe('the rate table and the policy chain agree about what a line can BE', (
     });
     expect(
       offenders,
-      'A Policy carries an office-added insurance line, and the commission rate table cannot express an agreement for one — so this policy can never have a governing rate and the calculation will 422 with nothing to fix it. Close the remaining step in IMPROVEMENTS.md § 1.40 (the agreement DTO taking a lineId) before allowing an office line onto the policy chain.',
+      'A Policy carries an office-added insurance line, and the commission rate table cannot express an agreement for one — so this policy can never have a governing rate and the calculation will 422 with nothing to fix it. Close the remaining step in docs/findings-register.md § 1.40 (the agreement DTO taking a lineId) before allowing an office line onto the policy chain.',
     ).toEqual([]);
 
     // And the same for the two models upstream, so the guard names the step where it entered
