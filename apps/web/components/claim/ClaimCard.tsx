@@ -549,7 +549,9 @@ function ClaimFollowUp({
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      <strong style={{ fontSize: '0.9rem', color: '#b45309' }}>{t('claimFollowUpAlertHeading')}</strong>
+      <strong style={{ fontSize: '0.9rem', color: 'var(--warning-ink)' }}>
+        {t('claimFollowUpAlertHeading')}
+      </strong>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}

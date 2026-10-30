@@ -35,7 +35,6 @@ export const DASHBOARDS = {
     // ENTITY_SOURCES entry supplies its own (`entitySearchBranchPlaceholder`).
     dashBranchIdLabel: 'اعرض فرعاً واحداً فقط',
     dashInsuranceLineLabel: 'فرع التأمين',
-    dashInsuranceLineFilterAria: 'تصفية حسب فرع التأمين',
     dashInsurerIdLabel: 'اعرض شركة تأمين واحدة فقط',
     dashPeriodLabel: 'تسمية الفترة',
     dashPeriodStart: 'بداية الفترة',
@@ -167,7 +166,6 @@ export const DASHBOARDS = {
       'الوثائق السارية والوثائق التي تقترب من الانتهاء لقطة حيّة كما هي الآن (وتنطبق نافذة التجديد على الوثائق المنتهية فقط). أما الوثائق الجديدة الصادرة والوثائق الملغاة (مع أسبابها) فمحصورة بالفترة المختارة، والافتراضي هو الشهر الميلادي السابق.',
     dpolBeforeIssuance: '{customer} — قبل الإصدار',
     dpolRenewalWindowLabel: 'نافذة التجديد (بالأيام)',
-    dpolRenewalWindowAria: 'نافذة التجديد بالأيام',
     dpolActivePolicies: 'الوثائق السارية',
     dpolExpiringPolicies: 'الوثائق المنتهية (ضمن نافذة التجديد)',
     dpolNewIssued: 'الوثائق الجديدة الصادرة',
@@ -402,7 +400,6 @@ export const DASHBOARDS = {
 
     dashBranchIdLabel: 'Show one branch only',
     dashInsuranceLineLabel: 'Insurance line',
-    dashInsuranceLineFilterAria: 'Insurance line filter',
     dashInsurerIdLabel: 'Show one insurance company only',
     dashPeriodLabel: 'Period label',
     dashPeriodStart: 'Period start',
@@ -510,7 +507,6 @@ export const DASHBOARDS = {
       'Active policies and expiring policies are a live snapshot as of now (the renewal window applies to expiring policies only). New policies issued and cancelled policies (with reasons) are scoped to the selected period, which defaults to the previous calendar month.',
     dpolBeforeIssuance: '{customer} — before issuance',
     dpolRenewalWindowLabel: 'Renewal window (days)',
-    dpolRenewalWindowAria: 'Renewal window in days',
     dpolActivePolicies: 'Active policies',
     dpolExpiringPolicies: 'Expiring policies (within renewal window)',
     dpolNewIssued: 'New policies issued',

@@ -110,7 +110,6 @@ export default function PolicyDashboardPage() {
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           {t('dashInsuranceLineLabel')}
           <input
-            aria-label={t('dashInsuranceLineFilterAria')}
             dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
@@ -152,7 +151,6 @@ export default function PolicyDashboardPage() {
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           {t('dpolRenewalWindowLabel')}
           <input
-            aria-label={t('dpolRenewalWindowAria')}
             placeholder="90"
             value={renewalWindowDays}
             onChange={(e) => setRenewalWindowDays(e.target.value)}

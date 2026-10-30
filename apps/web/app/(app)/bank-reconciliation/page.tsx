@@ -145,7 +145,6 @@ export default function BankReconciliationPage() {
             {t('brStatementLinesHintBefore')}{' '}
             <code>invoiceId, amount</code> {t('brStatementLinesHintAfter')}
             <textarea
-              aria-label={t('brStatementLinesLabel')}
               value={statement}
               onChange={(e) => setStatement(e.target.value)}
               rows={5}

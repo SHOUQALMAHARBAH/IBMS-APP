@@ -143,9 +143,8 @@ export default function DpiaScreeningsPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            {t('dpiaSubjectFieldLabel')}
+            {t('dpiaSubjectLabel')}
             <input
-              aria-label={t('dpiaSubjectLabel')}
               value={subjectDescription}
               onChange={(e) => setSubjectDescription(e.target.value)}
               required

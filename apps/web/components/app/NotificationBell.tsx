@@ -75,7 +75,7 @@ const panelStyle: CSSProperties = {
   color: 'var(--ink-primary)',
   border: '1px solid var(--border-default)',
   borderRadius: 'var(--radius-lg)',
-  boxShadow: 'var(--shadow-md, 0 8px 24px rgba(0,0,0,0.18))',
+  boxShadow: 'var(--shadow-md)',
   padding: 'var(--space-2)',
   zIndex: 40,
 };

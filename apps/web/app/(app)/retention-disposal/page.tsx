@@ -674,62 +674,60 @@ export default function RetentionDisposalPage() {
           ) : notices.length === 0 ? (
             <EmptyState title={t('rdNoticeNone')} />
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>{t('rdNoticeColCategory')}</Th>
-                    <Th>{t('rdNoticeColElapsed')}</Th>
-                    <Th>{t('rdNoticeColBasis')}</Th>
-                    <Th>{t('rdNoticeColCountedFrom')}</Th>
-                    <Th>{t('rdNoticeColChoices')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {notices.map((n) => (
-                    <Tr key={n.recordCategory} data-notice-for={n.recordCategory}>
-                      <Td>{n.recordCategory}</Td>
-                      <Td>
-                        {/*
-                          AN UNRESOLVABLE CATEGORY SAYS SO, LOUDLY, ON ITS OWN ROW — decision 28's
-                          family. An office that set a period for a category it named itself and is
-                          never alerted will believe the system is watching it, and silence there is
-                          the defect.
-                        */}
-                        {n.resolvable ? (
-                          n.elapsedCount
-                        ) : (
-                          <span data-testid={`retention-unwatched-${n.recordCategory}`}>
-                            {t('rdNoticeUnwatched')}
-                          </span>
-                        )}
-                      </Td>
-                      <Td>
-                        {n.floor
-                          ? `${n.floor.instrument}, ${n.floor.article} — ${n.floor.operativeText}`
-                          : '—'}
-                      </Td>
-                      <Td>{n.countedFrom ?? '—'}</Td>
-                      <Td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span style={{ color: 'var(--ink-secondary)' }}>
-                            {n.noLegalHoldStatement}
-                          </span>
-                          {canExtend && n.resolvable && n.elapsedCount > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => setExtendFor(n.recordCategory)}
-                            >
-                              {t('rdNoticeExtend')}
-                            </button>
-                          ) : null}
-                        </div>
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>{t('rdNoticeColCategory')}</Th>
+                  <Th>{t('rdNoticeColElapsed')}</Th>
+                  <Th>{t('rdNoticeColBasis')}</Th>
+                  <Th>{t('rdNoticeColCountedFrom')}</Th>
+                  <Th>{t('rdNoticeColChoices')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {notices.map((n) => (
+                  <Tr key={n.recordCategory} data-notice-for={n.recordCategory}>
+                    <Td>{n.recordCategory}</Td>
+                    <Td>
+                      {/*
+                        AN UNRESOLVABLE CATEGORY SAYS SO, LOUDLY, ON ITS OWN ROW — decision 28's
+                        family. An office that set a period for a category it named itself and is
+                        never alerted will believe the system is watching it, and silence there is
+                        the defect.
+                      */}
+                      {n.resolvable ? (
+                        n.elapsedCount
+                      ) : (
+                        <span data-testid={`retention-unwatched-${n.recordCategory}`}>
+                          {t('rdNoticeUnwatched')}
+                        </span>
+                      )}
+                    </Td>
+                    <Td>
+                      {n.floor
+                        ? `${n.floor.instrument}, ${n.floor.article} — ${n.floor.operativeText}`
+                        : '—'}
+                    </Td>
+                    <Td>{n.countedFrom ?? '—'}</Td>
+                    <Td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span style={{ color: 'var(--ink-secondary)' }}>
+                          {n.noLegalHoldStatement}
+                        </span>
+                        {canExtend && n.resolvable && n.elapsedCount > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setExtendFor(n.recordCategory)}
+                          >
+                            {t('rdNoticeExtend')}
+                          </button>
+                        ) : null}
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )}
           {extendFor ? (
             <div
@@ -1021,52 +1019,50 @@ export default function RetentionDisposalPage() {
               {t('rdRetrieveNone')}
             </p>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <Table data-testid="retrieve-register-table">
-                <thead>
-                  <tr>
-                    <Th>{t('rdNoticeColCategory')}</Th>
-                    <Th>{t('rdRetrieveColBasis')}</Th>
-                    <Th>{t('rdRetrieveColNote')}</Th>
-                    <Th>{t('rdRetrieveColWho')}</Th>
-                    <Th>{t('rdRetrieveColWhen')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {retrievals.map((r) => (
-                    <Tr key={r.id} data-retrieval-for={r.recordId}>
-                      <Td>{r.recordCategory}</Td>
-                      {/*
-                        THE RECORD'S OWN ID IS NOT RENDERED, and that is rule 2 rather than an
-                        omission. The identifier-budget guard fired on the first version (29 -> 30)
-                        and its own message names the right move: a uuid identifies nothing to a
-                        person, so give the record something readable — and where the payload has
-                        none, that is an API change and a decision rather than a display fix.
-                        MEASURED: of the four blockable models only `Receipt.reference` and
-                        `CommissionLedgerEntry.paymentReference` carry anything readable at all;
-                        `Remittance` and `Settlement` carry nothing. So what identifies a RETRIEVED
-                        record to a person joins rule 2's deferred family (register entry 94).
-                        The id is still in the register row and in the api response, so the
-                        accountability the register exists for is intact; what is missing is a
-                        readable handle for the person reading it, and inventing one would be the
-                        display fix the rule refuses. The row keeps it as a test hook, which is an
-                        attribute and not text a reader sees.
-                      */}
-                      {/*
-                        THE SAME LOOKUP THE SELECT USES. This was a ternary on one member, so any
-                        basis that was not `JUDICIAL_REQUEST` rendered the CBJ-audit label — a third
-                        basis would have been mislabelled as a Central Bank audit on the register
-                        that exists to say why a blocked record was opened.
-                      */}
-                      <Td>{basisLabel(r.basis)}</Td>
-                      <Td>{r.note}</Td>
-                      <Td>{r.retrievedByName ?? t('commonNameNotResolved')}</Td>
-                      <Td>{r.retrievedAt.slice(0, 10)}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
+            <Table data-testid="retrieve-register-table">
+              <thead>
+                <tr>
+                  <Th>{t('rdNoticeColCategory')}</Th>
+                  <Th>{t('rdRetrieveColBasis')}</Th>
+                  <Th>{t('rdRetrieveColNote')}</Th>
+                  <Th>{t('rdRetrieveColWho')}</Th>
+                  <Th>{t('rdRetrieveColWhen')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {retrievals.map((r) => (
+                  <Tr key={r.id} data-retrieval-for={r.recordId}>
+                    <Td>{r.recordCategory}</Td>
+                    {/*
+                      THE RECORD'S OWN ID IS NOT RENDERED, and that is rule 2 rather than an
+                      omission. The identifier-budget guard fired on the first version (29 -> 30)
+                      and its own message names the right move: a uuid identifies nothing to a
+                      person, so give the record something readable — and where the payload has
+                      none, that is an API change and a decision rather than a display fix.
+                      MEASURED: of the four blockable models only `Receipt.reference` and
+                      `CommissionLedgerEntry.paymentReference` carry anything readable at all;
+                      `Remittance` and `Settlement` carry nothing. So what identifies a RETRIEVED
+                      record to a person joins rule 2's deferred family (register entry 94).
+                      The id is still in the register row and in the api response, so the
+                      accountability the register exists for is intact; what is missing is a
+                      readable handle for the person reading it, and inventing one would be the
+                      display fix the rule refuses. The row keeps it as a test hook, which is an
+                      attribute and not text a reader sees.
+                    */}
+                    {/*
+                      THE SAME LOOKUP THE SELECT USES. This was a ternary on one member, so any
+                      basis that was not `JUDICIAL_REQUEST` rendered the CBJ-audit label — a third
+                      basis would have been mislabelled as a Central Bank audit on the register
+                      that exists to say why a blocked record was opened.
+                    */}
+                    <Td>{basisLabel(r.basis)}</Td>
+                    <Td>{r.note}</Td>
+                    <Td>{r.retrievedByName ?? t('commonNameNotResolved')}</Td>
+                    <Td>{r.retrievedAt.slice(0, 10)}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )}
         </Card>
       ) : null}
@@ -1123,83 +1119,81 @@ export default function RetentionDisposalPage() {
               {t('rdExtRegisterNone')}
             </p>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <Table data-testid="retention-extension-table">
-                <thead>
-                  <tr>
-                    <Th>{t('rdNoticeColCategory')}</Th>
-                    <Th>{t('rdExtColRecord')}</Th>
-                    <Th>{t('rdExtColUntil')}</Th>
-                    <Th>{t('rdRetrieveColBasis')}</Th>
-                    <Th>{t('rdRetrieveColNote')}</Th>
-                    <Th>{t('rdNoticeInstrumentLabel')}</Th>
-                    <Th>{t('rdNoticeArticleLabel')}</Th>
-                    <Th>{t('rdNoticeHoldLabel')}</Th>
-                    <Th>{t('rdExtColWho')}</Th>
-                    <Th>{t('rdRetrieveColWhen')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {extensions.map((x) => (
-                    <Tr key={x.id} data-extension-for={x.recordId}>
-                      {/*
-                        WHICH RECORD — owner decision 44, and the id is STILL not rendered. The
-                        reference is the real one the record carries (a client bank reference, a
-                        commission payment reference), resolved by the api per category; where there
-                        is none the cell says WHICH of the three reasons applies, because "nobody
-                        wrote it down", "this kind of record has none" and "the record is gone" are
-                        different answers to a regulator and an em dash is none of them.
+            <Table data-testid="retention-extension-table">
+              <thead>
+                <tr>
+                  <Th>{t('rdNoticeColCategory')}</Th>
+                  <Th>{t('rdExtColRecord')}</Th>
+                  <Th>{t('rdExtColUntil')}</Th>
+                  <Th>{t('rdRetrieveColBasis')}</Th>
+                  <Th>{t('rdRetrieveColNote')}</Th>
+                  <Th>{t('rdNoticeInstrumentLabel')}</Th>
+                  <Th>{t('rdNoticeArticleLabel')}</Th>
+                  <Th>{t('rdNoticeHoldLabel')}</Th>
+                  <Th>{t('rdExtColWho')}</Th>
+                  <Th>{t('rdRetrieveColWhen')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {extensions.map((x) => (
+                  <Tr key={x.id} data-extension-for={x.recordId}>
+                    {/*
+                      WHICH RECORD — owner decision 44, and the id is STILL not rendered. The
+                      reference is the real one the record carries (a client bank reference, a
+                      commission payment reference), resolved by the api per category; where there
+                      is none the cell says WHICH of the three reasons applies, because "nobody
+                      wrote it down", "this kind of record has none" and "the record is gone" are
+                      different answers to a regulator and an em dash is none of them.
 
-                        The api's `description` rides along as a `title`, not as visible text: four
-                        categories name four different kinds of reference and one column heading
-                        cannot say which, but a cell crowded with that sentence stops being a
-                        reference.
-                      */}
-                      <Td data-extension-handle={x.recordHandle.state}>
-                        {x.recordHandle.state === 'RECORDED' ? (
-                          <bdi title={x.recordHandle.description}>
-                            {x.recordHandle.value}
-                          </bdi>
-                        ) : x.recordHandle.state === 'NOT_RECORDED' ? (
-                          <span title={x.recordHandle.description}>
-                            {t('rdExtRecordNotRecorded')}
-                          </span>
-                        ) : x.recordHandle.state === 'CATEGORY_HAS_NO_REFERENCE' ? (
-                          <span title={x.recordHandle.reason}>
-                            {t('rdExtRecordTypeNone')}
-                          </span>
-                        ) : (
-                          t('rdExtRecordGone')
-                        )}
-                      </Td>
-                      <Td>{x.recordCategory}</Td>
-                      <Td>{x.extendedUntil.slice(0, 10)}</Td>
-                      <Td>{t(EXTENSION_BASIS_LABEL[x.basis])}</Td>
-                      <Td>{x.note}</Td>
-                      {/*
-                        An em dash rather than an omitted row where the basis did not need an
-                        instrument: "this extension cites no statute" and "somebody left it blank"
-                        are different facts, and a missing cell says neither.
-                      */}
-                      <Td>{x.legislativeInstrument ?? '—'}</Td>
-                      <Td>{x.legislativeArticle ?? '—'}</Td>
-                      {/*
-                        THE HOLD'S SCOPE AND REASON, never its id — which is both rule 2 and the
-                        useful half: a reader checking whether an extension is justified needs to
-                        know WHAT was held and why, and a uuid tells them neither.
-                      */}
-                      <Td>
-                        {x.legalHold === null
-                          ? '—'
-                          : `${x.legalHold.scope} — ${x.legalHold.reason}`}
-                      </Td>
-                      <Td>{x.extendedByName ?? t('commonNameNotResolved')}</Td>
-                      <Td>{x.extendedAt.slice(0, 10)}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
+                      The api's `description` rides along as a `title`, not as visible text: four
+                      categories name four different kinds of reference and one column heading
+                      cannot say which, but a cell crowded with that sentence stops being a
+                      reference.
+                    */}
+                    <Td data-extension-handle={x.recordHandle.state}>
+                      {x.recordHandle.state === 'RECORDED' ? (
+                        <bdi title={x.recordHandle.description}>
+                          {x.recordHandle.value}
+                        </bdi>
+                      ) : x.recordHandle.state === 'NOT_RECORDED' ? (
+                        <span title={x.recordHandle.description}>
+                          {t('rdExtRecordNotRecorded')}
+                        </span>
+                      ) : x.recordHandle.state === 'CATEGORY_HAS_NO_REFERENCE' ? (
+                        <span title={x.recordHandle.reason}>
+                          {t('rdExtRecordTypeNone')}
+                        </span>
+                      ) : (
+                        t('rdExtRecordGone')
+                      )}
+                    </Td>
+                    <Td>{x.recordCategory}</Td>
+                    <Td>{x.extendedUntil.slice(0, 10)}</Td>
+                    <Td>{t(EXTENSION_BASIS_LABEL[x.basis])}</Td>
+                    <Td>{x.note}</Td>
+                    {/*
+                      An em dash rather than an omitted row where the basis did not need an
+                      instrument: "this extension cites no statute" and "somebody left it blank"
+                      are different facts, and a missing cell says neither.
+                    */}
+                    <Td>{x.legislativeInstrument ?? '—'}</Td>
+                    <Td>{x.legislativeArticle ?? '—'}</Td>
+                    {/*
+                      THE HOLD'S SCOPE AND REASON, never its id — which is both rule 2 and the
+                      useful half: a reader checking whether an extension is justified needs to
+                      know WHAT was held and why, and a uuid tells them neither.
+                    */}
+                    <Td>
+                      {x.legalHold === null
+                        ? '—'
+                        : `${x.legalHold.scope} — ${x.legalHold.reason}`}
+                    </Td>
+                    <Td>{x.extendedByName ?? t('commonNameNotResolved')}</Td>
+                    <Td>{x.extendedAt.slice(0, 10)}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )}
         </Card>
       ) : null}
@@ -1233,8 +1227,7 @@ export default function RetentionDisposalPage() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               {t('rdLegalBasisLabel')}
               <input
-                aria-label={t('rdColLegalBasis')}
-                value={legalBasis}
+                  value={legalBasis}
                 onChange={(e) => setLegalBasis(e.target.value)}
               />
             </label>
@@ -1334,132 +1327,130 @@ export default function RetentionDisposalPage() {
           schedule.length === 0 ? (
             <EmptyState title={t('rdNoScheduleItems')} />
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <Table data-testid="retention-schedule-table">
-                <thead>
-                  <tr>
-                    <Th>{t('rdColCategory')}</Th>
-                    <Th>{t('rdColMonths')}</Th>
-                    <Th>{t('rdColLegalBasis')}</Th>
-                    <Th>{t('rdColConfirmed')}</Th>
-                    <Th>{t('rdColAction')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedule.map((s) => (
-                    <Tr key={s.id}>
-                      <Td>{s.recordCategory}</Td>
-                      <Td>
-                        {canManageSchedule && !s.isConfirmed ? (
-                          <input
-                            aria-label={t('rdMonthsAria', { name: s.recordCategory })}
-                            style={{ width: '5rem' }}
-                            value={
-                              editMonths[s.id] ??
-                              (s.retentionPeriodMonths === null
-                                ? ''
-                                : String(s.retentionPeriodMonths))
-                            }
-                            onChange={(e) =>
-                              setEditMonths((m) => ({ ...m, [s.id]: e.target.value }))
-                            }
-                          />
-                        ) : (
-                          s.retentionPeriodMonths
-                        )}
-                        {/*
-                          NO PERIOD SET — and this is the shipped state for a floored category, not
-                          an error. The office is shown the ARTICLE and the FLOOR where the number
-                          would be, which is what makes it actionable: "no period yet, and here is
-                          the minimum the law requires" is something to act on where a blank is not.
-
-                          Decision 32's reason is why the number is absent in the first place: a
-                          period shipped beside an article number would read as a legal opinion from
-                          us, and we do not have one.
-                        */}
-                        {s.retentionPeriodMonths === null ? (
-                          <span
-                            style={{ display: 'block', color: 'var(--ink-muted)' }}
-                            data-no-period={s.recordCategory}
-                          >
-                            {t('rdNoPeriodSet')}
-                            {s.floor === null ? null : (
-                              <>
-                                {' — '}
-                                {t('rdFloorApplies', {
-                                  article: `${s.floor.instrument}, ${s.floor.article}`,
-                                  months: String(s.floor.floorMonths),
-                                })}
-                              </>
-                            )}
-                            {' '}
-                            {t('rdInertNothingMeasured')}
-                          </span>
-                        ) : null}
-                      </Td>
-                      <Td>{s.legalBasis ?? '—'}</Td>
-                      <Td>
-                        {/* `commonYes`, not a hardcoded 'Yes' — an Arabic reader was seeing the
-                            English word in this cell. The key already existed in both languages. */}
-                        {s.isConfirmed ? t('commonYes') : t('rdDraftPending')}
-                        {/* THE ACT, ON THE RECORD — in the CONFIRMED column, because the
-                            confirmation is the half it excuses and that is the cell a reader
-                            asking "who confirmed this" is already looking at. Renders nothing
-                            when there is no act, which is nearly every row. */}
-                        <CombinedDutyOnRecord
-                          act={s.combinedDutyAct}
-                          testId={`retention-schedule-combined-duty-${s.id}`}
+            <Table data-testid="retention-schedule-table">
+              <thead>
+                <tr>
+                  <Th>{t('rdColCategory')}</Th>
+                  <Th>{t('rdColMonths')}</Th>
+                  <Th>{t('rdColLegalBasis')}</Th>
+                  <Th>{t('rdColConfirmed')}</Th>
+                  <Th>{t('rdColAction')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {schedule.map((s) => (
+                  <Tr key={s.id}>
+                    <Td>{s.recordCategory}</Td>
+                    <Td>
+                      {canManageSchedule && !s.isConfirmed ? (
+                        <input
+                          aria-label={t('rdMonthsAria', { name: s.recordCategory })}
+                          style={{ width: '5rem' }}
+                          value={
+                            editMonths[s.id] ??
+                            (s.retentionPeriodMonths === null
+                              ? ''
+                              : String(s.retentionPeriodMonths))
+                          }
+                          onChange={(e) =>
+                            setEditMonths((m) => ({ ...m, [s.id]: e.target.value }))
+                          }
                         />
-                      </Td>
-                      <Td>
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
-                          {canManageSchedule && !s.isConfirmed && editMonths[s.id] ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void runOrAsk(
-                                  {
-                                    key: s.id,
-                                    recordCategory: s.recordCategory,
-                                    months: Number(editMonths[s.id]),
-                                  },
-                                  () =>
-                                    updateRetentionScheduleItem(s.id, {
-                                      retentionPeriodMonths: Number(
-                                        editMonths[s.id],
-                                      ),
-                                      ...(noFloorAsk?.key === s.id
-                                        ? {
-                                            noFloorDeclaration:
-                                              noFloorDeclarationPayload(),
-                                          }
-                                        : {}),
-                                    }),
-                                )
-                              }
-                            >
-                              {t('rdSaveButton')}
-                            </button>
-                          ) : null}
-                          {canManageSchedule && !s.isConfirmed ? (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void run(() => confirmRetentionScheduleItem(s.id))
-                              }
-                            >
-                              {t('rdConfirmButton')}
-                            </button>
-                          ) : null}
-                        </div>
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
+                      ) : (
+                        s.retentionPeriodMonths
+                      )}
+                      {/*
+                        NO PERIOD SET — and this is the shipped state for a floored category, not
+                        an error. The office is shown the ARTICLE and the FLOOR where the number
+                        would be, which is what makes it actionable: "no period yet, and here is
+                        the minimum the law requires" is something to act on where a blank is not.
+
+                        Decision 32's reason is why the number is absent in the first place: a
+                        period shipped beside an article number would read as a legal opinion from
+                        us, and we do not have one.
+                      */}
+                      {s.retentionPeriodMonths === null ? (
+                        <span
+                          style={{ display: 'block', color: 'var(--ink-muted)' }}
+                          data-no-period={s.recordCategory}
+                        >
+                          {t('rdNoPeriodSet')}
+                          {s.floor === null ? null : (
+                            <>
+                              {' — '}
+                              {t('rdFloorApplies', {
+                                article: `${s.floor.instrument}, ${s.floor.article}`,
+                                months: String(s.floor.floorMonths),
+                              })}
+                            </>
+                          )}
+                          {' '}
+                          {t('rdInertNothingMeasured')}
+                        </span>
+                      ) : null}
+                    </Td>
+                    <Td>{s.legalBasis ?? '—'}</Td>
+                    <Td>
+                      {/* `commonYes`, not a hardcoded 'Yes' — an Arabic reader was seeing the
+                          English word in this cell. The key already existed in both languages. */}
+                      {s.isConfirmed ? t('commonYes') : t('rdDraftPending')}
+                      {/* THE ACT, ON THE RECORD — in the CONFIRMED column, because the
+                          confirmation is the half it excuses and that is the cell a reader
+                          asking "who confirmed this" is already looking at. Renders nothing
+                          when there is no act, which is nearly every row. */}
+                      <CombinedDutyOnRecord
+                        act={s.combinedDutyAct}
+                        testId={`retention-schedule-combined-duty-${s.id}`}
+                      />
+                    </Td>
+                    <Td>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        {canManageSchedule && !s.isConfirmed && editMonths[s.id] ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void runOrAsk(
+                                {
+                                  key: s.id,
+                                  recordCategory: s.recordCategory,
+                                  months: Number(editMonths[s.id]),
+                                },
+                                () =>
+                                  updateRetentionScheduleItem(s.id, {
+                                    retentionPeriodMonths: Number(
+                                      editMonths[s.id],
+                                    ),
+                                    ...(noFloorAsk?.key === s.id
+                                      ? {
+                                          noFloorDeclaration:
+                                            noFloorDeclarationPayload(),
+                                        }
+                                      : {}),
+                                  }),
+                              )
+                            }
+                          >
+                            {t('rdSaveButton')}
+                          </button>
+                        ) : null}
+                        {canManageSchedule && !s.isConfirmed ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() => confirmRetentionScheduleItem(s.id))
+                            }
+                          >
+                            {t('rdConfirmButton')}
+                          </button>
+                        ) : null}
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )
         ) : loadError ? null : (
           <SkeletonList rows={3} label={t('rdLoading')} />
@@ -1474,27 +1465,24 @@ export default function RetentionDisposalPage() {
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {t('rdScopeFieldLabel')}
+              {t('rdScopeAria')}
               <input
-                aria-label={t('rdScopeAria')}
                 value={holdScope}
                 onChange={(e) => setHoldScope(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {t('rdReasonLabel')}
+              {t('rdReasonAria')}
               <input
-                aria-label={t('rdReasonAria')}
                 value={holdReason}
                 onChange={(e) => setHoldReason(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {t('rdHoldCategoryIdLabel')}
+              {t('rdHoldCategoryIdAria')}
               <input
-                aria-label={t('rdHoldCategoryIdAria')}
                 value={holdCategoryId}
                 onChange={(e) => setHoldCategoryId(e.target.value)}
               />
@@ -1506,9 +1494,8 @@ export default function RetentionDisposalPage() {
               label={t('rdHoldCustomerIdLabel')}
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {t('rdHoldInsuredPersonIdLabel')}
+              {t('rdHoldInsuredPersonIdAria')}
               <input
-                aria-label={t('rdHoldInsuredPersonIdAria')}
                 value={holdInsuredPersonId}
                 onChange={(e) => setHoldInsuredPersonId(e.target.value)}
               />
@@ -1522,73 +1509,71 @@ export default function RetentionDisposalPage() {
           holds.length === 0 ? (
             <EmptyState title={t('rdNoHolds')} />
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>{t('rdScopeLabel')}</Th>
-                    <Th>{t('rdColCategory')}</Th>
-                    <Th>{t('rdColSubject')}</Th>
-                    <Th>{t('rdColNextReviewDue')}</Th>
-                    <Th>{t('rdColStatus')}</Th>
-                    <Th>{t('rdColAction')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {holds.map((h) => (
-                    <Tr key={h.id}>
-                      <Td>{h.scope}</Td>
-                      <Td>
-                        {h.retentionScheduleItemId ? h.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
-                      </Td>
-                      <Td>
-                        {/*
-                          * RULE 2 — WHOSE records are frozen, by name. This rendered
-                          * `Customer <8 chars of a uuid>`, so a DPO working the six-monthly
-                          * necessity review could not tell whose file each hold covers.
-                          *
-                          * The insured-person branch still renders its GENERIC label rather than a
-                          * name: `InsuredPerson.fullName` exists, but that id is not among the 24
-                          * this pass measures (the screen never rendered it), so resolving it is a
-                          * widening nobody asked for and a disclosure decision of its own.
-                          */}
-                        {h.customerName ? (
-                          <bdi>{h.customerName}</bdi>
-                        ) : h.insuredPersonId ? (
-                          t('rdInsuredPersonGeneric')
-                        ) : (
-                          '—'
-                        )}
-                      </Td>
-                      <Td>{h.nextReviewDueAt.slice(0, 10)}</Td>
-                      <Td>{h.isActive ? t('rdHoldInForce') : t('rdReleased')}</Td>
-                      <Td>
-                        {canManageHolds && h.isActive ? (
-                          <div style={{ display: 'flex', gap: '0.35rem' }}>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void run(() => reviewLegalHold(h.id))}
-                            >
-                              {t('rdRecordReviewButton')}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void run(() => releaseLegalHold(h.id))}
-                            >
-                              {t('rdReleaseButton')}
-                            </button>
-                          </div>
-                        ) : (
-                          '—'
-                        )}
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>{t('rdScopeLabel')}</Th>
+                  <Th>{t('rdColCategory')}</Th>
+                  <Th>{t('rdColSubject')}</Th>
+                  <Th>{t('rdColNextReviewDue')}</Th>
+                  <Th>{t('rdColStatus')}</Th>
+                  <Th>{t('rdColAction')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {holds.map((h) => (
+                  <Tr key={h.id}>
+                    <Td>{h.scope}</Td>
+                    <Td>
+                      {h.retentionScheduleItemId ? h.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
+                    </Td>
+                    <Td>
+                      {/*
+                        * RULE 2 — WHOSE records are frozen, by name. This rendered
+                        * `Customer <8 chars of a uuid>`, so a DPO working the six-monthly
+                        * necessity review could not tell whose file each hold covers.
+                        *
+                        * The insured-person branch still renders its GENERIC label rather than a
+                        * name: `InsuredPerson.fullName` exists, but that id is not among the 24
+                        * this pass measures (the screen never rendered it), so resolving it is a
+                        * widening nobody asked for and a disclosure decision of its own.
+                        */}
+                      {h.customerName ? (
+                        <bdi>{h.customerName}</bdi>
+                      ) : h.insuredPersonId ? (
+                        t('rdInsuredPersonGeneric')
+                      ) : (
+                        '—'
+                      )}
+                    </Td>
+                    <Td>{h.nextReviewDueAt.slice(0, 10)}</Td>
+                    <Td>{h.isActive ? t('rdHoldInForce') : t('rdReleased')}</Td>
+                    <Td>
+                      {canManageHolds && h.isActive ? (
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void run(() => reviewLegalHold(h.id))}
+                          >
+                            {t('rdRecordReviewButton')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void run(() => releaseLegalHold(h.id))}
+                          >
+                            {t('rdReleaseButton')}
+                          </button>
+                        </div>
+                      ) : (
+                        '—'
+                      )}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )
         ) : loadError ? null : (
           <SkeletonList rows={3} label={t('rdLoading')} />
@@ -1603,9 +1588,8 @@ export default function RetentionDisposalPage() {
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {t('rdBatchCategoryIdFieldLabel')}
+              {t('rdBatchCategoryIdLabel')}
               <input
-                aria-label={t('rdBatchCategoryIdLabel')}
                 value={nominateCategoryId}
                 onChange={(e) => setNominateCategoryId(e.target.value)}
               />
@@ -1619,144 +1603,142 @@ export default function RetentionDisposalPage() {
           batches.length === 0 ? (
             <EmptyState title={t('rdNoBatches')} />
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>{t('rdColCategory')}</Th>
-                    <Th>{t('rdColStatus')}</Th>
-                    <Th>{t('rdColSlaDue')}</Th>
-                    <Th>{t('rdColCertificate')}</Th>
-                    <Th>{t('rdColAction')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {batches.map((b) => (
-                    <Tr key={b.id}>
-                      <Td>
-                        {b.retentionScheduleItemId ? b.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
-                      </Td>
-                      <Td>
-                        {t(ENUM_LABEL.DisposalBatchStatus[b.status])}
-                        {/* Part 4 step 5 — in the STATUS cell, because the status says DPO_APPROVED
-                            whether one person or two agreed, and this pair authorises irreversible
-                            destruction of personal data. Shared renderer. */}
-                        <CombinedDutyOnRecord
-                          act={b.combinedDutyAct}
-                          testId={`combined-duty-disposal-${b.id}`}
+            <Table>
+              <thead>
+                <tr>
+                  <Th>{t('rdColCategory')}</Th>
+                  <Th>{t('rdColStatus')}</Th>
+                  <Th>{t('rdColSlaDue')}</Th>
+                  <Th>{t('rdColCertificate')}</Th>
+                  <Th>{t('rdColAction')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.map((b) => (
+                  <Tr key={b.id}>
+                    <Td>
+                      {b.retentionScheduleItemId ? b.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
+                    </Td>
+                    <Td>
+                      {t(ENUM_LABEL.DisposalBatchStatus[b.status])}
+                      {/* Part 4 step 5 — in the STATUS cell, because the status says DPO_APPROVED
+                          whether one person or two agreed, and this pair authorises irreversible
+                          destruction of personal data. Shared renderer. */}
+                      <CombinedDutyOnRecord
+                        act={b.combinedDutyAct}
+                        testId={`combined-duty-disposal-${b.id}`}
+                      />
+                    </Td>
+                    <Td>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</Td>
+                    <Td>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</Td>
+                    <Td>
+                      {/* Owner decision 41 — this batch's state history, without a pasted uuid.
+                          Outside the CLOSED ternary deliberately: a CLOSED batch is exactly the one
+                          whose history somebody comes to read, and the branch below renders an
+                          em-dash for it. Renders nothing without `workflow-history.read`. */}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="DisposalBatch"
+                          entityId={b.id}
                         />
-                      </Td>
-                      <Td>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</Td>
-                      <Td>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</Td>
-                      <Td>
-                        {/* Owner decision 41 — this batch's state history, without a pasted uuid.
-                            Outside the CLOSED ternary deliberately: a CLOSED batch is exactly the one
-                            whose history somebody comes to read, and the branch below renders an
-                            em-dash for it. Renders nothing without `workflow-history.read`. */}
-                        <div style={{ marginBottom: '0.4rem' }}>
-                          <WorkflowHistoryLink
-                            entityType="DisposalBatch"
-                            entityId={b.id}
-                          />
-                        </div>
-                        {b.status === 'CLOSED' ? (
-                          '—'
-                        ) : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', minWidth: '18rem' }}>
-                            {canNominate && b.status === 'NOMINATED' ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => managerApproveDisposalBatch(b.id))}
-                              >
-                                {t('rdManagerApproveButton')}
-                              </button>
-                            ) : null}
-                            {canApprove && b.status === 'MANAGER_APPROVED' ? (
-                              (() => {
-                                // Part 4 — the person who performed the first half may complete it themselves in an office
-                                // that has declared COMBINED, only by saying why. Every other case is unchanged.
-                                const needs = needsCombinedDutyDeclaration({
-                                  mode: user.dutySegregationMode,
-                                  makerUserId: b.nominatedByUserId,
-                                  currentUserId: user.id,
-                                  alreadyDecided: b.dpoApprovedByUserId != null,
-                                });
-                                const declaration = declarations[b.id] ?? '';
-                                return (
-                                  <>
-                                    {needs ? (
-                                      <CombinedDutyReasonField
-                                        id={b.id}
-                                        value={declaration}
-                                        onChange={(next) =>
-                                          setDeclarations((prev) => ({ ...prev, [b.id]: next }))
-                                        }
-                                      />
-                                    ) : null}
-                                    <button
-                                      type="button"
-                                      disabled={busy || (needs && combinedDutyTooShort(declaration))}
-                                      onClick={() =>
-                                        void run(() =>
-                                          dpoApproveDisposalBatch(b.id, needs ? declaration.trim() : undefined),
-                                        )
+                      </div>
+                      {b.status === 'CLOSED' ? (
+                        '—'
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', minWidth: '18rem' }}>
+                          {canNominate && b.status === 'NOMINATED' ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void run(() => managerApproveDisposalBatch(b.id))}
+                            >
+                              {t('rdManagerApproveButton')}
+                            </button>
+                          ) : null}
+                          {canApprove && b.status === 'MANAGER_APPROVED' ? (
+                            (() => {
+                              // Part 4 — the person who performed the first half may complete it themselves in an office
+                              // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                              const needs = needsCombinedDutyDeclaration({
+                                mode: user.dutySegregationMode,
+                                makerUserId: b.nominatedByUserId,
+                                currentUserId: user.id,
+                                alreadyDecided: b.dpoApprovedByUserId != null,
+                              });
+                              const declaration = declarations[b.id] ?? '';
+                              return (
+                                <>
+                                  {needs ? (
+                                    <CombinedDutyReasonField
+                                      id={b.id}
+                                      value={declaration}
+                                      onChange={(next) =>
+                                        setDeclarations((prev) => ({ ...prev, [b.id]: next }))
                                       }
-                                    >
-                                      {t('rdDpoApproveButton')}
-                                    </button>
-                                  </>
-                                );
-                              })()
-                            ) : null}
-                            {canApprove && b.status === 'DPO_APPROVED' ? (
-                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                                <select
-                                  aria-label={t('rdDestructionMethodAria')}
-                                  value={method}
-                                  onChange={(e) => setMethod(e.target.value)}
-                                >
-                                  {DISPOSAL_METHODS.map((m) => (
-                                    <option key={m} value={m}>
-                                      {t(ENUM_LABEL.DisposalMethod[m])}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void run(() => executeDisposalBatch(b.id, method))}
-                                >
-                                  {t('rdRecordExecutionButton')}
-                                </button>
-                              </div>
-                            ) : null}
-                            {canApprove && b.status === 'EXECUTED' && !b.hasCertificateOfDestruction ? (
+                                    />
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    disabled={busy || (needs && combinedDutyTooShort(declaration))}
+                                    onClick={() =>
+                                      void run(() =>
+                                        dpoApproveDisposalBatch(b.id, needs ? declaration.trim() : undefined),
+                                      )
+                                    }
+                                  >
+                                    {t('rdDpoApproveButton')}
+                                  </button>
+                                </>
+                              );
+                            })()
+                          ) : null}
+                          {canApprove && b.status === 'DPO_APPROVED' ? (
+                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                              <select
+                                aria-label={t('rdDestructionMethodAria')}
+                                value={method}
+                                onChange={(e) => setMethod(e.target.value)}
+                              >
+                                {DISPOSAL_METHODS.map((m) => (
+                                  <option key={m} value={m}>
+                                    {t(ENUM_LABEL.DisposalMethod[m])}
+                                  </option>
+                                ))}
+                              </select>
                               <button
                                 type="button"
                                 disabled={busy}
-                                onClick={() => void run(() => issueCertificateOfDestruction(b.id))}
+                                onClick={() => void run(() => executeDisposalBatch(b.id, method))}
                               >
-                                {t('rdIssueCertificateButton')}
+                                {t('rdRecordExecutionButton')}
                               </button>
-                            ) : null}
-                            {canApprove && b.status === 'EXECUTED' && b.hasCertificateOfDestruction ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => closeDisposalBatch(b.id))}
-                              >
-                                {t('rdCloseButton')}
-                              </button>
-                            ) : null}
-                          </div>
-                        )}
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
+                            </div>
+                          ) : null}
+                          {canApprove && b.status === 'EXECUTED' && !b.hasCertificateOfDestruction ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void run(() => issueCertificateOfDestruction(b.id))}
+                            >
+                              {t('rdIssueCertificateButton')}
+                            </button>
+                          ) : null}
+                          {canApprove && b.status === 'EXECUTED' && b.hasCertificateOfDestruction ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void run(() => closeDisposalBatch(b.id))}
+                            >
+                              {t('rdCloseButton')}
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )
         ) : loadError ? null : (
           <SkeletonList rows={3} label={t('rdLoading')} />

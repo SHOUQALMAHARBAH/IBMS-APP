@@ -126,62 +126,60 @@ export default function ClientAccountingPage() {
         data.rows.length === 0 ? (
           <EmptyState title={t('caNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>{t('caColClient')}</Th>
-                  {AR_AGEING_BUCKET_KEYS.map((k) => (
-                    <Th key={k}>
-                      {t(AR_AGEING_BUCKET_LABEL_KEY[k])}
-                    </Th>
-                  ))}
-                  <Th>{t('caColOutstanding')}</Th>
-                  <Th>{t('caColInvoices')}</Th>
-                  <Th>{t('caColOldest')}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((r) => (
-                  <Tr key={r.customerId}>
-                    <Td>
-                      <bdi>{r.customerLegalName}</bdi>
-                    </Td>
-                    {AR_AGEING_BUCKET_KEYS.map((k) => (
-                      <Td key={k}>
-                        {formatMoney(r[k], language)}
-                      </Td>
-                    ))}
-                    <Td>{formatMoney(r.outstandingTotal, language)}</Td>
-                    <Td>{r.invoiceCount}</Td>
-                    <Td>
-                      {oldest(r.oldestDaysOverdue, r.oldestDueDate, language, t)}
-                    </Td>
-                  </Tr>
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('caColClient')}</Th>
+                {AR_AGEING_BUCKET_KEYS.map((k) => (
+                  <Th key={k}>
+                    {t(AR_AGEING_BUCKET_LABEL_KEY[k])}
+                  </Th>
                 ))}
-                {/* THE TOTALS ROW IS A ROW, not eight bold cells. It carried
-                    `{ ...cellStyle, fontWeight: 600 }` once per column — eight inline style
-                    objects all saying one thing about the row they are in — and `Tr`'s `total`
-                    variant says it once, with the rule and the sunken ground that tell a reader
-                    this line is not one of the things in the list. */}
-                <Tr variant="total">
-                  <Td>{t('caColTotal')}</Td>
+                <Th>{t('caColOutstanding')}</Th>
+                <Th>{t('caColInvoices')}</Th>
+                <Th>{t('caColOldest')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <Tr key={r.customerId}>
+                  <Td>
+                    <bdi>{r.customerLegalName}</bdi>
+                  </Td>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
-                    <Td key={k} numeric>
-                      {formatMoney(data.totals[k], language)}
+                    <Td key={k}>
+                      {formatMoney(r[k], language)}
                     </Td>
                   ))}
-                  <Td numeric>
-                    {formatMoney(data.totals.outstandingTotal, language)}
+                  <Td>{formatMoney(r.outstandingTotal, language)}</Td>
+                  <Td>{r.invoiceCount}</Td>
+                  <Td>
+                    {oldest(r.oldestDaysOverdue, r.oldestDueDate, language, t)}
                   </Td>
-                  <Td numeric>
-                    {data.totals.invoiceCount}
-                  </Td>
-                  <Td />
                 </Tr>
-              </tbody>
-            </Table>
-          </div>
+              ))}
+              {/* THE TOTALS ROW IS A ROW, not eight bold cells. It carried
+                  `{ ...cellStyle, fontWeight: 600 }` once per column — eight inline style
+                  objects all saying one thing about the row they are in — and `Tr`'s `total`
+                  variant says it once, with the rule and the sunken ground that tell a reader
+                  this line is not one of the things in the list. */}
+              <Tr variant="total">
+                <Td>{t('caColTotal')}</Td>
+                {AR_AGEING_BUCKET_KEYS.map((k) => (
+                  <Td key={k} numeric>
+                    {formatMoney(data.totals[k], language)}
+                  </Td>
+                ))}
+                <Td numeric>
+                  {formatMoney(data.totals.outstandingTotal, language)}
+                </Td>
+                <Td numeric>
+                  {data.totals.invoiceCount}
+                </Td>
+                <Td />
+              </Tr>
+            </tbody>
+          </Table>
         )
       ) : loadError ? null : (
         <SkeletonList rows={4} label={t('caLoading')} />

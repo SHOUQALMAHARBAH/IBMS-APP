@@ -172,7 +172,6 @@ export default function FinancialDashboardPage() {
         >
           {t('dashInsuranceLineLabel')}
           <input
-            aria-label={t('dashInsuranceLineFilterAria')}
             dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
@@ -187,9 +186,8 @@ export default function FinancialDashboardPage() {
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
-          {t('dashAsOf')}
+          {t('dashAsOfDateAria')}
           <input
-            aria-label={t('dashAsOfDateAria')}
             placeholder={t('dashDatePlaceholder')}
             value={asOf}
             onChange={(e) => setAsOf(e.target.value)}

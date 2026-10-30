@@ -28,6 +28,7 @@ import {
 import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { formatDate } from '../../../lib/i18n/format';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -45,7 +46,7 @@ function isOverdue(nextTestDueAt: string | null): boolean {
 }
 
 export default function BcpDrPlansPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -163,8 +164,15 @@ export default function BcpDrPlansPage() {
         coverage.map((entry) => (
           <section key={entry.scenario} style={sectionStyle}>
             <h2>
-              {entry.scenario}{' '}
-              {entry.hasPlan ? null : <span style={{ color: '#b91c1c' }}>{t('bcpNoPlanOnFile')}</span>}
+              {/*
+                The ENUM MEMBER was rendering RAW here — `system_outage` as an Arabic reader's
+                section heading — while the `<select>` eighteen lines above renders
+                `ENUM_LABEL.BcpDrScenario[s]` from a map that ships all five in both languages.
+                So the same screen had two answers for one value and the English one was the
+                heading. No word was written: the Arabic was already on the screen.
+              */}
+              {t(ENUM_LABEL.BcpDrScenario[entry.scenario])}{' '}
+              {entry.hasPlan ? null : <span style={{ color: 'var(--danger-ink)' }}>{t('bcpNoPlanOnFile')}</span>}
             </h2>
             {entry.plans.length > 0 ? (
               <Card padded={false}>
@@ -184,12 +192,28 @@ export default function BcpDrPlansPage() {
                       <Td>{plan.rtoHours ?? '—'}</Td>
                       <Td>{plan.rpoHours ?? '—'}</Td>
                       <Td>
-                        {plan.lastTestedAt ? plan.lastTestedAt.slice(0, 10) : 'never'}
+                        {/*
+                          `.slice(0, 10)` prints the ISO date, so an Arabic reader saw
+                          `2027-09-06` where every other date in the product renders through
+                          `formatDate`. The 'never' beside it is BARE ENGLISH and is NOT fixed
+                          here — see the register: a byte-identical English twin ships
+                          (`vendNotScheduled`) and its Arabic cannot be reused, because it agrees
+                          with a feminine noun and this screen's subject is «الفحص».
+                        */}
+                        {plan.lastTestedAt
+                          ? formatDate(plan.lastTestedAt, language)
+                          : 'never'}
                       </Td>
                       <Td>
                         {plan.nextTestDueAt ? (
-                          <span style={isOverdue(plan.nextTestDueAt) ? { color: '#b91c1c' } : undefined}>
-                            {plan.nextTestDueAt.slice(0, 10)}
+                          <span
+                            style={
+                              isOverdue(plan.nextTestDueAt)
+                                ? { color: 'var(--danger-ink)' }
+                                : undefined
+                            }
+                          >
+                            {formatDate(plan.nextTestDueAt, language)}
                             {isOverdue(plan.nextTestDueAt) ? ` ${t('statusOverdue')}` : ''}
                           </span>
                         ) : (

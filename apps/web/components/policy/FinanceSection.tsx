@@ -270,7 +270,7 @@ export function FinanceSection({
           </button>
         </div>
       ) : (
-        <p style={{ color: "#6b7280" }}>
+        <p style={{ color: "var(--ink-muted)" }}>
           {t("financeNoInvoiceMessage", {
             amount: formatMoney(
               policy.issuedPremium,

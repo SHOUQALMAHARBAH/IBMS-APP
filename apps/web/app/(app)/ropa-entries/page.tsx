@@ -171,8 +171,7 @@ export default function RopaEntriesPage() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {t('ropaDataCategoriesLabel')}
               <input
-                aria-label={t('ropaColDataCategories')}
-                value={categoriesOfData}
+                  value={categoriesOfData}
                 onChange={(e) => setCategoriesOfData(e.target.value)}
                 required
               />
@@ -189,8 +188,7 @@ export default function RopaEntriesPage() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {t('ropaRecipientsLabel')}
               <input
-                aria-label={t('ropaColRecipients')}
-                value={recipients}
+                  value={recipients}
                 onChange={(e) => setRecipients(e.target.value)}
                 required
               />
@@ -219,32 +217,30 @@ export default function RopaEntriesPage() {
         rows.length === 0 ? (
           <EmptyState title={t('ropaNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={t('ropaHeading')}>
-            <Card padded={false}>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>{t('ropaColActivity')}</Th>
-                  <Th>{t('ropaColDataCategories')}</Th>
-                  <Th>{t('ropaPurposeLabel')}</Th>
-                  <Th>{t('ropaColRecipients')}</Th>
-                  <Th>{t('ropaColRetentionMonths')}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <Tr key={r.id}>
-                    <Td>{r.processingActivity}</Td>
-                    <Td>{r.categoriesOfData.join(', ')}</Td>
-                    <Td>{r.purpose}</Td>
-                    <Td>{r.recipients.join(', ')}</Td>
-                    <Td>{r.retentionPeriodMonths ?? '—'}</Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card>
-          </div>
+          <Card padded={false}>
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('ropaColActivity')}</Th>
+                <Th>{t('ropaColDataCategories')}</Th>
+                <Th>{t('ropaPurposeLabel')}</Th>
+                <Th>{t('ropaColRecipients')}</Th>
+                <Th>{t('ropaColRetentionMonths')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <Tr key={r.id}>
+                  <Td>{r.processingActivity}</Td>
+                  <Td>{r.categoriesOfData.join(', ')}</Td>
+                  <Td>{r.purpose}</Td>
+                  <Td>{r.recipients.join(', ')}</Td>
+                  <Td>{r.retentionPeriodMonths ?? '—'}</Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
         )
       ) : loadError ? null : (
         <SkeletonList rows={4} label={t('ropaLoading')} />

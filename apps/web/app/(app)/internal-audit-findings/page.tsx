@@ -129,7 +129,6 @@ export default function InternalAuditFindingsPage() {
           <label style={labelStyle}>
             {t('iafAuditPeriodFieldLabel')}
             <input
-              aria-label={t('iafAuditPeriodLabel')}
               value={auditPeriodLabel}
               onChange={(e) => setAuditPeriodLabel(e.target.value)}
               required

@@ -158,7 +158,6 @@ export default function CommunicationsPage() {
           >
             {t('commChannelLabel')}
             <select
-              aria-label={t('commColChannel')}
               value={channel}
               onChange={(e) => setChannel(e.target.value)}
             >
@@ -184,7 +183,6 @@ export default function CommunicationsPage() {
           >
             {t('commSubjectLabel')}
             <input
-              aria-label={t('commColSubject')}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
@@ -213,7 +211,9 @@ export default function CommunicationsPage() {
             <p
               style={{
                 opacity: 0.8,
-                color: consent.marketing.allowed ? '#15803d' : '#b45309',
+                color: consent.marketing.allowed
+                  ? 'var(--success-ink)'
+                  : 'var(--warning-ink)',
               }}
             >
               {t('commConsentLabel')}{' '}

@@ -120,7 +120,7 @@ const cardStyle: CSSProperties = {
   borderRadius: '0.5rem',
   width: '22rem',
   maxWidth: '90vw',
-  boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+  boxShadow: 'var(--shadow-lg)',
 };
 
 const labelStyle: CSSProperties = { display: 'block', marginTop: '1rem', marginBottom: '0.25rem' };

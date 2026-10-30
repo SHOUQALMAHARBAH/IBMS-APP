@@ -116,7 +116,13 @@ export const buttonStyle: CSSProperties = {
   fontFamily: 'inherit',
   fontSize: 'var(--text-base)',
   fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
-  color: '#ffffff',
+  // `--on-brand`, NOT a literal white, and the arithmetic is the reason: the dark theme flips
+  // `--brand-600` to a light blue (#6bb0e6), where white measures 2.34:1 against the 7.70:1
+  // the token gives. `Button`'s own `primary` variant already carried this exact note by name
+  // and this file kept the literal — on the sign-in button, which is the first thing the
+  // product shows anybody. Invisible to `literal-colours.py` until it read `.ts` as well as
+  // `.tsx`, and invisible to axe because Playwright runs one theme.
+  color: 'var(--on-brand)',
   background: 'var(--brand-600)',
   border: '1px solid var(--brand-600)',
   borderRadius: 'var(--radius-md)',

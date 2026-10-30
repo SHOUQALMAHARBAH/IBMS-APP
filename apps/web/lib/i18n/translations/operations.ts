@@ -422,7 +422,6 @@ export const OPERATIONS = {
     homeNoRole: 'لم يتم تعيين دور',
     usrLoading: 'جارٍ التحميل…',
     usrRefusalAct: 'عرض المستخدمين',
-    usrPasswordAria: 'كلمة المرور',
     renLoading: 'جارٍ التحميل…',
     renRefusalAct: 'عرض حالات التجديد',
 
@@ -1095,7 +1094,6 @@ export const OPERATIONS = {
     homeNoRole: 'no role assigned',
     usrLoading: 'Loading…',
     usrRefusalAct: 'view user accounts',
-    usrPasswordAria: 'Password',
     renLoading: 'Loading…',
     renRefusalAct: 'view renewals',
 

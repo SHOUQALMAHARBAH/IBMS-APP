@@ -250,112 +250,108 @@ export default function SlaDashboardPage() {
 
           <section style={sectionStyle}>
             <h2>{tr('slaDashByWorkflow')}</h2>
-            <div style={{ overflowX: 'auto' }}>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>{tr('slaDashColWorkflow')}</Th>
-                    <Th>{tr('slaDashColEntity')}</Th>
-                    <Th>{tr('slaDashColSla')}</Th>
-                    <Th>{tr('slaDashOnTrack')}</Th>
-                    <Th>{tr('slaDashDueSoon')}</Th>
-                    <Th>{tr('slaDashBreached')}</Th>
-                    <Th>{tr('slaDashEscalated')}</Th>
-                    <Th>{tr('slaDashResolved')}</Th>
-                    <Th>{tr('slaDashOldestOverdue')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.byWorkflow.length === 0 ? (
-                    <Tr>
-                      <Td colSpan={9}>
-                        {tr('slaDashNoTimers')}
+            <Table>
+              <thead>
+                <tr>
+                  <Th>{tr('slaDashColWorkflow')}</Th>
+                  <Th>{tr('slaDashColEntity')}</Th>
+                  <Th>{tr('slaDashColSla')}</Th>
+                  <Th>{tr('slaDashOnTrack')}</Th>
+                  <Th>{tr('slaDashDueSoon')}</Th>
+                  <Th>{tr('slaDashBreached')}</Th>
+                  <Th>{tr('slaDashEscalated')}</Th>
+                  <Th>{tr('slaDashResolved')}</Th>
+                  <Th>{tr('slaDashOldestOverdue')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.byWorkflow.length === 0 ? (
+                  <Tr>
+                    <Td colSpan={9}>
+                      {tr('slaDashNoTimers')}
+                    </Td>
+                  </Tr>
+                ) : (
+                  summary.byWorkflow.map((w) => (
+                    <Tr key={w.workflowName}>
+                      <Td>
+                        {w.label}
+                        {w.drafted ? (
+                          <span
+                            title={tr('slaDashDraftNote')}
+                            style={{ color: 'var(--ink-secondary)' }}
+                          >
+                            {' '}
+                            {tr('statusNoRegulatorySource')}
+                          </span>
+                        ) : null}
+                      </Td>
+                      {/* Decision 53 — the TYPE'S WORD, with no number: this row is about a
+                          WORKFLOW, not one record, so there is nothing to number. Found by this
+                          screen's own Playwright assertion, which asserted the member name was
+                          gone and found TWO cells still rendering it — the timer list had been
+                          switched and these two tables had not, which is precisely the
+                          half-built state the sequencing rule refuses. Neither cell carries a
+                          uuid, so the rendered-identifier budget could never have seen them. */}
+                      <Td>
+                        {slaEntityLabel(w.entityType)
+                          ? tr(slaEntityLabel(w.entityType)!)
+                          : w.entityType}
+                      </Td>
+                      <Td>
+                        {formatSlaDuration(w.configuredDuration)}
+                      </Td>
+                      <Td>{w.onTrack}</Td>
+                      <Td>{w.dueSoon}</Td>
+                      <Td>{w.breached}</Td>
+                      <Td>{w.escalated}</Td>
+                      <Td>
+                        {w.resolvedOnTime + w.resolvedLate}
+                      </Td>
+                      <Td>
+                        {w.oldestOverdueDays == null
+                          ? '—'
+                          : `${w.oldestOverdueDays}d`}
                       </Td>
                     </Tr>
-                  ) : (
-                    summary.byWorkflow.map((w) => (
-                      <Tr key={w.workflowName}>
-                        <Td>
-                          {w.label}
-                          {w.drafted ? (
-                            <span
-                              title={tr('slaDashDraftNote')}
-                              style={{ color: 'var(--ink-secondary)' }}
-                            >
-                              {' '}
-                              {tr('statusNoRegulatorySource')}
-                            </span>
-                          ) : null}
-                        </Td>
-                        {/* Decision 53 — the TYPE'S WORD, with no number: this row is about a
-                            WORKFLOW, not one record, so there is nothing to number. Found by this
-                            screen's own Playwright assertion, which asserted the member name was
-                            gone and found TWO cells still rendering it — the timer list had been
-                            switched and these two tables had not, which is precisely the
-                            half-built state the sequencing rule refuses. Neither cell carries a
-                            uuid, so the rendered-identifier budget could never have seen them. */}
-                        <Td>
-                          {slaEntityLabel(w.entityType)
-                            ? tr(slaEntityLabel(w.entityType)!)
-                            : w.entityType}
-                        </Td>
-                        <Td>
-                          {formatSlaDuration(w.configuredDuration)}
-                        </Td>
-                        <Td>{w.onTrack}</Td>
-                        <Td>{w.dueSoon}</Td>
-                        <Td>{w.breached}</Td>
-                        <Td>{w.escalated}</Td>
-                        <Td>
-                          {w.resolvedOnTime + w.resolvedLate}
-                        </Td>
-                        <Td>
-                          {w.oldestOverdueDays == null
-                            ? '—'
-                            : `${w.oldestOverdueDays}d`}
-                        </Td>
-                      </Tr>
-                    ))
-                  )}
-                </tbody>
-              </Table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </Table>
           </section>
 
           <section style={sectionStyle}>
             <h2>{tr('slaDashByEntityType')}</h2>
-            <div style={{ overflowX: 'auto' }}>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>{tr('slaDashColEntityType')}</Th>
-                    <Th>{tr('slaDashColTimers')}</Th>
-                    <Th>{tr('slaDashColEntities')}</Th>
-                    <Th>{tr('slaDashBreached')}</Th>
-                    <Th>{tr('slaDashEscalated')}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.byEntityType.map((e) => (
-                    <Tr key={e.entityType}>
-                      {/* The same word, in the by-entity-type breakdown. The KEY stays the stored
-                          member name — a React key must be stable and language-independent, and
-                          keying on a translated word would re-key every row on a language
-                          switch. */}
-                      <Td>
-                        {slaEntityLabel(e.entityType)
-                          ? tr(slaEntityLabel(e.entityType)!)
-                          : e.entityType}
-                      </Td>
-                      <Td>{e.total}</Td>
-                      <Td>{e.entityCount}</Td>
-                      <Td>{e.breached}</Td>
-                      <Td>{e.escalated}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>{tr('slaDashColEntityType')}</Th>
+                  <Th>{tr('slaDashColTimers')}</Th>
+                  <Th>{tr('slaDashColEntities')}</Th>
+                  <Th>{tr('slaDashBreached')}</Th>
+                  <Th>{tr('slaDashEscalated')}</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.byEntityType.map((e) => (
+                  <Tr key={e.entityType}>
+                    {/* The same word, in the by-entity-type breakdown. The KEY stays the stored
+                        member name — a React key must be stable and language-independent, and
+                        keying on a translated word would re-key every row on a language
+                        switch. */}
+                    <Td>
+                      {slaEntityLabel(e.entityType)
+                        ? tr(slaEntityLabel(e.entityType)!)
+                        : e.entityType}
+                    </Td>
+                    <Td>{e.total}</Td>
+                    <Td>{e.entityCount}</Td>
+                    <Td>{e.breached}</Td>
+                    <Td>{e.escalated}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           </section>
 
           <section style={sectionStyle}>
@@ -392,204 +388,202 @@ export default function SlaDashboardPage() {
                 {reducedCapability(tr, 'slaDashPauseCanAct', 'slaDashPauseCannotAct', 'sla.timer.pause')}
               </p>
             )}
-            <div style={{ overflowX: 'auto' }}>
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>{tr('slaDashColWorkflow')}</Th>
-                    <Th>{tr('slaDashColEntity')}</Th>
-                    <Th>{tr('slaDashColState')}</Th>
-                    <Th>{tr('slaDashColDue')}</Th>
-                    <Th>{tr('slaDashOverdue')}</Th>
-                    <Th>{tr('slaDashEscalatesTo')}</Th>
-                    <Th>{tr('slaDashColClock')}</Th>
-                    {canPause && (
-                      <Th>{tr('slaDashColActions')}</Th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {timers == null ? (
-                    <Tr>
-                      <Td colSpan={canPause ? 8 : 7}>
-                        {tr('slaDashLoading')}
+            <Table>
+              <thead>
+                <tr>
+                  <Th>{tr('slaDashColWorkflow')}</Th>
+                  <Th>{tr('slaDashColEntity')}</Th>
+                  <Th>{tr('slaDashColState')}</Th>
+                  <Th>{tr('slaDashColDue')}</Th>
+                  <Th>{tr('slaDashOverdue')}</Th>
+                  <Th>{tr('slaDashEscalatesTo')}</Th>
+                  <Th>{tr('slaDashColClock')}</Th>
+                  {canPause && (
+                    <Th>{tr('slaDashColActions')}</Th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {timers == null ? (
+                  <Tr>
+                    <Td colSpan={canPause ? 8 : 7}>
+                      {tr('slaDashLoading')}
+                    </Td>
+                  </Tr>
+                ) : timers.length === 0 ? (
+                  <Tr>
+                    <Td colSpan={canPause ? 8 : 7}>
+                      {tr('slaDashNoTimersInState')}
+                    </Td>
+                  </Tr>
+                ) : (
+                  timers.map((r) => (
+                    <Tr key={r.id}>
+                      <Td>{r.label}</Td>
+                      {/*
+                        * OWNER DECISION 53 — the tracked workflow's type in Arabic plus its
+                        * number. Sixteen SLA-tracked entity types, closed by the registry's own
+                        * inventory spec, so decision 49's test says NAME; all sixteen derived.
+                        *
+                        * The id stays for the same reason as on `/internal-controls`: an SLA
+                        * timer's subject has no readable handle, so the number is the honest
+                        * answer to WHICH record rather than an approximation of a name.
+                        */}
+                      <Td>
+                        {slaEntityLabel(r.entityType) ? (
+                          tr('atEntityRef', {
+                            type: tr(slaEntityLabel(r.entityType)!),
+                            ref: r.entityId,
+                          })
+                        ) : (
+                          <span
+                            title={tr('atEntityTypeUnlabelled')}
+                            style={{
+                              fontFamily: 'var(--font-mono, monospace)',
+                              color: 'var(--ink-secondary)',
+                            }}
+                          >
+                            {r.entityType} · {r.entityId}
+                          </span>
+                        )}
                       </Td>
-                    </Tr>
-                  ) : timers.length === 0 ? (
-                    <Tr>
-                      <Td colSpan={canPause ? 8 : 7}>
-                        {tr('slaDashNoTimersInState')}
+                      <Td>
+                        {tr(STATE_FILTER_LABEL_KEY[r.state])}
                       </Td>
-                    </Tr>
-                  ) : (
-                    timers.map((r) => (
-                      <Tr key={r.id}>
-                        <Td>{r.label}</Td>
-                        {/*
-                          * OWNER DECISION 53 — the tracked workflow's type in Arabic plus its
-                          * number. Sixteen SLA-tracked entity types, closed by the registry's own
-                          * inventory spec, so decision 49's test says NAME; all sixteen derived.
-                          *
-                          * The id stays for the same reason as on `/internal-controls`: an SLA
-                          * timer's subject has no readable handle, so the number is the honest
-                          * answer to WHICH record rather than an approximation of a name.
-                          */}
-                        <Td>
-                          {slaEntityLabel(r.entityType) ? (
-                            tr('atEntityRef', {
-                              type: tr(slaEntityLabel(r.entityType)!),
-                              ref: r.entityId,
-                            })
-                          ) : (
+                      <Td>
+                        {fmtDate(r.dueAt)}
+                        {r.isRegulatory && (
+                          <>
+                            {' '}
                             <span
-                              title={tr('atEntityTypeUnlabelled')}
+                              data-testid={`sla-regulatory-${r.id}`}
+                              title={tr('slaDashRegulatoryTitle')}
                               style={{
-                                fontFamily: 'var(--font-mono, monospace)',
-                                color: 'var(--ink-secondary)',
+                                fontSize: '0.7rem',
+                                border: '1px solid var(--border-default)',
+                                borderRadius: 4,
+                                padding: '0 0.3rem',
+                                whiteSpace: 'nowrap',
                               }}
                             >
-                              {r.entityType} · {r.entityId}
+                              {tr('slaDashRegulatory')}
                             </span>
-                          )}
-                        </Td>
+                          </>
+                        )}
+                      </Td>
+                      <Td>
+                        {r.overdueDays == null ? '—' : `${r.overdueDays}d`}
+                      </Td>
+                      <Td>{r.escalatedTo ?? '—'}</Td>
+                      <Td data-testid={`sla-clock-${r.id}`}>
+                        {r.pausedAt == null ? (
+                          '—'
+                        ) : (
+                          <>
+                            {tr('slaDashPausedSince')} {fmtDate(r.pausedAt)}
+                            {r.pauseReason && (
+                              <div style={{ opacity: 0.75 }}>
+                                {r.pauseReason}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </Td>
+                      {canPause && (
                         <Td>
-                          {tr(STATE_FILTER_LABEL_KEY[r.state])}
-                        </Td>
-                        <Td>
-                          {fmtDate(r.dueAt)}
-                          {r.isRegulatory && (
-                            <>
-                              {' '}
-                              <span
-                                data-testid={`sla-regulatory-${r.id}`}
-                                title={tr('slaDashRegulatoryTitle')}
-                                style={{
-                                  fontSize: '0.7rem',
-                                  border: '1px solid var(--border-default)',
-                                  borderRadius: 4,
-                                  padding: '0 0.3rem',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {tr('slaDashRegulatory')}
-                              </span>
-                            </>
-                          )}
-                        </Td>
-                        <Td>
-                          {r.overdueDays == null ? '—' : `${r.overdueDays}d`}
-                        </Td>
-                        <Td>{r.escalatedTo ?? '—'}</Td>
-                        <Td data-testid={`sla-clock-${r.id}`}>
-                          {r.pausedAt == null ? (
+                          {r.resolvedAt != null ? (
                             '—'
-                          ) : (
-                            <>
-                              {tr('slaDashPausedSince')} {fmtDate(r.pausedAt)}
-                              {r.pauseReason && (
-                                <div style={{ opacity: 0.75 }}>
-                                  {r.pauseReason}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </Td>
-                        {canPause && (
-                          <Td>
-                            {r.resolvedAt != null ? (
-                              '—'
-                            ) : r.slaStatus === 'PAUSED' ? (
-                              <button
-                                type="button"
-                                data-testid={`sla-resume-${r.id}`}
-                                disabled={busyId === r.id}
-                                onClick={() => void doResume(r.id)}
+                          ) : r.slaStatus === 'PAUSED' ? (
+                            <button
+                              type="button"
+                              data-testid={`sla-resume-${r.id}`}
+                              disabled={busyId === r.id}
+                              onClick={() => void doResume(r.id)}
+                            >
+                              {tr('slaDashResume')}
+                            </button>
+                          ) : pausingId === r.id ? (
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.35rem',
+                                minWidth: '18rem',
+                              }}
+                            >
+                              <label
+                                htmlFor={`sla-pause-reason-${r.id}`}
+                                style={{ fontSize: '0.8rem' }}
                               >
-                                {tr('slaDashResume')}
-                              </button>
-                            ) : pausingId === r.id ? (
-                              <div
+                                {tr('slaDashPauseReasonLabel')}
+                              </label>
+                              <textarea
+                                id={`sla-pause-reason-${r.id}`}
+                                data-testid={`sla-pause-reason-${r.id}`}
+                                rows={3}
+                                minLength={SLA_PAUSE_REASON_MIN_LENGTH}
+                                value={pauseReason}
+                                onChange={(ev) =>
+                                  setPauseReason(ev.target.value)
+                                }
+                              />
+                              <p
                                 style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.35rem',
-                                  minWidth: '18rem',
+                                  fontSize: '0.75rem',
+                                  opacity: 0.75,
+                                  margin: 0,
                                 }}
                               >
-                                <label
-                                  htmlFor={`sla-pause-reason-${r.id}`}
-                                  style={{ fontSize: '0.8rem' }}
-                                >
-                                  {tr('slaDashPauseReasonLabel')}
-                                </label>
-                                <textarea
-                                  id={`sla-pause-reason-${r.id}`}
-                                  data-testid={`sla-pause-reason-${r.id}`}
-                                  rows={3}
-                                  minLength={SLA_PAUSE_REASON_MIN_LENGTH}
-                                  value={pauseReason}
-                                  onChange={(ev) =>
-                                    setPauseReason(ev.target.value)
+                                {tr('slaDashPauseReasonHint')}
+                              </p>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                  type="button"
+                                  data-testid={`sla-pause-confirm-${r.id}`}
+                                  disabled={
+                                    busyId === r.id ||
+                                    !slaPauseReasonIsValid(pauseReason)
                                   }
-                                />
-                                <p
-                                  style={{
-                                    fontSize: '0.75rem',
-                                    opacity: 0.75,
-                                    margin: 0,
+                                  onClick={() =>
+                                    void doPause(r.id, pauseReason)
+                                  }
+                                >
+                                  {tr('slaDashConfirmPause')}
+                                </button>
+                                <button
+                                  type="button"
+                                  data-testid={`sla-pause-cancel-${r.id}`}
+                                  onClick={() => {
+                                    setPausingId(null);
+                                    setPauseReason('');
+                                    setActionError(null);
                                   }}
                                 >
-                                  {tr('slaDashPauseReasonHint')}
-                                </p>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                  <button
-                                    type="button"
-                                    data-testid={`sla-pause-confirm-${r.id}`}
-                                    disabled={
-                                      busyId === r.id ||
-                                      !slaPauseReasonIsValid(pauseReason)
-                                    }
-                                    onClick={() =>
-                                      void doPause(r.id, pauseReason)
-                                    }
-                                  >
-                                    {tr('slaDashConfirmPause')}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    data-testid={`sla-pause-cancel-${r.id}`}
-                                    onClick={() => {
-                                      setPausingId(null);
-                                      setPauseReason('');
-                                      setActionError(null);
-                                    }}
-                                  >
-                                    {tr('slaDashCancel')}
-                                  </button>
-                                </div>
+                                  {tr('slaDashCancel')}
+                                </button>
                               </div>
-                            ) : (
-                              <button
-                                type="button"
-                                data-testid={`sla-pause-${r.id}`}
-                                disabled={busyId === r.id}
-                                onClick={() => {
-                                  setPausingId(r.id);
-                                  setPauseReason('');
-                                  setActionError(null);
-                                }}
-                              >
-                                {tr('slaDashPause')}
-                              </button>
-                            )}
-                          </Td>
-                        )}
-                      </Tr>
-                    ))
-                  )}
-                </tbody>
-              </Table>
-            </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              data-testid={`sla-pause-${r.id}`}
+                              disabled={busyId === r.id}
+                              onClick={() => {
+                                setPausingId(r.id);
+                                setPauseReason('');
+                                setActionError(null);
+                              }}
+                            >
+                              {tr('slaDashPause')}
+                            </button>
+                          )}
+                        </Td>
+                      )}
+                    </Tr>
+                  ))
+                )}
+              </tbody>
+            </Table>
           </section>
         </>
       )}

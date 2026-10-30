@@ -70,13 +70,14 @@
     "check:token-contrast": "python scripts/measurements/token-contrast.py",
     "check:inline-styles": "python scripts/measurements/inline-styles.py",
     "check:opacity-muting": "python scripts/measurements/opacity-as-muting.py",
+    "check:literal-colours": "python scripts/measurements/literal-colours.py --check",
     "check:rendered-identifiers": "python scripts/measurements/rendered-identifiers.py --check",
     "check:typed-identifiers": "python scripts/measurements/typed-identifier-inputs.py --check",
     "check:four-states": "python scripts/measurements/four-states.py --check",
     "check:load-error-way-forward": "python scripts/measurements/load-error-way-forward.py --check",
     "check:unreachable-routes": "python scripts/measurements/unreachable-routes.py --check",
     "check:unreachable-routes-by-verb": "python scripts/measurements/unreachable-routes-by-verb.py --check",
-    "check:screen-pass": "npm run check:labels && npm run check:token-contrast && npm run check:inline-styles && npm run check:opacity-muting && npm run check:rendered-identifiers && npm run check:typed-identifiers && npm run check:four-states && npm run check:load-error-way-forward && npm run check:unreachable-routes && npm run check:unreachable-routes-by-verb",
+    "check:screen-pass": "npm run check:labels && npm run check:token-contrast && npm run check:inline-styles && npm run check:opacity-muting && npm run check:literal-colours && npm run check:rendered-identifiers && npm run check:typed-identifiers && npm run check:four-states && npm run check:load-error-way-forward && npm run check:unreachable-routes && npm run check:unreachable-routes-by-verb",
     "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py"
   },
   "devDependencies": {

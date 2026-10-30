@@ -190,9 +190,8 @@ export default function CommissionRatesPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {t('crateRateLabel')}
+            {t('crateRateAria')}
             <input
-              aria-label={t('crateRateAria')}
               value={ratePercent}
               onChange={(e) => setRatePercent(e.target.value)}
               placeholder="15"
@@ -201,9 +200,8 @@ export default function CommissionRatesPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {t('crateVatLabel')}
+            {t('crateVatAria')}
             <input
-              aria-label={t('crateVatAria')}
               value={vatRatePercent}
               onChange={(e) => setVatRatePercent(e.target.value)}
               placeholder="16"

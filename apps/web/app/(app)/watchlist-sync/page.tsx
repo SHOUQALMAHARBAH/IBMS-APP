@@ -161,34 +161,37 @@ export default function WatchlistSyncPage() {
         runs.length === 0 ? (
           <EmptyState title={t('wsNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }} data-testid="watchlist-runs">
-            <Card padded={false}>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>{t('wsColSource')}</Th>
-                  <Th>{t('wsColStatus')}</Th>
-                  <Th>{t('wsColRecords')}</Th>
-                  <Th>{t('wsColStarted')}</Th>
-                  <Th>{t('wsColCompleted')}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.map((r) => (
-                  <Tr key={r.id}>
-                    <Td>{t(ENUM_LABEL.WatchlistSource[r.source])}</Td>
-                    <Td>{t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}</Td>
-                    <Td>{r.recordCount ?? '—'}</Td>
-                    <Td>{r.startedAt.slice(0, 16).replace('T', ' ')}</Td>
-                    <Td>
-                      {r.completedAt ? r.completedAt.slice(0, 16).replace('T', ' ') : '—'}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card>
-          </div>
+          <Card padded={false}>
+          {/*
+            The hook rode the scroll wrapper this batch removed, and `watchlist-sync.spec.ts`
+            reads it twice. `Table` forwards `data-*` onto its own `<table>` — that is what the
+            template-literal index signature is for — so it moves here rather than being lost.
+          */}
+          <Table data-testid="watchlist-runs">
+            <thead>
+              <tr>
+                <Th>{t('wsColSource')}</Th>
+                <Th>{t('wsColStatus')}</Th>
+                <Th>{t('wsColRecords')}</Th>
+                <Th>{t('wsColStarted')}</Th>
+                <Th>{t('wsColCompleted')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((r) => (
+                <Tr key={r.id}>
+                  <Td>{t(ENUM_LABEL.WatchlistSource[r.source])}</Td>
+                  <Td>{t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}</Td>
+                  <Td>{r.recordCount ?? '—'}</Td>
+                  <Td>{r.startedAt.slice(0, 16).replace('T', ' ')}</Td>
+                  <Td>
+                    {r.completedAt ? r.completedAt.slice(0, 16).replace('T', ' ') : '—'}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
         )
       ) : loadError ? null : (
         // The loading state directive §2 requires; this page rendered

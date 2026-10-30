@@ -594,7 +594,11 @@ export function PolicySection({
               style={{
                 marginTop: '0.8rem',
                 padding: '0.6rem',
-                borderInlineStart: `3px solid ${policy.checking.discrepancyFound ? 'var(--error, #c00)' : 'var(--ok, #2a7)'}`,
+                borderInlineStart: `3px solid ${
+                  policy.checking.discrepancyFound
+                    ? 'var(--danger-ink)'
+                    : 'var(--success-ink)'
+                }`,
               }}
             >
               <p style={{ fontWeight: 600, margin: 0 }}>

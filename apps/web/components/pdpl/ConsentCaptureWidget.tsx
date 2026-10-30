@@ -150,7 +150,10 @@ export function ConsentCaptureWidget({
     >
       <h3 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>{label}</h3>
       {error ? (
-        <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>
+        <p
+          role="alert"
+          style={{ color: 'var(--danger-ink)', fontSize: '0.85rem' }}
+        >
           {error}
         </p>
       ) : null}

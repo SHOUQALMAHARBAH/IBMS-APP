@@ -122,7 +122,6 @@ export default function ExecutiveDashboardPage() {
         >
           {t('execInsuranceLine')}
           <input
-            aria-label={t('dashInsuranceLineFilterAria')}
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />

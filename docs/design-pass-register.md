@@ -173,16 +173,16 @@ Each is something the pass found and deliberately left, with what it would take 
 | 3b | **`four-states.py` reports `/incidents` as having an empty state, and it has none.** Measured: with no incidents the screen rendered a table header over nothing, while `incNone` had shipped in both languages with ZERO consumers since before this batch. The detector counts a `.length === 0` branch and that file has one — `inc.containmentActions.length === 0`, a PER-ROW check inside a cell. | The instance is fixed (the screen uses `incNone` now). Telling a screen-level empty branch from a per-row one needs more than a text match, so the gate is left and the class recorded. **Found by reading the screen, not the count.** |
 | 3c | **The reference screen has a filter strip; `/incidents` gets none.** | A filter is new interactive functionality, and §4(h) says no altered logic. It also has a real consequence worth a decision rather than a default: a filter that hides rows can hide an overdue containment. Proposed, not built. |
 | 4 | **Tajawal has no weight 600.** `--weight-semibold` resolves by the browser's own font-matching, which for a desired 600 with 500 and 700 available lands on 700. | Stated rather than discovered: a heading that reads bolder than its token says is the face not having that weight, not a bug. |
-| 4b | **`aria-label` over a visible label is the most common defect this pass is finding.** Two of the three pilot screens carried it, FOUR controls in all, and in three of the four the two strings DISAGREED: `pcAccountAria` said four digits where the field accepts two to four; `incTitleLabel` ("Incident title") was better than the visible `incTitleFieldLabel` ("Title"); `incRootCauseLabel` was a placeholder doing a label's job, so a sighted reader had nothing left to read once they typed. An `aria-label` REPLACES the accessible name, so the two readers were told different things and nobody proof-reads the invisible one. | Fixed per screen as the pass reaches them, by making the informative string the VISIBLE label and withdrawing the duplicate key in both languages — four keys withdrawn so far. A gate for the class is worth considering and is not built here. |
+| 4b | **`aria-label` over a visible label is the most common defect this pass is finding.** Two of the three pilot screens carried it, FOUR controls in all, and in three of the four the two strings DISAGREED: `pcAccountAria` said four digits where the field accepts two to four; `incTitleLabel` ("Incident title") was better than the visible `incTitleFieldLabel` ("Title"); `incRootCauseLabel` was a placeholder doing a label's job, so a sighted reader had nothing left to read once they typed. An `aria-label` REPLACES the accessible name, so the two readers were told different things and nobody proof-reads the invisible one. | **CLOSED 2026-10-30 (batch 14 § 4): 54 → 14, and the 14 are the MATCHER.** FULLER 8 → 1, THINNER 10 → 0, UNRELATED 31 → 13, DUPLICATE 7 → 0; 209 aria-labels across 73 files → 159 across 67, with 25 keys withdrawn in both languages and **no new string anywhere**. The sharpest row was hers: `/settings/users` told the eye the password policy and the ear «كلمة المرور». **A GATE IS STILL NOT BUILT, and now there is a measured reason rather than a hesitation**: the resolver falls through to the nearest text node, which can be a BUTTON, an empty-state sentence or a heading, so 13 rows are false — and a ratchet on a matcher with 13 known false rows is a red build on a clean tree, where the first false red teaches everyone to ignore it. |
 | 4c | **`hardcoded-ui-english.py` reports 0 undeclared and misses two strings on `/internal-controls`** — a governance report an auditor reads. `'None'` was the violations figure when the count was zero: a ternary of bare literals inside a PROP VALUE, which failure mode 8 excludes by design because the identical shape is a `data-*` test hook elsewhere. And `Generated {…}` was a capitalised single word in front of a brace, which `PROSE` misses (it needs two words) and `BARE_TEXT_LINE` misses (its character class excludes braces). | Both instances fixed — the count is `٠` through `formatNumber`, and the generated-at line goes through `ReportProvenance`, which this product already decided on for exactly that line. **Mode 8 is NOT widened**: that script's own header records that tolerating more makes every bare call a finding. |
 | 4d | **`ReportProvenance` was never exported from the `components/ui` barrel.** Found by the compiler when the first screen tried to compose it. | Exported. Worth a line because the component shipped with its own decision record and a `report-provenance` testid and could only be reached by a deep import — which is how a primitive stays unused. |
 | 4e | **`/internal-controls/combined-duty-acts` is mocked by NO Playwright spec and its declared-acts half has never been exercised in a browser.** Found while writing that screen's capture: there was no working fixture to copy, so the first attempt was paraphrased from the type and silently rendered nothing. | The capture now exercises it. A real assertion on that section belongs with whoever owns COMBINED mode — it is the section the whole mode rests on. |
 | 5b | **The collapsed rail is a STRIP, not a drawer.** Its `<details>` groups stay closed, so it costs about one brand lockup and one search field of height. | A drawer needs a toggle, a focus trap and an escape key — three pieces of BEHAVIOUR, which §4(h) does not allow this batch to add. It is the better answer whenever somebody is allowed to build it. |
 | 5c | **The rail's layout lives in inline styles, which is why the responsive rule needs `!important`.** | Moving it to CSS is a larger change than a responsive fix should carry. Recorded so the `!important` is read as a consequence rather than as carelessness. |
-| 6 | **The two new CI steps are committed locally and NOT PUSHED.** `check:token-contrast` and `check:inline-styles` are wired in `package.json` (so `npm run check:screen-pass` runs both) and their `ci.yml` steps sit in an unpushed commit: GitHub refuses a push touching a workflow file from a token without `workflow` scope, and this machine's keyring token holds `gist, read:org, repo`. **No credential was written to disk to get around it** — the credential-safety hook refuses that and is right to, since it cannot tell a credential store from a leak. | Needs one push with a `workflow`-scoped token, which is the owner's to make. Until then both gates are green locally and runnable by name, and CI simply does not run them. Recorded here rather than left as a silent gap, because a gate nobody runs is the thing this repository has paid for three times. |
-| 7 | **SIXTEEN screens still wrap a `<Table>` in their OWN `overflow-x: auto` div.** `Table` has provided a scroll container since batch 3 **with `tabIndex={0}`**, because a scroll container nothing can focus is a region a keyboard user cannot scroll at all — so an unfocusable one wrapping it is that defect one level out. Measured 17 sites across 10 files; `/screening-health`'s is fixed. **axe is silent**: `scrollable-region-focusable` fires only when a region actually OVERFLOWS, and the inner scroller absorbs the overflow first. `client-accounting`, `financial-report`, `insurer-accounting`, `regulatory-compliance`, `retention-disposal` ×6, `ropa-entries`, `screening-matches`, `sla-dashboard` ×3, `watchlist-sync`. | Sixteen deletions across nine files, each needing its own JSX close matched and its screen's spec re-run. It is a sweep, and the one that was fixed was fixed because this batch's own measurement ran into it. |
-| 8 | **`ProviderHealth.providerName` is English on an Arabic screen** — «الاسم» reads `Built-in watchlist cache (OFAC SDN + UN Consolidated)` beside a TYPE that reads «القائمة المحلية المزامنة». Declared as `readonly name` on each adapter, which is why a sweep over display-FIELD names (`note`, `detail`, …) did not see it. | No Arabic exists for it and inventing one is what the standing rule forbids. Same class and same answer as `ProviderHealth.detail` beside it. |
-| 5 | **The four other `(auth)` screens do not yet use `AuthFrame`.** `/login` links to `/forgot-password`, which still wears the old card. | They are screens in this batch and adopt the frame when the pass reaches them. |
+| 6 | **The two new CI steps are committed locally and NOT PUSHED.** `check:token-contrast` and `check:inline-styles` are wired in `package.json` (so `npm run check:screen-pass` runs both) and their `ci.yml` steps sit in an unpushed commit: GitHub refuses a push touching a workflow file from a token without `workflow` scope, and this machine's keyring token holds `gist, read:org, repo`. **No credential was written to disk to get around it** — the credential-safety hook refuses that and is right to, since it cannot tell a credential store from a leak. | **CLOSED 2026-10-30 (batch 14 § 9) — AND IT WAS ONE STEP, NOT THREE.** Measured rather than trusted: `check:token-contrast` and `check:inline-styles` are already in `ci.yml` at lines 124 and 133, and the held branch's own diff proves it — `5a17f08` adds exactly ONE step and *"Inline styling may only fall"* appears in it as unchanged CONTEXT. So only `check:opacity-muting` was ever absent. It is wired now, with the new `check:literal-colours` beside it, and `wire-opacity-gate-into-ci` is SUPERSEDED (it sat four commits behind carrying the same 13 lines). The half of this row that outlived its figures is the reason it was written: a gate nobody runs is a number nobody can trust. |
+| 7 | **SIXTEEN screens still wrap a `<Table>` in their OWN `overflow-x: auto` div.** `Table` has provided a scroll container since batch 3 **with `tabIndex={0}`**, because a scroll container nothing can focus is a region a keyboard user cannot scroll at all — so an unfocusable one wrapping it is that defect one level out. Measured 17 sites across 10 files; `/screening-health`'s is fixed. **axe is silent**: `scrollable-region-focusable` fires only when a region actually OVERFLOWS, and the inner scroller absorbs the overflow first. `client-accounting`, `financial-report`, `insurer-accounting`, `regulatory-compliance`, `retention-disposal` ×6, `ropa-entries`, `screening-matches`, `sla-dashboard` ×3, `watchlist-sync`. | **CLOSED 2026-10-30 (batch 14 § 5).** Sixteen removed across nine files, each close matched by DEPTH COUNTING because `</div>` nests; `SCREEN_BUDGET` 1099 → 1083, exactly one site per wrapper. **Re-measured first, and the measurement classified them independently: 28 wrappers exist, of which exactly 16 wrap the PRIMITIVE — her list to the site. The other 12 hold a RAW `<table>`, where that div is the ONLY scroller**, so removing it there would be the regression rather than the fix — and those twelve are therefore batch 3's keyboard trap still UNFIXED, which is the one item this register leaves both mechanical-ish and open. **And removing them dropped a live test hook**: `watchlist-sync`'s wrapper carried `data-testid="watchlist-runs"`, read by two assertions — the `data-*` class from the other direction, five having been dropped BY components before. It rides the `<Table>` now, which forwards them. |
+| 8 | **`ProviderHealth.providerName` is English on an Arabic screen** — «الاسم» reads `Built-in watchlist cache (OFAC SDN + UN Consolidated)` beside a TYPE that reads «القائمة المحلية المزامنة». Declared as `readonly name` on each adapter, which is why a sweep over display-FIELD names (`note`, `detail`, …) did not see it. | **~~No Arabic exists for it~~ — MEASURED 2026-10-30 AND THAT CLAIM WAS TOO STRONG (batch 14 § 11), which matters because it was repeated to the owner.** `scripts/measurements/api-display-strings.py` re-derives it: `'On-premise screening engine'` is **byte-identical** to `screenProviderOnPremise`, whose «محرك فحص محلي» ships; `'Commercial screening provider'` is ONE WORD from `screenProviderCommercial`; only the built-in name has no single twin, and its two parts both ship. **AND THE REAL FINDING IS THAT THE ARABIC IS ALREADY ON THAT SCREEN EIGHT LINES ABOVE** — the «المزوّد» row renders `ENUM_LABEL.ScreeningProviderKind` in Arabic and «الاسم» renders `providerName` raw in English, so for two of the three this is a SECOND answer to a question already answered, in the wrong language. **Reported and NOT shipped by her instruction**, because the honest fix is removing a row from a compliance screen or putting a KEY on the wire, and she reads the derivation first. `ProviderHealth.detail` is a DIFFERENT answer: two of its ten are already covered bilingually by `shMissingConfig` (rendered as a duplicate directly beneath the English), three carry a RAW runtime fragment whose CARRIER SENTENCE is still localisable, and five interpolate only numbers or URLs. |
+| 5 | **~~The four other `(auth)` screens do not yet use `AuthFrame`~~ — CLOSED 2026-10-30 (batch 14 § 6).** THE ORIGINAL CLAIM: `/login` links to `/forgot-password`, which still wore the old card — this product's first impression going wrong one click in. | All four wear the frame, with `pitch` OMITTED because `AuthFrame`'s own comment anticipated exactly these four in advance: *a reader who is already resetting a password does not need selling to*. No new words, and the frame renders its own `<main>`, so each screen shed two inline style sites as well. |
 
 ---
 
@@ -269,8 +269,8 @@ truncation.
 | 9b | the on-premise PEP note | **ANSWERED 2026-10-30 — she restored the clause herself**, so the Arabic now opens «حسب ما إذا كانت» against the English's own *Depends on whether*. THE ORIGINAL ROW, because the defect was UPSTREAM of her: the shipping English hedges, the table she was given had lost that clause, and her Arabic rendered the truncation faithfully and ASSERTED what the English HEDGES | `shNoteOnPremisePepVerify`. **It was caught by comparing the two languages against each other rather than by reading either alone** — a bilingual pair where one half makes a stronger claim than the other is a defect neither reader can see. The clause went missing when the sentences were extracted FOR her, not when she wrote them, so it was never hers to drop |
 | 10 | the `CLEAR` sentence | **WITHDRAWN BY HER.** `screenOutcomeNoMatch` keeps «لا يوجد تطابق»: *the product can demonstrate that no match was found; it cannot demonstrate that a customer is clean, and on a compliance screen the weaker claim is the true one* | Nothing changed. Recorded as HER decision with that reason, because the label now reads like half a sentence and is not |
 | 11 | the date fields | **ANSWERED IN FULL 2026-10-30 — NINE SENTENCES, and her measurement is what made it nine.** 19 fields were worth reading; six already had their Arabic shipping as an invisible `aria-label` (*what is heard becomes what is seen*), two were DECIDED to stay bare, one cannot have a word until the behaviour is measured, and 20 never needed one. Plus **GREGORIAN ONLY — «نحسمها ميلادي فقط- حاليا»**, with «حالياً» part of the decision | Nine key pairs, `Hint` and `DateEcho`, four labels that took their spoken sentence and six aria-labels withdrawn. **NOT ONE of the nine sites goes through `Field`**, so its `hint` slot — which the previous batch said this would reuse — was not reachable at any of them; `Hint` is extracted from `Field` instead. The MONTH-FIRST defect a hint cannot reach is closed in Arabic and NOT in English, measured |
-| 12 | the aria-vs-visible class | **COUNT IT AND STOP** — *if it is six, this is closed; if it is sixty, the owner needs to know that before anyone decides what to do* | **IT IS 54**, by `aria-vs-visible-label.py` over 209 aria-labels in 73 files — and split by WHICH READER LOSES: **FULLER 8** (the eye loses, her class), **THINNER 10** (the EAR loses a qualifier), **UNRELATED 36** (22 of them naming a deliberately-written `*Aria` key, so most of that bucket is the matcher). **The sharpest row is not in her six**: `/settings/users`' password field tells the eye the policy and the ear «كلمة المرور». Nothing beyond her six was changed |
-| 13 | «تتوقّف التغطية» on the endorsement form | **SHE DELIBERATELY DID NOT WRITE THIS ONE** — *is the date entered the LAST day cover applies, or the FIRST day it does not? One day apart, and one day decides whether a claim is covered or refused* | **MEASURED: it is the FIRST day cover does NOT apply**, and both halves of the product agree — the schedule closes at `effectiveTo := effectiveFrom` with no successor and `claim.config.ts` reads `effectiveFrom <= lossDate < effectiveTo`, while `cancellationReturnPremium` counts `unexpiredDays` FROM that date, so the client is refunded for it. **No finding** — the behaviour is consistent and the label is not wrong, only ambiguous by one day. Her sentence is owed and should say *the first day cover no longer applies* |
+| 12 | the aria-vs-visible class | **COUNT IT AND STOP** — *if it is six, this is closed; if it is sixty, the owner needs to know that before anyone decides what to do* | **IT IS 54 — AND IT IS 14 NOW, CLOSED 2026-10-30 (batch 14 § 4) after she approved closing the rest; what remains is entirely the matcher.** THE ORIGINAL MEASUREMENT, because the split is what made the decision possible: **IT IS 54**, by `aria-vs-visible-label.py` over 209 aria-labels in 73 files — and split by WHICH READER LOSES: **FULLER 8** (the eye loses, her class), **THINNER 10** (the EAR loses a qualifier), **UNRELATED 36** (22 of them naming a deliberately-written `*Aria` key, so most of that bucket is the matcher). **The sharpest row is not in her six**: `/settings/users`' password field tells the eye the policy and the ear «كلمة المرور». Nothing beyond her six was changed |
+| 13 | «تتوقّف التغطية» on the endorsement form | **SHE DELIBERATELY DID NOT WRITE THIS ONE** — *is the date entered the LAST day cover applies, or the FIRST day it does not? One day apart, and one day decides whether a claim is covered or refused* | **MEASURED: it is the FIRST day cover does NOT apply**, and both halves of the product agree — the schedule closes at `effectiveTo := effectiveFrom` with no successor and `claim.config.ts` reads `effectiveFrom <= lossDate < effectiveTo`, while `cancellationReturnPremium` counts `unexpiredDays` FROM that date, so the client is refunded for it. **No finding** — the behaviour is consistent and the label is not wrong, only ambiguous by one day. **ANSWERED 2026-10-30: «أول يوم لا تسري فيه التغطية.»**, hers, now shipping as `endorsementCoverCeasesHint` — and the HINT AND THE ASSERTION WERE WRITTEN TOGETHER, which is the pairing to keep: `claim.config.spec.ts` pins a loss ON the cancellation date as NOT covered, so the sentence cannot drift from the behaviour in either direction. The original guidance was right to the word. |
 | 14 | «مُهيّأ» the POSITIVE word | **NOT ASKED** — her ruling names the negative phrase «غير مُهيّأ», which is now one spelling across all 8 sites | The positive word meaning *configured* ships four times, **three without the damma (`shConfigured` among them) and once with it (`provStateConfigured`)**. It is PRE-EXISTING on `/screening-health`, which already renders `shConfigured` «مهيّأ» beside `screenOutcomeNotConfigured` «غير مُهيّأ» — so the normalisation neither caused it nor closed it. Four sites, one word |
 | 7 | the `Ring` caption | **«١٤ مطالبة مفتوحة من ٦٦»** — *{open} open claims of {total}*, the string `Ring` has required since it was written | `dclmOpenClaimsOfTotal` in `plurals.ts`, and a `Ring` on `/dashboards/claims`. `other` is her run with the numerals replaced; `few` slices `execOpenClaims` verbatim; **`zero`, `one` and `two` are OMITTED** because «مطالبتان» ships nowhere — the «محاولتان» dual again. **And her caption did not fit the space**: it drew as 9px SVG text inside the ring and spilled past the arc, so the COMPONENT moved it under the label. Her words untouched |
 
@@ -1758,17 +1758,29 @@ show THE DAY BEFORE. `SlaHolidayCalendar` already carries that warning in its ow
 | language | `formatDate(4 March 2026)` | calendar | digits |
 |---|---|---|---|
 | AR (`'ar'`) | **`4‏/3‏/2026`** — DAY-first | gregory | Western |
-| EN | **`3/4/2026`** — MONTH-first | gregory | Western |
+| EN | ~~**`3/4/2026`** — MONTH-first~~ → **`04/03/2026`** — DAY-first | gregory | Western |
 
-So the echo **closes the ambiguity in Arabic**, where the two numbers appear in the other order from
-the one that was typed — and **does NOT close it in English**, where `formatDate` reproduces the
-same month-first order as the input's own placeholder. It disambiguates only when one number exceeds
-12, and is silent in exactly the case it exists for. **Her decision «ميلادي فقط — حالياً» is
-satisfied either way**: both are Gregorian, measured.
+**CORRECTED 2026-10-30, AND THE CORRECTION MATTERS BECAUSE THE WRONG HALF WAS REPORTED TO HER AS A
+LIMITATION OF HER OWN FEATURE.** `EN_LOCALE` is **`'en-GB'`**, not `en-US`. Measured through the
+product's own constant, 4 March 2026 renders **`04/03/2026`** — DAY-FIRST, the OPPOSITE of the
+input's `mm/dd/yyyy` placeholder. **So the echo closes the ambiguity in BOTH languages.**
 
-**The closure needs no new words and is NOT taken here**: a LONG month form, for which
-`AR_MONTH_LOCALE = 'ar-JO-u-nu-latn'` already exists in `format.ts` and produces «تشرين الأول 2026»
-— but that constant's own note scopes it to one job, so widening it is hers.
+The defect was mine and it is the ordinary one: **I measured a locale I assumed instead of reading
+`EN_LOCALE`.** Caught when a re-pointed Playwright assertion on `/bcp-dr-plans` predicted `9/6/2027`
+and the page rendered `06/09/2027` — so the thing that found it was a test asserting an EXACT value
+rather than a substring.
+
+**Her decision «ميلادي فقط — حالياً» is satisfied either way**: both are Gregorian, measured.
+
+~~**The closure needs no new words and is NOT taken here**: a LONG month form, for which
+`AR_MONTH_LOCALE = 'ar-JO-u-nu-latn'` already exists…~~ — **WITHDRAWN: THERE IS NO CLOSURE OWED.**
+That paragraph existed only to describe how to fix an English gap that does not exist, so the
+`AR_MONTH_LOCALE` widening is NOT a question for her and must not be put to her as one.
+
+THE ORIGINAL CLAIM, kept because it is what the correction corrects: *the echo closes the ambiguity
+in Arabic and does NOT close it in English, where `formatDate` reproduces the same month-first order
+as the input's own placeholder; it disambiguates only when one number exceeds 12, and is silent in
+exactly the case it exists for.*
 
 #### 7 — THE HEDGE RESTORED, AND HOW IT WAS FOUND
 
@@ -1926,6 +1938,333 @@ it is rebased, so it is named by BRANCH here rather than by commit; the previous
 itself** — a number nobody can trust, because nothing runs it where it matters.
 
 ---
+
+---
+
+---
+
+## Batch 14 — closing the pass: everything recorded and not fixed that could be
+
+The owner's test for this batch was not the list. It was: *when it is reported, is there anything
+left in this register that is both MECHANICAL and OPEN?* The answer is at the bottom of this
+section, with the one remaining item named and its size measured.
+
+**Nothing in this batch needed a new Arabic word**, which is the line that kept it mechanical. Two
+items started to need one and both STOPPED — they are named below rather than guessed at.
+
+### 1 · Her last date sentence shipped, and the assertion was written with it
+
+**«أول يوم لا تسري فيه التغطية.»** — `endorsementCoverCeasesHint`, on the cancellation date of the
+endorsement form, where «تتوقّف التغطية» was ambiguous by exactly one day and one claim.
+
+She deliberately did not write this one until the behaviour was measured, and the measurement is
+what makes the sentence safe to print: `cancelDate` is submitted as the endorsement's
+`effectiveFrom`; `versionScheduleForEndorsement` closes the schedule at
+`effectiveTo := effectiveFrom` with **no successor** for a cancellation; `claim.config.ts` reads
+`effectiveFrom <= lossDate < effectiveTo`; and `cancellationReturnPremium` counts `unexpiredDays`
+FROM that date, so the client is refunded for it. Both halves agree: **day D is the first day not
+covered.**
+
+**THE HINT AND THE ASSERTION WERE WRITTEN TOGETHER, and that pairing is the thing to record.** The
+previous batch added a test beyond the letter of its instruction — a loss ON the cancellation date
+is NOT covered, pinned by name in `claim.config.spec.ts` — because the case was consistent BY
+CONSTRUCTION and asserted nowhere. A hint that contradicts the behaviour is worse than no hint,
+because it is believed; this one cannot drift silently now, in either direction.
+
+### 2 · The 26 literal colours, and the gate is the deliverable
+
+**17 converted, 9 declared, the gate wired, and the defect turned out to be ARITHMETIC.**
+
+The brief said *the fix is the gate, not the sites*, and that was right for a reason neither of us
+had measured. Against the two card surfaces (`#ffffff` light, `#1e2733` dark):
+
+| literal | what it was | on light | on DARK | the token | light | DARK |
+|---|---|---|---|---|---|---|
+| `#b91c1c` | danger text | 6.47 | **2.33** | `--danger-ink` | 7.26 | 6.76 |
+| `#15803d` | success text | 5.02 | **3.01** | `--success-ink` | 6.50 | 7.81 |
+| `#b45309` | warning text | 5.02 | **3.00** | `--warning-ink` | 5.91 | 7.91 |
+| `#c00` | danger, via a `var()` fallback | 5.89 | **2.56** | `--danger-ink` | 7.26 | 6.76 |
+| `#2a7` | ok, via a `var()` fallback | **2.96** | 5.08 | `--success-ink` | 6.50 | 7.81 |
+| `#6b7280` | muted ink | 4.83 | **3.12** | `--ink-muted` | — | — |
+
+**Five of the six fail AA in the dark theme. `#2a7` fails the OTHER way round, in LIGHT** — so a
+policy that passed its QC check rendered its own *no discrepancy* marker at 2.96:1 for every
+light-theme reader, which is the `--brand-800` ramp inversion met a second time. **The a11y suite
+is silent about all of it** for the same reason it is silent about `opacity`-as-muting: axe reads
+RENDERED contrast and Playwright runs one theme, so a literal that is legible in whichever theme
+the suite happens to be in is a pass.
+
+**AND WIDENING THE MATCHER FROM `.tsx` TO `.ts` FOUND A 27TH SITE, WHICH IS THE WORST ONE.**
+`auth-form.styles.ts:119` set the primary button's label to a literal `#ffffff` on
+`background: var(--brand-600)` — and the dark theme flips that fill to `#6bb0e6`, where white
+measures **2.34:1** against `--on-brand`'s **7.70**. That is the SIGN-IN button's own label, on the
+first screen this product shows anybody, and **`Button`'s own `primary` variant already carried a
+comment naming that exact defect**: *"`--on-brand`, not a literal white… white would measure 3.02:1
+— the defect reference page B shipped."* The primitive was fixed once and the sign-in form kept the
+literal, invisible because every `*.styles.ts` file was outside the matcher. **Same blind-spot class
+as `hardcoded-ui-english.py` never scanning `components/`** — a measurement reporting a clean figure
+over a surface it does not read — and it means the owner's 7 and my 26 were BOTH low.
+
+**THE FLOOR BECAME A `--self-test`, AND IT HAD TO.** `FLOOR = 10` was the non-vacuity guard against
+a real 26; the moment the sweep succeeded it REFUSED a correct tree at 9. **A count floor goes stale
+every time the work it guards gets done** — so the matcher is now proven against 12 planted inputs
+(7 positives including a `var()` fallback pair and a gradient at alpha, 5 negatives including a
+token reference, a comment quoting a removed colour, and a hex-looking id), which holds at any count
+including zero.
+
+**THE NINE THAT REMAIN ARE DECLARED WITH WHAT EACH IS FOR, because `rgba()` is not automatically a
+defect and converting one to make a sweep finish is worse than leaving it:**
+
+| site | ×  | why there is no token |
+|---|---|---|
+| `NotificationBell` `#b42318` + `#fff` | 2 | A SOLID red badge with white text. The semantic set ships (bg tint, ink, border) for a NOTICE and has no solid step — using `--danger-ink` as a background inverts in dark (a pale `#e59a9a`). The code has read `var(--danger-solid, …)` since it was written: somebody anticipated the token and it was never added. |
+| `IdleLockOverlay` `rgba(0,0,0,0.6)` | 1 | A modal scrim. It must NOT follow the theme — a scrim that lightens in dark mode stops being a scrim. |
+| `AuthFrame` radial gradients | 4 | `--brand-600` and the amber at ALPHA. A plain `var()` cannot express a token at an alpha, and the amber's own rule (1.99:1 on white — never text, never a ground) is what makes it safe as a glow and unsafe as anything else. |
+| `BrandPitch` white at alpha | 2 | On the one surface that stays dark in both themes. The site's own comment already records it: there is no token for *a sixth of the surface above me*. |
+
+**`--danger-solid` IS THE ONE TOKEN DECISION STILL OWED and is deliberately not taken** — it needs a
+light value and two dark ones, and `globals.css`'s 86 properties are a set somebody reasoned about.
+Adding a token to empty a list is what the brief forbade.
+
+**AND THE COLOUR SWEEP MOVED A SECOND GATE, which is the two meeting.** `check:css-properties`'
+fallback-only list went **5 → 2**: `--error` and `--ok` disappeared because pointing those sites at
+real tokens removed the undefined references entirely. Then the third was fixed on the same ground:
+**`--status-warning-ink` is defined nowhere**, so `/insurers/[id]`'s attention count fell back to
+`var(--ink-primary)` and rendered IDENTICALLY to the four ordinary counts stacked beside it — while
+its own comment says it is *"emphasised because it is the one the API reports separately for exactly
+that reason."* It was not emphasised at all. `--warning-ink` is the token that means this. The two
+survivors are `--danger-solid` (above) and `--font-geist-mono` inside `globals.css` itself.
+
+### 3 · `/bcp-dr-plans` — three of five closed, and the two words are hers
+
+CLOSED: both literal colours; both `.slice(0, 10)` dates now through `formatDate`; and **the raw
+`system_outage` section heading, which needed no word at all** — `ENUM_LABEL.BcpDrScenario` ships
+all five bilingually and the `<select>` eighteen lines above already rendered it, so one screen gave
+two answers to what a scenario is called: you pick «انقطاع الأنظمة» and the section you created is
+headed `system_outage`. **Found by opening the phone capture, not by any gate.**
+
+**STILL OWED, AND THE REASON IS SHARPER THAN *nothing ships*.** Measured both:
+
+- **`'not scheduled'` HAS A BYTE-IDENTICAL ENGLISH TWIN** — `vendNotScheduled`, doing the identical
+  job on `/vendors/[id]`: a next-due date nobody has set. **And its Arabic cannot be reused.**
+  «غير مجدولة» is FEMININE, agreeing with «المراجعة» (the review); this screen's subject is «الفحص»
+  (the test), which is masculine. Agreeing it to «غير مجدول» is Arabic morphology, which a slice can
+  never be, and which this repository has refused by name twice — the «محاولتان» dual and
+  «تقويمي»/«تقويمية». **That is a better finding than *no source*: the English twin exists and the
+  gender is what blocks it.**
+- **`'never'` has no twin.** The nearest are `icNone` «لم يُجرَ أي تدقيق بعد» and `dcmpNoScanYet`
+  «(لم يُجرَ أي فحص بعد)» — full SENTENCES where this cell holds one word. «فحص» IS this screen's own
+  noun for a test, by her own row-9 decision, so the raw material is right there; the register and
+  the length are hers.
+
+**AND THE MODE-8 COUNT IS THREE**, which the brief asked to be recorded as a number:
+`/data-sharing-approvals`, `/sales-performance`, and now this. `hardcoded-ui-english.py` reports 0
+and is right to — both strings are the ternary-of-bare-literals shape mode 8 excludes BY DESIGN,
+because the identical shape is a `data-*` hook elsewhere and tolerating it makes every bare call a
+finding. **Three instances is where a known limit stops being theoretical, and the honest closure is
+the two keys, not a wider matcher. DO NOT WIDEN MODE 8.**
+
+### 4 · The aria class — 54 → 14, and the 14 that remain are the matcher
+
+| bucket | before | after | treatment |
+|---|---|---|---|
+| DIVERGENT / FULLER (the eye loses) | 8 | **1** | the spoken value became the VISIBLE label, or the aria was dropped |
+| DIVERGENT / THINNER (the EAR loses) | 10 | **0** | the aria dropped; the fuller visible label becomes the accessible name |
+| DIVERGENT / UNRELATED | 36 → 31 | **13** | 18 were plainly the same class and are closed; 13 are matcher noise |
+| DUPLICATE (two keys, one sentence) | 7 | **0** | the aria dropped |
+| total aria-labels | 209 / 73 files | **159 / 67 files** | 25 keys withdrawn in both languages |
+
+**NO NEW STRING ANYWHERE.** Every fix is a REMOVAL or a MOVE of a value that already ships — a label
+pointed at the richer KEY, never Arabic typed.
+
+**THE SHARPEST ROW IS THE ONE SHE NAMED, AND IT IS CLOSED.** `/settings/users`: the eye read
+«١٢ محرفاً على الأقل، مع حرف كبير وصغير ورقم ورمز» and the ear read «كلمة المرور», so a
+screen-reader user was never told the password policy, typed a password, was refused, and nothing on
+the field had ever said what was required. Six more THINNER rows dropped «(اختياري)» — the ear was
+not told the field was optional — and two more are worse than that: `/communications`' channel field
+loses *«(اتركها فارغة لاستخدام القناة المفضّلة المسجّلة للعميل)»*, which is the only thing that
+explains what leaving it empty DOES, and `/ropa-entries` loses «(مفصولة بفواصل)», which is how to
+type the value at all.
+
+**TWO MORE THINNER ROWS CAME OUT OF THE *UNRELATED* BUCKET AND ARE WORSE AGAIN**:
+`CommissionSection`'s override reason spoke «سبب التعديل» against a visible
+«السبب (إلزامي، ويُسجَّل)» — so the ear is never told the reason is mandatory and RECORDED, on a
+commission override.
+
+**THE FOUR DASHBOARD FILTERS WERE DROPPED RATHER THAN PROMOTED, and the row itself is the reason.**
+«تصفية حسب فرع التأمين» spoken against «فرع التأمين» seen — but every OTHER filter in that same row
+(the branch field, the period fields) carries no *filter by* aria, so one control announced itself as
+a filter and its siblings did not. Promoting it would lengthen four dashboards' visible labels;
+adding *filter by* to every filter in the product is a NEW CONVENTION and hers. Dropping makes one
+string serve both readers with nothing changing on screen, and removes a key shared across four
+screens — a drift risk by itself.
+
+**ONE ROW WAS A DUPLICATE IN MEANING RATHER THAN A DIVERGENCE** and is recorded because the
+treatment differs: `iafAuditPeriodLabel` «الفترة التدقيقية» (adjectival) against
+`iafAuditPeriodFieldLabel` «فترة التدقيق» (construct) — two phrasings of one thing, neither fuller.
+The aria went and the VISIBLE one stayed: the conservative choice between two of her words, needing
+none. **And the key SURVIVED, because it still heads its own column** — which is also what confirms
+dropping was right rather than promoting.
+
+**THE 13 THAT REMAIN ARE ALL THE RESOLVER, AND THE CAUSE IS ONE DEFECT.** `labels_for` falls through
+to the nearest text node, which can be a BUTTON, an EMPTY-STATE sentence or a HEADING. So it reports
+`ScreeningCasePanel`'s escalation textarea — which has `aria-label` + `placeholder` with the same key
+and **no `<label>` at all**, an ARIA-ONLY control — as *spoken «سبب التصعيد» | seen «تصعيد»*, where
+«تصعيد» is the button above it. Thirteen rows have that shape. **Reported rather than fixed, and a
+gate for the class is NOT built**: a ratchet on a matcher with 13 known false rows is a red build on
+a clean tree, and the first false red teaches everyone to ignore it.
+
+### 5 · The sixteen table scrollers, and the twelve that must keep theirs
+
+**Re-measured before starting, as the brief required** — and the measurement classified them
+independently of her list: **28 wrappers, of which exactly 16 wrap the `<Table>` primitive**, which
+is her list to the site. The other 12 wrap a **RAW `<table>`**, where that div is the ONLY scroller
+and removing it would be the regression rather than the fix.
+
+16 removed, `SCREEN_BUDGET` **1099 → 1083** — exactly one site per wrapper, which is what makes the
+fall reconcile. Each close was matched by DEPTH COUNTING rather than a blanket replace, because
+`</div>` nests.
+
+**AND REMOVING THEM DROPPED A LIVE TEST HOOK, which is the `data-*` class from the other direction.**
+`watchlist-sync`'s wrapper carried `data-testid="watchlist-runs"`, read by two Playwright
+assertions. Five times this repository has paid for a hook being silently dropped BY A COMPONENT;
+here a sweep removed the element that carried one. It is on the `<Table>` now, which forwards `data-*`
+onto its own `<table>` through the template-literal index signature — which is what that signature is
+for. `ropa-entries`' wrapper also carried `role="region" aria-label={t('ropaHeading')}`: a region
+named after the page's own `<h1>`, which announces nothing a heading does not, and whose removal also
+retired one of the 13 matcher-noise rows.
+
+### 6 · The four `(auth)` screens wear the frame
+
+`/login` adopted `AuthFrame` in the pilot and **links to `/forgot-password`**, which still wore the
+old bare card — so this product's first impression went wrong one click in. All four now use the
+frame, with `pitch` OMITTED: `AuthFrame`'s own comment already recorded why, in advance — *«a reader
+who is already resetting a password does not need selling to, and the panel there is the mark
+alone»*. No new words, and the frame renders its own `<main>`, so each screen also shed two inline
+style sites.
+
+### 7 · Both record screens have a `main` landmark
+
+`/leads/[id]` and `/policies/[id]` wrapped every branch in a `<div>` — four each, one per state. **A
+page with no `main` landmark is a page a screen reader cannot skip to**, and these are record screens
+where the rail is long, so the cost fell on exactly the reader who most needs the shortcut. All eight
+branches take it, because a landmark present only in the populated state is one the loading and
+refused states lack.
+
+**It was recorded as *more than a wrapper swap*, and that was right for a batch forbidden to change
+structure. It is eight lines.**
+
+**AND MY OWN CONVERTER WAS DEFEATED BY A COMMENT, which is this repository's own recorded limit met
+inside the tool.** `leads/[id]` carries a comment explaining a past fix that QUOTES `` `<div>` `` —
+so the depth counter matched it, the count went wrong, and the script REFUSED with *no clean matching
+`</div>`* and **wrote nothing**, which is the half that mattered. Comments are blanked (positions
+preserved) before counting now.
+
+### 8 · `/sla-policies` has its `@a11y` test
+
+The second of the two COMPLIANCE screens that had none. Written in ARABIC, for the same two reasons
+as `/screening-health`'s: these words were written for that reading direction, and this screen is
+THREE tables — and this batch removed sixteen scrollers across nine screens, so the markup around
+every table in the product moved. Anchored on content from both independently-loaded surfaces, so a
+run where one request escaped the mocks cannot pass as a clean a11y result over half a screen.
+
+### 9 · The CI steps — and it was ONE, not three
+
+**Measured rather than trusted, and the brief's own figure was wrong.** `check:token-contrast` and
+`check:inline-styles` are ALREADY in `ci.yml` on this branch (lines 124 and 133), and the held
+branch's own diff confirms it: `5a17f08` adds exactly one step, and *"Inline styling may only fall"*
+appears in it as unchanged CONTEXT. So only **`check:opacity-muting`** was absent.
+
+It is wired now, with `check:literal-colours` beside it. The held branch `wire-opacity-gate-into-ci`
+is **superseded** — it sat four commits behind and carried the same 13 lines.
+
+### 10 · What stays deferred, and why
+
+| left | why |
+|---|---|
+| the expand/collapse and the filter strip on `/incidents` | new INTERACTION, and a filter that hides rows can hide an overdue containment — her decision |
+| the collapsed rail as a drawer | a toggle, a focus trap and an escape key: BEHAVIOUR |
+| the rail's layout out of inline styles | larger than this batch, and the `!important` is recorded as its consequence |
+| widening `check:raw-values` and `check:css-properties` | matcher changes with their own blast radius |
+| a custom date control | the calendar question is answered (**Gregorian only, for now**); the control is its own piece of work |
+| `--danger-solid` | a token needs a light value and two dark ones — § 2 |
+| the two English words on `/bcp-dr-plans` | hers, and the gender finding is why — § 3 |
+| «مُهيّأ», the POSITIVE word | hers; 4 sites, 3 spellings without the damma and 1 with |
+| a gate on the aria class | the matcher has 13 known false rows — § 4 |
+| Tajawal has no weight 600 | a property of the face, stated not fixed |
+| `ProviderHealth.providerName` · `.detail` · `RetentionScheduleItem.legalBasis` | **measured now — § 11. The register's claim about all three was too strong, and about one of them wrong in its noun.** |
+
+### 11 · "No Arabic exists" was a claim, and it was not measured
+
+The register said of `ProviderHealth.providerName`: *"No Arabic exists for it and inventing one is
+what the standing rule forbids."* **That was repeated to the owner. Measured, it is too strong for
+one value, and the sibling claim about `RetentionScheduleItem` is wrong in its NOUN.**
+`scripts/measurements/api-display-strings.py` re-derives all of it.
+
+**THE THREE PROVIDER NAMES — AND THE ANSWER IS BETTER THAN DERIVING.**
+
+| the api sends | verdict |
+|---|---|
+| `'On-premise screening engine'` | **EXACT.** `screenProviderOnPremise`'s English is byte-identical, and «محرك فحص محلي» ships beside it. |
+| `'Commercial screening provider'` | **NEAR, 0.67.** `screenProviderCommercial` is `'Commercial provider'` — one word apart. Reported, not pointed at. |
+| `'Built-in watchlist cache (OFAC SDN + UN Consolidated)'` | **NONE** as a whole string; the kind label «القائمة المحلية المزامنة» plus the parenthetical's own Arabic inside `shNoteBuiltInSanctionsSynced` («OFAC SDN وقائمة الأمم المتحدة الموحّدة»). |
+
+**BUT THE REAL FINDING IS THAT THE ARABIC IS ALREADY ON THAT SCREEN, EIGHT LINES ABOVE.**
+`/screening-health` renders `providerLabel(health.provider)` at the «المزوّد» row from
+`ENUM_LABEL.ScreeningProviderKind` — the Arabic kind label — and then renders `health.providerName`
+RAW in English at «الاسم». **So for two of the three, `providerName` is a SECOND answer to a
+question the row above already answers, in the wrong language.** For the third it adds one genuine
+extra fact — WHICH lists — and that fact ships too.
+
+**REPORTED AND NOT SHIPPED, by her own instruction** (*do not ship any of it unless deriving it is as
+mechanical as the 27th note was — these render on a compliance screen, and the owner reads the
+derivation before it goes live*). It is not: the honest fix is removing a duplicate ROW from a
+compliance screen, or putting a KEY on the wire the way the 27 capability notes now do. Both are hers
+to read first.
+
+**`ProviderHealth.detail` IS NOT ONE THING, AND TWO OF ITS TEN ARE ALREADY COVERED.** Ten distinct
+strings across eleven sites. **`shMissingConfig` ALREADY SHIPS BILINGUALLY** — and is rendered on
+that very screen, as an `ErrorState` directly beneath the English `detail` it duplicates. So for a
+NOT_CONFIGURED provider the same claim is on screen TWICE, once in English from the api and once in
+Arabic from the dictionary, and **the Arabic one is RICHER** (it carries the *automated screening is
+not configured* clause the api splits across two variants). That is a duplicate, not a gap.
+
+Of the remaining eight: **three interpolate a RAW fragment that can never be localised** —
+`(err as Error).message` twice, and an 80-character slice of a remote engine's own response body —
+**but the sentence AROUND it can be.** *"Provider unreachable: {raw}"* becomes Arabic with the
+fragment left exactly as it arrives. **Splitting the translatable carrier from the untranslatable
+fragment is the work; declaring the whole row impossible is what the measurement refuses.** The other
+five interpolate only numbers, URLs or env-var names — all language-free — so they are ordinary
+parameterised strings.
+
+**AND `RetentionScheduleItem.note` DOES NOT EXIST.** The field is `note` on the TEMPLATE and
+`legalBasis` on the ROW, and they are not the same column — the register named the wrong one. What
+actually ships is **eight statutory CITATIONS**: article numbers in both scripts («المادة ١٧/أ»),
+an Official Gazette reference, and a PROVISIONAL marker. **Translating one is a legal act rather than
+a translation**, and the column is EDITABLE by the office under decision 80 — so a localised copy
+would be a second home for a value a person may replace. Verdict: **NOT-A-LABEL.** Nothing is owed
+here, and that is a different answer from *nobody has written it yet*.
+
+### THE QUESTION THIS BATCH IS JUDGED ON
+
+**Is anything left in this register both MECHANICAL and OPEN? One thing, and it is new — my own
+measurement found it while closing § 5.**
+
+**TWELVE WRAPPERS HOLD A RAW `<table>` WITH NO `tabIndex`**, which is batch 3's keyboard trap
+UNFIXED: a scroll region nothing can focus is one a keyboard user cannot scroll at all, and axe
+raises `scrollable-region-focusable` only when a region actually overflows. `/dpo-workspace` ×5,
+`/financial-report`, `/settings/customer-import` ×2, `AdminAccessRecord`, `WatchlistGenerations`,
+`EncryptionKeyInventory`, `SlaHolidayCalendar` — including the DPO's own workspace.
+
+**AND IT IS NOT PURELY MECHANICAL, WHICH IS WHY IT IS STOPPED RATHER THAN DECIDED.** The cheap fix
+— adding `tabIndex={0}` to twelve divs — **introduces a second defect**: a thing that takes focus and
+does not show it leaves a keyboard user with no idea where they are, which is exactly what `Table`'s
+own comment says its focus ring is for. Doing it properly means either four lines per site (a copy of
+`Table`'s focus handling, twelve times) or converting the twelve onto the primitive — a markup sweep
+across every cell of twelve tables, where `design-pass-sections.py` has refused files before.
+
+**So: one item, measured, with both options and why neither is a one-liner. Everything else in this
+register is either closed, deferred with a reason, or a word that is hers.**
 
 ---
 

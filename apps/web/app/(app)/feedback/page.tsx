@@ -150,7 +150,6 @@ export default function FeedbackPage() {
           >
             {t('fbScoreLabel')}
             <input
-              aria-label={t('fbColScore')}
               type="number"
               min={1}
               max={5}
@@ -163,7 +162,6 @@ export default function FeedbackPage() {
           >
             {t('fbCommentsLabel')}
             <textarea
-              aria-label={t('fbColComments')}
               value={comments}
               onChange={(e) => setComments(e.target.value)}
               rows={3}

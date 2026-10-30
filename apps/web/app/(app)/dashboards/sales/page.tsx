@@ -127,7 +127,6 @@ export default function SalesDashboardPage() {
         >
           {t('dashInsuranceLineLabel')}
           <input
-            aria-label={t('dashInsuranceLineFilterAria')}
             dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}

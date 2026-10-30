@@ -126,9 +126,8 @@ export default function CrossBorderTransfersPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            {t('cbtDescriptionFieldLabel')}
+            {t('cbtDescriptionLabel')}
             <input
-              aria-label={t('cbtDescriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required

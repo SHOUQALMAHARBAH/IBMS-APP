@@ -51,7 +51,14 @@ SITE = re.compile(r"style=\{\{")
 # unfocusable scroller around a focusable one is batch 3's keyboard trap one level out, and
 # axe is silent because the outer div rarely overflows. 16 more sites across 9 files still
 # do it — counted, not swept.
-SCREEN_BUDGET = 1099
+SCREEN_BUDGET = 1083
+# 1099 -> 1083: the sixteen redundant table scrollers (finding 7). `Table` has carried its own
+# `overflow-x: auto` with `tabIndex={0}` since batch 3, so an UNFOCUSABLE wrapper around it was
+# batch 3's keyboard trap one level out — and axe cannot see it, because it raises
+# `scrollable-region-focusable` only when a region actually overflows and the inner one absorbs
+# the overflow first. Exactly one site per wrapper, which is what makes the fall reconcile.
+# TWELVE MORE WRAPPERS STAY: they hold a RAW `<table>`, where that div is the ONLY scroller and
+# removing it would be the regression rather than the fix.
 
 # UI_BUDGET is the primitive set itself — where a style is SUPPOSED to live. It is gated rather
 # than merely reported, because a primitive that grows a hundred one-off objects has stopped being

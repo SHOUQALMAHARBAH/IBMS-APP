@@ -473,12 +473,29 @@ export function EndorsementSection({
             </div>
             <div style={quoteFieldStyle}>
               <label htmlFor="cancel-date">{t('endorsementCoverCeases')}</label>
+              {/*
+                HER SENTENCE, and the measurement is what made it safe to print. «تتوقّف التغطية»
+                is one day ambiguous and one day decides whether a claim is paid, so the behaviour
+                was measured end to end before a word was written: `cancelDate` is submitted as the
+                endorsement's `effectiveFrom`, `versionScheduleForEndorsement` closes the schedule
+                at `effectiveTo := effectiveFrom` with NO successor for a cancellation,
+                `claim.config.ts` reads `effectiveFrom <= lossDate < effectiveTo`, and
+                `cancellationReturnPremium` counts `unexpiredDays` FROM that date so the client is
+                refunded for it. Both halves agree: day D is the FIRST day not covered.
+
+                The hint and the assertion were written together — `claim.config.spec.ts` pins a
+                loss ON the cancellation date as NOT covered. A hint that contradicts the behaviour
+                is worse than no hint, because it is believed; this one cannot drift silently.
+              */}
               <input
                 id="cancel-date"
+                aria-describedby="cancel-date-hint"
                 type="date"
                 value={cancelDate}
                 onChange={(ev) => setCancelDate(ev.target.value)}
               />
+              <Hint id="cancel-date-hint">{t('endorsementCoverCeasesHint')}</Hint>
+              <DateEcho value={cancelDate} />
             </div>
             <button
               type="button"

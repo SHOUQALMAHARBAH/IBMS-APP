@@ -307,7 +307,6 @@ export default function UserAdminPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrPasswordMin12CharsWith')}
             <input
-              aria-label={t('usrPasswordAria')}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

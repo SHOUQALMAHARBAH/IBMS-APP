@@ -222,9 +222,8 @@ export default function OperationalPiRiskPage() {
             </select>
           </label>
           <label style={labelStyle}>
-            {t('opRiskDescriptionFieldLabel')}
+            {t('opRiskDescriptionLabel')}
             <input
-              aria-label={t('opRiskDescriptionLabel')}
               value={riskDescription}
               onChange={(e) => setRiskDescription(e.target.value)}
               required
@@ -311,9 +310,8 @@ export default function OperationalPiRiskPage() {
       {canManagePiPolicy ? (
         <form onSubmit={submitPolicy} style={formStyle}>
           <label style={labelStyle}>
-            {t('opPiInsurerFieldLabel')}
+            {t('opPiInsurerLabel')}
             <input
-              aria-label={t('opPiInsurerLabel')}
               dir="auto"
               value={insurerName}
               onChange={(e) => setInsurerName(e.target.value)}
@@ -421,9 +419,8 @@ export default function OperationalPiRiskPage() {
       {canManagePiPolicy ? (
         <form onSubmit={submitEvent} style={formStyle}>
           <label style={labelStyle}>
-            {t('opEventDescriptionFieldLabel')}
+            {t('opEventDescriptionLabel')}
             <input
-              aria-label={t('opEventDescriptionLabel')}
               value={eventDescription}
               onChange={(e) => setEventDescription(e.target.value)}
               required

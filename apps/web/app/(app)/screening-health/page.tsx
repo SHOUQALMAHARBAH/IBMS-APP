@@ -48,7 +48,7 @@ const row: CSSProperties = {
   justifyContent: "space-between",
   gap: 'var(--space-4)',
   padding: "0.3rem 0",
-  borderBottom: "1px solid #f3f4f6",
+  borderBottom: "1px solid var(--border-subtle)",
 };
 
 function statusStyle(status: string): CSSProperties {
@@ -402,7 +402,7 @@ export default function ScreeningHealthPage() {
                     style={{
                       color:
                         overview.attempts.unresolved > 0
-                          ? "#b91c1c"
+                          ? "var(--danger-ink)"
                           : undefined,
                     }}
                   >
@@ -627,7 +627,10 @@ export default function ScreeningHealthPage() {
                         {t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}
                         {r.errorMessage ? (
                           <div
-                            style={{ fontSize: "0.75rem", color: "#b91c1c" }}
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "var(--danger-ink)",
+                            }}
                           >
                             {r.errorMessage}
                           </div>

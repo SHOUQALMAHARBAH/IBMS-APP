@@ -264,7 +264,6 @@ export function CommissionSection({
                 />
               </label>
               <label>{t('polCommOverrideReason')}<textarea
-                  aria-label={t('polCommOverrideReasonAria')}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   minLength={10}
@@ -308,7 +307,6 @@ export function CommissionSection({
                 />
               </label>
               <label>{t('polCommStatementRef')}<input
-                  aria-label={t('polCommPaymentRef')}
                   value={paymentReference}
                   onChange={(e) => setPaymentReference(e.target.value)}
                   required

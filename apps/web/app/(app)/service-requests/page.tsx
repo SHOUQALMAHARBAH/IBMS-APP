@@ -162,7 +162,6 @@ export default function ServiceRequestsPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('srDetailLabel')}
             <input
-              aria-label={t('srColDetail')}
               value={detail}
               onChange={(e) => setDetail(e.target.value)}
             />

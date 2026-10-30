@@ -84,15 +84,27 @@ export default function LeadDetailPage() {
 
   if (isLoading2) {
     return (
-      <div style={pageStackStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('leaddLoading')}</p>
-      </div>
+      </main>
     );
   }
 
   if (loadError) {
     return (
-      <div style={pageStackStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         {/*
           `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
           role, so a sighted reader saw the error and a screen-reader user was never told — the screen
@@ -108,15 +120,21 @@ export default function LeadDetailPage() {
         >
           {t('leaddBackToList')}
         </button>
-      </div>
+      </main>
     );
   }
 
   if (!lead) {
     return (
-      <div style={pageStackStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('leaddNotFound2')}</p>
-      </div>
+      </main>
     );
   }
 
@@ -127,7 +145,13 @@ export default function LeadDetailPage() {
   const displayStatus = statusKey ? t(statusKey) : lead.status;
 
   return (
-    <div style={pageStackStyle}>
+    <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
       <h1>
         {t('leaddLeadDetails')} — <bdi>{lead.fullName}</bdi>
       </h1>
@@ -217,6 +241,6 @@ export default function LeadDetailPage() {
       >
         {t('leaddBack')}
       </button>
-    </div>
+    </main>
   );
 }

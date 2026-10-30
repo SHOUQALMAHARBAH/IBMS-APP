@@ -105,53 +105,51 @@ export default function InsurerAccountingPage() {
             {t('iaNone')}
           </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>{t('iaColInsurer')}</Th>
-                  <Th>{t('iaColOutstanding')}</Th>
-                  <Th>{t('iaColInvoices')}</Th>
-                  <Th>{t('iaColOldest')}</Th>
-                  <Th>{t('iaColRemittedToDate')}</Th>
-                  <Th>{t('iaColRemittances')}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((r) => (
-                  <Tr key={r.insurerId}>
-                    <Td>
-                      <bdi>{r.insurerName}</bdi>
-                    </Td>
-                    <Td>{formatMoney(r.outstandingAmount, language)}</Td>
-                    <Td>{r.outstandingCount}</Td>
-                    <Td>
-                      {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt, language)}
-                    </Td>
-                    <Td>{formatMoney(r.remittedAmount, language)}</Td>
-                    <Td>{r.remittedCount}</Td>
-                  </Tr>
-                ))}
-                {/* THE TOTALS ROW IS A ROW — see the same note on `/client-accounting`. */}
-                <Tr variant="total">
-                  <Td>{t('iaColTotal')}</Td>
-                  <Td numeric>
-                    {formatMoney(data.totals.outstandingAmount, language)}
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('iaColInsurer')}</Th>
+                <Th>{t('iaColOutstanding')}</Th>
+                <Th>{t('iaColInvoices')}</Th>
+                <Th>{t('iaColOldest')}</Th>
+                <Th>{t('iaColRemittedToDate')}</Th>
+                <Th>{t('iaColRemittances')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <Tr key={r.insurerId}>
+                  <Td>
+                    <bdi>{r.insurerName}</bdi>
                   </Td>
-                  <Td numeric>
-                    {data.totals.outstandingCount}
+                  <Td>{formatMoney(r.outstandingAmount, language)}</Td>
+                  <Td>{r.outstandingCount}</Td>
+                  <Td>
+                    {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt, language)}
                   </Td>
-                  <Td />
-                  <Td numeric>
-                    {formatMoney(data.totals.remittedAmount, language)}
-                  </Td>
-                  <Td numeric>
-                    {data.totals.remittedCount}
-                  </Td>
+                  <Td>{formatMoney(r.remittedAmount, language)}</Td>
+                  <Td>{r.remittedCount}</Td>
                 </Tr>
-              </tbody>
-            </Table>
-          </div>
+              ))}
+              {/* THE TOTALS ROW IS A ROW — see the same note on `/client-accounting`. */}
+              <Tr variant="total">
+                <Td>{t('iaColTotal')}</Td>
+                <Td numeric>
+                  {formatMoney(data.totals.outstandingAmount, language)}
+                </Td>
+                <Td numeric>
+                  {data.totals.outstandingCount}
+                </Td>
+                <Td />
+                <Td numeric>
+                  {formatMoney(data.totals.remittedAmount, language)}
+                </Td>
+                <Td numeric>
+                  {data.totals.remittedCount}
+                </Td>
+              </Tr>
+            </tbody>
+          </Table>
         )
       ) : loadError ? null : (
         <SkeletonList rows={4} label={t('iaLoading')} />

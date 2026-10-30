@@ -401,7 +401,7 @@ export function RecommendationSection({
           </p>
 
           {rec.blockedFromSend.length > 0 ? (
-            <ul style={{ color: "var(--error, #c00)", margin: "0.4rem 0" }}>
+            <ul style={{ color: "var(--danger-ink)", margin: "0.4rem 0" }}>
               {rec.blockedFromSend.map((b) => (
                 <li key={b}>{b}</li>
               ))}

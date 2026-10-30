@@ -104,15 +104,27 @@ export default function PolicyDetailPage() {
 
   if (isLoading2) {
     return (
-      <div style={pageStackStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('poldLoading')}</p>
-      </div>
+      </main>
     );
   }
 
   if (loadError) {
     return (
-      <div style={pageStackStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         {/*
           `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
           role, so a sighted reader saw the error and a screen-reader user was never told — the screen
@@ -128,15 +140,21 @@ export default function PolicyDetailPage() {
         >
           {t('poldBackToList')}
         </button>
-      </div>
+      </main>
     );
   }
 
   if (!policy) {
     return (
-      <div style={pageStackStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('poldNotFound2')}</p>
-      </div>
+      </main>
     );
   }
 
@@ -149,7 +167,13 @@ export default function PolicyDetailPage() {
   const displayStatus = statusKey ? t(statusKey) : policy.status;
 
   return (
-    <div style={pageStackStyle}>
+    <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
       <h1>
         {t('poldPolicyDetails')}{' '}
         {policy.policyNumber && `— ${policy.policyNumber}`}
@@ -313,6 +337,6 @@ export default function PolicyDetailPage() {
       >
         {t('poldBack')}
       </button>
-    </div>
+    </main>
   );
 }

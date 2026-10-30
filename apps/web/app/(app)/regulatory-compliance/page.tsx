@@ -891,7 +891,6 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             {t('rcLicenseNumber')}
             <input
-              aria-label={t('rcLicenseNumberLabel')}
               value={licenseNumber}
               onChange={(e) => setLicenseNumber(e.target.value)}
               required
@@ -900,7 +899,6 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             {t('rcCertificateFileName')}
             <input
-              aria-label={t('rcCertificateFileNameLabel')}
               value={certificateFileName}
               onChange={(e) => setCertificateFileName(e.target.value)}
               required
@@ -909,7 +907,6 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             {t('rcCertificateStorageRef')}
             <input
-              aria-label={t('rcCertificateStorageRefLabel')}
               value={certificateStorageRef}
               onChange={(e) => setCertificateStorageRef(e.target.value)}
               required
@@ -918,7 +915,6 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             {t('rcScopeOfAuth')}
             <input
-              aria-label={t('rcScopeLabel')}
               value={scopeOfAuthorization}
               onChange={(e) => setScopeOfAuthorization(e.target.value)}
             />
@@ -926,7 +922,6 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             {t('rcIssuedAt')}
             <input
-              aria-label={t('rcIssuedAtLabel')}
               type="date"
               value={issuedAt}
               onChange={(e) => setIssuedAt(e.target.value)}
@@ -935,7 +930,6 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             {t('rcExpiresAt')}
             <input
-              aria-label={t('rcExpiresAtLabel')}
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
@@ -1036,7 +1030,6 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             {t('rcDueDate')}
             <input
-              aria-label={t('rcDueDateLabel')}
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
@@ -1062,74 +1055,72 @@ export default function RegulatoryCompliancePage() {
             {t('rcNoCalendarItems')}
           </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>{t('rcObligationLabel')}</Th>
-                  <Th>{t('rcColDue')}</Th>
-                  <Th>{t('rcColStatus')}</Th>
-                  <Th>{t('rcColEvidence')}</Th>
-                  <Th>{t('rcColAction')}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it) => (
-                  <Tr key={it.id}>
-                    <Td>{it.obligationName}</Td>
-                    <Td>
-                      {it.dueDate.slice(0, 10)}
-                      {it.isOverdue ? ` ${t('statusOverdue')}` : ''}
-                    </Td>
-                    <Td>
-                      {/* Owner decision 55 — «لم يُقدَّم», NOT «قيد الانتظار»: the English said `pending`,
-                          which reads as BEING PROCESSED, while `isSubmitted` false means nothing has
-                          been filed at all. Different facts, and the second is the one a regulator
-                          asks about. */}
-                      {it.isSubmitted
-                        ? t('statusSubmitted')
-                        : t('statusNotSubmitted')}
-                    </Td>
-                    <Td>{it.evidenceOfSubmissionRef ?? '—'}</Td>
-                    <Td>
-                      {canManage && !it.isSubmitted ? (
-                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                          <input
-                            aria-label={t('rcEvidenceRefAria', {
-                              name: it.obligationName,
-                            })}
-                            value={evidenceDrafts[it.id] ?? ''}
-                            onChange={(e) =>
-                              setEvidenceDrafts((prev) => ({
-                                ...prev,
-                                [it.id]: e.target.value,
-                              }))
-                            }
-                            placeholder={t('rcEvidenceRefLabel')}
-                            style={{ width: '9rem' }}
-                          />
-                          <button
-                            type="button"
-                            disabled={busy || !evidenceDrafts[it.id]?.trim()}
-                            onClick={() =>
-                              void run(() =>
-                                recordComplianceSubmission(it.id, {
-                                  evidenceOfSubmissionRef:
-                                    evidenceDrafts[it.id]!.trim(),
-                                }),
-                              )
-                            }
-                          >
-                            {t('rcRecordSubmissionButton')}
-                          </button>
-                        </div>
-                      ) : null}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('rcObligationLabel')}</Th>
+                <Th>{t('rcColDue')}</Th>
+                <Th>{t('rcColStatus')}</Th>
+                <Th>{t('rcColEvidence')}</Th>
+                <Th>{t('rcColAction')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <Tr key={it.id}>
+                  <Td>{it.obligationName}</Td>
+                  <Td>
+                    {it.dueDate.slice(0, 10)}
+                    {it.isOverdue ? ` ${t('statusOverdue')}` : ''}
+                  </Td>
+                  <Td>
+                    {/* Owner decision 55 — «لم يُقدَّم», NOT «قيد الانتظار»: the English said `pending`,
+                        which reads as BEING PROCESSED, while `isSubmitted` false means nothing has
+                        been filed at all. Different facts, and the second is the one a regulator
+                        asks about. */}
+                    {it.isSubmitted
+                      ? t('statusSubmitted')
+                      : t('statusNotSubmitted')}
+                  </Td>
+                  <Td>{it.evidenceOfSubmissionRef ?? '—'}</Td>
+                  <Td>
+                    {canManage && !it.isSubmitted ? (
+                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                        <input
+                          aria-label={t('rcEvidenceRefAria', {
+                            name: it.obligationName,
+                          })}
+                          value={evidenceDrafts[it.id] ?? ''}
+                          onChange={(e) =>
+                            setEvidenceDrafts((prev) => ({
+                              ...prev,
+                              [it.id]: e.target.value,
+                            }))
+                          }
+                          placeholder={t('rcEvidenceRefLabel')}
+                          style={{ width: '9rem' }}
+                        />
+                        <button
+                          type="button"
+                          disabled={busy || !evidenceDrafts[it.id]?.trim()}
+                          onClick={() =>
+                            void run(() =>
+                              recordComplianceSubmission(it.id, {
+                                evidenceOfSubmissionRef:
+                                  evidenceDrafts[it.id]!.trim(),
+                              }),
+                            )
+                          }
+                        >
+                          {t('rcRecordSubmissionButton')}
+                        </button>
+                      </div>
+                    ) : null}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
         )
       ) : itemsLoadError ? null : (
         // The loading state directive §2 requires; this page rendered

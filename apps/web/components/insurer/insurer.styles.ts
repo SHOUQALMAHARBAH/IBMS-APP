@@ -72,7 +72,16 @@ export const impactCountStyle: CSSProperties = {
  *  action. Emphasised because it is the one the API reports separately for exactly that reason. */
 export const impactCountAttentionStyle: CSSProperties = {
   ...impactCountStyle,
-  color: 'var(--status-warning-ink, var(--ink-primary))',
+  /*
+   * `--warning-ink`, the token that already means this. `--status-warning-ink` is defined NOWHERE
+   * — `check:css-properties` has reported it as fallback-only since that gate was written — so
+   * this count rendered in `--ink-primary`, IDENTICAL to the ordinary counts stacked beside it.
+   * The style's own comment says it is "emphasised because it is the one the API reports
+   * separately for exactly that reason", and it was not emphasised at all. The `--surface-raised`
+   * class: a property anticipated, never defined, and the fallback quietly doing the opposite of
+   * what the name promised.
+   */
+  color: 'var(--warning-ink)',
 };
 
 export const lineChipStyle: CSSProperties = {

@@ -176,9 +176,8 @@ export default function ConsentPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
-            {t('consDataSubjectFieldLabel')}
+            {t('consDataSubjectKindLabel')}
             <select
-              aria-label={t('consDataSubjectKindLabel')}
               value={ownerKind}
               onChange={(e) =>
                 setOwnerKind(

@@ -146,9 +146,8 @@ export default function DataSharingApprovalsPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            {t('dsaDescriptionFieldLabel')}
+            {t('dsaDescriptionLabel')}
             <input
-              aria-label={t('dsaDescriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
@@ -164,9 +163,8 @@ export default function DataSharingApprovalsPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            {t('dsaClassificationFieldLabel')}
+            {t('dsaClassificationLabel')}
             <select
-              aria-label={t('dsaClassificationLabel')}
               value={classification}
               onChange={(e) => setClassification(e.target.value)}
             >
@@ -178,9 +176,8 @@ export default function DataSharingApprovalsPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            {t('dsaChannelFieldLabel')}
+            {t('dsaChannelLabel')}
             <select
-              aria-label={t('dsaChannelLabel')}
               value={channel}
               onChange={(e) =>
                 setChannel(e.target.value as DataSharingChannel)

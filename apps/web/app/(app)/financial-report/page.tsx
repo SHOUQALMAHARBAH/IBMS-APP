@@ -35,7 +35,7 @@ function Figure({ label, value }: { label: string; value: string }) {
         justifyContent: 'space-between',
         gap: '2rem',
         padding: '0.3rem 0',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid var(--border-subtle)',
         maxWidth: '28rem',
       }}
     >
@@ -218,33 +218,31 @@ function ProfitTable({
   if (rows.length === 0)
     return <EmptyState title={t('frNoPolicies')} />;
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <Table>
-        <thead>
-          <tr>
-            <Th>{t('frColGroup')}</Th>
-            <Th>{t('frColPremiumWritten')}</Th>
-            <Th>{t('frColClaimsPaid')}</Th>
-            <Th>{t('frColCommission')}</Th>
-            <Th>{t('frColNetPosition')}</Th>
-            <Th>{t('frColPolicies')}</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <Tr key={r.key}>
-              <Td>
-                <bdi>{r.label}</bdi>
-              </Td>
-              <Td>{formatMoney(r.premiumWritten, language)}</Td>
-              <Td>{formatMoney(r.claimsPaid, language)}</Td>
-              <Td>{formatMoney(r.commissionEarned, language)}</Td>
-              <Td>{formatMoney(r.netPosition, language)}</Td>
-              <Td>{r.policyCount}</Td>
-            </Tr>
-          ))}
-        </tbody>
-      </Table>
-    </div>
+    <Table>
+      <thead>
+        <tr>
+          <Th>{t('frColGroup')}</Th>
+          <Th>{t('frColPremiumWritten')}</Th>
+          <Th>{t('frColClaimsPaid')}</Th>
+          <Th>{t('frColCommission')}</Th>
+          <Th>{t('frColNetPosition')}</Th>
+          <Th>{t('frColPolicies')}</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <Tr key={r.key}>
+            <Td>
+              <bdi>{r.label}</bdi>
+            </Td>
+            <Td>{formatMoney(r.premiumWritten, language)}</Td>
+            <Td>{formatMoney(r.claimsPaid, language)}</Td>
+            <Td>{formatMoney(r.commissionEarned, language)}</Td>
+            <Td>{formatMoney(r.netPosition, language)}</Td>
+            <Td>{r.policyCount}</Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
