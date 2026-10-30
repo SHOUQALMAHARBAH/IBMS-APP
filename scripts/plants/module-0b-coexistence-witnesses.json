@@ -1,0 +1,14 @@
+{
+  "a-companys-lines-ignore-what-was-requested": {
+    "_": "Write a fixed two lines for every company instead of the set it asked for. The second company then holds 2 lines where 3 were requested — which is what a wrongly-keyed or wrongly-sourced line write looks like from outside, and is the defect class item (e) actually shipped once (the row was keyed on organizationId and would have been invisible to every office). Must kill TWO COMPANIES COEXIST, and nothing else: the single-company tests assert against their own requested set of 2 and cannot see it.",
+    "file": "apps/api/src/modules/provider/insurance-company-registration.service.ts",
+    "from": "          data: dto.licensedLineIds.map((insuranceLineId) => ({",
+    "to": "          data: dto.licensedLineIds.slice(0, 2).map((insuranceLineId) => ({"
+  },
+  "an-offices-administrator-role-is-not-isSystem": {
+    "_": "Create each office's administrator role without isSystem, so the office can rename, retire or re-grant it — and retiring it locks that office out of its own user administration with no route back from inside the system. Registration still SUCCEEDS, which is the point: this disables a mechanism rather than breaking the structure, so it kills the assertion that observes it rather than killing six tests at their expect(201). Replaces an earlier attempt that resolved the grants against one hard-coded code and made the service's own count guard throw.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "        isSystem: true,\n        // The strict values, which are the defaults",
+    "to": "        isSystem: false,\n        // The strict values, which are the defaults"
+  }
+}

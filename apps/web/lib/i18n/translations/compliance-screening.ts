@@ -28,6 +28,7 @@ export const COMPLIANCE_SCREENING = {
     smDecision: 'القرار',
     smReview: 'المراجعة',
     smEdd: 'عناية معززة',
+    smViewCustomerRfqs: 'طلبات عروض الأسعار لهذا العميل',
     smNoLongerOnTheSource: 'رُفع من القائمة المصدر — القرار قائم',
     smReasonForTheDecisionMin: 'سبب القرار (١٠ أحرف على الأقل)',
     smClearFalsePositive: 'مطابقة خاطئة',
@@ -80,6 +81,7 @@ export const COMPLIANCE_SCREENING = {
       'أرقام الالتزام الحالية تُظهر تأخراً أكبر من الواقع — في غير مصلحة الشركة. ' +
       'أدخل الأيام المعتمدة رسمياً.',
     slapHolidayDate: 'التاريخ',
+    slapHolidayDateHint: 'تاريخ يوم العطلة.',
     slapHolidayName: 'المناسبة',
     slapHolidayCalendar: 'التقويم',
     slapHolidayAllCalendars: 'كل التقاويم',
@@ -131,6 +133,51 @@ export const COMPLIANCE_SCREENING = {
     slapCreateUnit: 'الوحدة',
     slapCreateCalendar: 'التقويم',
     slapCreateSourceType: 'مصدر الإلزام',
+    // SLICED from `slaDashRegulatoryTitle` — «هذه المهلة مصدرها نظامي» — which
+    // is this same enum member described on the SLA dashboard, so the word is already
+    // the product's own for this concept. `statusNoRegulatorySource` uses «نظاميّ» for
+    // the absence of one.
+    //
+    // ONE KEY, NOT AN `ENUM_LABEL` FAMILY, AND THAT IS DELIBERATE. `SlaSourceType` has
+    // FIVE members and only this one is hardcoded in a text position; the other four
+    // (INTERNAL_POLICY, CONTRACTUAL, OPERATIONAL, OTHER) have no Arabic anywhere and are
+    // on the owner's list. A family naming one of five would render the member name for
+    // the other four, which is the notification-bell defect this repository has already
+    // paid for — so the family is created when her four words arrive, not before.
+    /*
+     * OWNER DECISION 59 — the two `<select>`s on the new-SLA-policy form rendered their
+     * raw stored values, and the sharpest part is that one option in the SOURCE list was
+     * ALREADY translated: `slapSourceRegulatory` = «نظامي» sat beside four English ones.
+     * One Arabic option and four English in a single list, and the calendar `<select>`
+     * immediately beside it was fully translated.
+     *
+     * EVERY WORD HERE IS A CONTIGUOUS SLICE of a string already shipping — verified by
+     * substring check against the dictionary on disk, not by eye. Nine of the ten words
+     * decision 59 needed were already in the product; the only one that was not is
+     * «تقويمية», and the owner ruled it is not needed.
+     *
+     * `slapUnitCalendarDays` IS «أيام» WITH NO QUALIFIER, which is her decision: the two
+     * options are adjacent in one list — «أيام عمل» then «أيام» — so the contrast carries
+     * the distinction, and a word added to mark a difference the list already shows is
+     * cost without gain.
+     *
+     * `slapSourceInternalPolicy` IS «داخلي», NOT a composed «سياسة داخلية». Both halves
+     * ship separately, and joining them would have been a composition rather than a
+     * slice — but it is not needed: `dataClassInternal` ships «داخلي» as a standalone
+     * enum label, and this feature's own `slaDashRegulatoryTitle` already contrasts
+     * «نظامي» with «داخلي» in exactly this sense. It also keeps the list a list of
+     * ADJECTIVES instead of one noun phrase among four.
+     */
+    slapUnitMinutes: 'دقائق',
+    slapUnitHours: 'ساعات',
+    slapUnitBusinessDays: 'أيام عمل',
+    slapUnitCalendarDays: 'أيام',
+    slapUnitMonths: 'أشهر',
+    slapSourceInternalPolicy: 'داخلي',
+    slapSourceContractual: 'تعاقدي',
+    slapSourceOperational: 'تشغيلي',
+    slapSourceOther: 'أخرى',
+    slapSourceRegulatory: 'نظامي',
     slapRegulatoryCanAct: 'إنشاء هذه السياسة',
     slapRegulatoryCannotAct: 'تسجيلها كمطلوبة بحكم التنظيم',
     slapCreateRegulatoryWarning:
@@ -153,9 +200,81 @@ export const COMPLIANCE_SCREENING = {
     slapDurationAria: 'المدة لـ {name}',
     shRefusalAct: 'عرض تقرير سلامة الفحص',
     shCouldNotLoadScreeningHealth: 'تعذّر تحميل حالة الفحص — حاول مرة أخرى.',
+    shListHealth: 'حالة مزوّد الفحص',
+    shListOverview: 'إحصاءات الفحص لآخر ٣٠ يوماً',
+    /*
+     * OWNER ANSWER 2 — the two capability words, hers verbatim.
+     *
+     * «الأشخاص السياسيون (PEP)» is the NOMINATIVE, which is what a column label takes. The
+     * Arabic already on this screen reads «فحص الأشخاص السياسيين (PEP)» — genitive, inside a
+     * sentence — and agreeing that run back to the nominative is morphology rather than a
+     * slice. That difference is why this was her decision; do not "harmonise" the two.
+     */
+    shCapSanctions: 'العقوبات',
+    shCapPep: 'الأشخاص السياسيون (PEP)',
+    /*
+     * AND THE OTHER SEVEN, also hers. `PROVIDER_CAPABILITY_LABEL_KEY` is TOTAL with no `null`
+     * left, so the screen's fall-through to the raw token is DELETED rather than left
+     * unreachable — the same treatment `AR_AGEING_BUCKET_FALLBACK` got.
+     *
+     * «التغطية الإعلامية السلبية» WAS DECIDED TWICE. She rejected «الأخبار السلبية» as not clear
+     * enough to a clerk and chose this, which is the AML term. The rejected one is the one a
+     * later reader would guess, which is why it is written down here and in the register.
+     */
+    shCapWatchlist: 'قوائم المراقبة',
+    shCapAdverseMedia: 'التغطية الإعلامية السلبية',
+    shCapIndividual: 'فحص الأفراد',
+    shCapEntity: 'فحص الكيانات',
+    shCapBatch: 'الفحص بالدفعات',
+    shCapOngoingMonitoring: 'المراقبة المستمرة',
+    shCapWebhooks: 'إشعارات فورية',
+    /*
+     * THE TWENTY-SEVEN CAPABILITY NOTES — the sentence under each capability name, which until
+     * this batch was English prose the api sent and this screen rendered verbatim. An Arabic
+     * compliance officer read an English token with an English sentence under it, on the screen
+     * whose job is to say whether customers are actually being screened.
+     *
+     * `hardcoded-ui-english.py` reported 0 and was right to: it reads the WEB tree and these
+     * strings did not exist here. That is the structural class the thirteen risk-questionnaire
+     * prompts already recorded by name, met for the SECOND time.
+     *
+     * The api now names a `CapabilityNoteKey` and the web resolves it, so the FOUR keys that
+     * interpolate carry their parameter rather than their sentence. Every value below is the
+     * owner's own Arabic except `shNoteBuiltInSanctionsSynced`, which her table did not have
+     * because the built-in SANCTIONS row is a TERNARY and she was given its false branch — it is
+     * a contiguous run of `wsIntro` on `/watchlist-sync`, asserted as a substring rather than
+     * asked for.
+     */
+    shNoteBuiltInSanctionsSynced: 'تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة الأمم المتحدة الموحّدة) محلياً.',
+    shNoteBuiltInCacheEmpty: 'مهيّأ، لكن القوائم المحفوظة داخلياً فارغة — لم تكتمل أي مزامنة بعد.',
+    shNoteBuiltInNoPepData: 'لا تتوفّر لدى هذا المزوّد أي بيانات عن الأشخاص السياسيين. فحصهم يحتاج مزوّداً تجارياً، أو محرّكاً مركَّباً لدى المكتب تتضمّن بياناته هذه الفئة.',
+    shNoteBuiltInSanctionsOnly: 'تُزامَن قوائم العقوبات فقط.',
+    shNoteBuiltInAdverseMediaUnavailable: 'غير متوفّرة.',
+    shNoteBuiltInIndividualNames: 'تُطابَق أسماء الأشخاص.',
+    shNoteBuiltInEntityLegalNames: 'تُطابَق الأسماء القانونية للشركات.',
+    shNoteBuiltInBatchLocal: 'يجري الفحص داخلياً على دفعات، ولا يوجد حدّ خارجي لعدد الطلبات.',
+    shNoteBuiltInMonitoringSchedule: 'إعادة فحص كل أربع ساعات، وإعادة فحص فور تحديث القوائم.',
+    shNoteBuiltInWebhooksNotApplicable: 'لا تنطبق على قوائم محفوظة داخل النظام.',
+    shNoteCommercialContractCoverage: 'التغطية الفعلية تعتمد على المنتج المتعاقَد عليه — راجع اتفاقية المزوّد قبل الاعتماد عليها.',
+    shNoteCommercialIndividual: 'فحص أفراد.',
+    shNoteCommercialEntity: 'فحص كيانات.',
+    shNoteCommercialBatchFanOut: 'تُرسَل الأسماء واحداً تلو الآخر؛ يُستبدَل ذلك بواجهة دفعات لدى المزوّد إن توفّرت.',
+    shNoteCommercialMonitoringEnrolment: 'تتطلّب اشتراك مراقبة لدى المزوّد، وهو قرار تعاقدي — لا يُفعَّل من النظام وحده.',
+    shNoteCommercialWebhooksNotConfigured: 'تتطلّب عنوان استقبال مُوثَّقاً ومفتاحاً مشتركاً؛ غير مُهيّأة.',
+    shNoteOnPremiseDataset: 'مجموعة البيانات «{name}».',
+    shNoteOnPremisePepVerify: 'حسب ما إذا كانت مجموعة البيانات «{name}» تتضمّن بيانات الأشخاص السياسيين — راجع قائمة بيانات المحرّك قبل الاعتماد عليها.',
+    shNoteOnPremisePepSanctionsOnly: 'مجموعة البيانات «{name}» مقتصرة على العقوبات؛ لا تُفحَص بيانات الأشخاص السياسيين.',
+    shNoteOnPremiseAdverseMediaUnavailable: 'لا يوفّرها هذا المحرّك.',
+    shNoteOnPremisePersonSchema: 'وفق نموذج بيانات الأشخاص.',
+    shNoteOnPremiseOrganizationSchema: 'وفق نموذج بيانات المنشآت.',
+    shNoteOnPremiseBatchFanOut: 'تُرسَل الأسماء واحداً تلو الآخر مراعاةً لطاقة المحرّك.',
+    shNoteOnPremiseMonitoringScheduler: 'عبر مجدوِل إعادة الفحص، لا عبر إشعار من المزوّد.',
+    shNoteOnPremiseWebhooksUnsupported: 'المحرّك لا يرسل إشعارات.',
+    shNoteNotConfigured: 'غير مُهيّأ.',
+    shNoteNotConfiguredMissing: 'غير مُهيّأ — ناقص: {list}.',
     shScreeningHealth: 'حالة فحص العقوبات',
     shWhichProviderActuallyPerformsScreening:
-      'يوضّح هذا الجدول أي مزوّد يُجري الفحص فعلياً، وما إذا كانت بياناته حديثة، وما الذي يغطيه. «غير مهيأ» أو «غير متاح» تعني أنّ الفحص لم يجرِ — وهي ليست نتيجة سلبية.',
+      'يوضّح هذا الجدول أي مزوّد يُجري الفحص فعلياً، وما إذا كانت بياناته حديثة، وما الذي يغطيه. «غير مُهيّأ» أو «غير متاح» تعني أنّ الفحص لم يجرِ — وهي ليست نتيجة سلبية.',
     shLoading: 'جارٍ التحميل…',
     shProvider: 'المزوّد',
     shStatus: 'الحالة',
@@ -249,6 +368,7 @@ export const COMPLIANCE_SCREENING = {
     smDecision: 'Decision',
     smReview: 'Review',
     smEdd: 'EDD',
+    smViewCustomerRfqs: 'RFQs for this customer',
     smNoLongerOnTheSource: 'No longer on the source list — decision stands',
     smReasonForTheDecisionMin: 'Reason for the decision (min. 10 characters)',
     smClearFalsePositive: 'Clear (false positive)',
@@ -303,6 +423,7 @@ export const COMPLIANCE_SCREENING = {
       'currently overstate lateness — against this brokerage. Enter the officially ' +
       'observed days.',
     slapHolidayDate: 'Date',
+    slapHolidayDateHint: 'The date of the holiday.',
     slapHolidayName: 'Occasion',
     slapHolidayCalendar: 'Calendar',
     slapHolidayAllCalendars: 'All calendars',
@@ -353,6 +474,18 @@ export const COMPLIANCE_SCREENING = {
     slapCreateUnit: 'Unit',
     slapCreateCalendar: 'Calendar',
     slapCreateSourceType: 'Where this SLA comes from',
+    // The Arabic half of this key carries the derivation and the reason there is no
+    // `ENUM_LABEL.SlaSourceType` family yet. Read it before adding one.
+    slapUnitMinutes: 'Minutes',
+    slapUnitHours: 'Hours',
+    slapUnitBusinessDays: 'Business days',
+    slapUnitCalendarDays: 'Calendar days',
+    slapUnitMonths: 'Months',
+    slapSourceInternalPolicy: 'Internal policy',
+    slapSourceContractual: 'Contractual',
+    slapSourceOperational: 'Operational',
+    slapSourceOther: 'Other',
+    slapSourceRegulatory: 'Regulatory',
     slapRegulatoryCanAct: 'create this policy',
     slapRegulatoryCannotAct: 'record it as required by regulation',
     slapCreateRegulatoryWarning:
@@ -375,6 +508,61 @@ export const COMPLIANCE_SCREENING = {
     slapDurationAria: 'Duration for {name}',
     shRefusalAct: 'view the screening health report',
     shCouldNotLoadScreeningHealth: 'Could not load screening health — try again.',
+    shListHealth: 'the screening provider status',
+    shListOverview: 'the last 30 days of screening figures',
+    shCapSanctions: 'Sanctions',
+    shCapPep: 'Politically exposed persons (PEP)',
+    shCapWatchlist: 'Watchlists',
+    shCapAdverseMedia: 'Adverse media',
+    shCapIndividual: 'Individual screening',
+    shCapEntity: 'Entity screening',
+    shCapBatch: 'Batch screening',
+    shCapOngoingMonitoring: 'Ongoing monitoring',
+    shCapWebhooks: 'Webhooks',
+    /*
+     * THE TWENTY-SEVEN CAPABILITY NOTES — the sentence under each capability name, which until
+     * this batch was English prose the api sent and this screen rendered verbatim. An Arabic
+     * compliance officer read an English token with an English sentence under it, on the screen
+     * whose job is to say whether customers are actually being screened.
+     *
+     * `hardcoded-ui-english.py` reported 0 and was right to: it reads the WEB tree and these
+     * strings did not exist here. That is the structural class the thirteen risk-questionnaire
+     * prompts already recorded by name, met for the SECOND time.
+     *
+     * The api now names a `CapabilityNoteKey` and the web resolves it, so the FOUR keys that
+     * interpolate carry their parameter rather than their sentence.
+     *
+     * EVERY ENGLISH VALUE BELOW IS THE API'S OWN FORMER STRING, verbatim — asserted against
+     * `git show HEAD` by the edit that moved them. What changed is WHERE the sentence lives, not
+     * what it says, so no English was written on this path.
+     */
+    shNoteBuiltInSanctionsSynced: 'OFAC SDN + UN Consolidated, synced locally.',
+    shNoteBuiltInCacheEmpty: 'Configured, but the local cache is empty — the sync has never completed.',
+    shNoteBuiltInNoPepData: 'This provider has NO PEP data. PEP screening requires a commercial provider or an on-premise dataset that includes PEP data.',
+    shNoteBuiltInSanctionsOnly: 'Only sanctions lists are synced.',
+    shNoteBuiltInAdverseMediaUnavailable: 'Not available.',
+    shNoteBuiltInIndividualNames: 'Names are matched.',
+    shNoteBuiltInEntityLegalNames: 'Legal names are matched.',
+    shNoteBuiltInBatchLocal: 'Batched locally; no external rate limit applies.',
+    shNoteBuiltInMonitoringSchedule: 'The 4-hourly re-screening batch plus re-screening on list update.',
+    shNoteBuiltInWebhooksNotApplicable: 'Not applicable to a local cache.',
+    shNoteCommercialContractCoverage: 'Actual coverage depends on the contracted product — verify against the provider agreement before relying on it.',
+    shNoteCommercialIndividual: 'Individual screening.',
+    shNoteCommercialEntity: 'Entity screening.',
+    shNoteCommercialBatchFanOut: 'Sequential fan-out; switch to a native batch endpoint if the provider has one.',
+    shNoteCommercialMonitoringEnrolment: 'Requires provider-side monitoring enrolment, which is a contract decision — not enabled by this adapter alone.',
+    shNoteCommercialWebhooksNotConfigured: 'Requires a verified callback endpoint and a shared secret; not configured.',
+    shNoteOnPremiseDataset: 'Dataset "{name}".',
+    shNoteOnPremisePepVerify: 'Depends on whether dataset "{name}" actually ingested PEP collections — verify against the engine dataset listing before relying on it.',
+    shNoteOnPremisePepSanctionsOnly: 'Dataset "{name}" is scoped to sanctions; no PEP data is searched.',
+    shNoteOnPremiseAdverseMediaUnavailable: 'Not provided by this engine.',
+    shNoteOnPremisePersonSchema: 'Person schema.',
+    shNoteOnPremiseOrganizationSchema: 'Organization schema.',
+    shNoteOnPremiseBatchFanOut: 'Fanned out sequentially to respect the engine.',
+    shNoteOnPremiseMonitoringScheduler: 'Via the re-screening scheduler, not a provider push.',
+    shNoteOnPremiseWebhooksUnsupported: 'The engine does not push events.',
+    shNoteNotConfigured: 'Not configured.',
+    shNoteNotConfiguredMissing: 'Not configured — missing {list}.',
     shScreeningHealth: 'Screening health',
     shWhichProviderActuallyPerformsScreening:
       'Which provider actually performs screening, whether its data is current, and what it covers. NOT_CONFIGURED or UNAVAILABLE means screening did not happen — it is not a negative result.',

@@ -1,0 +1,38 @@
+{
+  "the-request-text-becomes-optional": {
+    "file": "apps/api/src/modules/pdpl/dto/create-dsr.dto.ts",
+    "from": "  @Transform(trimIfString)\n  @IsString()\n  @Length(DSR_REQUEST_TEXT_MIN_LENGTH, DSR_REQUEST_TEXT_MAX_LENGTH)\n  requestText!: string;",
+    "to": "  @IsOptional()\n  @Transform(trimIfString)\n  @IsString()\n  @Length(DSR_REQUEST_TEXT_MIN_LENGTH, DSR_REQUEST_TEXT_MAX_LENGTH)\n  requestText!: string;",
+    "why": "THE DTO IS THE ONLY GUARD, and this is what removing it costs. The column is NULLABLE on purpose — the requests that predate it are not backfilled, because inventing what a data subject asked for is the one thing this record must never contain — and a `NOT VALID` CHECK fires on UPDATE, so it would refuse the CLOSURE of those requests (measured: 18 on db-test, 14 of them OPEN). So nothing in the database can catch this; the row would simply be written with no request, and a row saying `ACCESS` and nothing about WHICH data is the defect the column exists to close. Planted, `refuses an intake with no request text, and one with no channel, separately` fails with **`omitting requestText must be refused … expected 201 to be 400`** — the field NAMED, and the whitespace test beside it still passing. CORRECTED FROM THE RUN: these refusals first lived inside the lifecycle walk, where all three plants killed the SAME test with a bare `expected 400, got 201` and named no field, because the first failing assertion stops the block. One-at-a-time is pointless if the failure cannot say WHICH, so they were extracted into two named tests and the status is asserted with the field in its own message."
+  },
+  "the-channel-becomes-optional": {
+    "file": "apps/api/src/modules/pdpl/dto/create-dsr.dto.ts",
+    "from": "  @IsIn(DSR_INTAKE_CHANNELS, {\n    message: `intakeChannel must be one of: ${DSR_INTAKE_CHANNELS.join(', ')}`,\n  })\n  intakeChannel!: string;",
+    "to": "  @IsOptional()\n  @IsIn(DSR_INTAKE_CHANNELS, {\n    message: `intakeChannel must be one of: ${DSR_INTAKE_CHANNELS.join(', ')}`,\n  })\n  intakeChannel!: string;",
+    "why": "The other half, planted separately for the reason the test is written per field: the approved procedure requires a request to be logged the same business day *regardless of channel*, which is what makes the channel a fact a regulator asks for — and `DataSubjectRequest.receivedAt`'s own comment has said so since M04 shipped while nothing stored the value. Planted, the same test fails with **`omitting intakeChannel must be refused`** — the OTHER field named, which is what the per-field message buys: the two omissions share one test (they are one property, asserted twice) and the message distinguishes them, while the whitespace test stands apart because a blank is a different failure from an omission."
+  },
+  "the-trim-moves-back-into-the-service": {
+    "file": "apps/api/src/modules/pdpl/dto/create-dsr.dto.ts",
+    "from": "  @Transform(trimIfString)\n  @IsString()\n  @Length(DSR_REQUEST_TEXT_MIN_LENGTH",
+    "to": "  @IsString()\n  @Length(DSR_REQUEST_TEXT_MIN_LENGTH",
+    "why": "A DEFECT I SHIPPED AND MY OWN e2e CAUGHT, planted so it cannot come back. I trimmed in the SERVICE, after validation — so `@Length(3, …)` counted three SPACES as length 3, the body passed, and the service's trim then stored an EMPTY request. `expected 400 \"Bad Request\", got 201 \"Created\"`. `trimIfString` exists for exactly this and says so in its own comment: *pair with `@IsString()`/`@MinLength()` so \" x \" can't slip past a length check.* ORDER IS THE WHOLE POINT — the transform has to run BEFORE the length check, which is why it lives on the DTO and the service no longer trims at all: two places that trim are two answers about what was stored. Planted, **`refuses a request of nothing but whitespace`** dies on `expected 400, got 201` while both one-at-a-time refusals still pass — a different test, because a blank is a different failure from an omission, and that separation is what makes this plant distinguishable from the two above it."
+  },
+  "the-words-enter-the-immutable-audit-log": {
+    "file": "apps/api/src/modules/pdpl/dsr.config.ts",
+    "from": "    requestTextLength: row.requestText ? row.requestText.length : null,",
+    "to": "    requestText: row.requestText,",
+    "why": "A PDPL DECISION REVERSED, and it is the plant worth reading. `AuditLogEntry` is immutable by trigger (Part 10.3), so copying a data subject's own request into it puts their personal data somewhere an ERASURE request can NEVER reach — inside the very mechanism that proves erasure requests are answered. The words live on the row, which an erasure CAN reach; the snapshot records the CHANNEL and the LENGTH, the length being the one thing a reader needs from the log (*was anything recorded at all*), and nullable rather than 0 because zero would read as an empty request. **NO TEST CATCHES THIS, and that is stated rather than discovered**: the audit snapshot's shape is asserted nowhere, so the plant leaves the whole pdpl suite and the DSR e2e green. It is committed as the record of a decision an instrument cannot hold — the honest counterpart to the declared-fallback limit `check:raw-values` taught."
+  },
+  "the-row-type-stops-carrying-the-fields": {
+    "file": "apps/api/src/modules/pdpl/dsr.config.ts",
+    "from": "  requestText: string | null;\n  intakeChannel: DsrIntakeChannel | null;",
+    "to": "  requestText?: string | null;\n  intakeChannel?: DsrIntakeChannel | null;",
+    "why": "The `IncidentReport.load()` shape, one model over: a row type whose field is OPTIONAL lets a read path project `undefined` while every other path carries a value — a request's own words present after a LIST and absent after a CREATE, invisible to any test that only reads one. Required on the row type is what made the compiler name six call sites when these fields landed, including the two spec fixtures. Planted, the api typecheck fails — which is the honest outcome: the compiler is the guard for this one, and no runtime test can see an optional field that happens to be populated everywhere today."
+  },
+  "a-fifth-channel-with-no-word": {
+    "file": "packages/db/prisma/schema.prisma",
+    "from": "enum DsrIntakeChannel {\n  POST\n  TELEPHONE\n  IN_PERSON\n  WEBSITE_FORM\n}",
+    "to": "enum DsrIntakeChannel {\n  POST\n  TELEPHONE\n  IN_PERSON\n  WEBSITE_FORM\n  EMAIL\n}",
+    "why": "THE ONE THE PARITY GUARD EXISTS FOR. A fifth channel added to the schema reaches the api's DTO automatically — `DSR_INTAKE_CHANNELS` there is `Object.values` of the generated enum — and reaches NEITHER of the web's two hand-copied lists. The option would simply not be offered (silent) or would render through `t(undefined)` and show NO WORDS AT ALL, which is the notification-bell defect on a PDPL intake screen. Planted and after `prisma generate`, `dsr-intake-channel.test.ts` fails on THREE tests, not the two I wrote: the non-vacuity floor first (`parsed 5 member(s): expected 5 to be 4`), then the client list not being the database enum, then the label map not being total over it. The floor firing first is the honest ordering — it is what tells a reader the SET moved rather than that the parser broke. That is the only moment anybody knows which Arabic word is owed — the four shipped are the owner's and a fifth is hers too."
+  }
+}

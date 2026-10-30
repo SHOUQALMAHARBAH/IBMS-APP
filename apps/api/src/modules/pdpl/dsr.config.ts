@@ -1,4 +1,4 @@
-import { DsrType } from '@ibms/db';
+import { DsrIntakeChannel, DsrType } from '@ibms/db';
 import type { CombinedDutyAct } from '@ibms/db';
 import {
   combinedDutyActView,
@@ -11,6 +11,33 @@ import {
 } from '../../common/business-days.util';
 
 export const DSR_TYPES = Object.values(DsrType);
+
+/**
+ * How a request reached the office — the four of `DsrIntakeChannel`.
+ *
+ * `Object.values` of the GENERATED enum rather than a hand-written list, for the reason
+ * `DSR_TYPES` above is written that way: a fifth channel added to the schema reaches the DTO,
+ * the refusal message and the screen's `<select>` on the commit that adds it, and a second list
+ * is the copy that drifts.
+ *
+ * The approved procedure requires a request to be logged the same business day "regardless of
+ * channel", which is what makes the channel a fact a regulator asks for —
+ * `DataSubjectRequest.receivedAt`'s own comment has said so since M04 shipped, while nothing
+ * stored the value.
+ */
+export const DSR_INTAKE_CHANNELS = Object.values(DsrIntakeChannel);
+
+/**
+ * The floor on the transcribed request, and it is DERIVED rather than chosen.
+ *
+ * Three, which is this codebase's recorded minimum for a NOTE — deliberately NOT
+ * `COMBINED_DUTY_REASON_MIN_LENGTH`'s ten. That ten is for a DECLARATION, a reason somebody
+ * gives for their own act; this is a TRANSCRIPTION of what another person asked, and a data
+ * subject's request may legitimately be short. Inventing a longer floor would refuse a real
+ * request for being briefly worded, on the record that proves a statutory right was answered.
+ */
+export const DSR_REQUEST_TEXT_MIN_LENGTH = 3;
+export const DSR_REQUEST_TEXT_MAX_LENGTH = 2000;
 
 /**
  * M04 — Data Subject Request Management (backlog Part D, bundled under
@@ -101,6 +128,17 @@ export interface DataSubjectRequestRow {
   customerId: string | null;
   insuredPersonId: string | null;
   type: DsrType;
+  /**
+   * What was asked for, and how it arrived.
+   *
+   * NULLABLE here, matching the columns — and the compiler is what made this honest: adding
+   * them to the view without widening this type was six errors, including the two the spec
+   * fixtures raised. A row loaded without these fields is a row whose request nobody knows,
+   * which is the `IncidentReport.load()` shape, so the type carries them rather than letting a
+   * read path project `undefined`.
+   */
+  requestText: string | null;
+  intakeChannel: DsrIntakeChannel | null;
   status: DsrStatus;
   receivedAt: Date;
   identityVerifiedAt: Date | null;
@@ -127,6 +165,16 @@ export interface DataSubjectRequestView {
   customerId: string | null;
   insuredPersonId: string | null;
   type: string;
+  /**
+   * What the person actually asked for, and how it arrived.
+   *
+   * `string | null` rather than required, and the null is HONEST rather than a gap: the columns
+   * are nullable because the requests that predate them are not backfilled — inventing what a
+   * data subject asked for is the one thing this record must never contain. A screen therefore
+   * has to render *not recorded* for those, which is a different fact from an empty request.
+   */
+  requestText: string | null;
+  intakeChannel: string | null;
   status: string;
   receivedAt: string;
   identityVerifiedAt: string | null;
@@ -185,6 +233,8 @@ export function deriveDsrView(
     customerId: row.customerId,
     insuredPersonId: row.insuredPersonId,
     type: row.type,
+    requestText: row.requestText,
+    intakeChannel: row.intakeChannel,
     status: row.status,
     receivedAt: row.receivedAt.toISOString(),
     identityVerifiedAt: row.identityVerifiedAt
@@ -225,6 +275,21 @@ export function dsrCreateAuditSnapshot(
     status: row.status,
     receivedAt: row.receivedAt.toISOString(),
     slaDueAt: row.slaDueAt.toISOString(),
+    /*
+     * THE CHANNEL AND THE LENGTH — NEVER THE WORDS, and that is a PDPL decision rather than
+     * brevity.
+     *
+     * `AuditLogEntry` is immutable by trigger (Part 10.3), so quoting a data subject's own
+     * request into it would put their personal data somewhere an ERASURE request can never
+     * reach — inside the very mechanism that proves erasure requests are answered. The words
+     * live on the row, which an erasure CAN reach.
+     *
+     * The length is here because it is the one thing a reader needs from the log: *was anything
+     * recorded at all*. `null` for the requests that predate the column, which is why it is a
+     * nullable number rather than 0 — zero would read as an empty request.
+     */
+    intakeChannel: row.intakeChannel,
+    requestTextLength: row.requestText ? row.requestText.length : null,
   };
 }
 

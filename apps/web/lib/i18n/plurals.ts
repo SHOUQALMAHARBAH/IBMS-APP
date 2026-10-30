@@ -73,6 +73,26 @@ const AR: PluralDictionary = {
     many: 'أُثير {count} استثناءً',
     other: 'أُثير {count} استثناء',
   },
+  /*
+   * OWNER ANSWER 4 — the ring caption on `/dashboards/claims`, by her example
+   * «١٤ مطالبة مفتوحة من ٦٦».
+   *
+   * `other` is her own run with the two numerals replaced by placeholders, so `many`
+   * (11–99, where her own example falls) renders exactly what she wrote. `few` takes
+   * «مطالبات مفتوحة» from `execOpenClaims` verbatim — a contiguous shipping run, a slice
+   * rather than a construction.
+   *
+   * `zero`, `one` and `two` ARE DELIBERATELY ABSENT and fall back to `other`. «مطالبتان»
+   * ships nowhere in this product and constructing a dual is the morphology refused by name
+   * once already (the «محاولتان» case); «مطالبة واحدة» and «لا مطالبات» are constructions
+   * too. Three forms are owed and are in `docs/design-pass-register.md`. Do not fill them in
+   * by composing shipping words — that is the decision this omission is protecting.
+   */
+  dclmOpenClaimsOfTotal: {
+    few: '{count} مطالبات مفتوحة من {total}',
+    many: '{count} مطالبة مفتوحة من {total}',
+    other: '{count} مطالبة مفتوحة من {total}',
+  },
   dcmpBreachesOpen: {
     zero: 'لا شيء مفتوح',
     one: 'واحدة مفتوحة',
@@ -153,11 +173,11 @@ const AR: PluralDictionary = {
     other: 'صُدِّر {count} سجل.',
   },
   secIdleTimeoutMinutes: {
-    one: 'مهلة الخمول: دقيقة واحدة',
-    two: 'مهلة الخمول: دقيقتان',
-    few: 'مهلة الخمول: {count} دقائق',
-    many: 'مهلة الخمول: {count} دقيقة',
-    other: 'مهلة الخمول: {count} دقيقة',
+    one: 'مدّة الخمول: دقيقة واحدة',
+    two: 'مدّة الخمول: دقيقتان',
+    few: 'مدّة الخمول: {count} دقائق',
+    many: 'مدّة الخمول: {count} دقيقة',
+    other: 'مدّة الخمول: {count} دقيقة',
   },
   secHardLogoutMinutes: {
     one: 'تسجيل الخروج التلقائي بعد: دقيقة واحدة من الخمول',
@@ -205,6 +225,26 @@ const AR: PluralDictionary = {
     many: 'لا استجابة من المؤمِّن بعد {count} يوم عمل من التسجيل',
     other: 'لا استجابة من المؤمِّن بعد {count} يوم عمل من التسجيل',
   },
+  secCfgUnitMinutes: {
+    one: 'دقيقة واحدة',
+    two: 'دقيقتان',
+    few: '{count} دقائق',
+    many: '{count} دقيقة',
+    other: '{count} دقيقة',
+  },
+  secCfgUnitDays: {
+    one: 'يوم واحد',
+    two: 'يومان',
+    few: '{count} أيام',
+    many: '{count} يوماً',
+    other: '{count} يوم',
+  },
+  secCfgUnitAttempts: {
+    one: 'محاولة واحدة',
+    few: '{count} محاولات',
+    many: '{count} محاولة',
+    other: '{count} محاولة',
+  },
 };
 
 const EN: PluralDictionary = {
@@ -212,6 +252,10 @@ const EN: PluralDictionary = {
   brDetectExceptions: {
     one: '{count} exception raised',
     other: '{count} exceptions raised',
+  },
+  dclmOpenClaimsOfTotal: {
+    one: '{count} open claim of {total}',
+    other: '{count} open claims of {total}',
   },
   dcmpBreachesOpen: { other: '{count} open' },
   dpolRenewalWindowDays: {
@@ -259,6 +303,18 @@ const EN: PluralDictionary = {
   claimFollowUpBusinessDays: {
     one: 'No insurer response {count} business day after registration',
     other: 'No insurer response {count} business days after registration',
+  },
+  secCfgUnitMinutes: {
+    one: '{count} minute',
+    other: '{count} minutes',
+  },
+  secCfgUnitDays: {
+    one: '{count} day',
+    other: '{count} days',
+  },
+  secCfgUnitAttempts: {
+    one: '{count} attempt',
+    other: '{count} attempts',
   },
 };
 

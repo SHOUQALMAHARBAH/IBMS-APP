@@ -146,13 +146,77 @@ export type ProviderCapability =
   | 'ONGOING_MONITORING'
   | 'WEBHOOKS';
 
+/**
+ * WHICH note, not the note's text.
+ *
+ * Every member is resolved to an Arabic/English sentence by the web, which is the only layer that
+ * knows who is reading. Named for the MEANING and prefixed by the adapter that produces it,
+ * because the same capability means different things per provider: the built-in cache has no PEP
+ * data at all, while an on-premise engine may or may not depending on the dataset it was pointed
+ * at, and those are not one sentence.
+ */
+export type CapabilityNoteKey =
+  // -- the built-in OFAC/UN cache ------------------------------------------------------------
+  | 'BUILT_IN_SANCTIONS_SYNCED'
+  | 'BUILT_IN_CACHE_EMPTY'
+  | 'BUILT_IN_NO_PEP_DATA'
+  | 'BUILT_IN_SANCTIONS_ONLY'
+  | 'BUILT_IN_ADVERSE_MEDIA_UNAVAILABLE'
+  | 'BUILT_IN_INDIVIDUAL_NAMES'
+  | 'BUILT_IN_ENTITY_LEGAL_NAMES'
+  | 'BUILT_IN_BATCH_LOCAL'
+  | 'BUILT_IN_MONITORING_SCHEDULE'
+  | 'BUILT_IN_WEBHOOKS_NOT_APPLICABLE'
+  // -- a commercial provider -----------------------------------------------------------------
+  | 'COMMERCIAL_CONTRACT_COVERAGE'
+  | 'COMMERCIAL_INDIVIDUAL'
+  | 'COMMERCIAL_ENTITY'
+  | 'COMMERCIAL_BATCH_FAN_OUT'
+  | 'COMMERCIAL_MONITORING_ENROLMENT'
+  | 'COMMERCIAL_WEBHOOKS_NOT_CONFIGURED'
+  // -- a local screening engine --------------------------------------------------------------
+  | 'ON_PREMISE_DATASET'
+  | 'ON_PREMISE_PEP_VERIFY'
+  | 'ON_PREMISE_PEP_SANCTIONS_ONLY'
+  | 'ON_PREMISE_ADVERSE_MEDIA_UNAVAILABLE'
+  | 'ON_PREMISE_PERSON_SCHEMA'
+  | 'ON_PREMISE_ORGANIZATION_SCHEMA'
+  | 'ON_PREMISE_BATCH_FAN_OUT'
+  | 'ON_PREMISE_MONITORING_SCHEDULER'
+  | 'ON_PREMISE_WEBHOOKS_UNSUPPORTED'
+  // -- nothing configured --------------------------------------------------------------------
+  | 'NOT_CONFIGURED'
+  | 'NOT_CONFIGURED_MISSING';
+
+/**
+ * WHAT THE NOTE IS -- declared here, never derived by the screen.
+ *
+ * The same argument as decision 58's `metricScope`: the api is the only layer that knows whether
+ * one of its own sentences describes a capability or cautions against relying on it, and a screen
+ * guessing from `supported`/`configured`/`operational` would get the worst case exactly wrong --
+ * `COMMERCIAL_CONTRACT_COVERAGE` rides a row with three ticks and says the vendor may not cover
+ * what the row appears to claim.
+ */
+export type CapabilityNoteKind = 'DESCRIPTION' | 'CAUTION';
+
+/** Why a capability reads the way it does, in terms an operator can act on. */
+export interface CapabilityNote {
+  key: CapabilityNoteKey;
+  /** `{name}`-style substitutions the web applies to the resolved sentence. */
+  params?: Record<string, string>;
+  /** REQUIRED. Optional here would let a 29th note default to DESCRIPTION, which is the
+   * non-warning value and therefore the wrong direction on a compliance screen. */
+  kind: CapabilityNoteKind;
+}
+
 export interface CapabilityState {
   capability: ProviderCapability;
   supported: boolean;
   configured: boolean;
   operational: boolean;
-  /** Why, in terms an operator can act on. */
-  note: string;
+  /** Why, in terms an operator can act on. A KEY rather than a sentence: this api has no message
+   * i18n, and one deployment serves an Arabic and an English reader. */
+  note: CapabilityNote;
 }
 
 /**
@@ -235,9 +299,40 @@ export function capability(
   supported: boolean,
   configured: boolean,
   operational: boolean,
-  note: string,
+  note: CapabilityNote,
 ): CapabilityState {
   return { capability: cap, supported, configured, operational, note };
+}
+
+/** A note that describes what a capability does. */
+export function describes(
+  key: CapabilityNoteKey,
+  params?: Record<string, string>,
+): CapabilityNote {
+  return params
+    ? { key, params, kind: 'DESCRIPTION' }
+    : { key, kind: 'DESCRIPTION' };
+}
+
+/**
+ * A note that tells the reader NOT to rely on what the row appears to say.
+ *
+ * Five of the 27 are cautions. THREE ARE THE OWNER'S OWN CLASSIFICATION, named by her when she
+ * read them: the built-in cache has no PEP data (so the customer was not screened on that
+ * dimension), a commercial provider's real coverage depends on the contract, and an on-premise
+ * dataset scoped to sanctions searches no PEP data.
+ *
+ * TWO ARE THIS CODE'S JUDGEMENT AND ARE DECLARED AS SUCH, both by her own stated criterion --
+ * *the customer was not screened*: `BUILT_IN_CACHE_EMPTY` means the sync has never completed on
+ * the DEFAULT provider, so nobody has been screened against anything; and `ON_PREMISE_PEP_VERIFY`
+ * ends by telling the reader to verify before relying on it, which is an instruction not to rely
+ * on it. Both are in the register for her to confirm or overturn.
+ */
+export function cautions(
+  key: CapabilityNoteKey,
+  params?: Record<string, string>,
+): CapabilityNote {
+  return params ? { key, params, kind: 'CAUTION' } : { key, kind: 'CAUTION' };
 }
 
 /** Outcomes that mean "this subject was NOT cleared, and not because they

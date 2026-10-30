@@ -25,6 +25,8 @@ import { AuditService } from '../audit/audit.service';
 import { EncryptionService } from '../security/encryption.service';
 import { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
 import { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
+import { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import { ScreeningService } from './screening.service';
 import { duplicatePersonConflict } from '../../common/duplicate-person-conflict';
 import {
   encryptEntityFields,
@@ -39,6 +41,7 @@ import { pageWindow, type Paginated } from '../../common/pagination';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { UpdateCustomerContactDto } from './dto/update-customer-contact.dto';
+import type { CorrectCustomerIdentifiersDto } from './dto/correct-customer-identifiers.dto';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import type { SearchCustomersDto } from './dto/search-customers.dto';
 import type { CreateUboDto } from './dto/create-ubo.dto';
@@ -123,6 +126,19 @@ export class CustomerService {
     private readonly encryption: EncryptionService,
     private readonly reveal: SensitiveFieldRevealService,
     private readonly duplicateWarnings: DuplicateNameWarningRepository,
+    /**
+     * Both added for `correctIdentifiers`, and both are WITHIN THIS MODULE — `ScreeningService` lives
+     * in `modules/customer/` beside this file. This codebase shares repositories across modules and
+     * never services, with the sole exception of a `@Global()` engine; neither half of that rule is
+     * bent here.
+     *
+     * NO CYCLE, measured rather than assumed: `ScreeningService` injects five repositories plus
+     * `SlaTimerService`, `ProviderScreeningService` and `AuditService`, and imports nothing from this
+     * file — so `CustomerService -> ScreeningService` is a one-way edge and Nest resolves it without
+     * a `forwardRef`.
+     */
+    private readonly kycRecords: KycRecordRepository,
+    private readonly screening: ScreeningService,
   ) {}
 
   /** Decrypts and masks the three `-- ENCRYPT` fields for API responses —
@@ -838,6 +854,225 @@ export class CustomerService {
     }
 
     return this.toMasked(updated, actor.id);
+  }
+
+  /**
+   * CORRECT A CUSTOMER'S DATE OF BIRTH OR NATIONALITY — the owner's narrow strike of her own
+   * 2026-09-28 deferral, and the two halves ship together by her instruction.
+   *
+   * ## WHAT HER STRIKE RESTS ON, AND THE THREE PARTICULARS THAT DID NOT EXIST
+   *
+   * Her reason for striking it: *"What exists now records who changed it and when, keeps the encrypted
+   * before and after, demands a written reason, re-screens, and knocks the KYC file back out of its
+   * approved state. That is the guarded edit she was holding out for, not the one she refused."*
+   *
+   * Measured against the repository before a line was written, because the whole strike rests on it:
+   *
+   *   who and when            EXISTS. `correctedByUserId`/`correctedAt`, written by the contact path.
+   *   the before and after    COLUMNS EXIST, and the contact path deliberately does not read the BEFORE
+   *                           back (it would decrypt and re-encrypt for no gain). Written here.
+   *   a written reason        DID NOT EXIST. `reason?` is `@IsOptional()` on the contact DTO and the
+   *                           service defaults it to `'Contact detail corrected'`; that DTO's own comment
+   *                           says of the identifiers *"it will be mandatory"*, future tense.
+   *   re-screens              DID NOT EXIST AS A WRITER. `priorScreeningResultId` and `kycStatusBefore`
+   *                           appeared exactly once each in the whole api — in the repository signature,
+   *                           with no caller — and `newScreeningResultId` was not even in the signature.
+   *   knocks it out of        NOT REPRESENTABLE, AND NOT SOMETHING THIS SYSTEM DOES FOR ANY TRIGGER.
+   *   APPROVED                See the next block, because it is the one that changes the design.
+   *
+   * So the guarded edit she was holding out for was a TABLE SHAPED TO RECEIVE ONE. Four of the five are
+   * built here; the fifth is answered by the system's own established behaviour rather than by a new
+   * mechanism.
+   *
+   * ## THE FILE IS NOT KNOCKED OUT OF `APPROVED`, AND THAT IS NOT A GAP IN THIS PATH
+   *
+   * `WORKFLOW_TRANSITIONS.KYCRecord` reads `APPROVED: ['PERIODIC_REVIEW_DUE']` and is transcribed verbatim
+   * from the `KYCRecord` model comment's own chain. There is NO backward edge out of `APPROVED`, so moving
+   * a file back would mean adding one to a compliance state machine — and `PERIODIC_REVIEW_DUE`'s own
+   * comment says what re-KYC is here: *"the actual re-KYC cycle is a new KYCRecord for the same Customer,
+   * not a loop back onto this one."*
+   *
+   * And the system already answers *"a new sanctions hit on an already-approved, active customer"*:
+   * `ScreeningService.runRecurringBatch` re-screens every ACTIVE customer whose latest file is APPROVED or
+   * PERIODIC_REVIEW_DUE, every four hours, records the results, queues any match for review — and leaves
+   * the file APPROVED. A correction-triggered re-screen behaving the same way is CONSISTENT with that; a
+   * knockback here would be the only place in the product where a hit moves a file backwards.
+   *
+   * What makes that safe is a mechanism built in anticipation of exactly this and already shipped:
+   * `evaluateScreeningHold` recomputes the subject fingerprint from live rows and raises
+   * `IDENTITY_CHANGED_SINCE_SCREENING`, whose own message reads *"The identity details on this file changed
+   * after it was screened — a subject was added, removed, or CORRECTED. Re-run screening before
+   * deciding."* So if the re-screen below does not complete, the next decision on that file is BLOCKED.
+   * That is the backstop, and it is why the re-screen is best-effort rather than transactional.
+   *
+   * ## WHY THE PRIOR RESULT IS READ FIRST AND KEPT
+   *
+   * `priorScreeningResultId` is `onDelete: Restrict` — *"The prior one is the evidence; RESTRICT keeps
+   * it."* If a corrected date of birth makes a previously-matching subject stop matching, the row records
+   * who changed what to what, why, and which screening answer that replaced. The evasion is not prevented;
+   * it is RECORDED, which is what the AMLU requires retained and what the deferral was waiting for.
+   */
+  async correctIdentifiers(
+    customerId: string,
+    dto: CorrectCustomerIdentifiersDto,
+    actor: AuthenticatedUser,
+  ): Promise<MaskedCustomer & { rescreened: boolean }> {
+    const customer = await this.findOwnedOrVisible(customerId, actor);
+
+    // INDIVIDUAL only, mirroring the create path and `buildScreeningSubjects`: a company has no date of
+    // birth or nationality of its own — those belong to the natural persons behind it, which is what the
+    // UBO records carry. Accepting them on a corporate customer would write two columns nothing screens.
+    if (customer.customerType !== 'INDIVIDUAL') {
+      throw new UnprocessableEntityException(
+        `Customer ${customerId}: dateOfBirth and nationality apply to an INDIVIDUAL customer (this one is ${customer.customerType}). A company's own identity discriminators are its beneficial owners' — correct those on the UBO record.`,
+      );
+    }
+
+    const wantedDateOfBirth = parseDateOnly(dto.dateOfBirth);
+    const before = {
+      dateOfBirth: customer.dateOfBirth
+        ? customer.dateOfBirth.toISOString().slice(0, 10)
+        : null,
+      nationality: customer.nationality,
+    };
+
+    // NOTHING SENT and NOTHING CHANGED are two different refusals, deliberately.
+    //
+    // A correction that re-sends the value already on the row is not a correction: it would write a row
+    // reading "corrected dateOfBirth from 1990-01-01 to 1990-01-01", which is a false record in the one
+    // table that exists to be justifiable, and it would re-screen for an answer that cannot differ. The
+    // contact path has no equivalent check because re-sending a phone number costs nothing; here it costs
+    // a misleading evidence row.
+    const sent = (['dateOfBirth', 'nationality'] as const).filter(
+      (field) => dto[field] !== undefined,
+    );
+    if (sent.length === 0) {
+      throw new UnprocessableEntityException(
+        `Customer ${customerId}: nothing to correct — send dateOfBirth, nationality, or both.`,
+      );
+    }
+    const changed = sent.filter((field) =>
+      field === 'dateOfBirth'
+        ? dto.dateOfBirth !== before.dateOfBirth
+        : dto.nationality !== before.nationality,
+    );
+    if (changed.length === 0) {
+      throw new UnprocessableEntityException(
+        `Customer ${customerId}: every value sent is already the value on record (${sent.join(', ')}), so there is nothing to correct and nothing to re-screen.`,
+      );
+    }
+
+    // READ BEFORE THE WRITE. The latest file and the screening answer this correction supersedes — once
+    // the re-screen below runs it adds newer rows, and `[0]` would then be the NEW result rather than the
+    // prior one.
+    const kyc = await this.kycRecords.findLatestByCustomerId(customerId);
+    const priorResults = kyc
+      ? await this.kycRecords.findScreeningResultsByKycRecordId(kyc.id)
+      : [];
+
+    const updated = await this.customers.updateIdentifiers(customerId, {
+      dateOfBirth: wantedDateOfBirth,
+      nationality: dto.nationality,
+    });
+
+    // ONE CORRECTION ROW PER FIELD CHANGED, written BEFORE the re-screen — see
+    // `CustomerRepository.linkNewScreeningResult` for why that order, which is the same argument
+    // `ScreeningHoldService.assertClearToProceed` makes about its own release row.
+    //
+    // NOT best-effort, unlike the contact path's. There the row buys a DSR link and the details are
+    // already corrected; here the row IS the record the AMLU requires retained for a screening
+    // identifier, so a correction whose evidence cannot be written must fail loudly rather than succeed
+    // quietly — a changed discriminator with no record is the thing the deferral refused.
+    const correctionIds: string[] = [];
+    const dsrId =
+      dto.answersRequestType === 'dsr' ? dto.answersRequestId : undefined;
+    for (const field of changed) {
+      const values = await encryptEntityFields(
+        this.encryption,
+        'CustomerIdentifierCorrection',
+        {
+          beforeValueEnc: before[field] ?? undefined,
+          afterValueEnc: dto[field],
+        },
+        {
+          userId: actor.id,
+          entityType: 'CustomerIdentifierCorrection',
+          entityId: customerId,
+        },
+      );
+      const id = randomUUID();
+      await this.customers.recordCorrection({
+        id,
+        customerId,
+        field,
+        beforeValueEnc: values.beforeValueEnc,
+        afterValueEnc: values.afterValueEnc,
+        reason: dto.reason,
+        correctedByUserId: actor.id,
+        dsrId,
+        kycRecordId: kyc?.id,
+        kycStatusBefore: kyc?.status,
+        priorScreeningResultId: priorResults[0]?.id,
+      });
+      correctionIds.push(id);
+    }
+
+    // THE RE-SCREEN. Jordan's AMLU requires screening "Upon KYC reviews or CHANGES TO A CUSTOMER'S
+    // INFORMATION", and since `buildScreeningSubjects` carries both discriminators this is a genuinely
+    // different question rather than a re-run of the same one: until those columns had a producer every
+    // match this system raised agreed on NAME ALONE.
+    //
+    // Best-effort, and the backstop is what makes that honest rather than convenient: a file whose
+    // identity changed and whose screening did not re-run raises `IDENTITY_CHANGED_SINCE_SCREENING`, so
+    // the next decision on it is held. `rescreened: false` is reported to the caller rather than
+    // swallowed, because a screen saying "corrected" while the re-screen failed is the overclaiming shape
+    // — and the correction row's null `newScreeningResultId` is the queryable half of the same fact.
+    let rescreened = false;
+    if (kyc) {
+      try {
+        const run = await this.screening.run(kyc.id, actor.id);
+        rescreened = true;
+        const newest = run.results[0];
+        if (newest) {
+          await this.customers.linkNewScreeningResult(correctionIds, newest.id);
+        }
+      } catch (err) {
+        this.logger.error(
+          `Customer ${customerId}: identifier correction recorded, but re-screening KYC file ${kyc.id} failed: ${(err as Error).message}. The screening hold will refuse the next decision on that file (IDENTITY_CHANGED_SINCE_SCREENING).`,
+        );
+      }
+    }
+
+    try {
+      await this.audit.record({
+        userId: actor.id,
+        action: 'UPDATE',
+        entityType: 'Customer',
+        entityId: customerId,
+        // WHICH FIELDS CHANGED, NEVER THEIR VALUES — and that is the opposite treatment from the ADDRESS
+        // one field over, for a reason about the LOG rather than about the column.
+        //
+        // `dateOfBirth` and `nationality` are NOT encrypted columns, so the contact path's argument
+        // ("writing the plaintext into an audit row would defeat the column") does not apply here. The
+        // one that does is the DSR intake's: `AuditLogEntry` is immutable by trigger, so a date of birth
+        // written there is personal data an ERASURE REQUEST CAN NEVER REACH. The values live on the
+        // Customer row and on the correction row, both of which an erasure can reach.
+        beforeValue: { fieldsBeforeCorrection: changed },
+        afterValue: {
+          fieldsCorrected: changed,
+          reasonLength: dto.reason.length,
+          kycRecordId: kyc?.id ?? null,
+          kycStatusBefore: kyc?.status ?? null,
+          rescreened,
+          answersRequestType: dto.answersRequestType ?? null,
+          answersRequestId: dto.answersRequestId ?? null,
+        },
+      });
+    } catch {
+      // Best-effort, the same treatment every other audit call in this service gets.
+    }
+
+    return { ...(await this.toMasked(updated, actor.id)), rescreened };
   }
 
   async addUbo(

@@ -10,49 +10,51 @@ import {
   type PortfolioBreakdownRow,
 } from '../../../lib/management-reporting/portfolio-analysis-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 function BreakdownTable({ rows }: { rows: PortfolioBreakdownRow[] }) {
   const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ color: 'var(--ink-secondary)' }}>{t('paNone')}</p>;
+    return <EmptyState title={t('paNone')} />;
   }
   return (
-    <table style={{ borderCollapse: 'collapse', minWidth: '26rem' }}>
+    <Card padded={false}>
+            <Table>
       <thead>
         <tr>
-          <th style={head}>{t('dashColKey')}</th>
-          <th style={head}>{t('dashColPolicies')}</th>
-          <th style={head}>{t('dashTotalIssuedPremium')}</th>
+          <Th>{t('dashColKey')}</Th>
+          <Th>{t('dashColPolicies')}</Th>
+          <Th>{t('dashTotalIssuedPremium')}</Th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.key}>
-            <td style={cell}>
+          <Tr key={row.key}>
+            <Td>
               <bdi>{row.key}</bdi>
-            </td>
-            <td style={cell}>{row.policyCount}</td>
-            <td style={cell}>{row.totalIssuedPremiumJod}</td>
-          </tr>
+            </Td>
+            <Td>{row.policyCount}</Td>
+            <Td>{row.totalIssuedPremiumJod}</Td>
+          </Tr>
         ))}
       </tbody>
-    </table>
+    </Table>
+          </Card>
   );
 }
 
@@ -94,14 +96,14 @@ export default function PortfolioAnalysisPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('paHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('paIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('paHeading')}
+        description={t('paIntro')}
+      />
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary ? (
@@ -129,7 +131,7 @@ export default function PortfolioAnalysisPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

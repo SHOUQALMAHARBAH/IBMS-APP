@@ -1231,10 +1231,24 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     // — the test body, the restore, or both — is what actually throws.
     let testError: unknown = null;
     try {
-      // A non-Compliance actor cannot touch the license at all.
+      /*
+       * A non-Compliance actor cannot touch the licence at all.
+       *
+       * RE-POINTED from `POST /broker-license/mark-lapsed`, which is GONE. That route took no body
+       * and flipped a two-value column, so the office record of a CBJ suspension carried no basis,
+       * no effective date, no decision reference and no letter. The permission being asserted is
+       * the same (`license.manage`); what is asserted now is that the REPLACEMENT route is just as
+       * closed.
+       */
       await request(app.getHttpServer())
-        .post('/broker-license/mark-lapsed')
+        .post('/broker-license/regulatory-actions')
         .set(bearer(plc.accessToken))
+        .send({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: '2026-01-01',
+          decisionRef: 'should-not-apply',
+        })
         .expect(403);
 
       // Confirm the license reads as active + not lapsed before the block
@@ -1265,19 +1279,51 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
         .send({ opportunityId: okOpportunityId, inceptionDate: '2026-10-01' })
         .expect(201);
 
-      // Mark the license lapsed, then confirm a NEW placement is blocked.
-      const lapsed = await request(app.getHttpServer())
-        .post('/broker-license/mark-lapsed')
-        .set(bearer(compliance.accessToken))
-        .expect(201);
-      expect((lapsed.body as BrokerLicenseBody).status).toBe('lapsed');
-
+      /*
+       * THE CHAIN FOR THE BLOCKED CASE IS BUILT FIRST, WHILE THE LICENCE IS STILL CURRENT — and
+       * that is a real consequence of module 0-ب's licence batch rather than test bookkeeping.
+       *
+       * It used to be built after the lapse, which was fine when `assertLicenseNotLapsed` gated
+       * `place()` and nothing else. Five more acts are gated now, and `acceptedOpportunity` walks
+       * through one of them: `POST /recommendations/:id/send` is `ISSUE_RECOMMENDATION`. So the
+       * fixture for the blocked placement was itself refused by the gate it exists to test, and the
+       * failure read `expected 201, got 422` on a RECOMMENDATION SEND — which looks like an
+       * unrelated module until you know the gate widened.
+       */
       const { opportunityId: blockedOpportunityId } = await acceptedOpportunity(
         app,
         plc.accessToken,
         plc.userId,
         'license-blocked',
       );
+
+      /*
+       * SUSPEND THE LICENCE, then confirm a NEW placement is blocked.
+       *
+       * RE-POINTED, and the reversal is worth stating: this used to flip `BrokerLicense.status` to
+       * `'lapsed'` — a stored flag that was the THIRD of three answers to whether the office may
+       * practise, and the one the derivation's six states replaced. The office is now made
+       * unlicensed the way it happens in reality, by recording the CBJ decision, and the refusal
+       * comes from `LicenseGateService` — the one answer, which this placement path consults
+       * through `assertMayPractise('PLACE_POLICY')`.
+       */
+      const suspendRef = 'CBJ/POLICY-E2E/' + RUN;
+      const lapsed = await request(app.getHttpServer())
+        .post('/broker-license/regulatory-actions')
+        .set(bearer(compliance.accessToken))
+        .send({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: new Date().toISOString().slice(0, 10),
+          decisionRef: suspendRef,
+        })
+        .expect(201);
+      // The derived standing, not a stored flag — and CITABLE, which is the whole difference.
+      expect(
+        (lapsed.body as { status: string; mayPractise: boolean }).status,
+      ).toBe('SUSPENDED');
+      expect((lapsed.body as { mayPractise: boolean }).mayPractise).toBe(false);
+
       const blocked = await request(app.getHttpServer())
         .post('/policies')
         .set(bearer(plc.accessToken))
@@ -1286,8 +1332,18 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
           inceptionDate: '2026-10-01',
         })
         .expect(422);
+      /*
+       * The refusal is `LicenseGateService`'s now, so it NAMES THE ACT and cites the article — and
+       * the old `/license.*lapsed/i` could not have caught either. It also names what is NOT
+       * affected, which is asserted because an over-wide reading of the block is a worse defect
+       * than the block missing.
+       */
       expect((blocked.body as { message: string }).message).toMatch(
-        /license.*lapsed/i,
+        /placing new business/i,
+      );
+      expect((blocked.body as { message: string }).message).toMatch(/21\/a\/9/);
+      expect((blocked.body as { message: string }).message).toMatch(
+        /collection/i,
       );
       // No Policy row was created for the blocked Opportunity.
       const noPolicy = await prisma.policy.findUnique({
@@ -1306,6 +1362,31 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     // hiccup, an expired token, a real regression) — in that case the old
     // check silently did nothing, leaving the singleton lapsed with no
     // signal. Both conditions are asserted unconditionally now.
+    /*
+     * THE RESTORE NEEDED A SECOND HALF, and that is a real consequence of the change rather than
+     * bookkeeping: appending a later TERM used to be enough, because the thing blocking placement
+     * was a column on the old term. A recorded CBJ suspension is a fact about the OFFICE and
+     * outlives the term, so it has to be cleared by the regulator undoing its own act — art. 14/b,
+     * a recorded REINSTATEMENT.
+     *
+     * This runs FIRST, before the renewal, so that a failure here is reported as itself rather than
+     * as a renewal that appeared to work and left every later e2e file blocked.
+     */
+    const reinstated = await request(app.getHttpServer())
+      .post('/broker-license/regulatory-actions')
+      .set(bearer(compliance.accessToken))
+      .send({
+        kind: 'REINSTATEMENT',
+        basis: 'SANCTION',
+        effectiveFrom: new Date().toISOString().slice(0, 10),
+        decisionRef: 'CBJ/POLICY-E2E/' + RUN + '/REINSTATE',
+      });
+    if (reinstated.status !== 201) {
+      throw new Error(
+        `Broker licence reinstatement failed (status ${reinstated.status}: ${JSON.stringify(reinstated.body)}) — every subsequent e2e file placing a Policy would now be blocked.`,
+      );
+    }
+
     const restored = await request(app.getHttpServer())
       .post('/broker-license/renew')
       .set(bearer(compliance.accessToken))

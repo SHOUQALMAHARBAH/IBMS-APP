@@ -49,6 +49,44 @@ export class DocumentRepository {
     });
   }
 
+  /**
+   * THE DOCUMENT PICKER's source — owner decision 41, module 0-ب's screen pass.
+   *
+   * Matches on `fileName` alone, which is the only human-readable field on the model. `take` is a
+   * REQUIRED argument rather than defaulted, on the established picker shape: a bound that a caller can
+   * forget is a bound that eventually returns the register.
+   *
+   * The select is deliberately narrow — an id, the name, and the two facts that tell two matches apart.
+   * `storageRef`, `classification` and the uploader are NOT returned: a chooser is a way to name a
+   * record, and `GET /documents/:id` is where its contents are read under the same permission.
+   */
+  searchForPicker(
+    term: string,
+    take: number,
+  ): Promise<
+    {
+      id: string;
+      fileName: string;
+      category: DocumentCategory;
+      versionNumber: number;
+    }[]
+  > {
+    return this.prisma.client.document.findMany({
+      where: { fileName: { contains: term, mode: 'insensitive' } },
+      select: {
+        id: true,
+        fileName: true,
+        category: true,
+        versionNumber: true,
+      },
+      // A TOTAL order — `fileName` is far from unique here (forty policies carry a "policy.pdf"), so it
+      // cannot carry one alone and the row id is the tie-break. The `findActiveUserIdsWithPermission`
+      // lesson: a consumer reading the first row imposes an ordering requirement nothing type-checks.
+      orderBy: [{ fileName: 'asc' }, { id: 'asc' }],
+      take,
+    });
+  }
+
   /** A document has a successor once some row's `previousVersionId` points
    * at it — `previousVersionId` is `@unique`, so at most one exists. */
   async hasSuccessor(id: string): Promise<boolean> {

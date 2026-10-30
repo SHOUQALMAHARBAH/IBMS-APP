@@ -37,14 +37,30 @@ import {
 const ALL_OWNERS_BY_ROLE: Readonly<Record<string, readonly string[]>> = {
   SALES_RELATIONSHIP_OFFICER: [],
   PLACEMENT_TECHNICAL_OFFICER: [
+    // Owner decision 57 — this role can never OWN a customer
+    // (`customer.create` is SALES alone), so the owner filter left
+    // `/customers` permanently empty while the screen said there were none.
+    CUSTOMER_ALL_OWNERS_READ,
     CUSTOMER_FILE_ALL_OWNERS_READ,
     POLICY_ALL_OWNERS_READ,
     ENDORSEMENT_ALL_OWNERS_READ,
     RECOMMENDATION_ALL_OWNERS_READ,
   ],
   POLICY_CHECKING_OFFICER: [POLICY_ALL_OWNERS_READ],
-  CLAIMS_OFFICER: [CLAIM_ALL_OWNERS_READ],
-  FINANCE_COLLECTIONS_OFFICER: [ENDORSEMENT_ALL_OWNERS_READ],
+  CLAIMS_OFFICER: [
+    // Owner decision 57 — this role can never OWN a customer
+    // (`customer.create` is SALES alone), so the owner filter left
+    // `/customers` permanently empty while the screen said there were none.
+    CUSTOMER_ALL_OWNERS_READ,
+    CLAIM_ALL_OWNERS_READ,
+  ],
+  FINANCE_COLLECTIONS_OFFICER: [
+    // Owner decision 57 — this role can never OWN a customer
+    // (`customer.create` is SALES alone), so the owner filter left
+    // `/customers` permanently empty while the screen said there were none.
+    CUSTOMER_ALL_OWNERS_READ,
+    ENDORSEMENT_ALL_OWNERS_READ,
+  ],
   COMPLIANCE_OFFICER: [
     CUSTOMER_ALL_OWNERS_READ,
     RECOMMENDATION_ALL_OWNERS_READ,
@@ -58,7 +74,20 @@ const ALL_OWNERS_BY_ROLE: Readonly<Record<string, readonly string[]>> = {
     ENDORSEMENT_ALL_OWNERS_READ,
     RECOMMENDATION_ALL_OWNERS_READ,
   ],
-  DATA_PROTECTION_OFFICER: [],
+  DATA_PROTECTION_OFFICER: [
+    // Owner decision, 2026-10-28 — register row 2.2: the data-subject field
+    // reported that a customer who exists was "not available". The GATE was
+    // already open (the DPO holds `dsr.log`, which is in
+    // `CUSTOMER_SEARCH_CODES`); the OWNER FILTER beneath it returned zero rows
+    // for every word, because the DPO can never own a customer.
+    //
+    // This opens ONE route. The DPO holds no `customer.*`, `kyc.*` or
+    // `screening.*` code, so the list, the detail, the reveal, the UBO
+    // register, the 360° timeline and the KYC file all stay 403 — and that
+    // absence is what justifies the grant, pinned in `permissions.spec.ts` and
+    // in migration `20261213100000` rather than left as a reading.
+    CUSTOMER_ALL_OWNERS_READ,
+  ],
   SYSTEM_SECURITY_ADMINISTRATOR: [],
   EXECUTIVE_MANAGEMENT: [
     LEAD_ALL_OWNERS_READ,

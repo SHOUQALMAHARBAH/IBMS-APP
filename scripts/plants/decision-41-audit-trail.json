@@ -1,0 +1,44 @@
+{
+  "required-typed-identifier-budget-raised": {
+    "file": "scripts/measurements/typed-identifier-inputs.py",
+    "from": "REQUIRED_TYPED_IDENTIFIER_BUDGET = 0",
+    "to": "REQUIRED_TYPED_IDENTIFIER_BUDGET = 1",
+    "why": "THE ONLY BUDGET THIS BATCH MOVED, PLANTED IN THE DIRECTION A RATCHET ACTUALLY ROTS. At 0 the class is a flat ban, so the UP direction is already covered by `required-typed-identifier-shipped` in the sibling file; what this covers is somebody raising the number to re-admit a required identifier — the `MISSING_DESCRIPTION_BUDGET` failure mode, where a ratchet becomes a ceiling. `check:typed-identifiers` fails naming 0 as the number to lower it back to. The genuine below-budget direction is DEGENERATE here and is not faked with a plant that cannot run: nothing falls below zero."
+  },
+  "the-web-loses-a-workflow-entity-type": {
+    "file": "apps/web/lib/audit-trail/workflow-entity-types.ts",
+    "from": "  | 'DisposalBatch'\n",
+    "to": "",
+    "why": "THE DRIFT THE SELECT MADE LOAD-BEARING. While `wfEntityType` was a free-text box a short copy of the eighteen cost nothing — a person typed the string. Owner decision 41 made it a `<select>` built from this list, so a missing member means a compliance officer CANNOT SELECT that type at all, and the most natural conclusion is that the record has no history. Nothing fails at compile time: two packages, two builds, and the api's union is unreachable from here. `workflow-entity-type-parity.spec.ts` fails by NAME — `expected [ 'DisposalBatch' ] to deeply equal []` — on the assertion whose title is the direction that matters, plus the declaration-order one. `DisposalBatch` is the target deliberately: a disposal is irreversible and its approval chain is the history somebody comes to this screen to read."
+  },
+  "a-member-loses-its-word": {
+    "file": "apps/web/lib/audit-trail/workflow-entity-types.ts",
+    "from": "  Endorsement: 'workflowEntityEndorsement',",
+    "to": "  Endorsement: null,",
+    "why": "THE STATE THE THREE WORDS LEFT BEHIND ON 2026-10-23, RESTORED. `Endorsement` was `null` for one day and rendered its own member name — an English word in an Arabic dropdown, which was the honest display of an unfinished label. Now that all eighteen are worded, a `null` is a REGRESSION rather than a declaration, and TWO layers say so: `workflow-entity-type-parity.spec.ts` fails on `no member carries a null label — all eighteen have a word` (its `MAY_HAVE_NO_LABEL` is empty, so the subset check became a flat ban with no line of it changing), and `audit-trail.spec.ts` fails on the assertion that no option renders its own member name — the visible signature of a null, measured to be unreachable by any correct label because not one of the eighteen English words equals its member name. **THE PLAYWRIGHT HALF EXISTS BECAUSE THE PARITY HALF CANNOT SEE A SCREEN**: a label map could stay total and still render nothing if the key were wrong, and only the browser knows what a reader sees."
+  },
+  "the-label-map-stops-being-total": {
+    "file": "apps/web/lib/audit-trail/workflow-entity-types.ts",
+    "from": "} satisfies Record<WorkflowEntityType, TranslationKey | null>;",
+    "to": "} as Record<string, string | null>;",
+    "why": "THE COMPILE-TIME HALF, REMOVED — and this plant exists to show which half is which. The `satisfies` is what makes adding a nineteenth member without deciding its word a TYPE ERROR, and what makes a label naming a key the dictionary does not hold a type error too. Swapped for an `as` cast, both of those go silent and a missing label renders `t(undefined)`, which is nothing at all — the notification-bell defect, on a dropdown. `workflow-entity-type-parity.spec.ts` refuses rather than passing: its `} satisfies` boundary assertion cannot find the map and says so verbatim, because a guard that quietly read zero entries would then report clean. **IT FAILS AS A `Failed Suites 1` WITH `Tests  no tests`, NOT AS A NAMED TEST, and that is measured rather than assumed — my first `why` here claimed 'by NAME' and was wrong.** `labelMap()` runs in the `describe` body (the shape the sibling `notification-kinds-parity.spec.ts` established), so the assertion throws during COLLECTION and no test gets to run. The exit is non-zero and the sentence is printed in full, so it is loud — but a reader skimming for the `Tests` line sees 'no tests', which is the one way this failure could be mistaken for nothing having happened. Named here so it cannot be."
+  },
+  "the-document-chooser-is-widened-to-the-auditor": {
+    "file": "apps/api/src/common/picker-search.config.ts",
+    "from": "export const DOCUMENT_SEARCH_CODES = ['document.read'] as const;",
+    "to": "export const DOCUMENT_SEARCH_CODES = ['document.read', 'document-history.read'] as const;",
+    "why": "THE EXACT EDIT OWNER DECISION 41 REFUSES. The house rule says a picker's route is gated on ANY OF the permissions of the screens that use it; the screen that types a `documentId` is `/audit-trail`, gated on `document-history.read`; so this line is what the rule reads as the fix. It would hand a READ-ONLY AUDITOR a name search over every document in the office — every KYC pack, every incident report, every disposal batch's evidence — to serve a field they can already fill from an inbound link. `picker-search-gates.e2e-spec.ts` fails with `expected 403, got 200` on the assertion named for that role. **CORRECTED 2026-10-23: this `why` first said `picker-route-reachability.mjs` REPORTS the route as unreachable and would recommend this edit. MEASURED, IT DOES NOT** — that script prints six picker sections and no DOCUMENT one, reporting `0 stuck`, because its screen-side map carries no `documentId` field. So nothing will nag a future reader into applying this plant's edit, and nothing but this plant's own test will catch it if they do. That is weaker than I first wrote and is why the correction matters more than the claim: I asserted a measurement's behaviour in four files without running it."
+  },
+  "the-chooser-is-offered-to-a-reader-who-will-be-refused": {
+    "file": "apps/web/app/(app)/audit-trail/page.tsx",
+    "from": "          {hasPermission(user, 'document.read') ? (",
+    "to": "          {true ? (",
+    "why": "THE WEB HALF OF THE SAME ABSENCE, which the api e2e above structurally cannot see. With the condition gone the EXTERNAL_AUDITOR is shown a document chooser whose every keystroke answers 403 — a control rendered for a reader who cannot use it, which is the one thing `docs/frontend-ux-directive.md` is most explicit about. NOTE THAT NO GATE AND NO TEST CATCHES THIS TODAY, and that is stated here rather than discovered: `audit-trail.spec.ts` asserts the chooser's ABSENCE for a reader without the code, so this plant kills exactly that test — and if that assertion is ever deleted, this plant becomes the only record that the condition was deliberate. A plant whose value is partly the LABEL, like the controller-prefix one in the sibling file."
+  },
+  "the-url-stops-filling-the-field": {
+    "file": "apps/web/app/(app)/audit-trail/page.tsx",
+    "from": "    () => searchParams.get('entityId') ?? '',",
+    "to": "    () => '',",
+    "why": "OWNER DECISION 41's WHOLE MECHANISM, DISABLED. The inbound links on sixteen screens still render and still carry `?entityType=&entityId=`, the URL is still correct, and the field arrives EMPTY — so the fault the decision removed is back in full (a person must paste a uuid) while every link looks like it works. That is the shape worth planting: nothing errors, nothing is red, and the capability is gone. `audit-trail.spec.ts` fails on the assertion that the field is prefilled from the query string. The TYPE half is a separate state and a separate assertion, deliberately: a plant that cleared both would not tell which of the two the test observes."
+  }
+}

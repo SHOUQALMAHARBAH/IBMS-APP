@@ -1,0 +1,7 @@
+{
+  "a-third-code-crosses-the-asymmetry-unrecorded": {
+    "file": "packages/db/prisma/seed.ts",
+    "from": "    \"email.integration.read\",\n    \"email.integration.manage\",",
+    "to": "    \"email.integration.read\",\n    \"email.integration.manage\",\n    \"vendor.read\","
+  }
+}

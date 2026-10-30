@@ -1,3 +1,4 @@
+import { parseCalendarDate } from '../../common/calendar-date.util';
 import {
   ConflictException,
   Injectable,
@@ -15,6 +16,7 @@ import {
   type InsurerRelationshipFields,
   type InsurerStatusImpact,
 } from '../../repositories/insurer.repository';
+import { officeMayEditCompanyFacts } from '../../repositories/insurer-identity';
 import { pageWindow, type Paginated } from '../../common/pagination';
 import { PICKER_MAX_RESULTS } from '../../common/picker-search.config';
 import type { SearchInsurersDto } from '../../common/picker-search.dto';
@@ -31,6 +33,7 @@ import type {
   RegisterInsurerDto,
   UpdateInsurerDto,
 } from './dto/insurer-crud.dto';
+import { resolveInsurerNamePair } from '../../repositories/insurer-identity';
 
 /** What the two status endpoints answer with: the record as it now stands, and what was
  *  outstanding at the moment it changed. Two named halves rather than extra keys on the
@@ -113,14 +116,35 @@ export class InsurerService {
       dto.q,
       PICKER_MAX_RESULTS.insurer,
     );
-    return rows.map((r) => ({
-      id: r.id,
-      // The local name when the office registered the company itself, the catalogue's otherwise. A row
-      // carries exactly one identity (the `Insurer_has_identity` CHECK), so this coalesce cannot be
-      // empty — and `legalName` is only nullable because of that split, not because a name is optional.
-      name: r.legalName ?? r.insurerMaster?.legalName ?? '',
-      nameAr: r.legalNameAr ?? r.insurerMaster?.legalNameAr ?? null,
-    }));
+    return rows.map((r) => {
+      /*
+       * ITEM 3 — A FOURTH IMPLEMENTATION OF THE NAME PRECEDENCE LIVED HERE, and the new inventory
+       * guard found it on its first run rather than anybody reading for it. It was worse than the
+       * other three in two ways:
+       *
+       *   - IT IGNORED THE REGISTERED COMPANY ENTIRELY, so a placement officer choosing an
+       *     insurer from this picker would see the catalogue or local name while `/insurers` and
+       *     every outward document showed the company's own registered name. The picker is where
+       *     an insurer gets CHOSEN, so a reader comparing it against the directory would have
+       *     found two names for one company.
+       *   - IT COALESCED PER FIELD (`legalName ?? master.legalName`, `legalNameAr ??
+       *     master.legalNameAr`), which is the exact drift `insurerIdentity` carries a paragraph
+       *     against: a row whose chosen source has no Arabic name falls through to a DIFFERENT
+       *     source's Arabic name, rendering one company's Latin name beside another's Arabic.
+       *     Today that is unreachable — `Insurer_has_identity` means a row carries one identity —
+       *     but it stopped being unreachable the moment a registered company became a third
+       *     source.
+       *
+       * So the SOURCE is chosen once and both names are read from it, which is `insurerIdentity`'s
+       * own discipline, and the Latin half goes through the one precedence so the two cannot
+       * disagree.
+       */
+      // THE PAIR, from the one resolver. My first fix here still spelled the master branch for
+      // `nameAr` — and the new inventory guard caught that too, on the same run, which is why the
+      // pair has its own home rather than three call sites each choosing a source.
+      const source = resolveInsurerNamePair(r);
+      return { id: r.id, name: source.name, nameAr: source.nameAr };
+    });
   }
 
   async list(query: ListInsurersQueryDto): Promise<Paginated<InsurerView>> {
@@ -167,6 +191,8 @@ export class InsurerService {
 
     const company = this.companyFrom(dto);
     const relationship = this.relationshipFrom(dto);
+    // DECISION 90, on the create path: `current` is null because there is no row yet.
+    this.assertRatingCarriesItsDate(relationship, null);
     // Resolved BEFORE the insurer is written: an unknown line id is a 422 about the
     // body, and discovering it after the insert would leave a registered company with
     // a half-applied product list and no way for the caller to tell.
@@ -245,6 +271,48 @@ export class InsurerService {
       );
     }
 
+    /*
+     * REGISTER ENTRY 36 — THE LINK IS NOW A SERVER BOUNDARY, NOT A SCREEN ONE.
+     *
+     * `officeMayEditCompanyFacts` was projected onto the view and read by the screen, which greyed the
+     * company fields out. The server honoured a direct `PATCH` anyway, so the read-only was one layer.
+     * A hidden control the API still honours is not a boundary — the rule item (j) established with
+     * three layers for a PLATFORM permission (the matrix hides the code, `setPermissions` refuses it,
+     * the route checks the organization type), and this had one.
+     *
+     * THE SAME FUNCTION THE VIEW CALLS, deliberately. A second predicate spelling the condition again
+     * would be a second answer to "may this office type over a registered company's details", and the
+     * copy is the one that drifts — a screen saying read-only beside a server that permits it is the
+     * defect being fixed, and its mirror image is just as wrong.
+     *
+     * THE TOUCHED KEYS ARE DERIVED FROM `companyFrom`, NOT LISTED. A company fact added to the DTO
+     * later is covered the moment it appears there, where a hand-kept list here would admit it
+     * silently. The NAME is added explicitly because it is the company's own and is not a member of
+     * `InsurerCompanyFields` — it has its own column.
+     *
+     * THE RELATIONSHIP FIELDS STAY EDITABLE, which is the point of the link rather than a concession:
+     * what this office pays, which lines it places and whom it calls are facts about the OFFICE's
+     * relationship, and the registered company answers for none of them.
+     */
+    if (!officeMayEditCompanyFacts(row)) {
+      const touched = [
+        ...Object.keys(this.companyFrom(dto)),
+        ...(dto.legalName === undefined ? [] : ['legalName']),
+        ...(dto.legalNameAr === undefined ? [] : ['legalNameAr']),
+      ].sort();
+      if (touched.length > 0) {
+        /*
+         * The refusal NAMES the fields and the way out. "Forbidden" with no field list sends somebody
+         * removing one key at a time, and a 403 would be wrong twice over: the caller holds the
+         * permission, and the record is theirs — what has changed is who answers for these particular
+         * columns.
+         */
+        throw new UnprocessableEntityException(
+          `This insurer's record is linked to a registered insurance company, so the company's own details are answered by that company and cannot be edited here: ${touched.join(', ')}. The office's relationship terms are still editable. To take these details back under this office's control, unlink the record first.`,
+        );
+      }
+    }
+
     const patch: InsurerCompanyFields &
       InsurerRelationshipFields & {
         legalName?: string;
@@ -260,6 +328,13 @@ export class InsurerService {
         ? {}
         : { legalNameAr: dto.legalNameAr }),
     };
+
+    /*
+     * DECISION 90, on the UPDATE path, and this is the case a DTO could never get right: the rule is
+     * about the row AFTER the patch. `row` is the current state, `patch` is what this body changes,
+     * and the check reads the merge of the two.
+     */
+    this.assertRatingCarriesItsDate(patch, row);
 
     const resolvedLines = await this.resolveLineIds(dto.lineIds);
     const delta = auditDelta(row, patch);
@@ -406,6 +481,92 @@ export class InsurerService {
 
   /** One of this office's insurers, or absent. See the header for why absent is a
    *  404 even when the row exists in another office. */
+  /**
+   * DECISION 93 — CLEARS THE FINANCIAL STRENGTH RATING AND ITS AS-OF DATE IN ONE WRITE.
+   *
+   * ## WHY AN ACTION AND NOT A FIELD EDIT
+   *
+   * They are a PAIR by `Insurer_rating_carries_its_date`: clearing one alone either violates the
+   * constraint or leaves a dateless rating standing. And neither can be cleared through the ordinary
+   * PATCH at all — an empty string is refused by the DTO's length rule before any service rule runs,
+   * and `emptyStringToUndefined` turns an empty date into "no change" rather than into a clear. That
+   * gap is PRE-EXISTING, recorded in `docs/deferred-register.md`, and is NOT repaired here: the
+   * general fix (an explicit null meaning clear, absent meaning no change, an empty string refused)
+   * is an API-WIDE pass, and inventing it for one field would be a third way of saying "remove a
+   * value" in a codebase that already has two.
+   *
+   * So this is the narrow exit, scoped to one pair. The DTO's length rule is untouched,
+   * `emptyStringToUndefined` is untouched, and no null-means-clear convention is introduced.
+   *
+   * ## NO CONFIRMATION STEP, DELIBERATELY
+   *
+   * Clearing an optional note is undone by retyping it. The governing decision blocks what cannot be
+   * undone and warns about what can; it does not warn about what one line of typing restores. A
+   * confirm step here is exactly the weight decision 90 exists to remove, and the audit row — the
+   * value before and the value after — is the record.
+   *
+   * ## A NO-OP WHEN THERE IS NOTHING TO CLEAR, which is the OPPOSITE of the unlink's 409
+   *
+   * The distinction is what the operator's mistake would be. Unlinking a record that is not linked
+   * suggests they targeted the wrong record, which is worth surfacing. Clearing a rating that was
+   * never there is harmless and idempotent — there is no wrong-record hypothesis to raise, and no
+   * audit row is written because nothing changed.
+   */
+  async clearFinancialStrengthRating(
+    id: string,
+    actorUserId: string,
+  ): Promise<InsurerView> {
+    const row = await this.load(id);
+    if (
+      row.financialStrengthRating === null &&
+      row.financialStrengthRatingAsOf === null
+    ) {
+      // Nothing to clear — a no-op rather than a 422, because "already clear" is the state the
+      // caller asked for.
+      //
+      // THIS COMMENT HAS NOW BEEN WRONG IN BOTH DIRECTIONS, AND BOTH CORRECTIONS ARE KEPT because
+      // the pair is the lesson. It first said "the screen does not offer the action in this state
+      // either", describing a screen that did not exist; corrected on 2026-10-15 to say that nothing
+      // in `apps/web` called this route at all, which was true then.
+      //
+      // IT IS BUILT NOW — owner decision 43, 2026-10-23. `/insurers/[id]` carries a single Clear
+      // control, and it is rendered ONLY where there is something to clear, so the original claim is
+      // true again for the first time: the screen does not offer the action in this state. What
+      // keeps the no-op branch right regardless is that "already clear" is the state the caller
+      // asked for, and that does not depend on any screen.
+      return deriveInsurerView(row);
+    }
+
+    await this.insurers.update(id, {
+      financialStrengthRating: null,
+      financialStrengthRatingAsOf: null,
+    });
+
+    await this.audit.record({
+      userId: actorUserId,
+      action: 'UPDATE',
+      entityType: 'Insurer',
+      entityId: id,
+      /*
+       * BOTH HALVES OF WHAT WAS THERE. After the write both columns are NULL, so without `beforeValue`
+       * the trail would say a rating was cleared without saying what it was — and the rating is this
+       * office's record of the care it took in choosing an insurer, which is the half an auditor asks
+       * about.
+       */
+      beforeValue: {
+        financialStrengthRating: row.financialStrengthRating,
+        financialStrengthRatingAsOf:
+          row.financialStrengthRatingAsOf?.toISOString() ?? null,
+      },
+      afterValue: {
+        financialStrengthRating: null,
+        financialStrengthRatingAsOf: null,
+      },
+    });
+
+    return deriveInsurerView(await this.load(id));
+  }
+
   private async load(id: string): Promise<InsurerRecord> {
     const row = await this.insurers.findById(id);
     if (!row) throw new NotFoundException(`Insurer ${id} not found.`);
@@ -512,7 +673,66 @@ export class InsurerService {
       fields.creditTermsDays = dto.creditTermsDays;
     if (dto.financialStrengthRating !== undefined)
       fields.financialStrengthRating = dto.financialStrengthRating;
+    if (dto.financialStrengthRatingAsOf !== undefined)
+      fields.financialStrengthRatingAsOf = parseCalendarDate(
+        dto.financialStrengthRatingAsOf,
+        'financialStrengthRatingAsOf',
+      );
+    if (dto.ratingAgencyId !== undefined)
+      fields.ratingAgencyId = dto.ratingAgencyId;
     return fields;
+  }
+
+  /**
+   * DECISION 90 — A DATABASE CONSTRAINT MUST NEVER BE THE ERROR MESSAGE.
+   *
+   * `Insurer_rating_carries_its_date` refuses a rating without its as-of date and a date without its
+   * rating, in both directions, from `20261125110000` onward. The CHECK is the backstop and stays
+   * exactly as it is; this is the form-level equivalent, and its whole job is that nobody ever meets
+   * the backstop.
+   *
+   * Without it, an office typing a rating into `/insurers/new` — a screen that has existed since
+   * long before this module — would get a raw constraint violation surfaced as a 500. That is not a
+   * hypothetical: the field is on the form, the DTO accepted it, and the service wrote it.
+   *
+   * ## IT READS THE MERGED STATE, NOT THE BODY, AND THAT IS WHY IT IS NOT A DECORATOR
+   *
+   * A PATCH carrying only the rating is CORRECT on a record that already has a date and WRONG on one
+   * that does not; a PATCH clearing the date is wrong on a record that has a rating. A DTO cannot see
+   * the row, so a class-level `@Validate` would be right about the body and wrong about the outcome —
+   * item (e)'s own lesson, which bit when `@IsOptional()` turned out to skip every validator on an
+   * absent field.
+   *
+   * `current` is null on the create path, where the merged state is just the body.
+   */
+  private assertRatingCarriesItsDate(
+    fields: InsurerRelationshipFields,
+    current: {
+      financialStrengthRating: string | null;
+      financialStrengthRatingAsOf: Date | null;
+    } | null,
+  ): void {
+    const rating =
+      fields.financialStrengthRating !== undefined
+        ? fields.financialStrengthRating
+        : (current?.financialStrengthRating ?? null);
+    const asOf =
+      fields.financialStrengthRatingAsOf !== undefined
+        ? fields.financialStrengthRatingAsOf
+        : (current?.financialStrengthRatingAsOf ?? null);
+
+    const hasRating = rating !== null && rating !== '';
+    const hasAsOf = asOf !== null;
+    if (hasRating === hasAsOf) return;
+
+    if (hasRating) {
+      throw new UnprocessableEntityException(
+        'A financial strength rating must carry the date it was as at. Enter the as-of date beside the rating, or clear the rating. A rating with no date is a claim rather than a record of the care taken in choosing this insurer.',
+      );
+    }
+    throw new UnprocessableEntityException(
+      'An as-of date was given with no financial strength rating. Enter the rating beside it, or clear the date.',
+    );
   }
 
   /**

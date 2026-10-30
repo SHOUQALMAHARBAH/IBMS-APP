@@ -86,7 +86,13 @@ describe('ComplianceDashboardService.summary', () => {
             beforeValue: null,
             afterValue: {
               generatedAt: '2026-09-01T00:00:00.000Z',
-              pairsScanned: 16,
+              // 17 since module 0 close decision 3 — 16 same-table registry pairs plus the one
+              // cross-table. MOCK DATA, so nothing is asserted against it and the test passed at
+              // 16; corrected anyway because a figure in a fixture gets read as a fact about the
+              // system, and this one would have told the next reader the registry holds 16 pairs.
+              // Found by the register's own documented grep AFTER four pins had been fixed — the
+              // rule earning its place on the day it was written.
+              pairsScanned: 17,
               totalRowsChecked: 500,
               violationCount: 2,
             },

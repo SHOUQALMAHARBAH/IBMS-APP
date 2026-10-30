@@ -124,7 +124,10 @@ test("switching language re-renders a date in locale-aware format while money di
   const oldestCell = cells.nth(8);
 
   await expect(outstandingCell).toHaveText("JOD 1,234.500");
-  await expect(oldestCell).toHaveText("due 07/09/2026");
+  // RE-POINTED: this asserted `due 07/09/2026`, and the `due ` prefix was English prose on
+  // an Arabic-first money screen — removed because `caColOldest` («الأقدم») already says what
+  // the column is. The property this test is about is the DATE, and it is unchanged.
+  await expect(oldestCell).toHaveText("07/09/2026");
 
   await page.getByRole("button", { name: "العربية" }).click();
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe("ar");
@@ -136,6 +139,6 @@ test("switching language re-renders a date in locale-aware format while money di
   // The date DID change — genuinely re-rendered through the Arabic locale
   // (D/M/YYYY, no leading zeros), not just re-using the English string.
   const oldestArText = await oldestCell.textContent();
-  expect(oldestArText).not.toBe("due 07/09/2026");
-  expect(stripDirectionMarks(oldestArText ?? "")).toBe("due 7/9/2026");
+  expect(oldestArText).not.toBe("07/09/2026");
+  expect(stripDirectionMarks(oldestArText ?? "")).toBe("7/9/2026");
 });

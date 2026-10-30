@@ -16,12 +16,31 @@ export const CONSENT_PURPOSES = [
   'OTHER',
 ] as const;
 
+/**
+ * `ConsentRecord.purpose` is a Prisma ENUM with exactly these six members, and this
+ * interface declared it `string` — the hand-copied-interface class in its quiet form:
+ * not a missing field, a WIDENED TYPE. The wire value was always one of six.
+ *
+ * Declaring the union is what lets `/consent` index `ENUM_LABEL.ConsentPurpose`
+ * totally, so a seventh member is a compile error at the one place that would
+ * otherwise render `undefined`. A cast would have silenced the compiler and kept the
+ * hole; decision 49's declared fallback would have been wrong too, because that is for
+ * a vocabulary which is genuinely OPEN and this one is closed by the database.
+ */
+export type ConsentPurpose =
+  | 'UNDERWRITING'
+  | 'CLAIMS'
+  | 'MARKETING'
+  | 'KYC_AML'
+  | 'SHARING_WITH_INSURER'
+  | 'OTHER';
+
 export interface ConsentRecord {
   id: string;
   customerId: string | null;
   insuredPersonId: string | null;
   leadId: string | null;
-  purpose: string;
+  purpose: ConsentPurpose;
   isMarketing: boolean;
   granted: boolean;
   consentTextVersion: string;
@@ -29,6 +48,9 @@ export interface ConsentRecord {
   withdrawnAt: string | null;
   isActive: boolean;
   createdAt: string;
+  /** Batch six item 2 — whichever subject this record names, BY NAME. The KIND is not on the
+   *  wire: the three ids are already here, so the screen can see which one is set. */
+  subjectName: string | null;
 }
 
 export interface RequestWithdrawalResult {
@@ -42,6 +64,9 @@ export function listConsentRecords(
     customerId?: string;
     insuredPersonId?: string;
     leadId?: string;
+    /* Left LOOSE on purpose: this is a querystring filter, and the server validates
+     * it. Narrowing it would be tightening the one place where a caller legitimately
+     * passes whatever the user typed. */
     purpose?: string;
     granted?: boolean;
   } = {},
@@ -60,7 +85,7 @@ export function createConsentRecord(body: {
   customerId?: string;
   insuredPersonId?: string;
   leadId?: string;
-  purpose: string;
+  purpose: ConsentPurpose;
   granted: boolean;
   consentTextVersion: string;
 }): Promise<ConsentRecord> {

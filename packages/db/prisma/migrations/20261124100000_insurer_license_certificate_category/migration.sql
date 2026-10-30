@@ -1,0 +1,24 @@
+-- MODULE 0-ب ITEM (e), PART 1 OF 2: the document category an INSURANCE COMPANY's licence certificate
+-- is filed under.
+--
+-- Its own migration, not a line in the registration migration that follows, because
+-- `ALTER TYPE ... ADD VALUE` cannot be USED in the transaction that adds it. The
+-- `20261027110000_discard_audit_action` and `20261112100000_broker_license_certificate_category`
+-- precedent, met for the third time.
+--
+-- ## WHY NOT `BROKER_LICENSE_CERTIFICATE`
+--
+-- Because an insurance company does not hold a broker licence, and filing its certificate under one
+-- would make the query "show me this entity's broker licence certificates" return a document that
+-- is not one.
+--
+-- Art. 82 of Law No. 12 of 2021 lists insurance brokers and insurance companies as different kinds
+-- of service provider and their licences are different instruments. The field map records the same
+-- thing at § C.8 — an insurance company's licence is not a `BrokerLicense` — and this module has
+-- already refused one shortcut of exactly this shape: the company's licensed lines do NOT hang off
+-- `BrokerLicenseScopeLine`, because `brokerLicenseId` is NOT NULL and attaching them there would
+-- require inventing a broker licence row for a company that holds none.
+--
+-- The same reasoning, one layer down: a shared document category would make the two licences
+-- indistinguishable in the one query a CBJ inspection actually asks.
+ALTER TYPE "DocumentCategory" ADD VALUE 'INSURER_LICENSE_CERTIFICATE';

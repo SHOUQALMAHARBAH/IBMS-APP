@@ -11,6 +11,7 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import type { UserRepository } from '../../repositories/user.repository';
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: 'incident-1',
@@ -31,6 +32,17 @@ const row = (over: Record<string, unknown> = {}) => ({
   rootCauseAnalysis: null,
   recoveredAt: null,
   closedAt: null,
+  // Owner decision 56. This helper is typed `Record<string, unknown>` rather than the
+  // model, so the compiler could NOT name it — it failed at runtime instead, with
+  // `Cannot read properties of undefined (reading 'map')` out of the view mapper. The
+  // sibling fixture in `incident.config.spec.ts` IS typed to the row and was named at
+  // compile time, which is the argument for that typing in one line.
+  containmentActions: [],
+  touchesPersonalData: null,
+  dataCategoriesAffected: null,
+  subjectsAffectedEstimate: null,
+  occurredAt: null,
+  reportedByUserId: null,
   ...over,
 });
 
@@ -59,8 +71,24 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     recordCoSign: vi.fn().mockResolvedValue({ count: 1 }),
     recordSeniorManagementNotified: vi.fn().mockResolvedValue({ count: 1 }),
     recordAffectedSubjectsNotified: vi.fn().mockResolvedValue({ count: 1 }),
+    // Owner decision 56 — PRIV-SRS-02's `containment_actions` log.
+    appendContainmentAction: vi.fn().mockResolvedValue({ id: 'ica-1' }),
     ...over.repo,
   };
+  /* Decision 48's resolver. The map holds ONE id on purpose: a double that answered for
+   * every actor could not tell a resolved name from the `?? uuid` fallback the view
+   * forbids, which is the distinction decision 56's log exists to keep. */
+  const displayNamesForUserIds = vi.fn((ids: (string | null)[]) =>
+    Promise.resolve(
+      new Map(
+        ids
+          .filter((id): id is string => id === 'u-responder')
+          .map((id) => [id, 'Ahmad Al-Test'] as const),
+      ),
+    ),
+  );
+  const users = { displayNamesForUserIds } as unknown as UserRepository;
+
   const workflow = {
     transition: vi
       .fn()
@@ -96,6 +124,7 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
     dutySegregation,
+    users,
   );
   return { service, repo, workflow, slaTimer, audit };
 }
@@ -141,21 +170,83 @@ describe('IncidentService.create (Process 55)', () => {
 describe('IncidentService.contain (Process 55)', () => {
   it('resolves the containment SLA timer as a side effect', async () => {
     const { service, slaTimer } = makeService();
-    await service.contain('incident-1', 'u-responder');
+    await service.contain(
+      'incident-1',
+      { description: 'Isolated the mail server from the network.' },
+      'u-responder',
+    );
     expect(slaTimer.resolve).toHaveBeenCalledWith(
       expect.objectContaining({ workflowName: 'incident_containment' }),
     );
   });
 
-  it('is idempotent if already CONTAINED', async () => {
+  /*
+   * RE-POINTED BY OWNER DECISION 56, AND THE REVERSAL IS THE POINT.
+   *
+   * This test was called 'is idempotent if already CONTAINED' and asserted that a second
+   * call did NOTHING. That was right while containment was a bare timestamp and wrong the
+   * moment it became a LOG: `PRIV-SRS-02` types `containment_actions` as timestamped and
+   * PLURAL, and `PRIV-SOP-09` step 3 is «عزل الأنظمة أو الحسابات المتأثرة» — routinely
+   * more than one action. So a second containment action is a NEW ENTRY.
+   *
+   * It is also the third reading of the owner's own sentence, «الزر يقول إنه تم وأنا ما
+   * عملت شي»: under the old behaviour a second press returned SUCCESS having written
+   * nothing at all.
+   *
+   * What survives unchanged is the half that was always correct and is still asserted
+   * below: the STATUS TRANSITION happens once.
+   */
+  it('«بس بغيّر الحالة إلى تم احتوائه» — a second containment APPENDS, and only the status happens once', async () => {
+    const append = vi.fn().mockResolvedValue({ id: 'ica-2' });
     const { service, workflow } = makeService({
       repo: {
         findById: vi.fn().mockResolvedValue(row({ status: 'CONTAINED' })),
+        appendContainmentAction: append,
       },
     });
-    const v = await service.contain('incident-1', 'u-responder');
+    const v = await service.contain(
+      'incident-1',
+      { description: 'Also disabled the compromised account.' },
+      'u-responder',
+    );
     expect(v.status).toBe('CONTAINED');
+    // THE APPEND HAPPENED — the half the old test asserted away.
+    expect(append).toHaveBeenCalledWith({
+      incidentReportId: 'incident-1',
+      description: 'Also disabled the compromised account.',
+      actionTakenByUserId: 'u-responder',
+    });
+    // And the transition did not repeat, which is what 'idempotent' correctly meant.
     expect(workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('«الزر يقول إنه تم وأنا ما عملت شي» — the action is written BEFORE the stamp, so the stamp cannot exist alone', async () => {
+    const order: string[] = [];
+    const append = vi.fn().mockImplementation(() => {
+      order.push('append');
+      return Promise.resolve({ id: 'ica-1' });
+    });
+    const { service, workflow } = makeService({
+      repo: { appendContainmentAction: append },
+    });
+    workflow.transition = vi
+      .fn()
+      .mockImplementation((params: { entityId: string; toStatus: string }) => {
+        order.push('transition');
+        return Promise.resolve({
+          id: params.entityId,
+          status: params.toStatus,
+        });
+      });
+    await service.contain(
+      'incident-1',
+      { description: 'Isolated the server now.' },
+      'u1',
+    );
+    /* `IncidentReport_contained_needs_an_action` refuses to stamp `containedAt` while the
+     * log is empty, so this ordering is load-bearing rather than stylistic: reversed, the
+     * transition would fail against a real database and the act would be unusable. */
+    expect(order).toEqual(['append', 'transition']);
   });
 
   it('a genuinely concurrent double-call is race-safe', async () => {
@@ -168,7 +259,11 @@ describe('IncidentService.contain (Process 55)', () => {
       },
     });
     workflow.transition = vi.fn().mockRejectedValue(new ConflictException('x'));
-    const v = await service.contain('incident-1', 'u-responder');
+    const v = await service.contain(
+      'incident-1',
+      { description: 'Isolated the mail server from the network.' },
+      'u-responder',
+    );
     expect(v.status).toBe('CONTAINED');
   });
 });
@@ -183,11 +278,91 @@ describe('IncidentService.assessImpact (Process 55)', () => {
           .mockResolvedValue(row({ status: 'IMPACT_ASSESSED' })),
       },
     });
-    const v = await service.assessImpact('incident-1', 'u-responder');
+    const v = await service.assessImpact(
+      'incident-1',
+      {
+        touchesPersonalData: true,
+        dataCategoriesAffected: 'Customer names and contact details.',
+        subjectsAffectedEstimate: 42,
+      },
+      'u-responder',
+    );
     expect(workflow.transition.mock.calls[0]?.[0]).toMatchObject({
       toStatus: 'IMPACT_ASSESSED',
     });
     expect(v.status).toBe('IMPACT_ASSESSED');
+  });
+
+  /*
+   * OWNER DECISION 56 — «بس بظهرلي إنه تم تقييم أثره وأنا ما قيّمت ولا عملت شي».
+   *
+   * The assessment's THREE outputs reach the write, which is the whole of what she
+   * pressed. Asserted on the transition's `data` rather than on the returned view,
+   * because the view is derived from a mocked read: a `toMatchObject` on the view would
+   * pass against a service that threw the body away.
+   */
+  it('«بس بظهرلي إنه تم تقييم أثره وأنا ما قيّمت ولا عملت شي» — all three of step 4 outputs reach the write, not just a timestamp', async () => {
+    const { service, workflow } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValueOnce(row({ status: 'CONTAINED' }))
+          .mockResolvedValue(row({ status: 'IMPACT_ASSESSED' })),
+      },
+    });
+    await service.assessImpact(
+      'incident-1',
+      {
+        touchesPersonalData: true,
+        dataCategoriesAffected: 'Customer names and contact details.',
+        subjectsAffectedEstimate: 42,
+      },
+      'u-dpo',
+    );
+    const data = (
+      workflow.transition.mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      }
+    ).data;
+    expect(data).toMatchObject({
+      touchesPersonalData: true,
+      dataCategoriesAffected: 'Customer names and contact details.',
+      subjectsAffectedEstimate: 42,
+    });
+    // And the timestamp still goes with them — all four in ONE transition, so the
+    // row-level CHECK can never see a half-written assessment.
+    expect(data.impactAssessedAt).toBeInstanceOf(Date);
+  });
+
+  it('«ما قيّمت ولا عملت شي» is NOT what `false` and 0 mean — they are real assessment results', async () => {
+    const { service, workflow } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValueOnce(row({ status: 'CONTAINED' }))
+          .mockResolvedValue(row({ status: 'IMPACT_ASSESSED' })),
+      },
+    });
+    await service.assessImpact(
+      'incident-1',
+      {
+        touchesPersonalData: false,
+        dataCategoriesAffected: 'No personal data — internal build logs only.',
+        subjectsAffectedEstimate: 0,
+      },
+      'u-dpo',
+    );
+    /* An incident that touched nobody is an ASSESSMENT RESULT, and a service that treated
+     * `false`/0 as absent would make 'assessed, and it is not a privacy matter'
+     * indistinguishable from 'never assessed' — which is the distinction this whole
+     * decision exists to restore. */
+    const data = (
+      workflow.transition.mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      }
+    ).data;
+    expect(data.touchesPersonalData).toBe(false);
+    expect(data.subjectsAffectedEstimate).toBe(0);
   });
 });
 

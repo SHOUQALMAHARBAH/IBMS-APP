@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -13,24 +13,22 @@ import {
   type RenewalCase,
 } from '../../../lib/renewal/renewal-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { WorkflowHistoryLink } from '../../../components/ui/WorkflowHistoryLink';
 
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function RenewalCasesPage() {
   const router = useRouter();
@@ -108,11 +106,11 @@ export default function RenewalCasesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('renRenewalCases')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('renARenewalCaseOpensAutomatically')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('renRenewalCases')}
+        description={t('renARenewalCaseOpensAutomatically')}
+      />
 
       {canManage ? (
         <>
@@ -126,14 +124,10 @@ export default function RenewalCasesPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
@@ -142,44 +136,52 @@ export default function RenewalCasesPage() {
             {t('renNoRenewalCasesNothingIs')}
           </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '58rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('renCustomer')}</th>
-                  <th style={head}>{t('renPolicy')}</th>
-                  <th style={head}>{t('renLine')}</th>
-                  <th style={head}>{t('renExpires')}</th>
-                  <th style={head}>{t('renStatus')}</th>
-                  <th style={head}>
+                  <Th>{t('renCustomer')}</Th>
+                  <Th>{t('renPolicy')}</Th>
+                  <Th>{t('renLine')}</Th>
+                  <Th>{t('renExpires')}</Th>
+                  <Th>{t('renStatus')}</Th>
+                  <Th>
                     {t('renLossRatio')}
-                  </th>
-                  <th style={head}>
+                  </Th>
+                  <Th>
                     {t('renReMarketing')}
-                  </th>
-                  <th style={head}>{t('renAction')}</th>
+                  </Th>
+                  <Th>{t('renAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.customerLegalName}</td>
-                    <td style={cell}>{r.policyNumber ?? '—'}</td>
-                    <td style={cell}>{r.insuranceLine}</td>
-                    <td style={cell}>{r.expiryDate?.slice(0, 10) ?? '—'}</td>
-                    <td style={cell}>{t(ENUM_LABEL.RenewalStatus[r.status])}</td>
-                    <td style={cell}>{r.lossRatio?.ratio ?? '—'}</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    <Td>{r.customerLegalName}</Td>
+                    <Td>{r.policyNumber ?? '—'}</Td>
+                    <Td>{r.insuranceLine}</Td>
+                    <Td>{r.expiryDate?.slice(0, 10) ?? '—'}</Td>
+                    <Td>{t(ENUM_LABEL.RenewalStatus[r.status])}</Td>
+                    <Td>{r.lossRatio?.ratio ?? '—'}</Td>
+                    <Td>
                       {r.requiresRemarketing
                         ? t('renRequired')
                         : '—'}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
+                      {/* Owner decision 41 — this case's state history, without a pasted uuid.
+                          Renders nothing without `workflow-history.read`. */}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="RenewalCase"
+                          entityId={r.id}
+                        />
+                      </div>
                       {canManage && r.open ? (
                         <div
                           style={{
                             display: 'flex',
-                            gap: '0.3rem',
+                            gap: 'var(--space-2)',
                             flexWrap: 'wrap',
                           }}
                         >
@@ -227,15 +229,15 @@ export default function RenewalCasesPage() {
                           ) : null}
                         </div>
                       ) : null}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('renLoading')}</p>
+        <SkeletonList rows={4} label={t('renLoading')} />
       )}
     </main>
   );

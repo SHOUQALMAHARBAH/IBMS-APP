@@ -13,7 +13,7 @@ import type { AuthenticatedUser } from '../modules/auth/auth.types';
  * The guard runs BEFORE the handler and has no resource. "May this user place a policy?" is
  * answerable there; "may this user place a policy IN THE LIFE LINE?" is not, because the line
  * arrives in the body or behind an id the guard has not loaded. So scope is decided where the
- * resource is known, which is the service — the same shape the fifteen maker/checker pairs already
+ * resource is known, which is the service — the same shape the sixteen maker/checker pairs already
  * have.
  *
  * ## 2. Why several roles UNION rather than intersect

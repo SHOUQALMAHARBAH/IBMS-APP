@@ -9,7 +9,7 @@ import type {
 } from './screening-provider.types';
 import type { ScreeningProviderConfig } from './screening-provider.config';
 import { classifyList } from './list-classification.config';
-import { capability } from './screening-provider.types';
+import { capability, cautions, describes } from './screening-provider.types';
 import type { CapabilityState } from './screening-provider.types';
 
 /**
@@ -190,7 +190,7 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
         true,
         true,
         reachable,
-        'Dataset "' + dataset + '".',
+        describes('ON_PREMISE_DATASET', { name: dataset }),
       ),
       capability(
         'PEP',
@@ -198,49 +198,72 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
         pepConfigured,
         pepConfigured && reachable,
         pepConfigured
-          ? 'Depends on whether dataset "' +
-              dataset +
-              '" actually ingested PEP collections — verify against the engine dataset listing before relying on it.'
-          : 'Dataset "' +
-              dataset +
-              '" is scoped to sanctions; no PEP data is searched.',
+          ? // CLASSIFIED A CAUTION BY THIS CODE, NOT BY THE OWNER — and that classification is
+            // what the sentence now reads like.
+            //
+            // CORRECTED 2026-10-30: this was the one row whose Arabic and English did not make the
+            // same claim. The English opens *Depends on whether*; the table she was given had lost
+            // that clause, so her Arabic rendered the truncation faithfully and ASSERTED what the
+            // English hedges — on a caution about whether politically exposed persons are screened
+            // at all. The clause went missing when the sentences were extracted FOR her rather
+            // than when she wrote them, so it was never hers to drop; she has since supplied the
+            // sentence with the hedge restored, and the two halves agree.
+            //
+            // The half worth keeping is HOW it was found: by comparing the two languages against
+            // each other, not by reading either alone. A bilingual pair where one half makes a
+            // stronger claim than the other is a defect neither reader can see.
+            cautions('ON_PREMISE_PEP_VERIFY', { name: dataset })
+          : // HER CAUTION: a sanctions-scoped dataset searches no PEP data at all.
+            cautions('ON_PREMISE_PEP_SANCTIONS_ONLY', { name: dataset }),
       ),
       capability(
         'WATCHLIST',
         true,
         true,
         reachable,
-        'Dataset "' + dataset + '".',
+        describes('ON_PREMISE_DATASET', { name: dataset }),
       ),
       capability(
         'ADVERSE_MEDIA',
         false,
         false,
         false,
-        'Not provided by this engine.',
+        describes('ON_PREMISE_ADVERSE_MEDIA_UNAVAILABLE'),
       ),
-      capability('INDIVIDUAL', true, true, reachable, 'Person schema.'),
-      capability('ENTITY', true, true, reachable, 'Organization schema.'),
+      capability(
+        'INDIVIDUAL',
+        true,
+        true,
+        reachable,
+        describes('ON_PREMISE_PERSON_SCHEMA'),
+      ),
+      capability(
+        'ENTITY',
+        true,
+        true,
+        reachable,
+        describes('ON_PREMISE_ORGANIZATION_SCHEMA'),
+      ),
       capability(
         'BATCH',
         true,
         true,
         reachable,
-        'Fanned out sequentially to respect the engine.',
+        describes('ON_PREMISE_BATCH_FAN_OUT'),
       ),
       capability(
         'ONGOING_MONITORING',
         true,
         true,
         reachable,
-        'Via the re-screening scheduler, not a provider push.',
+        describes('ON_PREMISE_MONITORING_SCHEDULER'),
       ),
       capability(
         'WEBHOOKS',
         false,
         false,
         false,
-        'The engine does not push events.',
+        describes('ON_PREMISE_WEBHOOKS_UNSUPPORTED'),
       ),
     ];
   }

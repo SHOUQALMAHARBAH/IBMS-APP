@@ -10,6 +10,7 @@ import {
 import { DsrService } from './dsr.service';
 import type { DsrRepository } from '../../repositories/dsr.repository';
 import type { LegalHoldRepository } from '../../repositories/legal-hold.repository';
+import type { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -42,6 +43,7 @@ function makeService(
   over: {
     repo?: Record<string, unknown>;
     legalHolds?: Record<string, unknown>;
+    archive?: Record<string, unknown>;
     slaTimer?: Record<string, unknown>;
     customers?: Record<string, unknown>;
   } = {},
@@ -57,6 +59,15 @@ function makeService(
     applyExtension: vi.fn().mockResolvedValue({ count: 1 }),
     ...over.repo,
   };
+  // NOTHING IS IN THE BLOCKED RETENTION PHASE (batch 5 group 7c). An EMPTY array is what the real
+  // repository returns when none of this subject's records has passed its period — the state every
+  // assertion in this file is about, so each still exercises the code rather than the mock. The
+  // refusal itself is proven in an api e2e, where the blocked state is constructed for real.
+  const archive = {
+    blockedCountsForSubject: vi.fn().mockResolvedValue([]),
+    ...over.archive,
+  };
+
   const legalHolds = {
     hasActiveHoldForSubject: vi.fn().mockResolvedValue(false),
     ...over.legalHolds,
@@ -114,24 +125,47 @@ function makeService(
   const service = new DsrService(
     repo as unknown as DsrRepository,
     legalHolds as unknown as LegalHoldRepository,
+    archive as unknown as RetentionArchiveRepository,
     workflow as unknown as WorkflowTransitionService,
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
     dutySegregation,
     customers as unknown as CustomerRepository,
   );
-  return { service, repo, legalHolds, workflow, slaTimer, audit, customers };
+  return {
+    service,
+    repo,
+    legalHolds,
+    archive,
+    workflow,
+    slaTimer,
+    audit,
+    customers,
+  };
 }
 
 describe('DsrService.create (M04)', () => {
   it('422s when neither/both of customerId/insuredPersonId are set', async () => {
     const { service } = makeService();
     await expect(
-      service.create({ type: 'ACCESS' }, 'u-dpo'),
+      service.create(
+        {
+          type: 'ACCESS',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
+        },
+        'u-dpo',
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     await expect(
       service.create(
-        { customerId: 'c', insuredPersonId: 'i', type: 'ACCESS' },
+        {
+          customerId: 'c',
+          insuredPersonId: 'i',
+          type: 'ACCESS',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
+        },
         'u-dpo',
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -143,7 +177,12 @@ describe('DsrService.create (M04)', () => {
     });
     await expect(
       notFoundCustomer.service.create(
-        { customerId: 'nope', type: 'ACCESS' },
+        {
+          customerId: 'nope',
+          type: 'ACCESS',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
+        },
         'u-dpo',
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -157,6 +196,8 @@ describe('DsrService.create (M04)', () => {
           customerId: 'cust-1',
           type: 'ACCESS',
           dpoHandlerUserId: 'nope',
+          requestText: 'A copy of everything you hold about me.',
+          intakeChannel: 'WEBSITE_FORM',
         },
         'u-dpo',
       ),
@@ -165,7 +206,15 @@ describe('DsrService.create (M04)', () => {
 
   it('routes ACCESS/DELETION to dsr_access_deletion and starts an SLA timer, then audits CREATE (sensitive)', async () => {
     const { service, repo, slaTimer, audit } = makeService();
-    await service.create({ customerId: 'cust-1', type: 'ACCESS' }, 'u-dpo');
+    await service.create(
+      {
+        customerId: 'cust-1',
+        type: 'ACCESS',
+        requestText: 'A copy of everything you hold about me.',
+        intakeChannel: 'WEBSITE_FORM',
+      },
+      'u-dpo',
+    );
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ customerId: 'cust-1', type: 'ACCESS' }),
     );
@@ -185,7 +234,15 @@ describe('DsrService.create (M04)', () => {
 
   it('routes CORRECTION/OBJECTION to dsr_correction_objection', async () => {
     const { service, slaTimer } = makeService();
-    await service.create({ customerId: 'cust-1', type: 'CORRECTION' }, 'u-dpo');
+    await service.create(
+      {
+        customerId: 'cust-1',
+        type: 'CORRECTION',
+        requestText: 'A copy of everything you hold about me.',
+        intakeChannel: 'WEBSITE_FORM',
+      },
+      'u-dpo',
+    );
     expect(slaTimer.startTimer).toHaveBeenCalledWith(
       expect.objectContaining({ workflowName: 'dsr_correction_objection' }),
     );
@@ -535,6 +592,89 @@ describe('DsrService.fulfil (M04)', () => {
       insuredPersonId: null,
     });
     expect(workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('BATCH 5 GROUP 7c — CONDITION 4: refuses a DELETION fulfil while the subject has BLOCKED records, naming the articles', async () => {
+    const { service, archive, workflow } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValue(row({ type: 'DELETION', status: 'IN_PROGRESS' })),
+      },
+      archive: {
+        blockedCountsForSubject: vi
+          .fn()
+          .mockResolvedValue([
+            { recordCategory: 'CommissionLedgerEntry', count: 3 },
+          ]),
+      },
+    });
+
+    await expect(
+      service.fulfil('dsr-1', { confirmNoOpenRetentionHold: true }, 'u-dpo'),
+    ).rejects.toThrow(/PDPL art 10\/b and art 6\/a/);
+
+    // THE ARTICLES ARE THE OWNER'S OWN, supplied in her brief for this item, and asserted here so a
+    // reword cannot quietly turn this into the generic denial she said it must not be. Measured
+    // before writing: neither article is cited anywhere else in this tree.
+    await expect(
+      service.fulfil('dsr-1', { confirmNoOpenRetentionHold: true }, 'u-dpo'),
+    ).rejects.toThrow(/CommissionLedgerEntry \(3\)/);
+
+    // AND IT NAMES THE WAY FORWARD. A refusal that reads as a flat denial is how an officer
+    // concludes the right does not apply at all; partially-fulfil is the path the Legal Hold
+    // refusal beside it already uses.
+    await expect(
+      service.fulfil('dsr-1', { confirmNoOpenRetentionHold: true }, 'u-dpo'),
+    ).rejects.toThrow(/partially-fulfil/);
+
+    expect(archive.blockedCountsForSubject).toHaveBeenCalledWith({
+      customerId: 'cust-1',
+      insuredPersonId: null,
+    });
+    expect(workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('BATCH 5 GROUP 7c — and the blocked check runs BEFORE the attestation, so the officer is not asked to affirm something the system is about to contradict', async () => {
+    const { service, archive } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValue(row({ type: 'DELETION', status: 'IN_PROGRESS' })),
+      },
+      archive: {
+        blockedCountsForSubject: vi
+          .fn()
+          .mockResolvedValue([{ recordCategory: 'Receipt', count: 1 }]),
+      },
+    });
+
+    // NO attestation in the body at all. Both refusals apply; the ORDER decides which is reported,
+    // and it must be the one the caller cannot change by editing the request — art. 3/a's own
+    // ordering argument, applied here. A test asserting only "it throws" would pass either way,
+    // which is why this asserts WHICH sentence comes back.
+    await expect(service.fulfil('dsr-1', {}, 'u-dpo')).rejects.toThrow(
+      /PDPL art 10\/b and art 6\/a/,
+    );
+    await expect(service.fulfil('dsr-1', {}, 'u-dpo')).rejects.not.toThrow(
+      /confirmNoOpenRetentionHold/,
+    );
+    expect(archive.blockedCountsForSubject).toHaveBeenCalled();
+  });
+
+  it('BATCH 5 GROUP 7c — and does not consult the archive for a non-DELETION fulfil', async () => {
+    const { service, archive } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValueOnce(row({ type: 'ACCESS', status: 'IN_PROGRESS' }))
+          .mockResolvedValue(row({ type: 'ACCESS', status: 'FULFILLED' })),
+      },
+    });
+    await service.fulfil('dsr-1', {}, 'u-dpo');
+    // The cost assertion, the sibling's own shape: an ACCESS request is not an erasure, so the
+    // blocked phase has nothing to say about it and the query must not run.
+    expect(archive.blockedCountsForSubject).not.toHaveBeenCalled();
   });
 
   it('does not consult the Legal Hold register for a non-DELETION fulfil', async () => {

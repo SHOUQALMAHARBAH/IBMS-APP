@@ -14,6 +14,34 @@ import { BadRequestException } from '@nestjs/common';
  * Coverage-line strings are canonical free text (the schema keeps
  * `NeedsAssessment.recommendedCoverageLines` as `String[]`, not an enum —
  * see the model comment listing the same example lines).
+ *
+ * ## DO NOT RENAME THESE TO MATCH `INSURANCE_LINES`. CANCELLED 2026-10-28 BY THE OWNER.
+ *
+ * A brief asked for seven of the thirteen to be renamed so the two vocabularies would read
+ * alike — `Motor Fleet` -> `Motor Comprehensive` among them. The owner CANCELLED it on
+ * measurement, and the reason is written here rather than only in a register, because the next
+ * person to put these thirteen strings beside `INSURANCE_LINES`' thirty-two will reach for
+ * exactly that change:
+ *
+ *   1. THE UNIFICATION ALREADY EXISTS, one module over. `COVERAGE_LINE_MAPPINGS` in
+ *      `insurance-program.config.ts` maps all thirteen of these strings to a catalogue
+ *      `lineCode`, including every one of the seven targets, and its own comment records that
+ *      the two vocabularies differ DELIBERATELY. A rename would not unify anything; it would
+ *      replace a working bridge with a coincidence of spelling.
+ *
+ *   2. IT DESTROYS STORED DATA. `assembleProgramLines` matches the EXACT string, so every
+ *      renamed value drops into the `unknown` branch at `lineCode: null`. Measured on the day
+ *      it was cancelled: **90 of 90 `NeedsAssessment` rows on dev hold one of the seven, and
+ *      all 90 are APPROVED** (db-test: 34 of 51, 27 approved). Rewriting a signed-off
+ *      assessment's recommended cover is not a rename.
+ *
+ *   3. `Motor Fleet` -> `Motor Comprehensive` additionally destroys a distinction the mapping's
+ *      own comment records as load-bearing: a fleet is not a comprehensive private motor policy,
+ *      and collapsing the two changes which cover a client is recommended.
+ *
+ * The guard the brief asked for — every `COVERAGE_LINES` entry existing as an `INSURANCE_LINES`
+ * `nameEn` — would fail on 7 of 13 BY DESIGN. The one that checks the right thing already
+ * exists and is green: `managed-line-writers.e2e-spec.ts`.
  */
 
 export const COVERAGE_LINES = [
@@ -40,6 +68,26 @@ export interface NeedsAssessmentQuestion {
   id: string;
   /** Client-facing prompt — the web form renders these verbatim. */
   prompt: string;
+  /**
+   * The same question in Arabic — THE OWNER'S OWN WORDS, verbatim.
+   *
+   * REQUIRED, which is the whole point: the form rendered `{q.prompt}` unconditionally, so an
+   * Arabic officer read ENGLISH questions aloud to a Jordanian client on the screen that
+   * decides which cover to recommend. No gate caught it — these strings arrive from the API at
+   * runtime and `hardcoded-ui-english.py` reads SOURCE, so it cannot see any server-supplied
+   * display string. Making this required means a fourteenth question is a COMPILE ERROR until
+   * somebody decides its Arabic, rather than one more English question in an Arabic interview.
+   *
+   * A PAIR ON THE WIRE, not thirteen i18n keys. That is the established shape for bilingual
+   * reference DATA here (`InsuranceLineSeed.nameEn`/`nameAr`, `Role`, `Branch`,
+   * `DocumentTemplate`), and it leaves nothing to keep in parity — where keys would need a
+   * cross-package guard over two lists and would render NOTHING through `t(undefined)` if one
+   * were missed. Decision 45 moved `meaning` OFF the wire for the opposite case: an enum whose
+   * vocabulary already lived in the i18n tree, where a second copy could drift.
+   *
+   * PINNED BY HASH in `needs-assessment.config.spec.ts` — her prose, so a reword fails by name.
+   */
+  promptAr: string;
   type: QuestionType;
 }
 
@@ -48,68 +96,82 @@ export const NEEDS_ASSESSMENT_QUESTIONS: readonly NeedsAssessmentQuestion[] = [
   {
     id: 'ownsOrLeasesPremises',
     prompt: 'Does the business own or lease commercial premises?',
+    promptAr: 'هل يملك النشاطُ مقرّاً تجارياً أو يستأجره؟',
     type: 'boolean',
   },
   {
     id: 'holdsPhysicalStock',
     prompt: 'Does it hold physical stock, inventory or contents of value?',
+    promptAr: 'هل يحتفظ بمخزونٍ أو بضاعةٍ أو محتوياتٍ ذاتِ قيمة؟',
     type: 'boolean',
   },
   {
     id: 'revenueDependsOnPremises',
     prompt:
       'Would physical damage to the premises interrupt revenue for a meaningful period?',
+    promptAr: 'لو أصاب المقرَّ ضررٌ مادّيّ، هل يتوقّف الدخلُ مدّةً مؤثِّرة؟',
     type: 'boolean',
   },
   {
     id: 'operatesSpecialisedMachinery',
     prompt: 'Does it operate specialised plant or machinery?',
+    promptAr: 'هل يشغّل آلاتٍ أو معدّاتٍ متخصّصة؟',
     type: 'boolean',
   },
   {
     id: 'employeeCount',
     prompt: 'How many people does it employ?',
+    promptAr: 'كم عددُ العاملين لديه؟',
     type: 'number',
   },
   {
     id: 'publicVisitsPremises',
     prompt: 'Do members of the public or visitors attend its premises?',
+    promptAr: 'هل يزور الجمهورُ أو الزوّارُ مقرَّه؟',
     type: 'boolean',
   },
   {
     id: 'manufacturesOrSuppliesProducts',
     prompt: 'Does it manufacture, import, or supply physical products?',
+    promptAr: 'هل يصنع أو يستورد أو يورّد منتجاتٍ ماديّة؟',
     type: 'boolean',
   },
   {
     id: 'providesProfessionalAdvice',
     prompt: 'Does it provide professional advice or services for a fee?',
+    promptAr: 'هل يقدّم استشاراتٍ أو خدماتٍ مهنيّةً بأجر؟',
     type: 'boolean',
   },
   {
     id: 'operatesVehicleFleet',
     prompt: 'Does it operate a fleet of vehicles?',
+    promptAr: 'هل يشغّل أسطولَ مركبات؟',
     type: 'boolean',
   },
   {
     id: 'movesGoodsByTransport',
     prompt: 'Does it move goods by road, sea or air?',
+    promptAr: 'هل ينقل بضائعَ برّاً أو بحراً أو جوّاً؟',
     type: 'boolean',
   },
   {
     id: 'handlesPersonalOrPaymentData',
     prompt:
       'Does it hold personal or payment-card data, or depend on IT systems to operate?',
+    promptAr:
+      'هل يحتفظ ببياناتٍ شخصيةٍ أو بياناتِ بطاقاتِ دفع، أو يعتمد على أنظمةٍ معلوماتيةٍ في عمله؟',
     type: 'boolean',
   },
   {
     id: 'wantsStaffMedicalCover',
     prompt: 'Does it want to provide group medical cover for staff?',
+    promptAr: 'هل يرغب بتأمينٍ صحيٍّ جماعيٍّ لموظَّفيه؟',
     type: 'boolean',
   },
   {
     id: 'wantsStaffLifeCover',
     prompt: 'Does it want to provide group life cover for staff?',
+    promptAr: 'هل يرغب بتأمينِ حياةٍ جماعيٍّ لموظَّفيه؟',
     type: 'boolean',
   },
 ] as const;

@@ -21,9 +21,40 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly code?: string,
+    /**
+     * The per-FIELD complaints, when this came from the validation pipe.
+     *
+     * Kept on the error so a developer still has them in the console and the network tab, and
+     * deliberately NOT part of `message` for a screen to render — see `isFieldValidationError`.
+     */
+    public readonly fieldMessages?: readonly string[],
   ) {
     super(message);
   }
+}
+
+/**
+ * True when a 4xx is the validation pipe complaining about a FIELD, not the domain refusing an act.
+ *
+ * ## Why this can be answered exactly rather than guessed
+ *
+ * Nest's `ValidationPipe` is the only thing in this api that returns `message` as an ARRAY —
+ * `["customerId must be a UUID"]`. Every domain refusal is a `throw new
+ * UnprocessableEntityException('…')` and so a STRING. So the shape of the body IS the
+ * discriminator, and no message text has to be pattern-matched.
+ *
+ * ## Why it matters
+ *
+ * The owner's walk, on `/complaints`: «وبتطلع هاي الرسالة customerId must be a UUID». That text
+ * is framework output naming OUR OWN COLUMN, in English, on an Arabic-first screen — it breaks the
+ * standing rule that a label never names a column (owner decision 21) and her rule that no raw
+ * validator text may surface as UI copy. It also only ever appears when the WEB sent something
+ * invalid, so for a broker it is never actionable: the honest line is the screen's own.
+ *
+ * Use `actionErrorText` rather than reading this directly at a call site.
+ */
+export function isFieldValidationError(err: unknown): boolean {
+  return err instanceof ApiError && (err.fieldMessages?.length ?? 0) > 0;
 }
 
 /**
@@ -109,8 +140,14 @@ async function fetchWithRetry(
 
   if (!res.ok) {
     const body = await parseErrorBody(res);
-    const message = Array.isArray(body.message) ? body.message.join(', ') : (body.message ?? res.statusText);
-    throw new ApiError(message, res.status, body.code);
+    // An ARRAY means the validation pipe; a string means the domain refused. The array is carried
+    // separately rather than only joined into `message`, so a screen can decline to render
+    // framework text about our own column names at a broker. See `isFieldValidationError`.
+    const fieldMessages = Array.isArray(body.message)
+      ? body.message.filter((m): m is string => typeof m === 'string')
+      : undefined;
+    const message = fieldMessages ? fieldMessages.join(', ') : (body.message ?? res.statusText);
+    throw new ApiError(message, res.status, body.code, fieldMessages);
   }
   return res;
 }

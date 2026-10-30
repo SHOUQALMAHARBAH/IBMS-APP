@@ -29,6 +29,9 @@ const CONSENT_RECORDS = [
     id: "consent-1",
     customerId: "11111111-1111-1111-1111-111111111111",
     insuredPersonId: null,
+    leadId: null,
+    // Batch six item 2 — whichever subject the record names, BY NAME.
+    subjectName: "شركة اليرموك للتأمين",
     purpose: "MARKETING",
     isMarketing: true,
     granted: true,
@@ -42,6 +45,9 @@ const CONSENT_RECORDS = [
     id: "consent-2",
     customerId: "11111111-1111-1111-1111-111111111111",
     insuredPersonId: null,
+    leadId: null,
+    // Batch six item 2 — whichever subject the record names, BY NAME.
+    subjectName: "شركة اليرموك للتأمين",
     purpose: "KYC_AML",
     isMarketing: false,
     granted: false,
@@ -72,8 +78,16 @@ test("lists consent records with the capture form and withdrawal actions", async
   await expect(
     page.getByRole("heading", { name: "Consent management" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "MARKETING" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "KYC_AML" })).toBeVisible();
+  // RE-POINTED, decision 59, and the reversal is real: both lines asserted the raw ENUM
+  // MEMBER in a Purpose cell, which was correct until the labels arrived. Asserted as a
+  // PAIR now — the label present AND the member name gone — because the first of the two
+  // went on passing for the WRONG REASON: `getByRole(name)` matches case-insensitive
+  // substrings, so "MARKETING" matched the new label "Marketing" and only `KYC_AML`,
+  // whose label is "KYC / AML", actually failed. Half a reversal caught is how a screen
+  // ends up half-converted.
+  await expect(page.getByRole("cell", { name: "Marketing", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "KYC / AML", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "KYC_AML" })).toHaveCount(0);
   await expect(page.getByLabel("Purpose")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record decision" }),
@@ -85,6 +99,62 @@ test("lists consent records with the capture form and withdrawal actions", async
   await expect(
     page.getByRole("button", { name: "Confirm withdrawal" }),
   ).toHaveCount(1);
+
+  /*
+   * RULE 2 (batch six item 2) — WHOSE consent, by name. This column rendered `Lead <8 chars>` or a
+   * bare sliced uuid on the one screen whose whole subject is who agreed to what.
+   *
+   * THE PAIR: the name present AND the uuid gone. And the `Lead ` prefix is asserted ABSENT too,
+   * because it was hardcoded ENGLISH inside a template literal — an Arabic reader saw it as well,
+   * and removing it is a second fix rather than a side effect.
+   */
+  /*
+   * ASSERTED ON THE CELL WITH `exact: true`, NOT PAGE-WIDE, and the first version taught me why:
+   * `getByText("Lead ")` matched the CAPTURE FORM's own «Lead ID» label — a correct element that
+   * must stay — so the test failed on a correct screen. That is the page-wide-absence class
+   * `check:absence` exists for, met inside a test written to check rule 2.
+   *
+   * `exact: true` on the cell is strictly stronger than what the page-wide pair could say: it
+   * fails if the name is there AND fails if anything is prefixed to it, so the removed `Lead `
+   * prefix and the removed uuid are both covered by one assertion about one element.
+   */
+  await expect(
+    page.getByRole("cell", { name: "شركة اليرموك للتأمين", exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByRole("cell", { name: /11111111/ })).toHaveCount(0);
+
+  /*
+   * OWNER DECISION 51 — the kind marker. Removing the old `Lead ` prefix was right (it was
+   * hardcoded ENGLISH inside a template literal, so an Arabic reader saw it too) but it left the
+   * register unable to tell a lead from a customer, and that distinction is PDPL-significant:
+   * consent captured at LEAD CAPTURE pre-dates the customer record.
+   *
+   * BOTH HALVES IN ONE TEST: the marker appears on the LEAD row and NOT on the customer row.
+   * Asserting only its presence would pass against a marker stamped on every row, which says
+   * nothing and would be worse than none.
+   */
+  await page.route("http://localhost:4000/consent**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        {
+          ...CONSENT_RECORDS[0],
+          id: "consent-lead",
+          customerId: null,
+          leadId: "22222222-2222-2222-2222-222222222222",
+          subjectName: "سامر عبدالله",
+        },
+        CONSENT_RECORDS[1],
+      ],
+    }),
+  );
+  await page.reload();
+  await expect(
+    page.getByRole("cell", { name: /سامر عبدالله.*Lead/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: /شركة اليرموك للتأمين.*Lead/ }),
+  ).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

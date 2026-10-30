@@ -13,9 +13,11 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
-  errorStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -29,6 +31,7 @@ import { formatDateTime } from '../../../../lib/i18n/format';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 
 export default function CrossSellOpportunityDetailPage() {
@@ -93,7 +96,7 @@ export default function CrossSellOpportunityDetailPage() {
   const canConvert = hasPermission(user, 'cross-sell.convert');
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>
@@ -109,14 +112,15 @@ export default function CrossSellOpportunityDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {opportunity ? (
         <>
           <h1>{opportunity.gapLine}</h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='CrossSellOpportunity' entityId={opportunity.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             <span style={crossSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[opportunity.status])}</span>
           </p>
@@ -226,9 +230,7 @@ export default function CrossSellOpportunityDetailPage() {
           ) : null}
 
           {actionError ? (
-            <p role="alert" style={errorStyle}>
-              {actionError}
-            </p>
+            <ErrorState title={actionError} />
           ) : null}
         </>
       ) : null}

@@ -3077,3 +3077,72 @@ test("the recommendation declares nothing when two people agreed with the advice
     page.getByTestId("combined-duty-recommendation-rec-1"),
   ).toHaveCount(0);
 });
+
+/**
+ * DECISION ITEM 7 — the refusal on our own error path now names a cause and a way forward.
+ *
+ * `GET /rfqs/:id` answers 404 rather than 403 for a record in another owner's book, deliberately: a
+ * 403 would confirm that the record exists. That pattern is CORRECT and is not what changed.
+ *
+ * What changed is the sentence. It used to read "it may not exist, or you may not have access to it"
+ * — true, and it names neither a likely cause nor anything to do next, which is the class this whole
+ * module was spent removing. Both tests below drive the SAME screen through the two statuses and
+ * assert the same sentence, because the ambiguity is the point: a reader must not be able to tell a
+ * missing record from somebody else's.
+ */
+for (const status of [404, 403] as const) {
+  test(`the ${status} on an RFQ names a likely cause and a way forward, and confirms nothing`, async ({
+    page,
+  }) => {
+    await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+    await page.route("http://localhost:4000/rfqs/rfq-1", (route) =>
+      route.fulfill({ status, json: { message: "RFQ not found" } }),
+    );
+    await page.route("http://localhost:4000/rfqs/rfq-1/communications", (route) =>
+      route.fulfill({ status, json: { message: "RFQ not found" } }),
+    );
+
+    await page.goto("/rfqs/rfq-1");
+
+    const notice = page.locator("main").getByText("could not be found", {
+      exact: false,
+    });
+    await expect(notice).toBeVisible();
+    // THE WAY FORWARD is the half that was missing. Asserted separately from the sentence above,
+    // because a reword that drops it would otherwise still satisfy the first assertion.
+    await expect(
+      page.getByText("may not be one of your files", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("check the reference, or ask the file", { exact: false }),
+    ).toBeVisible();
+    // AND NO ROLE NAME IN THE SENTENCE. The first wording said "your branch manager" and was
+    // withdrawn on measurement: zero `Branch` rows exist, and the reader most likely to see this
+    // sentence is the sole practitioner who owns every file. Asserted as an ABSENCE, which is the
+    // only form that can fail if somebody adds one back to be helpful.
+    //
+    // SCOPED TO THE NOTICE, not page-wide. The first version of this loop was page-wide and matched
+    // "Compliance" in the NAV SIDEBAR — a real label, nothing to do with this sentence — so it
+    // failed on a correct tree. Page-wide text assertions on this app are the trap IMPROVEMENTS
+    // § 1.85 records, and this is the fourth time it has been paid for.
+    const sentence = (await notice.textContent()) ?? "";
+    for (const role of [
+      "branch manager",
+      "Manager",
+      "Administrator",
+      "Compliance",
+      "Executive",
+    ]) {
+      expect(sentence).not.toContain(role);
+    }
+    // AND IT CONFIRMS NOTHING. Anchored on the notice above already being visible, so this cannot
+    // pass on a page that never rendered. The API's own English message must be absent too —
+    // passing it straight through is the behaviour this scheme replaced.
+    await expect(
+      page.getByText("you may not have access", { exact: false }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator("main").getByText("RFQ not found", { exact: false }),
+    ).toHaveCount(0);
+  });
+}

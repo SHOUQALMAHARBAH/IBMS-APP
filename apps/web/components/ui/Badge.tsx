@@ -16,17 +16,36 @@ const TONES: Record<BadgeTone, CSSProperties> = {
   danger: { background: 'var(--danger-bg)', color: 'var(--danger-ink)', borderColor: 'var(--danger-border)' },
 };
 
+/**
+ * `data-*` ATTRIBUTES ARE FORWARDED, AND THIS TYPE IS WHY THAT IS SAFE.
+ *
+ * TypeScript exempts hyphen-containing JSX attributes from excess-property checking, so
+ * `<Badge data-claim-status={…}>` type-checks against ANY component and then goes NOWHERE unless
+ * the component spreads it. That silent drop already killed three test hooks in this batch with
+ * `tsc` clean and the screens rendering perfectly — the only thing that caught it was a screenshot
+ * capture failing to find a selector.
+ *
+ * A status pill is exactly where a screen hangs its machine hook (`data-claim-status`,
+ * `data-rfq-state`, …), so naming one attribute the way `EmptyState` names `data-testid` would not
+ * be enough: every screen uses its own. The template-literal index signature accepts the whole
+ * family and the spread forwards it, which makes the support a PROPERTY OF THE SIGNATURE rather
+ * than something a reader has to go and verify in the body.
+ */
+type DataAttributes = { [key: `data-${string}`]: string | undefined };
+
 export function Badge({
   tone = 'neutral',
   children,
   style,
+  ...dataAttributes
 }: {
   tone?: BadgeTone;
   children: ReactNode;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   return (
     <span
+      {...dataAttributes}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

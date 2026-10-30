@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
+import { UserRepository } from '../../repositories/user.repository';
 import { ConsentRecordRepository } from '../../repositories/consent-record.repository';
 import { DsrRepository } from '../../repositories/dsr.repository';
 import { IncidentRepository } from '../../repositories/incident.repository';
@@ -56,6 +57,7 @@ export class DpoWorkspaceService {
     private readonly legalHolds: LegalHoldRepository,
     private readonly crossBorderTransfers: CrossBorderTransferRepository,
     private readonly audit: AuditService,
+    private readonly users: UserRepository,
   ) {}
 
   async getSummary(actorUserId: string): Promise<DpoWorkspaceSummary> {
@@ -88,10 +90,34 @@ export class DpoWorkspaceService {
       };
     });
 
+    /*
+     * OWNER DECISION 56 — the containment log's actor, resolved by name.
+     *
+     * THE SAME MECHANISM FOUND THIS SITE AGAIN. The comment a few lines down records it
+     * happening once already: making a mapper's name parameter REQUIRED named a consumer
+     * nobody knew about. Decision 56 made `actorNames` required on
+     * `deriveIncidentReportView` and the compiler named this register — the DPO's own
+     * incident list — a module away. An optional argument would have shipped a nameless
+     * containment log here while `/incidents` carried names.
+     */
+    const incidentActorNames = await this.users.displayNamesForUserIds(
+      openIncidentRows.flatMap((r) =>
+        r.containmentActions.map((a) => a.actionTakenByUserId),
+      ),
+    );
     const incidentRegister = openIncidentRows.map((r) =>
-      deriveIncidentReportView(r, now),
+      deriveIncidentReportView(r, now, incidentActorNames),
     );
 
+    /*
+     * Item 2 — the cross-border register names its APPROVER here too. Found by the compiler, not by
+     * me reading: making the mapper's name parameter REQUIRED named this site, which is a fourth
+     * consumer of that view I did not know about. An optional field would have left the DPO's own
+     * workspace rendering `undefined` where every other surface showed a name.
+     */
+    const crossBorderApprovers = await this.users.displayNamesForUserIds(
+      crossBorderRows.map((r) => r.approvedByUserId),
+    );
     const summary: DpoWorkspaceSummary = {
       generatedAt: now.toISOString(),
       consentStatus: consentCounts,
@@ -100,7 +126,10 @@ export class DpoWorkspaceService {
       dpiaRegister: dpiaRows.map((r) => deriveDpiaScreeningView(r)),
       legalHoldRegister: legalHoldRows.map((r) => deriveLegalHoldView(r)),
       crossBorderTransferRegister: crossBorderRows.map((r) =>
-        deriveCrossBorderTransferView(r),
+        deriveCrossBorderTransferView(
+          r,
+          crossBorderApprovers.get(r.approvedByUserId ?? '') ?? null,
+        ),
       ),
     };
 

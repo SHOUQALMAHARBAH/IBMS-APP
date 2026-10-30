@@ -11,6 +11,10 @@ export interface PaymentChannel {
   ownerType: string;
   customerId: string | null;
   insurerId: string | null;
+  /* Item 1 — the owner's NAME, whichever kind. ONE field for the either-or, because exactly one of
+   * the two ids is set and two name fields would be one guaranteed-null field on every row. NULL
+   * means the owning row is gone, never the uuid. */
+  ownerName: string | null;
   channelType: string;
   label: string;
   bankName: string | null;

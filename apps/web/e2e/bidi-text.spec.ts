@@ -98,6 +98,23 @@ test("a policy number sitting next to an Arabic insurance-line label are each is
   const policyNumber = "POL-2026-00123";
   const summary = {
     generatedAt: "2026-09-07T00:00:00.000Z",
+    /*
+     * OWNER DECISION 58. This spec is about bidi isolation and mocks the policy
+     * dashboard only because that screen puts a Latin policy number beside an Arabic
+     * line label — but it is still a copy of that endpoint's response, so it carries
+     * the endpoint's required fields.
+     *
+     * Without this the screen reads `undefined.activePoliciesCount` and dies during
+     * render, and the failure appears on a `<bdi>` locator that was never the problem.
+     * Measured: exactly THREE spec files mock a dashboard endpoint, and this is the one
+     * whose NAME does not say so.
+     */
+    metricScope: {
+      activePoliciesCount: "asOf",
+      expiringPoliciesCount: "asOf",
+      newPoliciesIssuedCount: "period",
+      cancelledPolicies: "period",
+    },
     periodLabel: "2026-08",
     periodStart: "2026-08-01T00:00:00.000Z",
     periodEnd: "2026-09-01T00:00:00.000Z",
@@ -109,6 +126,7 @@ test("a policy number sitting next to an Arabic insurance-line label are each is
       {
         policyId: "pol-1",
         policyNumber,
+        customerName: "شركة اليرموك للتأمين",
         insuranceLine,
         reason: "Client sold the insured vehicle.",
         cancelledAt: "2026-08-15T00:00:00.000Z",

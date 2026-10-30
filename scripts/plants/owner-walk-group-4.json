@@ -1,0 +1,32 @@
+{
+  "mapping-not-pre-filled": {
+    "file": "apps/web/app/(app)/settings/customer-import/page.tsx",
+    "from": "    setMapping(headings);",
+    "to": "    void headings;",
+    "why": "The template downloads and the mapping stays empty — so the office fills the file, uploads it, and the submit button is disabled with a list of unmapped required fields. The feature exists and does not work, which is the shape of everything else in this batch. Kills customer-import.spec.ts's 'downloads a template, uploads THAT file, and the mapping already matches it' on the `not.toHaveValue('')` assertion, which fires BEFORE the upload — the earliest point it becomes wrong."
+  },
+  "template-headings-disagree-with-the-file": {
+    "file": "apps/web/lib/customer/import-template.ts",
+    "from": "  const header = IMPORT_FIELDS.map((f) => csvCell(headings[f])).join(',');",
+    "to": "  const header = IMPORT_FIELDS.map((f) => csvCell(opts.label(f))).join(',');",
+    "why": "THE PLANT THIS FEATURE EXISTS TO REFUSE, and the most plausible one: the file's header row built from the labels while the MAPPING keeps the marked headings, so the two disagree by exactly ` (إلزامي)` on the two mandatory columns. `mapRows` matches with `header.indexOf(heading.trim())` — an exact string — so `legalName` becomes unmappable and the api refuses the mapping outright, after the office has filled the file in. Two sources for one heading is the whole hazard; kills the round-trip test's per-heading loop by name."
+  },
+  "field-list-out-of-order": {
+    "file": "apps/web/lib/customer/legacy-import-api.ts",
+    "from": "export const IMPORT_FIELDS = [\n  'legalName',\n  'customerType',",
+    "to": "export const IMPORT_FIELDS = [\n  'customerType',\n  'legalName',",
+    "why": "The same seven names in a different order — which a SET comparison passes and a template does not survive, because the columns come out in this order and the mapping is pre-filled from it. Kills `legacy-import-shape-parity.spec.ts`'s 'holds the same importable fields IN THE SAME ORDER', which is why that assertion is on order rather than membership."
+  },
+  "required-set-drifts": {
+    "file": "apps/web/lib/customer/legacy-import-api.ts",
+    "from": "export const IMPORT_REQUIRED_FIELDS: ImportField[] = [\n  'legalName',\n  'customerType',\n];",
+    "to": "export const IMPORT_REQUIRED_FIELDS: ImportField[] = ['legalName'];",
+    "why": "A field the api requires and the web calls optional: the template marks `customerType` optional, the office leaves the column blank, and the import refuses the file — after it is filled in, which is the expensive moment to find out. Kills the parity guard's 'agrees on which fields are REQUIRED'. CORRECTED FROM THE RUN: this `why` first claimed it also killed the template unit test's marker assertion 'from two directions', and it did NOT — that test compared the generator against `IMPORT_REQUIRED_FIELDS`, the list the generator is BUILT FROM, so the two shrank together and it stayed green at 5/5. Comparing a value with itself, the same defect corrected in `screening-identity.dto-parts.spec.ts` one group earlier, found here by this plant rather than by reading. The expectation is a literal now and the plant kills both."
+  },
+  "parser-stops-stripping-the-bom": {
+    "file": "apps/api/src/modules/customer/legacy-import.config.ts",
+    "from": "  const input = text.replace(/^\\uFEFF/, '');",
+    "to": "  const input = text;",
+    "why": "The api side of the template's BOM. CORRECTED TWICE FROM THE RUN, and the corrections are worth more than the plant. (1) It first claimed to kill the new import e2e — it killed NOTHING there, 9/9 green, because `mapRows` trims every header before `indexOf` and `String.prototype.trim()` strips U+FEFF as ECMAScript whitespace. So the TRIM protects the mapping and this strip is defence in depth for every other caller of the exported `parseCsv`, which hands out untrimmed cells. (2) It then claimed to be the only observer — also false: `legacy-import.config.spec.ts` has tested the strip since it was written. What the plant actually found is that the SAME FALSE SENTENCE sat in two comments ('the mapping silently fails to find it'), and both are corrected. It kills 'strips a UTF-8 BOM so the first heading is not corrupted' by name, and the e2e is left asserting what it genuinely covers — Arabic headings, a parenthesised marker in a heading, and CRLF."
+  }
+}

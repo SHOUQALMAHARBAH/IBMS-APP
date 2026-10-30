@@ -91,6 +91,16 @@ export interface EscalationRecordRow {
 export interface ComplaintRow {
   id: string;
   customerId: string;
+  /**
+   * RULE 2 — the customer's name, resolved in the repository's include.
+   *
+   * REQUIRED on this interface rather than optional, deliberately: `ComplaintRow` is hand-written
+   * and every read path that builds one must therefore supply it, so a path that forgets is a
+   * compile error rather than a screen that silently renders nothing. That is the strict-payload
+   * argument this repository already relies on — an optional field here would have let the
+   * `IncidentReport.load()` class of defect through.
+   */
+  customer: { legalName: string };
   claimId: string | null;
   policyId: string | null;
   issue: string;
@@ -123,6 +133,8 @@ export interface ComplaintSlaView {
 export interface ComplaintView {
   id: string;
   customerId: string;
+  /** RULE 2 — the name the screen renders where it used to render eight characters of a uuid. */
+  customerName: string;
   claimId: string | null;
   policyId: string | null;
   issue: string;
@@ -164,6 +176,7 @@ export function deriveComplaintView(
   return {
     id: row.id,
     customerId: row.customerId,
+    customerName: row.customer.legalName,
     claimId: row.claimId,
     policyId: row.policyId,
     issue: row.issue,

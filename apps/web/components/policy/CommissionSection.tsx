@@ -176,7 +176,7 @@ export function CommissionSection({
                   <span>{entry.overrideReason}</span>
                 </div>
               ) : null}
-              {/* Part 4 step 5, and the most urgent of the fifteen: the block above prints
+              {/* Part 4 step 5, and the most urgent of the sixteen: the block above prints
                   '(approved)' and names the REQUESTER, so a self-approved override read as a
                   two-person one. Shared renderer — the same sentence as on a refund, a policy's
                   quality check and a data subject request. */}
@@ -264,7 +264,6 @@ export function CommissionSection({
                 />
               </label>
               <label>{t('polCommOverrideReason')}<textarea
-                  aria-label={t('polCommOverrideReasonAria')}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   minLength={10}
@@ -308,7 +307,6 @@ export function CommissionSection({
                 />
               </label>
               <label>{t('polCommStatementRef')}<input
-                  aria-label={t('polCommPaymentRef')}
                   value={paymentReference}
                   onChange={(e) => setPaymentReference(e.target.value)}
                   required

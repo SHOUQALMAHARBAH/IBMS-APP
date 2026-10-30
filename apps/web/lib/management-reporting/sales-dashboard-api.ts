@@ -4,8 +4,29 @@
 
 import { apiGet } from '../auth/api-client';
 
+/**
+ * OWNER DECISION 58 — which figures the period above actually describes.
+ *
+ * `'period'` counts events inside the window, so the period belongs beside the
+ * figure. `'asOf'` is a LIVE SNAPSHOT that ignores the window — printing a period
+ * beside one of those would be a false statement about a figure that does not obey
+ * it, which is a more confident version of the defect decision 58 removes.
+ *
+ * READ FROM THE WIRE, never decided here: the api is the only thing that knows
+ * which of its own queries apply the filter, and a copy of that classification on
+ * this side is a copy free to stop matching.
+ */
+export type FigureScope = 'period' | 'asOf';
+
 export interface SalesDashboardSummary {
   generatedAt: string;
+  metricScope: {
+    leads: FigureScope;
+    premiumWritten: FigureScope;
+    commissionIncomeJod: FigureScope;
+    crossSell: FigureScope;
+    upSell: FigureScope;
+  };
   periodLabel: string;
   periodStart: string;
   periodEnd: string;

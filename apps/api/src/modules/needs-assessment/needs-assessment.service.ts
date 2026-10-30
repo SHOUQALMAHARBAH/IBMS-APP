@@ -9,9 +9,12 @@ import {
   NeedsAssessmentRepository,
   type NeedsAssessmentFilter,
   type NeedsAssessmentWithActs,
+  type NeedsAssessmentActorNames,
+  type NeedsAssessmentWithNames,
 } from '../../repositories/needs-assessment.repository';
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
+import { UserRepository } from '../../repositories/user.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
@@ -70,6 +73,7 @@ export class NeedsAssessmentService {
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly dutySegregation: DutySegregationService,
+    private readonly users: UserRepository,
   ) {}
 
   private canViewAll(actor: AuthenticatedUser): boolean {
@@ -97,7 +101,7 @@ export class NeedsAssessmentService {
   private async findVisible(
     id: string,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     const assessment = await this.assessments.findById(id);
     if (
       !assessment ||
@@ -105,12 +109,58 @@ export class NeedsAssessmentService {
     ) {
       throw new NotFoundException('NeedsAssessment not found');
     }
-    return assessment;
+    return this.withName(assessment);
   }
 
   /** Re-read after a transition — WorkflowTransitionService.transition()
    * returns only the narrow `{ id, status }` shape (same pattern as
    * KycService.mustFind()). */
+  /**
+   * WHO REVIEWED AND WHO APPROVED, BY NAME — decision 48, through
+   * `UserRepository.displayNamesForUserIds`, which is the ONE place that answers
+   * *who did this*: `Employee.fullName` is the real identity and `User.fullName` is
+   * free text and only the fallback.
+   *
+   * ONE QUERY PER PAGE. `withNames` takes ROWS so the list path resolves every
+   * reviewer and approver in a single read; per-row resolution would be two queries
+   * per row on a register.
+   *
+   * A MISSING KEY REPORTS NO NAME, NEVER THE UUID. That is the whole point: the
+   * screen rendered `assessment.reviewedByUserId ?? '—'`, so an unnamed reviewer was
+   * a uuid under «راجعه» — and `rendered-identifiers.py` could not see it, because
+   * its ternary exclusion treated `??` as a ternary.
+   */
+  private async withNames<
+    T extends {
+      reviewedByUserId: string | null;
+      approvedByUserId: string | null;
+    },
+  >(rows: readonly T[]): Promise<(T & NeedsAssessmentActorNames)[]> {
+    const names = await this.users.displayNamesForUserIds(
+      rows.flatMap((r) => [r.reviewedByUserId, r.approvedByUserId]),
+    );
+    return rows.map((r) => ({
+      ...r,
+      reviewedByName: r.reviewedByUserId
+        ? (names.get(r.reviewedByUserId) ?? null)
+        : null,
+      approvedByName: r.approvedByUserId
+        ? (names.get(r.approvedByUserId) ?? null)
+        : null,
+    }));
+  }
+
+  /** The single-row form. Named rather than inlined so no call site spells the
+   *  `[0]` and the one-element array in nine places. */
+  private async withName<
+    T extends {
+      reviewedByUserId: string | null;
+      approvedByUserId: string | null;
+    },
+  >(row: T): Promise<T & NeedsAssessmentActorNames> {
+    return (await this.withNames([row]))[0];
+  }
+
   private async mustFind(id: string): Promise<NeedsAssessmentWithActs> {
     const assessment = await this.assessments.findById(id);
     if (!assessment) {
@@ -142,7 +192,7 @@ export class NeedsAssessmentService {
   async create(
     dto: CreateNeedsAssessmentDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     await this.assertRiskProfileVisible(dto.riskProfileId, actor);
 
     const answers = parseQuestionnaireAnswers(dto.questionnaireAnswers);
@@ -167,14 +217,14 @@ export class NeedsAssessmentService {
       },
     });
 
-    return assessment;
+    return this.withName(assessment);
   }
 
   async update(
     id: string,
     dto: UpdateNeedsAssessmentDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     const assessment = await this.findVisible(id, actor);
     // Only the capturer edits their own draft — a cross-owner viewer
     // (Placement/Manager/Exec) can read it but not rewrite the questionnaire.
@@ -202,14 +252,14 @@ export class NeedsAssessmentService {
       afterValue: { recommendedCoverageLines },
     });
 
-    return updated;
+    return this.withName(updated);
   }
 
   /** DRAFT -> PENDING_REVIEW. Owner-only (needs-assessment.create). */
   async submit(
     id: string,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     const assessment = await this.findVisible(id, actor);
     if (assessment.createdByUserId !== actor.id) {
       throw new NotFoundException('NeedsAssessment not found');
@@ -220,7 +270,7 @@ export class NeedsAssessmentService {
       toStatus: 'PENDING_REVIEW',
       actorUserId: actor.id,
     });
-    return this.mustFind(id);
+    return this.withName(await this.mustFind(id));
   }
 
   /** PENDING_REVIEW -> REVIEWED, stamping reviewedByUserId. Manager-only
@@ -229,7 +279,7 @@ export class NeedsAssessmentService {
     id: string,
     dto: CombinedDutyDeclarationDto | undefined,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     const assessment = await this.mustFind(id);
     const combinedDutyActId = await this.dutySegregation.resolve({
       constraint: 'NeedsAssessment_reviewer_maker_checker_distinct',
@@ -254,7 +304,7 @@ export class NeedsAssessmentService {
         reviewerCombinedDutyActId: combinedDutyActId,
       },
     });
-    return this.mustFind(id);
+    return this.withName(await this.mustFind(id));
   }
 
   /** REVIEWED -> APPROVED, stamping approvedByUserId. Manager-only
@@ -264,7 +314,7 @@ export class NeedsAssessmentService {
     id: string,
     dto: CombinedDutyDeclarationDto | undefined,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     const assessment = await this.mustFind(id);
     const combinedDutyActId = await this.dutySegregation.resolve({
       constraint: 'NeedsAssessment_approver_maker_checker_distinct',
@@ -296,7 +346,7 @@ export class NeedsAssessmentService {
       entityId: id,
       afterValue: { approvedByUserId: actor.id },
     });
-    return this.mustFind(id);
+    return this.withName(await this.mustFind(id));
   }
 
   /** PENDING_REVIEW | REVIEWED -> DRAFT — sent back to the capturer for
@@ -306,7 +356,7 @@ export class NeedsAssessmentService {
     id: string,
     reason: string | undefined,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     await this.mustFind(id);
     if (!reason?.trim()) {
       throw new BadRequestException(
@@ -327,7 +377,7 @@ export class NeedsAssessmentService {
       entityId: id,
       afterValue: { returnedToDraft: true, reason },
     });
-    return this.mustFind(id);
+    return this.withName(await this.mustFind(id));
   }
 
   /** PENDING_REVIEW | REVIEWED -> REJECTED (terminal). A reason is required.
@@ -336,7 +386,7 @@ export class NeedsAssessmentService {
     id: string,
     dto: NeedsAssessmentDecisionDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs> {
+  ): Promise<NeedsAssessmentWithNames> {
     const reason = dto.reason;
     const assessment = await this.mustFind(id);
     // A THIRD APPLICATION-ONLY PAIR, found while wiring Part 4 and not in the two the plan recorded.
@@ -378,19 +428,19 @@ export class NeedsAssessmentService {
       entityId: id,
       afterValue: { reason },
     });
-    return this.mustFind(id);
+    return this.withName(await this.mustFind(id));
   }
 
-  list(
+  async list(
     query: ListNeedsAssessmentsQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs[]> {
+  ): Promise<NeedsAssessmentWithNames[]> {
     const filter: NeedsAssessmentFilter = {
       riskProfileId: query.riskProfileId,
       status: query.status,
       createdByUserId: this.canViewAll(actor) ? undefined : actor.id,
     };
-    return this.assessments.findMany(filter);
+    return this.withNames(await this.assessments.findMany(filter));
   }
 
   /** `customerId` is resolved off the parent Risk Profile for the web
@@ -402,7 +452,7 @@ export class NeedsAssessmentService {
   async get(
     id: string,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessmentWithActs & { customerId: string }> {
+  ): Promise<NeedsAssessmentWithNames & { customerId: string }> {
     const assessment = await this.findVisible(id, actor);
     const riskProfile = await this.riskProfiles.findById(
       assessment.riskProfileId,

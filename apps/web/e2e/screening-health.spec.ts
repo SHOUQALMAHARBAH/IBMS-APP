@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
@@ -43,7 +44,10 @@ function health(over: Record<string, unknown> = {}) {
     provider: "built_in",
     providerName: "Built-in watchlist cache (OFAC SDN + UN Consolidated)",
     status: "HEALTHY",
-    detail: "Sanctions cache refreshed 2h ago.",
+    // The producer's own string. This was truncated to its first sentence and dropped
+    // *no PEP source is configured*, which is the clause that matters on this screen.
+    detail:
+      "Sanctions cache refreshed 2h ago. Covers SANCTIONS only (OFAC SDN + UN Consolidated) — no PEP source is configured.",
     datasetVersion: "local-2026-09-10T00:00:00.000Z",
     datasetUpdatedAt: "2026-09-10T00:00:00.000Z",
     checkedAt: "2026-09-10T12:00:00.000Z",
@@ -59,14 +63,17 @@ function health(over: Record<string, unknown> = {}) {
         supported: true,
         configured: true,
         operational: true,
-        note: "OFAC SDN + UN Consolidated, synced locally.",
+        note: { key: "BUILT_IN_SANCTIONS_SYNCED", kind: "DESCRIPTION" },
       },
       {
         capability: "PEP",
         supported: false,
         configured: false,
         operational: false,
-        note: "This provider has NO PEP data.",
+        // THE OWNER'S OWN CAUTION, and the most important row in this table: a deployment running
+        // only the built-in cache has NO PEP coverage, so these three dashes must not read as an
+        // absence of risk.
+        note: { key: "BUILT_IN_NO_PEP_DATA", kind: "CAUTION" },
       },
     ],
     pepOperational: false,
@@ -211,7 +218,7 @@ test("distinguishes supported / configured / operational", async ({ page }) => {
           supported: true,
           configured: true,
           operational: false,
-          note: "Actual coverage depends on the contracted product.",
+          note: { key: "COMMERCIAL_CONTRACT_COVERAGE", kind: "CAUTION" },
         },
       ],
       pepOperational: false,
@@ -295,9 +302,18 @@ test("surfaces a permission failure rather than an empty page", async ({
   page,
 }) => {
   await mockAuth(page);
-  await page.route("**/screening/providers/health", (route) =>
-    route.fulfill({ status: 403, json: { message: "Forbidden" } }),
-  );
+  // ITEM 8 — BOTH reads. `GET /screening/providers/health` and `GET /screening/overview` are both
+  // gated on `sanctions-pep.screen` (verified in their controllers), so a reader who lacks it is
+  // refused both; refusing only one was indistinguishable from refusing both while `Promise.all`
+  // collapsed them, and is not any more.
+  for (const path of [
+    "**/screening/providers/health",
+    "**/screening/overview**",
+  ]) {
+    await page.route(path, (route) =>
+      route.fulfill({ status: 403, json: { message: "Forbidden" } }),
+    );
+  }
 
   await page.goto("/screening-health");
 
@@ -316,7 +332,18 @@ test("renders in Arabic with RTL direction", async ({ page }) => {
   await page.goto("/screening-health");
 
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.getByText("غير مهيأ", { exact: true })).toBeVisible();
+  /*
+   * «غير مُهيّأ», WITH THE SHADDA — and this assertion failing is the proof of the defect it was
+   * pinning. It read «غير مهيأ» exactly, which was the LOCAL map this screen hand-wrote; the
+   * screen reads `ENUM_LABEL.ProviderHealthStatus` now, which has shipped
+   * `provHealthNotConfigured` in both languages the whole time. Two spellings of one word, the
+   * undiacriticised one live only because a screen kept its own copy — and an exact-match
+   * assertion on the copy is what held it in place.
+   *
+   * The test's own property is untouched: this screen must say NOT CONFIGURED in Arabic, and it
+   * does. What changed is which of the two spellings is the product's.
+   */
+  await expect(page.getByText("غير مُهيّأ", { exact: true })).toBeVisible();
   await expect(page.locator('[data-capability="PEP"]')).toBeVisible();
 });
 
@@ -469,10 +496,13 @@ test("populated: states when the recurring work next runs", async ({
   await mockOverview(page, overviewBody());
   await page.goto("/screening-health");
 
-  await expect(page.getByTestId("ops-next-rescreen")).toContainText(
-    "2026-09-11",
-  );
-  await expect(page.getByTestId("ops-next-sync")).toContainText("2026-09-11");
+  // RE-POINTED: these asserted the RAW ISO string `2026-09-11`, which is what the screen was
+  // printing — a machine string on a compliance screen, four centimetres below a panel that
+  // formatted its own dates a third way. Both now go through `formatDate`, the product's one
+  // answer, which renders DD/MM/YYYY for an English reader. The property this test is about —
+  // that the screen STATES when the recurring work next runs — is unchanged.
+  await expect(page.getByTestId("ops-next-rescreen")).toContainText("11/09/2026");
+  await expect(page.getByTestId("ops-next-sync")).toContainText("11/09/2026");
   // Never run is stated as such rather than shown blank.
   await expect(page.getByTestId("ops-last-sync-success")).toContainText(
     "never",
@@ -578,4 +608,264 @@ test("loading: shows a loading state before the data arrives", async ({
   // And once it lands, the loading state is gone and the view renders.
   await expect(page.getByText("Loading…")).toHaveCount(0);
   await expect(page.getByTestId("ops-attempts")).toBeVisible();
+});
+
+/*
+ * ===========================================================================================
+ * THE NINE CAPABILITY WORDS AND THE THREE WARNINGS -- all of them the owner's, all of them
+ * asserted BY CONTENT.
+ *
+ * Her reason for refusing a presence check: a key that resolved to the English half would pass
+ * one. So each assertion below names the Arabic run it expects, and the warning tests go further
+ * and prove the caution is not a grey footnote -- *"a caution that renders as decoration is worse
+ * than one nobody can read, because the first one looks like it was considered."*
+ * ===========================================================================================
+ */
+
+/** The built-in adapter's real nine rows, in the order it builds them. */
+function builtInNine() {
+  return [
+    { capability: "SANCTIONS", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_SANCTIONS_SYNCED", kind: "DESCRIPTION" } },
+    { capability: "PEP", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_NO_PEP_DATA", kind: "CAUTION" } },
+    { capability: "WATCHLIST", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_SANCTIONS_ONLY", kind: "DESCRIPTION" } },
+    { capability: "ADVERSE_MEDIA", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_ADVERSE_MEDIA_UNAVAILABLE", kind: "DESCRIPTION" } },
+    { capability: "INDIVIDUAL", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_INDIVIDUAL_NAMES", kind: "DESCRIPTION" } },
+    { capability: "ENTITY", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_ENTITY_LEGAL_NAMES", kind: "DESCRIPTION" } },
+    { capability: "BATCH", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_BATCH_LOCAL", kind: "DESCRIPTION" } },
+    { capability: "ONGOING_MONITORING", supported: true, configured: true, operational: true, note: { key: "BUILT_IN_MONITORING_SCHEDULE", kind: "DESCRIPTION" } },
+    { capability: "WEBHOOKS", supported: false, configured: false, operational: false, note: { key: "BUILT_IN_WEBHOOKS_NOT_APPLICABLE", kind: "DESCRIPTION" } },
+  ];
+}
+
+test("names all nine capabilities in Arabic, not one of them as a raw token", async ({
+  page,
+}) => {
+  await mockAuth(page, "AR");
+  await mockHealth(page, health({ capabilities: builtInNine() }));
+  await page.goto("/screening-health");
+
+  // Her nine words. `PROVIDER_CAPABILITY_LABEL_KEY` is total with no `null` left, so a tenth
+  // member cannot ship unworded and none of these can fall through to its member name.
+  const words: [string, string][] = [
+    ["SANCTIONS", "العقوبات"],
+    ["PEP", "الأشخاص السياسيون (PEP)"],
+    ["WATCHLIST", "قوائم المراقبة"],
+    ["ADVERSE_MEDIA", "التغطية الإعلامية السلبية"],
+    ["INDIVIDUAL", "فحص الأفراد"],
+    ["ENTITY", "فحص الكيانات"],
+    ["BATCH", "الفحص بالدفعات"],
+    ["ONGOING_MONITORING", "المراقبة المستمرة"],
+    ["WEBHOOKS", "إشعارات فورية"],
+  ];
+  for (const [member, word] of words) {
+    const row = page.locator(`[data-capability="${member}"]`);
+    await expect(row).toContainText(word);
+    // AND THE TOKEN IS GONE. Without this half the test passes against a cell that renders the
+    // word AND the member name, which is what a fall-through left beside a label would look like.
+    //
+    // DERIVED, NOT EXEMPTED: `PEP` is a substring of the owner's own «الأشخاص السياسيون (PEP)» --
+    // she put the Latin acronym in the label deliberately -- so the absence can never hold for
+    // that row. A hand-kept exemption list would go stale the day she rewords it; this condition
+    // cannot. (The recorded class: a needle that is a prefix of something legitimate is not a
+    // needle. It has cost this repository a base64 `'99'` and «لا» inside «للاختبار».)
+    if (!word.includes(member)) {
+      await expect(row).not.toContainText(member);
+    }
+  }
+
+  // AND THE CAUTION IS NOT IN THE CAPABILITY ROW. It spans its own row beneath, so a version that
+  // put it back in the cell — where measured it renders 62px wide on a phone — fails here.
+  await expect(
+    page.locator('[data-capability="PEP"] [data-note-kind="CAUTION"]'),
+  ).toHaveCount(0);
+  await expect(page.locator('[data-capability-caution="PEP"]')).toBeVisible();
+});
+
+test("renders every note in Arabic, with no English sentence left under any row", async ({
+  page,
+}) => {
+  await mockAuth(page, "AR");
+  await mockHealth(page, health({ capabilities: builtInNine() }));
+  await page.goto("/screening-health");
+
+  const table = page.locator('[data-capability="SANCTIONS"]');
+  await expect(table).toBeVisible();
+
+  // Four of the nine sentences, by content. Every one of them was English prose the api sent and
+  // this screen rendered verbatim until this batch.
+  await expect(page.locator('[data-capability="INDIVIDUAL"]')).toContainText(
+    "تُطابَق أسماء الأشخاص.",
+  );
+  await expect(page.locator('[data-capability="ENTITY"]')).toContainText(
+    "تُطابَق الأسماء القانونية للشركات.",
+  );
+  await expect(page.locator('[data-capability="WEBHOOKS"]')).toContainText(
+    "لا تنطبق على قوائم محفوظة داخل النظام.",
+  );
+  await expect(page.locator('[data-capability="BATCH"]')).toContainText(
+    "يجري الفحص داخلياً على دفعات، ولا يوجد حدّ خارجي لعدد الطلبات.",
+  );
+
+  // AND THE ENGLISH IS GONE. Anchored on the four positives above, which is what makes this an
+  // absence rather than an assertion about a page that never rendered.
+  const main = page.locator("main");
+  for (const english of [
+    "Names are matched.",
+    "Legal names are matched.",
+    "Not applicable to a local cache.",
+    "Batched locally",
+  ]) {
+    await expect(main).not.toContainText(english);
+  }
+});
+
+/*
+ * THE THREE WARNINGS SHE NAMED, one per provider, each asserted twice: the Arabic run is on the
+ * screen, AND it renders as a warning region rather than as grey text under the name.
+ *
+ * The second half is the one that cannot be read off the content. A caution carries
+ * `--warning-bg`, so its computed background is NOT transparent; a description has no background
+ * at all. Asserting the description's transparency as well is what stops this passing against an
+ * implementation that gave every note a box -- at which point nothing would distinguish a caution
+ * again.
+ */
+const TRANSPARENT = "rgba(0, 0, 0, 0)";
+
+test("the built-in cache's missing PEP data is a WARNING, in Arabic", async ({
+  page,
+}) => {
+  await mockAuth(page, "AR");
+  await mockHealth(page, health({ capabilities: builtInNine() }));
+  await page.goto("/screening-health");
+
+  // THE CAUTION IS ITS OWN ROW, spanning all four columns beneath the capability it is about.
+  // It used to sit inside the first cell; measured on a 390px phone that cell gave its text 62px
+  // of width and 299px of height, so by the owner's own rule the SPACE changed and not the
+  // sentence.
+  const pep = page.locator('[data-capability-caution="PEP"]');
+  await expect(pep).toContainText(
+    "لا تتوفّر لدى هذا المزوّد أي بيانات عن الأشخاص السياسيين.",
+  );
+  // «فحصهم يحتاج مزوّداً تجارياً» — the second clause, asserted separately: a reword that dropped
+  // what to DO about it would still satisfy the first assertion.
+  await expect(pep).toContainText("فحصهم يحتاج مزوّداً تجارياً");
+
+  const caution = pep.locator('[data-note-kind="CAUTION"]');
+  await expect(caution).toBeVisible();
+  await expect(caution).not.toHaveCSS("background-color", TRANSPARENT);
+  // THE MEANING IS IN THE WORDS, NOT IN THE COLOUR, and that is the half that matters for a
+  // reader who cannot see the box: the icon is decorative and carries no label, so the sentence
+  // above is what tells a screen-reader user this is a caution. It says so explicitly, which is
+  // why the colour is redundant encoding rather than the only encoding.
+  //
+  // There is deliberately NO `role` here. A live region is for content that UPDATES; these notes
+  // are static from first render and are reached in document order.
+  await expect(caution).not.toHaveAttribute("role", "status");
+  await expect(caution).not.toHaveAttribute("role", "alert");
+
+  // The other half of the claim: an ordinary note has no box, so a caution's box MEANS something.
+  const description = page
+    .locator('[data-capability="INDIVIDUAL"] [data-note-kind="DESCRIPTION"]');
+  await expect(description).toBeVisible();
+  await expect(description).toHaveCSS("background-color", TRANSPARENT);
+});
+
+test("a commercial provider's contract caveat is a WARNING on a row of three ticks", async ({
+  page,
+}) => {
+  await mockAuth(page, "AR");
+  await mockHealth(
+    page,
+    health({
+      provider: "commercial",
+      capabilities: [
+        {
+          capability: "PEP",
+          // SUPPORTED, CONFIGURED **AND** OPERATIONAL — the exact row she described: three green
+          // marks with a caveat under them saying the vendor may not cover what the row claims.
+          supported: true,
+          configured: true,
+          operational: true,
+          note: { key: "COMMERCIAL_CONTRACT_COVERAGE", kind: "CAUTION" },
+        },
+      ],
+      pepOperational: true,
+    }),
+  );
+  await page.goto("/screening-health");
+
+  // THE ROW STILL TICKS ALL THREE — that is the point of this one — and the caution beneath it
+  // says the vendor may not cover what the row appears to claim.
+  const row = page.locator('[data-capability="PEP"]');
+  await expect(row.locator('[data-operational="true"]')).toBeVisible();
+
+  const pep = page.locator('[data-capability-caution="PEP"]');
+  await expect(pep).toContainText(
+    "التغطية الفعلية تعتمد على المنتج المتعاقَد عليه",
+  );
+  await expect(pep).toContainText("راجع اتفاقية المزوّد قبل الاعتماد عليها.");
+
+  const caution = pep.locator('[data-note-kind="CAUTION"]');
+  await expect(caution).toBeVisible();
+  await expect(caution).not.toHaveCSS("background-color", TRANSPARENT);
+});
+
+test("a sanctions-scoped engine says in Arabic that no PEP data is searched", async ({
+  page,
+}) => {
+  await mockAuth(page, "AR");
+  await mockHealth(
+    page,
+    health({
+      provider: "on_premise",
+      capabilities: [
+        {
+          capability: "PEP",
+          supported: true,
+          configured: false,
+          operational: false,
+          note: {
+            key: "ON_PREMISE_PEP_SANCTIONS_ONLY",
+            params: { name: "sanctions_only" },
+            kind: "CAUTION",
+          },
+        },
+      ],
+      pepOperational: false,
+    }),
+  );
+  await page.goto("/screening-health");
+
+  const pep = page.locator('[data-capability-caution="PEP"]');
+  await expect(pep).toContainText("مقتصرة على العقوبات");
+  await expect(pep).toContainText("لا تُفحَص بيانات الأشخاص السياسيين.");
+  const caution = pep.locator('[data-note-kind="CAUTION"]');
+  await expect(caution).toBeVisible();
+  await expect(caution).not.toHaveCSS("background-color", TRANSPARENT);
+
+  // THE PARAMETER IS INTERPOLATED, NOT PRINTED. Three notes name the configured dataset, and a
+  // placeholder reaching the screen is the one failure the content assertions above cannot see:
+  // «مجموعة البيانات «{name}»» reads perfectly well as a sentence.
+  await expect(pep).toContainText("sanctions_only");
+  await expect(pep).not.toContainText("{name}");
+});
+
+test("screening-health screen has no serious/critical accessibility violations @a11y", async ({
+  page,
+}) => {
+  // IN ARABIC, which is the reading direction these words were written for — and the capability
+  // table is the markup this batch changed: a `Note` in a cell, then a second row whose single
+  // cell spans all four columns.
+  await mockAuth(page, "AR");
+  await mockHealth(page, health({ capabilities: builtInNine() }));
+
+  await page.goto("/screening-health");
+  await expect(page.locator('[data-capability-caution="PEP"]')).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(
+    results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    ),
+  ).toEqual([]);
 });

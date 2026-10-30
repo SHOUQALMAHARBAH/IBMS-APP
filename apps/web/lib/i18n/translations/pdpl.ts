@@ -25,24 +25,33 @@ export const PDPL = {
       'تسجيل قرار الموافقة (منح أو رفض صريح) عند نقطة تماس محدّدة. الموافقة والمعالجة بمقتضى الضرورة التعاقدية ضابطان منفصلان ومستقلان دائماً (PRIV-SOP-04) — ولا تُدمج الموافقة التسويقية مع أي غرض آخر أبداً. وسحب الموافقة إجراء من خطوتين: طلب السحب (ويبدأ مهلة يومَي عمل)، ثم تأكيده (فيُثبَت في السجل، ويوقف فوراً أي إرسال تسويقي لاحق إذا كانت الموافقة تسويقية).',
     consDataSubjectLabel: 'صاحب البيانات',
     consDataSubjectKindLabel: 'نوع صاحب البيانات',
-    consDataSubjectFieldLabel: 'صاحب البيانات',
     consKindCustomer: 'عميل',
     consKindInsuredPerson: 'شخص مؤمَّن عليه',
     consKindLead: 'عميل محتمل',
+    consSubjectLead: 'عميل محتمل',
     consCustomerIdLabel: 'العميل',
-    consInsuredPersonIdLabel: 'معرّف الشخص المؤمَّن عليه',
-    consLeadIdLabel: 'معرّف العميل المحتمل',
+    consInsuredPersonIdLabel: 'اعرض موافقات شخص مؤمَّن واحد فقط',
+    consLeadIdLabel: 'اعرض موافقات عميل محتمل واحد فقط',
     consPurposeLabel: 'الغرض',
     consDecisionLabel: 'القرار',
     consGrant: 'منح',
     consDecline: 'رفض',
     consTextVersionLabel: 'إصدار نص الموافقة',
     consTextVersionPlaceholder: 'مثال: privacy-notice-v1.2',
-    consFilterLabel: 'التصفية حسب معرّف العميل',
+    consFilterLabel: 'اعرض موافقات عميل واحد فقط',
     pnNoneForTouchpoint: 'لم يُنشر إشعار خصوصية لنقطة التواصل هذه بعد.',
     consNoDecisionYet: 'لم يُسجَّل أي قرار بعد.',
     consPreviouslyDeclined: 'سبق الرفض.',
     consWithdrawing: 'جارٍ سحب الموافقة…',
+    // SLICED from the line above — «سحب الموافقة» — rather than written. A verbal
+    // noun is this dictionary's own convention for a button («تأكيد», «إزالة»,
+    // «تنزيل»), so no imperative had to be constructed.
+    //
+    // «سحب» and NOT «إلغاء»: in this product «إلغاء» is a policy CANCELLATION, and
+    // the discard control's own note in `common.ts` guards that collision. «سحب
+    // الموافقة» is also the standard term and is already the one this screen uses
+    // while the withdrawal is in flight.
+    consWithdrawButton: 'سحب الموافقة',
     consCaptureFailed: 'فشل تسجيل الموافقة — حاول مرة أخرى.',
     consStatusLoadError: 'تعذّر تحميل حالة الموافقة — حاول مرة أخرى.',
     consWidgetRefusalAct: 'عرض سجلات موافقة هذا العميل',
@@ -106,6 +115,7 @@ export const PDPL = {
     dsrLoading: 'جارٍ التحميل…',
     dsrNone: 'لا توجد طلبات لأصحاب البيانات.',
     dsrLoadError: 'تعذّر تحميل طلبات أصحاب البيانات — حاول مرة أخرى.',
+    dsrViewCustomerRfqs: 'طلبات عروض الأسعار لهذا العميل',
     dsrActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     dsrRefusalAct: 'عرض طلبات أصحاب البيانات',
     dsrStatusReceived: 'وارد',
@@ -115,6 +125,12 @@ export const PDPL = {
     dsrStatusPartiallyFulfilled: 'مُنفَّذ جزئياً',
     dsrStatusRejected: 'مرفوض',
     dsrStatusClosed: 'مغلق',
+    dsrChannelPost: 'بريد',
+    dsrChannelTelephone: 'هاتف',
+    dsrChannelInPerson: 'حضورٌ شخصيّ',
+    dsrChannelWebsiteForm: 'نموذجُ الموقع',
+    dsrChannelLabel: 'كيف وصل الطلب',
+    dsrRequestTextLabel: 'نصُّ الطلب كما ورد',
     dsrTypeAccess: 'اطلاع',
     dsrTypeCorrection: 'تصحيح',
     dsrTypeDeletion: 'حذف',
@@ -142,10 +158,7 @@ export const PDPL = {
     rdNoScheduleItems: 'لا توجد بنود في جدول الاحتفاظ بعد.',
     rdHoldsHeading: 'الحجوزات القانونية',
     rdScopeLabel: 'النطاق',
-    rdReasonLabel: 'السبب',
-    rdHoldCategoryIdLabel: 'معرّف فئة السجلات (اختياري)',
     rdHoldCustomerIdLabel: 'العميل (اختياري)',
-    rdHoldInsuredPersonIdLabel: 'معرّف الشخص المؤمَّن عليه (اختياري)',
     rdPlaceHoldButton: 'فرض حجز',
     rdNoHolds: 'لا توجد حجوزات قانونية.',
     rdColSubject: 'الموضوع',
@@ -153,10 +166,21 @@ export const PDPL = {
     rdColStatus: 'الحالة',
     rdRecordReviewButton: 'تسجيل مراجعة',
     rdReleaseButton: 'رفع الحجز',
+    // The legal hold's OTHER state, beside its opposite. «سارية» is COPIED from
+    // `slaPolStatusActive` and verified as a copy.
+    //
+    // A CORRECTION OF MY OWN from one commit earlier, where this was declared for
+    // the owner on the ground that «سارية» carries a recorded caution. It does —
+    // but that caution is about a PI RECORD being current while its COVER has
+    // lapsed, and this product ALREADY uses «سارية» for a non-cover thing being in
+    // force: an SLA policy. A legal hold in force is the same concept.
+    //
+    // «على رأس عمله» (`empdActive`) was the wrong candidate and both read 'Active'
+    // in English — an EMPLOYEE at his post. Caught by reading the Arabic.
+    rdHoldInForce: 'سارية',
     rdReleased: 'مرفوع',
     rdBatchesHeading: 'دفعات الإتلاف',
-    rdBatchCategoryIdLabel: 'معرّف فئة السجلات لدفعة الإتلاف',
-    rdBatchCategoryIdFieldLabel: 'معرّف فئة السجلات (اختياري)',
+    rdBatchCategoryIdLabel: 'فئة السجلات التي تُتلفها هذه الدفعة',
     rdNominateBatchButton: 'ترشيح دفعة',
     rdNoBatches: 'لا توجد دفعات إتلاف.',
     rdColSlaDue: 'استحقاق المهلة',
@@ -167,9 +191,146 @@ export const PDPL = {
     rdIssueCertificateButton: 'إصدار الشهادة',
     rdCloseButton: 'إغلاق',
     rdAttached: 'مرفقة',
+    rdNoPeriodSet:
+      'لم تُحدَّد مدّة',
+    rdFloorApplies:
+      'يسري حدٌّ أدنى نظاميٌّ: {article} — {months} شهرًا على الأقل. تضع الشركةُ مدّتَها عند هذا الحدِّ أو أعلى منه بناءً على استشارتِها القانونية.',
+    rdInertNothingMeasured:
+      'لا يُحتسَبُ شيءٌ على هذه الفئةِ ولا يُقترَحُ أيُّ سجلٍّ للتخلُّصِ منه، إلى أن تُحدَّدَ المدّةُ ويُصادِقَ عليها المستشارُ القانوني.',
     rdDraftPending: 'مسودّة — قيد الانتظار',
+    rdNoFloorNotice:
+      'هذا النظامُ لا يعرف حدّاً أدنى قانونياً لفئةٍ بهذا الاسم — وهذا لا يعني أنّ القانونَ لا يضع لها حدّاً. فإن كانت هذه سجلّاتَ «اعرف عميلك» فحدُّها خمسُ سنواتٍ على الأقل بموجب قانون مكافحة غسل الأموال وتمويل الإرهاب رقم ٢٠ لسنة ٢٠٢١ (المادة ١٧/أ)، تُحسَب من إتمامِ المعاملة أو انتهاءِ العلاقة، أيُّهما أطول. وإن كانت سجلّاتٍ ماليةً أو تجاريةً فحدُّها عشرُ سنواتٍ من إغلاقِ المعاملة بموجب قانون التجارة رقم ١٢ لسنة ١٩٦٦ (المادة ١٩). اكتب سببَ المدّة التي اخترتَها، وأقِرَّ بأنّك قرأتَ ما سبق.',
+    rdNoFloorHeading: 'فئةٌ لا نعرف لها حدّاً أدنى',
+    rdNoFloorReasonLabel: 'سببُ المدّة التي اخترتَها',
+    rdNoFloorAcknowledgeLabel: 'أُقِرُّ بأنّي قرأتُ ما سبق',
+    rdNoFloorSaveButton: 'احفظ مع هذا الإقرار',
+    rdNoFloorReasonTooShort:
+      'اكتب سبباً لا يقلُّ عن عشرة أحرف — فالسؤالُ بعد سنةٍ هو لماذا اختيرت هذه المدّة.',
+    rdNoFloorDeclaredOn: 'أُقِرَّ بهذه المدّة',
+    rdNoticeHeading: 'مدَدُ الاحتفاظِ المنتهية',
+    rdNoticeLoading: 'جارٍ قراءةُ مدَدِ الاحتفاظ…',
+    rdNoticeNone: 'لا توجدُ فئةٌ انتهت مدّتُها.',
+    rdNoticeColCategory: 'فئةُ السجلات',
+    rdNoticeColElapsed: 'سجلّاتٌ انتهت مدّتُها',
+    rdNoticeColBasis: 'الأساسُ القانونيُّ للحدِّ الأدنى',
+    rdNoticeColCountedFrom: 'تُحسَبُ المدّةُ من',
+    rdNoticeColChoices: 'الخيارات',
+    rdNoticeUnwatched:
+      'هذا النظامُ لا يعرفُ أيَّ سجلّاتٍ تعنيها هذه الفئة، فلا يَعُدُّها ولن يُنبّهَ عنها أبداً. المدّةُ التي حدّدتَها مُسجَّلة، والحدُّ الأدنى القانونيُّ ما زال يسري عليها — لكن لا شيءَ هنا يراقبُ الوقت.',
+    rdNoticeNoHold: 'لا يوجدُ حجزٌ قانونيٌّ على هذه السجلات.',
+    rdNoticeExtend: 'تمديد',
+    rdNoticeExtendHeading: 'تمديدُ مدّةِ الاحتفاظ',
+    rdNoticeMonthsLabel: 'التمديدُ بالأشهر',
+    rdNoticeBasisLabel: 'الأساس',
+    rdNoticeNoteLabel: 'ما يستندُ إليه المكتبُ فعلاً',
+    rdNoticeInstrumentLabel: 'النصُّ التشريعيُّ (التشريع)',
+    rdNoticeArticleLabel: 'المادة',
+    rdNoticeHoldLabel: 'الحجزُ الذي يستندُ إليه التمديد',
+    rdNoticeExtendSubmit: 'سجّلِ التمديد',
+    rdNoticeBasisLegislative: 'نصٌّ تشريعيٌّ مُسمّى',
+    rdNoticeBasisHold: 'حجزٌ قانونيٌّ أو نزاعٌ قائم',
+    rdNoticeBasisConsent: 'موافقةٌ صريحةٌ من العميل — غيرُ متاحة',
+    rdNoticeConsentWhy:
+      'هذا الأساسُ يحتاجُ أن تَنُصَّ الموافقةُ المسجّلةُ على مدّتِها، حتى يُمكنَ رفضُ تمديدٍ يتجاوزُ ما وافقَ عليه العميل. والموافقاتُ في هذا النظامِ تحملُ غرضاً وتاريخَ منحٍ وتاريخَ سحبٍ، ولا تحملُ مدّة. فلا يُعرَضُ هذا الأساسُ حتى تُسجَّلَ المدّة.',
+    rdBlockedHeading:
+      'مرحلةُ الحجب',
+    rdBlockedWhat:
+      'السجلُّ الذي انتهت مدّةُ احتفاظِه يدخلُ مرحلةَ الحجب: يُحفَظُ لاستيفاءِ الحدِّ القانونيِّ الأدنى، ولا يُعالَج. أربعةُ شروطٍ تجعلُ هذا حجباً قانونياً وليس وصفاً: (١) لا يدخلُ أيَّ معالجةٍ جارية — فقد خرجَ من مسحِ مكافحةِ غسلِ الأموال، ومن تجميعِ العمولات، ومن صورةِ مستحقّاتِ الشركات؛ (٢) لا يظهرُ للموظّفِ العادي؛ (٣) لا يُستخرَجُ إلّا بطلبٍ قضائيٍّ أو بتدقيقٍ رسميٍّ من البنكِ المركزيِّ الأردني، بسببٍ مُدوَّنٍ وبصلاحيةٍ خاصة؛ (٤) ولا يُمحى في هذه المرحلةِ ولو طلبَ العميلُ ذلك.',
+    rdBlockedScopeLimit:
+      'وهذه المرحلةُ تسري على الفئاتِ التي يستطيعُ النظامُ قياسَ مدّتِها فقط. أمّا ملفُّ العميلِ وسجلّاتُ العنايةِ الواجبةِ فلا تدخلُها: المادةُ ١٧/أ تَحسُبُ المدّةَ من إتمامِ العمليةِ أو من انتهاءِ العلاقةِ، أيُّهما أطول، ولا يُسجِّلُ هذا النظامُ تاريخاً لانتهاءِ العلاقة. فلا تُقاسُ مدّتُها، ولا يُقالُ إنّها محجوبة.',
+    rdRetrieveCategoryLabel:
+      'الفئةُ التي تنتمي إليها هذه السجلّات',
+    rdRetrieveHeading:
+      'استخراجُ سجلٍّ محجوب',
+    rdRetrieveBasisLabel:
+      'على أيِّ أساسٍ يُستخرَجُ',
+    rdRetrieveBasisJudicial:
+      'طلب قضائي',
+    rdRetrieveWhenJudicial:
+      'يُختارُ هذا السببُ إذا وصلَ المكتبَ كتابٌ من محكمةٍ أو من النيابةِ العامّةِ أو من دائرةِ التنفيذِ أو من أيِّ جهةٍ قضائيّةٍ يَطلُبُ مستنداً من الأرشيف.',
+    rdRetrieveWriteJudicial:
+      'ويُكتَبُ في الخانة: الجهةُ التي طلبت باسمِها، ورقمُ كتابِها وتاريخُه، ورقمُ الدعوى إن وُجِد، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgJudicial:
+      'مثال: محكمةُ بدايةِ عمّان — كتابٌ رقم ١٢٣٤ تاريخ ٥/٣/٢٠٢٦ — الدعوى ٥٦٧/٢٠٢٦ — وثيقةُ تأمينِ العميل (فلان) وإيصالاتُ أقساطِها.',
+    rdRetrieveBasisCbj:
+      'تدقيق البنك المركزي',
+    rdRetrieveWhenCbj:
+      'يُختارُ هذا السببُ إذا كانَ الاسترجاعُ لتدقيقٍ رسميٍّ من البنكِ المركزيِّ الأردنيّ.',
+    rdRetrieveWriteCbj:
+      'ويُكتَبُ في الخانة: أيُّ تدقيقٍ هو — رقمُ كتابِ البنكِ المركزيِّ وتاريخُه، أو الفترةُ التي يُغطّيها التدقيق — ومَن طلبَ المستندَ من فريقِ التدقيق، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgCbj:
+      'مثال: تدقيقُ البنكِ المركزيِّ لفترةِ ٢٠٢٥ — كتابٌ رقم ٧٨٩ تاريخ ١٠/٢/٢٠٢٦ — ملفُّ «اعرف عميلك» للعميل (فلان).',
+    rdRetrieveBasisAmlu:
+      'طلب وحدة مكافحة غسل الأموال وتمويل الإرهاب',
+    rdRetrieveWhenAmlu:
+      'يُختارُ هذا السببُ إذا وصلَ المكتبَ طلبٌ من وحدةِ مكافحةِ غسلِ الأموالِ وتمويلِ الإرهاب.',
+    rdRetrieveWriteAmlu:
+      'ويُكتَبُ في الخانة: رقمُ كتابِ الوحدةِ وتاريخُه، واسمُ العميلِ أو السجلِّ المطلوبِ، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgAmlu:
+      'مثال: وحدةُ مكافحةِ غسلِ الأموال — كتابٌ رقم ٤٥٦ تاريخ ٨/٣/٢٠٢٦ — ملفُّ «اعرف عميلك» وسجلُّ الفرزِ للعميل (فلان) وإيصالاتُ أقساطِه.',
+    rdRetrieveBasisOther:
+      'أخرى',
+    rdRetrieveWhenOther:
+      'يُختارُ هذا السببُ إذا كانَ الاسترجاعُ لسببٍ مشروعٍ لا يَنطبِقُ عليه أيٌّ من الأسبابِ السابقة — ويُكتَبُ السببُ نفسُه في الخانة.',
+    rdRetrieveKindsOther:
+      'ومن أمثلتِه: شكوى عميلٍ يُعادُ فحصُها · مطالبةٌ تُعادُ فتحُها من شركةِ التأمين · تدقيقُ دائرةِ ضريبةِ الدخلِ والمبيعات · طلبُ العميلِ نسخةً من ملفِّه · تدقيقُ مدقّقِ حساباتِ المكتبِ السنويّ · مراجعةٌ داخليةٌ أو تحقيقٌ داخليّ.',
+    rdRetrieveWriteOther:
+      'ويُكتَبُ في الخانة: مَن طلب، وبأيِّ كتابٍ أو طلبٍ وتاريخِه إن وُجِد، وما طُلِبَ بالتحديد.',
+    rdRetrieveEgOther:
+      'مثال: شكوى العميل (فلان) رقم ١٢ — أُعيدَ فحصُها بطلبِ مديرِ المكتبِ تاريخ ٥/٣/٢٠٢٦ — ملفُّ الشكوى ومرفقاتُها.',
+    rdRetrieveBasisShared:
+      'هذا الملفُّ خرجَ من الأرشيفِ بعدَ انتهاءِ مدّةِ حفظِه، وما يُكتَبُ هنا هو جوابُ المكتبِ إذا سُئِلَ لاحقاً: لماذا استُرجِع، ولمن.',
+    rdRetrieveRecordsLabel:
+      'السجلّاتُ التي طلبَها القضاءُ أو التدقيق',
+    rdRetrieveNoteLabel:
+      'مَن طلبَ، ولأيِّ غرض',
+    rdRetrieveSubmit:
+      'سجّلِ الاستخراج',
+    rdRetrieveAppendOnly:
+      'السجلُّ أدناه لا يُعدَّلُ ولا يُحذَفُ بعد كتابتِه.',
+    rdRetrieveRegisterHeading:
+      'سجلُّ الاستخراجات',
+    rdRetrieveNone:
+      'لم يُستخرَج أيُّ سجلٍّ محجوبٍ بعد.',
+    rdRetrieveColBasis:
+      'الأساس',
+    rdRetrieveColNote:
+      'البيان',
+    rdRetrieveColWho:
+      'مَن استخرجَه',
+    rdRetrieveColWhen:
+      'متى',
+
+    // THE EXTENSION REGISTER — owner decision 43. Four new keys and every Arabic run sliced
+    // out of a string already in the product, never typed: «سجل X» is this dictionary's own
+    // register-heading shape (`dpowHoldRegister`, `dpowCbtRegister`, `dpowDpiaRegister`), the
+    // extension word comes from `rdNoticeExtendSubmit`, the empty state is `coiRegEmpty` with
+    // its own noun swapped, «حتى» comes from `dpowColDaysUntilDue` and «من» from
+    // `coiRegWhoHeading`. Every other column reuses an existing key outright — the basis, the
+    // statement, the category, the instrument, the article and the hold all already render here.
+    rdExtRegisterHeading: 'سجل التمديد',
+    rdExtRegisterNone: 'لا يوجد تمديد مسجّل في هذا المكتب بعد.',
+    rdExtColRecord:
+      'مرجع السجل',
+    rdExtRecordNotRecorded:
+      'لم يُسجَّل مرجع.',
+    rdExtRecordTypeNone:
+      'لا يوجد مرجع لهذا النوع من السجلات.',
+    rdExtRecordGone:
+      'السجل غير موجود.',
+    rdExtColUntil: 'حتى',
+    rdExtColWho: 'من',
+    rdRetrieveDone:
+      'تمّ تدوينُ الاستخراج.',
+    rdNoticeTwoChoices:
+      'وأمامَ المكتبِ خيارانِ لا ثلاثة: تمديدُ المدّةِ على أحدِ الأسبابِ الثلاثة، أو ترشيحُ السجلّاتِ للإتلاف. وفصلُ المعرّفاتِ عن القيمِ الماليةِ غيرُ متاحٍ في هذا النظام — فالسجلّاتُ التي يقيسُ النظامُ مدّتَها لا تحملُ هويةً أصلاً، والهويةُ على سجلِّ العميلِ نفسِه وهي مشتركةٌ بين كلِّ سجلّاتِه، فلا يُمكنُ فصلُها عن بعضِها. فحتى تُعالَجَ الهوية، الطريقُ الوحيدُ بعد انتهاءِ المدّةِ هو الإتلاف.',
+    rdBackupLimit:
+      'تنبيه: حذفُ السجلِّ من قاعدةِ البياناتِ الأساسيةِ ليس إتلافاً ما دامت نسخةٌ احتياطيةٌ تحملُه. لا يملكُ هذا النظامُ إتلافاً يشملُ النسخَ الاحتياطية، فلا تُوصَفُ أيُّ عمليةٍ هنا بأنها إتلافٌ كامل.',
     rdLoading: 'جارٍ التحميل…',
     rdLoadError: 'تعذّر تحميل سجل الاحتفاظ والإتلاف — حاول مرة أخرى.',
+    rdListSchedule: 'جدول الاحتفاظ',
+    rdListHolds: 'الحجوزات القانونية',
+    rdListBatches: 'دفعات الإتلاف',
     rdInsuredPersonGeneric: 'شخص مؤمَّن عليه',
     rdActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     rdSavingButton: 'جارٍ الحفظ…',
@@ -182,7 +343,6 @@ export const PDPL = {
     // beside them: the page has several 'Scope'/'Reason'/'…ID' fields across
     // three sections, and the accessible name is what disambiguates them.
     rdScopeAria: 'نطاق الحجز القانوني',
-    rdScopeFieldLabel: 'النطاق',
     rdReasonAria: 'سبب الحجز القانوني',
     rdHoldCategoryIdAria: 'معرّف فئة السجلات للحجز القانوني',
     rdHoldCustomerIdAria: 'معرّف العميل للحجز القانوني',
@@ -195,7 +355,6 @@ export const PDPL = {
     cbtIntro:
       'يُحظر أي نقل للبيانات الشخصية خارج الأردن ما لم يُسجَّل سند قانوني واحد بالتحديد من ثلاثة (استثناء قانوني معترف به، أو الشروط التعاقدية النموذجية، أو موافقة صريحة مخصّصة للغرض). وتسجيل النقل هنا هو ذاته فعل الاعتماد — ولا يقوم به إلا مسؤول حماية البيانات.',
     cbtDescriptionLabel: 'وصف النقل',
-    cbtDescriptionFieldLabel: 'الوصف',
     cbtDestinationLabel: 'دولة الوجهة',
     cbtLegalBasisLabel: 'السند القانوني',
     cbtEvidenceRefLabel: 'مرجع الإثبات (اختياري)',
@@ -215,9 +374,6 @@ export const PDPL = {
     dsaIntro:
       'مسار مشاركة بيانات لمرة واحدة، منفصل عن العلاقة القائمة مع المورّد. وتتطلب المشاركة مع مورّد محدّد أن يكون قد صُنِّف حسب المخاطر وأصبح جاهزاً لمشاركة البيانات أولاً، إلا إذا كانت القناة تنظيمية معترفاً بها (كبوابة البنك المركزي الأردني) — ويبقى الأمر خاضعاً لفحوص التصنيف وأمان القناة في الحالتين.',
     dsaDescriptionLabel: 'وصف المشاركة',
-    dsaChannelFieldLabel: 'القناة',
-    dsaClassificationFieldLabel: 'التصنيف',
-    dsaDescriptionFieldLabel: 'الوصف',
     dsaVendorIdLabel: 'معرّف المورّد (اختياري)',
     dsaClassificationLabel: 'تصنيف البيانات',
     dsaChannelLabel: 'قناة المشاركة',
@@ -243,7 +399,6 @@ export const PDPL = {
     dpiaIntro:
       'استمارة الفحص المكوّنة من خمسة أسئلة. أي إجابة بـ«نعم» تستوجب مراجعة مسؤول حماية البيانات خلال خمسة أيام عمل؛ والنتيجة التي تكون جميع إجاباتها «لا» تُعتمد تلقائياً مع خضوعها للفحص العشوائي؛ ويمكن تصعيد الحالة عالية الخطورة جوهرياً وهي قيد المراجعة إلى تقييم أثر كامل.',
     dpiaSubjectLabel: 'وصف الموضوع',
-    dpiaSubjectFieldLabel: 'الموضوع',
     dpiaQSensitive: 'هل تتضمّن بيانات حسّاسة؟',
     dpiaQLargeScale: 'هل المعالجة واسعة النطاق؟',
     dpiaQCrossBorder: 'هل تتضمّن نقلاً عبر الحدود؟',
@@ -353,24 +508,25 @@ export const PDPL = {
       'Capture a consent decision (grant or explicit decline) at a defined touchpoint. Consent and contractual-necessity processing are always two separate, independently-actionable controls (PRIV-SOP-04) — marketing consent is never combined with any other purpose. Withdrawal is a two-step flow: request it (starts a 2-business-day SLA clock), then confirm it (reflects it in the register and, for a MARKETING consent, immediately blocks further marketing sends).',
     consDataSubjectLabel: 'Data subject',
     consDataSubjectKindLabel: 'Data subject kind',
-    consDataSubjectFieldLabel: 'Data subject',
     consKindCustomer: 'Customer',
     consKindInsuredPerson: 'Insured person',
     consKindLead: 'Lead',
+    consSubjectLead: 'Lead',
     consCustomerIdLabel: 'Customer',
-    consInsuredPersonIdLabel: 'Insured person ID',
-    consLeadIdLabel: 'Lead ID',
+    consInsuredPersonIdLabel: 'Show consents for one insured person only',
+    consLeadIdLabel: 'Show consents for one lead only',
     consPurposeLabel: 'Purpose',
     consDecisionLabel: 'Decision',
     consGrant: 'Grant',
     consDecline: 'Decline',
     consTextVersionLabel: 'Consent text version',
     consTextVersionPlaceholder: 'e.g. privacy-notice-v1.2',
-    consFilterLabel: 'Filter by customer ID',
+    consFilterLabel: 'Show consents for one customer only',
     pnNoneForTouchpoint: 'No privacy notice published for this touchpoint yet.',
     consNoDecisionYet: 'No decision captured yet.',
     consPreviouslyDeclined: 'Previously declined.',
     consWithdrawing: 'Withdrawing…',
+    consWithdrawButton: 'Withdraw consent',
     consCaptureFailed: 'The capture failed — try again.',
     consStatusLoadError: 'Could not load consent status — try again.',
     consWidgetRefusalAct: "view this customer's consent records",
@@ -434,6 +590,7 @@ export const PDPL = {
     dsrLoading: 'Loading…',
     dsrNone: 'No Data Subject Requests.',
     dsrLoadError: 'Could not load Data Subject Requests — try again.',
+    dsrViewCustomerRfqs: 'RFQs for this customer',
     dsrActionError: 'That action failed — try again.',
     dsrRefusalAct: 'view and log data subject requests',
     dsrStatusReceived: 'Received',
@@ -443,6 +600,12 @@ export const PDPL = {
     dsrStatusPartiallyFulfilled: 'Partially fulfilled',
     dsrStatusRejected: 'Rejected',
     dsrStatusClosed: 'Closed',
+    dsrChannelPost: 'Post',
+    dsrChannelTelephone: 'Telephone',
+    dsrChannelInPerson: 'In person',
+    dsrChannelWebsiteForm: 'Website form',
+    dsrChannelLabel: 'How the request arrived',
+    dsrRequestTextLabel: 'The request as received',
     dsrTypeAccess: 'Access',
     dsrTypeCorrection: 'Correction',
     dsrTypeDeletion: 'Deletion',
@@ -469,10 +632,7 @@ export const PDPL = {
     rdNoScheduleItems: 'No retention-schedule items yet.',
     rdHoldsHeading: 'Legal holds',
     rdScopeLabel: 'Scope',
-    rdReasonLabel: 'Reason',
-    rdHoldCategoryIdLabel: 'Record category ID (optional)',
     rdHoldCustomerIdLabel: 'Customer (optional)',
-    rdHoldInsuredPersonIdLabel: 'Insured person ID (optional)',
     rdPlaceHoldButton: 'Place hold',
     rdNoHolds: 'No Legal Holds.',
     rdColSubject: 'Subject',
@@ -480,10 +640,10 @@ export const PDPL = {
     rdColStatus: 'Status',
     rdRecordReviewButton: 'Record review',
     rdReleaseButton: 'Release',
+    rdHoldInForce: 'In force',
     rdReleased: 'Released',
     rdBatchesHeading: 'Disposal batches',
-    rdBatchCategoryIdLabel: 'Disposal batch record category ID',
-    rdBatchCategoryIdFieldLabel: 'Record category ID (optional)',
+    rdBatchCategoryIdLabel: 'The record category this batch disposes of',
     rdNominateBatchButton: 'Nominate batch',
     rdNoBatches: 'No disposal batches.',
     rdColSlaDue: 'SLA due',
@@ -494,9 +654,139 @@ export const PDPL = {
     rdIssueCertificateButton: 'Issue certificate',
     rdCloseButton: 'Close',
     rdAttached: 'Attached',
+    rdNoPeriodSet:
+      'No period set',
+    rdFloorApplies:
+      'A statutory floor applies: {article} — at least {months} months. The office sets its own period at or above that, on its own legal advice.',
+    rdInertNothingMeasured:
+      'Nothing is measured against this category and no records are proposed for disposal until a period is set and legal counsel confirms it.',
     rdDraftPending: 'DRAFT — pending',
+    rdNoFloorNotice:
+      'This system does not know a statutory minimum for a record category with this name — and that does not mean the law sets none for it. If these are know-your-customer records, their minimum is at least five years under the Anti-Money Laundering and Counter-Terrorism Financing Law No. 20 of 2021 (art. 17/a), counted from completing the transaction or ending the relationship, whichever is longer. If they are financial or commercial records, their minimum is ten years from the closing of the transaction under the Commercial Law No. 12 of 1966 (art. 19). Write the reason for the period you have chosen, and confirm that you have read the above.',
+    rdNoFloorHeading: 'A category we know no minimum for',
+    rdNoFloorReasonLabel: 'Why you chose this period',
+    rdNoFloorAcknowledgeLabel: 'I confirm I have read the above',
+    rdNoFloorSaveButton: 'Save with this declaration',
+    rdNoFloorReasonTooShort:
+      'Write a reason of at least ten characters — a year from now the question is why this period was chosen.',
+    rdNoFloorDeclaredOn: 'This period was declared',
+    rdNoticeHeading: 'Retention periods that have ended',
+    rdNoticeLoading: 'Reading retention periods…',
+    rdNoticeNone: 'No category has reached the end of its period.',
+    rdNoticeColCategory: 'Record category',
+    rdNoticeColElapsed: 'Records past their period',
+    rdNoticeColBasis: 'What sets the minimum',
+    rdNoticeColCountedFrom: 'The period is counted from',
+    rdNoticeColChoices: 'Choices',
+    rdNoticeUnwatched:
+      'This system has not been told which records this category name means, so it cannot count them and will never raise a notice for it. The period you set is recorded and the statutory floor still applies to it — but nothing here is watching the clock.',
+    rdNoticeNoHold: 'No legal hold stands on these records.',
+    rdNoticeExtend: 'Extend',
+    rdNoticeExtendHeading: 'Extend the retention period',
+    rdNoticeMonthsLabel: 'Extend by (months)',
+    rdNoticeBasisLabel: 'Basis',
+    rdNoticeNoteLabel: 'What the office is actually relying on',
+    rdNoticeInstrumentLabel: 'Legislative instrument',
+    rdNoticeArticleLabel: 'Article',
+    rdNoticeHoldLabel: 'Which hold this extension relies on',
+    rdNoticeExtendSubmit: 'Record the extension',
+    rdNoticeBasisLegislative: 'A named legislative provision',
+    rdNoticeBasisHold: 'A live legal hold or dispute',
+    rdNoticeBasisConsent:
+      'Explicit consent from the customer — not available',
+    rdNoticeConsentWhy:
+      'This basis needs the recorded consent to state its own duration, so an extension beyond what the customer agreed can be refused. Consent records in this system carry a purpose, a grant date and a withdrawal date — and no duration. It is not offered until a duration is recorded.',
+    rdBlockedHeading:
+      'The blocked phase',
+    rdBlockedWhat:
+      'A record whose retention period has ended enters the blocked phase: it is kept to satisfy the statutory minimum, and it is not processed. Four conditions are what make that a legal block rather than a label. (1) It enters no ongoing processing — it has left the anti-money-laundering receipt sweep, the commission roll-up and the insurer payables picture. (2) It is not visible to ordinary employees. (3) It is retrievable only on a judicial request or an official audit by the Central Bank of Jordan, on a recorded basis and behind its own permission. (4) And erasure is refused in this phase even if the customer asks.',
+    rdBlockedScopeLimit:
+      'This phase applies only to the categories whose period this system can measure. The customer file and the due-diligence records are NOT among them: art. 17/a counts from completing the transaction or ending the relationship, whichever is longer, and this system records no date for a relationship ending. So their clock is not measured, and they are never described as blocked.',
+    rdRetrieveCategoryLabel:
+      'Which category the records belong to',
+    rdRetrieveHeading:
+      'Retrieve a blocked record',
+    rdRetrieveBasisLabel:
+      'On what basis it is being retrieved',
+    rdRetrieveBasisJudicial:
+      'A judicial request',
+    rdRetrieveWhenJudicial:
+      'Choose this basis when a letter reaches the office from a court, the public prosecution, the execution department or any judicial authority asking for a document from the archive.',
+    rdRetrieveWriteJudicial:
+      'In the box, record: the authority that asked, by name; its letter number and date; the case number if there is one; and exactly what was asked for.',
+    rdRetrieveEgJudicial:
+      'Example: Amman Court of First Instance — letter no. 1234 dated 5/3/2026 — case 567/2026 — the insurance policy of customer (name) and its instalment receipts.',
+    rdRetrieveBasisCbj:
+      'A Central Bank audit',
+    rdRetrieveWhenCbj:
+      'Choose this basis when the retrieval is for an official audit by the Central Bank of Jordan.',
+    rdRetrieveWriteCbj:
+      'In the box, record: which audit it is — the Central Bank letter number and date, or the period the audit covers — who on the audit team asked for the document, and exactly what was asked for.',
+    rdRetrieveEgCbj:
+      'Example: Central Bank audit for the 2025 period — letter no. 789 dated 10/2/2026 — the know-your-customer file of customer (name).',
+    rdRetrieveBasisAmlu:
+      'A request from the Anti-Money Laundering and Counter-Terrorist Financing Unit',
+    rdRetrieveWhenAmlu:
+      'Choose this basis when a request reaches the office from the Anti-Money Laundering and Counter-Terrorist Financing Unit.',
+    rdRetrieveWriteAmlu:
+      'In the box, record: the letter number and date of the Unit, the name of the customer or the record asked for, and exactly what was asked for.',
+    rdRetrieveEgAmlu:
+      'Example: Anti-Money Laundering Unit — letter no. 456 dated 8/3/2026 — the know-your-customer file, the screening record and the instalment receipts of customer (name).',
+    rdRetrieveBasisOther:
+      'Other',
+    rdRetrieveWhenOther:
+      'Choose this basis when the retrieval is for a legitimate reason that none of the bases above covers — and write the reason itself in the box.',
+    rdRetrieveKindsOther:
+      'Among its kinds: a customer complaint being re-examined · a claim reopened by the insurer · an Income and Sales Tax Department audit · a customer asking for a copy of their file · the annual external auditor of the office · an internal review or internal investigation.',
+    rdRetrieveWriteOther:
+      'In the box, record: who asked, under which letter or request and its date if there is one, and exactly what was asked for.',
+    rdRetrieveEgOther:
+      'Example: complaint no. 12 of customer (name) — re-examined at the request of the office manager on 5/3/2026 — the complaint file and its attachments.',
+    rdRetrieveBasisShared:
+      'This file left the archive after its retention period had ended, and what is written here is the answer the office gives if it is later asked: why was it retrieved, and for whom.',
+    rdRetrieveRecordsLabel:
+      'The records the court or the audit asked for',
+    rdRetrieveNoteLabel:
+      'Who asked, and for what',
+    rdRetrieveSubmit:
+      'Record the retrieval',
+    rdRetrieveAppendOnly:
+      'The register below cannot be edited or deleted once written.',
+    rdRetrieveRegisterHeading:
+      'Register of retrievals',
+    rdRetrieveNone:
+      'No blocked record has been retrieved yet.',
+    rdRetrieveColBasis:
+      'Basis',
+    rdRetrieveColNote:
+      'Statement',
+    rdRetrieveColWho:
+      'Retrieved by',
+    rdRetrieveColWhen:
+      'When',
+    rdExtRegisterHeading: 'Extension register',
+    rdExtRegisterNone: 'Nobody in this office has recorded an extension yet.',
+    rdExtColRecord:
+      'Record reference',
+    rdExtRecordNotRecorded:
+      'No reference recorded.',
+    rdExtRecordTypeNone:
+      'No reference exists for this kind of record.',
+    rdExtRecordGone:
+      'The record is no longer present.',
+    rdExtColUntil: 'Until',
+    rdExtColWho: 'Who',
+    rdRetrieveDone:
+      'The retrieval has been recorded.',
+    rdNoticeTwoChoices:
+      "The office has TWO choices here, not three: extend the period on one of the three bases, or nominate the records for destruction. Separating the identifiers from the financial values is NOT available in this system — the records whose period it can measure carry no identity at all, and the identity sits on the customer record and is shared across every one of that customer's records, so it cannot be separated for some of them. Until that is handled, the only route after a period elapses is destruction.",
+    rdBackupLimit:
+      'Note: deleting a record from the primary database is not destruction while a backup holds the row. This system has no backup-scoped destruction, so nothing here may be described as complete destruction.',
     rdLoading: 'Loading…',
     rdLoadError: 'Could not load the retention/disposal register — try again.',
+    rdListSchedule: 'the retention schedule',
+    rdListHolds: 'the legal holds',
+    rdListBatches: 'the disposal batches',
     rdInsuredPersonGeneric: 'An insured person',
     rdActionError: 'That action failed — try again.',
     rdSavingButton: 'Saving…',
@@ -506,7 +796,6 @@ export const PDPL = {
     rdStatusDpoApproved: 'DPO approved',
     rdStatusExecuted: 'Executed',
     rdScopeAria: 'Legal hold scope',
-    rdScopeFieldLabel: 'Scope',
     rdReasonAria: 'Legal hold reason',
     rdHoldCategoryIdAria: 'Legal hold record category ID',
     rdHoldCustomerIdAria: 'Legal hold customer ID',
@@ -518,7 +807,6 @@ export const PDPL = {
     cbtIntro:
       'Any transfer of personal data outside Jordan is blocked unless exactly one of three legal bases is recorded (a recognized statutory exception, Standard Contractual Clauses, or explicit purpose-specific consent). Logging a transfer here is the same act as approving it — only a Data Protection Officer may do so.',
     cbtDescriptionLabel: 'Transfer description',
-    cbtDescriptionFieldLabel: 'Description',
     cbtDestinationLabel: 'Destination country',
     cbtLegalBasisLabel: 'Legal basis',
     cbtEvidenceRefLabel: 'Evidence reference (optional)',
@@ -537,9 +825,6 @@ export const PDPL = {
     dsaIntro:
       'A one-off data-sharing path separate from the standing vendor relationship. Sharing with a named vendor requires that vendor to be risk-tiered and data-share ready first, unless the channel is a recognized regulatory one (e.g. the CBJ portal) — still subject to classification and secure-channel checks either way.',
     dsaDescriptionLabel: 'Data sharing description',
-    dsaChannelFieldLabel: 'Channel',
-    dsaClassificationFieldLabel: 'Classification',
-    dsaDescriptionFieldLabel: 'Description',
     dsaVendorIdLabel: 'Vendor ID (optional)',
     dsaClassificationLabel: 'Data classification',
     dsaChannelLabel: 'Sharing channel',
@@ -564,7 +849,6 @@ export const PDPL = {
     dpiaIntro:
       'The 5-question screening form. Any single "Yes" requires DPO review within 5 business days; an all-"No" result auto-approves subject to a spot-check; a materially high-risk case under review can be escalated to a Full DPIA.',
     dpiaSubjectLabel: 'Subject description',
-    dpiaSubjectFieldLabel: 'Subject',
     dpiaQSensitive: 'Involves sensitive data?',
     dpiaQLargeScale: 'Large-scale processing?',
     dpiaQCrossBorder: 'Cross-border transfer?',

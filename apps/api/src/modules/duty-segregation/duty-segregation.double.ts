@@ -8,7 +8,7 @@ import type {
 
 /**
  * A `DutySegregationService` standing in for a SEGREGATED office — which every office is, and which is the
- * only mode the unit tests of the fifteen maker/checker pairs are about.
+ * only mode the unit tests of the sixteen maker/checker pairs are about.
  *
  * ## Why this is shared rather than written per spec
  *

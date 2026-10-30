@@ -6,8 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { getProspect, type Prospect } from '../../../../lib/prospect/prospect-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import {
   profileFieldLabelStyle,
@@ -65,15 +67,13 @@ export default function ProspectProfilePage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button type="button" onClick={() => router.push('/prospects')} style={{ cursor: 'pointer' }}>
         {t('prospdBackToList')}
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {prospect ? (
@@ -81,7 +81,7 @@ export default function ProspectProfilePage() {
           <h1>
             <bdi>{prospect.companyName}</bdi>
           </h1>
-          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.ProspectStatus[prospect.status])}</p>
+          <p style={{ opacity: 0.8 }}>{t('commonStatusLabel')} {t(ENUM_LABEL.ProspectStatus[prospect.status])}</p>
           <div style={profileGridStyle}>
             <ProfileField label={t('prosdColSector')} value={prospect.sector} />
             <ProfileField label={t('prosdColActivity')} value={prospect.activity} />

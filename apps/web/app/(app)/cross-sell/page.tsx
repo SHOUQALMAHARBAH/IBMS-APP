@@ -18,7 +18,12 @@ import {
   buttonStyle,
   errorStyle,
 } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import {
   crossSellActionsStyle,
   crossSellBadgeStyle,
@@ -66,7 +71,7 @@ function OpportunityRow({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          gap: '1rem',
+          gap: 'var(--space-4)',
           flexWrap: 'wrap',
         }}
       >
@@ -79,7 +84,9 @@ function OpportunityRow({
         Flagged {formatDate(opportunity.detectedAt, language)}
       </div>
       {opportunity.status === 'DISMISSED' && opportunity.dismissReason ? (
-        <div style={cardMetaStyle}>Reason: {opportunity.dismissReason}</div>
+        <div style={cardMetaStyle}>
+          {t('commonReasonLabel')} {opportunity.dismissReason}
+        </div>
       ) : null}
 
       {opportunity.status === 'OPEN' && canConvert ? (
@@ -147,9 +154,7 @@ function OpportunityRow({
       ) : null}
 
       {error ? (
-        <p role="alert" style={errorStyle}>
-          {error}
-        </p>
+        <ErrorState title={error} />
       ) : null}
     </div>
   );
@@ -220,12 +225,10 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
 
   if (loadError) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!opportunities) return <p>{t('xsLoading')}</p>;
+  if (!opportunities) return <SkeletonList rows={4} label={t('xsLoading')} />;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -240,9 +243,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
         </button>
       ) : null}
       {scanError ? (
-        <p role="alert" style={errorStyle}>
-          {scanError}
-        </p>
+        <ErrorState title={scanError} />
       ) : null}
 
       {scan ? (
@@ -321,9 +322,11 @@ export default function CrossSellPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('xsHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('xsIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('xsHeading')}
+        description={t('xsIntro')}
+      />
       <Suspense fallback={null}>
         <CrossSellFlow />
       </Suspense>

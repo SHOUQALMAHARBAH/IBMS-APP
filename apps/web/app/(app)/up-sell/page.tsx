@@ -18,7 +18,12 @@ import {
   buttonStyle,
   errorStyle,
 } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import {
   upSellActionsStyle,
   upSellBadgeStyle,
@@ -67,7 +72,7 @@ function RecommendationRow({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          gap: '1rem',
+          gap: 'var(--space-4)',
           flexWrap: 'wrap',
         }}
       >
@@ -99,7 +104,7 @@ function RecommendationRow({
         })}
       </div>
       {recommendation.status === 'DISMISSED' && recommendation.dismissReason ? (
-        <div style={cardMetaStyle}>Reason: {recommendation.dismissReason}</div>
+        <div style={cardMetaStyle}>{t('commonReasonLabel')} {recommendation.dismissReason}</div>
       ) : null}
 
       {recommendation.status === 'OPEN' && canConvert ? (
@@ -170,9 +175,7 @@ function RecommendationRow({
       ) : null}
 
       {error ? (
-        <p role="alert" style={errorStyle}>
-          {error}
-        </p>
+        <ErrorState title={error} />
       ) : null}
     </div>
   );
@@ -242,12 +245,10 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
 
   if (loadError) {
     return (
-      <p role="alert" style={errorStyle}>
-        {loadError}
-      </p>
+      <ErrorState title={loadError} />
     );
   }
-  if (!recommendations) return <p>{t('upsLoading')}</p>;
+  if (!recommendations) return <SkeletonList rows={4} label={t('upsLoading')} />;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -262,9 +263,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
         </button>
       ) : null}
       {scanError ? (
-        <p role="alert" style={errorStyle}>
-          {scanError}
-        </p>
+        <ErrorState title={scanError} />
       ) : null}
 
       {scan ? (
@@ -352,9 +351,11 @@ export default function UpSellPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('upsHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('upsIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('upsHeading')}
+        description={t('upsIntro')}
+      />
       <Suspense fallback={null}>
         <UpSellFlow />
       </Suspense>

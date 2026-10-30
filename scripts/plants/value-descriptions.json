@@ -1,0 +1,52 @@
+{
+  "description-ignores-the-selection": {
+    "file": "apps/web/components/ui/SelectedValueDescription.tsx",
+    "from": "  const description = rows.find((row) => row.id === selectedId)?.descriptionAr;",
+    "to": "  const description = rows[0]?.descriptionAr;"
+  },
+  "description-renders-nothing": {
+    "file": "apps/web/components/ui/SelectedValueDescription.tsx",
+    "from": "  if (!description) return null;",
+    "to": "  if (!description || true) return null;"
+  },
+  "linked-record-editable-on-the-server": {
+    "file": "apps/api/src/modules/insurer/insurer.service.ts",
+    "from": "    if (!officeMayEditCompanyFacts(row)) {",
+    "to": "    if (false) {"
+  },
+  "company-record-leaks-an-office-rating": {
+    "file": "apps/api/src/modules/company/company-record.service.ts",
+    "from": "        registeredAt: company.createdAt.toISOString(),",
+    "to": "        registeredAt: company.createdAt.toISOString(),\n        financialStrengthRating: 'A-',"
+  },
+  "one-type-refusal-is-silent-about-its-basis": {
+    "file": "apps/web/app/(app)/regulatory-compliance/page.tsx",
+    "from": "              <p role=\"status\" data-one-type-basis=\"\">",
+    "to": "              <p role=\"status\" data-one-type-basis=\"\" hidden>"
+  },
+  "insurance-lines-gate-renarrowed": {
+    "file": "apps/api/src/modules/insurer/insurance-line.controller.ts",
+    "from": "  @RequirePermissions(\n    'insurer.read',\n    'provider.office.register',\n    'provider.insurer.register',\n    'role.read',\n    'commission.calculate',\n  )",
+    "to": "  @RequirePermissions('insurer.read')"
+  },
+  "branches-gate-named-user-manage-instead": {
+    "file": "apps/api/src/modules/rbac/controllers/org-structure.controller.ts",
+    "from": "  @RequirePermissions('branch.read', 'provider.office.administrator.invite')",
+    "to": "  @RequirePermissions('branch.read', 'user.manage')"
+  },
+  "fit-measurement-loses-template-paths": {
+    "file": "scripts/measurements/screen-route-permission-fit.py",
+    "from": "    found += [lit for lit in _template_literals(window) if lit.startswith(\"/\")]",
+    "to": "    found += []"
+  },
+  "e2e-batch-one-file-never-ran": {
+    "file": "scripts/api-e2e-batches.sh",
+    "from": "  want=\"$(expected_files \"${slice[@]}\")\"",
+    "to": "  want=$(( $(expected_files \"${slice[@]}\") + 1 ))"
+  },
+  "e2e-batch-workers-failed-to-start": {
+    "file": "scripts/api-e2e-batches.sh",
+    "from": "  files=\"${files:-0}\"; tests=\"${tests:-0}\"; errs=\"${errs:-0}\"",
+    "to": "  files=\"${files:-0}\"; tests=\"${tests:-0}\"; errs=9"
+  }
+}

@@ -198,3 +198,256 @@ export async function ensureOfficeAdministratorFor(
   }
   return role;
 }
+
+/**
+ * Delete an organization and the rows that now BLOCK its deletion.
+ *
+ * ## WHY THIS EXISTS — a blast radius, measured the moment it bit
+ *
+ * Module 0-ب item 1 half B made registration create a default Branch and Department for every new
+ * organization, so that a freshly registered office can provision its first user. Both carry
+ * `onDelete: Restrict`, so every teardown that had been deleting a registered organization directly
+ * started failing with:
+ *
+ *   update or delete on table "Organization" violates RESTRICT setting of foreign key constraint
+ *   "Department_organizationId_fkey"
+ *
+ * The ORDER is the fact that bit, so the order gets one home. A spec that spells the order itself is
+ * a spec that will be missed the next time registration creates something.
+ *
+ * Only the children that registration creates and that RESTRICT are handled here. Everything else an
+ * organization owns either cascades or is genuinely undeletable on purpose — `AuditLogEntry` above
+ * all, which is why an organization anybody has SIGNED INTO can never be removed at all and why no
+ * test may authenticate inside a fixture organization.
+ */
+export async function deleteOrganizationCascade(
+  organizationId: string,
+): Promise<void> {
+  await rawPrisma.branch.deleteMany({ where: { organizationId } });
+  await rawPrisma.department.deleteMany({ where: { organizationId } });
+  /*
+   * AND `SlaHoliday`, which the seed attaches to EVERY organization.
+   *
+   * MEASURED the hard way: the organizations my broken teardown leaked became UNDELETABLE after I
+   * re-ran `db:test:seed` for an unrelated change, because `ensureJordanFixedHolidays` sweeps
+   * `organization.findMany()` and wrote sixteen rows into each of them —
+   * `SlaHoliday_organizationId_fkey` is RESTRICT.
+   *
+   * The rule this adds: a PER-ORGANIZATION SEED SWEEP creates rows in fixture organizations too, so
+   * every such sweep belongs here. There are three today — branches, departments and holidays — and
+   * `ensureDefaultOrgUnitsForEveryOrganization` / `ensureJordanFixedHolidays` are the two to check
+   * against whenever this helper is read.
+   */
+  await rawPrisma.slaHoliday.deleteMany({ where: { organizationId } });
+
+  /*
+   * SWEEP FOUR: `ensureRetentionSchedule` — module 0-ب's shipped retention template.
+   *
+   * It walks every BROKERAGE_OFFICE and writes one `RetentionScheduleItem` per template category,
+   * and `RetentionScheduleItem_organizationId_fkey` is RESTRICT like the rest. So a leaked fixture
+   * office holds nine of them and is PERMANENTLY undeletable after one `db:test:seed` run — which
+   * takes down every later spec at `createTestApp` with a fault that looks like its own. That has
+   * happened twice in this repository, and the third time was caught here by the gate rather than by
+   * CI: `check:seed-sweeps` named this model the moment the sweep landed, in the same commit.
+   *
+   * The deletes are ORDERED, because rows hang off a schedule item and their own FKs are RESTRICT
+   * too: a legal hold, a disposal batch and a retention extension all reference it. Measured rather
+   * than assumed — the hold and the batch carry `retentionScheduleItemId`, and an extension is
+   * keyed by `recordCategory`.
+   */
+  await rawPrisma.legalHold.deleteMany({ where: { organizationId } });
+  await rawPrisma.disposalBatch.deleteMany({ where: { organizationId } });
+  await rawPrisma.retentionExtension.deleteMany({ where: { organizationId } });
+  await rawPrisma.retentionScheduleItem.deleteMany({
+    where: { organizationId },
+  });
+
+  /*
+   * SWEEP THREE: `ensureBrokerLicenseTerms` — the one the first version of this comment MISSED
+   * while claiming to list them all.
+   *
+   * It listed "branches, departments and holidays", which is TWO sweeps counted as three models.
+   * `ensureBrokerLicenseTerms` walks every BROKERAGE_OFFICE and writes a licence term plus its
+   * certificate `Document`, in one transaction, both rows or neither. Measured OFF THE DATABASE
+   * rather than the schema file: `BrokerLicense_organizationId_fkey` is RESTRICT,
+   * `BrokerLicense_certificateDocumentId_fkey` is RESTRICT, and
+   * `BrokerLicenseScopeLine_brokerLicenseId_fkey` is RESTRICT too — a chain three deep.
+   *
+   * It had not fired yet only because eleven of the twelve organizations the broken teardown leaked
+   * were `INSURANCE_COMPANY`, and this sweep filters on `BROKERAGE_OFFICE`. The TYPE spared us, not
+   * the code — the same "opposite visibility" that hid the first defect locally, one sweep along.
+   *
+   * `scripts/measurements/seed-sweeps-vs-cascade.py --check` now DERIVES this requirement from
+   * `seed.ts` and fails in CI, because the comment that was supposed to carry it is exactly what
+   * failed.
+   */
+  /*
+   * AND THE INSURANCE COMPANY'S OWN LICENCE TERMS — batch 5 group 7d, added here after CI found the
+   * leak this comment's own sweep-three story predicted one model over.
+   *
+   * `InsuranceCompanyLicenseTerm_insuranceCompanyId_fkey` is RESTRICT, and 7d made the company
+   * registration write a term in the same transaction as the organization. So EVERY spec that
+   * registers a company now acquires a row that blocks its own teardown — and the one I fixed by
+   * hand was `insurance-company-registration`, while `company-administrator-invitation` and
+   * `company-record-shape` register companies too. Twelve organizations leaked on CI and three
+   * assertions about the SET of organizations failed, none of them in a file this batch touched.
+   *
+   * THE ORDER HAS ONE HOME, which is the standing rule this cascade exists to carry: fixing it in a
+   * spec's own `finally` is how it was missed in the other two. Keyed on `insuranceCompanyId`
+   * rather than `organizationId`, because a company-level fact carries no tenancy column.
+   */
+  await rawPrisma.insuranceCompanyLicenseTerm.deleteMany({
+    where: { insuranceCompanyId: organizationId },
+  });
+
+  /*
+   * AND THE COMMUNICATION LOG — batch six item 4, added in the SAME COMMIT as the foreign key that
+   * makes it matter, which is the standing rule this helper exists to carry.
+   *
+   * Two separate RESTRICTs reach this table and only one of them is new.
+   *
+   *   `CommunicationLog_organizationId_fkey` has ALWAYS been RESTRICT (a required relation, and
+   *   this repository has already measured that the database says RESTRICT where Prisma's own
+   *   default for an optional one is SET NULL). So an organization holding any communication row
+   *   was ALREADY undeletable — a latent gap that had not fired only because nothing seeds this
+   *   table and no fixture had yet written one. Measured: dev 0 rows, db-test 12, seed none.
+   *
+   *   `CommunicationLog_customerId_fkey` is NEW and is SET NULL, so it blocks nothing — a customer
+   *   with send history still deletes, and the log keeps its row.
+   *
+   * It is cleared here rather than left to fire later, because the failure mode is the one that has
+   * cost this repository two days already: a leaked fixture organization becomes PERMANENTLY
+   * undeletable and takes down every later spec at `createTestApp` with a fault that looks like its
+   * own. The cheap line now beats the diagnosis then.
+   */
+  await rawPrisma.communicationLog.deleteMany({ where: { organizationId } });
+
+  const licences = await rawPrisma.brokerLicense.findMany({
+    where: { organizationId },
+    select: { id: true, certificateDocumentId: true },
+  });
+  if (licences.length > 0) {
+    await rawPrisma.brokerLicenseScopeLine.deleteMany({
+      where: { brokerLicenseId: { in: licences.map((l) => l.id) } },
+    });
+    await rawPrisma.brokerLicense.deleteMany({ where: { organizationId } });
+
+    /*
+     * THE CERTIFICATE DOCUMENTS, AND A SHARED ONE IS A STOP-AND-REPORT RATHER THAN A DELETE.
+     *
+     * Only what belongs to the organization being removed may go. A `Document` has six inbound FKs
+     * (measured: `ClaimDocument`, `BrokerLicense`, `Document.previousVersionId`, `RegulatoryAction`
+     * and three pointer columns on `Organization`), so "the licence pointed at it" is not on its own
+     * a licence to delete it.
+     *
+     * Two conditions, both checked: the row's own `organizationId` is this organization, and
+     * nothing outside this organization still points at it. If either fails this THROWS with the
+     * document named — a fixture helper that deleted somebody else's evidence to tidy up would be a
+     * far worse defect than the leak it is curing.
+     */
+    const certificateIds = licences.map((l) => l.certificateDocumentId);
+    const certificates = await rawPrisma.document.findMany({
+      where: { id: { in: certificateIds } },
+      select: { id: true, organizationId: true, fileName: true },
+    });
+    for (const certificate of certificates) {
+      if (certificate.organizationId !== organizationId) {
+        throw new Error(
+          `fixture teardown refused: the licence certificate ${certificate.id} ("${certificate.fileName}") belongs to organization ${certificate.organizationId}, not to ${organizationId}, so it is not this fixture's to delete. Report this rather than widening the helper — a shared document reached from a licence is a finding about the data, not a teardown problem.`,
+        );
+      }
+      const stillReferenced =
+        (await rawPrisma.claimDocument.count({
+          where: { documentId: certificate.id },
+        })) +
+        (await rawPrisma.brokerLicense.count({
+          where: { certificateDocumentId: certificate.id },
+        })) +
+        (await rawPrisma.regulatoryAction.count({
+          where: { documentId: certificate.id },
+        }));
+      if (stillReferenced > 0) {
+        throw new Error(
+          `fixture teardown refused: the licence certificate ${certificate.id} ("${certificate.fileName}") is still referenced by ${stillReferenced} row(s) outside the licences just removed. Report this — deleting it would destroy a reference somebody else holds.`,
+        );
+      }
+    }
+    await rawPrisma.document.deleteMany({
+      where: { id: { in: certificateIds } },
+    });
+  }
+
+  await rawPrisma.organization.deleteMany({ where: { id: organizationId } });
+}
+
+/**
+ * DELETE THE USERS OF A DISPOSABLE FIXTURE ORGANIZATION, DEPENDENTS FIRST.
+ *
+ * ## Why this exists, and it is a regression this helper is the cure for
+ *
+ * `rawPrisma.user.deleteMany({ where: { organizationId } })` was the whole teardown in two specs,
+ * and decision 25 broke both: the invitation now issues a `PasswordResetToken` for the invited
+ * administrator, `PasswordResetToken_userId_fkey` is NOT a cascade, so the user delete throws, the
+ * organization is never removed, and EVERY LATER SPEC IN THE RUN fails at `createTestApp` on the
+ * organization count — with a fault that looks like its own.
+ *
+ * That is exactly what happened: CI's `backend` job went red on `9da34f1` with ELEVEN leaked
+ * organizations, and db-test had accumulated a dozen locally. The failure was invisible to me
+ * because I read the run output through `grep -E "Tests |Test Files"` and an `afterAll` error is
+ * neither of those lines. Read the gate's own output.
+ *
+ * ## So the ORDER gets ONE home, like `deleteOrganizationCascade` above
+ *
+ * A spec that spells the order itself is a spec that will be missed the next time an invitation,
+ * a session or an enrolment gains a row that points at `User`. Every dependent that RESTRICTS and
+ * that a fixture can legitimately create goes here, and nothing else: a user who AUDITED is
+ * permanent by design, which is what the `auditRows` assertion in each caller is for.
+ */
+export async function deleteFixtureUsersInOrganization(
+  organizationId: string,
+): Promise<void> {
+  const users = await rawPrisma.user.findMany({
+    where: { organizationId },
+    select: { id: true },
+  });
+  const userIds = users.map((u) => u.id);
+  if (userIds.length === 0) return;
+
+  // The one decision 25 added. `invalidateAllForUser` marks tokens used; it does not remove them,
+  // deliberately — a consumed reset link is evidence — so a fixture has to clear them explicitly.
+  await rawPrisma.passwordResetToken.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.userRoleAssignment.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.userSession.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.mfaCredential.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  await rawPrisma.refreshToken.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  /*
+   * `ConflictOfInterestRegisterEntry` IS DELIBERATELY NOT CLEARED HERE, and the first version of
+   * this helper tried to.
+   *
+   * The standing rule is that a new RESTRICT FK on a fixture-owned row belongs in the shared
+   * teardown — and this is the exception that rule already names. The table is IMMUTABLE BY A
+   * TRIGGER PAIR, so the DELETE is refused by the database, `rawPrisma` included: a BEFORE DELETE
+   * trigger does not care who the caller is. The `AuditLogEntry` lesson met in a third table, after
+   * `Quotation`.
+   *
+   * WHAT FOLLOWS, so nobody rediscovers it: a fixture user who has declared a conflict can never be
+   * deleted, and neither can the organization holding them. That is the same state `AuditLogEntry`
+   * already creates for any organization anybody has SIGNED INTO — see `deleteOrganizationCascade`'s
+   * own header, which is where that rule is recorded.
+   *
+   * SO A SPEC THAT DECLARES A CONFLICT MUST DO IT AS A USER IN THE DEFAULT TEST ORGANIZATION, which
+   * is never torn down, and must assert SET MEMBERSHIP on the ids its own run created — leftover
+   * rows then cannot make an assertion pass or fail.
+   */
+  await rawPrisma.user.deleteMany({ where: { id: { in: userIds } } });
+}

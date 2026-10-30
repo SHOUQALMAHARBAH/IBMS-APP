@@ -13,6 +13,16 @@ export type QuestionType = "boolean" | "number";
 export interface NeedsAssessmentQuestion {
   id: string;
   prompt: string;
+  /**
+   * The same question in Arabic, from the api. REQUIRED rather than optional, and that is what
+   * makes the fix hold: this file's interfaces are hand-copied over HTTP and nothing
+   * type-checks them against the api, so an optional field would let a render site fall back to
+   * the English prompt silently — which is the defect, not a degraded state. The form rendered
+   * `{q.prompt}` unconditionally and an Arabic officer read English questions to a Jordanian
+   * client; `hardcoded-ui-english.py` could never see it, because these strings arrive at
+   * runtime and that scanner reads SOURCE.
+   */
+  promptAr: string;
   type: QuestionType;
 }
 
@@ -30,8 +40,17 @@ export interface NeedsAssessment {
   createdByUserId: string;
   reviewedByUserId: string | null;
   approvedByUserId: string | null;
+  // WHO, BY NAME — decision 48, resolved by the api through
+  // `UserRepository.displayNamesForUserIds`. The screen rendered the two ids above
+  // under «راجعه» and «اعتمده», which is where the owner read them.
+  //
+  // NULL MEANS NO NAME AND MUST NEVER BE FILLED FROM THE ID BESIDE IT. The ids stay on
+  // the wire because the screen keys other things on them; what may not reach a reader
+  // is the id in place of a name.
+  reviewedByName: string | null;
+  approvedByName: string | null;
   /**
-   * Part 4 step 5 — TWO acts, because this is the only one of the fifteen pairs' tables carrying two of
+   * Part 4 step 5 — TWO acts, because this is the only one of the sixteen pairs' tables carrying two of
    * them: `NeedsAssessment_reviewer_maker_checker_distinct` (the capturer is not the reviewer) and
    * `NeedsAssessment_approver_maker_checker_distinct` (the capturer is not the approver).
    *

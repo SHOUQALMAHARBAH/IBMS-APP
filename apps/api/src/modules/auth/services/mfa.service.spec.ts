@@ -39,7 +39,24 @@ describe('MfaService', () => {
     const secret = service.generateTotpSecret();
     const uri = service.buildOtpAuthUri('someone@example.com', secret);
     expect(uri).toContain('otpauth://totp/');
-    expect(uri).toContain('IBMS');
+    /*
+     * THE ISSUER IS PERCENT-ENCODED, AND THE RENAME IS WHAT SURFACED IT.
+     *
+     * `IBMS` had no space and this assertion could read the raw string; `WASEET 360` does, and
+     * `otpauth://` URL-encodes both the label and the `issuer` parameter — so the URI carries
+     * `WASEET%20360` in both places and an authenticator app decodes it before showing the user
+     * `WASEET 360`. Both are asserted rather than only the encoded form: the encoding is what the
+     * URI must contain, and the DECODED value is the claim that actually matters, because it is
+     * what a person reads in their phone.
+     *
+     * The label prefix and the `issuer` parameter must AGREE — they do, both `WASEET%20360` — which
+     * is the spec-compliant shape and the one older authenticator apps handle correctly.
+     */
+    expect(uri).toContain('issuer=WASEET%20360');
+    expect(uri).toContain('otpauth://totp/WASEET%20360:');
+    expect(
+      decodeURIComponent(new URL(uri).searchParams.get('issuer') ?? ''),
+    ).toBe('WASEET 360');
     expect(uri).toContain(secret);
   });
 

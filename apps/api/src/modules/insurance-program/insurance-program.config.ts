@@ -70,6 +70,16 @@ export const PROGRAM_LINE_PROPERTY_ALL_RISKS = 'Property All Risks';
  * wording the Needs Assessment uses (e.g. "Property All Risks (Fire)" ->
  * "Property All Risks").
  */
+/**
+ * THIS IS THE UNIFICATION, AND IT IS WHY THE SEVEN RENAMES WERE CANCELLED (owner, 2026-10-28).
+ *
+ * A brief proposed renaming seven `COVERAGE_LINES` members so they would read like
+ * `INSURANCE_LINES` entries. This map already bridges all thirteen to a catalogue `lineCode`,
+ * so the vocabularies are joined by DATA rather than by spelling — and `assembleProgramLines`
+ * matches the exact string, so a rename drops 90 of 90 APPROVED assessments on dev into the
+ * `unknown` branch. The full reasoning is at `COVERAGE_LINES` itself, where somebody comparing
+ * the two lists will be looking.
+ */
 const COVERAGE_LINE_MAPPINGS: Record<CoverageLine, CoverageLineMapping> = {
   'Property All Risks (Fire)': {
     insuranceLine: PROGRAM_LINE_PROPERTY_ALL_RISKS,

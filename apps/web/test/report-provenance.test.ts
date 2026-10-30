@@ -102,7 +102,8 @@ describe('the provenance line is one component, in both languages', () => {
     }
     expect(
       offenders,
-      'A reporting screen is rendering a provenance date itself. Use `ReportProvenance` — eight screens ' +
+      'A reporting screen is rendering a provenance date itself. Use `ReportProvenance` for the LINE ' +
+        'or `FigurePeriod` for a clause beside one figure (owner decision 58) — eight screens ' +
         'did this in hardcoded ENGLISH, which is what the component exists to stop. If a genuinely new ' +
         'sentence is needed, add a SHAPE to that component\'s discriminated union so it is translated ' +
         'once, rather than writing the sentence here.',
@@ -144,5 +145,125 @@ describe('the provenance line is one component, in both languages', () => {
       read(s).includes('ReportProvenance'),
     );
     expect(users.length, 'nothing imports ReportProvenance').toBeGreaterThan(7);
+  });
+});
+
+/*
+ * OWNER DECISION 58 — THE SECOND PROVENANCE COMPONENT, AND THE SAME SINGLE-SOURCE RULE.
+ *
+ * `FigurePeriod` puts the period beside ONE figure rather than once at the top of the
+ * screen, because `/dashboards/sales` already printed the top line and the owner still
+ * read the screen as broken: «قسم العملاء المحتملون بيطلع 0 مع إنه في عملاء محتملون جدد».
+ *
+ * THE PROPERTY GUARDED HERE IS NOT THE WORDING — it is that a screen may not decide
+ * WHICH clause a figure gets. Two of `/dashboards/policy`'s four metrics ignore the
+ * period filter entirely, so the choice between «خلال …» and «كما في …» comes from the
+ * api's `metricScope` on the wire. A screen spelling the key itself would make that
+ * choice locally, and the failure would LOOK like the fix: a period printed beside a
+ * figure that does not obey it, which is a more confident version of the defect decision
+ * 58 exists to remove.
+ *
+ * This is the same argument this file already makes for `ReportProvenance` — «a component
+ * is only the single source while nothing bypasses it» — one level down.
+ */
+const FIGURE_PERIOD_KEYS = ['dashFigureDuringPeriod', 'dashFigureAsOf'];
+
+describe('the per-figure period clause is one component (owner decision 58)', () => {
+  it('no screen spells the clause itself — the clause chooses from `metricScope`, which only the component reads', () => {
+    const offenders: string[] = [];
+    for (const screen of REPORTING_SCREENS) {
+      const src = read(screen);
+      for (const key of FIGURE_PERIOD_KEYS) {
+        if (src.includes(key)) offenders.push(`${screen}  ${key}`);
+      }
+    }
+    expect(
+      offenders,
+      'A screen is rendering the per-figure period clause itself. Use `FigurePeriod` and pass the ' +
+        'api\'s own `metricScope` entry: the screen must not decide whether a figure obeys the ' +
+        'period, because two of /dashboards/policy\'s metrics do not and a period beside one of ' +
+        'those is a false claim.',
+    ).toEqual([]);
+  });
+
+  it('every Playwright spec that mocks a dashboard endpoint carries `metricScope` — the field the screen reads unconditionally', () => {
+    /*
+     * THE SIXTH TIME A FIXTURE SHORT OF A FIELD HAS BITTEN, so it is a check now.
+     *
+     * CI found `bidi-text.spec.ts` mocking `/dashboards/policy` without it — a third
+     * copy of that response, in a file about bidi isolation. The screen read
+     * `undefined.activePoliciesCount`, died during render, and the failure appeared on
+     * a `<bdi>` locator that was never the problem. I had widened the two specs whose
+     * NAMES matched the feature rather than the three that mock the endpoint.
+     *
+     * NO FALLBACK WAS ADDED TO THE SCREEN, deliberately, and this is where that
+     * decision is recorded: the `IncidentReport` CBJ panel degrades to «the server did
+     * not send this» because a missing field there is survivable. The degraded state
+     * HERE is a figure with no period clause — which is exactly the bare number owner
+     * decision 58 exists to remove, and it would be invisible. A crash is the correct
+     * failure for this field.
+     *
+     * LIMIT, stated rather than discovered: this checks ONE field by name. It cannot
+     * derive what a screen reads unconditionally — that needs the api's view type, and
+     * `apps/web` cannot import it. A seventh required field needs its own line here.
+     */
+    const e2e = path.join(__dirname, '..', 'e2e');
+    const mocking = fs
+      .readdirSync(e2e)
+      .filter((f) => f.endsWith('.spec.ts'))
+      .map((f) => ({ file: f, src: fs.readFileSync(path.join(e2e, f), 'utf8') }))
+      .filter(
+        ({ src }) =>
+          src.includes('dashboards/policy') || src.includes('dashboards/sales'),
+      );
+
+    // THE FLOOR: a readdir that stops matching reports a clean nothing, and three is
+    // the measured figure.
+    expect(
+      mocking.length,
+      'no spec was found mocking a dashboard endpoint — the matcher broke, which reads exactly like a clean result',
+    ).toBeGreaterThanOrEqual(3);
+
+    const short = mocking
+      // `metricScope\s*:` and NOT `includes('metricScope')` — a plant renaming the key
+      // to `metricScopeRemoved` satisfied the substring check and the guard passed. The
+      // recorded base64-'99' class: a needle that is a PREFIX of something else is not a
+      // needle. Found by the plant, not by reading the matcher.
+      //
+      // And written WITHOUT a word boundary on purpose: the first attempt carried one,
+      // a heredoc turned it into a literal BACKSPACE byte, and the regex then matched
+      // NOTHING — so the guard flagged all three specs, including the two that are
+      // correct. A matcher that matches nothing reads exactly like one finding a real
+      // problem everywhere. The key is always preceded by whitespace in a fixture, so
+      // the boundary bought nothing and cost a false red.
+      .filter(({ src }) => !/metricScope\s*:/.test(src))
+      .map(({ file }) => file);
+    expect(
+      short,
+      'these spec(s) mock a dashboard endpoint without `metricScope`. The screen reads it ' +
+        'unconditionally, so the page dies during render and the failure surfaces on whatever ' +
+        'locator happens to be next — add the field rather than a fallback.',
+    ).toEqual([]);
+  });
+
+  it('is not vacuous — the component really does use both keys, and the api really does declare the scope', () => {
+    /*
+     * THE FLOOR. The check above passes against a renamed key, a deleted component and a
+     * screen that prints no clause at all — three clean-nothings. So the two keys are
+     * asserted to be live in the component, and the component is asserted to read the
+     * declaration rather than choosing.
+     */
+    const component = fs.readFileSync(
+      path.join(__dirname, '..', 'components', 'ui', 'FigurePeriod.tsx'),
+      'utf8',
+    );
+    for (const key of FIGURE_PERIOD_KEYS) {
+      expect(component, `${key} is not used by FigurePeriod`).toContain(key);
+    }
+    // It renders from the PROP, never from its own judgement about a metric name.
+    expect(component).toContain("scope === 'period'");
+    expect(component, 'FigurePeriod names a metric itself instead of taking the scope').not.toContain(
+      'activePoliciesCount',
+    );
   });
 });

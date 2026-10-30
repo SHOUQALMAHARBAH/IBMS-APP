@@ -1,6 +1,14 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { errorStyle } from '../../../components/auth/auth-form.styles';
+import {
+  ErrorState,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { useCallback, useEffect, useState } from "react";
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
@@ -19,8 +27,7 @@ import {
   ScreeningCasePanel,
 } from "../../../components/screening/ScreeningCasePanel";
 import { ApiError } from "../../../lib/auth/api-client";
-import { errorStyle } from "../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../components/lead/lead.styles";
+import { pageStackStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import { hasPermission } from '../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -30,17 +37,6 @@ const STATUSES: ScreeningMatchStatus[] = ["pending", "confirmed", "cleared"];
  * rejecting a too-short reason after a round trip. */
 const MIN_REASON = 10;
 
-const cell: CSSProperties = {
-  padding: "0.4rem 0.75rem",
-  borderBottom: "1px solid var(--border-subtle)",
-  textAlign: "start",
-  verticalAlign: "top",
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
 
 export default function ScreeningMatchesPage() {
   const router = useRouter();
@@ -143,7 +139,7 @@ export default function ScreeningMatchesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>
         {t('smSanctionsMatchReview')}
       </h1>
@@ -160,7 +156,7 @@ export default function ScreeningMatchesPage() {
         </p>
       ) : null}
 
-      <div style={{ display: "flex", gap: "0.4rem", margin: "1rem 0" }}>
+      <div style={{ display: "flex", gap: 'var(--space-2)', margin: "1rem 0" }}>
         {STATUSES.map((s) => (
           <button
             key={s}
@@ -169,7 +165,9 @@ export default function ScreeningMatchesPage() {
             disabled={busy}
             style={{ fontWeight: s === status ? 700 : 400 }}
           >
-            {s}
+            {/* Decision 59 — «لم يُبَتَّ فيه» · «مؤكَّد» · «مُستبعَد». The label map
+                already shipped all three; this screen rendered the stored value. */}
+            {t(ENUM_LABEL.ScreeningMatchStatus[s])}
           </button>
         ))}
       </div>
@@ -189,14 +187,10 @@ export default function ScreeningMatchesPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
@@ -207,122 +201,138 @@ export default function ScreeningMatchesPage() {
               : t('smNoRecords')}
           </p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", minWidth: "62rem" }}>
-              <thead>
-                <tr>
-                  <th style={head}>{t('smCustomer')}</th>
-                  <th style={head}>
-                    {t('smMatchedName')}
-                  </th>
-                  <th style={head}>
-                    {t('smListEntry')}
-                  </th>
-                  <th style={head}>{t('smType')}</th>
-                  <th style={head}>{t('smDetected')}</th>
-                  <th style={head}>{t('smCaseColumn')}</th>
-                  <th style={head}>
-                    {status === "pending"
-                      ? t('smDecision')
-                      : t('smReview')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>
-                      {r.customerLegalName}
-                      {r.isEdd ? (
-                        <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                          {t('smEdd')}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td style={cell}>{r.subjectName}</td>
-                    <td style={cell}>
-                      {r.listEntryName}
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('smCustomer')}</Th>
+                <Th>
+                  {t('smMatchedName')}
+                </Th>
+                <Th>
+                  {t('smListEntry')}
+                </Th>
+                <Th>{t('smType')}</Th>
+                <Th>{t('smDetected')}</Th>
+                <Th>{t('smCaseColumn')}</Th>
+                <Th>
+                  {status === "pending"
+                    ? t('smDecision')
+                    : t('smReview')}
+                </Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <Tr key={r.id}>
+                  <Td>
+                    {r.customerLegalName}
+                    {r.isEdd ? (
                       <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                        {r.listSource}
+                        {t('smEdd')}
                       </div>
-                      {r.listEntryDelisted ? (
-                        <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                          {t('smNoLongerOnTheSource')}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td style={cell}>{r.matchType}</td>
-                    <td style={cell}>{r.detectedAt.slice(0, 10)}</td>
-                    <td style={cell}>
-                      {canReview && r.status === "pending" ? (
-                        <ScreeningCasePanel
-                          match={r}
-                          reviewers={reviewers}
-                          onChanged={() => load(status)}
+                    ) : null}
+                  </Td>
+                  <Td>
+                    {r.subjectName}
+                    {/*
+                      DOOR FOUR'S WAY IN. An open screening case assigned to this officer opens
+                      that customer's RFQ chain, and until this link existed the system admitted
+                      her to a record no screen told her the id of. It goes to the CUSTOMER-FILTERED
+                      list, never to `/customers/[id]`: the customer page is not what the anchor
+                      opens, so linking it would answer 404 from the ownership layer about a
+                      record that exists.
+                    */}
+                    <div style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                      <a
+                        href={`/rfqs?customerId=${encodeURIComponent(r.customerId)}`}
+                        data-customer-rfqs={r.customerId}
+                      >
+                        {t('smViewCustomerRfqs')}
+                      </a>
+                    </div>
+                  </Td>
+                  <Td>
+                    {r.listEntryName}
+                    <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                      {r.listSource}
+                    </div>
+                    {r.listEntryDelisted ? (
+                      <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                        {t('smNoLongerOnTheSource')}
+                      </div>
+                    ) : null}
+                  </Td>
+                  <Td>{r.matchType}</Td>
+                  <Td>{r.detectedAt.slice(0, 10)}</Td>
+                  <Td>
+                    {canReview && r.status === "pending" ? (
+                      <ScreeningCasePanel
+                        match={r}
+                        reviewers={reviewers}
+                        onChanged={() => load(status)}
+                      />
+                    ) : (
+                      t(screeningCaseStatusKey(r.caseStatus))
+                    )}
+                  </Td>
+                  <Td>
+                    {r.status !== "pending" ? (
+                      <div style={{ fontSize: "0.85rem" }}>
+                        <strong>{t(ENUM_LABEL.ScreeningMatchStatus[r.status])}</strong>
+                        <div style={{ opacity: 0.75 }}>{r.reviewReason}</div>
+                      </div>
+                    ) : canReview ? (
+                      <div style={{ display: "grid", gap: 'var(--space-2)' }}>
+                        <textarea
+                          aria-label={t('smReviewReasonAria', { name: r.subjectName })}
+                          value={reasons[r.id] ?? ""}
+                          onChange={(e) =>
+                            setReasons((prev) => ({
+                              ...prev,
+                              [r.id]: e.target.value,
+                            }))
+                          }
+                          rows={2}
+                          placeholder={
+                            t('smReasonForTheDecisionMin')
+                          }
+                          style={{ minWidth: "18rem" }}
                         />
-                      ) : (
-                        t(screeningCaseStatusKey(r.caseStatus))
-                      )}
-                    </td>
-                    <td style={cell}>
-                      {r.status !== "pending" ? (
-                        <div style={{ fontSize: "0.85rem" }}>
-                          <strong>{t(ENUM_LABEL.ScreeningMatchStatus[r.status])}</strong>
-                          <div style={{ opacity: 0.75 }}>{r.reviewReason}</div>
-                        </div>
-                      ) : canReview ? (
-                        <div style={{ display: "grid", gap: "0.3rem" }}>
-                          <textarea
-                            aria-label={t('smReviewReasonAria', { name: r.subjectName })}
-                            value={reasons[r.id] ?? ""}
-                            onChange={(e) =>
-                              setReasons((prev) => ({
-                                ...prev,
-                                [r.id]: e.target.value,
-                              }))
+                        <div style={{ display: "flex", gap: 'var(--space-2)' }}>
+                          <button
+                            type="button"
+                            disabled={
+                              busy ||
+                              !caseCanBeDecided(r.caseStatus) ||
+                              (reasons[r.id]?.trim().length ?? 0) < MIN_REASON
                             }
-                            rows={2}
-                            placeholder={
-                              t('smReasonForTheDecisionMin')
+                            onClick={() => void decide(r.id, "cleared")}
+                          >
+                            {t('smClearFalsePositive')}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              busy ||
+                              !caseCanBeDecided(r.caseStatus) ||
+                              (reasons[r.id]?.trim().length ?? 0) < MIN_REASON
                             }
-                            style={{ minWidth: "18rem" }}
-                          />
-                          <div style={{ display: "flex", gap: "0.3rem" }}>
-                            <button
-                              type="button"
-                              disabled={
-                                busy ||
-                                !caseCanBeDecided(r.caseStatus) ||
-                                (reasons[r.id]?.trim().length ?? 0) < MIN_REASON
-                              }
-                              onClick={() => void decide(r.id, "cleared")}
-                            >
-                              {t('smClearFalsePositive')}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={
-                                busy ||
-                                !caseCanBeDecided(r.caseStatus) ||
-                                (reasons[r.id]?.trim().length ?? 0) < MIN_REASON
-                              }
-                              onClick={() => void decide(r.id, "confirmed")}
-                            >
-                              {t('smConfirmMatch')}
-                            </button>
-                          </div>
+                            onClick={() => void decide(r.id, "confirmed")}
+                          >
+                            {t('smConfirmMatch')}
+                          </button>
                         </div>
-                      ) : (
-                        <span style={{ color: 'var(--ink-secondary)' }}>
-                          {t('smComplianceOfficerOnly')}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--ink-secondary)' }}>
+                        {t('smComplianceOfficerOnly')}
+                      </span>
+                    )}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
         )
       ) : loadError ? null : (
         // The loading state directive §2 requires; this page rendered

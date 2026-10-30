@@ -45,6 +45,18 @@ function navbar(page: Page) {
   return page.getByRole("navigation", { name: /^(Account and settings|الحساب والإعدادات)$/ });
 }
 
+/*
+ * THE RAIL, by its own accessible name in EITHER language — the same shape `navbar()` above
+ * already uses, and for a reason this batch re-learned by getting it wrong: the first version of
+ * the two re-pointed tests below spelled `{ name: "Primary" }`, which matched until the test
+ * switched the interface to Arabic and the landmark's own name became «التنقّل الرئيسي». The
+ * element then "disappeared" — an element-not-found that reads exactly like a removed element and
+ * is not one. Any locator that survives a language switch has to carry both names.
+ */
+function rail(page: Page) {
+  return page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ });
+}
+
 test("the navbar is its own landmark, distinct from the sidebar", async ({ page }) => {
   await openApp(page);
   // Two <nav> landmarks now exist. Each needs its own accessible name or
@@ -54,11 +66,29 @@ test("the navbar is its own landmark, distinct from the sidebar", async ({ page 
   await expect(page.getByRole("navigation")).toHaveCount(2);
 });
 
-test("the wordmark sits in the navbar and no longer in the sidebar", async ({ page }) => {
+/*
+ * RE-POINTED BY THE DESIGN BATCH, and the reversal is the point rather than a detail.
+ *
+ * This test's own title was "the wordmark sits in the navbar and no longer in the sidebar", and it
+ * asserted a link named `IBMS` in the navbar. Both halves moved:
+ *
+ *   * the product is **WASEET 360**; `IBMS` was the internal codename, and this was the THIRD
+ *     user-visible occurrence of it — a hardcoded JSX literal, which is why an i18n grep for the
+ *     codename found only two;
+ *   * the brand went BACK to the rail, where the owner named its place ("the sidebar header") and
+ *     where the approved reference screen puts it. The note that first moved it OUT of the rail was
+ *     right about its reason — two brand marks stacked diagonally is what the alternative looks
+ *     like — and what changed is that there is only one now.
+ *
+ * The property this test exists for is UNCHANGED and is still what it asserts: **one brand mark,
+ * not two.** Only its home moved.
+ */
+test("the brand lockup sits in the sidebar header, and there is only one", async ({ page }) => {
   await openApp(page);
-  await expect(navbar(page).getByRole("link", { name: "IBMS" })).toBeVisible();
-  // The whole point of moving it: one brand mark, not two.
-  await expect(page.getByRole("link", { name: "IBMS" })).toHaveCount(1);
+  await expect(rail(page).getByRole("link", { name: /وسيط 360/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /وسيط 360/ })).toHaveCount(1);
+  // And nowhere does the codename reach a reader.
+  await expect(page.getByRole("link", { name: "IBMS" })).toHaveCount(0);
 });
 
 test("the profile block shows the name and the department under it", async ({ page }) => {
@@ -145,8 +175,12 @@ test("the sidebar still starts below the navbar rather than under it", async ({ 
   const sidebarBox = await page.getByRole("navigation", { name: "Primary" }).boundingBox();
   if (!barBox || !sidebarBox) throw new Error("no bounding box");
 
-  // sidebarStyle is sticky; with `top: 0` it would park underneath the bar.
-  // Both offsets derive from NAVBAR_HEIGHT, and this is what proves they agree.
+  // THE ASSERTION STANDS AND ITS REASON MOVED. This used to read "sidebarStyle is sticky; with
+  // `top: 0` it would park underneath the bar — both offsets derive from NAVBAR_HEIGHT, and this
+  // is what proves they agree." Neither offset exists now: the shell is the viewport, the rail is
+  // a full-height cell in a flex row below the bar, and it starts below the bar by FLOW rather
+  // than by a sticky offset agreeing with a max-height. Kept rather than deleted, because the
+  // property a reader cares about — the rail does not sit under the bar — is the same one.
   expect(sidebarBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height - 1);
 });
 
@@ -161,4 +195,54 @@ test("the navbar screen has no serious/critical accessibility violations @a11y",
     (v) => v.impact === "serious" || v.impact === "critical",
   );
   expect(serious).toEqual([]);
+});
+
+/**
+ * BATCH 1 ITEM 4, COMPLETED — the signed-in organization's own name in the shell.
+ *
+ * The item existed because the provider's name is the first thing the owner reads on screen one,
+ * and the rename was half delivered: seeded, byte-asserted in CI, and rendered by nothing. Under
+ * the standing rule a half-built decision is worse than an unbuilt one, because it reads as a
+ * guarantee — so this asserts the render in BOTH languages and asserts the no-name case too.
+ *
+ * It reads under NO permission, deliberately: it rides on `me()` beside `organizationType`, which
+ * every authenticated caller already receives. A code whose absence hides a person's own employer
+ * from them is a gate nobody can fail.
+ */
+test("the shell renders the signed-in organization's name, by language", async ({
+  page,
+}) => {
+  await openApp(page, {
+    ...ME,
+    organizationName: { en: "GO Global", ar: "جو جلوبال" },
+  });
+  // RE-POINTED: the organization's name went with the brand, into the rail's lockup as its
+  // subtitle, so the office is named ONCE rather than twice. The property — resolved at RENDER by
+  // the reader's language, never chosen by the server — is unchanged and is what the two
+  // assertions below still test.
+  const name = rail(page).locator("[data-organization-name]");
+  await expect(name).toBeVisible();
+  await expect(name).toHaveText("GO Global");
+
+  // The Arabic form, resolved at RENDER rather than chosen by the server: picking server-side pins
+  // the language to whatever `me()` was fetched under.
+  await navbar(page)
+    .getByRole("button", { name: /العربية|Arabic/ })
+    .click();
+  await expect(name).toHaveText("جو جلوبال");
+});
+
+test("the shell renders NO organization name when the field is absent", async ({
+  page,
+}) => {
+  // Anchored on something positive from the same render, so the absence cannot pass against a page
+  // that never mounted — and the absence is SCOPED to the navbar, never page-wide, which is the
+  // rule decision 13 made unwritable.
+  await openApp(page, ME);
+  const sidebar = rail(page);
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar.locator("[data-organization-name]")).toHaveCount(0);
+  // NOT a placeholder: an organization name is the one string here a person reads as
+  // authoritative, so inventing one would have the system assert something untrue about her
+  // employer. ~80 spec mocks predate the field, which is why absent is a real state.
 });

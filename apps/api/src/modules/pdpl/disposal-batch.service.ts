@@ -345,9 +345,23 @@ export class DisposalBatchService {
     retentionScheduleItemId: string | null,
   ): Promise<void> {
     if (!retentionScheduleItemId) return;
-    if (await this.legalHolds.hasActiveHold(retentionScheduleItemId)) {
+    /*
+     * BATCH 5 GROUP 7b — THE REFUSAL NAMES THE HOLD.
+     *
+     * It used to name the schedule item id and stop, which told a reader that something was in the
+     * way without saying what. A hold is the one of the three old destruction conditions that
+     * survives as a machine — because it is a stored FACT rather than a judgement — so the refusal
+     * can point at the row: its id, its scope and the reason somebody placed it.
+     *
+     * `findActiveHold` rather than `hasActiveHold`: the boolean is enough to refuse and not enough
+     * to explain, and an officer who cannot see which hold stands cannot go and ask about it.
+     */
+    const hold = await this.legalHolds.findActiveHold(retentionScheduleItemId);
+    if (hold) {
       throw new UnprocessableEntityException(
-        `Retention schedule item ${retentionScheduleItemId} is under an active Legal Hold — it is excluded from routine disposal.`,
+        `Retention schedule item ${retentionScheduleItemId} is under an active Legal Hold and is excluded from routine disposal. ` +
+          `The hold is ${hold.id}, placed ${hold.placedAt.toISOString().slice(0, 10)}, covering "${hold.scope}" — ${hold.reason}. ` +
+          'Release the hold deliberately, or extend the retention of these records on a basis that cites it.',
       );
     }
   }

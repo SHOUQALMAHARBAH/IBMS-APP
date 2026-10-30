@@ -220,7 +220,29 @@ export const OPERATIONS = {
     bcpScenario: 'السيناريو',
     bcpCreateHeading: 'تسجيل خطة جديدة',
     bcpRecordTestButton: 'تسجيل اختبار',
+    bcpNextTestDueLabel: 'تاريخ الفحص القادم للخطة.',
     bcpNoPlanOnFile: '— لا توجد خطة مسجّلة',
+    // THE OWNER'S OWN WORDS, and «غير مجدول» is MASCULINE deliberately. A byte-identical
+    // English twin ships one screen over — `vendNotScheduled`, 'not scheduled' — whose Arabic
+    // is «غير مجدولة», FEMININE, agreeing with «المراجعة»; this screen's subject is «الفحص»,
+    // masculine, which is her own noun for it from `bcpNextTestDueLabel`. Measured: her form IS
+    // the twin minus its taa marbuta, and that is exactly why it could not be derived —
+    // dropping ة to change grammatical gender is MORPHOLOGY, and a slice that happens to be
+    // one character is the trap, not the licence. DO NOT POINT EITHER KEY AT THE VENDOR TWIN.
+    //
+    // «لم يُفحَص بعد» is decision 60's own frame — `commonNotAssessedYet` is «لم» + «يُقيَّم» +
+    // «بعد», identical prefix, suffix and diacritic placement, only the root differs. It is NOT
+    // that key and must not be pointed at it either: a plan not ASSESSED and a plan not TESTED
+    // are different claims, and `declared-vocabulary.test.ts` refuses a fourth key carrying one
+    // of her three words.
+    //
+    // AND THERE IS A SHIPPING ARABIC WORD FOR AN ENGLISH `never` ONE SCREEN OVER, AND IT IS
+    // THE WRONG ONE: `shNever` on /screening-health is «لا يوجد» — *none exists*, a statement
+    // about the RECORD, where hers is a statement about the PLAN. That is decision 60's own
+    // «غير متوفّر» / «لم يُقيَّم بعد» distinction, and reusing it would have said the plan has
+    // no test record rather than that it has not been tested.
+    bcpNeverTested: 'لم يُفحَص بعد',
+    bcpNoTestScheduled: 'غير مجدول',
     bcpRefusalAct: 'عرض خطط استمرارية العمل والتعافي من الكوارث وصيانتها',
 
     // ---- Information assets (#69) ---------------------------------------------------
@@ -256,6 +278,15 @@ export const OPERATIONS = {
       'من يملك إدارة المستخدمين ليس مستثنى من مراجعة صلاحياته. هذا السجل يبيّن أي حسابات ' +
       'المسؤولين شملتها الدورة، ومن راجع كل منها.',
     acrAdminCycleLabel: 'الدورة',
+    // SLICED, none of it typed. «الموضوع» from `commColSubject`, «الدورة» from
+    // `acrAdminCycleLabel` directly above, «تأكيد» from `rdConfirmButton`. New keys
+    // rather than pointers at those three, so a table header on this screen is not
+    // hostage to the wording of a column on another one.
+    // «إزالة» from `rcScopeRemove`.
+    rsRemoveAssetButton: 'إزالة',
+    acrColSubject: 'الموضوع',
+    acrColCycle: 'الدورة',
+    acrConfirmButton: 'تأكيد',
     acrAdminNoCycles: 'لم تُفتح أي دورة مراجعة بعد.',
     acrAdminNoneCovered:
       'لم تشمل هذه الدورة أي حساب مسؤول. هذه هي الحالة التي يمنعها البند 5.1 — راجِع الدورة.',
@@ -343,6 +374,8 @@ export const OPERATIONS = {
       'تعذّر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     rpLoading: 'جارٍ التحميل…',
     rpLoadError: 'تعذّر تحميل ملفات المخاطر — حاول مرة أخرى.',
+    rpListProfiles: 'سجلّات تقييم المخاطر',
+    rpListConsolidated: 'الملخّص المجمَّع',
     rpAddSiteError: 'تعذّرت إضافة الموقع — حاول مرة أخرى.',
     rpAddingButton: 'جارٍ الإضافة…',
     rpAddSiteButton: 'إضافة موقع',
@@ -410,7 +443,6 @@ export const OPERATIONS = {
     homeNoRole: 'لم يتم تعيين دور',
     usrLoading: 'جارٍ التحميل…',
     usrRefusalAct: 'عرض المستخدمين',
-    usrPasswordAria: 'كلمة المرور',
     renLoading: 'جارٍ التحميل…',
     renRefusalAct: 'عرض حالات التجديد',
 
@@ -491,6 +523,23 @@ export const OPERATIONS = {
       'هذه الأجهزة تتخطّى رمز التحقق عند تسجيل الدخول. ألغِ الثقة بأي جهاز لا تعرفه.',
     secNoTrustedDevices: 'لا توجد أجهزة موثوقة.',
     secUnnamedDevice: 'جهاز بلا اسم',
+    secCfgAccessTokenLabel: 'عمر رمز الجلسة',
+    secCfgAccessTokenMeaning: 'داخليّ، يُجدَّد تلقائياً',
+    secCfgFailedAttemptsLabel: 'محاولات الدخول الفاشلة',
+    secCfgFailedAttemptsMeaning: 'بعدها يُقفَل الحساب',
+    secCfgHardLogoutLabel: 'الخروج النهائي بعد الخمول',
+    secCfgHardLogoutMeaning: 'بعدها لا تُستأنَف الجلسة، ويُعاد الدخول من أوّله',
+    secCfgHeading: 'إعدادات الأمان',
+    secCfgIdleLabel: 'مدّة الخمول',
+    secCfgIdleMeaning: 'يُخرَج المستخدم إذا ترك الشاشة هذه المدّة',
+    secCfgLoadError: 'تعذّر تحميل إعدادات الأمان — حاول مرة أخرى.',
+    secCfgLoading: 'جارٍ تحميل إعدادات الأمان…',
+    secCfgLockoutLabel: 'مدّة القفل',
+    secCfgLockoutMeaning: 'ثمّ يُفتَح من نفسه',
+    secCfgRefreshTokenLabel: 'عمر رمز التجديد',
+    secCfgRefreshTokenMeaning: 'بعده دخولٌ كامل',
+    secCfgStepUpLabel: 'مدّة صلاحية التحقّق المضاعف',
+    secCfgStepUpMeaning: 'قبل أن يُطلَب مرّةً ثانيةً لفعلٍ حسّاس',
     secDeviceTrustedOn: 'مُوثَّق في',
     secDeviceExpires: 'تنتهي الثقة في',
     secRevokeDevice: 'إلغاء الثقة',
@@ -515,8 +564,9 @@ export const OPERATIONS = {
       'العملية 5 — استبيان مخاطر منظّم يقترح قائمة تغطية، ثم بوابة مراجعة ' +
       'واعتماد. ابدأ تقييماً من ملف العميل.',
     secHardwareKeyPending:
-      'يتطلب دورك مفتاح أمان مادياً. مسار التسجيل هذا غير متاح بعد — ويفي رمز ' +
-      'تطبيق المصادقة بمتطلب المصادقة الثنائية الإلزامية في الوقت الحالي.',
+      'دورُك مُعلَّمٌ بأنّه سيتطلّب مفتاحَ أمانٍ مادياً عندما يدعمه النظام. والنظامُ ' +
+      'لا يقبل مفاتيحَ الأمان اليوم، فلا شيءَ عليك فعلُه — ورمزُ تطبيق المصادقة هو ' +
+      'ما يفي بمتطلّب المصادقة الثنائية الإلزامية. هذا بيانٌ لا إجراء.',
     iprogNoCustomerSelected:
       'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح برنامج التأمين ' +
       'الخاص به من هناك.',
@@ -683,10 +733,10 @@ export const OPERATIONS = {
       'Multi-factor authentication is now enabled on your account.',
     secInvalidCode: 'Invalid code — try again.',
     secEnabled: 'Enabled',
-    secNotEnrolled: 'Not enrolled — required before you can use most of IBMS',
+    secNotEnrolled: 'Not enrolled — required before you can use most of WASEET 360',
     secQrAlt: 'MFA enrollment QR code',
     secAuthCodeLabel: 'Authentication code',
-    secAccessEnds: 'Your access to IBMS ends: {at}',
+    secAccessEnds: 'Your access to WASEET 360 ends: {at}',
     secVerifyingButton: 'Verifying…',
     secVerifyButton: 'Verify and enable',
     secStartingButton: 'Starting…',
@@ -870,7 +920,14 @@ export const OPERATIONS = {
     bcpScenario: 'Scenario',
     bcpCreateHeading: 'Record a new plan',
     bcpRecordTestButton: 'Record test',
+    bcpNextTestDueLabel: 'The next test date for this plan.',
     bcpNoPlanOnFile: '— no plan on file',
+    // UNCHANGED from what these two cells already rendered as bare literals, so no English
+    // reader sees any difference. One measured divergence, reported rather than reworded: her
+    // Arabic carries «بعد» (YET) and `never` does not — both true of the same row, but the
+    // English is the terser half, which is the opposite of this dictionary's usual direction.
+    bcpNeverTested: 'never',
+    bcpNoTestScheduled: 'not scheduled',
     bcpRefusalAct:
       'view and maintain the business-continuity and disaster-recovery plans',
 
@@ -906,6 +963,10 @@ export const OPERATIONS = {
       'Whoever can administer users is not exempt from review of their own access. This record ' +
       'shows which administrator accounts a cycle covered, and who reviewed each one.',
     acrAdminCycleLabel: 'Cycle',
+    rsRemoveAssetButton: 'Remove',
+    acrColSubject: 'Subject',
+    acrColCycle: 'Cycle',
+    acrConfirmButton: 'Confirm',
     acrAdminNoCycles: 'No review cycle has been opened yet.',
     acrAdminNoneCovered:
       'This cycle covered no administrator account. That is the condition Part 5.1 exists to ' +
@@ -992,6 +1053,8 @@ export const OPERATIONS = {
       'This customer could not be found — it may not exist, or you may not have access to it.',
     rpLoading: 'Loading…',
     rpLoadError: 'Could not load risk profiles — try again.',
+    rpListProfiles: 'the risk-assessment records',
+    rpListConsolidated: 'the consolidated summary',
     rpAddSiteError: 'Could not add the site — try again.',
     rpAddingButton: 'Adding…',
     rpAddSiteButton: 'Add site',
@@ -1058,7 +1121,6 @@ export const OPERATIONS = {
     homeNoRole: 'no role assigned',
     usrLoading: 'Loading…',
     usrRefusalAct: 'view user accounts',
-    usrPasswordAria: 'Password',
     renLoading: 'Loading…',
     renRefusalAct: 'view renewals',
 
@@ -1138,6 +1200,23 @@ export const OPERATIONS = {
       'These devices skip the verification code at sign-in. Revoke any you do not recognise.',
     secNoTrustedDevices: 'No trusted devices.',
     secUnnamedDevice: 'Unnamed device',
+    secCfgAccessTokenLabel: 'Session token expiry',
+    secCfgAccessTokenMeaning: 'Internal; renewed automatically.',
+    secCfgFailedAttemptsLabel: 'Failed sign-in attempts',
+    secCfgFailedAttemptsMeaning: 'After this the account is locked.',
+    secCfgHardLogoutLabel: 'Automatic sign-out after idle',
+    secCfgHardLogoutMeaning: 'After this the session cannot be resumed — signing in starts from the beginning.',
+    secCfgHeading: 'Security configuration',
+    secCfgIdleLabel: 'Idle timeout',
+    secCfgIdleMeaning: 'The user is signed out if they leave the screen for this long.',
+    secCfgLoadError: 'Could not load the security configuration — try again.',
+    secCfgLoading: 'Loading the security configuration…',
+    secCfgLockoutLabel: 'Lockout duration',
+    secCfgLockoutMeaning: 'Then it unlocks by itself.',
+    secCfgRefreshTokenLabel: 'Refresh token expiry',
+    secCfgRefreshTokenMeaning: 'After this, a full sign-in.',
+    secCfgStepUpLabel: 'Step-up verification expiry',
+    secCfgStepUpMeaning: 'Before it is asked for a second time for a sensitive action.',
     secDeviceTrustedOn: 'Trusted on',
     secDeviceExpires: 'Trust ends',
     secRevokeDevice: 'Revoke',
@@ -1163,9 +1242,10 @@ export const OPERATIONS = {
       "list, then a review and approval gate. Start one from a customer's " +
       'profile.',
     secHardwareKeyPending:
-      "Your role requires a hardware security key. That enrollment path isn't " +
-      'available yet — an authenticator-app code satisfies the mandatory-MFA ' +
-      'requirement for now.',
+      'Your role is marked to require a hardware security key once this system ' +
+      'supports them. It cannot accept one today, so there is nothing for you to ' +
+      'do — your authenticator-app code is what satisfies the mandatory-MFA ' +
+      'requirement. This is a note, not an action.',
     iprogNoCustomerSelected:
       'No customer selected — open a customer from {link} and open its ' +
       'insurance program from there.',

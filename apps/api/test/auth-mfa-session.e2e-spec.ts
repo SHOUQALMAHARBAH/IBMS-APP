@@ -343,7 +343,48 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
     expect(body.department).not.toBeNull();
     expect(body.department!.name).toBe(`Claims ${tag}`);
     expect(body.department!.nameAr).toBe(`المطالبات ${tag}`);
+
+    /*
+     * BATCH 1 ITEM 4 COMPLETED — the ORGANIZATION's own name, asserted ON THE RESPONSE BODY.
+     *
+     * This assertion exists because its absence was caught by a plant. Making `me()` send
+     * `organizationName: null` left the whole api e2e suite GREEN and killed only a Playwright
+     * test — the §1.80 shape: the web's `MeResponse` is hand-copied over HTTP, so `tsc` cannot see
+     * a field that stopped being sent, and a Playwright mock supplies the field itself. The only
+     * layer that can catch it is an assertion on the real body.
+     *
+     * BOTH FORMS, for the same reason the department carries both: `legalNameAr` is NOT NULL on
+     * `Organization` and the caller is what knows which script it is drawing.
+     */
+    const withOrg = me.body as {
+      organizationName: { en: string; ar: string } | null;
+    };
+    expect(withOrg.organizationName).not.toBeNull();
+    expect(typeof withOrg.organizationName!.en).toBe('string');
+    expect(withOrg.organizationName!.en.length).toBeGreaterThan(0);
+    expect(typeof withOrg.organizationName!.ar).toBe('string');
+    expect(withOrg.organizationName!.ar.length).toBeGreaterThan(0);
   });
+
+  /*
+   * RUN-UNIQUE PERSON NAME, not merely a unique national id.
+   *
+   * `POST /employees` pre-checks the CANONICAL PERSON NAME and answers 409, so a FIXED name passes
+   * the first time it ever runs against the cumulative db-test and 409s forever after. This repo
+   * recorded that on 2026-10-11 ("a cumulative-database e2e needs run-unique PERSON NAMES, not just
+   * unique ids") for a different spec; this file never got the fix, so both of its onboarding tests
+   * had been failing locally since the first run and only CI — which builds db-test from nothing —
+   * still saw them pass.
+   *
+   * The family name carries the run tag, and the expectation below is COMPOSED from these same
+   * values rather than written out a second time, so the fixture and the assertion cannot disagree.
+   */
+  const person = {
+    givenName: 'طارق',
+    fatherName: 'ناصر',
+    grandfatherName: 'كريم',
+    familyName: `الزعبي-${tag}`,
+  };
 
   it('the display name comes from the linked HR record, and falls back when there is none', async () => {
     // An employee record first — HR data, created through its own endpoint
@@ -352,10 +393,7 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
       .post('/employees')
       .set(bearer(admin.accessToken))
       .send({
-        givenName: 'طارق',
-        fatherName: 'ناصر',
-        grandfatherName: 'كريم',
-        familyName: 'الزعبي',
+        ...person,
         nationalId: `99${Date.now()}`.slice(0, 10),
         hireDate: '2026-01-01',
         departmentId,
@@ -396,9 +434,10 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
       .get('/auth/me')
       .set(bearer((changed.body as LoginBody).accessToken!))
       .expect(200);
-    // The HR record wins: the four-part official name, not the role label.
+    // The HR record wins: the four-part official name, not the role label. Composed from the same
+    // fixture that created it, so a change to one cannot silently diverge from the other.
     expect((me.body as { fullName: string }).fullName).toBe(
-      'طارق ناصر كريم الزعبي',
+      `${person.givenName} ${person.fatherName} ${person.grandfatherName} ${person.familyName}`,
     );
 
     // And an account with no link still shows its own name — the state every
@@ -446,7 +485,9 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
       .set(bearer(admin.accessToken))
       .send({
         givenName: 'لينا',
-        familyName: 'البدور',
+        // Run-unique for the same reason as `person` above — this test's own 409 assertion is about
+        // a TAKEN employee link, and a 409 from the duplicate-person pre-check would masquerade as it.
+        familyName: `البدور-${tag}`,
         nationalId: `88${Date.now()}`.slice(0, 10),
         hireDate: '2026-01-01',
         departmentId,

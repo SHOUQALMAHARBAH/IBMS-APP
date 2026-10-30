@@ -1,0 +1,17 @@
+{
+  "the-provider-role-loses-user-administration": {
+    "file": "packages/db/prisma/seed.ts",
+    "from": "    \"user.manage\",\n    \"role.read\",",
+    "to": "    \"role.read\","
+  },
+  "the-set-check-becomes-a-count-check": {
+    "file": "packages/db/prisma/seed.ts",
+    "from": "  if (grantedCodes.join(\",\") !== expectedCodes.join(\",\")) {",
+    "to": "  if (grantedCodes.length !== expectedCodes.length) {"
+  },
+  "a-brokerage-code-is-swapped-in": {
+    "file": "packages/db/prisma/seed.ts",
+    "from": "    \"permission.read\",\n  ] as const;",
+    "to": "    \"customer.create\",\n  ] as const;"
+  }
+}

@@ -46,6 +46,17 @@ export interface LegalHoldRow {
   retentionScheduleItemId: string | null;
   customerId: string | null;
   insuredPersonId: string | null;
+  /**
+   * Batch six item 2, rule 2 — the hold's Subject column rendered the first eight characters of a
+   * uuid, so a DPO reviewing holds could not tell WHOSE records were frozen.
+   *
+   * THE FIELD IS REQUIRED AND THE VALUE IS NULLABLE, and the two are different claims. Required is
+   * what makes the compiler name every path that builds a row: an optional field would leave a
+   * write path projecting `undefined`, which renders a name after a LIST and none after a CREATE —
+   * the `IncidentReport.load()` defect, invisible to every test that only reads. Nullable is
+   * honest: a hold may legitimately name no customer at all (see `hasAtMostOneSubjectReference`).
+   */
+  customer: { legalName: string } | null;
 }
 
 export interface LegalHoldView {
@@ -58,6 +69,10 @@ export interface LegalHoldView {
   retentionScheduleItemId: string | null;
   customerId: string | null;
   insuredPersonId: string | null;
+  /** The customer's own name, resolved by the api so no screen renders the uuid. Null when
+   *  the hold names no customer — the screen still has `insuredPersonId` and `scope` to
+   *  say what it covers. */
+  customerName: string | null;
   /** `releasedAt === null` — this hold is currently in force. */
   isActive: boolean;
 }
@@ -73,6 +88,7 @@ export function deriveLegalHoldView(row: LegalHoldRow): LegalHoldView {
     retentionScheduleItemId: row.retentionScheduleItemId,
     customerId: row.customerId,
     insuredPersonId: row.insuredPersonId,
+    customerName: row.customer ? row.customer.legalName : null,
     isActive: row.releasedAt === null,
   };
 }
@@ -86,6 +102,12 @@ export function deriveLegalHoldView(row: LegalHoldRow): LegalHoldView {
 export function legalHoldAuditSnapshot(
   row: LegalHoldRow,
 ): Prisma.InputJsonObject {
+  /*
+   * `customerName` is deliberately ABSENT here. What enters an append-only audit row is described,
+   * not quoted: the name is a LOOKUP that `customerId` already resolves, and copying it in would
+   * freeze one rendering of a mutable fact. That is the inverse of `actorRoleNames`, which IS
+   * stored because a role held in the past and never written down is unrecoverable.
+   */
   return {
     legalHoldId: row.id,
     scope: row.scope,

@@ -1,0 +1,32 @@
+{
+  "the-form-prints-the-english-prompt": {
+    "file": "apps/web/components/needs-assessment/NeedsAssessmentForm.tsx",
+    "from": "          const prompt = language === 'AR' ? q.promptAr : q.prompt;",
+    "to": "          const prompt = q.prompt;",
+    "why": "The state the owner walked into, restored at the form: an Arabic officer reads ENGLISH questions aloud to a Jordanian client on the screen that decides which cover to recommend. Planted, the Playwright pair test dies on the FORM half — the Arabic absent AND the English present, which is why it asserts both on one render. NO OTHER GATE CAN SEE IT, and that is the finding rather than a gap: `hardcoded-ui-english.py` reads SOURCE and these prompts arrive from the API at runtime, so it is structurally blind to this and to every other server-supplied display string in the product. The resolution is ONE expression serving both the number and boolean branches on purpose — a per-branch `language === 'AR' ? …` is two places to forget, and forgetting one is how the English survived."
+  },
+  "the-answer-list-prints-the-english-prompt": {
+    "file": "apps/web/app/(app)/needs-assessments/[id]/page.tsx",
+    "from": "                  {language === 'AR' ? q.promptAr : q.prompt}{' '}",
+    "to": "                  {q.prompt}{' '}",
+    "why": "The THIRD render site, which my own grep found and my own reading then mis-scoped: I believed the read-back answer list was APPROVED-only (the neighbouring `status === 'APPROVED' && !isPlacement` gates a NOTE, not the list), so I split the test in two and neither half would have covered a DRAFT's list. Playwright caught it as a strict-mode violation — one prompt resolving to a `<legend>` and an `<li>` — rather than my reading catching it. Planted, the single pair test dies on the ANSWER-LIST half. Separate from the form plant because they are separate surfaces: one dying while the other passes is what proves each half is observed."
+  },
+  "a-prompt-is-reworded": {
+    "file": "apps/api/src/modules/needs-assessment/needs-assessment.config.ts",
+    "from": "    promptAr: 'هل يشغّل أسطولَ مركبات؟',",
+    "to": "    promptAr: 'هل يشغّل أسطولَ مركباتٍ؟',",
+    "why": "ONE TANWEEN CHANGED — the smallest edit that is still a reword of the owner's own words, and the kind somebody makes while 'tidying' Arabic they did not write. These thirteen are her prose, not a slice of a shipping string and not a draft adopted from a measured meaning, so the thing to protect is the BYTES: `needs-assessment.config.spec.ts` pins the sha256 over the NFC set, NUL-joined in question order. Planted, that test dies with the message saying whose text it is and that the digest moves only deliberately. NUL-joined because NUL cannot occur in the text, so two different groupings of the same thirteen strings cannot collide on one digest — which a space-joined hash could not promise. REPOINTED once already: `eslint --fix` (apps/api enforces prettier) collapsed the two-line `promptAr:` onto one and expired the original anchor — the fourth time a committed plant in this repository has gone stale on a reformat rather than on a code change, and `plant --self-test` is what said so. The hash test stayed green across that reformat, which is the other half of the evidence: the digest is over the VALUES, not the formatting."
+  },
+  "the-arabic-prompts-become-optional": {
+    "file": "apps/api/src/modules/needs-assessment/needs-assessment.config.ts",
+    "from": "  promptAr: string;\n  type: QuestionType;",
+    "to": "  promptAr?: string;\n  type: QuestionType;",
+    "why": "THE REQUIRED FIELD IS THE WHOLE MECHANISM, and this is what removing it costs. Required means a fourteenth question cannot ship without its Arabic — a COMPILE ERROR rather than one more English question in an Arabic interview. Optional means the next question added carries `undefined`, the web's hand-copied interface accepts it, and the form renders NOTHING where a prompt belongs: a blank legend above a Yes/No pair, on a questionnaire read aloud to a client. Planted, the api typecheck fails at `needs-assessment.config.spec.ts` with TS18048 and TS2345 — and the `why` here is CORRECTED FROM THE RUN, having also claimed it fails at the web client's required `promptAr`. It does NOT, and that absence is the sharper finding: `apps/web/lib/needs-assessment/needs-assessment-api.ts` declares its own copy of this interface over HTTP and NOTHING type-checks the two against each other, so the api can make the field optional and stop sending it while the web type still insists it is there. That is the hand-copied-interface hole this project has paid for repeatedly — the compiler guards each side's own consistency and neither side's agreement with the other. AND MEASURED: the api e2e's new WIRE assertion passes under this plant (9/9) — correctly, because the plant changes the TYPE and not the thirteen values, so the response still carries every Arabic prompt. The hazard it opens is the FOURTEENTH question, which is a future commit rather than present data. So the compiler really is the only guard for this one, and the wire assertion guards a different thing: that the field the screen reads is on the response at all."
+  },
+  "the-answers-are-in-english-again": {
+    "file": "apps/web/app/(app)/needs-assessments/[id]/page.tsx",
+    "from": "                        ? t('commonYes')\n                        : t('commonNo')}",
+    "to": "                        ? 'Yes'\n                        : 'No'}",
+    "why": "FOUND WHILE CONVERTING THE PROMPTS ONE LINE ABOVE, on the same row of the same screen — an Arabic question answered in English, while `commonYes`/`commonNo` had shipped in both languages for months. The dead-vocabulary class: a complete bilingual pair existing and the screen never reaching for it. `hardcoded-ui-english.py` does not see it either, and here the reason is different from the prompts': failure mode 8 DOES cover a ternary of bare literals, but requires the LINE to be entirely a brace expression, and this ternary is wrapped across four lines inside a `<strong>`. Reported in the measurement doc rather than widening mode 8, because that script's own header warns a multi-line widening makes every bare call a finding. Planted, the pair test dies on its exact-match «نعم»/«لا» half — exact because «لا» is a SUBSTRING of the fixture's own «للاختبار», which resolved to three elements before it was tightened."
+  }
+}

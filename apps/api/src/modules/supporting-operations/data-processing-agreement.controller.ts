@@ -26,7 +26,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  * neither the typecheck nor a mocked Playwright test could see it — only the projection measurement.
  *
  * Promise-taking, so each handler stays a one-line delegation. `combinedDutyActView` stays the ONE
- * definition of this shape for all fifteen pairs.
+ * definition of this shape for all sixteen pairs.
  */
 async function onWire<T extends { combinedDutyAct: CombinedDutyAct | null }>(
   pending: Promise<T>,

@@ -58,6 +58,22 @@ export interface CreateCustomerInput {
   grandfatherName?: string;
   familyName?: string;
   nationalId?: string;
+  /**
+   * THE TWO SCREENING DISCRIMINATORS — `YYYY-MM-DD` and ISO 3166-1 alpha-2,
+   * upper case (the column's CHECK is `^[A-Z]{2}$`).
+   *
+   * The api's DTO has accepted both since the columns shipped and this
+   * hand-copied interface never declared them, so no screen could send one
+   * even by mistake. That is the same drift class `legacy-import-shape-parity`
+   * exists for, in the other direction: a field the SERVER accepts and the
+   * client cannot express is a capability nothing can reach, and no type sees
+   * it because there is nothing to disagree with.
+   *
+   * Individual only. A company has no date of birth or nationality of its own;
+   * those belong to its UBOs, which is what `CreateUboInput` carries them for.
+   */
+  dateOfBirth?: string;
+  nationality?: string;
   registrationNumber?: string;
   taxRegistrationNumber?: string;
   registeredAddress?: string;
@@ -106,6 +122,11 @@ export interface CreateUboInput {
   grandfatherName?: string;
   familyName: string;
   nationalId: string;
+  /** As on `CreateCustomerInput`. A UBO is always a natural person, so these
+   *  are the discriminators a CORPORATE customer's screening has to rely on —
+   *  and measured, 2 of 2 UBOs carried neither. */
+  dateOfBirth?: string;
+  nationality?: string;
   ownershipPercent?: number;
   isAuthorizedSignatory?: boolean;
   isPep: boolean;
@@ -138,7 +159,14 @@ export function createCustomer(input: CreateCustomerInput): Promise<Customer> {
 export interface DuplicateNameMatch {
   id: string;
   legalName: string;
-  status: string;
+  /* `CustomerStatus`, not `string` — this is a CUSTOMER's status, and `Customer.status`
+   * in this same file already declares the union. Two declarations of one field, one of
+   * them loose, is how a label map ends up indexed with a type it cannot take.
+   *
+   * AND IT IS NOT A SCREENING-MATCH STATUS, which decision 59 is about: I read this site
+   * as one and the compiler refused it. `raw-stored-values.py` calls `status` AMBIGUOUS
+   * BY TYPE for exactly this reason. */
+  status: CustomerStatus;
 }
 
 export interface DuplicateNameCheck {
@@ -311,3 +339,84 @@ export function hasSomethingToCorrect(input: CustomerContactCorrection): boolean
     (v) => (v ?? '').trim() !== '',
   );
 }
+
+/**
+ * CORRECTING A DATE OF BIRTH OR A NATIONALITY — `PATCH /customers/:id/identifiers`.
+ *
+ * A SEPARATE call rather than two more fields on the one above, mirroring the api, where the
+ * separation is what keeps the other six identifiers refused: `UpdateCustomerContactDto` being a
+ * three-field class IS the first of the three layers the 2026-09-28 deferral's safety condition 1
+ * rests on, and the owner struck that deferral for these two fields only.
+ *
+ * ## THIS FORM *MAY* PREFILL, UNLIKE THE CONTACT ONE — AND THE REASON IS WORTH KNOWING
+ *
+ * The contact form must not, because `contactPhone` and `contactEmail` arrive MASKED and prefilling
+ * would write the mask back as the customer's phone number. These two arrive IN THE CLEAR and
+ * deliberately so — the detail view's own comment says they *"exist to be compared against a
+ * sanctions/PEP list entry, and a reviewer working a match needs to see them"*. So the displayed
+ * value IS the stored value and a prefill is honest.
+ *
+ * It is still not prefilled here. The service refuses a correction whose every value already matches
+ * the row (*"nothing to correct and nothing to re-screen"*), so a prefilled form that somebody opens
+ * and submits unchanged would be a 422 rather than a no-op — and a form that starts empty cannot be
+ * submitted by accident at all. That is a decision about THIS form rather than a property of the
+ * data, which is the opposite of the contact case and is why it is written down.
+ */
+export interface CustomerIdentifierCorrection {
+  /** `YYYY-MM-DD`. */
+  dateOfBirth?: string;
+  /** ISO 3166-1 alpha-2, upper case. */
+  nationality?: string;
+  /** MANDATORY here, unlike the contact correction's. Part of the record the AMLU requires retained,
+   *  and the server refuses below ten characters. */
+  reason: string;
+  answersRequestType?: 'dsr';
+  answersRequestId?: string;
+}
+
+export interface CustomerIdentifierCorrectionResult extends Customer {
+  /**
+   * Whether the re-screen that this correction triggers actually completed.
+   *
+   * FALSE is reachable: the correction row is written BEFORE the re-screen, so a screening failure
+   * leaves the record intact and the check owed. It is reported rather than swallowed because a
+   * screen claiming a corrected identifier was re-checked when it was not would be the overclaiming
+   * shape. Nothing on the screen words it yet — the sentence for that case is one item on the
+   * owner's list, and the backstop meanwhile is the screening hold, which raises
+   * IDENTITY_CHANGED_SINCE_SCREENING and refuses the next decision on that file.
+   */
+  rescreened: boolean;
+}
+
+export function correctCustomerIdentifiers(
+  customerId: string,
+  input: CustomerIdentifierCorrection,
+): Promise<CustomerIdentifierCorrectionResult> {
+  const body: Record<string, string> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();
+  }
+  return apiPatch(
+    `/customers/${encodeURIComponent(customerId)}/identifiers`,
+    body,
+  );
+}
+
+/** At least one identifier AND a reason long enough for the server to accept — a screen must not send
+ *  a request it already knows will be refused. The floor is the api's
+ *  `DECLARATION_REASON_MIN_LENGTH`; a copy, because the web cannot import from the api, and the e2e
+ *  asserts the refusal so the two cannot drift silently. */
+export const IDENTIFIER_CORRECTION_REASON_MIN_LENGTH = 10;
+
+export function hasAnIdentifierToCorrect(
+  input: CustomerIdentifierCorrection,
+): boolean {
+  const hasField = [input.dateOfBirth, input.nationality].some(
+    (v) => (v ?? '').trim() !== '',
+  );
+  return (
+    hasField &&
+    input.reason.trim().length >= IDENTIFIER_CORRECTION_REASON_MIN_LENGTH
+  );
+}
+

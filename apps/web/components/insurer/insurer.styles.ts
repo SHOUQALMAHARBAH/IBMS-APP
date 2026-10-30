@@ -50,7 +50,8 @@ export const impactPanelStyle: CSSProperties = {
   borderRadius: '0.5rem',
   padding: '0.75rem 1rem',
   marginTop: '0.75rem',
-  background: 'var(--surface-raised)',
+  /* was `--surface-raised`, which is defined nowhere — see the surfaces note in globals.css */
+  background: 'var(--surface-sunken)',
 };
 
 export const impactRowStyle: CSSProperties = {
@@ -71,12 +72,28 @@ export const impactCountStyle: CSSProperties = {
  *  action. Emphasised because it is the one the API reports separately for exactly that reason. */
 export const impactCountAttentionStyle: CSSProperties = {
   ...impactCountStyle,
-  color: 'var(--status-warning-ink, var(--ink-primary))',
+  /*
+   * `--warning-ink`, the token that already means this. `--status-warning-ink` is defined NOWHERE
+   * — `check:css-properties` has reported it as fallback-only since that gate was written — so
+   * this count rendered in `--ink-primary`, IDENTICAL to the ordinary counts stacked beside it.
+   * The style's own comment says it is "emphasised because it is the one the API reports
+   * separately for exactly that reason", and it was not emphasised at all. The `--surface-raised`
+   * class: a property anticipated, never defined, and the fallback quietly doing the opposite of
+   * what the name promised.
+   */
+  color: 'var(--warning-ink)',
 };
 
 export const lineChipStyle: CSSProperties = {
   display: 'inline-block',
-  border: '1px solid var(--border-subtle)',
+  // LONGHAND, DELIBERATELY, and never the `border` shorthand: the variant below
+  // overrides `borderStyle`, and React refuses to update a longhand on a rerender when the
+  // shorthand is also set — *"can lead to styling bugs"*, which is its own warning
+  // and not a style preference. Measured across the web tree: FOUR pairs had this
+  // shape, and `style-shorthand-conflict.test.ts` refuses a fifth.
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'var(--border-subtle)',
   borderRadius: '999px',
   padding: '0.1rem 0.6rem',
   marginInlineEnd: '0.3rem',

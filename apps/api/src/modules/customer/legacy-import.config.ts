@@ -77,8 +77,20 @@ export interface ParsedLegacyImport {
  * entry on a path that ingests customer records.
  */
 export function parseCsv(text: string): string[][] {
-  // A BOM survives an Excel "Save as CSV" and would otherwise become part of
-  // the first header name, silently breaking the mapping for that one column.
+  // A BOM survives an Excel "Save as CSV" — and `/settings/customer-import`'s
+  // downloadable template EMITS one deliberately, because Excel on Windows reads
+  // a BOM-less UTF-8 CSV as mojibake and every heading in that file is Arabic.
+  //
+  // CORRECTED 2026-10-26: this comment used to say the BOM would otherwise
+  // "become part of the first header name, silently breaking the mapping for that
+  // one column". That is FALSE, and a plant proved it — removing this line left
+  // the whole import e2e suite green. `mapRows` trims every header before
+  // `indexOf`, and `String.prototype.trim()` strips U+FEFF, which is ECMAScript
+  // whitespace. So the TRIM is what protects the mapping and this is defence in
+  // depth — kept, because `parseCsv` is exported and hands out UNTRIMMED cells to
+  // whatever calls it next. `legacy-import.config.spec.ts` has asserted it since it
+  // was written, which the plant also established: a first attempt to add a second
+  // test for it was a near-duplicate and was removed.
   const input = text.replace(/^\uFEFF/, '');
 
   // An explicit, LOCAL bound on the loop below.

@@ -1,0 +1,7 @@
+{
+  "the-insert-stops-supplying-the-arabic-name": {
+    "file": "apps/api/test/organization-type.e2e-spec.ts",
+    "from": "  'INSERT INTO \"Organization\" (id, \"legalName\", \"legalNameAr\", subdomain, \"updatedAt\", \"type\") VALUES ($1, $2, $2, $3, now(), $4::\"OrganizationType\")';",
+    "to": "  'INSERT INTO \"Organization\" (id, \"legalName\", subdomain, \"updatedAt\", \"type\") VALUES ($1, $2, $3, now(), $4::\"OrganizationType\")';"
+  }
+}

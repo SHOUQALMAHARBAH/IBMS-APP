@@ -151,11 +151,18 @@ describe("an absence assertion is anchored on something that proves the page ren
             /toHaveCount\(\s*0\s*\)/.test(stmt) || /not\.toBeVisible\(\)/.test(stmt);
           if (!negative) continue;
           if (!/getByRole\(\s*["']link["']/.test(stmt)) continue;
+          // REPAIRED: this alternation held four literal BACKSPACE bytes where its four
+          // word boundaries belong, so `nav` and `sidebar` matched NOTHING and this guard
+          // ran on its third alternative alone from the day it was written. Measured
+          // before repairing it — both matchers find 0 offenders across all specs, so
+          // nothing was hiding behind it; what the repair buys is the future
+          // `sidebar.getByRole('link', …).toHaveCount(0)`, which the shipped matcher
+          // would have let through.
           // NAV-SCOPED only. A page link is in the accessibility tree — it is not inside a
           // collapsed <details> — so asserting its absence by role is sound, and flagging
           // it would be a false red. `insurers.spec.ts`'s "Register an insurer" is that
           // case and died correctly under the plant.
-          if (!/nav|sidebar|getByRole\(\s*["']navigation["']/.test(stmt)) continue;
+          if (!/\bnav\b|\bsidebar\b|getByRole\(\s*["']navigation["']/.test(stmt)) continue;
           // And exempt a test that ALSO asserts by href: `sidebar-manager.spec.ts`
           // deliberately asserts the accessibility consequence of a collapsed group,
           // anchored by a count(1)+toBeHidden pair on the href. That is the documented
@@ -211,10 +218,28 @@ describe("the three non-waiting reads are reached only through the helper", () =
 
   it("is available from the helper, which is where the waiting happens", () => {
     const helper = readFileSync(join(E2E, "support", "anchored.ts"), "utf8");
-    for (const name of ["anchoredCount", "anchoredAttributes", "anchoredTexts", "expectNone"]) {
+    for (const name of [
+      "anchoredCount",
+      "anchoredAttributes",
+      "anchoredTexts",
+      "expectNone",
+      // DECISION 13, 2026-10-19 — the scoped absence assertion. Its `scope` is typed `Locator`, so
+      // passing `page` is a COMPILE error rather than a review comment, which is what makes a
+      // page-wide root unwritable instead of discouraged.
+      "expectAbsentWithin",
+    ]) {
       expect(helper, `${name} is missing from the helper`).toContain(`export async function ${name}`);
     }
-    // Each one anchors before reading. Without this, the helper could be an alias for the raw read.
-    expect(helper.match(/toBeVisible/g)?.length, "every helper must assert its anchor first").toBe(4);
+    /*
+     * Each one anchors before reading. Without this, the helper could be an alias for the raw read.
+     *
+     * FIVE since `expectAbsentWithin` arrived, and this count failing is the guard working: a new
+     * helper in this file is a new way to assert an absence, and the property that matters is that
+     * it waits on something positive FIRST. Scoping fixes the wrong-element failure; it does not
+     * fix not-yet-rendered, because `toHaveCount(0)` passes on its first poll. So a helper that
+     * took a scope and did not assert it visible would close one trap and leave the other — which
+     * is what this number refuses.
+     */
+    expect(helper.match(/toBeVisible/g)?.length, "every helper must assert its anchor first").toBe(5);
   });
 });

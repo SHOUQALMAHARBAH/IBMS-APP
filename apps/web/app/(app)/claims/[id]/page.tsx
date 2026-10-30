@@ -6,11 +6,15 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { getClaim, type Claim } from '../../../../lib/claim/claim-api';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { ClaimCard } from '../../../../components/claim/ClaimCard';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate } from '../../../../lib/i18n/format';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 /**
  * One claim, on a route the Claims desk can actually reach.
@@ -81,7 +85,7 @@ export default function ClaimDetailPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() => router.push('/claims')}
@@ -90,12 +94,10 @@ export default function ClaimDetailPage() {
         {t('claimsDetailBackButton')}
       </button>
 
-      {claim === null && !loadError ? <p>{t('commonLoading')}</p> : null}
+      {claim === null && !loadError ? <SkeletonList rows={4} label={t('commonLoading')} /> : null}
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {claim ? (
@@ -118,6 +120,9 @@ export default function ClaimDetailPage() {
                   at: formatDate(claim.lossDate, language),
                 })}
           </h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='Claim' entityId={claim.id} />
+          </p>
           <ClaimCard
             claim={claim}
             abilities={{

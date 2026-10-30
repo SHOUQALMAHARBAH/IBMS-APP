@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 /**
  * The two combined-duty relations, on every item a review screen reads.
  *
- * `AccessRecertificationItem` is the only row of the fifteen where the pair has TWO relations, and they
+ * `AccessRecertificationItem` is the only row of the sixteen where the pair has TWO relations, and they
  * are NOT two pairs. The distinction is recorded on the schema and matters here:
  *
  *   `combinedDutyAct`         — the act on the ARRANGEMENT. She was SET TO review her own access, which

@@ -1,0 +1,14 @@
+{
+  "a-ternary-of-bare-literals-ships": {
+    "file": "apps/web/app/(app)/operational-pi-risk/page.tsx",
+    "from": "                  {p.isCurrent ? t('statusRecordCurrent') : t('statusRecordPast')}",
+    "to": "                  {p.isCurrent ? 'current' : 'past'}",
+    "why": "THE EXACT SHAPE THE DETECTOR COULD NOT SEE, PUT BACK — byte for byte what was on this screen while `hardcoded-ui-english.py` reported CLEAN for it, and THE ONLY PROOF THE WIDENING WORKS, because it would have PASSED before failure mode 8 existed. Why all seven earlier patterns miss it: PROSE and ONE_WORD_LABEL need a capital, TEMPLATE_PROSE needs backticks and two words, BARE_TEXT_LINE's character class excludes braces and quotes, and the two parenthetical patterns need parentheses. A lowercase word in single quotes inside a brace expression matched nothing.\nKills the hardcoded-English gate in `screen-copy.test.ts` with `undeclared 2`, naming `operational-pi-risk|current` and `operational-pi-risk|past` — BOTH branches, which is the correction failure mode 8 needed after its first run reported only two of a chained ternary's three literals.\nAND NOTE WHAT IT RESTORES BESIDE THE ENGLISH: the owner's wording ruling. «الحالية» speaks about the RECORD and «سارية» would speak about the COVER, because a PI record can be the CURRENT one while its cover has LAPSED. `current` carries neither distinction, so an Arabic reader got no word at all on the row where that distinction is the whole point."
+  },
+  "a-declared-row-outlives-its-reason": {
+    "file": "scripts/measurements/hardcoded-ui-english.py",
+    "from": "    'sales-performance|Set target',",
+    "to": "    'sales-performance|Set target',\n    'operational-pi-risk|current',",
+    "why": "THE DIRECTION THAT KEPT THIS GATE HONEST ACROSS TWO BATCHES, and the reason the set is a SET. A declared row for a string that no longer occurs sits there covering whatever lands next — and this is not hypothetical: re-measuring after owner decision 55's eleven translations FAILED with SIX STALE ROWS NAMED ONE BY ONE, which is how the nine came to be emptied in the same commit. A budget of nine would have read *three remain* and looked like progress.\nPlanted, the script exits 1 with `STALE operational-pi-risk|current`. The row chosen is a plausible one rather than nonsense: it is exactly what somebody would leave behind after translating that very ternary — which is the mistake this direction exists to catch."
+  }
+}

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import type { UserRepository } from '../../repositories/user.repository';
 import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import { NeedsAssessmentService } from './needs-assessment.service';
 import { NEEDS_ASSESSMENT_QUESTIONS } from './needs-assessment.config';
@@ -96,6 +97,21 @@ function makeDeps() {
   // self-approval tests below pass on the mock rather than on the code.
   const dutySegregation = segregatedOfficeDutySegregation();
 
+  // Decision 48's resolver. A MAP, and deliberately one that does NOT hold every id the
+  // tests pass: a double returning a name for everything could not tell a resolved name
+  // from the `?? uuid` fallback this change exists to remove.
+  const displayNamesForUserIds = vi.fn((ids: (string | null)[]) => {
+    const known = new Map([['manager-1', 'Ahmad Al-Test']]);
+    return Promise.resolve(
+      new Map(
+        ids
+          .filter((id): id is string => id !== null && known.has(id))
+          .map((id) => [id, known.get(id)!] as const),
+      ),
+    );
+  });
+  const users = { displayNamesForUserIds } as unknown as UserRepository;
+
   return {
     service: new NeedsAssessmentService(
       assessments,
@@ -104,8 +120,10 @@ function makeDeps() {
       audit,
       workflow,
       dutySegregation,
+      users,
     ),
     mocks: {
+      displayNamesForUserIds,
       createAssessment,
       findAssessmentById,
       findManyAssessments,
@@ -275,6 +293,66 @@ describe('NeedsAssessmentService', () => {
         ForbiddenException,
       );
       expect(mocks.transition).not.toHaveBeenCalled();
+    });
+
+    /*
+     * WHO REVIEWED, BY NAME — and these three assertions exist because the spec PASSED the
+     * moment `withNames` landed, asserting nothing about it. That is the recorded failure:
+     * a spec that reads one unrelated field cannot see a new projection, so the assertion
+     * goes in the same commit as the service change.
+     *
+     * The owner read `reviewedByUserId` as a uuid under «راجعه»; the middle test is the one
+     * that matters, because a double returning a name for every id could not tell a
+     * resolved name from the `?? uuid` fallback this change removes.
+     */
+    it('resolves the reviewer to a NAME, through decision 48 resolver', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findAssessmentById.mockResolvedValue({
+        id: 'na-1',
+        status: 'PENDING_REVIEW',
+        createdByUserId: 'sales-1',
+        reviewedByUserId: 'manager-1',
+        approvedByUserId: null,
+      });
+      const out = await service.review('na-1', undefined, MANAGER);
+      expect(out.reviewedByName).toBe('Ahmad Al-Test');
+      expect(out.approvedByName).toBeNull();
+    });
+
+    it('reports NO NAME, never the uuid, for an id the resolver cannot resolve', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findAssessmentById.mockResolvedValue({
+        id: 'na-1',
+        status: 'PENDING_REVIEW',
+        createdByUserId: 'sales-1',
+        reviewedByUserId: 'a-user-who-no-longer-resolves',
+        approvedByUserId: null,
+      });
+      const out = await service.review('na-1', undefined, MANAGER);
+      // NULL — and emphatically not the id, which is the whole defect.
+      expect(out.reviewedByName).toBeNull();
+      expect(out.reviewedByName).not.toBe('a-user-who-no-longer-resolves');
+    });
+
+    it('resolves a LIST in ONE query, not one per row', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findManyAssessments.mockResolvedValue([
+        { id: 'na-1', reviewedByUserId: 'manager-1', approvedByUserId: null },
+        {
+          id: 'na-2',
+          reviewedByUserId: 'manager-1',
+          approvedByUserId: 'manager-1',
+        },
+        { id: 'na-3', reviewedByUserId: null, approvedByUserId: null },
+      ]);
+      const rows = await service.list({}, MANAGER);
+      expect(rows.map((r) => r.reviewedByName)).toEqual([
+        'Ahmad Al-Test',
+        'Ahmad Al-Test',
+        null,
+      ]);
+      // ONE call for three rows and five ids. Per-row resolution would be three.
+      expect(mocks.displayNamesForUserIds).toHaveBeenCalledTimes(1);
     });
 
     it('stamps reviewedByUserId through the transition on a valid review', async () => {

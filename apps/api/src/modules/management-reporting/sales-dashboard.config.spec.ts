@@ -5,7 +5,41 @@ import {
   deriveConversionMetric,
   deriveLeadsMetric,
   derivePremiumWrittenMetric,
+  SALES_DASHBOARD_METRIC_SCOPE,
 } from './sales-dashboard.config';
+
+/*
+ * OWNER DECISION 58 — every metric on THIS screen obeys the period, asserted rather
+ * than assumed. The config's own header says the period «applies to every metric via
+ * its own date field», so all five are `'period'`.
+ *
+ * A UNIFORM DECLARATION IS STILL ASSERTED, because the sibling dashboard proves the
+ * asymmetry is a real design choice here rather than a hypothesis: if a metric on this
+ * screen ever became a snapshot, a screen that had assumed uniformity would keep
+ * printing a period beside it. The `satisfies` makes a SIXTH metric a compile error;
+ * this makes a CHANGED one a failing test.
+ */
+describe('SALES_DASHBOARD_METRIC_SCOPE (owner decision 58)', () => {
+  it('declares every metric period-scoped, which is what this screen measured', () => {
+    expect(Object.values(SALES_DASHBOARD_METRIC_SCOPE)).toEqual([
+      'period',
+      'period',
+      'period',
+      'period',
+      'period',
+    ]);
+  });
+
+  it('covers all five metrics by name — a figure with no entry renders no clause at all', () => {
+    expect(Object.keys(SALES_DASHBOARD_METRIC_SCOPE).sort()).toEqual([
+      'commissionIncomeJod',
+      'crossSell',
+      'leads',
+      'premiumWritten',
+      'upSell',
+    ]);
+  });
+});
 
 describe('computeConversionRatePercent', () => {
   /*

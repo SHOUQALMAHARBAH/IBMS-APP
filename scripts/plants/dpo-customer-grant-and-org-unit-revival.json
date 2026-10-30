@@ -1,0 +1,56 @@
+{
+  "the-dpo-grant-removed": {
+    "file": "packages/db/prisma/seed-data/permissions.ts",
+    "from": "      PLACEMENT,\n      DPO,\n    ],",
+    "to": "      PLACEMENT,\n    ],",
+    "why": "Register row 2.2 restored: the DPO searching the data-subject field for a customer who exists is told the customer is not available. The GATE is not what fails — the DPO holds `dsr.log`, which is in `CUSTOMER_SEARCH_CODES`, so it reaches `GET /customers/search` either way; what empties the result is `canReadAllCustomerOwners(actor) ? undefined : actor.id`, the owner filter one line below. Planted, `permissions.spec.ts`'s exact-set test dies naming the eight expected holders, and the new premise test dies on its `toBe(true)` — two independent assertions, because the set and the DPO's own membership are different claims. Migration `20261213100000` also refuses to re-apply, which is the half a grid-only check cannot see."
+  },
+  "the-dpo-handed-the-360-view": {
+    "file": "packages/db/prisma/seed-data/permissions.ts",
+    "from": "    roles: [SALES, MANAGER, EXEC, COMPLIANCE, AUDITOR],",
+    "to": "    roles: [SALES, MANAGER, EXEC, COMPLIANCE, AUDITOR, DPO],",
+    "why": "THE PREMISE, and it is the thing the owner asked to be pinned. This grant is justified by an ABSENCE — the DPO cannot OPEN a customer file, so widening its SEARCH to every owner discloses a name, a type, a status and two corporate identifiers rather than the file. `customer.360-view.read` is what gates the detail page, the field reveal, the UBO register and the 360° timeline. Planted, the premise test dies naming the code and saying what to do: re-decide the cross-owner grant rather than keeping both. It fires in TWO places on purpose — `permissions.spec.ts` and the migration's own assertion (2) — because a disclosure premise that lives in one file is a premise one edit removes. The anchor is `customer.360-view.read`'s OWN roles line, so this plant grants the door rather than removing the guard: the realistic regression is somebody widening the 360° view for an unrelated reason and never reading this file."
+  },
+  "consent-manage-removed-from-the-customer-picker": {
+    "file": "apps/api/src/common/picker-search.config.ts",
+    "from": "export const CUSTOMER_SEARCH_CODES = [\n  'customer.read',\n  'dsr.log',\n  'consent.manage',\n] as const;",
+    "to": "export const CUSTOMER_SEARCH_CODES = ['customer.read', 'dsr.log'] as const;",
+    "why": "THE PLANT THAT KILLS NOTHING, and it is committed because that is the measurement rather than a gap. `consent.manage` is in this list by the house rule — `/consent` renders the customer picker and the screen is gated on that code — and its effect on the seeded grid is ZERO: all four holders (CLAIMS, DPO, PLACEMENT, SALES) already reach the route, three through `customer.read` and the DPO through `dsr.log`. So no test can observe its removal, and `picker-route-reachability.mjs` prints `0 stuck` either way. What it closes is a CUSTOM office role holding only `consent.manage`, which nothing in a seeded database can represent. Recorded here rather than defended by a test, because the alternative — a test asserting the array's contents — would pin the list rather than the property. AND IT RECORDS A CORRECTION: the brief this implements said that screen's reader is *refused at the gate before the filter is reached*, which is false on the seeded grid; the gate was open and the filter was the defect."
+  },
+  "reactivating-a-live-unit-is-a-no-op": {
+    "file": "apps/api/src/modules/rbac/services/org-structure.service.ts",
+    "from": "    if (!before.deactivatedAt) {\n      // Refused rather than treated as a no-op:",
+    "to": "    if (false) {\n      // Refused rather than treated as a no-op:",
+    "why": "A silent 200 on a unit that was never retired. `deactivate` refuses an already-retired unit for the mirror reason, and the asymmetry would be the defect: an administrator who clicks reactivate on a live unit and gets a 200 believes they changed something. Planted, the org-units e2e dies on `expect(422)` at property (a). `if (false)` rather than deleting the block, so the MECHANISM is disabled and the structure around it stands — a plant that deletes a block breaks the method and cannot say which test observes what."
+  },
+  "the-retired-unit-stays-hidden": {
+    "file": "apps/api/src/repositories/department.repository.ts",
+    "from": "      where: includeRetired ? {} : { deactivatedAt: null },\n      // A TOTAL order once retired rows can be in the set",
+    "to": "      where: { deactivatedAt: null },\n      // A TOTAL order once retired rows can be in the set",
+    "why": "THE READ THAT MAKES THE ROUTE REACHABLE, removed — which is the state this batch found: eight administration routes, no reactivate, and both list reads filtering live-only, so a retired unit was invisible on the only screen that could bring it back and the only way out was a hand-written UPDATE. The route alone is not the capability. Planted, the org-units e2e dies at property (b) with `the retired unit must be reachable, or nothing can revive it` — the message says why the assertion exists rather than what it compared."
+  },
+  "the-collision-arrives-as-a-500": {
+    "file": "apps/api/src/modules/rbac/services/org-structure.service.ts",
+    "from": "      after = await repo.reactivate(id);\n    } catch (err) {\n      throw this.asNameCollision(err, kind, before.name);",
+    "to": "      after = await repo.reactivate(id);\n    } catch (err) {\n      throw err;",
+    "why": "Clearing `deactivatedAt` enters `<Kind>_one_live_name_per_org`, a partial UNIQUE on live rows — so reviving a unit whose name another unit has since taken is a real P2002. Unwrapped it reaches the caller as a bare 500, which is IMPROVEMENTS § 1.11's shape exactly: a correct database invariant arriving as an indistinguishable server error that tells a person nothing about what to do. Planted, the org-units e2e dies at property (d) on `expect(409)`. The index is the enforcement and this is only its translation, which is why no pre-check was written — a pre-check would be a second answer, and the racy one."
+  },
+  "the-arabic-name-is-optional-again": {
+    "file": "apps/api/src/modules/rbac/dto/org-structure.dto.ts",
+    "from": "  @IsString()\n  @Length(1, 100)\n  nameAr!: string;\n}",
+    "to": "  @IsOptional()\n  @IsString()\n  @Length(1, 100)\n  nameAr?: string;\n}",
+    "why": "The state the owner closed: a unit created with no Arabic name on an Arabic-first platform, rendering as its Latin name to a reader who does not read it — and the office that has not settled its wording is exactly the office that never comes back to it. Planted, the org-units e2e dies on the `nameAr` half of `refuses a create with no Arabic name, and one with no Latin name, separately`. ONE FIELD AT A TIME is why that test can see it: a single request missing both names would answer 400 from the `name` rule and pass while this one was gone."
+  },
+  "the-catalogue-counts-every-role": {
+    "file": "scripts/export-permission-catalogue.ts",
+    "from": "        roles: {\n          where: { role: { isSystem: true } },\n          select: { role: { select: { name: true } } },\n        },",
+    "to": "        roles: { select: { role: { select: { name: true } } } },",
+    "why": "The unfiltered read, restored. `docs/permission-catalogue.md` is the document the owner writes her Arabic permission descriptions against, and its own header claims the 'Held by' column shows the SEEDED roles — a claim the code did not enforce. Planted and regenerated, `commission-rate.manage` names `E2E_SCOPED_1792576115054`, a leaked e2e fixture role, in her working document. Measured when this was fixed: dev holds ZERO non-`isSystem` roles and db-test holds SIXTEEN, and this script reads db-test, so the output was machine-specific as well as wrong. NOT OBSERVED BY ANY TEST — there is no `:check` variant for this generator, which is also why the file had gone stale at 227 codes against a catalogue of 230; the plant is the record."
+  },
+  "the-provider-fixture-picks-any-role": {
+    "file": "apps/api/test/provider-self-administration.e2e-spec.ts",
+    "from": "    where: { organizationId: office.id, isSystem: true, status: 'ACTIVE' },\n    orderBy: [{ name: 'asc' }, { id: 'asc' }],",
+    "to": "    where: { organizationId: office.id, status: 'INACTIVE' },\n    orderBy: [{ name: 'asc' }, { id: 'asc' }],",
+    "why": "A PRE-EXISTING defect, proven at HEAD with everything else stashed before it was attributed. This read was `findFirstOrThrow({ where: { organizationId } })` with no `status` filter, no `isSystem` filter and NO `orderBy`, while the test it feeds asserts `status === 'ACTIVE'` after a refused request — so which role it got was decided by the query plan, and db-test held 14 ACTIVE roles against 15 INACTIVE leaked `E2E_PLATFORM_GRANT_*` ones. The plant makes that choice DETERMINISTIC rather than reproducing the race, because a plant on a non-determinism cannot be relied on to fail: pointed at an INACTIVE role it dies on `expected 'INACTIVE' to be 'ACTIVE'`, which is the exact message the real failure produced. Same class as `findActiveUserIdsWithPermission`, where a consumer taking `[0]` imposed an ordering requirement nothing type-checked."
+  }
+}

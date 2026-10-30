@@ -15,6 +15,28 @@ import {
  *              a NATURAL PERSON (sole establishment) may hold ONE type only.
  *   art. 4/a — capital: 5,000 JOD per type up to 6 branches, 7,500 up to 12, 10,000 above 12.
  *
+ * ## ART. 13/b/2 IS DECLARED UNIMPLEMENTED, AND MUST NOT BE BUILT FROM ITS CAPITAL FIGURE ALONE
+ *
+ * Art. 13/b allows a CORPORATE broker to open more than five branches INSIDE THE KINGDOM, or any
+ * branch abroad, subject to four CONJUNCTIVE conditions: three years since licensing with actual
+ * practice (13/b/1), paid-up capital of at least 50,000 JOD (13/b/2), operating profits in the two
+ * preceding years (13/b/3), and a legal form of public shareholding, private shareholding or LLC
+ * (13/b/4).
+ *
+ * NONE OF IT IS IMPLEMENTED, and the reason is that the system does not model what it counts: art.
+ * 13's فروع are PHYSICAL BRANCH OFFICES, and this product has no physical-branch concept at all.
+ * Art. 4/a's فروع above are INSURANCE BRANCHES — lines within a type — which is a different noun
+ * sharing a word.
+ *
+ * So a guard written against the branch count THIS file has would fire on insurance lines and tell
+ * every office holding six or more of them — the ordinary case — that it needs 50,000 JOD, with no
+ * basis in the text. That is the same class of false regulatory finding as the provider being
+ * reported as an unlicensed office, and it is why the article is named here and left unbuilt
+ * rather than approximated.
+ *
+ * Were physical branches modelled later, a capital-only guard would STILL be wrong: the four
+ * conditions are conjunctive, and capital is one of them.
+ *
  * ## The TYPE is derived from the branch, never stored beside it
  *
  * `InsuranceLineCategory` has exactly two values — GENERAL and LIFE — which is precisely the pair
@@ -93,6 +115,83 @@ export function typesInScope(
   const present = branchCountByType(branches);
   return INSURANCE_LINE_CATEGORIES.filter((t) => present.has(t));
 }
+
+/**
+ * THE UNIT THE BRANCHES ARE COUNTED IN IS UNDER VERIFICATION WITH THE CENTRAL BANK.
+ *
+ * Art. 4/a's slabs count BRANCHES within a type — up to 6, up to 12, more than 12 — so the counting
+ * unit decides how much capital an office must hold. This function counts rows of OUR catalogue,
+ * which is 32 lines.
+ *
+ * An unattributed reply to a question put to the Central Bank states that those 32 are a COMMERCIAL
+ * PRODUCT catalogue while the Bank licenses against a shorter REGULATORY classification — its
+ * example being that our several liability lines fall under one regulatory branch, "general
+ * liability". That is consistent with the 18-general-and-8-life list in the Bank's own published
+ * broker re-registration form, which reads like a licensing classification rather than a product
+ * list.
+ *
+ * ## WHY NOTHING IS CHANGED HERE, AND WHY THE NOTE EXISTS ANYWAY
+ *
+ * The reply is NOT AUTHORITATIVE and is recorded as unattributed: no reference number, no signature,
+ * it does not contain the form or the list that was asked for, and its own closing line directs us to
+ * submit a formal written request to obtain the annexes. Nothing is built on it.
+ *
+ * So the catalogue is untouched — merging or renaming a line would change what every existing licence
+ * MEANS — and no mapping column is added, because an empty column with no reader is the
+ * `dpoAlternateApproverUserId` precedent: it existed for exactly this kind of problem, acquired no
+ * reader, and is now marked superseded. The column arrives with the official list that populates it.
+ *
+ * What IS done is to stop the screens stating a settled answer. The figure below is still computed
+ * and still shown; what changes is that both surfaces displaying it now say the counting unit is
+ * under verification. The owner's rule is that the system does not state as settled what is not, and
+ * a capital requirement is a money figure an office acts on.
+ *
+ * ## 2026-10-19, DECISION 20 — DEFERRED, WITH THE REOPENING CONDITION WRITTEN IN ADVANCE
+ *
+ * **NOTHING IS BUILT HERE AND NOTHING IS REQUESTED FROM THE CENTRAL BANK.** Decision 122 closed
+ * that channel; decision 9 says the mapping column is not built until the list that fills it
+ * arrives. Both stand.
+ *
+ * The answer in the owner's folder gives **COUNTS — 26 branches, 18 general and 8 life/medical —
+ * and a count is not a list.** It does not say WHICH 18, WHICH 8, or which of our 32 belongs to
+ * each, and that is the whole of what a mapping needs. An earlier draft of this very comment said
+ * "the fix is authorised"; it was not, and the correction is recorded here rather than quietly
+ * applied, because the first version is the kind of sentence that gets built on.
+ *
+ * ## THE REOPENING CONDITION
+ *
+ * The mapping is built when **THE NAMES OF THE 26 ARRIVE FROM AN AUTHORITATIVE SOURCE** — which 18,
+ * which 8, and which of our 32 rows belongs to each.
+ *
+ * It is NOT opened by an engineer's estimate, a coordinator's estimate, or a mapping inferred from
+ * our own line names. **A wrong mapping changes a capital tier shown to a licensed office**, which
+ * is a money figure that office acts on — so a plausible guess here is worse than the known gap,
+ * because the gap is flagged and a guess is not.
+ *
+ * ## AND THE SHAPE, WHEN IT ARRIVES, IS NOT A PARENT COLUMN
+ *
+ * Measured on the seeded catalogue: ours is **27 GENERAL and 5 LIFE**.
+ *
+ *     GENERAL   27 ours -> 18 official   nine of ours collapse into parents — a parent FK expresses this
+ *     LIFE       5 ours ->  8 official   THREE OFFICIAL BRANCHES HAVE NO CHILD IN OUR CATALOGUE
+ *
+ * A parent column on our rows cannot represent the second line: three official life/medical branches
+ * would exist only as the absence of a row. And because the tier counts DISTINCT OFFICIAL BRANCHES
+ * an office is licensed for, an office licensed for one of those three could not be represented at
+ * all — its capital would be computed on a scope that cannot include it, which is the same
+ * arithmetic error one level down.
+ *
+ * So the 26 need their **OWN managed table**, seeded with all 26 including the three we have no
+ * child for, with `InsuranceLine` pointing INTO it. That is recorded now so the next reader does not
+ * reach for the smaller change.
+ *
+ * ## UNTIL THEN: THIS FUNCTION COUNTS OUR OWN ROWS, AND THE WARNING SENTENCE STAYS
+ *
+ * The figure is otherwise **wrong AND unflagged**, which is worse than either alone. The sentence on
+ * both surfaces saying the counting unit is under verification is the only thing telling a reader
+ * the tier may be higher than the regulator would require. It is removed in the same change that
+ * lands the mapping, and not before.
+ */
 
 /**
  * The capital art. 4/a requires for the WHOLE scope.

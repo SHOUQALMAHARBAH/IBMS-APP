@@ -22,7 +22,7 @@ export interface NeedsAssessmentFilter {
 /**
  * BOTH combined-duty acts, on every read and write that returns an assessment.
  *
- * `NeedsAssessment` is the only table in the fifteen carrying TWO pairs, and therefore two escape columns:
+ * `NeedsAssessment` is the only table in the sixteen carrying TWO pairs, and therefore two escape columns:
  * `NeedsAssessment_reviewer_maker_checker_distinct` (the capturer is not the reviewer) and
  * `NeedsAssessment_approver_maker_checker_distinct` (the capturer is not the approver). One shared column
  * would let a declared combined REVIEW excuse a self-APPROVAL, which is the reason there are fifteen
@@ -38,6 +38,31 @@ const NEEDS_ASSESSMENT_INCLUDE = {
 export type NeedsAssessmentWithActs = Prisma.NeedsAssessmentGetPayload<{
   include: typeof NEEDS_ASSESSMENT_INCLUDE;
 }>;
+
+/**
+ * WHO REVIEWED AND WHO APPROVED, BY NAME — decision 48.
+ *
+ * The owner read two uuids under «راجعه» and «اعتمده» on `/needs-assessments/[id]`,
+ * and `rendered-identifiers.py` reported that screen CLEAN: its ternary exclusion
+ * `\?[^.]` was written to let optional chaining through and let NULLISH COALESCING
+ * through with it, so the one shape the budget exists to count was the one shape it
+ * could not see.
+ *
+ * BOTH FIELDS ARE REQUIRED, not optional, and that is the whole reason this type
+ * exists rather than a widened inline return: ten call sites return this shape and an
+ * optional field would leave any one of them projecting `undefined` while the others
+ * carried a name — a name after a REVIEW and none after a CREATE, which is the
+ * `IncidentReport.load()` defect and is invisible to a test that only reads.
+ *
+ * A MISSING key means NO NAME and must never become the uuid.
+ */
+export interface NeedsAssessmentActorNames {
+  reviewedByName: string | null;
+  approvedByName: string | null;
+}
+
+export type NeedsAssessmentWithNames = NeedsAssessmentWithActs &
+  NeedsAssessmentActorNames;
 
 @Injectable()
 export class NeedsAssessmentRepository {

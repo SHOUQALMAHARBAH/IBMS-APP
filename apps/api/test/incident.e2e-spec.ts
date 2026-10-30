@@ -165,10 +165,63 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
       .set(bearer(reporter.accessToken))
       .expect(403);
 
+    /*
+     * OWNER DECISION 56 — «لما أضغط ع زر الاحتواء بس بغيّر الحالة إلى تم احتوائه».
+     *
+     * An EMPTY BODY is refused now. This is the assertion that would have caught the
+     * defect she found: before this decision the route took no body at all, so the only
+     * possible outcome was 201 and a bare timestamp.
+     */
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/contain`)
       .set(bearer(responder.accessToken))
+      .send({})
+      .expect(400);
+
+    // And so is a description below the shared declaration floor — «تم الاحتواء» must
+    // never mean that somebody typed a character.
+    await request(app.getHttpServer())
+      .post(`/incidents/${incident.id}/contain`)
+      .set(bearer(responder.accessToken))
+      .send({ description: 'short' })
+      .expect(400);
+
+    const contained = await request(app.getHttpServer())
+      .post(`/incidents/${incident.id}/contain`)
+      .set(bearer(responder.accessToken))
+      .send({
+        description: 'Isolated the affected mail server from the network.',
+      })
       .expect(201);
+
+    /* THE LOG IS ON THE WIRE, which is the layer no typecheck can reach: the screen reads
+     * this through a hand-copied interface, so a field the api stops sending is
+     * `undefined` at runtime with nothing failing at compile time. */
+    const firstLog = (
+      contained.body as { containmentActions: { description: string }[] }
+    ).containmentActions;
+    expect(firstLog).toHaveLength(1);
+    expect(firstLog[0].description).toBe(
+      'Isolated the affected mail server from the network.',
+    );
+
+    /* A SECOND CONTAINMENT APPENDS — `PRIV-SRS-02` types `containment_actions` as a
+     * timestamped LOG and an incident is routinely contained in more than one action.
+     * Asserted as a PAIR with the length above, because a second call returning 201 says
+     * nothing about whether it recorded anything: that was exactly the old behaviour. */
+    const again = await request(app.getHttpServer())
+      .post(`/incidents/${incident.id}/contain`)
+      .set(bearer(responder.accessToken))
+      .send({ description: 'Disabled the compromised user account as well.' })
+      .expect(201);
+    const secondLog = (
+      again.body as { containmentActions: { description: string }[] }
+    ).containmentActions;
+    expect(secondLog).toHaveLength(2);
+    // Newest first, which is what the include orders by.
+    expect(secondLog[0].description).toBe(
+      'Disabled the compromised user account as well.',
+    );
 
     // containment timer resolved by the transition's side effect
     const containmentAfter = await prisma.slaTimer.findMany({
@@ -188,10 +241,74 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
     expect(containmentAfter).toHaveLength(1);
     expect(containmentAfter[0].resolvedAt).not.toBeNull();
 
+    /*
+     * OWNER DECISION 56 — «بس بظهرلي إنه تم تقييم أثره وأنا ما قيّمت ولا عملت شي».
+     *
+     * The three outputs are `PRIV-SOP-09` step 4's own, and each is refused SEPARATELY
+     * rather than in one request carrying none: a single empty-body 400 would pass while
+     * only ONE of the three was still required, which is the recorded
+     * one-field-at-a-time lesson from the customer-correction DTO.
+     */
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/assess-impact`)
       .set(bearer(responder.accessToken))
+      .send({})
+      .expect(400);
+
+    for (const partial of [
+      {
+        dataCategoriesAffected: 'Customer names and contact details.',
+        subjectsAffectedEstimate: 12,
+      },
+      { touchesPersonalData: true, subjectsAffectedEstimate: 12 },
+      {
+        touchesPersonalData: true,
+        dataCategoriesAffected: 'Customer names and contact details.',
+      },
+    ]) {
+      await request(app.getHttpServer())
+        .post(`/incidents/${incident.id}/assess-impact`)
+        .set(bearer(responder.accessToken))
+        .send(partial)
+        .expect(400);
+    }
+
+    // A negative count is refused — there is no negative number of affected people.
+    await request(app.getHttpServer())
+      .post(`/incidents/${incident.id}/assess-impact`)
+      .set(bearer(responder.accessToken))
+      .send({
+        touchesPersonalData: true,
+        dataCategoriesAffected: 'Customer names and contact details.',
+        subjectsAffectedEstimate: -1,
+      })
+      .expect(400);
+
+    const assessed = await request(app.getHttpServer())
+      .post(`/incidents/${incident.id}/assess-impact`)
+      .set(bearer(responder.accessToken))
+      .send({
+        touchesPersonalData: true,
+        dataCategoriesAffected: 'Customer names and contact details.',
+        subjectsAffectedEstimate: 12,
+      })
       .expect(201);
+
+    const body = assessed.body as {
+      touchesPersonalData: boolean;
+      dataCategoriesAffected: string;
+      subjectsAffectedEstimate: number;
+      impactAssessedAt: string | null;
+    };
+    expect(body.touchesPersonalData).toBe(true);
+    expect(body.dataCategoriesAffected).toBe(
+      'Customer names and contact details.',
+    );
+    expect(body.subjectsAffectedEstimate).toBe(12);
+    // The timestamp AND the trio — the row-level CHECK makes any other combination
+    // unrepresentable, and this is what proves they arrived together rather than the
+    // stamp arriving alone as it used to.
+    expect(body.impactAssessedAt).not.toBeNull();
 
     // Executive Management cannot classify. Since Phase 2 that is a PERMISSION:
     // `incident.classify` is the DPO's, `incident.classification.co-sign` is
@@ -386,10 +503,18 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
       await request(app.getHttpServer())
         .post(`/incidents/${incidentId}/contain`)
         .set(bearer(dualHatted.accessToken))
+        .send({
+          description: 'Isolated the affected mail server from the network.',
+        })
         .expect(201);
       await request(app.getHttpServer())
         .post(`/incidents/${incidentId}/assess-impact`)
         .set(bearer(dualHatted.accessToken))
+        .send({
+          touchesPersonalData: true,
+          dataCategoriesAffected: 'Customer names and contact details.',
+          subjectsAffectedEstimate: 12,
+        })
         .expect(201);
 
       // Both halves are reachable for this caller — no 403 on either route.
@@ -471,10 +596,18 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/contain`)
       .set(bearer(responder.accessToken))
+      .send({
+        description: 'Isolated the affected mail server from the network.',
+      })
       .expect(201);
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/assess-impact`)
       .set(bearer(responder.accessToken))
+      .send({
+        touchesPersonalData: true,
+        dataCategoriesAffected: 'Customer names and contact details.',
+        subjectsAffectedEstimate: 12,
+      })
       .expect(201);
 
     const classified = await request(app.getHttpServer())

@@ -18,7 +18,12 @@ import {
   inputStyle,
   labelStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
+import {
+  EmptyState,
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
@@ -118,9 +123,7 @@ function NewNeedsAssessmentFlow() {
   return (
     <>
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       <section style={sectionStyle}>
@@ -156,7 +159,7 @@ function NewNeedsAssessmentFlow() {
             </select>
           </div>
         ) : profiles ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('nanNoRiskProfile')}</p>
+          <EmptyState title={t('nanNoRiskProfile')} />
         ) : (
           <p>{t('nanLoadingRiskProfiles')}</p>
         )}
@@ -189,9 +192,7 @@ function NewNeedsAssessmentFlow() {
             {creatingProfile ? t('nanAdding') : t('nanAddButton')}
           </button>
           {profileError ? (
-            <p role="alert" style={errorStyle}>
-              {profileError}
-            </p>
+            <ErrorState title={profileError} />
           ) : null}
         </form>
       </section>
@@ -225,7 +226,7 @@ export default function NewNeedsAssessmentPage() {
   const canStart = hasPermission(user, 'needs-assessment.create');
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() => router.push('/needs-assessments')}
@@ -233,7 +234,7 @@ export default function NewNeedsAssessmentPage() {
       >
         {t('nadBackToList')}
       </button>
-      <h1>{t('nanHeading')}</h1>
+      <PageHeader title={t('nanHeading')} />
       {canStart ? (
         <Suspense fallback={null}>
           <NewNeedsAssessmentFlow />

@@ -9,21 +9,26 @@ import {
   type InsurerPerformanceScore,
 } from '../../../lib/management-reporting/insurer-performance-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  DateEcho,
+  EmptyState,
+  ErrorState,
+  Hint,
+  PageHeader,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', margin: '1rem 0' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '26rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -112,11 +117,11 @@ export default function InsurerPerformancePage() {
   const latest = history && history.length > 0 ? history[0] : null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('ipHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('ipIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('ipHeading')}
+        description={t('ipIntro')}
+      />
 
       <form onSubmit={onLookup} style={formStyle}>
         <h2>{t('ipLookUp')}</h2>
@@ -132,9 +137,7 @@ export default function InsurerPerformancePage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {latest ? (
@@ -153,31 +156,33 @@ export default function InsurerPerformancePage() {
           </p>
 
           <h2>{t('dashHistory')}</h2>
-          <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('dashColPeriod')}</th>
-                <th style={head}>{t('diepQuoteResponse')}</th>
-                <th style={head}>{t('diepClaimsService')}</th>
-                <th style={head}>{t('diepPrice')}</th>
-                <th style={head}>{t('diepServiceQuality')}</th>
+                <Th>{t('dashColPeriod')}</Th>
+                <Th>{t('diepQuoteResponse')}</Th>
+                <Th>{t('diepClaimsService')}</Th>
+                <Th>{t('diepPrice')}</Th>
+                <Th>{t('diepServiceQuality')}</Th>
               </tr>
             </thead>
             <tbody>
               {history!.map((row) => (
-                <tr key={row.id}>
-                  <td style={cell}>{row.periodLabel}</td>
-                  <td style={cell}>{row.quoteResponseScore}</td>
-                  <td style={cell}>{row.claimsServiceScore}</td>
-                  <td style={cell}>{row.priceScore}</td>
-                  <td style={cell}>{row.serviceQualityScore}</td>
-                </tr>
+                <Tr key={row.id}>
+                  <Td>{row.periodLabel}</Td>
+                  <Td>{row.quoteResponseScore}</Td>
+                  <Td>{row.claimsServiceScore}</Td>
+                  <Td>{row.priceScore}</Td>
+                  <Td>{row.serviceQualityScore}</Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         </>
       ) : hasLookedUp && !loadError ? (
-        <p style={{ color: 'var(--ink-secondary)' }}>{t('ipNoScore')}</p>
+        <EmptyState title={t('ipNoScore')} />
       ) : null}
 
       <form onSubmit={onCompute} style={formStyle}>
@@ -192,29 +197,35 @@ export default function InsurerPerformancePage() {
             onChange={(e) => setComputePeriodLabel(e.target.value)}
           />
         </label>
-        <label style={labelStyle}>
-          {t('ipPeriodStartOptionalLabel')}
+        <div style={labelStyle}>
+          <label htmlFor="ip-period-start">{t('ipPeriodStartOptionalLabel')}</label>
           <input
+            id="ip-period-start"
+            aria-describedby="ip-period-start-hint"
             type="date"
             value={computePeriodStart}
             onChange={(e) => setComputePeriodStart(e.target.value)}
           />
-        </label>
-        <label style={labelStyle}>
-          {t('ipPeriodEndOptionalLabel')}
+          <Hint id="ip-period-start-hint">{t('ipPeriodStartHint')}</Hint>
+          <DateEcho value={computePeriodStart} />
+        </div>
+        <div style={labelStyle}>
+          <label htmlFor="ip-period-end">{t('ipPeriodEndOptionalLabel')}</label>
           <input
+            id="ip-period-end"
+            aria-describedby="ip-period-end-hint"
             type="date"
             value={computePeriodEnd}
             onChange={(e) => setComputePeriodEnd(e.target.value)}
           />
-        </label>
+          <Hint id="ip-period-end-hint">{t('ipPeriodEndHint')}</Hint>
+          <DateEcho value={computePeriodEnd} />
+        </div>
         <button type="submit" disabled={!insurerId}>
           {t('ipComputeButton')}
         </button>
         {computeError ? (
-          <p role="alert" style={errorStyle}>
-            {computeError}
-          </p>
+          <ErrorState title={computeError} />
         ) : null}
         {computeMessage ? <p>{computeMessage}</p> : null}
       </form>

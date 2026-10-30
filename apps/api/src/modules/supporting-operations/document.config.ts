@@ -64,6 +64,29 @@ export interface PolicyFileClassificationView {
   highestClassification: DataClassification | null;
 }
 
+/**
+ * One option in the document chooser — owner decision 41.
+ *
+ * `fileName` crosses to the client here while `documentAuditSnapshot` below deliberately WITHHOLDS it,
+ * and the two are consistent rather than in tension. That snapshot's reason is that a filename can name
+ * an insured person or describe a medical event, so it must not be copied into the append-only audit
+ * table; this view goes only to a holder of `document.read`, which is the permission that already
+ * returns the whole register including every filename through `GET /documents`. So the chooser discloses
+ * nothing its reader could not already list — the `employee-search-narrowness` argument.
+ *
+ * The SEARCH's own audit row records matched ids and the term, never a filename, which is what keeps
+ * the snapshot rule intact on the path this adds.
+ *
+ * `category` and `versionNumber` are the disambiguation line and are the whole reason they are here:
+ * filenames repeat heavily, so a chooser showing names alone cannot tell two matches apart.
+ */
+export interface DocumentPickerResult {
+  id: string;
+  fileName: string;
+  category: DocumentCategory;
+  versionNumber: number;
+}
+
 /** CREATE/DELETE audit snapshot for a `Document` row — like the #18-19
  * `policyDocumentAuditSnapshot` / #25 `claimDocumentAuditSnapshot`, this
  * excludes `fileName` and `storageRef`: a filename can itself name an

@@ -39,6 +39,9 @@ const ALERTS = [
     status: "open",
     isClosed: false,
     classification: "HIGHLY_CONFIDENTIAL",
+    // Batch six item 2 — the api resolves the customer by name, so the Customer column renders
+    // this rather than eight characters of a uuid.
+    customerName: "مؤسسة النور للتجارة",
   },
   {
     id: "tma-2",
@@ -54,6 +57,9 @@ const ALERTS = [
     status: "closed",
     isClosed: true,
     classification: "HIGHLY_CONFIDENTIAL",
+    // Batch six item 2 — the api resolves the customer by name, so the Customer column renders
+    // this rather than eight characters of a uuid.
+    customerName: "مؤسسة النور للتجارة",
   },
 ];
 
@@ -79,11 +85,21 @@ test("lists transaction-monitoring alerts with the log form and sweep button", a
   await expect(
     page.getByRole("heading", { name: "AML/CFT transaction monitoring" }),
   ).toBeVisible();
+  // RE-POINTED, decision 59, and the reversal is real: both lines asserted the raw
+  // ENUM MEMBER in the Pattern column, which was correct until the labels arrived - all
+  // five had in fact shipped in both languages for months and this cell simply never
+  // reached for them. Asserted as a PAIR (the label present AND the member name gone),
+  // because the label contains no underscore so the stale form would have failed loudly
+  // while the sibling `MARKETING` assertion on `/consent` went on passing against
+  // "Marketing" - substring matching hides exactly half of this class.
   await expect(
-    page.getByRole("cell", { name: "large_premium_payment" }),
+    page.getByRole("cell", { name: "Large premium payment" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("cell", { name: "frequent_cancellations" }),
+    page.getByRole("cell", { name: "large_premium_payment" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("cell", { name: "Frequent cancellations" }),
   ).toBeVisible();
   await expect(page.getByLabel("Pattern")).toBeVisible();
   await expect(page.getByRole("button", { name: "Log alert" })).toBeVisible();
@@ -93,6 +109,22 @@ test("lists transaction-monitoring alerts with the log form and sweep button", a
   // the open, unescalated alert shows Escalate + Close; the closed one shows neither.
   await expect(page.getByRole("button", { name: "Escalate" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Close" })).toHaveCount(1);
+
+  /*
+   * RULE 2 (batch six item 2) — WHOSE transactions tripped the pattern, by name. This column
+   * rendered the first eight characters of a uuid, which on an AML queue identifies nobody: an
+   * officer working a list of alerts could not tell two of them apart.
+   *
+   * THE PAIR IS WHAT MAKES IT AN ASSERTION: the name present AND the uuid gone. A screen rendering
+   * both would pass a name-only check, and that is the realistic half-done state.
+   */
+  await expect(
+    page.getByRole("cell", { name: "مؤسسة النور للتجارة", exact: true }).first(),
+  ).toBeVisible();
+  // Asserted on the CELL, never page-wide: `check:absence` bans a page-wide `getByText` absence
+  // because it matches any text anywhere, and my first version of this pair pushed that class from
+  // 42 to 44. `exact: true` is also stronger — it fails on anything prefixed to the name.
+  await expect(page.getByRole("cell", { name: /11111111/ })).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({
@@ -114,8 +146,10 @@ test("transaction-monitoring screen has no serious/critical accessibility violat
   await mockAlerts(page);
 
   await page.goto("/transaction-monitoring");
+  // Re-pointed with the cell above, decision 59. This is the a11y test's READY ANCHOR
+  // rather than an assertion about wording - a different job, and said so.
   await expect(
-    page.getByRole("cell", { name: "large_premium_payment" }),
+    page.getByRole("cell", { name: "Large premium payment" }),
   ).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(

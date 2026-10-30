@@ -10,7 +10,7 @@ import type { ProviderOfficeStateRow } from '../../repositories/provider-office-
  *
  *   * a NAIVE `expiresAt <= now` answers identically to the regulatory rule,
  *   * the `no term on record` branch is never reached,
- *   * and art. 11's by-operation-of-law extension — the case where the two readings DISAGREE —
+ *   * and the renewal-pending rule — the case where the two readings DISAGREE —
  *     cannot occur.
  *
  * An e2e over one office cannot tell those apart however it is written. So the states are proven
@@ -28,9 +28,11 @@ const BASE: ProviderOfficeStateRow = {
   organizationStatus: 'ACTIVE',
   onboardedAt: new Date('2024-01-01T00:00:00.000Z'),
   licenseNumber: 'CBJ-1',
+  // REQUIRED on the row type rather than optional, so a fixture cannot omit it and make "no
+  // regulator has barred this office" indistinguishable from "nobody looked".
+  mayNotIssue: false,
   licenseIssuedAt: new Date('2024-01-01T00:00:00.000Z'),
   licenseExpiresAt: new Date('2026-12-31T00:00:00.000Z'),
-  licenseStatus: 'active',
   renewalRequestedAt: null,
   licensedBranches: 4,
   dormantLicensedBranches: 1,
@@ -55,7 +57,6 @@ describe('item (j): the three licence states', () => {
         licenseNumber: null,
         licenseIssuedAt: null,
         licenseExpiresAt: null,
-        licenseStatus: null,
       },
       NOW,
     );
@@ -76,12 +77,12 @@ describe('item (j): the three licence states', () => {
     expect(view.isCurrentlyLapsed).toBe(true);
   });
 
-  it('A TERM PAST ITS EXPIRY WITH A TIMELY RENEWAL IS NOT LAPSED — art. 11', () => {
+  it('A TERM PAST ITS EXPIRY WITH A TIMELY RENEWAL IS NOT LAPSED — the renewal-pending rule', () => {
     /*
      * THE CASE THAT DISTINGUISHES THE RULE FROM A COMPARISON, and the reason a naive
      * `expiresAt <= now` plant survived the e2e.
      *
-     * After expiry, an office that applied for renewal on time stays valid by operation of law
+     * After expiry, an office that applied for renewal on time stays valid pending the decision
      * until the CBJ's decision issues (item (d)). A comparison answers "lapsed"; the rule answers
      * "not lapsed". One of those tells a provider to chase an office that is compliant.
      */
@@ -98,7 +99,7 @@ describe('item (j): the three licence states', () => {
   });
 
   it('a term past its expiry with a LATE renewal IS lapsed', () => {
-    // The other side of the same edge: art. 11's extension is earned by filing ON TIME, so a late
+    // The other side of the same edge: the extension is earned by filing ON TIME, so a late
     // filing does not buy it. Both sides are asserted, because a rule tested on one side is a rule
     // that passes against an implementation that always says yes.
     const view = toProviderOfficeStateView(
@@ -112,20 +113,21 @@ describe('item (j): the three licence states', () => {
     expect(view.renewalFiledOnTime).toBe(false);
   });
 
-  it('A MANUAL LAPSE OUTRANKS A TIMELY FILING, even inside the term', () => {
-    // A CBJ suspension is not cured by having applied for renewal, and the check ORDER in
-    // `isBrokerLicenseCurrentlyLapsed` is what holds that. Asserted here as well, because this
-    // dashboard is where a provider would first see it.
-    const view = toProviderOfficeStateView(
-      {
-        ...BASE,
-        licenseStatus: 'lapsed',
-        renewalRequestedAt: new Date('2026-10-01T00:00:00.000Z'),
-      },
-      NOW,
-    );
-    expect(view.isCurrentlyLapsed).toBe(true);
-  });
+  /*
+   * RE-POINTED, not deleted. This asserted that a MANUAL LAPSE outranked a timely renewal filing —
+   * `licenseStatus: 'lapsed'` with a filed renewal still reading `isCurrentlyLapsed: true` — and
+   * its comment was right about why: *"a CBJ suspension is not cured by having applied for
+   * renewal."*
+   *
+   * The column is gone (the third of three answers), so the view no longer carries it and this
+   * dashboard no longer rebuilds a term object from it. The RULE moved to where a regulator's act
+   * is modelled properly: `deriveLicenseStanding` folds `RegulatoryAction` before the term
+   * arithmetic, and `license-standing.config.spec.ts` asserts exactly that ordering with a timely
+   * filing in play.
+   *
+   * What this dashboard still owes is the half it can answer from a term alone, asserted above: a
+   * term past its expiry with nothing filed reads lapsed.
+   */
 
   it("art. 11's deadline is 45 days before expiry, derived not stored", () => {
     expect(toProviderOfficeStateView(BASE, NOW).renewalDueBy).toBe(

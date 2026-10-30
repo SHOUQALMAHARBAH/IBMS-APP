@@ -1,0 +1,86 @@
+{
+  "aml-floor-not-enforced-on-create": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "    assertMeetsStatutoryFloor(dto.recordCategory, dto.retentionPeriodMonths);",
+    "to": "    void assertMeetsStatutoryFloor;",
+    "why": "ITEM A — the statutory floor is one of the owner's three standing refusals. With the create gate gone, a KYC due-diligence period of 12 months is accepted and the office's own retention schedule records a period below AML Law No. 20 of 2021, art. 17/a. Kills BOTH statutory-floor e2e tests in `retention-disposal.e2e-spec.ts` and nothing else: the config spec still passes, because the pure function is untouched — which is the point of planting at the CALL SITE rather than in the rule."
+  },
+  "floor-not-enforced-on-edit": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "      assertMeetsStatutoryFloor(item.recordCategory, dto.retentionPeriodMonths);",
+    "to": "      void assertMeetsStatutoryFloor;",
+    "why": "ITEM A — without the EDIT gate the create gate is a formality: set 60 months for a KYC category, then patch it to 6. REPOINTED 2026-10-20 (group 6) after `plant --self-test` caught it expired: the update path's floor check moved inside the declaration block, so the old two-line anchor no longer occurred. Same hazard, expressed against the new code — and anchored on the CALL rather than the enclosing `if`, because disabling the branch would also disable the no-floor declaration and the plant would then be testing two things at once. Kills the acceptance e2e, which is the one that drives the patch."
+  },
+  "floor-boundary-is-exclusive": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  if (floor && retentionPeriodMonths < floor.floorMonths) {",
+    "to": "  if (floor && retentionPeriodMonths <= floor.floorMonths) {",
+    "why": "ITEM A — the off-by-one in the direction that refuses a period which is EXACTLY what the statute requires. Five years is lawful; `<=` makes it unlawful. Kills the config spec's both-sides boundary case and the e2e acceptance test. This is the plant a mid-range test cannot catch, which is why the boundary is asserted on both sides of each floor."
+  },
+  "pair-count-pinned-to-a-literal-again": {
+    "file": "scripts/measurements/combined-duty-projection.py",
+    "from": "    derived = cross_check(sources)",
+    "to": "    derived = 15",
+    "why": "ITEM B — the defect itself, restored: a pair count pinned to a literal rather than derived. `npm run check:maker-checker-pairs` exits 1 with 'cross_check and measure disagree on the pair count (15 vs 16)'. The gate is now a CI step, so this is a red build rather than a script nobody runs — which is the whole change, since the original `assert pairs == 15` had been failing before it measured anything and CI never saw it."
+  },
+  "sixteenth-pair-shows-nobody-again": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.config.ts",
+    "from": "    combinedDutyAct: combinedDutyActView(row.combinedDutyAct),",
+    "to": "    combinedDutyAct: null,",
+    "why": "ITEM B's FINDING — the sixteenth pair writing the act and showing nobody, which is how the fixed measurement found it. `npm run check:maker-checker-pairs` reports 'writing it and showing nobody 1' naming `RetentionScheduleItem_maker_checker_distinct`. NOTE it does NOT fail the gate: the gate refuses an unregistered or unconstrained pair, and the projection figure is a REPORTED column. That division is deliberate and stated here rather than discovered — the e2e wire assertion is the half that fails."
+  },
+  "maker-permission-records-an-unenforced-code": {
+    "file": "apps/api/src/common/maker-checker-pairs.config.ts",
+    "from": "    makerPermission: 'endorsement.apply',",
+    "to": "    makerPermission: 'refund.raise',",
+    "why": "ITEM C — the exact wrong answer, and the one anybody would write from the field name. `refund.raise` IS in the catalogue, IS granted to roles and IS described on the Role matrix; it gates NO route. `maker-permissions.inventory.spec.ts` fails by name on 'Refund_maker_checker_distinct -> refund.raise' with the instruction to measure it from the route. An EXISTENCE check would have accepted it, which is why the guard reads @RequirePermissions instead."
+  },
+  "silent-case-stays-silent": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  if (acknowledgedMonths === null) return true;",
+    "to": "  if (acknowledgedMonths === null) return false;",
+    "why": "BATCH 5 GROUP 6 — the silent case restored. With the never-acknowledged branch answering false, a period for a category this system knows no minimum for is accepted with no refusal AND NO WORD, which is exactly the state the owner ruled on: a hard refusal escaped by a spelling. Kills the ASK unit test and BOTH declaration e2e tests (the ask returns 201 and the audit row carries no sentence). The floor tests all still pass, which is the point of planting the DECLARATION rather than the floor."
+  },
+  "declaration-asked-on-every-save": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  return requestedMonths < acknowledgedMonths;",
+    "to": "  return requestedMonths <= acknowledgedMonths;",
+    "why": "BATCH 5 GROUP 6 — WALLPAPER, by one character. `<=` re-asks on an UNCHANGED period, so an office editing a legal basis or re-saving the same figure meets the notice again and learns to click past it within a week — the failure the owner named by name, and the reason the boundary is asserted at 24-does-not-ask / 23-does. Kills the not-re-asked unit test and the e2e's same-or-longer loop."
+  },
+  "declaration-shows-a-floor-where-one-is-known": {
+    "file": "apps/api/src/modules/pdpl/retention-floors.config.ts",
+    "from": "  if (floorForCategory(recordCategory) !== null) return false;",
+    "to": "  if (false) return false;",
+    "why": "BATCH 5 GROUP 6 — the notice shown for a category that HAS a floor, where the sentence is FALSE: it says the system does not know a minimum for that name, and for `KYCRecord` it does. This product would be stating something untrue about its own knowledge. Kills the never-asks-where-a-floor-exists unit test, plus TWO e2e tests rather than one — the floored-category test AND the at-floor acceptance, because with every category treated as unfloored a `KYCRecord` save at exactly 60 months is asked to declare and answers 422 instead of 201. Measured by running it rather than predicted."
+  },
+  "audit-row-says-acknowledged-instead-of-the-sentence": {
+    "file": "apps/api/src/modules/pdpl/retention-schedule.service.ts",
+    "from": "    noFloorNoticeShown: declaration.noticeShown,\n    noFloorReason: declaration.reason,\n  };\n}",
+    "to": "    noFloorAcknowledged: true,\n  };\n}",
+    "why": "BATCH 5 GROUP 6 — the audit row reduced to the WORD, which is precisely what the owner ruled out: what the person was TOLD is part of the record, because a year from now the question is what they saw. Kills only the audit assertion in the silent-case e2e — and it dies on BOTH halves, the missing sentence and the `not.toContain('acknowledged')`, which is why that absence is asserted rather than described."
+  },
+  "from-empty-provider-grants-pinned-to-a-literal": {
+    "file": "scripts/from-empty.sh",
+    "from": "check \"the provider role's grants (derived from the seed's own output)\" \"$PROVIDER_GRANTS_ANNOUNCED\" \\",
+    "to": "check \"the provider role's grants (derived from the seed's own output)\" 11 \\",
+    "why": "THE DEFECT ITSELF, restored. `from-empty.sh` carried a literal 11 while `PROVIDER_CODES` had gone to 13 with the authorised email-integration widening, so this check had been FAILING since that commit — and was reported as '19 assertions green' in that batch's own row, which was false. Nothing was red because this script is gated by `verify.sh` and by NO CI step, the same way `combined-duty-projection.py` sat dead. Planted: `FAIL the provider role's grants expected 11, got 13` and the run exits 1."
+  },
+  "from-empty-grant-derivation-reads-nothing": {
+    "file": "scripts/from-empty.sh",
+    "from": "PLATFORM_OPERATOR role (\\([0-9]\\{1,\\}\\) permissions:",
+    "to": "PLATFORM_OPERATOR_ROLE_THAT_DOES_NOT_EXIST (\\([0-9]\\{1,\\}\\) permissions:",
+    "why": "THE NON-VACUITY GUARD on the derivation. If the seed's wording changes the pattern reads NOTHING, and without this guard an empty expected value would be compared against the database's count and the check would simply go quiet — a derivation that silently stops deriving is worse than the literal it replaced. Planted: the run exits 1 with 'could not read the provider role's grant count out of the seed's own output' and the explicit instruction NOT to replace it with a literal."
+  },
+  "from-empty-skips-silently-in-ci": {
+    "file": "scripts/from-empty.sh",
+    "from": "  if [ -n \"${CI:-}\" ]; then",
+    "to": "  if [ -n \"${CI_DISABLED:-}\" ]; then",
+    "why": "ITEM 1, batch 5 group 7 — THE HAZARD INSIDE THE FIX. `from-empty.sh` was added as a CI step because its pins ran nowhere; it SKIPS WITH exit 0 when the server is unreachable, and its own output says 'this is a skip, NOT a pass'. Without the CI-strict branch, the new step would print SKIPPED and PASS on every run forever — a green gate that never runs, which is the exact defect the step exists to fix, reproduced inside its own fix. Proven: with the branch disabled, `CI=1 FROM_EMPTY_ADMIN_URL=<unreachable> bash scripts/from-empty.sh` exits 0; with it, exit 1 naming the server and the variable."
+  },
+  "from-empty-message-invites-a-bump": {
+    "file": "scripts/from-empty.sh",
+    "from": "    printf '        ^ the figure MOVED. If that was a decision, come to scripts/from-empty.sh and\\n'",
+    "to": "    true",
+    "why": "BATCH 5 GROUP 7b — the pin's failure message reduced to 'expected 227, got 228', which is what it read before and what invites the exact edit the pin exists to prevent. Eight of these assertions are pinned to growing figures DELIBERATELY, so the message has to say that a mismatch means the figure MOVED and moving the pin is a recorded decision. Planted: the three explanatory lines vanish and the refusal reads as an off-by-one."
+  }
+}

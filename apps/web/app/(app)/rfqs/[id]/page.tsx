@@ -1,5 +1,11 @@
 'use client';
 
+import {
+  ErrorState,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
@@ -20,14 +26,13 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { QuotationsSection } from '../../../../components/quotation/QuotationsSection';
 import { ComparisonSection } from '../../../../components/comparison/ComparisonSection';
-import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
+import { buttonStyle } from '../../../../components/auth/auth-form.styles';
+import { cardMetaStyle, pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   commBodyStyle,
   insurerPickerStyle,
   rfqActionsStyle,
   rfqBadgeStyle,
-  rfqCellStyle,
   rfqFieldStyle,
   rfqTableStyle,
 } from '../../../../components/rfq/rfq.styles';
@@ -37,6 +42,7 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate, formatDateTime } from '../../../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../../../lib/i18n/translations';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 
 // The medium of a broker<->insurer exchange. The API accepts the full
@@ -223,7 +229,7 @@ export default function RfqDetailPage() {
   );
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>
@@ -237,9 +243,7 @@ export default function RfqDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rfq ? (
@@ -273,30 +277,44 @@ export default function RfqDetailPage() {
             <table style={rfqTableStyle}>
               <thead>
                 <tr>
-                  <th style={rfqCellStyle}>{t('rfqColumnInsurer')}</th>
-                  <th style={rfqCellStyle}>{t('commonStatus')}</th>
-                  <th style={rfqCellStyle}>{t('rfqColumnSent')}</th>
-                  <th style={rfqCellStyle}>{t('rfqColumnResponded')}</th>
-                  <th style={rfqCellStyle}>{t('rfqColumnFollowUpAlert')}</th>
-                  {isPlacement ? <th style={rfqCellStyle}>{t('rfqColumnSetStatus')}</th> : null}
+                  <Th>{t('rfqColumnInsurer')}</Th>
+                  <Th>{t('commonStatus')}</Th>
+                  <Th>{t('rfqColumnSent')}</Th>
+                  <Th>{t('rfqColumnResponded')}</Th>
+                  <Th>{t('rfqColumnFollowUpAlert')}</Th>
+                  {isPlacement ? <Th>{t('rfqColumnSetStatus')}</Th> : null}
                 </tr>
               </thead>
               <tbody>
                 {rfq.insurerSubmissions.map((submission) => (
-                  <tr key={submission.id}>
-                    <td style={rfqCellStyle}>
+                  <Tr key={submission.id}>
+                    <Td>
                       <bdi>{submission.insurer.name}</bdi>
-                    </td>
-                    <td style={rfqCellStyle}>
+                    </Td>
+                    <Td>
                       <span style={rfqBadgeStyle}>{t(RFQ_INSURER_STATUS_LABEL_KEY[submission.status])}</span>
-                    </td>
-                    <td style={rfqCellStyle}>{fmt(submission.sentAt, language)}</td>
-                    <td style={rfqCellStyle}>{fmt(submission.respondedAt, language)}</td>
-                    <td style={rfqCellStyle}>
+                      {/*
+                        Owner decision 41 — `RFQInsurer` is the workflow entity, and these rows are it.
+                        In the STATUS cell rather than a column of its own: the last column here is
+                        conditional on `isPlacement`, so a link placed there would be invisible to the
+                        compliance officer and the external auditor, who are the only holders of
+                        `workflow-history.read`. A new always-present column would instead change this
+                        table's shape for every reader to serve two.
+                      */}
+                      <div style={{ marginTop: '0.3rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="RFQInsurer"
+                          entityId={submission.id}
+                        />
+                      </div>
+                    </Td>
+                    <Td>{fmt(submission.sentAt, language)}</Td>
+                    <Td>{fmt(submission.respondedAt, language)}</Td>
+                    <Td>
                       {fmt(submission.followUpAlertSentAt, language)}
-                    </td>
+                    </Td>
                     {isPlacement ? (
-                      <td style={rfqCellStyle}>
+                      <Td>
                         <select
                           aria-label={t('rfqSetStatusAria', { name: submission.insurer.name })}
                           disabled={busyRow === submission.id}
@@ -313,18 +331,16 @@ export default function RfqDetailPage() {
                             </option>
                           ))}
                         </select>
-                      </td>
+                      </Td>
                     ) : null}
-                  </tr>
+                  </Tr>
                 ))}
               </tbody>
             </table>
           )}
 
           {rowError ? (
-            <p role="alert" style={errorStyle}>
-              {rowError}
-            </p>
+            <ErrorState title={rowError} />
           ) : null}
 
           {isPlacement ? (
@@ -333,9 +349,7 @@ export default function RfqDetailPage() {
                 <div style={{ width: '100%' }}>
                   <strong>{t('rfqAddInsurersHeading')}</strong>
                   {addError ? (
-                    <p role="alert" style={errorStyle}>
-                      {addError}
-                    </p>
+                    <ErrorState title={addError} />
                   ) : null}
                   {insurers === null ? (
                     <p>{t('commonLoading')}</p>
@@ -423,9 +437,7 @@ export default function RfqDetailPage() {
           <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('rfqCorrespondenceIntro')}</p>
 
           {commsError ? (
-            <p role="alert" style={errorStyle}>
-              {commsError}
-            </p>
+            <ErrorState title={commsError} />
           ) : null}
 
           {comms === null ? (
@@ -436,33 +448,33 @@ export default function RfqDetailPage() {
             <table style={rfqTableStyle}>
               <thead>
                 <tr>
-                  <th style={rfqCellStyle}>{t('rfqColumnWhen')}</th>
-                  <th style={rfqCellStyle}>{t('rfqColumnDirection')}</th>
-                  <th style={rfqCellStyle}>{t('rfqColumnChannel')}</th>
-                  <th style={rfqCellStyle}>{t('rfqColumnInsurer')}</th>
-                  <th style={rfqCellStyle}>{t('rfqColumnExchange')}</th>
+                  <Th>{t('rfqColumnWhen')}</Th>
+                  <Th>{t('rfqColumnDirection')}</Th>
+                  <Th>{t('rfqColumnChannel')}</Th>
+                  <Th>{t('rfqColumnInsurer')}</Th>
+                  <Th>{t('rfqColumnExchange')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {comms.map((c) => (
-                  <tr key={c.id}>
-                    <td style={rfqCellStyle}>{formatDateTime(c.sentAt, language)}</td>
-                    <td style={rfqCellStyle}>
+                  <Tr key={c.id}>
+                    <Td>{formatDateTime(c.sentAt, language)}</Td>
+                    <Td>
                       <span style={rfqBadgeStyle}>{t(COMM_DIRECTION_BADGE_LABEL_KEY[c.direction])}</span>
-                    </td>
-                    <td style={rfqCellStyle}>
+                    </Td>
+                    <Td>
                       {c.channel in COMM_CHANNEL_LABEL_KEY
                         ? t(COMM_CHANNEL_LABEL_KEY[c.channel as keyof typeof COMM_CHANNEL_LABEL_KEY])
                         : c.channel}
-                    </td>
-                    <td style={rfqCellStyle}>
+                    </Td>
+                    <Td>
                       <bdi>{c.rfqInsurer?.insurer.name ?? t('rfqPanelWide')}</bdi>
-                    </td>
-                    <td style={rfqCellStyle}>
+                    </Td>
+                    <Td>
                       {c.subject ? <strong>{c.subject}</strong> : null}
                       <p style={commBodyStyle}>{c.body}</p>
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
             </table>
@@ -472,9 +484,7 @@ export default function RfqDetailPage() {
             <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
               <strong>{t('rfqLogExchangeHeading')}</strong>
               {commError ? (
-                <p role="alert" style={errorStyle}>
-                  {commError}
-                </p>
+                <ErrorState title={commError} />
               ) : null}
               <div style={rfqFieldStyle}>
                 <label htmlFor="comm-direction">{t('rfqDirectionLabel')}</label>

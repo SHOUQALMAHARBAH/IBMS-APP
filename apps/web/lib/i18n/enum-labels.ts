@@ -5,10 +5,42 @@
 // to the vocabulary without a label to go with it. That last part is the
 // point: a missing label used to mean raw `PENDING_KYC` on screen, silently.
 import type { TranslationKey } from './translations';
+import type { ConsentPurpose } from '../pdpl/consent-api';
+import type {
+  SlaDurationUnit,
+  SlaSourceType,
+} from '../sla/sla-policy-api';
 
 type Labels<T extends string> = Record<T, TranslationKey>;
 
 export const ENUM_LABEL = {
+  /** Module 0-ب item (c) — the brokerage licence type. NOT the life/general split, which module 0
+   *  derives from the licence's branches and never stores; merging the two axes would destroy that
+   *  derivation. */
+  BrokerageKind: {
+    DIRECT: 'brokerageKindDirect',
+    REINSURANCE: 'brokerageKindReinsurance',
+  } satisfies Labels<'DIRECT' | 'REINSURANCE'>,
+  /** Module 0-ب item (b) — the brokerage office's own legal form (art. 3/a: a natural
+   *  person may be licensed for ONE insurance type, a company for both). */
+  BrokerKind: {
+    CORPORATE: 'brokerKindCorporate',
+    NATURAL_PERSON: 'brokerKindNaturalPerson',
+  } satisfies Labels<'CORPORATE' | 'NATURAL_PERSON'>,
+  /** An individual or a company. BOTH KEYS ALREADY EXISTED — the onboarding wizard has
+   *  rendered them since it was built, through a map local to that one component, so
+   *  `/crm` printing the raw member was pure oversight and cost no Arabic at all. */
+  CustomerType: {
+    INDIVIDUAL: 'customerTypeIndividual',
+    CORPORATE: 'customerTypeCorporate',
+  } satisfies Labels<'INDIVIDUAL' | 'CORPORATE'>,
+  /** Module 0-ب item (c) — how the system exchanges data with an insurance company. */
+  IntegrationMethod: {
+    API: 'integrationMethodApi',
+    PORTAL: 'integrationMethodPortal',
+    EMAIL: 'integrationMethodEmail',
+    MANUAL: 'integrationMethodManual',
+  } satisfies Labels<'API' | 'PORTAL' | 'EMAIL' | 'MANUAL'>,
   /** Module 0 item (e) — the two insurance TYPES a broker licence covers (art. 3/a). Added here
    *  rather than labelled per screen: the licence scope, the insurance-lines admin screen and the
    *  insurer directory all render this enum. */
@@ -49,10 +81,11 @@ export const ENUM_LABEL = {
     STEP_UP_VERIFIED: 'auditActionStepUpVerified',
     ACCESS_WINDOW_EXPIRED: 'auditActionAccessWindowExpired',
   } satisfies Labels<string>,
-  BrokerLicenseStatus: {
-    active: 'licStatusActive',
-    lapsed: 'licStatusLapsed',
-  } satisfies Labels<string>,
+  // `BrokerLicenseStatus` IS GONE from here, with its column. It mapped `active | lapsed` — the
+  // two-value marker that was the third of three answers to "is this office licensed". The office
+  // standing is derived in six states now (`deriveLicenseStanding`), and the regulatory-compliance
+  // screen labels them through its own `STANDING_LABEL`, which is a TOTAL map over the union rather
+  // than a loose index, so a seventh state is a compile error instead of a raw word on screen.
   ClaimStatus: {
     APPROVED: 'claimStatusApproved',
     NOTIFIED: 'claimStatusNotified',
@@ -151,6 +184,21 @@ export const ENUM_LABEL = {
     FULFILLED: 'dsrStatusFulfilled',
     REJECTED: 'dsrStatusRejected',
     CLOSED: 'dsrStatusClosed',
+  } satisfies Labels<string>,
+  /**
+   * How a request reached the office. The four Arabic labels are the OWNER'S OWN WORDS.
+   *
+   * `satisfies Labels<string>` matches `DsrType` directly above rather than the tighter
+   * `Labels<Union>` form: these maps are keyed by a value arriving over HTTP, and the api's
+   * `DSR_INTAKE_CHANNELS` is derived from the generated enum, so a fifth channel reaches the
+   * DTO and the screen's `<select>` on the commit that adds it. What catches a missing LABEL is
+   * `dsr-intake-channel.test.ts`, which compares this map against the schema's own enum.
+   */
+  DsrIntakeChannel: {
+    POST: 'dsrChannelPost',
+    TELEPHONE: 'dsrChannelTelephone',
+    IN_PERSON: 'dsrChannelInPerson',
+    WEBSITE_FORM: 'dsrChannelWebsiteForm',
   } satisfies Labels<string>,
   DsrType: {
     ACCESS: 'dsrTypeAccess',
@@ -267,6 +315,14 @@ export const ENUM_LABEL = {
     open: 'rrStatusOpen',
     closed: 'rrStatusClosed',
   } satisfies Labels<string>,
+  /** Which screening implementation answered. The three Arabic words moved here verbatim from a
+   *  local map inside `/screening-health`, which returned the RAW TOKEN (`built_in`) to an English
+   *  reader — the same dead-vocabulary shape owner answer 2 is about, one map over. */
+  ScreeningProviderKind: {
+    built_in: 'screenProviderBuiltIn',
+    on_premise: 'screenProviderOnPremise',
+    commercial: 'screenProviderCommercial',
+  } satisfies Labels<string>,
   ScreeningAttemptOutcome: {
     NO_MATCH: 'screenOutcomeNoMatch',
     POTENTIAL_MATCH: 'screenOutcomePotentialMatch',
@@ -350,7 +406,10 @@ export const ENUM_LABEL = {
     KYC_AML: 'consPurposeOptKycAml',
     SHARING_WITH_INSURER: 'consPurposeOptSharingWithInsurer',
     OTHER: 'consPurposeOptOther',
-  } satisfies Labels<string>,
+    /* Typed on the union as of decision 59 rather than on `string`: the field is a
+     * Prisma enum, so the stronger form is available and makes a seventh member a
+     * compile error instead of a cell rendering `undefined`. */
+  } satisfies Labels<ConsentPurpose>,
   CrossBorderLegalBasis: {
     statutory_exception: 'cbtBasisStatutoryException',
     standard_contractual_clauses: 'cbtBasisStandardContractualClauses',
@@ -427,6 +486,33 @@ export const ENUM_LABEL = {
     SYSTEM_SECURITY_ADMINISTRATOR: 'roleNameSystemSecurityAdministrator',
     EXTERNAL_AUDITOR: 'roleNameExternalAuditor',
   } satisfies Labels<string>,
+  /*
+   * OWNER DECISION 59. Both `<select>`s on the new-SLA-policy form rendered their raw
+   * stored values, and one option in the source list was ALREADY translated —
+   * `slapSourceRegulatory` sat in Arabic beside four English ones.
+   *
+   * TYPED ON THE UNION, NOT ON `string`, which is stronger than most entries here:
+   * `Labels<string>` lets any key type-check and return `undefined` at runtime, while
+   * these two make a SIXTH member a compile error. Both vocabularies are closed unions
+   * in `lib/sla/sla-policy-api.ts`, so the stronger form is available and is used.
+   */
+  SlaDurationUnit: {
+    MINUTES: 'slapUnitMinutes',
+    HOURS: 'slapUnitHours',
+    BUSINESS_DAYS: 'slapUnitBusinessDays',
+    CALENDAR_DAYS: 'slapUnitCalendarDays',
+    MONTHS: 'slapUnitMonths',
+  } satisfies Labels<SlaDurationUnit>,
+  SlaSourceType: {
+    /* REGULATORY's label pre-dates this decision and is UNCHANGED — it is also the
+     * reason the other four are bare adjectives rather than noun phrases: «نظامي» is
+     * the form the list already had. */
+    REGULATORY: 'slapSourceRegulatory',
+    INTERNAL_POLICY: 'slapSourceInternalPolicy',
+    CONTRACTUAL: 'slapSourceContractual',
+    OPERATIONAL: 'slapSourceOperational',
+    OTHER: 'slapSourceOther',
+  } satisfies Labels<SlaSourceType>,
   TransactionMonitoringPattern: {
     large_premium_payment: 'tmPatternLargePremiumPayment',
     frequent_cancellations: 'tmPatternFrequentCancellations',
@@ -476,3 +562,26 @@ export const ENUM_LABEL = {
     NO_RESPONSE: 'rfqInsurerStatusNoResponse',
   } satisfies Labels<string>,
 } as const;
+
+/**
+ * IS THIS `patternType` ONE OF THE FIVE THE SCHEMA DECLARES?
+ *
+ * `TransactionMonitoringAlert.patternType` is a free `String` in the database — its
+ * vocabulary is declared in the schema's own doc comment
+ * (`large_premium_payment | frequent_cancellations | frequent_refunds |
+ * third_party_payment_source | other`) and nowhere else — so a SIXTH value is
+ * representable and `ENUM_LABEL.TransactionMonitoringPattern[x]` would be `undefined`
+ * for it. Passing that to `t()` is the notification-bell defect: a count with no words.
+ *
+ * So the screen narrows with this and falls back the way owner decision 49 prescribes —
+ * the stored value rendered AS STORED, visibly machine text, under its own tooltip.
+ * `/audit-trail`'s `entityType` is the worked example and this follows it exactly.
+ *
+ * DERIVED FROM THE MAP, never a second list: a sixth label added above is covered here
+ * the moment it is added, which is the whole reason the keys are not restated.
+ */
+export function isDeclaredTransactionPattern(
+  value: string,
+): value is keyof typeof ENUM_LABEL.TransactionMonitoringPattern {
+  return value in ENUM_LABEL.TransactionMonitoringPattern;
+}

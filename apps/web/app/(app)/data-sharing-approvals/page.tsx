@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
@@ -21,8 +21,18 @@ import {
   type DataSharingChannel,
 } from '../../../lib/pdpl/data-sharing-approval-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusalAnyOf } from '../../../lib/i18n/permission-refusal';
@@ -33,14 +43,6 @@ const REQUEST_ROLES = [
 const APPROVE_ROLES = [
   'data-sharing.approve',
 ];
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 
 
 export default function DataSharingApprovalsPage() {
@@ -125,21 +127,17 @@ export default function DataSharingApprovalsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dsaHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('dsaIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('dsaHeading')}
+        description={t('dsaIntro')}
+      />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {canRequest ? (
@@ -147,17 +145,16 @@ export default function DataSharingApprovalsPage() {
           onSubmit={(ev) => void submit(ev)}
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('dsaDescriptionFieldLabel')}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {t('dsaDescriptionLabel')}
             <input
-              aria-label={t('dsaDescriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
               minLength={20}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('dsaVendorIdLabel')}
             <input
               aria-label={t('dsaVendorIdLabel')}
@@ -165,10 +162,9 @@ export default function DataSharingApprovalsPage() {
               onChange={(e) => setVendorId(e.target.value)}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('dsaClassificationFieldLabel')}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {t('dsaClassificationLabel')}
             <select
-              aria-label={t('dsaClassificationLabel')}
               value={classification}
               onChange={(e) => setClassification(e.target.value)}
             >
@@ -179,10 +175,9 @@ export default function DataSharingApprovalsPage() {
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('dsaChannelFieldLabel')}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {t('dsaChannelLabel')}
             <select
-              aria-label={t('dsaChannelLabel')}
               value={channel}
               onChange={(e) =>
                 setChannel(e.target.value as DataSharingChannel)
@@ -211,28 +206,28 @@ export default function DataSharingApprovalsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('dsaNone')}</p>
+          <EmptyState title={t('dsaNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('dsaDescriptionLabel')}</th>
-                  <th style={head}>{t('dsaClassificationLabel')}</th>
-                  <th style={head}>{t('dsaChannelLabel')}</th>
-                  <th style={head}>{t('dsaColSlaDue')}</th>
-                  <th style={head}>{t('dsaColStatus')}</th>
-                  <th style={head}>{t('dsaColAction')}</th>
+                  <Th>{t('dsaDescriptionLabel')}</Th>
+                  <Th>{t('dsaClassificationLabel')}</Th>
+                  <Th>{t('dsaChannelLabel')}</Th>
+                  <Th>{t('dsaColSlaDue')}</Th>
+                  <Th>{t('dsaColStatus')}</Th>
+                  <Th>{t('dsaColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.description}</td>
-                    <td style={cell}>{t(ENUM_LABEL.DataClassification[r.classification])}</td>
-                    <td style={cell}>{t(ENUM_LABEL.DataSharingChannel[r.channel])}</td>
-                    <td style={cell}>{r.slaDueAt.slice(0, 10)}</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    <Td>{r.description}</Td>
+                    <Td>{t(ENUM_LABEL.DataClassification[r.classification])}</Td>
+                    <Td>{t(ENUM_LABEL.DataSharingChannel[r.channel])}</Td>
+                    <Td>{r.slaDueAt.slice(0, 10)}</Td>
+                    <Td>
                       {r.isApproved ? 'Approved' : r.isDeclined ? 'Declined' : 'Pending'}
                       {/* Part 4 step 5 — in the STATUS cell, because "Approved" is the claim being
                           made and it is only true of a TWO-person decision. Shared renderer. */}
@@ -240,8 +235,8 @@ export default function DataSharingApprovalsPage() {
                         act={r.combinedDutyAct}
                         testId={`combined-duty-sharing-${r.id}`}
                       />
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {canApprove && r.isPending ? (
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
                           {(() => {
@@ -290,15 +285,15 @@ export default function DataSharingApprovalsPage() {
                       ) : (
                         '—'
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('dsaLoading')}</p>
+        <SkeletonList rows={4} label={t('dsaLoading')} />
       )}
     </main>
   );

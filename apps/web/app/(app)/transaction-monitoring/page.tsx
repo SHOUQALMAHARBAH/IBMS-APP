@@ -1,8 +1,11 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
-import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
+import {
+  ENUM_LABEL,
+  isDeclaredTransactionPattern,
+} from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -16,24 +19,23 @@ import {
   type TransactionMonitoringAlert,
 } from '../../../lib/compliance-risk/transaction-monitoring-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { actionErrorText } from '../../../lib/i18n/action-error';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function TransactionMonitoringPage() {
   const router = useRouter();
@@ -87,7 +89,7 @@ export default function TransactionMonitoringPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('tmActionError'),
+        actionErrorText(err, t, 'tmActionError'),
       );
     } finally {
       setBusy(false);
@@ -125,11 +127,11 @@ export default function TransactionMonitoringPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('tmHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('tmIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('tmHeading')}
+        description={t('tmIntro')}
+      />
 
       {canMonitor ? (
         <>
@@ -138,7 +140,7 @@ export default function TransactionMonitoringPage() {
             style={{
               margin: '1rem 0',
               display: 'grid',
-              gap: '0.4rem',
+              gap: 'var(--space-2)',
               maxWidth: '30rem',
             }}
           >
@@ -149,7 +151,7 @@ export default function TransactionMonitoringPage() {
               label={t('tmCustomerIdOptionalLabel')}
             />
             <label
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
             >
               {t('tmPatternLabel')}
               <select
@@ -165,7 +167,7 @@ export default function TransactionMonitoringPage() {
               </select>
             </label>
             <label
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
             >
               {t('tmDetailLabel')}
               <textarea
@@ -187,45 +189,81 @@ export default function TransactionMonitoringPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('tmNone')}</p>
+          <EmptyState title={t('tmNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '55rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('tmColCustomer')}</th>
-                  <th style={head}>{t('tmPatternLabel')}</th>
-                  <th style={head}>{t('tmColStatus')}</th>
-                  <th style={head}>{t('tmColEscalated')}</th>
-                  <th style={head}>{t('tmColReported')}</th>
-                  <th style={head}>{t('tmColDetected')}</th>
-                  <th style={head}>{t('tmColAction')}</th>
+                  <Th>{t('tmColCustomer')}</Th>
+                  <Th>{t('tmPatternLabel')}</Th>
+                  <Th>{t('tmColStatus')}</Th>
+                  <Th>{t('tmColEscalated')}</Th>
+                  <Th>{t('tmColReported')}</Th>
+                  <Th>{t('tmColDetected')}</Th>
+                  <Th>{t('tmColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.customerId ? `${r.customerId.slice(0, 8)}…` : '—'}</td>
-                    <td style={cell}>{r.patternType}</td>
-                    <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
-                    <td style={cell}>{r.escalatedToSuspiciousActivity ? 'yes' : 'no'}</td>
-                    <td style={cell}>{r.reportedToAuthorityAt ? 'yes' : 'no'}</td>
-                    <td style={cell}>{r.detectedAt.slice(0, 10)}</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    {/*
+                      * RULE 2 — the customer's NAME, resolved by the api. This rendered eight
+                      * characters of a uuid, which on an AML queue is the one column the screen is
+                      * about: an officer could not tell two alerts apart. The em dash is the real
+                      * absent case — an alert raised against a pattern with no single customer
+                      * behind it — and NOT a name the api failed to send.
+                      */}
+                    <Td>
+                      {r.customerName ? <bdi>{r.customerName}</bdi> : t('commonNameNotResolved')}
+                    </Td>
+                    {/*
+                      Decision 59 — and the vocabulary cost NOTHING: all five
+                      `TransactionMonitoringPattern` labels have shipped in both languages for
+                      months, and this cell rendered `third_party_payment_source` at an Arabic
+                      reader on an AML alert queue regardless.
+
+                      BUT NOT A TOTAL MAP, because this one genuinely is not closed:
+                      `patternType` is a free `String` in the database whose five values live
+                      only in a schema doc comment, so a sixth is representable TODAY and
+                      `ENUM_LABEL.TransactionMonitoringPattern[x]` would be `undefined` for it.
+                      `t(undefined)` is the notification-bell defect — an AML alert with no
+                      words at all. So it takes OWNER DECISION 49's declared fallback: narrowed
+                      by a type predicate, and the unlisted case rendered AS STORED in monospace
+                      under its own tooltip, visibly machine text rather than dressed up as a
+                      name. `/audit-trail`'s `entityType` is the worked example and this follows
+                      it exactly, down to the two custom properties.
+                    */}
+                    <Td>
+                      {isDeclaredTransactionPattern(r.patternType) ? (
+                        t(ENUM_LABEL.TransactionMonitoringPattern[r.patternType])
+                      ) : (
+                        <span
+                          title={t('tmPatternUnlabelled')}
+                          style={{
+                            fontFamily: 'var(--font-mono, monospace)',
+                            color: 'var(--ink-secondary)',
+                          }}
+                        >
+                          {r.patternType}
+                        </span>
+                      )}
+                    </Td>
+                    <Td>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</Td>
+                    <Td>{r.escalatedToSuspiciousActivity ? t('commonYes') : t('commonNo')}</Td>
+                    <Td>{r.reportedToAuthorityAt ? t('commonYes') : t('commonNo')}</Td>
+                    <Td>{r.detectedAt.slice(0, 10)}</Td>
+                    <Td>
                       {canMonitor && !r.isClosed ? (
-                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                           {!r.escalatedToSuspiciousActivity ? (
                             <button
                               type="button"
@@ -258,18 +296,18 @@ export default function TransactionMonitoringPage() {
                           </button>
                         </div>
                       ) : null}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
         // The loading state directive §2 requires; this page rendered
         // nothing at all while fetching. Guarded on loadError so an error
         // and a "Loading…" line never appear together.
-        <p>{t('tmLoading')}</p>
+        <SkeletonList rows={4} label={t('tmLoading')} />
       )}
     </main>
   );

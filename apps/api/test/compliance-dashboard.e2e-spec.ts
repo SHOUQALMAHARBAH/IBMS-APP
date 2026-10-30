@@ -318,7 +318,9 @@ describe('Compliance Dashboard (e2e) — backlog Part E / Process #64', () => {
         entityId: 'self-approval-audit',
         afterValue: {
           generatedAt: '2036-01-01T00:00:00.000Z',
-          pairsScanned: 16,
+          // 16 same-table pairs + the one cross-table. 16 -> 17: module 0 close decision 3
+          // registered the retention schedule as the sixteenth same-table pair.
+          pairsScanned: 17,
           totalRowsChecked: 999,
           violationCount: 7,
         },

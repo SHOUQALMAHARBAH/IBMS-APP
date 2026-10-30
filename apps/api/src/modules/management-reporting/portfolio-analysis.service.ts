@@ -10,6 +10,7 @@ import {
   reduceByGeography,
   type PortfolioAnalysisSummary,
 } from './portfolio-analysis.config';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 /**
  * Process 62 — composes the four breakdowns into one summary. See
@@ -23,6 +24,10 @@ export class PortfolioAnalysisService {
 
   constructor(
     private readonly repo: PortfolioAnalysisRepository,
+    /** The insurer's own repository, for the ONE resolver that answers what an insurer is called.
+     * Provided independently rather than imported as a service — this codebase's cross-module
+     * rule. */
+    private readonly insurerRepo: InsurerRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -37,10 +42,9 @@ export class PortfolioAnalysisService {
 
     this.warnIfTruncated(crossTableRows.length);
 
-    const insurerNames = await this.repo.findInsurerNames(
+    const insurerNameById = await this.insurerRepo.namesForInsurerIds(
       insurerGroups.map((g) => g.key),
     );
-    const insurerNameById = new Map(insurerNames.map((i) => [i.id, i.name]));
 
     const ownerUserIds = [...new Set(crossTableRows.map((r) => r.ownerUserId))];
     const branchNameByOwner =

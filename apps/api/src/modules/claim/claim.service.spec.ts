@@ -16,6 +16,7 @@ import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { EncryptionService } from '../security/encryption.service';
 import type { LossRatioService } from '../loss-ratio/loss-ratio.service';
+import type { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
 import type { RegisterClaimDto } from './dto/register-claim.dto';
@@ -382,6 +383,14 @@ function makeDeps(opts: Opts = {}) {
   // own self-approval assertions pass on the mock rather than on the code.
   const dutySegregation = segregatedOfficeDutySegregation();
 
+  // NOTHING IS IN THE BLOCKED RETENTION PHASE (batch 5 group 7c). `null` is what the real repository
+  // returns for a category with no clock, no period set, or an active legal hold — the state every
+  // assertion in this file is about, so each one still exercises the code rather than the mock. The
+  // blocked-phase refusal has its own e2e, where the state is constructed for real.
+  const archive = {
+    blockedExclusionFor: vi.fn().mockResolvedValue(null),
+  };
+
   const service = new ClaimService(
     claimRepo as unknown as ClaimRepository,
     policyRepo as unknown as PolicyRepository,
@@ -391,6 +400,7 @@ function makeDeps(opts: Opts = {}) {
     encryption as unknown as EncryptionService,
     lossRatio as unknown as LossRatioService,
     dutySegregation,
+    archive as unknown as RetentionArchiveRepository,
   );
 
   return {
@@ -403,6 +413,7 @@ function makeDeps(opts: Opts = {}) {
     encryption,
     lossRatio,
     claimState,
+    archive,
   };
 }
 
@@ -2361,6 +2372,63 @@ describe('ClaimService settlement (Process 28)', () => {
       deps.audit.record.mockClear();
       return deps;
     }
+
+    it('BATCH 5 GROUP 7c — CONDITION 1: refuses to second-approve a settlement in the BLOCKED retention phase, and says where to go', async () => {
+      const { service, workflow, archive, claimState } =
+        await pendingSecondApproval();
+
+      // The settlement's client payment was confirmed twelve years ago and the category's period has
+      // elapsed — the one anomalous-but-representable state this write can reach. It is anomalous
+      // because payment is normally confirmed AFTER the second approval, which is also why the other
+      // eight write sites cannot reach a blocked record at all.
+      const twelveYearsAgo = new Date();
+      twelveYearsAgo.setUTCFullYear(twelveYearsAgo.getUTCFullYear() - 12);
+      const cutoff = new Date();
+      cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 10);
+      // The settlement is read off `claim.settlement` through `loadVisibleClaim`, so the fixture is
+      // `claimState` — there is no `findSettlementByClaimId` to mock, and the compiler said so.
+      claimState.settlement!.clientPaymentConfirmedAt = twelveYearsAgo;
+      archive.blockedExclusionFor = vi
+        .fn()
+        .mockResolvedValue({ cutoff, extendedRecordIds: [] });
+
+      await expect(
+        service.secondApproveSettlement('claim-1', manager()),
+      ).rejects.toThrow(/blocked retention phase/);
+
+      // AND IT NAMES THE WAY FORWARD rather than only refusing — the standing rule for a refusal a
+      // reader cannot otherwise act on.
+      await expect(
+        service.secondApproveSettlement('claim-1', manager()),
+      ).rejects.toThrow(/judicial request or an official CBJ audit/);
+
+      // The write did not happen. Without this the refusal could throw AFTER approving, which is a
+      // worse state than either outcome.
+      expect(workflow.transition).not.toHaveBeenCalled();
+    });
+
+    it('BATCH 5 GROUP 7c — and an EXTENDED settlement is NOT blocked, so the approval proceeds', async () => {
+      const { service, archive, claimState } = await pendingSecondApproval();
+
+      const twelveYearsAgo = new Date();
+      twelveYearsAgo.setUTCFullYear(twelveYearsAgo.getUTCFullYear() - 12);
+      const cutoff = new Date();
+      cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 10);
+      // The settlement is read off `claim.settlement` through `loadVisibleClaim`, so the fixture is
+      // `claimState` — there is no `findSettlementByClaimId` to mock, and the compiler said so.
+      claimState.settlement!.clientPaymentConfirmedAt = twelveYearsAgo;
+      // THE SAME elapsed date, and an extension covering THIS record. An extension means ordinary
+      // retention for longer, not a block — so the refusal must not fire. This is the direction a
+      // refusal keyed on the cutoff alone would get wrong, and it is the half that stops the control
+      // becoming a universal refusal on anything old.
+      archive.blockedExclusionFor = vi
+        .fn()
+        .mockResolvedValue({ cutoff, extendedRecordIds: ['settlement-1'] });
+
+      await expect(
+        service.secondApproveSettlement('claim-1', manager()),
+      ).resolves.toBeDefined();
+    });
 
     it('a different user second-approves -> the claim is SETTLED, an APPROVE audit is written', async () => {
       const { service, workflow, audit } = await pendingSecondApproval();

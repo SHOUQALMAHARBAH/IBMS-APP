@@ -89,6 +89,7 @@ let app: INestApplication<App> | null = null;
 let admin: { accessToken: string; userId: string };
 let reader: { accessToken: string; userId: string };
 let outsider: { accessToken: string; userId: string };
+let refusedOutsider: { accessToken: string; userId: string };
 
 function bearer(token: string) {
   return { Authorization: `Bearer ${token}` };
@@ -168,9 +169,17 @@ beforeAll(async () => {
   await removeFixtures();
   admin = await makeUser(`line-admin-${tag}`, 'OFFICE_ADMINISTRATOR');
   reader = await makeUser(`line-reader-${tag}`, 'SALES_RELATIONSHIP_OFFICER');
+  // ADMITTED by item 3's widening — kept under its old name so the diff shows the boundary moving
+  // rather than a fixture being swapped out.
   outsider = await makeUser(
     `line-outsider-${tag}`,
     'FINANCE_COLLECTIONS_OFFICER',
+  );
+  // REFUSED on all five codes of the any-of: the DPO picks no insurers, reads no commission schedule
+  // and builds no roles.
+  refusedOutsider = await makeUser(
+    `line-refused-${tag}`,
+    'DATA_PROTECTION_OFFICER',
   );
 }, 600_000);
 
@@ -236,8 +245,28 @@ describe('the standard list', () => {
   }, 300_000);
 
   it('is readable by a role that picks insurers, and refused to one that does not', async () => {
+    /*
+     * THE BOUNDARY MOVED BY DECISION, SO THE TEST MOVED WITH IT — and this is a repointing, not a
+     * relaxation. Owner decision, 2026-10-17, item 3: `GET /insurance-lines` became an ANY-OF over
+     * five codes because the 32 standard lines are a GLOBAL catalogue that describes the software and
+     * discloses nothing about anybody, and three more roles genuinely need the vocabulary — Finance
+     * to read a commission schedule, and the two role-builder roles to set a role's line SCOPE.
+     *
+     * `outsider` was FINANCE_COLLECTIONS_OFFICER, which that decision now ADMITS. CI caught it with
+     * `expected 403 "Forbidden", got 200 "OK"`, which is this test doing its job: it pinned a boundary
+     * and the boundary was deliberately moved. So the role is re-pointed rather than the assertion
+     * weakened — the DPO picks no insurers, reads no commission schedule and builds no roles, so it is
+     * refused on every one of the five codes.
+     *
+     * The exact set of eleven roles that may now reach this route is pinned by name in
+     * `route-role-reach.spec.ts`; this test keeps the narrower property it was written for, that a
+     * role with no business here is refused over real HTTP.
+     */
     await listLines(reader.accessToken).expect(200);
-    await listLines(outsider.accessToken).expect(403);
+    await listLines(refusedOutsider.accessToken).expect(403);
+    // And the role the decision ADMITTED is asserted as admitted, so the change is pinned in both
+    // directions rather than only in the one that happened to fail.
+    await listLines(outsider.accessToken).expect(200);
   }, 300_000);
 });
 

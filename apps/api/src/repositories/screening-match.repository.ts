@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { ScreeningMatch } from '@ibms/db';
+import type { ScreeningCaseStatus, ScreeningMatch } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SCREENING_MATCH_INCLUDE = {
@@ -132,6 +132,39 @@ export class ScreeningMatchRepository {
       orderBy: { detectedAt: 'asc' },
       take: SCREENING_MATCH_PAGE_SIZE,
     });
+  }
+
+  /**
+   * DOOR FOUR — the Compliance Officer's anchor. The id of an OPEN screening case on this customer
+   * ASSIGNED TO this user, or null.
+   *
+   * The customer is reached through the KYC record (`ScreeningMatch` has no `customerId` of its
+   * own), which is one hop and both sides are indexed: `KYCRecord[customerId]` and
+   * `ScreeningMatch[assignedToUserId, caseStatus]` — that composite index IS this query, and it
+   * existed before this feature did.
+   *
+   * `assignedToUserId` rather than merely open: "an open review on that customer" would let one
+   * officer read a file on the strength of a colleague's case. The status set arrives from
+   * `CustomerFileAnchorService`, which owns the vocabulary, so there is no second answer here to
+   * what counts as open.
+   */
+  findOpenCaseAssignedTo(
+    customerId: string,
+    userId: string,
+    openStatuses: readonly ScreeningCaseStatus[],
+  ): Promise<string | null> {
+    return this.prisma.client.screeningMatch
+      .findFirst({
+        where: {
+          assignedToUserId: userId,
+          caseStatus: { in: [...openStatuses] },
+          kycRecord: { customerId },
+        },
+        select: { id: true },
+        // Oldest first, matching `findMany` above: the case open longest is the stable answer.
+        orderBy: { detectedAt: 'asc' },
+      })
+      .then((row) => row?.id ?? null);
   }
 
   findById(id: string): Promise<ScreeningMatchWithContext | null> {

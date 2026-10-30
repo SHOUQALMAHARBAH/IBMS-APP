@@ -130,7 +130,7 @@ test("prompts to pick a customer when none is in the URL", async ({ page }) => {
   await mockCrm(page);
 
   await page.goto("/crm");
-  await expect(page.locator('p[role="alert"]')).toContainText("No customer selected");
+  await expect(page.locator('main [role="alert"]')).toContainText("No customer selected");
 });
 
 test("a role that can log but not read the 360 view still gets the log form", async ({
@@ -168,7 +168,7 @@ test("a role with neither permission sees a friendly message and no form", async
   await mockCrm(page, { viewStatus: 403 });
 
   await page.goto("/crm?customerId=cust-1");
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     "(customer.360-view.read)",
   );
   await expect(page.getByLabel("What happened?")).toHaveCount(0);

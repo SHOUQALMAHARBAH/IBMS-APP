@@ -17,9 +17,12 @@ import { NeedsAssessmentReviewPanel } from '../../../../components/needs-assessm
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
-  errorStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   coveragePreviewStyle,
   coverageTagListStyle,
@@ -33,9 +36,14 @@ import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCapture
 import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 export default function NeedsAssessmentDetailPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
@@ -46,16 +54,35 @@ export default function NeedsAssessmentDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  /*
+   * ITEM 8 — the two reads are NOT equally load-bearing, and the old `Promise.all` treated them
+   * as if they were.
+   *
+   * The assessment IS the page: without it there is nothing to show, so its failure keeps the
+   * not-found sentence exactly as before. The QUESTIONNAIRE only supplies the question text, and
+   * losing it used to take down an assessment that had arrived — so a refused questionnaire now
+   * leaves the record on screen and says which list is missing.
+   */
   const load = useCallback(async () => {
-    try {
-      const [result, questionnaire] = await Promise.all([
-        getNeedsAssessment(params.id),
-        getQuestionnaire(),
-      ]);
-      setAssessment(result);
-      setQuestions(questionnaire.questions);
-      setLoadError(null);
-    } catch (err) {
+    const { values, failures } = await loadIndependently([
+      {
+        key: 'assessment',
+        label: t('nadListAssessment'),
+        load: () => getNeedsAssessment(params.id),
+      },
+      {
+        key: 'questionnaire',
+        label: t('nadListQuestionnaire'),
+        load: getQuestionnaire,
+      },
+    ]);
+    if (values.assessment) setAssessment(values.assessment as NeedsAssessment);
+    if (values.questionnaire)
+      setQuestions((values.questionnaire as { questions: NeedsAssessmentQuestion[] }).questions);
+
+    const assessmentFailure = failures.find((f) => f.key === 'assessment');
+    if (assessmentFailure) {
+      const err = assessmentFailure.error;
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
           ? t('nadNotFound')
@@ -63,7 +90,13 @@ export default function NeedsAssessmentDetailPage() {
             ? err.message
             : t('nadLoadError'),
       );
+      return;
     }
+    setLoadError(
+      failures.length === 0
+        ? null
+        : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
   }, [params.id, t]);
 
   useEffect(() => {
@@ -102,7 +135,7 @@ export default function NeedsAssessmentDetailPage() {
     assessment?.status === 'REVIEWED';
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() => router.push('/needs-assessments')}
@@ -112,14 +145,15 @@ export default function NeedsAssessmentDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {assessment ? (
         <>
-          <h1>{t('nadHeading')}</h1>
+          <PageHeader title={t('nadHeading')} />
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='NeedsAssessment' entityId={assessment.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             {t('commonStatusLabel')}{' '}
             {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}
@@ -166,7 +200,7 @@ export default function NeedsAssessmentDetailPage() {
             <div>
               <div style={profileFieldLabelStyle}>{t('nadReviewedBy')}</div>
               <div style={profileFieldValueStyle}>
-                {assessment.reviewedByUserId ?? '—'}
+                {assessment.reviewedByName ?? t('commonNameNotResolved')}
                 {/*
                   Part 4 step 5. The row names a reviewer whether that was a second person or the
                   capturer herself. Under the REVIEWER row specifically, because the approval below has
@@ -180,8 +214,11 @@ export default function NeedsAssessmentDetailPage() {
             </div>
             <div>
               <div style={profileFieldLabelStyle}>{t('nadApprovedBy')}</div>
-              <div style={profileFieldValueStyle}>
-                {assessment.approvedByUserId ?? '—'}
+              {/* The hook is what lets a test assert the uuid is ABSENT from THIS cell
+                  rather than page-wide — `check:absence` refuses the page-wide form, and
+                  it is right to: a role-name loop once matched a nav label. */}
+              <div style={profileFieldValueStyle} data-approver-value>
+                {assessment.approvedByName ?? t('commonNameNotResolved')}
                 <CombinedDutyOnRecord
                   act={assessment.approverCombinedDutyAct}
                   testId="combined-duty-assessment-approver"
@@ -207,9 +244,7 @@ export default function NeedsAssessmentDetailPage() {
                 {submitting ? t('nadSubmitting') : t('nadSubmitButton')}
               </button>
               {actionError ? (
-                <p role="alert" style={errorStyle}>
-                  {actionError}
-                </p>
+                <ErrorState title={actionError} />
               ) : null}
             </>
           ) : null}
@@ -249,16 +284,35 @@ export default function NeedsAssessmentDetailPage() {
 
           <section style={{ marginTop: '2rem' }}>
             <h2>{t('nadAnswers')}</h2>
-            <ul>
+            {/*
+              Addressable because `main ul` is AMBIGUOUS on this screen — the recommended-coverage
+              list is a `<ul>` too, and a test scoped to `main ul` resolves to both. A hook here
+              rather than `.first()` in the spec: an index follows whichever list renders first,
+              which is the kind of locator that silently starts asserting about the wrong element.
+            */}
+            <ul data-testid="assessment-answers">
               {questions.map((q) => (
                 <li key={q.id}>
-                  {q.prompt}{' '}
+                  {language === 'AR' ? q.promptAr : q.prompt}{' '}
                   <strong>
+                    {/*
+                      `Yes`/`No` were HARDCODED ENGLISH here — found while converting the prompts
+                      one line above, on the same row of the same screen. The shared keys have
+                      shipped in both languages for months and this list never reached for them, so
+                      an Arabic reader saw an Arabic question answered in English.
+
+                      `hardcoded-ui-english.py` does not see it: failure mode 8 covers a ternary of
+                      bare literals, and requires the LINE to be entirely a brace expression — this
+                      one is wrapped across four lines inside a `<strong>`, so no pattern matches.
+                      Reported in the measurement doc rather than widened here, because widening
+                      mode 8 to multi-line expressions is what its own header warns makes every
+                      bare call a finding.
+                    */}
                     {q.type === 'number'
                       ? String(assessment.questionnaireAnswers[q.id] ?? 0)
                       : assessment.questionnaireAnswers[q.id]
-                        ? 'Yes'
-                        : 'No'}
+                        ? t('commonYes')
+                        : t('commonNo')}
                   </strong>
                 </li>
               ))}

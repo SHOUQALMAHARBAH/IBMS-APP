@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectAbsentWithin } from './support/anchored';
 import AxeBuilder from '@axe-core/playwright';
 import { permissionsForRoles } from './fixtures/role-permissions';
 
@@ -27,17 +28,31 @@ async function mockAuth(page: Page, roles: string[]) {
   );
 }
 
+/*
+ * `promptAr` is REQUIRED on the api's question type since the thirteen Arabic prompts landed.
+ * The Arabic BELOW IS FIXTURE TEXT, deliberately not the owner's wording: hers lives in
+ * `needs-assessment.config.ts` and is pinned there by sha256, and a mock carrying it would be a
+ * second copy of her prose free to drift from the pinned one. What a fixture has to prove is
+ * WHICH FIELD the screen reads, and distinct nonsense proves that better than a faithful copy.
+ */
 const QUESTIONNAIRE = {
   questions: [
     {
       id: 'ownsOrLeasesPremises',
       prompt: 'Own or lease premises?',
+      promptAr: 'سؤالُ المقرِّ للاختبار',
       type: 'boolean',
     },
-    { id: 'employeeCount', prompt: 'How many staff?', type: 'number' },
+    {
+      id: 'employeeCount',
+      prompt: 'How many staff?',
+      promptAr: 'سؤالُ العددِ للاختبار',
+      type: 'number',
+    },
     {
       id: 'handlesPersonalOrPaymentData',
       prompt: 'Holds card data?',
+      promptAr: 'سؤالُ البياناتِ للاختبار',
       type: 'boolean',
     },
   ],
@@ -130,7 +145,7 @@ test('shows a friendly message when the user lacks read permission', async ({
   );
 
   await page.goto('/needs-assessments');
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     "(needs-assessment.read)",
   );
 });
@@ -285,7 +300,7 @@ test("the questionnaire's first control is reachable via keyboard", async ({
 /*
  * THE TWO COMBINED-DUTY ACTS ON A NEEDS ASSESSMENT — Part 4 step 5, pairs fourteen and fifteen.
  *
- * `NeedsAssessment` is the ONLY table of the fifteen carrying two pairs:
+ * `NeedsAssessment` is the ONLY table of the sixteen carrying two pairs:
  * `NeedsAssessment_reviewer_maker_checker_distinct` (the capturer is not the reviewer) and
  * `NeedsAssessment_approver_maker_checker_distinct` (the capturer is not the approver). It therefore has
  * two escape columns, deliberately — one shared column would let a declared combined REVIEW excuse a
@@ -384,6 +399,9 @@ test('a declared REVIEW does not declare anything about the approval', async ({
     reviewedByUserId: 'user-1',
     reviewerCombinedDutyAct: REVIEWER_ACT,
     approvedByUserId: 'user-9',
+    // Decision 48's resolved name. The api sends it; the screen renders it INSTEAD of the
+    // id, which is the whole of group 7.
+    approvedByName: 'Layla Al-Checker',
     approverCombinedDutyAct: null,
   });
 
@@ -396,6 +414,113 @@ test('a declared REVIEW does not declare anything about the approval', async ({
   await expect(
     page.getByTestId('combined-duty-assessment-approver'),
   ).toHaveCount(0);
-  // And the approver row still names its approver — the anchor, from the same read.
-  await expect(page.getByText('user-9')).toBeVisible();
+  /*
+   * RE-POINTED, and this one is a REAL REVERSAL rather than a moved selector. It asserted
+   * `getByText('user-9')` — the uuid — as a READY ANCHOR from the same read, which worked
+   * only because the uuid WAS the text in that cell. That is the defect the owner read with
+   * her own eyes under «اعتمده», and `rendered-identifiers.py` reported this screen clean
+   * because its ternary exclusion treated `??` as a ternary.
+   *
+   * The anchor's JOB is unchanged — prove the approver row rendered, from the same read, so
+   * the absence assertion above cannot pass against an unhydrated page. What changed is that
+   * the cell now holds a NAME, and the id is additionally asserted ABSENT, because an anchor
+   * that merely moved would not catch the fallback coming back.
+   */
+  const approverCell = page.locator('[data-approver-value]');
+  await expect(approverCell).toContainText('Layla Al-Checker');
+  // SCOPED, not page-wide: `check:absence` refuses the page-wide form and was right to
+  // here, because the fixture's own `approvedByUserId` is still on the wire and a
+  // page-wide match could find it in a `data-*` attribute rather than in the cell.
+  await expectAbsentWithin(approverCell, (s) => s.getByText('user-9'));
+});
+
+/*
+ * ONE TEST, THREE RENDER SITES, AND THE SPLIT I FIRST WROTE WAS BASED ON A MISREADING.
+ *
+ * I had two tests on the belief that the read-back answer list was APPROVED-only. It is not:
+ * `assessment.status === 'APPROVED' && !isPlacement` gates a NOTE above it, and the answers
+ * section renders unconditionally. A DRAFT therefore shows the FORM and the ANSWER LIST at once,
+ * which Playwright reported as a strict-mode violation — the third prompt resolving to a
+ * `<legend>` and an `<li>` — rather than my reading catching it.
+ *
+ * SO EACH HALF IS SCOPED TO ITS OWN SURFACE. Two legitimate elements carrying one string is not
+ * a defect, and `.first()` would have hidden which surface was being asserted about.
+ *
+ * The sites, all three of which printed `{q.prompt}` unconditionally before this:
+ *   the form's number branch   a <label>
+ *   the form's boolean branch  a <legend>
+ *   the read-back answer list  an <li>
+ *
+ * NO GATE COULD SEE ANY OF THEM: these strings arrive from the API at runtime and
+ * `hardcoded-ui-english.py` reads SOURCE, so it is blind to every server-supplied display
+ * string in the product. The questionnaire is the instance that was found, not the class.
+ *
+ * A PAIR PER SURFACE: the Arabic present AND the English gone. Presence alone passes against a
+ * screen rendering both; absence alone passes against one rendering neither.
+ */
+const AR_FIXTURE_PROMPTS = [
+  'سؤالُ المقرِّ للاختبار',
+  'سؤالُ العددِ للاختبار',
+  'سؤالُ البياناتِ للاختبار',
+];
+const EN_FIXTURE_PROMPTS = [
+  'Own or lease premises?',
+  'How many staff?',
+  'Holds card data?',
+];
+
+async function mockAuthAr(page: Page, roles: string[]) {
+  await page.route('**/auth/refresh', (route) =>
+    route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
+  );
+  await page.route('**/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        languagePreference: 'AR',
+        roles,
+        permissions: permissionsForRoles(roles),
+      },
+    }),
+  );
+}
+
+test('asks the questions in Arabic at all three render sites, and answers them in Arabic too', async ({
+  page,
+}) => {
+  await mockAuthAr(page, ['SALES_RELATIONSHIP_OFFICER']);
+  // A DRAFT the viewer created: the only state that renders the form, and it renders the
+  // answer list beside it.
+  await openAssessment(page, {});
+
+  const form = page.locator('main form');
+  // `main ul` is AMBIGUOUS here: the recommended-coverage list is a `<ul>` too, which
+  // Playwright reported as a strict-mode violation rather than my reading catching it.
+  const answers = page.getByTestId('assessment-answers');
+
+  for (const ar of AR_FIXTURE_PROMPTS) {
+    await expect(form.getByText(ar)).toBeVisible();
+    await expect(answers.getByText(ar)).toBeVisible();
+  }
+  for (const english of EN_FIXTURE_PROMPTS) {
+    await expectAbsentWithin(form, (scope) => scope.getByText(english));
+    await expectAbsentWithin(answers, (scope) => scope.getByText(english));
+  }
+
+  /*
+   * AND THE ANSWERS THEMSELVES — found while converting the prompts, on the same row.
+   * `Yes`/`No` were hardcoded English in that `<li>`, so an Arabic question was answered in
+   * English while `commonYes`/`commonNo` had shipped in both languages for months. Asserted as
+   * a pair for the same reason the prompts are.
+   */
+  // EXACT, and the reason is the fixture's own text: «لا» is a SUBSTRING of «للاختبار», so a
+  // substring match resolved to three elements. Playwright reported it; my reading did not.
+  await expect(answers.getByText('لا', { exact: true })).toBeVisible();
+  await expect(answers.getByText('نعم', { exact: true })).toBeVisible();
+  for (const english of ['Yes', 'No']) {
+    await expectAbsentWithin(answers, (scope) =>
+      scope.getByText(english, { exact: true }),
+    );
+  }
 });

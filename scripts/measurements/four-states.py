@@ -54,7 +54,11 @@ EMPTY = re.compile(r'None(?:Yet|Match)?\b|\bEmpty\b|\.length\s*===\s*0')
 ERROR = re.compile(r'\b\w*(?:[Ee]rror|[Ff]ailed)\b\s*\?|\{\s*\w*(?:[Ee]rror|[Ff]ailed)\s*\}')
 REFUSAL = re.compile(r'permissionRefusal(?:AnyOf|AllOf)?\(')
 FORM = re.compile(r'<form\b')
-TABLE = re.compile(r'<table\b')
+# `<Table>` COUNTS TOO — see the note in `typed-identifier-inputs.py`. Rule 1 compares where
+# the first form sits against where the first table sits, so a screen moved onto the primitive
+# would read as having NO table and the rule would quietly stop being checkable on exactly the
+# screens the design pass has reached.
+TABLE = re.compile(r'<[Tt]able\b')
 # A CREATE form, told apart from a FILTER form by its submit handler. This is the fifth false-positive class
 # the formal pass documented — "a filter form was mistaken for a create form" — and correcting for it is what
 # hid two REAL violations: a filter form above the table satisfied a first-form-vs-first-table comparison
@@ -126,6 +130,33 @@ def probe(page_src, child_src):
     }
 
 
+# ---------------------------------------------------------------------------- the ratchet
+#
+# THREE budgets, one per worklist, because the three states fail differently and a single total
+# would let one be traded for another silently.
+#
+# Each is a WORKLIST and not a violation count — this script's own closing line says so, and batch 4
+# flagged three screens that were all correct. So the budgets are at today's measured numbers and
+# what they enforce is the owner's third part of decision 34: THE COUNT NEVER RISES. A NEW screen
+# shipped without an empty state, a load-error branch or a permission refusal fails the build; the
+# existing rows are read and closed deliberately, one at a time, lowering the budget as they go.
+#
+# The known-correct exceptions are why these do not start at 0 and why lowering them is a judgement
+# rather than a sweep: a detail page addressed by an id answers 404 and not 403 ON PURPOSE (a 403
+# there discloses that another office's record exists), `/settings/security` must stay ungated or ten
+# of eleven roles can never enrol in MFA, and a screen that loads nothing has no empty state to be
+# missing.
+#
+# Measured 2026-10-22 across 106 screens; all three matched the screen-pass measurement document.
+NO_LOAD_ERROR_BUDGET = 1
+NO_PERMISSION_REFUSAL_BUDGET = 9
+NO_EMPTY_STATE_BUDGET = 2
+
+# Blank is not zero. A screen root that moves takes all three counts to zero, and a report of three
+# zeroes is indistinguishable from a finished job.
+MINIMUM_SCREENS_SCANNED = 90
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     rows = []
@@ -184,6 +215,52 @@ def main():
           % ('forms classified', classified, handlers))
     print('\nEach count is a WORKLIST. Batch 4 flagged three screens and all three were correct — read before\n'
           'calling anything a violation.')
+
+    if '--check' not in sys.argv:
+        return 0
+
+    if args:
+        print('\nfour-states: REFUSED — --check measures the whole app and was given a screen '
+              'filter (%s). A budget compared against a subset is not a budget.' % ', '.join(args))
+        return 1
+
+    if len(rows) < MINIMUM_SCREENS_SCANNED:
+        print('\nfour-states: REFUSED — only %d screen(s) scanned against a floor of %d. The screen '
+              'root has moved and all three counts above are meaningless. Blank is not zero.'
+              % (len(rows), MINIMUM_SCREENS_SCANNED))
+        return 1
+
+    failed = False
+    for label, key, budget, const, consequence in (
+        ('no load-error branch', 'error', NO_LOAD_ERROR_BUDGET, 'NO_LOAD_ERROR_BUDGET',
+         'A screen whose read fails and says nothing leaves a reader looking at an empty page with '
+         'no way to tell a broken server from an office with no records.'),
+        ('no permission refusal', 'refusal', NO_PERMISSION_REFUSAL_BUDGET,
+         'NO_PERMISSION_REFUSAL_BUDGET',
+         'A screen that refuses without saying so sends somebody to ask for the wrong grant. Use '
+         '`permissionRefusal(t, actKey, code)` — never write the sentence.'),
+        ('no empty-state signal', 'empty', NO_EMPTY_STATE_BUDGET, 'NO_EMPTY_STATE_BUDGET',
+         'An empty table reads as "nothing to see" where the honest answer is "nothing here yet, '
+         'and here is how the first one gets created".'),
+    ):
+        actual = len([1 for _rel, p in rows if not p[key]])
+        if actual > budget:
+            print('\nfour-states: FAILED — %s is %d against a budget of %d.' % (label, actual, budget))
+            print(consequence)
+            print('Do NOT raise %s: the owner struck attrition, so this number only falls.' % const)
+            failed = True
+        elif actual < budget:
+            print('\nfour-states: FAILED — %s is only %d, so lower %s to %d.'
+                  % (label, actual, const, actual))
+            print('This half is what stops the ratchet becoming a ceiling.')
+            failed = True
+
+    if failed:
+        return 1
+
+    print('\nfour-states: all three classes are at their declared budgets — %d load-error, '
+          '%d refusal, %d empty-state.'
+          % (NO_LOAD_ERROR_BUDGET, NO_PERMISSION_REFUSAL_BUDGET, NO_EMPTY_STATE_BUDGET))
     return 0
 
 

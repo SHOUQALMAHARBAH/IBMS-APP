@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
+import { WorkflowHistoryLink } from '../ui/WorkflowHistoryLink';
 import { KYC_STATUS_LABEL_KEY } from '../../lib/kyc/kyc-status-labels';
 import {
   approveKyc,
@@ -15,6 +16,7 @@ import {
   type ScreeningHoldView,
 } from "../../lib/kyc/kyc-api";
 import { ApiError } from "../../lib/auth/api-client";
+import { ActionStatus } from '../ui';
 import { useAuth } from '../../lib/auth/auth-context';
 import {
   CombinedDutyReasonField,
@@ -60,6 +62,11 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
   const { user } = useAuth();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // What the act DID, per row. Her words about this screen: «الموظف رح يشعر
+  // بالضياع لأن فش اشي بيظهر اله ولا كأنه عمل اشي». The act already ran and
+  // already reloaded the row — what was missing is a sentence saying so, and
+  // a status cell three columns away changing is not that sentence.
+  const [outcomes, setOutcomes] = useState<Record<string, string>>({});
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
 
   // Part B §17 — the screening hold, per decidable row.
@@ -116,9 +123,17 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
   async function run(id: string, action: () => Promise<KycRecord>) {
     setBusyId(id);
     setErrors((prev) => ({ ...prev, [id]: "" }));
+    setOutcomes((prev) => ({ ...prev, [id]: "" }));
     try {
       const updated = await action();
       onItemChanged(updated);
+      // Composed from two strings already on this screen — the column heading
+      // and the status badge's own label — so the outcome names the state the
+      // record is NOW in and not one word of it is newly written.
+      setOutcomes((prev) => ({
+        ...prev,
+        [id]: `${t("commonStatus")}: ${t(KYC_STATUS_LABEL_KEY[updated.status])}`,
+      }));
       // The hold can move as a side effect of the action (an approval records
       // a release; a re-screen changes the attempt outcome), so re-read it
       // rather than leaving a stale evaluation on screen.
@@ -185,6 +200,12 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                 />
               </td>
               <td style={queueCellStyle}>
+                {/* Owner decision 41 — this KYC file's state history, without a pasted uuid. The
+                    link is to the RECORD, not the customer: `KYCRecord` is the workflow entity.
+                    Renders nothing without `workflow-history.read`. */}
+                <div style={{ marginBottom: "0.4rem" }}>
+                  <WorkflowHistoryLink entityType="KYCRecord" entityId={item.id} />
+                </div>
                 {item.status === "SUBMITTED" ? (
                   <button
                     type="button"
@@ -382,18 +403,13 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                     </button>
                   </div>
                 ) : null}
-                {errors[item.id] ? (
-                  <p
-                    role="alert"
-                    style={{
-                      ...errorStyle,
-                      fontSize: "0.75rem",
-                      marginTop: "0.4rem",
-                    }}
-                  >
-                    {errors[item.id]}
-                  </p>
-                ) : null}
+                <ActionStatus
+                  pending={isBusy ? t("commonWorking") : undefined}
+                  outcome={outcomes[item.id] || undefined}
+                  error={errors[item.id] || undefined}
+                  testId={`kyc-queue-${item.id}`}
+                  style={{ fontSize: "0.75rem", marginTop: "0.4rem" }}
+                />
               </td>
             </tr>
           );

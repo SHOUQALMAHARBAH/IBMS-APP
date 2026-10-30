@@ -43,19 +43,22 @@ async function mockAuth(page: Page, permissions: string[]) {
   );
 }
 
-const CLAIMS = { id: "dept-1", name: "Claims", nameAr: "المطالبات" };
-const IRBID = { id: "branch-1", name: "Irbid", nameAr: "إربد" };
+// `retiredAt` is part of the endpoint's shape since the reactivate route landed. Carried here
+// even though no control reads it yet: an absent `retiredAt` renders a retired unit as LIVE,
+// which is silent, and a mock that approximates a view's shape is how that reaches a screen.
+const CLAIMS = { id: "dept-1", name: "Claims", nameAr: "المطالبات", retiredAt: null };
+const IRBID = { id: "branch-1", name: "Irbid", nameAr: "إربد", retiredAt: null };
 
 async function mockUnits(page: Page) {
   await page.route("http://localhost:4000/admin/departments", (route) => {
     if (route.request().method() === "POST") {
-      return route.fulfill({ status: 201, json: { id: "dept-2", name: "Finance", nameAr: null } });
+      return route.fulfill({ status: 201, json: { id: "dept-2", name: "Finance", nameAr: null, retiredAt: null } });
     }
     return route.fulfill({ status: 200, json: [CLAIMS] });
   });
   await page.route("http://localhost:4000/admin/branches", (route) => {
     if (route.request().method() === "POST") {
-      return route.fulfill({ status: 201, json: { id: "branch-2", name: "Zarqa", nameAr: null } });
+      return route.fulfill({ status: 201, json: { id: "branch-2", name: "Zarqa", nameAr: null, retiredAt: null } });
     }
     return route.fulfill({ status: 200, json: [IRBID] });
   });
@@ -80,7 +83,7 @@ test("creates a department, sending the name the person typed", async ({ page })
   await page.route("http://localhost:4000/admin/departments", (route) => {
     if (route.request().method() === "POST") {
       posted = route.request().postDataJSON() as Record<string, unknown>;
-      return route.fulfill({ status: 201, json: { id: "dept-2", name: "Finance", nameAr: "المالية" } });
+      return route.fulfill({ status: 201, json: { id: "dept-2", name: "Finance", nameAr: "المالية", retiredAt: null } });
     }
     return route.fulfill({ status: 200, json: [CLAIMS] });
   });

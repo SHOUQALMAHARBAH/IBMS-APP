@@ -1,6 +1,6 @@
 import { addMoney, formatMoney, formatMoneySum } from '../../common/money.util';
 import type { MoneyInput } from '../../common/money.util';
-import type { PeriodWindow } from '../../common/period.util';
+import type { FigureScope, PeriodWindow } from '../../common/period.util';
 
 /**
  * Part E — Dashboards & Management Reporting (Part 13), backlog Process
@@ -67,6 +67,10 @@ export interface ConversionMetric {
 
 export interface SalesDashboardSummary {
   generatedAt: string;
+  /** Owner decision 58 — which figures the period above actually describes.
+   *  A screen renders the period clause beside a `'period'` metric and an AS-OF
+   *  clause beside an `'asOf'` one; it must never decide this for itself. */
+  metricScope: typeof SALES_DASHBOARD_METRIC_SCOPE;
   periodLabel: string;
   periodStart: string;
   periodEnd: string;
@@ -144,6 +148,33 @@ export function derivePremiumWrittenMetric(
   return { newJod, renewalJod, totalJod };
 }
 
+/**
+ * EVERY METRIC ON THIS SCREEN OBEYS THE PERIOD, and it is declared rather than
+ * assumed. This file's own header already states it — the period «applies to every
+ * metric via its own date field (`Lead.createdAt`, `Policy.createdAt`,
+ * `CommissionLedgerEntry.createdAt`, `CrossSellOpportunity.detectedAt`,
+ * `UpSellRecommendation.detectedAt`)» — so all five values here are `'period'`.
+ *
+ * A UNIFORM MAP IS STILL WORTH SHIPPING, because the sibling dashboard proves the
+ * asymmetry is a real design choice in this codebase rather than a hypothetical:
+ * `/dashboards/policy` has two snapshot metrics. If a metric here ever became a
+ * snapshot, a screen that had assumed uniformity would keep printing a period beside
+ * it and nothing would say otherwise.
+ *
+ * `satisfies` with the key union spelled out makes a sixth metric a COMPILE ERROR
+ * here rather than a figure that silently renders no clause at all.
+ */
+export const SALES_DASHBOARD_METRIC_SCOPE = {
+  leads: 'period',
+  premiumWritten: 'period',
+  commissionIncomeJod: 'period',
+  crossSell: 'period',
+  upSell: 'period',
+} as const satisfies Record<
+  'leads' | 'premiumWritten' | 'commissionIncomeJod' | 'crossSell' | 'upSell',
+  FigureScope
+>;
+
 export function buildSalesDashboardSummary(input: {
   now: Date;
   period: PeriodWindow;
@@ -162,6 +193,7 @@ export function buildSalesDashboardSummary(input: {
     periodLabel: input.period.periodLabel,
     periodStart: input.period.periodStart.toISOString(),
     periodEnd: input.period.periodEnd.toISOString(),
+    metricScope: SALES_DASHBOARD_METRIC_SCOPE,
     leads: deriveLeadsMetric(
       input.newLeadsCount,
       input.convertedToProspectCount,

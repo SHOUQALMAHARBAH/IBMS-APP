@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   deactivateInsurer,
+  clearFinancialStrengthRating,
   getInsurer,
   getInsurerStatusImpact,
   reactivateInsurer,
@@ -13,8 +14,11 @@ import {
   type InsurerStatusImpact,
 } from '../../../../lib/insurer/insurer-api';
 import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import {
   detailGridStyle,
   fieldLabelStyle,
@@ -64,6 +68,13 @@ export default function InsurerDetailPage() {
   // thing on the page behind it. `insurer.deactivate` also gates the impact read the dialog performs,
   // so the button and the request it makes ask for the same code.
   const canDeactivate = !!user && hasPermission(user, 'insurer.deactivate');
+  /*
+   * DECISION 93's CONTROL — `insurer.update` and NOT a new code. This is a correction to the office's
+   * own relationship record, which is what that permission is for, and the controller records the
+   * argument against minting one: a code per action would be a checkbox on the Role screen for
+   * something nobody administers separately. OFFICE_ADMINISTRATOR is the only holder.
+   */
+  const canCorrect = !!user && hasPermission(user, 'insurer.update');
 
   const [insurer, setInsurer] = useState<Insurer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -74,6 +85,7 @@ export default function InsurerDetailPage() {
   const [reason, setReason] = useState('');
   const [statusError, setStatusError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -146,13 +158,11 @@ export default function InsurerDetailPage() {
 
   if (loadError)
     return (
-      <main style={pageStyle}>
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+      <main style={pageStackStyle}>
+        <ErrorState title={loadError} />
       </main>
     );
-  if (!insurer) return <main style={pageStyle}>{t('insListLoading')}</main>;
+  if (!insurer) return <main style={pageStackStyle}>{t('insListLoading')}</main>;
 
   const dash = t('insDetailEmptyField');
   const field = (labelKey: TranslationKey, value: string | null) => (
@@ -165,7 +175,7 @@ export default function InsurerDetailPage() {
   );
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>
         <bdi>{language === 'AR' ? (insurer.nameAr ?? insurer.name) : insurer.name}</bdi>
         <DeactivatedInsurerBadge isActive={insurer.isActive} />
@@ -229,7 +239,68 @@ export default function InsurerDetailPage() {
               ? null
               : t('insDetailCreditTermsDays', { days: insurer.creditTermsDays }),
           )}
-          {field('insDetailRatingLabel', insurer.financialStrengthRating)}
+          {/*
+            THE RATING WITH ITS AS-OF DATE, AND A WAY TO CLEAR BOTH.
+
+            The api has always sent `financialStrengthRatingAsOf` and this screen DROPPED it, so the
+            office's own solvency judgement about an insurer rendered with no date on it — which is
+            the exact state decision 93 exists to prevent, one layer above the clear. Hand-copied
+            over HTTP, so neither the compiler nor any test could see the omission.
+
+            The clear removes BOTH FIELDS TOGETHER, which is the whole of decision 93: a rating
+            attributed to a month that has passed is a judgement nobody made today. There is no
+            confirmation step — the act is a correction, not a disposal, and the audit row carries
+            both halves of what was there as `beforeValue`, so the old rating is recoverable by a
+            person reading the trail. What is NOT recoverable from the product is re-entering it:
+            measured, `updateInsurer` has no caller anywhere in `apps/web`, so no screen sets a
+            rating either. That is an adjacent gap, reported rather than closed here.
+          */}
+          <div>
+            <div style={fieldLabelStyle}>{t('insDetailRatingLabel')}</div>
+            <div style={fieldValueStyle} data-insurer-rating="">
+              <bdi>
+                {insurer.financialStrengthRating === null
+                  ? dash
+                  : insurer.financialStrengthRatingAsOf === null
+                    ? insurer.financialStrengthRating
+                    : `${insurer.financialStrengthRating} ${t('insDetailRatingAsOf', {
+                        at: insurer.financialStrengthRatingAsOf.slice(0, 10),
+                      })}`}
+              </bdi>
+            </div>
+            {/* The control exists only where there is something to clear AND the reader may clear
+                it — the frontend directive's rule, and it also keeps the api's own no-op branch
+                unreachable from the screen rather than merely harmless. */}
+            {canCorrect && insurer.financialStrengthRating !== null ? (
+              <button
+                type="button"
+                disabled={busy}
+                data-testid="insurer-clear-rating"
+                onClick={() => {
+                  setBusy(true);
+                  setRatingError(null);
+                  void (async () => {
+                    try {
+                      setInsurer(await clearFinancialStrengthRating(id));
+                    } catch (err) {
+                      setRatingError(
+                        err instanceof ApiError
+                          ? err.message
+                          : t('insListLoadError'),
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  })();
+                }}
+              >
+                {busy ? t('commonWorking') : t('commonClear')}
+              </button>
+            ) : null}
+            {ratingError !== null ? (
+              <ErrorState title={ratingError} data-testid="insurer-rating-error" />
+            ) : null}
+          </div>
           {field('insDetailRfqContactLabel', insurer.rfqContactName)}
           {field('insDetailClaimsContactLabel', insurer.claimsContactName)}
           {field('insDetailUnderwriterLabel', insurer.underwriterContact)}
@@ -264,11 +335,9 @@ export default function InsurerDetailPage() {
                     {t('insImpactIntro')}
                   </p>
                   {impactError ? (
-                    <p role="alert" style={errorStyle}>
-                      {impactError}
-                    </p>
+                    <ErrorState title={impactError} />
                   ) : impact === null ? (
-                    <p>{t('insImpactLoading')}</p>
+                    <SkeletonList rows={4} label={t('insImpactLoading')} />
                   ) : (
                     <dl style={{ margin: 0 }}>
                       <div style={impactRowStyle}>
@@ -335,9 +404,7 @@ export default function InsurerDetailPage() {
               </label>
 
               {statusError ? (
-                <p role="alert" style={errorStyle}>
-                  {statusError}
-                </p>
+                <ErrorState title={statusError} />
               ) : null}
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>

@@ -1,6 +1,18 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+  Card,
+  DateEcho,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -8,23 +20,11 @@ import {
   type FinancialReportSummary,
 } from '../../../lib/finance/financial-report-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatMoney } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'end',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
-const sectionStyle: CSSProperties = { margin: '1.5rem 0' };
 
 function Figure({ label, value }: { label: string; value: string }) {
   const { language } = useLanguage();
@@ -35,7 +35,7 @@ function Figure({ label, value }: { label: string; value: string }) {
         justifyContent: 'space-between',
         gap: '2rem',
         padding: '0.3rem 0',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid var(--border-subtle)',
         maxWidth: '28rem',
       }}
     >
@@ -85,39 +85,37 @@ export default function FinancialReportPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('frHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('frIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('frHeading')}
+        description={t('frIntro')}
+      />
 
-      <label
-        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
+      <div
+        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0', alignItems: 'baseline' }}
       >
-        {t('frAsOf')}
+        <label htmlFor="fr-as-of">{t('frAsOf')}</label>
         <input
+          id="fr-as-of"
           type="date"
-          aria-label={t('frAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
         />
-      </label>
+        <DateEcho value={asOf} />
+      </div>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {!data ? (
         loadError ? null : (
-          <p>{t('frLoading')}</p>
+          <SkeletonList rows={4} label={t('frLoading')} />
         )
       ) : (
         <>
-          <section style={sectionStyle}>
-            <h2>{t('frClientReceivables')}</h2>
+          <Card title={t('frClientReceivables')}>
             <Figure
               label={t('frOutstandingTotal')}
               value={data.receivables.outstandingTotal}
@@ -133,10 +131,9 @@ export default function FinancialReportPage() {
                 customers: tPlural('frCustomerCount', data.receivables.customerCount),
               })}
             </p>
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('frInsurerPayables')}</h2>
+          <Card title={t('frInsurerPayables')}>
             <Figure
               label={t('frOutstandingCollectedNotRemitted')}
               value={data.payables.outstandingAmount}
@@ -150,10 +147,9 @@ export default function FinancialReportPage() {
                 insurers: tPlural('frInsurerCount', data.payables.insurerCount),
               })}
             </p>
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('frCommissionIncome')}</h2>
+          <Card title={t('frCommissionIncome')}>
             <Figure label={t('frEarnedGross')} value={data.commission.earned} />
             <Figure label={t('frVat')} value={data.commission.vat} />
             <Figure label={t('frGrossInclVat')} value={data.commission.gross} />
@@ -174,40 +170,39 @@ export default function FinancialReportPage() {
                 >
                   <thead>
                     <tr>
-                      <th style={{ ...head, textAlign: 'start' }}>{t('frColInsurer')}</th>
-                      <th style={head}>{t('frEarned')}</th>
-                      <th style={head}>{t('frPaid')}</th>
-                      <th style={head}>{t('frOutstanding')}</th>
-                      <th style={head}>{t('frReversed')}</th>
+                      <Th>{t('frColInsurer')}</Th>
+                      <Th>{t('frEarned')}</Th>
+                      <Th>{t('frPaid')}</Th>
+                      <Th>{t('frOutstanding')}</Th>
+                      <Th>{t('frReversed')}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.commission.byInsurer.map((r) => (
-                      <tr key={r.insurerId}>
-                        <td style={{ ...cell, textAlign: 'start' }}>
+                      <Tr key={r.insurerId}>
+                        <Td>
                           <bdi>{r.insurerName}</bdi>
-                        </td>
-                        <td style={cell}>{formatMoney(r.earned, language)}</td>
-                        <td style={cell}>{formatMoney(r.paid, language)}</td>
-                        <td style={cell}>{formatMoney(r.outstanding, language)}</td>
-                        <td style={cell}>{formatMoney(r.reversed, language)}</td>
-                      </tr>
+                        </Td>
+                        <Td>{formatMoney(r.earned, language)}</Td>
+                        <Td>{formatMoney(r.paid, language)}</Td>
+                        <Td>{formatMoney(r.outstanding, language)}</Td>
+                        <Td>{formatMoney(r.reversed, language)}</Td>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : null}
-          </section>
+          </Card>
 
-          <section style={sectionStyle}>
-            <h2>{t('frBookResultByLine')}</h2>
+          <Card title={t('frBookResultByLine')}>
             <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem', maxWidth: '44rem' }}>
               {t('frNetPositionNote')}
             </p>
             <ProfitTable rows={data.profitability.byLine} />
             <h2 style={{ marginTop: '1.25rem' }}>{t('frBookResultBySegment')}</h2>
             <ProfitTable rows={data.profitability.bySegment} />
-          </section>
+          </Card>
         </>
       )}
     </main>
@@ -221,35 +216,33 @@ function ProfitTable({
 }) {
   const { language, t } = useLanguage();
   if (rows.length === 0)
-    return <p style={{ color: 'var(--ink-secondary)' }}>{t('frNoPolicies')}</p>;
+    return <EmptyState title={t('frNoPolicies')} />;
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
-        <thead>
-          <tr>
-            <th style={{ ...head, textAlign: 'start' }}>{t('frColGroup')}</th>
-            <th style={head}>{t('frColPremiumWritten')}</th>
-            <th style={head}>{t('frColClaimsPaid')}</th>
-            <th style={head}>{t('frColCommission')}</th>
-            <th style={head}>{t('frColNetPosition')}</th>
-            <th style={head}>{t('frColPolicies')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key}>
-              <td style={{ ...cell, textAlign: 'start' }}>
-                <bdi>{r.label}</bdi>
-              </td>
-              <td style={cell}>{formatMoney(r.premiumWritten, language)}</td>
-              <td style={cell}>{formatMoney(r.claimsPaid, language)}</td>
-              <td style={cell}>{formatMoney(r.commissionEarned, language)}</td>
-              <td style={cell}>{formatMoney(r.netPosition, language)}</td>
-              <td style={cell}>{r.policyCount}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table>
+      <thead>
+        <tr>
+          <Th>{t('frColGroup')}</Th>
+          <Th>{t('frColPremiumWritten')}</Th>
+          <Th>{t('frColClaimsPaid')}</Th>
+          <Th>{t('frColCommission')}</Th>
+          <Th>{t('frColNetPosition')}</Th>
+          <Th>{t('frColPolicies')}</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <Tr key={r.key}>
+            <Td>
+              <bdi>{r.label}</bdi>
+            </Td>
+            <Td>{formatMoney(r.premiumWritten, language)}</Td>
+            <Td>{formatMoney(r.claimsPaid, language)}</Td>
+            <Td>{formatMoney(r.commissionEarned, language)}</Td>
+            <Td>{formatMoney(r.netPosition, language)}</Td>
+            <Td>{r.policyCount}</Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }

@@ -171,7 +171,7 @@ test('prompts to pick a customer when none is in the URL', async ({ page }) => {
   await mockUpSell(page);
 
   await page.goto('/up-sell');
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     'No customer selected',
   );
 });
@@ -183,7 +183,7 @@ test('shows a friendly message when the user lacks read permission', async ({
   await mockUpSell(page, { listStatus: 403 });
 
   await page.goto('/up-sell?customerId=cust-1');
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     "(up-sell.read)",
   );
 });

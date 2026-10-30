@@ -21,12 +21,26 @@ export const FINANCE = {
     caHeading: 'حسابات العملاء',
     caIntro:
       'الذمم المدينة موزّعة بأعمارها حسب العميل — كل فاتورة قسط لم تُحصَّل بالكامل بعد، مقسّمة إلى شرائح ٣٠ و٦٠ و٩٠ يوماً بالقياس إلى التاريخ المرجعي. والصفوف مرتّبة من الأسوأ أولاً (الأقدم ديناً أولاً).',
-    caAsOf: 'كما في',
-    caAsOfDateAria: 'تاريخ الرصيد',
+    caAsOf: 'تاريخ الرصيد',
     caColClient: 'العميل',
     caColOutstanding: 'المستحق',
     caColInvoices: 'الفواتير',
     caColOldest: 'الأقدم',
+    /*
+     * THE `1–30 days` AGEING BUCKET — owner answer 1, and this is NOT `dclmAgeing0To30`.
+     *
+     * That string reads «من ٠ إلى ٣٠ يوماً» and covers DAY ZERO, which on a receivables
+     * report is the `current` bucket — a separate column one place to the left. The two
+     * differ by exactly ONE codepoint (U+0660 against U+0661), which is the whole reason
+     * this row was opened rather than closed with a pointer: a header claiming a range its
+     * column does not hold is a false label, and worse than an English one.
+     *
+     * The bytes are the owner's and were already in the product — `frAgeing1To30` on
+     * `/financial-report` is byte-identical, and this value was copied from it rather than
+     * retyped. `dclmAgeing31To60` / `frAgeing31To60` are already byte-identical siblings, so
+     * one ageing heading per screen family is this dictionary's own shape.
+     */
+    caAgeing1To30: 'من ١ إلى ٣٠ يوماً',
     caColTotal: 'الإجمالي',
     caNone: 'لا توجد ذمم مدينة قائمة.',
     caLoading: 'جارٍ التحميل…',
@@ -37,8 +51,7 @@ export const FINANCE = {
     iaHeading: 'حسابات شركات التأمين',
     iaIntro:
       'ما يترتّب على الوسيط لكل شركة تأمين — صافي القسط (القسط ناقص العمولة) الذي حُصِّل من العميل ولم يُورَّد بعد — إلى جانب المبلغ المورَّد حتى تاريخه. والصفوف مرتّبة من الأسوأ أولاً (الالتزام الأقدم غير المورَّد أولاً).',
-    iaAsOf: 'كما في',
-    iaAsOfDateAria: 'تاريخ الرصيد',
+    iaAsOf: 'تاريخ الرصيد',
     iaColInsurer: 'شركة التأمين',
     iaColOutstanding: 'المستحق',
     iaColInvoices: 'الفواتير',
@@ -59,11 +72,10 @@ export const FINANCE = {
     crateSelectInsurer: 'اختر شركة تأمين…',
     crateLineLabel: 'فرع التأمين',
     crateLineChoose: 'اختر فرع تأمين…',
-    crateRateLabel: 'النسبة ٪',
     crateRateAria: 'نسبة العمولة المئوية',
-    crateVatLabel: 'ضريبة المبيعات ٪',
     crateVatAria: 'نسبة ضريبة المبيعات المئوية',
     crateEffectiveFromLabel: 'ساري من',
+    crateEffectiveFromHint: 'أول يوم تسري فيه نسبة العمولة هذه.',
     crateColRate: 'النسبة',
     crateColVat: 'الضريبة',
     crateColEffectiveTo: 'ساري إلى',
@@ -82,9 +94,8 @@ export const FINANCE = {
     pcIntro:
       'قنوات الدفع المعتمدة للعملاء (الأموال الواردة، على سند قبض) ولشركات التأمين (الأموال الصادرة، على إشعار توريد). تتولّى المالية صيانة هذه القائمة، وتصبح القناة قابلة للاستخدام فور إضافتها وتظل كذلك حتى تُعطَّل. ولا يُحفظ من رقم الحساب سوى آخر أرقام منه.',
     pcOwnerLabel: 'الجهة المالكة',
-    pcOwnerTypeAria: 'نوع الجهة المالكة',
     pcOwnerFieldLabel: 'المالك',
-    pcOwnerIdLabel: 'معرّف الجهة المالكة',
+    pcColOwnerType: 'نوع الجهة المالكة',
     pcOwnerIdAria: 'معرّف الجهة المالكة',
     pcCustomer: 'عميل',
     pcInsurer: 'شركة تأمين',
@@ -95,7 +106,6 @@ export const FINANCE = {
     pcBankNameLabel: 'اسم البنك',
     pcBankPlaceholder: 'بنك القاهرة عمّان — دينار أردني',
     pcAccountLabel: 'الحساب (آخر ٢–٤ أرقام)',
-    pcAccountAria: 'آخر أربعة أرقام من الحساب',
     pcColType: 'النوع',
     pcColBank: 'البنك',
     pcColAccount: 'الحساب',
@@ -147,8 +157,7 @@ export const FINANCE = {
     frHeading: 'التقرير المالي',
     frIntro:
       'اللوحة المالية الموحّدة — ذمم العملاء المدينة وأعمارها، وما هو مستحق لشركات التأمين وما وُرِّد إليها، وتجميع إيرادات العمولة (المكتسبة / المدفوعة / المستحقة / المستردّة)، ونتيجة المحفظة بحسب فرع التأمين وشريحة العملاء.',
-    frAsOf: 'كما في',
-    frAsOfDateAria: 'تاريخ الرصيد',
+    frAsOf: 'تاريخ الرصيد',
     frClientReceivables: 'ذمم العملاء المدينة',
     frInsurerPayables: 'الذمم الدائنة لشركات التأمين',
     frCommissionIncome: 'إيرادات العمولة',
@@ -196,12 +205,12 @@ export const FINANCE = {
     caHeading: 'Client accounting',
     caIntro:
       'Accounts receivable aged by customer — every premium invoice that has not yet been collected in full, split into 30 / 60 / 90-day buckets against the reference date. Rows are ordered worst-first (oldest debt first).',
-    caAsOf: 'As of',
-    caAsOfDateAria: 'As of date',
+    caAsOf: 'As of date',
     caColClient: 'Client',
     caColOutstanding: 'Outstanding',
     caColInvoices: 'Invoices',
     caColOldest: 'Oldest',
+    caAgeing1To30: '1–30 days',
     caColTotal: 'Total',
     caNone: 'No outstanding receivables to report.',
     caLoading: 'Loading…',
@@ -211,8 +220,7 @@ export const FINANCE = {
     iaHeading: 'Insurer accounting',
     iaIntro:
       'What the broker owes each insurer — the net premium (premium less commission) that has been collected from the client but not yet remitted — alongside the amount remitted to date. Rows are ordered worst-first (the oldest unremitted obligation first).',
-    iaAsOf: 'As of',
-    iaAsOfDateAria: 'As of date',
+    iaAsOf: 'As of date',
     iaColInsurer: 'Insurer',
     iaColOutstanding: 'Outstanding',
     iaColInvoices: 'Invoices',
@@ -232,11 +240,10 @@ export const FINANCE = {
     crateSelectInsurer: 'Select an insurer…',
     crateLineLabel: 'Insurance line',
     crateLineChoose: 'Select an insurance line…',
-    crateRateLabel: 'Rate %',
     crateRateAria: 'Rate percent',
-    crateVatLabel: 'VAT %',
     crateVatAria: 'VAT rate percent',
     crateEffectiveFromLabel: 'Effective from',
+    crateEffectiveFromHint: 'The first day this commission rate applies.',
     crateColRate: 'Rate',
     crateColVat: 'VAT',
     crateColEffectiveTo: 'Effective to',
@@ -254,9 +261,8 @@ export const FINANCE = {
     pcIntro:
       'The approved payment channels for customers (money in, on a collection receipt) and insurers (money out, on a remittance). Finance maintains this list; a channel is usable the moment it is added and stays so until it is deactivated. Only the last few digits of an account are ever stored.',
     pcOwnerLabel: 'Owner',
-    pcOwnerTypeAria: 'Owner type',
     pcOwnerFieldLabel: 'Owner',
-    pcOwnerIdLabel: 'Owner ID',
+    pcColOwnerType: 'Owner type',
     pcOwnerIdAria: 'Owner id',
     pcCustomer: 'Customer',
     pcInsurer: 'Insurer',
@@ -267,7 +273,6 @@ export const FINANCE = {
     pcBankNameLabel: 'Bank name',
     pcBankPlaceholder: 'Cairo Amman Bank — JOD',
     pcAccountLabel: 'Account (last 2–4 digits)',
-    pcAccountAria: 'Account last 4',
     pcColType: 'Type',
     pcColBank: 'Bank',
     pcColAccount: 'Acct',
@@ -317,8 +322,7 @@ export const FINANCE = {
     frHeading: 'Financial report',
     frIntro:
       "The consolidated financial dashboard — client receivables and ageing, what is owed to and remitted from insurers, the commission income roll-up (earned / paid / outstanding / reversed), and the book's result by line of business and client segment.",
-    frAsOf: 'As of',
-    frAsOfDateAria: 'As of date',
+    frAsOf: 'As of date',
     frClientReceivables: 'Client receivables',
     frInsurerPayables: 'Insurer payables',
     frCommissionIncome: 'Commission income',

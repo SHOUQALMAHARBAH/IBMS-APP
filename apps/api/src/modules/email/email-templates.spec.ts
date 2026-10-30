@@ -18,6 +18,25 @@ const TEST_MESSAGE = {
   },
 };
 
+/**
+ * EVERY KIND, so a fourth template cannot ship outside the sweeps below. The invitation needs
+ * parameters the other two do not, which is why this is a list of rendered CASES rather than of
+ * kinds — a `kind` alone cannot be rendered.
+ */
+const ALL_TEMPLATES = [
+  RESET,
+  TEST_MESSAGE,
+  {
+    kind: 'organization_administrator_invitation' as const,
+    params: {
+      recipientName: 'سارة النعيمي',
+      organizationName: 'شركة السلام لوساطة التأمين',
+      setPasswordUrl: 'https://waseet.example/reset-password?token=xyz789',
+      expiresInMinutes: 60,
+    },
+  },
+];
+
 describe('password reset notification', () => {
   it('renders in Arabic by default — the platform language', () => {
     const message = renderNotification(RESET, 'AR');
@@ -30,7 +49,7 @@ describe('password reset notification', () => {
   it('renders in English for a recipient who chose it', () => {
     const message = renderNotification(RESET, 'EN');
 
-    expect(message.subject).toBe('Reset your IBMS password');
+    expect(message.subject).toBe('Reset your WASEET 360 password');
     expect(message.bodyText).toContain('Hello أحمد الخطيب');
     expect(message.bodyText).toContain('your password has not changed');
   });
@@ -85,6 +104,44 @@ describe('every template', () => {
         expect(message.subject.trim().length).toBeGreaterThan(0);
         expect(message.bodyText.trim().length).toBeGreaterThan(0);
       }
+    }
+  });
+
+  it('names the product in EVERY subject, in BOTH languages (owner decision 2026-10-29)', () => {
+    /*
+     * THE OWNER'S RULING, and the half worth keeping is her reason: the three Arabic subjects
+     * were never WRONG — they described the system because there was no name to put there, and
+     * they never carried the `IBMS` codename at all. There is a name now, so they carry it.
+     *
+     * ASSERTED OVER EVERY KIND rather than over the three subjects that exist today, because the
+     * failure this guards is a FOURTH template shipping with a generic Arabic subject while its
+     * English sibling names the product — which is exactly the asymmetry that was here before.
+     *
+     * The Arabic and Latin forms are both checked, one per language, because they are two
+     * different strings and a subject carrying the Latin `WASEET 360` in Arabic would be the
+     * product shouting in the wrong script on the one line a recipient reads first.
+     */
+    const brand = { AR: 'وسيط 360', EN: 'WASEET 360' } as const;
+
+    for (const template of ALL_TEMPLATES) {
+      for (const language of ['AR', 'EN'] as const) {
+        const message = renderNotification(template, language);
+        expect(message.subject).toContain(brand[language]);
+      }
+    }
+  });
+
+  it('carries no generic stand-in where the product name belongs', () => {
+    /*
+     * THE ABSENCE IS THE OTHER HALF, and only an absence can fail: a subject that gained the name
+     * while KEEPING «نظام إدارة الوساطة التأمينية» beside it would satisfy the check above and
+     * still say more in Arabic than in English — two subjects for one email, which is what the
+     * substitution was for.
+     */
+    for (const template of ALL_TEMPLATES) {
+      expect(renderNotification(template, 'AR').subject).not.toContain(
+        'نظام إدارة الوساطة التأمينية',
+      );
     }
   });
 

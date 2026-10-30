@@ -1,3 +1,4 @@
+import { isUnresolved } from '../screening-providers/screening-provider.types';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MATCHING_ALGORITHM_VERSION } from '../compliance-risk/watchlist-match.config';
@@ -169,12 +170,22 @@ export class ScreeningOperationsService {
     ]);
 
     const total = byOutcome.reduce((sum, row) => sum + row._count._all, 0);
+    /*
+     * THROUGH `isUnresolved`, NEVER A LIST SPELLED OUT HERE.
+     *
+     * This read `['NOT_CONFIGURED', 'SCREENING_FAILED', 'UNABLE_TO_SCREEN'].includes(...)` — a
+     * second home for a classification `screening-provider.types.ts` already owns, whose own
+     * comment says in as many words that callers should not re-derive it. The two agreed, so the
+     * figure was right; what was wrong is that the only thing keeping it right was that nobody had
+     * touched either copy. A sixth error outcome added to the enum and to `UNRESOLVED_OUTCOMES`
+     * would have left this literal short, and the consequence is the one that matters on this
+     * screen: an outcome meaning NOBODY CHECKED counted on the side of the ones that were.
+     *
+     * The inline array was also typed `string[]`, so `.includes(row.outcome)` accepted any string
+     * and a renamed member would not have been a compile error. `isUnresolved` takes the enum.
+     */
     const unresolvedCount = byOutcome
-      .filter((row) =>
-        ['NOT_CONFIGURED', 'SCREENING_FAILED', 'UNABLE_TO_SCREEN'].includes(
-          row.outcome,
-        ),
-      )
+      .filter((row) => isUnresolved(row.outcome))
       .reduce((sum, row) => sum + row._count._all, 0);
 
     const policy = loadHoldPolicy();

@@ -1,12 +1,13 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   CONSENT_PURPOSES,
+  type ConsentPurpose,
   confirmConsentWithdrawal,
   createConsentRecord,
   listConsentRecords,
@@ -14,24 +15,23 @@ import {
   type ConsentRecord,
 } from '../../../lib/pdpl/consent-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { actionErrorText } from '../../../lib/i18n/action-error';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function ConsentPage() {
   const router = useRouter();
@@ -50,7 +50,10 @@ export default function ConsentPage() {
     'customer' | 'insuredPerson' | 'lead'
   >('customer');
   const [ownerId, setOwnerId] = useState('');
-  const [purpose, setPurpose] = useState<string>(CONSENT_PURPOSES[2]); // MARKETING
+  // `ConsentPurpose`, not `string`: `CONSENT_PURPOSES` is already `as const`, so the
+  // union was available and the loose state was the only thing standing between the
+  // label map and a total index.
+  const [purpose, setPurpose] = useState<ConsentPurpose>(CONSENT_PURPOSES[2]); // MARKETING
   const [decision, setDecision] = useState<'grant' | 'decline'>('grant');
   const [consentTextVersion, setConsentTextVersion] = useState('');
   const [filterCustomerId, setFilterCustomerId] = useState('');
@@ -101,7 +104,7 @@ export default function ConsentPage() {
       await load(filterCustomerId.trim() || undefined);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('consSubmitError'),
+        actionErrorText(err, t, 'consSubmitError'),
       );
     } finally {
       setBusy(false);
@@ -123,7 +126,7 @@ export default function ConsentPage() {
       );
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('consRequestError'),
+        actionErrorText(err, t, 'consRequestError'),
       );
     } finally {
       setBusyId(null);
@@ -139,7 +142,7 @@ export default function ConsentPage() {
       await load(filterCustomerId.trim() || undefined);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('consWithdrawError'),
+        actionErrorText(err, t, 'consWithdrawError'),
       );
     } finally {
       setBusyId(null);
@@ -154,11 +157,11 @@ export default function ConsentPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('consHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('consIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('consHeading')}
+        description={t('consIntro')}
+      />
 
       {canManage ? (
         <form
@@ -166,16 +169,15 @@ export default function ConsentPage() {
           style={{
             margin: '1rem 0',
             display: 'grid',
-            gap: '0.4rem',
+            gap: 'var(--space-2)',
             maxWidth: '30rem',
           }}
         >
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
-            {t('consDataSubjectFieldLabel')}
+            {t('consDataSubjectKindLabel')}
             <select
-              aria-label={t('consDataSubjectKindLabel')}
               value={ownerKind}
               onChange={(e) =>
                 setOwnerKind(
@@ -202,7 +204,7 @@ export default function ConsentPage() {
             />
           ) : (
             <label
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
             >
               {ownerKind === 'insuredPerson'
                 ? t('consInsuredPersonIdLabel')
@@ -220,13 +222,18 @@ export default function ConsentPage() {
             </label>
           )}
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('consPurposeLabel')}
+            {/* The cast below is this codebase's own convention for a `<select>`
+                whose options are GENERATED from the union — `NewSlaPolicyForm`
+                does the same — and it is sound because the option set IS the
+                union: every value the handler can receive came from
+                `CONSENT_PURPOSES`. */}
             <select
               aria-label={t('consPurposeLabel')}
               value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
+              onChange={(e) => setPurpose(e.target.value as ConsentPurpose)}
             >
               {CONSENT_PURPOSES.map((p) => (
                 <option key={p} value={p}>
@@ -236,7 +243,7 @@ export default function ConsentPage() {
             </select>
           </label>
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('consDecisionLabel')}
             <select
@@ -249,7 +256,7 @@ export default function ConsentPage() {
             </select>
           </label>
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('consTextVersionLabel')}
             <input
@@ -271,7 +278,7 @@ export default function ConsentPage() {
         style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', margin: '1rem 0' }}
       >
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('consFilterLabel')}
           <input
@@ -285,53 +292,87 @@ export default function ConsentPage() {
 
       {notice ? <p style={{ opacity: 0.8 }}>{notice}</p> : null}
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('consNone')}</p>
+          <EmptyState title={t('consNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('consDataSubjectLabel')}</th>
-                  <th style={head}>{t('consPurposeLabel')}</th>
-                  <th style={head}>{t('consColMarketing')}</th>
-                  <th style={head}>{t('consDecisionLabel')}</th>
-                  <th style={head}>{t('consColStatus')}</th>
-                  <th style={head}>{t('consColTextVersion')}</th>
-                  <th style={head}>{t('consColActions')}</th>
+                  <Th>{t('consDataSubjectLabel')}</Th>
+                  <Th>{t('consPurposeLabel')}</Th>
+                  <Th>{t('consColMarketing')}</Th>
+                  <Th>{t('consDecisionLabel')}</Th>
+                  <Th>{t('consColStatus')}</Th>
+                  <Th>{t('consColTextVersion')}</Th>
+                  <Th>{t('consColActions')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>
-                      {r.leadId
-                        ? `Lead ${r.leadId.slice(0, 8)}…`
-                        : `${(r.customerId ?? r.insuredPersonId ?? '—').slice(0, 8)}…`}
-                    </td>
-                    <td style={cell}>{r.purpose}</td>
-                    <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>
-                    <td style={cell}>{r.granted ? t('consStatusGranted') : t('consStatusDeclined')}</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    <Td>
+                      {/*
+                        * RULE 2 — WHOSE consent, by name. This rendered `Lead <8 chars of a uuid>`
+                        * or a bare sliced uuid on the one screen whose whole subject is who agreed
+                        * to what.
+                        *
+                        * AND THE KIND MARKER IS BACK — OWNER DECISION 51, «عميل محتمل», the
+                        * singular of the «العملاء المحتملون» that already ships in `leadsHeading`
+                        * and `navLeads`. Removing the old `Lead ` prefix was right (it was
+                        * hardcoded ENGLISH inside a template literal, so an Arabic reader saw it
+                        * too) but it left the register unable to distinguish a lead from a
+                        * customer, and that distinction is PDPL-significant: consent captured at
+                        * lead capture pre-dates the customer record. The kind is derived from the
+                        * id the api already sends, never from a second wire field.
+                        */}
+                      {r.subjectName ? (
+                        r.leadId ? (
+                          <>
+                            <bdi>{r.subjectName}</bdi>{' '}
+                            <span style={{ color: 'var(--ink-secondary)' }}>
+                              ({t('consSubjectLead')})
+                            </span>
+                          </>
+                        ) : (
+                          <bdi>{r.subjectName}</bdi>
+                        )
+                      ) : (
+                        '—'
+                      )}
+                    </Td>
+                    {/*
+                      Decision 59 — PURE OVERSIGHT, zero Arabic. `ConsentRecord.purpose`
+                      is a `ConsentPurpose` ENUM and `ENUM_LABEL.ConsentPurpose` has
+                      shipped all six members all along; this cell rendered the stored
+                      value beside two cells that were already translated.
+
+                      NOT the same field as `/ropa-entries`' `purpose`, which is a free
+                      `String` a human typed and is CORRECT rendered raw. Same name, two
+                      models, opposite answers — which is why `raw-stored-values.py` calls
+                      this field AMBIGUOUS BY TYPE and why each site is read, not counted.
+                    */}
+                    <Td>
+                      {t(ENUM_LABEL.ConsentPurpose[r.purpose])}
+                    </Td>
+                    <Td>{r.isMarketing ? t('commonYes') : t('commonNo')}</Td>
+                    <Td>{r.granted ? t('consStatusGranted') : t('consStatusDeclined')}</Td>
+                    <Td>
                       {r.withdrawnAt
                         ? `Withdrawn ${r.withdrawnAt.slice(0, 10)}`
                         : r.isActive
                           ? 'Active'
                           : t('consStatusNeverGranted')}
-                    </td>
-                    <td style={cell}>{r.consentTextVersion}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{r.consentTextVersion}</Td>
+                    <Td>
                       {canManage && r.isActive ? (
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
                           <button
@@ -352,18 +393,18 @@ export default function ConsentPage() {
                       ) : (
                         '—'
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
         // This page previously rendered NOTHING while fetching — one of the
         // four states directive §2 requires. Guarded on loadError so the
         // error and a "Loading…" line cannot appear together.
-        <p>{t('consLoading')}</p>
+        <SkeletonList rows={4} label={t('consLoading')} />
       )}
     </main>
   );

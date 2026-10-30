@@ -11,6 +11,7 @@
     "packages/*"
   ],
   "overrides": {
+    "body-parser": "^2.4.0",
     "deepmerge-ts": "8.0.2",
     "fast-uri": "3.1.8"
   },
@@ -30,6 +31,7 @@
     "db:migrate:dev": "npm run migrate:dev --workspace=@ibms/db",
     "db:migrate:status": "npm run migrate:status --workspace=@ibms/db",
     "db:permission-catalogue": "dotenv -e .env.test -- tsx scripts/export-permission-catalogue.ts",
+    "db:reference-values": "dotenv -e .env.test -- tsx scripts/generate-reference-values.ts",
     "db:permission-descriptions": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts",
     "db:permission-descriptions:check": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts --check",
     "db:privileges": "npm run privileges --workspace=@ibms/db",
@@ -55,7 +57,31 @@
     "test:e2e": "turbo run test:e2e",
     "test:security": "node scripts/audit-check.mjs",
     "test:smoke": "bash scripts/smoke.sh api",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "db:migrate:diff": "npm run migrate:diff --workspace=@ibms/db",
+    "check:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py --check",
+    "check:loaders": "python scripts/measurements/all-or-nothing-loaders.py --check",
+    "check:absence": "python scripts/measurements/page-wide-absence-assertions.py --check",
+    "check:labels": "python scripts/measurements/identifier-labels.py --check",
+    "check:raw-values": "python scripts/measurements/raw-stored-values.py",
+    "check:seed-sweeps": "python scripts/measurements/seed-sweeps-vs-cascade.py --check",
+    "check:maker-checker-pairs": "python scripts/measurements/combined-duty-projection.py",
+    "check:undated-absence-claims": "python scripts/measurements/undated-absence-claims.py --check",
+    "check:whats-new-cap": "python scripts/measurements/whats-new-cap.py --check",
+    "check:docs": "npm run check:undated-absence-claims && npm run check:whats-new-cap",
+    "check:css-properties": "python scripts/measurements/undefined-css-properties.py",
+    "check:token-contrast": "python scripts/measurements/token-contrast.py",
+    "check:inline-styles": "python scripts/measurements/inline-styles.py",
+    "check:opacity-muting": "python scripts/measurements/opacity-as-muting.py",
+    "check:literal-colours": "python scripts/measurements/literal-colours.py --check",
+    "check:rendered-identifiers": "python scripts/measurements/rendered-identifiers.py --check",
+    "check:typed-identifiers": "python scripts/measurements/typed-identifier-inputs.py --check",
+    "check:four-states": "python scripts/measurements/four-states.py --check",
+    "check:load-error-way-forward": "python scripts/measurements/load-error-way-forward.py --check",
+    "check:unreachable-routes": "python scripts/measurements/unreachable-routes.py --check",
+    "check:unreachable-routes-by-verb": "python scripts/measurements/unreachable-routes-by-verb.py --check",
+    "check:screen-pass": "npm run check:labels && npm run check:token-contrast && npm run check:inline-styles && npm run check:opacity-muting && npm run check:literal-colours && npm run check:rendered-identifiers && npm run check:typed-identifiers && npm run check:four-states && npm run check:load-error-way-forward && npm run check:unreachable-routes && npm run check:unreachable-routes-by-verb",
+    "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py"
   },
   "devDependencies": {
     "turbo": "2.10.11"

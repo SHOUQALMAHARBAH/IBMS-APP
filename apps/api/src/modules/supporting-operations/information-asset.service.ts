@@ -1,5 +1,4 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { InformationAsset } from '@ibms/db';
 import { InformationAssetRepository } from '../../repositories/information-asset.repository';
 import { UserRepository } from '../../repositories/user.repository';
 import { AuditService } from '../audit/audit.service';
@@ -7,6 +6,10 @@ import type { RecordAuditEntryInput } from '../audit/audit.service';
 import type { CreateInformationAssetDto } from './dto/create-information-asset.dto';
 import type { UpdateInformationAssetDto } from './dto/update-information-asset.dto';
 import type { ListInformationAssetsQueryDto } from './dto/list-information-assets-query.dto';
+import {
+  deriveInformationAssetView,
+  type InformationAssetView,
+} from './information-asset.config';
 
 /** Process 69 — the foundational `InformationAsset` CRUD (ISO 27001 Clause
  * 8.1 asset inventory). See `information-asset.config.ts` for why this is
@@ -25,7 +28,7 @@ export class InformationAssetService {
   async create(
     dto: CreateInformationAssetDto,
     actorUserId: string,
-  ): Promise<InformationAsset> {
+  ): Promise<InformationAssetView> {
     const owner = await this.users.findById(dto.ownerUserId);
     if (!owner) throw new NotFoundException('Owner user not found');
 
@@ -49,27 +52,40 @@ export class InformationAssetService {
       },
     });
 
-    return asset;
+    return deriveInformationAssetView(asset, await this.ownerNames([asset]));
   }
 
-  list(query: ListInformationAssetsQueryDto): Promise<InformationAsset[]> {
-    return this.assets.findMany({
+  async list(
+    query: ListInformationAssetsQueryDto,
+  ): Promise<InformationAssetView[]> {
+    const rows = await this.assets.findMany({
       assetType: query.assetType,
       classification: query.classification,
     });
+    /* BATCHED. An asset inventory is as long as the office's systems, and one lookup per row is how
+     * a register that works on a demonstration office stops working on a real one. */
+    const names = await this.ownerNames(rows);
+    return rows.map((r) => deriveInformationAssetView(r, names));
   }
 
-  async get(id: string): Promise<InformationAsset> {
+  async get(id: string): Promise<InformationAssetView> {
     const asset = await this.assets.findById(id);
     if (!asset) throw new NotFoundException('Information asset not found');
-    return asset;
+    return deriveInformationAssetView(asset, await this.ownerNames([asset]));
+  }
+
+  /** ONE place the four projection paths get their owner names, through decision 48's resolver. */
+  private ownerNames(
+    rows: readonly { ownerUserId: string }[],
+  ): Promise<Map<string, string>> {
+    return this.users.displayNamesForUserIds(rows.map((r) => r.ownerUserId));
   }
 
   async update(
     id: string,
     dto: UpdateInformationAssetDto,
     actorUserId: string,
-  ): Promise<InformationAsset> {
+  ): Promise<InformationAssetView> {
     const existing = await this.assets.findById(id);
     if (!existing) throw new NotFoundException('Information asset not found');
 
@@ -98,7 +114,10 @@ export class InformationAssetService {
       },
     });
 
-    return updated;
+    return deriveInformationAssetView(
+      updated,
+      await this.ownerNames([updated]),
+    );
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {

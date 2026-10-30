@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { CONTROL } from './Field';
 import { useLanguage } from '../../lib/i18n/language-context';
 import type { TranslationKey } from '../../lib/i18n/translations';
 import { searchCustomers } from '../../lib/customer/customer-api';
@@ -16,6 +17,7 @@ import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import { searchEmployees } from '../../lib/supporting-operations/employee-api';
 import {
   searchBranches,
+  searchDocuments,
   searchInsurers,
   searchPolicies,
   searchUsers,
@@ -127,6 +129,21 @@ interface EntitySource {
    * request it knows will 400 or withholds one the server would have answered.
    */
   minChars: number;
+  /**
+   * What to say when somebody has TYPED a term and chosen nothing, and the field is `required`.
+   *
+   * `required` sits on the visible input (see the note at its call site), and the input displays
+   * the search TERM while nothing is selected — so the browser saw a non-empty required field and
+   * let the form submit with the id still EMPTY. On `/complaints` that is a create carrying
+   * `customerId: ''`, which is where the owner's «customerId must be a UUID» came from. This
+   * message is handed to `setCustomValidity`, so the browser refuses the submit and anchors its
+   * own bubble on the control she is looking at — the property the visible-input decision bought.
+   *
+   * OPTIONAL because only the customer source has a sentence for it that is already written.
+   * A source without one keeps the plain `required` behaviour (which still refuses an EMPTY box)
+   * and is listed for the owner rather than given a sentence nobody decided.
+   */
+  chooseOne?: TranslationKey;
 }
 
 export type EntityKind =
@@ -136,7 +153,8 @@ export type EntityKind =
   | 'insurer'
   | 'policy'
   | 'user'
-  | 'branch';
+  | 'branch'
+  | 'document';
 
 export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
   /**
@@ -165,6 +183,11 @@ export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
     noMatches: 'customerPickerNoMatches',
     error: 'customerPickerSearchError',
     minChars: 3,
+    // The two-control version's empty-option placeholder, which has been declared and rendered by
+    // nothing since this field replaced it: «— اختر عميلاً —» / '— select a customer —'. Reused
+    // rather than written, and the surrounding em dashes are sliced off at the call site because
+    // they belong to a dropdown option and not to a validation message.
+    chooseOne: 'customerPickerNonePlaceholder',
     async search(term) {
       const rows = await searchCustomers(term);
       return rows.map((c) => {
@@ -347,6 +370,42 @@ export const ENTITY_SOURCES: Record<EntityKind, EntitySource> = {
     },
   },
 
+  /**
+   * `GET /documents/search` — owner decision 41, so `/audit-trail`'s document-history field can be
+   * filled by naming a file instead of pasting a uuid.
+   *
+   * `minChars: 3`, the server's own floor for this entity: the register holds every version of every
+   * file this office has ever attached, which makes it the largest of the seven sets.
+   *
+   * THE DETAIL LINE IS LOAD-BEARING HERE, more than on any other source. File names repeat by nature —
+   * forty policies each carry a "policy.pdf" — so the category and the version are what tell two
+   * matches apart, and a chooser showing names alone would be a list of identical rows. `v2` is written
+   * as a literal rather than through a key because it is language-free, which is the same treatment the
+   * version column on `/audit-trail` itself already gives it.
+   *
+   * NOT AVAILABLE TO EVERY READER OF THE SCREEN THAT USES IT, deliberately: `document.read` does not
+   * reach the EXTERNAL_AUDITOR, who keeps the typed field. See the api config for why that absence is
+   * the decision rather than a defect to be widened away.
+   */
+  document: {
+    searchLabel: 'entitySearchDocumentLabel',
+    placeholder: 'entitySearchDocumentPlaceholder',
+    noMatches: 'entitySearchDocumentNoMatches',
+    error: 'entitySearchDocumentError',
+    minChars: 3,
+    async search(term) {
+      const rows = await searchDocuments(term);
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.fileName,
+        detail: [
+          { key: ENUM_LABEL.DocumentCategory[r.category] },
+          `v${r.versionNumber}`,
+        ],
+      }));
+    },
+  },
+
   auditActor: {
     searchLabel: 'entitySearchActorLabel',
     placeholder: 'entitySearchActorPlaceholder',
@@ -380,11 +439,23 @@ const listStyle: CSSProperties = {
   top: '100%',
   zIndex: 20,
   background: 'var(--surface-card)',
-  border: '1px solid var(--line)',
+  /*
+   * `--border-default` and `--shadow-md`, resolved by MEASUREMENT rather than by picking an
+   * elevation: `--line` and `--shadow-raised` are both defined nowhere, so this dropdown rendered
+   * with no edge and no shadow — floating over the page with nothing separating it from the content
+   * underneath.
+   *
+   * The answer was already decided one component over. `NotificationBell`'s panel is the app's only
+   * other floating dropdown and is the exact comparable: absolutely positioned, `--surface-card`
+   * background, `border: 1px solid var(--border-default)`, `boxShadow: var(--shadow-md)`. Matching
+   * it is sounder than choosing between `--shadow-sm`/`md`/`lg` on taste, and it makes the two
+   * overlays in this product look like one product.
+   */
+  border: '1px solid var(--border-default)',
   borderRadius: 'var(--radius-sm)',
   maxHeight: '16rem',
   overflowY: 'auto',
-  boxShadow: 'var(--shadow-raised)',
+  boxShadow: 'var(--shadow-md)',
 };
 const optionStyle = (active: boolean): CSSProperties => ({
   padding: 'var(--space-1) var(--space-2)',
@@ -433,6 +504,7 @@ export function EntitySearch({
   // overwrite a newer one. A `cancelled` flag per effect is not enough on its own: two responses can
   // both belong to live effects and still arrive out of order.
   const latest = useRef('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   /**
    * The caller may clear the selection (a form reset, a submit), and the field must follow — a name
@@ -448,6 +520,39 @@ export function EntitySearch({
    * name does not, and re-fetching it to render what somebody just clicked would be a request for an
    * answer already on screen.
    */
+  /**
+   * THE CALLER CLEARED THE SELECTION, SO THE FIELD FOLLOWS — all of it, not just `selected`.
+   *
+   * The owner's walk, on `/complaints`: «لما أبحث أول مرة عملية البحث ممتازة، بس لما أبحث كمان
+   * مرة بتعلّق ما بتظهر اشي، وبتطلع هاي الرسالة customerId must be a UUID». Every clause of that
+   * sentence came from ONE omission: `clear()` resets `chosen` and `term`, and `clear()` is only
+   * ever called by the Clear BUTTON. When the CALLER clears `value` — which `/complaints`,
+   * `/consent` and `/transaction-monitoring` all do after a successful create — `chosen` and
+   * `term` were left behind, and then:
+   *
+   *   1. the search effect's first line is `if (chosen !== null) return`, so it NEVER SEARCHED
+   *      AGAIN — «بتعلّق ما بتظهر اشي», it hangs and nothing appears;
+   *   2. `shown` falls back to `term`, so the box still displayed the PREVIOUS customer's name
+   *      for an id the form no longer held — which is exactly what the comment below forbids;
+   *   3. that non-empty text satisfied `required`, so the browser let the form submit;
+   *   4. and the submit carried `customerId: ''` → «customerId must be a UUID».
+   *
+   * Adjusted DURING RENDER rather than in an effect: `npm run lint` refuses synchronous setState
+   * inside an effect (it refused the first version of `selected` for that reason), and React
+   * supports this shape for precisely this job — no cascade, no extra commit.
+   */
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    if (value === '') {
+      setChosen(null);
+      setTerm('');
+      setResults(null);
+      setOpen(false);
+      setActive(-1);
+    }
+  }
+
   const selected = value === '' ? null : chosen;
 
   const trimmed = term.trim();
@@ -574,10 +679,16 @@ export function EntitySearch({
       return;
     }
     if (event.key === 'Enter') {
-      // Never submits the surrounding form while a list is open — the behaviour the two-field version
-      // had to implement for its own reasons, kept for this one.
+      // ENTER IN A SEARCH BOX MEANS SEARCH, NEVER SUBMIT.
+      //
+      // This used to call `preventDefault` only when an option was ACTIVE — and `active` is -1
+      // until either an arrow key is pressed or a result set lands, which is 250ms of debounce
+      // plus a round trip. So typing a name and pressing Enter submitted the surrounding form
+      // with the id still EMPTY, and the comment here claimed the opposite. Gated on nothing
+      // being SELECTED rather than on the list being open: with a customer chosen, Enter
+      // submitting the form is ordinary and wanted.
+      if (selected === null) event.preventDefault();
       if (open && active >= 0 && options[active]) {
-        event.preventDefault();
         choose(options[active]);
       }
       return;
@@ -597,6 +708,31 @@ export function EntitySearch({
     }
   }
 
+  /**
+   * `required` IS SATISFIED BY A SEARCH TERM, WHICH IS NOT A SELECTION.
+   *
+   * The input displays the term while nothing is chosen, so a non-empty box looked like a filled
+   * required field and the browser let the form through with the id empty. Fixing the two defects
+   * above closes the paths through typing and through Enter; this closes the one through the
+   * submit BUTTON, which is the likelier of the three.
+   *
+   * An effect with no setState, so the lint rule that refused the other two shapes does not apply.
+   * Cleared to '' whenever the field is in any other state — a stale custom validity would make a
+   * correctly-filled form unsubmittable, which is a worse failure than the one being fixed.
+   */
+  const chooseOne = source.chooseOne;
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const typedButNotChosen =
+      required && value === '' && term.trim() !== '' && chooseOne !== undefined;
+    // The em dashes belong to the dropdown option this sentence was written for, not to a
+    // validation bubble. Sliced rather than retyped — the Arabic is the owner's own.
+    el.setCustomValidity(
+      typedButNotChosen ? t(chooseOne).replace(/^[—\s]+|[—\s]+$/g, '') : '',
+    );
+  }, [required, value, term, chooseOne, t]);
+
   const describedBy: string[] = [];
   if (showBusy) describedBy.push(`${listId}-busy`);
 
@@ -613,6 +749,7 @@ export function EntitySearch({
       </label>
       <span style={chosenStyle}>
         <input
+          ref={inputRef}
           id={`${listId}-input`}
           // ARIA 1.2 combobox. The native `<select>` this replaces carried all of it for free; having
           // merged the two controls, each piece is now explicit and asserted by keyboard in
@@ -651,6 +788,17 @@ export function EntitySearch({
           }}
           placeholder={t(source.placeholder)}
           data-entity-search-term={kind}
+          /*
+           * THE PRODUCT'S OWN CONTROL APPEARANCE. This input had NO style prop, so it rendered in
+           * the browser's own control chrome — and beside a `Field`-wrapped `TextInput` the two
+           * looked like controls from two different applications. On a dark screen the user agent
+           * paints a light box, which is how it was found: by opening a screenshot of
+           * `/dashboards/claims`, whose filter row holds two pickers and two text fields.
+           *
+           * Nothing but the appearance changes — the combobox role, every ARIA attribute, the
+           * required-on-the-visible-input decision and the keyboard handling are untouched.
+           */
+          style={CONTROL}
         />
         {selected ? (
           <button type="button" onClick={clear} data-entity-search-clear={kind}>

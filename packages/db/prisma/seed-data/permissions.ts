@@ -537,6 +537,41 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
   },
   {
+    /*
+     * MODULE 0-ب ITEM (e), DECISION 63 — LINKING THIS OFFICE'S COUNTERPARTY RECORD TO A REGISTERED
+     * INSURANCE COMPANY.
+     *
+     * Its own code, and SEPARATE from `insurer.update`, because the act is not an edit: it changes
+     * which SOURCE answers for the company's name, phone, email, website and address, and it makes
+     * this office's own columns read-only. An officer who may correct a phone number has not thereby
+     * been given the authority to decide that the record in front of them IS a particular licensed
+     * company.
+     *
+     * OFFICE-scoped, not PLATFORM: the office is asserting something about ITS OWN record. Nothing is
+     * written on the company's row — tenant scoping would not permit it, and nothing should be built
+     * that needs it.
+     */
+    code: "insurer.company.link",
+    module: "insurance-operations",
+    description:
+      "Link this office's insurer record to an insurance company registered on the platform. Changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's own copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record.",
+    roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
+  },
+  {
+    /*
+     * UNLINKING IS ITS OWN CODE, not the same one read twice. The owner's condition is that each act
+     * needs a permission, and the two are not symmetrical in consequence: linking narrows what this
+     * office may edit, while unlinking RETURNS a company's published details to being whatever the
+     * office last typed — which is the direction that can quietly make a screen show a stale phone
+     * number as though it were current.
+     */
+    code: "insurer.company.unlink",
+    module: "insurance-operations",
+    description:
+      "Remove the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note.",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
     code: "rfq.insurer.update",
     module: "insurance-operations",
     description: "Update an insurer's RFQ response status",
@@ -1058,7 +1093,27 @@ const complianceRisk: PermissionSeed[] = [
   {
     code: "aml.monitor",
     module: "compliance-risk",
-    description: "Monitor AML/CFT transaction-monitoring alerts",
+    /*
+     * THE NAME STAYS, THE DESCRIPTION IS CORRECTED — 2026-10-20.
+     *
+     * It said "Monitor AML/CFT transaction-monitoring alerts". MEASURED: it
+     * gates FIVE routes on `transaction-monitoring.controller.ts` — log an
+     * alert, run the detection sweep, list alerts, read one, AND CLOSE ONE.
+     * Escalation and reporting to the authority are a different code
+     * (`aml.escalate`).
+     *
+     * "Monitor" understates it: closing an alert is a DISPOSAL DECISION about a
+     * suspicious-activity finding, and an administrator ticking this box is
+     * granting that.
+     *
+     * THE CODE STRING IS NOT CHANGED, deliberately twice over: the owner's walk
+     * settles the Arabic naming of permissions (decision 94) and that governs
+     * this one, so renaming now is work done twice in the wrong order; and this
+     * file's own note already records that a rename is the LAST option here,
+     * with a second code preferred.
+     */
+    description:
+      "Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are `aml.escalate`, a separate code",
     roles: [COMPLIANCE],
   },
   {
@@ -1071,7 +1126,34 @@ const complianceRisk: PermissionSeed[] = [
   {
     code: "sanctions-pep.screen",
     module: "compliance-risk",
-    description: "Run recurring sanctions screening batches",
+    /*
+     * THE NAME STAYS, THE DESCRIPTION IS CORRECTED — 2026-10-20, and the
+     * measurement corrected the brief as well as the description.
+     *
+     * It said "Run recurring sanctions screening batches", which names ONE of
+     * SEVENTEEN routes. MEASURED across three controllers:
+     *
+     *   screening.controller.ts        11 — overview, the recurring batch, the
+     *                                      match queue, pending count, REVIEW a
+     *                                      match, reviewers, a case, assign,
+     *                                      start review, escalate, notes
+     *   watchlist-sync.controller.ts    4 — run a sync, status, the dataset
+     *                                      generations, and ROLL A GENERATION
+     *                                      BACK, which decides that screening
+     *                                      runs against an older list
+     *   screening-config.controller.ts  2 — the configuration and its health
+     *
+     * The brief for this correction said the code gates four routes on
+     * `watchlist-sync` and that a holder "refreshes the list from its sources;
+     * they do not screen a customer". That is NOT what it does: eleven of the
+     * seventeen are the screening surface itself, including deciding a potential
+     * match. Both halves — screening people, and maintaining the lists people
+     * are screened against — are one code.
+     *
+     * THE CODE STRING IS NOT CHANGED: same two reasons as `aml.monitor` above.
+     */
+    description:
+      "The whole sanctions/PEP screening surface: run screening and the recurring batch, work the match queue (assign, review, escalate, annotate), AND maintain the watchlists themselves — including rolling a dataset generation back, which decides that screening runs against an older list. 17 routes across three controllers",
     roles: [COMPLIANCE],
   },
   {
@@ -1180,6 +1262,31 @@ const complianceRisk: PermissionSeed[] = [
     description:
       "Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason",
     roles: [OFFICE_ADMIN],
+  },
+  {
+    // MODULE 0-ب, DECISION 36 — READING the conflict-of-interest disclosure register.
+    //
+    // THERE IS NO CODE FOR DECLARING, and that is structural rather than an omission: the discloser
+    // is the SUBJECT. The same reasoning leaves `AccessRecertificationItem`'s maker permission
+    // empty, where no permission exists or can — and it bites harder here, because a code an office
+    // could withhold would leave the person who HAS the conflict unable to say so.
+    //
+    // THE HOLDER IS A TEMPLATE DEFAULT AND NOT A LOCK (decision 80). The owner's words were "the
+    // OFFICE MANAGER", and MEASURED against the seeded grid there is no role of that name: the
+    // twelve are SALES_RELATIONSHIP_OFFICER, PLACEMENT_TECHNICAL_OFFICER, POLICY_CHECKING_OFFICER,
+    // CLAIMS_OFFICER, FINANCE_COLLECTIONS_OFFICER, COMPLIANCE_OFFICER, BRANCH_DEPARTMENT_MANAGER,
+    // DATA_PROTECTION_OFFICER, SYSTEM_SECURITY_ADMINISTRATOR, EXECUTIVE_MANAGEMENT,
+    // EXTERNAL_AUDITOR and OFFICE_ADMINISTRATOR. `BRANCH_DEPARTMENT_MANAGER` is the manager role in
+    // this product — the one the concentration measurement itself reports as "the MANAGER" — so it
+    // is the one shipped, and an office may grant it elsewhere.
+    //
+    // COMPLIANCE_OFFICER IS THE OBVIOUS SECOND HOLDER and is deliberately NOT shipped: the owner
+    // named one role, and widening a grant she named precisely is not a tidy-up. Reported instead.
+    code: "conflict-of-interest.register.read",
+    module: "compliance-risk",
+    description:
+      "Read the conflict-of-interest disclosure register — the conflicts this office's people have declared about themselves",
+    roles: [MANAGER],
   },
   {
     code: "internal-controls.view",
@@ -1481,10 +1588,57 @@ const pdpl: PermissionSeed[] = [
     roles: [DPO],
   },
   {
-    code: "retention-schedule.manage",
+    /*
+     * MODULE 0 CLOSE, DECISION 3 — THE EDIT HALF.
+     *
+     * `retention-schedule.manage` gated BOTH the edit and the Legal Counsel confirmation, which made
+     * "a retention period one person chose and confirmed alone" unrepresentable as a defect: there
+     * was one code, so there was nothing to separate.
+     *
+     * Splitting it is only half the work, and the owner was explicit that the other half is what
+     * matters: "splitting the codes alone would leave two codes with no enforcement — separated in
+     * appearance only". So migration `20261128100000` gives the table a MAKER column, a CHECKER
+     * column, an escape column and a CHECK constraint, and the pair is registered in
+     * `maker-checker-pairs.config.ts` — which is what makes the database, the readiness signal and
+     * the office's declared separated/merged state pick it up automatically.
+     *
+     * WHICH OF THE TWO A PERSON HOLDS IS THE OFFICE'S CHOICE. Both successors go to both roles that
+     * held the umbrella, because withdrawing one from one role here would be this product deciding
+     * an office's separation of duties for it. A one-person office is covered by the declared merged
+     * state, with the hat recorded per step.
+     */
+    code: "retention-schedule.update",
     module: "pdpl",
     description:
-      "Maintain the retention-period table (record categories, months, Legal Counsel confirmation)",
+      "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded",
+    roles: [COMPLIANCE, DPO],
+  },
+  {
+    /*
+     * THE CONFIRM HALF — and it is the checker, so it is registered in `checker-roles.config.ts`
+     * too. A pair added to the maker/checker registry WITHOUT a code there is a pair whose checker
+     * half can be handed out silently: the database still refuses a self-confirmation, but nothing
+     * reports that an office granted one role both halves. That was found on 2026-10-13 for
+     * `needs-assessment.approve` and is not repeated here.
+     */
+    code: "retention-schedule.confirm",
+    module: "pdpl",
+    description:
+      "Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row",
+    roles: [COMPLIANCE, DPO],
+  },
+  {
+    code: "retention.extend",
+    module: "pdpl",
+    description:
+      "Extend the retention of specific records past the period set for their category, on one of exactly three bases — a named legislative provision, a live legal hold or dispute, or the customer's explicit consent. Free text may accompany a basis; it may not BE one. Every extension is recorded in the register with which records, which basis, who, when and until when, so it can be justified from one place. Extending WITHOUT legislative cover and WITHOUT the customer's consent carries real liability under the PDPL, which is why the basis is a closed list rather than a field",
+    roles: [COMPLIANCE, DPO],
+  },
+  {
+    code: "retention.archive.retrieve",
+    module: "pdpl",
+    description:
+      "Read a record that is in the BLOCKED retention phase — past the period its category was given, kept only to satisfy a statutory minimum, and otherwise out of every ongoing report and sweep. Retrieval is permitted on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each retrieval is recorded in an append-only register with the basis, who asked and for what, which cannot afterwards be edited or deleted. Holding this does NOT permit retrieval for the office's own purposes — that is the processing the block exists to prevent",
     roles: [COMPLIANCE, DPO],
   },
   {
@@ -1782,6 +1936,103 @@ const admin: PermissionSeed[] = [
     roles: [],
   },
   {
+    /*
+     * MODULE 0-ب ITEM (d) — REGISTER A BROKERAGE OFFICE ON THE PLATFORM.
+     *
+     * PLATFORM-scoped and the SECOND such code. Its effect is the creation of a TENANT, which is as
+     * far outside the granting office as an effect can reach, so item (j)'s three layers all apply:
+     * the office matrix never offers it, `setPermissions` refuses it for a non-PROVIDER
+     * organization, and the route checks the caller's organization type.
+     *
+     * Nothing in this product could create a second office before it. Measured and recorded against
+     * `soleOrganizationIdOrThrow`: the only two writers of `Organization` were the seed and the demo
+     * script, neither reachable over HTTP, and the signup refusal says in its own message that a
+     * second office cannot be onboarded through the application. This is the route that changes it.
+     */
+    code: "provider.office.register",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Register a new brokerage office on the platform: its legal identity, licence term and certificate, licensed branches, professional indemnity cover, banking details and its first administrator role. CREATES A TENANT — every office registered this way is a separate, isolated set of records — and it is the only route in this product that can. Grant it only to whoever operates the platform",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its own roles", and no office may register another office. The PROVIDER organization's
+     * `PLATFORM_OPERATOR` role holds it, granted by `ensureProviderOrganization()` in the seed.
+     */
+    roles: [],
+  },
+  {
+    /*
+     * MODULE 0-ب ITEM (f) — INVITING A REGISTERED OFFICE'S FIRST ADMINISTRATOR.
+     *
+     * PLATFORM-scoped and the FOURTH such code. Its effect is not the creation of a tenant — item
+     * (d) already did that — it is the creation of an ACCOUNT INSIDE ONE, which is the only write in
+     * this product that crosses a tenancy boundary. Separate from `provider.office.register` because
+     * registering an office and giving somebody the keys to it are different acts: the first is a
+     * filing, the second hands over control, and an operator trusted to file is not thereby trusted
+     * to choose who runs the office.
+     *
+     * It is also NARROWER than its name suggests, by three refusals in the service: the target must
+     * be a brokerage office, and it must have NO account yet. So this is the right to bootstrap an
+     * empty office once — never a standing ability to add accounts to a live one.
+     */
+    code: "provider.office.administrator.invite",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its roles", and no office may hold a PLATFORM code. The provider's own grant comes from
+     * `PROVIDER_CODES` in the seed, and the grid guard REFUSES a PLATFORM code that names an office
+     * role here — by name.
+     */
+    roles: [],
+  },
+  {
+    /*
+     * ITEM (f), THE COMPANY HALF — and a SEPARATE code from the office invite rather than a reuse.
+     *
+     * Reusing `provider.office.administrator.invite` for a company would make the name promise
+     * "office" while the act reached a company, which is the exact defect class the close measured in
+     * `aml.monitor` and `sanctions-pep.screen`: a code whose name claims more, or other, than it does.
+     * A rename is the last option considered here, so the honest move is a second code.
+     *
+     * It is also a genuinely different act: an office administrator receives 47 codes and runs an
+     * office; a company administrator receives SIX and can administer users and roles only, because
+     * an insurance company has nothing else to do in this product yet.
+     */
+    code: "provider.insurance-company.administrator.invite",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset",
+    /*
+     * EMPTY, like every PLATFORM code and for the same reason: this grid is "granted BY an office TO
+     * its roles", and no office may hold a PLATFORM code. The provider's own grant comes from
+     * `PROVIDER_CODES` in the seed, and the grid guard REFUSES a PLATFORM code that names an office
+     * role here — by name.
+     */
+    roles: [],
+  },
+  {
+    /*
+     * MODULE 0-ب ITEM (e) — REGISTER AN INSURANCE COMPANY ON THE PLATFORM.
+     *
+     * PLATFORM-scoped and the THIRD such code, for the same reason as the second: its effect is the
+     * creation of a TENANT. Separate from `provider.office.register` because the two create different
+     * kinds of entity under different articles — a brokerage office is licensed under art. 10, an
+     * insurance company is not — and an operator trusted to register one has not thereby been trusted
+     * to register the other.
+     */
+    code: "provider.insurer.register",
+    module: "admin",
+    scope: "PLATFORM",
+    description:
+      "Register an insurance company on the platform: its legal identity, its licence number and certificate, the lines it is licensed to underwrite, its published quotation and claims channels, its integration method and its banking details. CREATES A TENANT. Does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform",
+    roles: [],
+  },
+  {
     code: "access-recertification.cycle.start",
     module: "admin",
     description: "Start an access-recertification cycle",
@@ -1850,7 +2101,77 @@ const crossOwnerVisibility: PermissionSeed[] = [
     module: "customer",
     description:
       "See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design)",
-    roles: [MANAGER, EXEC, COMPLIANCE, AUDITOR],
+    /*
+     * OWNER DECISION 57, 2026-10-28 — CLAIMS, FINANCE and PLACEMENT added, and the
+     * reason is a measurement rather than a preference.
+     *
+     * `/customers` is gated on `customer.read`, which these three hold, and the list
+     * beneath that gate is then filtered to the customers the actor OWNS
+     * (`customer.service.ts`, through `canReadAllCustomerOwners`). Ownership is
+     * creator-assigned: `customer.create` is SALES alone and `customer.bulk-import`
+     * is the two administrator roles, whose import writes `ownerUserId: actorUserId`
+     * (`legacy-import.service.ts`). NONE OF THESE THREE CAN EVER OWN A CUSTOMER, so
+     * the filter returned exactly zero rows, permanently, by construction — and the
+     * screen said «لا يوجد عملاء بعد», *there are no customers yet*, which is a false
+     * statement about the office rather than a true one about the reader.
+     *
+     * SO THE LIE IS CLOSED AT ITS CAUSE AND NOT BY REWORDING THE SYMPTOM. Measured
+     * across all fourteen seeded roles: after this grant not one holds `customer.read`
+     * while being unable both to see all owners and to own a row, so there is no role
+     * left for whom an empty register is a false claim.
+     * `customers-empty-state-is-honest.spec.ts` keeps that set empty.
+     *
+     * OFFICE_ADMINISTRATOR and SYSTEM_SECURITY_ADMINISTRATOR are deliberately NOT
+     * here: they hold `customer.bulk-import`, so they own every row they import and
+     * an empty list genuinely means they have imported none. SALES is deliberately
+     * NOT here either — «دفترها دفترها», its own book is the point of the filter.
+     *
+     * WHAT THIS OPENS, measured rather than assumed, because the near neighbour is a
+     * 46-route disclosure: `customer.all-owners.read` is read at SIX decision sites in
+     * THREE services, all through `rbac-visibility.util.ts`. The detail page, the
+     * field reveal, the UBO register and the 360° timeline are all gated on
+     * `customer.360-view.read`, which none of these three holds, so they stay 403; the
+     * KYC sites sit behind `kyc.capture`/`kyc.approve`/`screening.run`, likewise. It
+     * DOES also widen `GET /customers/search`, the shared picker, which returns a
+     * name, a type, a status and the two cleartext corporate identifiers.
+     *
+     * NOT `customer-file.all-owners.read`, which is a different code one row below:
+     * that is the COMMERCIAL file (risk profile, needs assessment, programme,
+     * opportunity, RFQ, quotation, comparison, client decision) across nine services,
+     * and PLACEMENT already holds it. Confusing the two is how a one-screen fix
+     * becomes a disclosure decision.
+     *
+     * OWNER DECISION, 2026-10-28 — THE DPO IS THE EIGHTH, and it is the same cause one
+     * screen over. Register row 2.2: «في حقل صاحب البيانات لما أبحث عن عميل موجود
+     * بيحكيلي إنه غير متوفر» — *in the data-subject field, when I search for a customer
+     * that exists it tells me it is not available.*
+     *
+     * THE GATE WAS NOT THE PROBLEM, measured: `CUSTOMER_SEARCH_CODES` is
+     * `['customer.read', 'dsr.log']` and the DPO holds `dsr.log`, so it has reached
+     * `GET /customers/search` since that widening shipped FOR this screen. What emptied
+     * the result is the owner filter beneath it, and that is what this grant lifts.
+     *
+     * WHAT IT OPENS IS ONE ROUTE, and the reason is an ABSENCE rather than a judgement:
+     * the DPO holds 27 codes and NOT ONE `customer.*`, `kyc.*` or `screening.*` code, so
+     * five of the six decision sites stay 403 (`customer.read` for the list;
+     * `customer.360-view.read` for the detail, the reveal, the UBO register and the 360°
+     * timeline; `kyc.capture`/`kyc.approve`/`screening.run` for the KYC file).
+     *
+     * THAT ABSENCE IS PINNED IN TWO PLACES, because it is what justifies the grant:
+     * migration `20261213100000` refuses to apply if the DPO holds any of those five, and
+     * `permissions.spec.ts` asserts the same by name. Give the DPO the 360° view and the
+     * statement that justified THIS grant fails, rather than a screen quietly widening.
+     */
+    roles: [
+      MANAGER,
+      EXEC,
+      COMPLIANCE,
+      AUDITOR,
+      CLAIMS,
+      FINANCE,
+      PLACEMENT,
+      DPO,
+    ],
   },
   {
     code: "customer-file.all-owners.read",

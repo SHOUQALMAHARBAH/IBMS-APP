@@ -797,7 +797,7 @@ export function deriveSettlementView(input: {
     approvedByUserId: string | null;
     secondApproverUserId: string | null;
     /** The relation is `combinedDutyAct` here — but the name is per CONSTRAINT and not uniform across
-     *  the fifteen (the DSR's is `closureCombinedDutyAct`). Read it off the schema per pair. */
+     *  the sixteen (the DSR's is `closureCombinedDutyAct`). Read it off the schema per pair. */
     combinedDutyAct: CombinedDutyAct | null;
     clientPaymentConfirmedAt: Date | null;
     createdAt: Date;

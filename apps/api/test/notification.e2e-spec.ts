@@ -188,6 +188,9 @@ describe('Notifications (e2e) — the derived notification centre', () => {
         contactPhone: '+962-7-5550000',
         contactEmail: `awaiting-${Date.now()}@example.test`,
         languagePreference: 'AR',
+        // Required before SUBMITTED since 2026-10-28 — see `KycService.submit`.
+        dateOfBirth: '1990-01-01',
+        nationality: 'JO',
       })
       .expect(201);
 

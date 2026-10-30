@@ -12,8 +12,19 @@ import {
   type InternalAuditFinding,
 } from '../../../lib/compliance-risk/internal-audit-finding-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { actionErrorText } from '../../../lib/i18n/action-error';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusalAnyOf } from '../../../lib/i18n/permission-refusal';
@@ -25,15 +36,12 @@ const CLOSE_ROLE = [
   'internal-audit.close',
 ];
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
+const formStyle: CSSProperties = {
+  display: 'grid',
+  gap: 'var(--space-3)',
+  maxWidth: '30rem',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 
 export default function InternalAuditFindingsPage() {
@@ -85,7 +93,7 @@ export default function InternalAuditFindingsPage() {
       await fn();
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t('iafActionError'));
+      setActionError(actionErrorText(err, t, 'iafActionError'));
     } finally {
       setBusy(false);
     }
@@ -103,21 +111,17 @@ export default function InternalAuditFindingsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('iafHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('iafIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('iafHeading')}
+        description={t('iafIntro')}
+      />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {canRecord ? (
@@ -125,7 +129,6 @@ export default function InternalAuditFindingsPage() {
           <label style={labelStyle}>
             {t('iafAuditPeriodFieldLabel')}
             <input
-              aria-label={t('iafAuditPeriodLabel')}
               value={auditPeriodLabel}
               onChange={(e) => setAuditPeriodLabel(e.target.value)}
               required
@@ -147,32 +150,32 @@ export default function InternalAuditFindingsPage() {
       ) : null}
 
       {findings && findings.length === 0 ? (
-        <p style={{ color: 'var(--ink-secondary)' }}>{t('iafNone')}</p>
+        <EmptyState title={t('iafNone')} />
       ) : null}
 
       {findings && findings.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>
+        <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('iafAuditPeriodLabel')}</th>
-                <th style={head}>{t('iafColFinding')}</th>
-                <th style={head}>{t('iafColRemediation')}</th>
-                <th style={head}>{t('iafColStatus')}</th>
-                <th style={head}>{t('iafColAction')}</th>
+                <Th>{t('iafAuditPeriodLabel')}</Th>
+                <Th>{t('iafColFinding')}</Th>
+                <Th>{t('iafColRemediation')}</Th>
+                <Th>{t('iafColStatus')}</Th>
+                <Th>{t('iafColAction')}</Th>
               </tr>
             </thead>
             <tbody>
               {findings.map((f) => (
-                <tr key={f.id}>
-                  <td style={cell}>{f.auditPeriodLabel}</td>
-                  <td style={cell}>{f.finding}</td>
-                  <td style={cell}>{f.remediationAction ?? '—'}</td>
-                  <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[f.status])}</td>
-                  <td style={cell}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '16rem' }}>
+                <Tr key={f.id}>
+                  <Td>{f.auditPeriodLabel}</Td>
+                  <Td>{f.finding}</Td>
+                  <Td>{f.remediationAction ?? '—'}</Td>
+                  <Td>{t(ENUM_LABEL.TransactionMonitoringStatus[f.status])}</Td>
+                  <Td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '16rem' }}>
                       {canRecord && f.status === 'open' ? (
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                           <input
                             aria-label={t('iafRemediationActionAria')}
                             placeholder={t('iafRemediationActionLabel')}
@@ -208,18 +211,26 @@ export default function InternalAuditFindingsPage() {
                       ) : null}
                       {f.status === 'closed' ? '—' : null}
                     </div>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
-      ) : loadError ? null : (
-        // The loading state directive §2 requires; this page rendered
-        // nothing at all while fetching. Guarded on loadError so an error
-        // and a "Loading…" line never appear together.
-        <p>{t('iafLoading')}</p>
-      )}
+          </Table>
+        </Card>
+      ) : null}
+      {/* FETCHING is `findings === null`, and nothing else.
+
+          This was `) : loadError ? null : (<Loading/>)` hanging off the
+          `findings.length > 0` ternary above, so an empty list — which
+          loaded perfectly — fell through to the loading line and rendered it
+          BESIDE the empty state. Her walk: «ما بتظهر شي الي، بس بكون مكتوب
+          عليها جارِ التحميل». The old comment said the branch was guarded so
+          an error and a Loading line never appear together; the EMPTY
+          coexistence was the one nobody asked about. Three states, three
+          conditions, none of them a fallback. */}
+      {findings === null && loadError === null ? (
+        <SkeletonList rows={4} label={t('iafLoading')} />
+      ) : null}
     </main>
   );
 }

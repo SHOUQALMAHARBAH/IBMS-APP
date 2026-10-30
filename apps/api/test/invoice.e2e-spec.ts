@@ -1443,8 +1443,40 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     const chanAudit = await prisma.auditLogEntry.findMany({
       where: { entityType: 'PaymentChannel', entityId: custChanId },
     });
-    expect(chanAudit.some((r) => r.action === 'CREATE')).toBe(true);
-    expect(JSON.stringify(chanAudit)).not.toContain('4321');
+    const chanCreate = chanAudit.find((r) => r.action === 'CREATE');
+    expect(chanCreate).toBeDefined();
+
+    // THE PROPERTY IS ASSERTED ON THE SNAPSHOT'S OWN KEYS, which is both stronger and not a coin
+    // toss. `expect(JSON.stringify(chanAudit)).not.toContain('4321')` went RED IN CI on
+    // 2026-10-30 against a correct implementation: an `AuditLogEntry` carries its own `id` plus
+    // `entityId`, `userId` and `organizationId` — four uuids, ~125 hex offsets — and every digit
+    // of a four-digit needle is hex-valid, so it matched `8b610228-27c1-4321-9c6a-…`. That is the
+    // recorded base64-`'99'` class with a longer needle and a bigger haystack.
+    //
+    // An EXACT KEY SET is the right shape because a leak arrives as an ADDITION: `accountLast4`
+    // appearing in the snapshot fails here by name, and so does anything else nobody decided on.
+    expect(Object.keys(chanCreate?.afterValue as object).sort()).toEqual(
+      [
+        'bankName',
+        'channelId',
+        'channelType',
+        'customerId',
+        'insurerId',
+        'label',
+        'ownerType',
+        'status',
+      ].sort(),
+    );
+
+    // AND THE FRAGMENT ITSELF, kept rather than traded away — it catches the fragment reaching a
+    // field that IS in the set (a label somebody pastes it into). Uuids are stripped first,
+    // because they are the only thing in here that can match by accident.
+    expect(
+      JSON.stringify(chanCreate?.afterValue).replace(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
+        '<uuid>',
+      ),
+    ).not.toContain('4321');
   });
 
   it('Process 39 — bank reconciliation: a variance ALWAYS raises an exception, then the investigate/resolve path returns the invoice to the cycle', async () => {

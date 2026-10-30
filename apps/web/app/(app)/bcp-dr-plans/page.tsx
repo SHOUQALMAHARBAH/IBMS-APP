@@ -14,10 +14,21 @@ import {
   type ScenarioCoverage,
 } from '../../../lib/supporting-operations/bcp-dr-plan-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  DateEcho,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { formatDate } from '../../../lib/i18n/format';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -26,8 +37,8 @@ const cell: CSSProperties = {
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '26rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 function isOverdue(nextTestDueAt: string | null): boolean {
   if (!nextTestDueAt) return false;
@@ -35,7 +46,7 @@ function isOverdue(nextTestDueAt: string | null): boolean {
 }
 
 export default function BcpDrPlansPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -113,21 +124,17 @@ export default function BcpDrPlansPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('bcpHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('bcpIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('bcpHeading')}
+        description={t('bcpIntro')}
+      />
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
 
       <form onSubmit={onCreate} style={formStyle}>
@@ -157,46 +164,87 @@ export default function BcpDrPlansPage() {
         coverage.map((entry) => (
           <section key={entry.scenario} style={sectionStyle}>
             <h2>
-              {entry.scenario}{' '}
-              {entry.hasPlan ? null : <span style={{ color: '#b91c1c' }}>{t('bcpNoPlanOnFile')}</span>}
+              {/*
+                The ENUM MEMBER was rendering RAW here — `system_outage` as an Arabic reader's
+                section heading — while the `<select>` eighteen lines above renders
+                `ENUM_LABEL.BcpDrScenario[s]` from a map that ships all five in both languages.
+                So the same screen had two answers for one value and the English one was the
+                heading. No word was written: the Arabic was already on the screen.
+              */}
+              {t(ENUM_LABEL.BcpDrScenario[entry.scenario])}{' '}
+              {entry.hasPlan ? null : <span style={{ color: 'var(--danger-ink)' }}>{t('bcpNoPlanOnFile')}</span>}
             </h2>
             {entry.plans.length > 0 ? (
-              <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
+              <Card padded={false}>
+            <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('bcpColRto')}</th>
-                    <th style={head}>{t('bcpColRpo')}</th>
-                    <th style={head}>{t('bcpColLastTested')}</th>
-                    <th style={head}>{t('bcpColNextTestDue')}</th>
+                    <Th>{t('bcpColRto')}</Th>
+                    <Th>{t('bcpColRpo')}</Th>
+                    <Th>{t('bcpColLastTested')}</Th>
+                    <Th>{t('bcpColNextTestDue')}</Th>
                     <th style={head} />
                   </tr>
                 </thead>
                 <tbody>
                   {entry.plans.map((plan) => (
-                    <tr key={plan.id}>
-                      <td style={cell}>{plan.rtoHours ?? '—'}</td>
-                      <td style={cell}>{plan.rpoHours ?? '—'}</td>
-                      <td style={cell}>
-                        {plan.lastTestedAt ? plan.lastTestedAt.slice(0, 10) : 'never'}
-                      </td>
-                      <td style={cell}>
+                    <Tr key={plan.id}>
+                      <Td>{plan.rtoHours ?? '—'}</Td>
+                      <Td>{plan.rpoHours ?? '—'}</Td>
+                      <Td>
+                        {/*
+                          `.slice(0, 10)` printed the ISO date here, so an Arabic reader saw
+                          `2027-09-06` where every other date in the product renders through
+                          `formatDate`.
+
+                          The two absence words beside it are the OWNER'S, supplied after this
+                          screen stopped rather than guessed — «غير مجدول» is masculine, agreeing
+                          with «الفحص», where the byte-identical English twin one screen over
+                          (`vendNotScheduled`) carries the FEMININE «غير مجدولة». Her form is the
+                          twin minus its taa marbuta, which is precisely why it was not derivable:
+                          a one-character cut that changes grammatical gender is morphology.
+                        */}
+                        {plan.lastTestedAt
+                          ? formatDate(plan.lastTestedAt, language)
+                          : t('bcpNeverTested')}
+                      </Td>
+                      <Td>
                         {plan.nextTestDueAt ? (
-                          <span style={isOverdue(plan.nextTestDueAt) ? { color: '#b91c1c' } : undefined}>
-                            {plan.nextTestDueAt.slice(0, 10)}
-                            {isOverdue(plan.nextTestDueAt) ? ' (overdue)' : ''}
+                          <span
+                            style={
+                              isOverdue(plan.nextTestDueAt)
+                                ? { color: 'var(--danger-ink)' }
+                                : undefined
+                            }
+                          >
+                            {formatDate(plan.nextTestDueAt, language)}
+                            {isOverdue(plan.nextTestDueAt) ? ` ${t('statusOverdue')}` : ''}
                           </span>
                         ) : (
-                          'not scheduled'
+                          t('bcpNoTestScheduled')
                         )}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {testingId === plan.id ? (
                           <>
+                            {/* NO WRAPPER, and that is the inline-styles ratchet rather than a
+                             * taste: a styled `div` here is a NEW SCREEN site and that budget may
+                             * only FALL. The echo is a `<p>`, so it breaks the line on its own and
+                             * the cell stacks anyway.
+                             *
+                             * The first version of this comment NAMED the attribute it is about
+                             * and counted as the site, because the gate reads TEXT — which is its
+                             * own recorded limit, met inside the comment explaining it. */}
+                            <label htmlFor="bcp-next-test-due">
+                              {t('bcpNextTestDueLabel')}
+                            </label>{' '}
                             <input
+                              id="bcp-next-test-due"
                               type="date"
                               value={nextTestDueAt}
                               onChange={(e) => setNextTestDueAt(e.target.value)}
-                            />{' '}
+                            />
+                            <DateEcho value={nextTestDueAt} />
                             <button type="button" onClick={() => submitTest(plan.id)}>
                               {t('commonSave')}
                             </button>
@@ -206,16 +254,17 @@ export default function BcpDrPlansPage() {
                             {t('bcpRecordTestButton')}
                           </button>
                         )}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
+          </Card>
             ) : null}
           </section>
         ))
       ) : loadError ? null : (
-        <p>{t('bcpLoading')}</p>
+        <SkeletonList rows={4} label={t('bcpLoading')} />
       )}
 
     </main>

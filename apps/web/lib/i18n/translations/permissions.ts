@@ -36,7 +36,18 @@
 //
 // ## What is wanted in a line
 //
-// THE ARABIC IS THE REVIEWED TEXT. All 219 lines were written by the owner for an office manager
+// THE ARABIC IS THE REVIEWED TEXT — FOR 220 OF 224 CODES, NOT ALL OF THEM. 219 lines were
+// written by the owner on 2026-09-30 and delivered as a FILE rather than through the chat, on
+// her reasoning that 219 hand-copied strings is 219 chances of a silent transcription error and
+// a file can be CHECKED rather than trusted. She supplied `provider.insurer.register` verbatim
+// afterwards, which makes 220. The remaining FOUR were written by an agent, because the parity
+// guard requires both languages and a code therefore cannot ship without Arabic — they are
+// PLACEHOLDERS IN HER REGISTER and are named in `AWAITING_OWNER_REVIEW` in
+// `lib/admin/permission-descriptions.test.ts`, which refuses to let the next one go undeclared.
+// This header previously said all 219 were hers, which was true at delivery and became false
+// with the first code added after it — and a header that claims every line is reviewed makes an
+// unreviewed one indistinguishable, which is the single property her file delivery provided.
+// The lines are written for an office manager
 // deciding a grant, saying what the permission OPENS and what it REVEALS rather than restating its
 // name — eighteen of her own lines failed that rule on review and were rewritten in her source
 // document before extraction. A handful name another permission code in passing (`claim.discard`,
@@ -48,7 +59,18 @@
 // an English reader sees exactly what they saw before. `permission-descriptions.test.ts` ratchets how
 // many are still the carried hint, so the English gap is measured rather than assumed done.
 //
-// THE ARABIC IS THE REVIEWED TEXT. All 219 lines were written by the owner for an office manager
+// THE ARABIC IS THE REVIEWED TEXT — FOR 220 OF 224 CODES, NOT ALL OF THEM. 219 lines were
+// written by the owner on 2026-09-30 and delivered as a FILE rather than through the chat, on
+// her reasoning that 219 hand-copied strings is 219 chances of a silent transcription error and
+// a file can be CHECKED rather than trusted. She supplied `provider.insurer.register` verbatim
+// afterwards, which makes 220. The remaining FOUR were written by an agent, because the parity
+// guard requires both languages and a code therefore cannot ship without Arabic — they are
+// PLACEHOLDERS IN HER REGISTER and are named in `AWAITING_OWNER_REVIEW` in
+// `lib/admin/permission-descriptions.test.ts`, which refuses to let the next one go undeclared.
+// This header previously said all 219 were hers, which was true at delivery and became false
+// with the first code added after it — and a header that claims every line is reviewed makes an
+// unreviewed one indistinguishable, which is the single property her file delivery provided.
+// The lines are written for an office manager
 // deciding a grant, saying what the permission OPENS and what it REVEALS rather than restating its
 // name — eighteen of her own lines failed that rule on review and were rewritten in her source
 // document before extraction. A handful name another permission code in passing (`claim.discard`,
@@ -108,6 +130,8 @@ export const PERMISSIONS = {
     'perm:complaint.log': 'يسجّل شكوى عميل. تُمنح لمن يلتقي العميل، حتى لا تضيع شكوى لأن مستلمها لا يملك تسجيلها',
     'perm:compliance-calendar.manage': 'يدير تقويم الالتزام التنظيمي ومواعيد ما يجب تقديمه للجهات',
     'perm:conflict-of-interest.disclose': 'يسجّل إفصاح تضارب المصالح الإلزامي على توصية مُعلَّمة، قبل أن تُرسَل للعميل. ولا يجوز أن يكون المُفصِح هو كاتب التوصية — والنظام يمنعه',
+    'perm:conflict-of-interest.register.read':
+      'قراءة سجل الإفصاح عن تضارب المصالح: ما أفصح به العاملون في المكتب عن أنفسهم. وهو غير الإفصاح المُعلَّم على توصية — ذاك يرصده النظام ويُقرّه شخص آخر، وهذا يسجّله الشخص عن نفسه بلا رصد ولا تحفيز. والإفصاح نفسه لا يحتاج صلاحية، لأن المُفصِح هو صاحب الشأن، ومنعه يعني أن من عليه تضارب هو الوحيد الذي لا يستطيع قوله.',
     'perm:consent.manage': 'يسجّل موافقة العميل أو سحبها عند نقطة تواصل محدَّدة. والموافقة أساس قانوني لا خانة — بلا تسجيلها لا يجوز الاستعمال الذي بُنيت عليه',
     'perm:cross-border-transfer.approve': 'يعتمد نقل بيانات شخصية خارج المملكة. ولا يُعتمد النقل إلا بعد التحقّق من مستوى الحماية عند الجهة المستقبِلة — مسؤولية قانونية مباشرة',
     'perm:cross-sell.convert': 'يحوّل فرصة بيع متقاطع رشّحها النظام إلى فرصة حقيقية، أو يستبعدها. الاستبعاد قرار مسجَّل لا إخفاء',
@@ -120,7 +144,7 @@ export const PERMISSIONS = {
     'perm:customer.create': 'يسجّل عميلاً جديداً، فرداً أو شركة',
     'perm:customer.national-id.reveal': 'يكشف الرقم الوطني كاملاً للعميل، بتبريرٍ مكتوب. وكل كشف يُسجَّل كقراءة حسّاسة في سجل التدقيق. لأضيق عدد، وللالتزام لا للعمل اليومي',
     'perm:customer.read': 'يبحث عن عميل ويفتح هويّته الأساسية — الطريق الذي يجد به الموظف عميلاً ليعمل عليه. لا يفتح السجل الكامل ولا سجل المالكين المستفيدين ولا الوثائق ولا كشف حقل مُقنَّع؛ هذه كلها تبقى على الصلاحية السابقة. تُمنح لكل من يشتغل على العملاء ولو لم يكن من حقّه أن يقرأ تاريخهم',
-    'perm:customer.update': 'يصحّح بيانات التواصل وحدها: الهاتف والبريد والعنوان المسجَّل. ولا يصحّح الاسم ولا تاريخ الميلاد ولا الجنسية ولا أرقام الهوية — تغيير أيٍّ من هذه واقعة تُوجب إعادة الفحص بحسب قواعد مكافحة غسل الأموال، لا تعديل بيانات',
+    'perm:customer.update': 'يصحّح بيانات التواصل: الهاتف والبريد والعنوان المسجَّل. ولا يصحّح الاسم ولا أرقام الهوية — تغيير أيٍّ من هذه واقعة تُوجب إعادة الفحص بحسب قواعد مكافحة غسل الأموال، لا تعديل بيانات',
     'perm:dashboard.claims.view': 'يرى مطالبات المكتب المفتوحة وقيمتها المستحقة ونسبة الخسارة، وأعمار المطالبات، موزّعة على كل عميل وكل نوع تأمين وكل شركة. يكشف أي عميل وأي شركة يكلّف المكتب. لا يكشف عمولة',
     'perm:dashboard.compliance.view': 'يرى إخفاقات المكتب في الالتزام: حالة ملفات اعرف-عميلك، الشكاوى، تنبيهات غسل الأموال المفتوحة، ما تأخّر تقديمه للجهات، طلبات أصحاب البيانات، سجل الاختراقات. لا أرقام مال — ولكنه دليل التزام عن المكتب نفسه',
     'perm:dashboard.executive.view': 'ملخّص كل شيء: العملاء المحتملون ونسبة التحويل وإيراد العمولة والوثائق السارية والمطالبات المفتوحة وما لم يُقبَض وما يُستحق للشركات. كل رقم فيه منقول حرفياً من لوحته الأصلية فلا يخالفها',
@@ -178,6 +202,10 @@ export const PERMISSIONS = {
     'perm:insurer.form.map': 'يربط نموذج شركة التأمين الرسمي لنوع تأمين واحد. أثره على المنصة كلها: النموذج يصير النموذج الذي تقدّم عليه كل المكاتب — ولهذا لا تُمنح لمن يستعمل النموذج فقط',
     'perm:insurer.master.read': 'يقرأ السجل العام لشركات التأمين وربط النماذج المشترك بين كل المؤسسات. ولا يحمل شروط أي مكتب التجارية — تلك على سجل المكتب نفسه',
     'perm:insurer.office-form.map': 'يربط نسخة هذا المكتب وحده من نموذج شركة يتعامل معها مباشرة. أثره داخل المكتب فقط: لا يقرأه غيره، ويتقدّم على النموذج المشترك في تقديمات هذا المكتب، ولا يعدّل المشترك أبداً. وبخلاف السابقة يجوز أن يشير إلى نوع تأمين أضافه المكتب بنفسه',
+    'perm:insurer.company.link':
+      'يُسجّل حاملُها أنّ المكتبَ يعمل مع شركةِ تأمينٍ مسجَّلةٍ في النظام. لا يُنشئ الشركةَ ولا يُعدّل بياناتها ولا رخصَها.',
+    'perm:insurer.company.unlink':
+      'يُنهي حاملُها علاقةَ العملِ المسجَّلةَ بين المكتب وشركةِ تأمين. لا يحذف الشركةَ، ولا يُلغي ما صدر أو سُجِّل قبل الإنهاء.',
     'perm:insurer.read': 'يقرأ علاقة هذا المكتب بشركات التأمين: جهات الاتصال وشروط الائتمان والقوة المالية وأنواع التأمين التي تكتبها',
     'perm:insurer.update': 'يحدّث سجل المكتب لشركة تأمين وشروط التعامل معها',
     'perm:interaction.log': 'يسجّل تواصلاً مع عميل: اجتماع، اتصال، بريد. ويلزم معها customer.read وإلا فلن يجد الموظف العميل ليسجّل عليه',
@@ -220,7 +248,16 @@ export const PERMISSIONS = {
     'perm:portfolio-analysis.view': 'يرى أين يقع دفتر المكتب: الوثائق والقسط الصادر موزّعاً على أنواع التأمين والشركات وفئات العملاء والفروع. قسط لا عمولة',
     'perm:privacy-notice.publish': 'ينشر إشعار خصوصية بنسخة مُرقَّمة بلغتين. نشرٌ للعموم بأثر قانوني',
     'perm:privacy-notice.read': 'يقرأ إشعار الخصوصية المنطبق على نقطة تواصل. قراءة فقط؛ النشر صلاحية أخرى',
-    'perm:provider.office-state.read': 'يقرأ قائمة مكاتب الوساطة على المنصّة وحالتها: رقم الترخيص وتاريخ انتهائه، وعدد الفروع المرخَّصة التي لا يُكتب فيها أي عمل، وأعداد المستخدمين، وآخر استخدام لكل مكتب. القراءة تعبُر المكاتب — فهي تُظهر مكاتب أخرى لا مكتبك وحده — ولا تحتوي عن قصد أي بيانات عملاء أو وثائق أو أقساط أو عمولات، ولا أي بيانات شخصية. امنحها لمن يُشغّل المنصّة فقط',
+    'perm:provider.office.administrator.invite':
+      'يُنشئ حاملُها أوّلَ حسابٍ داخل مكتبِ وساطةٍ سجّله المزوّد، ويمنحه دورَ إدارةِ ذلك المكتب. وهو الكتابةُ الوحيدةُ في هذا النظام التي تتجاوز حدودَ المستأجر. ويُرفَض بعد أن يصبح للمكتب أيُّ حساب، فمن حينها يُدير المكتبُ نفسَه. ويُنشَأ المديرُ المدعوُّ بلا كلمةِ مرورٍ صالحة، ويدخل بطلبِ إعادةِ تعيينِ كلمةِ المرور لعنوانه — فلا يختار النظامُ كلمةَ مرورٍ لأحدٍ ولا يُرسلها.',
+    'perm:provider.insurance-company.administrator.invite':
+      'يُنشئ حاملُها أوّلَ حسابٍ داخل شركةِ تأمينٍ سجّلها المزوّد، ويمنحه دورَ إدارةِ تلك الشركة. يتجاوز حدودَ المستأجر كما يفعل نظيرُه الخاصُّ بمكاتب الوساطة، ويُرفَض بعد أن يصبح للشركة أيُّ حساب. ومديرُ الشركة الذي يُنشئه يحمل ستَّ صلاحياتٍ لإدارةِ نفسه فقط ولا شيء غيرها، فالشركةُ تقرأ سجلَّها لدينا ولا تملك في هذا النظام قدرةً أخرى. ويُنشَأ المديرُ المدعوُّ بلا كلمةِ مرورٍ صالحة، ويدخل بطلبِ إعادةِ تعيينِ كلمةِ المرور.',
+    'perm:provider.office-state.read':
+      'يرى حاملُها حالةَ مكاتب الوساطة المسجَّلة وما سُجِّل عليها من حالات وتواريخها. ويرى معها أرقاماً مجمَّعةً عن كلِّ مكتب: عددَ المستخدمين والنشطِ منهم، وعددَ أنواع التأمين المرخَّصة التي لا يكتب فيها أعمالاً، وتاريخَ آخرِ استخدامٍ للنظام. لا يُغيّر حالةَ أيِّ مكتب، ولا يصل إلى عملاءِ المكتب ولا وثائقِه ولا أقساطِه ولا عمولاتِه ولا أيِّ بياناتٍ شخصية.',
+    'perm:provider.office.register':
+      'يُنشئ حاملُها سجلَّ مكتبِ وساطةٍ جديدٍ ببياناته ومستنداته. لا تُعطيه هذه الصلاحيةُ دخولاً إلى المكتب ولا إدارةَ مستخدميه.',
+    'perm:provider.insurer.register':
+      'تسمح لمزوّد النظام بتسجيل شركةِ تأمينٍ على المنصّة: الاسمُ القانونيُّ والشكلُ القانونيُّ والرقمُ الوطنيُّ للمنشأة ورقمُ الترخيص والجهةُ المرخِّصةُ وشهادةُ الترخيص وفروعُ التأمين المرخَّصُ بها وقنواتُ التعامل المنشورة. ولا تُنشئ هذه الصلاحيةُ علاقةَ مكتبٍ بالشركة ولا تمسّ ما يسجّله أيُّ مكتبٍ عنها — فتصنيفُ الملاءة ووكالتُه ومسؤولُ علاقات الوسطاء بياناتُ مكتبٍ لا بياناتُ شركة. وهي منفصلةٌ عن صلاحية تسجيل مكتبِ الوساطة لأنّ الاثنتين تُنشئان كياناً قانونياً مختلفاً بسندٍ مختلف، ومقصورةٌ على أدوار المزوّد وحده.',
     'perm:profitability-analysis.view': 'يرى ما يربح المكتب فعلاً: إيراد العمولة مقابل تكلفة الخدمة وصافي الربحية لكل نوع تأمين وكل فئة عملاء. أكشف شاشة بعد تقرير المالية',
     'perm:program.assemble': 'يبني البرنامج التأميني للعميل: عدة أنواع تأمين مجموعة بناءً على نتائج تقييم الخطر. عمل فني لا بيعي',
     'perm:program.read': 'يقرأ البرامج التأمينية للعملاء',
@@ -245,7 +282,14 @@ export const PERMISSIONS = {
     'perm:renewal.manage': 'يشغّل مسح التجديدات القادمة، ويحرّك حالة التجديد، ويضبط متى يُعاد طرح الوثيقة على السوق',
     'perm:renewal.read': 'يقرأ حالات التجديد ومهلها ونسبة الخسارة عليها',
     'perm:retention-case.manage': 'يدير حالة محافظة على عميل فُتحت لأن وثيقته قاربت الانتهاء أو خمد تعامله',
-    'perm:retention-schedule.manage': 'يدير جدول مدد الاحتفاظ: فئات السجلات والمدد وتأكيد المستشار القانوني. ومن يملكها يحدّد متى يصير إتلاف بيانات الناس مشروعاً — لأضيق عدد',
+    'perm:retention-schedule.update':
+      'يحدّد حاملُها مدّةَ الاحتفاظ لفئةِ سجلاتٍ وسندَها القانوني. وهو النصفُ الأوّلُ من زوجِ فصلِ المهام: من يحدّد المدّة لا يستطيع تأكيدَها بوصفه المستشارَ القانوني، إلّا إذا أعلن المكتبُ دمجَ المهام فيُسجَّل الفعل. ومن يملكها يحدّد متى يصير إتلافُ بيانات الناس مشروعاً — لأضيق عدد.',
+    'perm:retention.archive.retrieve':
+      'قراءةُ سجلٍّ يقعُ في مرحلةِ الحجب — أي انتهت مدّةُ الاحتفاظِ المحدّدةُ لفئتِه، فيُحفَظُ وحدَه لاستيفاءِ حدٍّ قانونيٍّ أدنى، ويخرجُ من كلِّ تقريرٍ ومسحٍ جارٍ. والاستخراجُ مباحٌ على سببينِ حصراً، وكلاهما إلزامٌ خارجي: طلبٌ قضائي، أو تدقيقٌ رسميٌّ من البنكِ المركزيِّ الأردني. وكلُّ استخراجٍ يُدوَّنُ في سجلٍّ لا يُعدَّلُ ولا يُحذَفُ: السببُ، ومن طلبَ، ولأيِّ غرض. وحملُها لا يُبيحُ الاستخراجَ لأغراضِ المكتبِ نفسِه — فذلكَ هو المعالجةُ التي وُجِدَ الحجبُ لمنعِها.',
+    'perm:retention.extend':
+      'تمديدُ مدّةِ الاحتفاظِ بسجلّاتٍ بعينِها بعد انتهاءِ المدّةِ المحدّدةِ لفئتِها، على أحدِ ثلاثةِ أسبابٍ حصراً: نصٌّ تشريعيٌّ مُسمّى، أو حجزٌ قانونيٌّ أو نزاعٌ قائم، أو موافقةٌ صريحةٌ من العميل. والنصُّ الحرُّ يُرافقُ السببَ ولا يكونُ هو السبب. وكلُّ تمديدٍ يُدوَّنُ في السجلِّ: أيُّ سجلّات، وبأيِّ سبب، ومن مدَّدَها، ومتى، وإلى متى.',
+    'perm:retention-schedule.confirm':
+      'يؤكّد حاملُها مدّةَ الاحتفاظ بوصفه المستشارَ القانوني، فيُثبَّت التاريخُ ومعه الفاعل. وهو النصفُ الثاني من الزوج: يُرفَض على من حدّد المدّة نفسَه، إلّا إذا أعلن المكتبُ دمجَ المهام فيُسجَّل الإعلانُ على السجلّ.',
     'perm:retention.dispose.approve': 'يعتمد دفعة إتلاف نهائياً. الطرف الثاني من رقابة مزدوجة، ولا يجوز أن يكون هو من رشّحها',
     'perm:retention.dispose.nominate': 'يرشّح دفعة إتلاف. الطرف الأول؛ والاعتماد لشخص آخر',
     'perm:rfq.communication.log': 'يسجّل سؤالاً وارداً من شركة تأمين أو رداً صادراً على طلب تسعير. القراءة مشمولة بـrfq.read',
@@ -262,7 +306,7 @@ export const PERMISSIONS = {
     'perm:role.update': 'يصحّح اسم الدور، ويغيّر ما يمنحه، ويضبط شروط المصادقة عليه. الحفظ يطلب تأكيد هوية إضافياً لأن تعديل دور يعدّل صلاحيات ناس',
     'perm:ropa.manage': 'يدير سجل أنشطة المعالجة — ما يجمعه المكتب من بيانات ولماذا وإلى أين يذهب. مستند التزام إلزامي',
     'perm:sales-target.manage': 'يضع أهداف المبيعات لكل موظف أو فريق ويعدّلها. من يملكها يحدّد ما يُحاسَب عليه الناس',
-    'perm:sanctions-pep.screen': 'يشغّل دفعات فحص العقوبات المتكرّرة على قاعدة العملاء، لا فحص عميل واحد',
+    'perm:sanctions-pep.screen': 'كلُّ سطحِ الفرزِ على قوائمِ الجزاءاتِ والأشخاصِ المعرَّضين سياسياً: تشغيلُ الفرزِ ودفعتِه الدورية، والعملُ على طابورِ المطابقات — إسنادُها إلى موظّف، وبدءُ مراجعتِها، والبتُّ فيها، وإحالتُها إلى زميلٍ آخر، وتدوينُ الملاحظاتِ عليها — وصيانةُ قوائمِ الفرزِ نفسِها: تحديثُها من مصادرها، والاطّلاعُ على حالتِها وعلى إصداراتِها، والرجوعُ عن إصدارٍ منها، وهو قرارٌ يجعل الفرزَ يعمل على قائمةٍ أقدم. ومعها الاطّلاعُ على إعدادِ مزوّدِ الفرزِ وحالتِه. والإحالةُ هنا إلى موظّفٍ داخلَ المكتب، لا إبلاغاً للجهةِ المختصّة — ذاك رمزٌ آخر.',
     'perm:screening.run': 'يشغّل فحص العقوبات ومكافحة غسل الأموال على عميل. وظيفة التزام خالصة',
     'perm:security-config.manage': 'يعدّل إعدادات الأمان للمكتب: مدة الخمول قبل الخروج التلقائي، وقاعدة إيقاف الحساب بعد محاولات خاطئة. تعديلها يمسّ كل مستخدم في المكتب',
     'perm:security-config.read': 'يقرأ إعدادات الأمان: مدة الخمول قبل الخروج التلقائي، وقاعدة إيقاف الحساب بعد محاولات خاطئة، ونحوها',
@@ -292,7 +336,7 @@ export const PERMISSIONS = {
     'perm:access-recertification.review': "Review and decide an access-recertification item (never one's own)",
     'perm:access-recertification.review.routine': 'Be assigned access-recertification items routinely, ahead of fallback reviewers — the assignment preference, not the right to decide (that is access-recertification.review)',
     'perm:aml.escalate': 'Escalate a suspicious-activity alert to the competent authority',
-    'perm:aml.monitor': 'Monitor AML/CFT transaction-monitoring alerts',
+    'perm:aml.monitor': 'Work AML/CFT transaction-monitoring alerts: log one, run the detection sweep, list and read alerts, AND CLOSE AN ALERT — a disposal decision about a suspicious-activity finding, not monitoring. Escalating and reporting to the authority are aml.escalate, a separate code',
     'perm:audit-log.read': 'Read the immutable audit log',
     'perm:bcp-dr.manage': 'Manage Business Continuity / Disaster Recovery plans',
     'perm:branch.create': 'Create a branch in this office',
@@ -330,6 +374,8 @@ export const PERMISSIONS = {
     'perm:complaint.log': 'Log a complaint',
     'perm:compliance-calendar.manage': 'Manage the regulatory compliance calendar',
     'perm:conflict-of-interest.disclose': 'Record the mandatory conflict-of-interest disclosure for a flagged recommendation before it can be sent (Process 16). The acknowledger must differ from the drafter (assertDifferentActors).',
+    'perm:conflict-of-interest.register.read':
+      'See what the people in this office have declared about their own conflicts of interest. This is not the flagged disclosure on a recommendation, which the system detects and a second person acknowledges: here the person records it about themselves, with nothing detecting and nothing prompting. Declaring one needs no permission at all, because the person declaring is the person it is about.',
     'perm:consent.manage': 'Capture/withdraw consent at a defined touchpoint',
     'perm:cross-border-transfer.approve': 'Approve a cross-border personal-data transfer',
     'perm:cross-sell.convert': 'Convert or dismiss a system-flagged cross-sell opportunity',
@@ -342,7 +388,7 @@ export const PERMISSIONS = {
     'perm:customer.create': 'Create a Customer (individual/corporate)',
     'perm:customer.national-id.reveal': "Reveal a customer's unmasked national ID with a written justification (Part 10.2 Highly Confidential; the contact fields on the same endpoint stay under customer.360-view.read)",
     'perm:customer.read': "List customers and read a customer's basic identity — the path for finding a customer. Does NOT cover the aggregated 360° view, the UBO register, the document list or revealing a masked field, all of which stay under customer.360-view.read",
-    'perm:customer.update': "Correct a customer's contact details — phone, email and registered address. Does NOT cover name, date of birth, nationality or identity numbers: changing one of those is a screening event under the AMLU rules, not an edit",
+    'perm:customer.update': "Correct a customer's details. Contact details — phone, email and registered address — unconditionally; date of birth and nationality through their own form, which demands a written reason and re-screens the file against the sanctions lists. Does NOT cover name or identity numbers: changing one of those is a screening event under the AMLU rules, not an edit, and no path exists for them",
     'perm:dashboard.claims.view': 'View the Claims dashboard',
     'perm:dashboard.compliance.view': 'View the Compliance dashboard',
     'perm:dashboard.executive.view': 'View the executive management dashboard',
@@ -403,6 +449,10 @@ export const PERMISSIONS = {
     'perm:insurer.read': "Read this office's own insurer relationships — contacts, credit terms, financial strength and the lines they offer",
     'perm:insurer.update': "Maintain this office's own record of an insurer and its relationship terms",
     'perm:interaction.log': 'Log a customer interaction (meeting/call/email/...)',
+    'perm:insurer.company.link':
+      "Links this office's insurer record to an insurance company registered on the platform. It changes which source answers for the company's name and published contact details — the company's own record then wins — and makes this office's copies of those fields read-only. The office's values are kept and still shown, labelled as what the office recorded. Nothing is written on the company's record.",
+    'perm:insurer.company.unlink':
+      "Removes the link between this office's insurer record and a registered insurance company. The office's own stored values answer again and become editable. Nothing on the company's record changes. Audited, because it returns a published fact to being an office note.",
     'perm:internal-audit.close': 'Close an internal audit finding after remediation',
     'perm:internal-audit.record': 'Record an internal audit finding',
     'perm:internal-controls.view': 'View the periodic self-approval (maker/checker) audit report',
@@ -442,8 +492,16 @@ export const PERMISSIONS = {
     'perm:portfolio-analysis.view': 'View portfolio analysis by line/insurer/segment/geography',
     'perm:privacy-notice.publish': 'Publish a version-controlled bilingual privacy notice',
     'perm:privacy-notice.read': 'Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)',
+    'perm:provider.office.administrator.invite':
+      "Create the FIRST user account inside a brokerage office the provider has registered, and grant it that office's administrator role. The only write in this product that crosses a tenancy boundary. Refused once the office has any account: from then on the office administers itself. The invited administrator is created with NO usable password and signs in by requesting a password reset — nothing here chooses or sends a password",
+    'perm:provider.insurance-company.administrator.invite':
+      "Create the FIRST user account inside an insurance company the provider has registered, and grant it that company's administrator role. Like the brokerage-office invite it crosses a tenancy boundary and is refused once the company has any account. The company administrator it creates holds SIX self-administration codes and nothing more — a company reads its own registry record and has no other capability in this product. The invited administrator is created with NO usable password and signs in by requesting a password reset",
     'perm:provider.office-state.read':
       'Opens the platform-wide view of every brokerage office: its licence number and expiry, whether that licence still lets it place business, how many of its licensed branches carry no business at all, how many people it has, and when it was last used. This crosses office boundaries — the holder sees other offices, not only their own — so grant it only to whoever operates the platform. It shows no customers, no policies, no premiums or commission, and nothing about any individual person',
+    'perm:provider.office.register':
+      'Registers a new brokerage office on the platform: its legal identity, its licence term and certificate, the branches it is licensed for, its professional indemnity cover, its banking details and its first administrator role. This CREATES A TENANT — every office registered this way is a separate, isolated set of records that no other office can reach — and it is the only route in this product that can do it. Grant it only to whoever operates the platform',
+    'perm:provider.insurer.register':
+      "Registers an insurance company on the platform: its legal identity, its licence number and certificate, the lines its licence permits it to underwrite, its published quotation and claims channels, its integration method and its banking details. This CREATES A TENANT. It does not touch any brokerage office's own record of that company — an office links its record itself, through its own permission. Grant it only to whoever operates the platform",
     'perm:profitability-analysis.view': 'View profitability analysis (commission income vs. cost-to-serve)',
     'perm:program.assemble': 'Assemble a multi-line Insurance Program from risk-assessment results',
     'perm:program.read': 'List/read Insurance Programs',
@@ -468,7 +526,14 @@ export const PERMISSIONS = {
     'perm:renewal.manage': 'Run the renewal lead-time sweep, walk a renewal case through RenewalStatus, and set its re-marketing triggers',
     'perm:renewal.read': 'List/read renewal cases, their lead-time window and loss ratio',
     'perm:retention-case.manage': 'Manage a retention case opened on renewal inactivity/lapse risk',
-    'perm:retention-schedule.manage': 'Maintain the retention-period table (record categories, months, Legal Counsel confirmation)',
+    'perm:retention-schedule.update':
+      "Set a record category's retention period and its legal basis. The MAKER half of a maker/checker pair: whoever sets a period cannot also confirm it as Legal Counsel unless the office has declared merged duties, in which case the act is recorded",
+    'perm:retention.archive.retrieve':
+      "Read a record in the blocked phase — its category's retention period has ended, so it is kept only to satisfy a statutory minimum and leaves every ongoing report and sweep. Retrieval is allowed on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each one is written into an append-only register with the basis, who asked and for what. Holding this does not allow retrieval for the office's own purposes — that is the processing the block exists to prevent.",
+    'perm:retention.extend':
+      'Extend the retention of specific records past the period set for their category, on one of exactly three bases: a named legislative provision, a live legal hold or dispute, or the explicit consent of the customer. Free text accompanies a basis and may not be one. Every extension is recorded in the register — which records, which basis, who extended it, when, and until when.',
+    'perm:retention-schedule.confirm':
+      'Confirm a retention period as Legal Counsel, stamping the date AND the actor. The CHECKER half: refused for whoever set the period, unless the office has declared merged duties — in which case the declaration is recorded against the row',
     'perm:retention.dispose.approve': 'Give final DPO approval on a disposal batch (checker side of dual control)',
     'perm:retention.dispose.nominate': 'Nominate a disposal batch (maker side of dual control)',
     'perm:rfq.communication.log': 'Record an inbound insurer query or an outbound response / additional-information note on an RFQ (Process 12). Reading the correspondence is covered by rfq.read.',
@@ -485,7 +550,7 @@ export const PERMISSIONS = {
     'perm:role.update': 'Rename a role, change what it grants, and set its MFA requirements.',
     'perm:ropa.manage': 'Maintain the Records of Processing Activities register',
     'perm:sales-target.manage': 'Set and revise sales targets per employee/team',
-    'perm:sanctions-pep.screen': 'Run recurring sanctions screening batches',
+    'perm:sanctions-pep.screen': 'The whole sanctions/PEP screening surface: run screening and the recurring batch, work the match queue (assign, start a review, decide it, escalate it to a COLLEAGUE inside the office — not a report to the authority, which is a separate code — and annotate it), maintain the watchlists themselves (refresh from source, read their status and generations, and roll a generation back, which decides that screening runs against an older list), and read the configuration and health of the screening provider itself',
     'perm:screening.run': 'Run sanctions/AML screening',
     'perm:security-config.manage': 'Update the security configuration',
     'perm:security-config.read': 'Read the security configuration (idle timeout, lockout policy, ...)',

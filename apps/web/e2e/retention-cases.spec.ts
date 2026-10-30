@@ -28,6 +28,7 @@ const RETENTION_CASES = [
   {
     id: "rc-1",
     customerId: "11111111-1111-1111-1111-111111111111",
+    customerName: "Al-Yarmouk Trading Company",
     reason: "lapse_risk",
     status: "open",
     isClosed: false,
@@ -37,6 +38,7 @@ const RETENTION_CASES = [
   {
     id: "rc-2",
     customerId: "11111111-1111-1111-1111-111111111111",
+    customerName: "Al-Yarmouk Trading Company",
     reason: "renewal_inactivity",
     status: "closed",
     isClosed: true,
@@ -112,4 +114,25 @@ test("retention screen has no serious/critical accessibility violations @a11y", 
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+test("RULE 2 — the Customer column names the customer, and never shows the id", async ({
+  page,
+}) => {
+  /*
+   * MEASURED BEFORE THIS WAS WRITTEN: with the screen changed and the build forced, every existing
+   * test in this file still passed — nothing was looking at the Customer column, so the column
+   * rendering eight characters of a uuid had no observer at all and neither would the fix.
+   *
+   * ASSERTED AS A PAIR. The name alone passes against a screen that renders BOTH, and the absence
+   * alone passes against a screen that renders NEITHER — which is what an empty cell looks like.
+   */
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockRetentionCases(page);
+
+  await page.goto("/retention-cases");
+
+  const main = page.locator("main");
+  await expect(main).toContainText("Al-Yarmouk Trading Company");
+  await expect(main).not.toContainText("11111111");
 });

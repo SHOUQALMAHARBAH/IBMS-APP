@@ -18,6 +18,14 @@ export const COMMUNICATION_CHANNELS = [
 export interface Communication {
   id: string;
   customerId: string | null;
+  /**
+   * RULE 2 — WHO THE ROW IS ABOUT, or null. Nullable where the four sibling screens are
+   * not, and for TWO reasons rather than one: a communication may be logged against no
+   * customer at all, AND `CommunicationLog.customerId` has no relation and no foreign key
+   * behind it, so an id that resolves to nothing is representable. The api resolves the
+   * name with a second read for exactly that reason.
+   */
+  customerName: string | null;
   channel: string;
   templateId: string | null;
   languageUsed: string | null;

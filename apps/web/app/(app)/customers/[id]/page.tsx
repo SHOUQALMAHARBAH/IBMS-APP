@@ -16,9 +16,15 @@ import {
   type Ubo,
 } from '../../../../lib/customer/customer-api';
 import { CustomerContactCorrection } from '../../../../components/customer/CustomerContactCorrection';
+import { CustomerIdentifierCorrection } from '../../../../components/customer/CustomerIdentifierCorrection';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -37,6 +43,7 @@ import {
   KYC_AWAITING_DECISION,
   KYC_STATUS_LABEL_KEY,
 } from '../../../../lib/kyc/kyc-status-labels';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -75,13 +82,14 @@ function ProfileField({
       <div style={profileFieldValueStyle}>
         <bdi>{revealed ?? value ?? '—'}</bdi>
         {onReveal && !revealed ? (
-          <button
-            type="button"
-            style={{ ...smallButtonStyle, marginInlineStart: '0.5rem' }}
+          <Button
+            variant="secondary"
+            size="sm"
+            style={{ marginInlineStart: 'var(--space-2)' }}
             onClick={onReveal}
           >
             {revealLabel}
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>
@@ -198,15 +206,13 @@ export default function CustomerProfilePage() {
   const canRevealNationalId = hasPermission(user, 'customer.national-id.reveal');
 
   return (
-    <main style={pageStyle}>
-      <button type="button" onClick={() => router.push('/customers')} style={{ cursor: 'pointer' }}>
+    <main style={pageStackStyle}>
+      <Button variant="ghost" onClick={() => router.push('/customers')}>
         {t('customerProfileBackButton')}
-      </button>
+      </Button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {customer ? (
@@ -214,7 +220,10 @@ export default function CustomerProfilePage() {
           <h1>
             <bdi>{customer.legalName}</bdi>
           </h1>
-          <p style={{ opacity: 0.8 }}>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='Customer' entityId={customer.id} />
+          </p>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {t('customerProfileTypeStatusLine', {
               type: t(TYPE_LABEL_KEY[customer.customerType]),
               status: t(STATUS_LABEL_KEY[customer.status]),
@@ -226,7 +235,7 @@ export default function CustomerProfilePage() {
               why. A reader seeing the first and not the second is the state the defect describes —
               including the officer who has just pressed "submit for review" and is sent here. */}
           {canReadKyc ? (
-            <p data-kyc-stage={kyc?.status ?? 'none'} style={{ opacity: 0.8 }}>
+            <p data-kyc-stage={kyc?.status ?? 'none'} style={{ color: 'var(--ink-secondary)' }}>
               {kyc ? (
                 <>
                   {t('customerKycStageLine', {
@@ -261,19 +270,50 @@ export default function CustomerProfilePage() {
             canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
-          <div style={profileGridStyle}>
-            <ProfileField
-              label={t('customerFieldNationalId')}
-              value={customer.nationalId}
-              fieldKey="nationalId"
-              revealed={revealed.nationalId}
-              onReveal={
-                customer.nationalId && canRevealNationalId
-                  ? () => setRevealTarget('nationalId')
-                  : undefined
-              }
-              revealLabel={t('customerProfileFieldReveal')}
-            />
+          {/* THE RECORD'S OWN FACTS. A plain `Card` and deliberately no title: the block
+              is identified by what is in it, and inventing a heading here would be an
+              Arabic word nobody chose. It had no surface at all until this pass — two
+              cards above it, a stretch of bare page, then cards again. */}
+          <Card>
+            <div style={profileGridStyle}>
+            {/* INDIVIDUAL ONLY — a company has no national ID, and this field was
+                rendered for one anyway. The owner's walk: «لما سجلت عميل ك شركة،
+                الرقم الوطني بطلعله – شرطة لأني ما ضفته، فش اله حقل تعبئة بعملية
+                التسجيل» — she read the dash as a field she had failed to fill,
+                which is the only reasonable reading of a labelled empty row. */}
+            {customer.customerType === 'INDIVIDUAL' ? (
+              <>
+                <ProfileField
+                  label={t('customerFieldNationalId')}
+                  value={customer.nationalId}
+                  fieldKey="nationalId"
+                  revealed={revealed.nationalId}
+                  onReveal={
+                    customer.nationalId && canRevealNationalId
+                      ? () => setRevealTarget('nationalId')
+                      : undefined
+                  }
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                {/* THE TWO SCREENING DISCRIMINATORS, rendered for the first time.
+                    `Customer.dateOfBirth` and `.nationality` have been on the wire
+                    and in the web's own type since the columns shipped, and no
+                    screen read either — so the two facts that separate a true
+                    sanctions match from a coincidence of names were invisible to
+                    the person reviewing the match. Stored in the CLEAR by decision
+                    (see the column's own comment), so no reveal control. */}
+                <ProfileField
+                  label={t('customerFieldDateOfBirth')}
+                  value={customer.dateOfBirth}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('impFieldNationality')}
+                  value={customer.nationality}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+              </>
+            ) : null}
             <ProfileField
               label={t('customerFieldContactPhone')}
               value={customer.contactPhone}
@@ -290,21 +330,32 @@ export default function CustomerProfilePage() {
               onReveal={() => setRevealTarget('contactEmail')}
               revealLabel={t('customerProfileFieldReveal')}
             />
-            <ProfileField
-              label={t('customerFieldRegistrationNumber')}
-              value={customer.registrationNumber}
-              revealLabel={t('customerProfileFieldReveal')}
-            />
-            <ProfileField
-              label={t('customerFieldRegisteredAddress')}
-              value={customer.registeredAddress}
-              revealLabel={t('customerProfileFieldReveal')}
-            />
-            <ProfileField
-              label={t('customerFieldNatureOfBusiness')}
-              value={customer.natureOfBusiness}
-              revealLabel={t('customerProfileFieldReveal')}
-            />
+            {/* CORPORATE ONLY. These three were rendered on an INDIVIDUAL's page as
+                three empty rows, and they are the very three the brief believed had
+                no form field: «سجلت عميل ك فرد وهيك طلعلي زي – عند هذول الحقول لأني
+                ما ضفتهم لأنه فش الهم حقول من البداية». They DO have form fields — on
+                the corporate branch of the wizard, which the company she registered
+                the same day used successfully. What was wrong was showing them to a
+                natural person, who can never have any of them. */}
+            {customer.customerType === 'CORPORATE' ? (
+              <>
+                <ProfileField
+                  label={t('customerFieldRegistrationNumber')}
+                  value={customer.registrationNumber}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('customerFieldRegisteredAddress')}
+                  value={customer.registeredAddress}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('customerFieldNatureOfBusiness')}
+                  value={customer.natureOfBusiness}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+              </>
+            ) : null}
             <ProfileField
               label={t('customerFieldLanguagePreference')}
               value={customer.languagePreference}
@@ -333,8 +384,9 @@ export default function CustomerProfilePage() {
                   revealLabel={t('customerProfileFieldReveal')}
                 />
               </>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          </Card>
 
           {revealTarget ? (
             <div style={repeatableRowStyle}>
@@ -347,17 +399,16 @@ export default function CustomerProfilePage() {
                 onChange={(e) => setRevealReason(e.target.value)}
                 style={{ width: '100%', padding: '0.4rem', marginTop: '0.4rem' }}
               />
-              <button
-                type="button"
-                style={{ ...smallButtonStyle, marginTop: '0.5rem' }}
+              <Button
+                variant="secondary"
+                size="sm"
+                style={{ marginTop: 'var(--space-2)' }}
                 onClick={() => void handleReveal(revealTarget)}
               >
                 {t('customerRevealConfirmButton')}
-              </button>
+              </Button>
               {revealError ? (
-                <p role="alert" style={{ ...errorStyle, marginTop: '0.4rem' }}>
-                  {revealError}
-                </p>
+                <ErrorState title={revealError} />
               ) : null}
             </div>
           ) : null}
@@ -372,10 +423,23 @@ export default function CustomerProfilePage() {
             />
           </div>
 
+          {/* Correcting the two SCREENING DISCRIMINATORS — the owner's narrow strike of her own
+            * 2026-09-28 deferral (2026-10-28). A sibling control rather than two more fields on
+            * the form above: the reason is mandatory, the fields are INDIVIDUAL-only, and saving
+            * re-screens. It renders nothing at all on a corporate customer, which is why the
+            * type is passed rather than the condition being written here — the component owns
+            * that decision, and a second copy of it is a second answer. */}
+          <div style={{ marginTop: '1.25rem' }}>
+            <CustomerIdentifierCorrection
+              customerId={customer.id}
+              customerType={customer.customerType}
+              onCorrected={load}
+            />
+          </div>
+
           {customer.customerType === 'CORPORATE' ? (
-            <section style={{ marginTop: '2rem' }}>
-              <h2>{t('customerUbosHeading')}</h2>
-              {ubos.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUbosNone')}</p> : null}
+            <Card title={t('customerUbosHeading')}>
+              {ubos.length === 0 ? <EmptyState title={t('customerUbosNone')} /> : null}
               {ubos.map((u) => (
                 <div key={u.id} style={repeatableRowStyle}>
                   <strong>
@@ -385,124 +449,105 @@ export default function CustomerProfilePage() {
                   {u.isPep ? <span> — {t('customerUboPep')}</span> : null}
                 </div>
               ))}
-            </section>
+            </Card>
           ) : null}
 
-          <section style={{ marginTop: '2rem' }}>
-            <h2>{t('customerDocumentsHeading')}</h2>
-            {documents.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerDocumentsNone')}</p> : null}
+          <Card title={t('customerDocumentsHeading')}>
+            {documents.length === 0 ? <EmptyState title={t('customerDocumentsNone')} /> : null}
             {documents.map((d) => (
               <div key={d.id} style={repeatableRowStyle}>
                 <strong>{d.fileName}</strong> — {t(ENUM_LABEL.DocumentClassification[d.classification])}
               </div>
             ))}
-          </section>
+          </Card>
 
-          <section style={{ marginTop: '2rem' }}>
-            <h2>{t('customerNeedsAssessmentHeading')}</h2>
-            <p style={{ opacity: 0.8 }}>{t('customerNeedsAssessmentIntro')}</p>
+          <Card title={t('customerNeedsAssessmentHeading')}>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerNeedsAssessmentIntro')}</p>
             {canStartNeedsAssessment ? (
-              <button
-                type="button"
-                style={{ cursor: 'pointer' }}
+              <Button
                 onClick={() =>
                   router.push(`/needs-assessments/new?customerId=${customer.id}`)
                 }
               >
                 {t('customerNeedsAssessmentStartButton')}
-              </button>
+              </Button>
             ) : (
               <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerNeedsAssessmentRefusalAct', 'needs-assessment.create')}</p>
             )}
-          </section>
+          </Card>
 
-          <section style={{ marginTop: '2rem' }}>
-            <h2>{t('customerRiskSurveyHeading')}</h2>
-            <p style={{ opacity: 0.8 }}>{t('customerRiskSurveyIntro')}</p>
+          <Card title={t('customerRiskSurveyHeading')}>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerRiskSurveyIntro')}</p>
             {canOpenRiskSurvey ? (
-              <button
-                type="button"
-                style={{ cursor: 'pointer' }}
+              <Button
                 onClick={() =>
                   router.push(`/risk-profiles?customerId=${customer.id}`)
                 }
               >
                 {t('customerRiskSurveyOpenButton')}
-              </button>
+              </Button>
             ) : (
               <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerRiskSurveyRefusalAct', 'risk-profile.read')}</p>
             )}
-          </section>
+          </Card>
 
-          <section style={{ marginTop: '2rem' }}>
-            <h2>{t('customerInsuranceProgramHeading')}</h2>
-            <p style={{ opacity: 0.8 }}>{t('customerInsuranceProgramIntro')}</p>
+          <Card title={t('customerInsuranceProgramHeading')}>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerInsuranceProgramIntro')}</p>
             {canOpenInsuranceProgram ? (
-              <button
-                type="button"
-                style={{ cursor: 'pointer' }}
+              <Button
                 onClick={() =>
                   router.push(`/insurance-programs?customerId=${customer.id}`)
                 }
               >
                 {t('customerInsuranceProgramOpenButton')}
-              </button>
+              </Button>
             ) : (
               <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerInsuranceProgramRefusalAct', 'program.read')}</p>
             )}
-          </section>
+          </Card>
 
-          <section style={{ marginTop: '2rem' }}>
-            <h2>{t('customerCrossSellHeading')}</h2>
-            <p style={{ opacity: 0.8 }}>{t('customerCrossSellIntro')}</p>
+          <Card title={t('customerCrossSellHeading')}>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrossSellIntro')}</p>
             {canOpenCrossSell ? (
-              <button
-                type="button"
-                style={{ cursor: 'pointer' }}
+              <Button
                 onClick={() =>
                   router.push(`/cross-sell?customerId=${customer.id}`)
                 }
               >
                 {t('customerCrossSellOpenButton')}
-              </button>
+              </Button>
             ) : (
               <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerCrossSellRefusalAct', 'cross-sell.read')}</p>
             )}
-          </section>
+          </Card>
 
-          <section style={{ marginTop: '2rem' }}>
-            <h2>{t('customerUpSellHeading')}</h2>
-            <p style={{ opacity: 0.8 }}>{t('customerUpSellIntro')}</p>
+          <Card title={t('customerUpSellHeading')}>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUpSellIntro')}</p>
             {canOpenUpSell ? (
-              <button
-                type="button"
-                style={{ cursor: 'pointer' }}
+              <Button
                 onClick={() =>
                   router.push(`/up-sell?customerId=${customer.id}`)
                 }
               >
                 {t('customerUpSellOpenButton')}
-              </button>
+              </Button>
             ) : (
               <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerUpSellRefusalAct', 'up-sell.read')}</p>
             )}
-          </section>
+          </Card>
 
-          <section style={{ marginTop: '2rem' }}>
-            <h2>{t('customerCrmHeading')}</h2>
-            <p style={{ opacity: 0.8 }}>{t('customerCrmIntro')}</p>
+          <Card title={t('customerCrmHeading')}>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrmIntro')}</p>
             {canOpenCrm ? (
-              <button
-                type="button"
-                style={{ cursor: 'pointer' }}
+              <Button
                 onClick={() => router.push(`/crm?customerId=${customer.id}`)}
               >
                 {t('customerCrmOpenButton')}
-              </button>
+              </Button>
             ) : (
               <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerCrmRefusalAct', 'customer.360-view.read')}</p>
             )}
-          </section>
+          </Card>
         </>
       ) : null}
     </main>

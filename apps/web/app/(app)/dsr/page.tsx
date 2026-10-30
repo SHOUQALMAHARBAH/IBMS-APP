@@ -1,7 +1,8 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+import { WorkflowHistoryLink } from '../../../components/ui/WorkflowHistoryLink';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -15,6 +16,9 @@ import {
   assignDsr,
   closeDsr,
   createDsr,
+  DSR_INTAKE_CHANNELS,
+  DSR_REQUEST_TEXT_MAX_LENGTH,
+  DSR_REQUEST_TEXT_MIN_LENGTH,
   DSR_TYPES,
   fulfilDsr,
   listDsrs,
@@ -25,8 +29,18 @@ import {
   type DataSubjectRequest,
 } from '../../../lib/pdpl/dsr-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { DsrClockControl } from '../../../components/pdpl/DsrClockControl';
@@ -42,18 +56,6 @@ const HANDLE_ROLES = [
 const CLOSE_ROLES = [
   'dsr.close',
 ];
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 
 export default function DsrPage() {
@@ -72,6 +74,10 @@ export default function DsrPage() {
   const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [customerId, setCustomerId] = useState('');
+  const [requestText, setRequestText] = useState('');
+  // Defaults to the channel a request most often arrives through here. Not blank: a blank first
+  // option in a REQUIRED select is a field somebody submits without reading.
+  const [intakeChannel, setIntakeChannel] = useState<string>('WEBSITE_FORM');
   const [type, setType] = useState<string>(DSR_TYPES[0]!);
   const [text, setText] = useState<Record<string, string>>({});
   const [reference, setReference] = useState<Record<string, string>>({});
@@ -121,8 +127,14 @@ export default function DsrPage() {
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
     await run(async () => {
-      await createDsr({ customerId: customerId.trim(), type });
+      await createDsr({
+        customerId: customerId.trim(),
+        type,
+        requestText: requestText.trim(),
+        intakeChannel,
+      });
       setCustomerId('');
+      setRequestText('');
     });
   }
 
@@ -135,16 +147,16 @@ export default function DsrPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('dsrHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('dsrIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('dsrHeading')}
+        description={t('dsrIntro')}
+      />
 
       {canLog ? (
         <form
           onSubmit={submit}
-          style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}
+          style={{ margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '30rem' }}
         >
           <EntitySearch
             kind="customer"
@@ -153,7 +165,7 @@ export default function DsrPage() {
             label={t('dsrCustomerIdLabel')}
             required
           />
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('dsrTypeLabel')}
             <select
               aria-label={t('dsrTypeLabel')}
@@ -167,6 +179,40 @@ export default function DsrPage() {
               ))}
             </select>
           </label>
+          {/*
+            WHAT WAS ASKED FOR, and HOW IT ARRIVED — both REQUIRED by the api's DTO.
+
+            These two inputs ship with the api rather than with the design batch, and that is a
+            stated departure: a required field with no input is not a deferred screen, it is a
+            create path that 400s on every submit. Their PLACEMENT, wording polish and the
+            deadline-and-conditions line that belongs at intake are still the design batch's.
+          */}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {t('dsrRequestTextLabel')}
+            <textarea
+              aria-label={t('dsrRequestTextLabel')}
+              value={requestText}
+              onChange={(e) => setRequestText(e.target.value)}
+              rows={3}
+              required
+              minLength={DSR_REQUEST_TEXT_MIN_LENGTH}
+              maxLength={DSR_REQUEST_TEXT_MAX_LENGTH}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {t('dsrChannelLabel')}
+            <select
+              aria-label={t('dsrChannelLabel')}
+              value={intakeChannel}
+              onChange={(e) => setIntakeChannel(e.target.value)}
+            >
+              {DSR_INTAKE_CHANNELS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.DsrIntakeChannel[opt])}
+                </option>
+              ))}
+            </select>
+          </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
             {busy ? t('dsrSavingButton') : t('dsrLogButton')}
           </button>
@@ -174,42 +220,69 @@ export default function DsrPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('dsrNone')}</p>
+          <EmptyState title={t('dsrNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('dsrColCustomer')}</th>
-                  <th style={head}>{t('dsrTypeLabel')}</th>
-                  <th style={head}>{t('dsrColStatus')}</th>
-                  <th style={head}>{t('dsrColSlaDue')}</th>
-                  <th style={head}>{t('dsrColAction')}</th>
+                  <Th>{t('dsrColCustomer')}</Th>
+                  <Th>{t('dsrTypeLabel')}</Th>
+                  <Th>{t('dsrColStatus')}</Th>
+                  <Th>{t('dsrColSlaDue')}</Th>
+                  <Th>{t('dsrColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((d) => (
-                  <tr key={d.id}>
-                    <td style={cell}>{(d.customerId ?? d.insuredPersonId ?? '—').slice(0, 8)}…</td>
-                    <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
-                    <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
-                    <td style={cell}>
+                  <Tr key={d.id}>
+                    <Td>
+                      {/*
+                        DOOR FOUR'S WAY IN, for the DPO. An open DSR he is handling opens that
+                        customer's RFQ chain, and until this link existed the system admitted him to
+                        a record no screen told him the id of.
+                        CONDITIONAL ON THERE BEING A CUSTOMER: `customerId` is nullable and an
+                        insured-person request names none, so a request about nobody links nowhere.
+                        And it goes to the customer-FILTERED list, never to `/customers/[id]` —
+                        the customer page is not what the anchor opens, so linking it would answer
+                        404 from the ownership layer about a record that exists.
+                      */}
+                      {d.customerId ? (
+                        <a
+                          href={`/rfqs?customerId=${encodeURIComponent(d.customerId)}`}
+                          data-customer-rfqs={d.customerId}
+                        >
+                          {t('dsrViewCustomerRfqs')}
+                        </a>
+                      ) : (
+                        `${(d.insuredPersonId ?? '—').slice(0, 8)}…`
+                      )}
+                    </Td>
+                    <Td>{t(ENUM_LABEL.DsrType[d.type])}</Td>
+                    <Td>{t(ENUM_LABEL.DsrStatus[d.status])}</Td>
+                    <Td>
                       {d.slaDueAt.slice(0, 10)}
-                      {d.isOverdue ? ' (overdue)' : ''}
-                    </td>
-                    <td style={cell}>
+                      {d.isOverdue ? ` ${t('statusOverdue')}` : ''}
+                    </Td>
+                    <Td>
+                      {/* Owner decision 41 — carries this request's id into `/audit-trail`'s
+                          workflow-history fields. Renders nothing without `workflow-history.read`,
+                          which the DPO does not hold, so on this screen it is for the compliance
+                          officer and the external auditor. */}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <WorkflowHistoryLink
+                          entityType="DataSubjectRequest"
+                          entityId={d.id}
+                        />
+                      </div>
                       {d.status === 'CLOSED' ? (
                         /* A closed request has no actions left, so this cell held a bare em-dash.
                            Part 4 step 5 — if ONE person both logged and closed it, that is the one
@@ -225,7 +298,7 @@ export default function DsrPage() {
                           '—'
                         )
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '18rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '18rem' }}>
                           {canHandle ? (
                             <input
                               aria-label={t('dsrTextAria')}
@@ -243,7 +316,7 @@ export default function DsrPage() {
                             />
                           ) : null}
                           {canHandle && d.type === 'DELETION' && d.status === 'IN_PROGRESS' ? (
-                            <label style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                            <label style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                               <input
                                 type="checkbox"
                                 aria-label={t('dsrNoRetentionHoldAria')}
@@ -268,7 +341,7 @@ export default function DsrPage() {
                             requestId={d.id}
                             closed={d.closedAt !== null}
                           />
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                             {canHandle && d.status === 'RECEIVED' ? (
                               <button
                                 type="button"
@@ -392,15 +465,15 @@ export default function DsrPage() {
                           </div>
                         </div>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('dsrLoading')}</p>
+        <SkeletonList rows={4} label={t('dsrLoading')} />
       )}
     </main>
   );

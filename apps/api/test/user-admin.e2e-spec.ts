@@ -596,7 +596,10 @@ describe('User admin / provisioning (e2e)', () => {
       await request(app.getHttpServer())
         .post('/admin/departments')
         .set(bearer(officer.accessToken))
-        .send({ name: 'Should Not Exist' })
+        // A COMPLETE body, so this proves the PERMISSION refusal and not a DTO refusal. It
+        // passes either way today because `PermissionsGuard` runs before the validation
+        // pipe — which is precisely why it should not depend on that ordering.
+        .send({ name: 'Should Not Exist', nameAr: 'قسم Should Not Exist' })
         .expect(403);
       await request(app.getHttpServer())
         .get('/admin/branches')
@@ -605,7 +608,10 @@ describe('User admin / provisioning (e2e)', () => {
       await request(app.getHttpServer())
         .post('/admin/branches')
         .set(bearer(officer.accessToken))
-        .send({ name: 'Should Not Exist' })
+        // A COMPLETE body, so this proves the PERMISSION refusal and not a DTO refusal. It
+        // passes either way today because `PermissionsGuard` runs before the validation
+        // pipe — which is precisely why it should not depend on that ordering.
+        .send({ name: 'Should Not Exist', nameAr: 'قسم Should Not Exist' })
         .expect(403);
     });
   });

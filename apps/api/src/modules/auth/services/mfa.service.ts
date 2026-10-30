@@ -10,7 +10,19 @@ import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
 import { decryptField, encryptField } from '../../../common/crypto.util';
 
-const ISSUER = 'IBMS';
+/*
+ * WHAT THE USER'S AUTHENTICATOR APP CALLS THIS ACCOUNT.
+ *
+ * The product is WASEET 360; `IBMS` was the internal codename and must not appear anywhere a
+ * person reads, which includes the entry in their phone.
+ *
+ * THE CONSEQUENCE IS RECORDED RATHER THAN DISCOVERED: the issuer is baked into the `otpauth://`
+ * URI at ENROLMENT time, so this changes the label of NEW pairings only — anybody already paired
+ * keeps seeing the old name in their app until they re-enrol, and there is no repair that reaches
+ * them and none is needed. Verification reads the SECRET and nothing else, so no existing code
+ * stops working; measured, this constant has exactly one reader, `keyuri` below.
+ */
+const ISSUER = 'WASEET 360';
 
 /**
  * Part II §4.3.2 — accept the previous, current and next 30-second code.

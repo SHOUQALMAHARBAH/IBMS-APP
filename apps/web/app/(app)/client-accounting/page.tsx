@@ -1,38 +1,62 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+  DateEcho,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   AR_AGEING_BUCKET_KEYS,
-  AR_AGEING_BUCKET_LABEL,
+  AR_AGEING_BUCKET_LABEL_KEY,
   getReceivablesAgeing,
   type ReceivablesAgeingReport,
 } from '../../../lib/client-accounting/ageing-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
-import { formatDate, formatMoney } from '../../../lib/i18n/format';
-import type { Language } from '../../../lib/i18n/translations';
+import { formatDate, formatMoney, formatNumber } from '../../../lib/i18n/format';
+import type { Language, TranslationKey } from '../../../lib/i18n/translations';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-function oldest(daysOverdue: number, dueDate: string | null, language: Language): string {
-  if (daysOverdue > 0) return `${daysOverdue}d overdue`;
-  if (dueDate) return `due ${formatDate(dueDate, language)}`;
+/**
+ * THE OLDEST OUTSTANDING INVOICE, IN THE SIBLING SCREEN'S OWN TREATMENT.
+ *
+ * This read `${daysOverdue}d overdue` and `due ${date}` — two English runs on the screen that says
+ * what clients owe the office, on an Arabic-first product. `hardcoded-ui-english.py` reports 0 for
+ * them because its template-literal pattern needs TWO words and each of these has one.
+ *
+ * `/sla-dashboard` renders the same concept as `${overdueDays}d` with the meaning in its column
+ * heading, so the figure stays a figure and the meaning comes from `statusOverdue` — owner
+ * decision 55's marker, already serving three screens, whose job is exactly to sit beside a date
+ * or a figure and say the deadline has passed.
+ *
+ * The not-yet-due case renders the DATE ALONE: `caColOldest` («الأقدم») already says what the
+ * column is, and the English `due ` prefix carried nothing on top of it. The third case keeps its
+ * em dash — *nothing is outstanding* is not one of owner decision 60's three cases, and her
+ * instruction with those words was that a site which does not fit one of them keeps the dash.
+ */
+function oldest(
+  daysOverdue: number,
+  dueDate: string | null,
+  language: Language,
+  t: (key: TranslationKey) => string,
+): string {
+  if (daysOverdue > 0) {
+    return `${formatNumber(daysOverdue, language)}d ${t('statusOverdue')}`;
+  }
+  if (dueDate) return formatDate(dueDate, language);
   return '—';
 }
 
-const cellStyle: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'end',
-};
-const headCellStyle: CSSProperties = {
-  ...cellStyle,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function ClientAccountingPage() {
   const router = useRouter();
@@ -74,93 +98,91 @@ export default function ClientAccountingPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('caHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        {t('caIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('caHeading')}
+        description={t('caIntro')}
+      />
 
-      <label
-        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
+      <div
+        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0', alignItems: 'baseline' }}
       >
-        {t('caAsOf')}
+        <label htmlFor="ca-as-of">{t('caAsOf')}</label>
         <input
+          id="ca-as-of"
           type="date"
-          aria-label={t('caAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
         />
-      </label>
+        <DateEcho value={asOf} />
+      </div>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('caNone')}</p>
+          <EmptyState title={t('caNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
-              <thead>
-                <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('caColClient')}</th>
-                  {AR_AGEING_BUCKET_KEYS.map((k) => (
-                    <th key={k} style={headCellStyle}>
-                      {AR_AGEING_BUCKET_LABEL[k]}
-                    </th>
-                  ))}
-                  <th style={headCellStyle}>{t('caColOutstanding')}</th>
-                  <th style={headCellStyle}>{t('caColInvoices')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('caColOldest')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((r) => (
-                  <tr key={r.customerId}>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
-                      <bdi>{r.customerLegalName}</bdi>
-                    </td>
-                    {AR_AGEING_BUCKET_KEYS.map((k) => (
-                      <td key={k} style={cellStyle}>
-                        {formatMoney(r[k], language)}
-                      </td>
-                    ))}
-                    <td style={cellStyle}>{formatMoney(r.outstandingTotal, language)}</td>
-                    <td style={cellStyle}>{r.invoiceCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
-                      {oldest(r.oldestDaysOverdue, r.oldestDueDate, language)}
-                    </td>
-                  </tr>
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('caColClient')}</Th>
+                {AR_AGEING_BUCKET_KEYS.map((k) => (
+                  <Th key={k}>
+                    {t(AR_AGEING_BUCKET_LABEL_KEY[k])}
+                  </Th>
                 ))}
-                <tr>
-                  <td
-                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
-                  >
-                    {t('caColTotal')}
-                  </td>
+                <Th>{t('caColOutstanding')}</Th>
+                <Th>{t('caColInvoices')}</Th>
+                <Th>{t('caColOldest')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <Tr key={r.customerId}>
+                  <Td>
+                    <bdi>{r.customerLegalName}</bdi>
+                  </Td>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
-                    <td key={k} style={{ ...cellStyle, fontWeight: 600 }}>
-                      {formatMoney(data.totals[k], language)}
-                    </td>
+                    <Td key={k}>
+                      {formatMoney(r[k], language)}
+                    </Td>
                   ))}
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {formatMoney(data.totals.outstandingTotal, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {data.totals.invoiceCount}
-                  </td>
-                  <td style={cellStyle} />
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                  <Td>{formatMoney(r.outstandingTotal, language)}</Td>
+                  <Td>{r.invoiceCount}</Td>
+                  <Td>
+                    {oldest(r.oldestDaysOverdue, r.oldestDueDate, language, t)}
+                  </Td>
+                </Tr>
+              ))}
+              {/* THE TOTALS ROW IS A ROW, not eight bold cells. It carried
+                  `{ ...cellStyle, fontWeight: 600 }` once per column — eight inline style
+                  objects all saying one thing about the row they are in — and `Tr`'s `total`
+                  variant says it once, with the rule and the sunken ground that tell a reader
+                  this line is not one of the things in the list. */}
+              <Tr variant="total">
+                <Td>{t('caColTotal')}</Td>
+                {AR_AGEING_BUCKET_KEYS.map((k) => (
+                  <Td key={k} numeric>
+                    {formatMoney(data.totals[k], language)}
+                  </Td>
+                ))}
+                <Td numeric>
+                  {formatMoney(data.totals.outstandingTotal, language)}
+                </Td>
+                <Td numeric>
+                  {data.totals.invoiceCount}
+                </Td>
+                <Td />
+              </Tr>
+            </tbody>
+          </Table>
         )
       ) : loadError ? null : (
-        <p>{t('caLoading')}</p>
+        <SkeletonList rows={4} label={t('caLoading')} />
       )}
     </main>
   );

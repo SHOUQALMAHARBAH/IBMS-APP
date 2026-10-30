@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  ErrorState,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
@@ -15,9 +19,7 @@ import { createOpportunity } from '../../../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
-  errorStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatMoney } from '../../../../lib/i18n/format';
@@ -32,6 +34,7 @@ import {
   programPanelStyle,
   programTableStyle,
 } from '../../../../components/insurance-program/insurance-program.styles';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 export default function InsuranceProgramDetailPage() {
   const { language, t } = useLanguage();
@@ -116,7 +119,7 @@ export default function InsuranceProgramDetailPage() {
   const ctx = program?.context;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>
@@ -132,9 +135,7 @@ export default function InsuranceProgramDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {program && ctx ? (
@@ -144,6 +145,9 @@ export default function InsuranceProgramDetailPage() {
               ? t('iprogdHeadingWithSite', { site: ctx.siteLabel })
               : t('iprogdHeading')}
           </h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='InsuranceProgram' entityId={program.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             {t('iprogdStatus', {
               status: t(ENUM_LABEL.InsuranceProgramStatus[program.status]),
@@ -328,9 +332,7 @@ export default function InsuranceProgramDetailPage() {
           ) : null}
 
           {actionError ? (
-            <p role="alert" style={errorStyle}>
-              {actionError}
-            </p>
+            <ErrorState title={actionError} />
           ) : null}
         </>
       ) : null}

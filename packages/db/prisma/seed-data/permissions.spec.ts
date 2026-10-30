@@ -58,9 +58,56 @@ describe("permission grid — every code is independent and traceable", () => {
   it("has at least one PLATFORM code, so the branch above is not vacuous", () => {
     // Without this, deleting the scope field from every entry would make the narrowing above
     // unreachable and the test would still pass.
+    //
+    // THE SET, NOT A COUNT, AND IT IS THE RIGHT SHAPE FOR THIS ONE. A PLATFORM code is a code whose
+    // effect leaves the granting office, so which codes are on this list is the boundary itself —
+    // `toHaveLength(2)` would be satisfied by any two, including one swapped for a code nobody
+    // decided should cross offices. Adding to it is a deliberate edit here, with a reason.
     expect(
-      PERMISSIONS.filter((p) => p.scope === "PLATFORM").map((p) => p.code),
-    ).toEqual(["provider.office-state.read"]);
+      PERMISSIONS.filter((p) => p.scope === "PLATFORM")
+        .map((p) => p.code)
+        .sort(),
+    ).toEqual(
+      [
+        // Module 0 item (j) — reads the cross-office dashboard.
+        "provider.office-state.read",
+        // Module 0-ب item (d) — CREATES A TENANT, which is as far outside the granting office as an
+        // effect can reach.
+        "provider.office.register",
+        // Module 0-ب item (e) — the other kind of tenant. Separate from the office code because the
+        // two create different legal entities under different instruments.
+        "provider.insurer.register",
+        /*
+         * Module 0-ب item (f) — THE ONLY CODE WHOSE EFFECT IS A WRITE *INSIDE* ANOTHER TENANT.
+         *
+         * The three above create or read across offices; this one creates an ACCOUNT in one. That is
+         * why it is separate from `provider.office.register`: registering an office is a filing, and
+         * handing somebody the keys to it is not, so an operator trusted to file is not thereby
+         * trusted to choose who runs the office.
+         *
+         * It is narrower than its name: the service refuses a non-brokerage target and refuses once
+         * the office holds ANY account, so it is the right to bootstrap an empty office once — never
+         * a standing ability to add accounts to a live one.
+         */
+        "provider.office.administrator.invite",
+        /*
+         * Module 0-ب item (f), THE COMPANY HALF — the same act for a registered insurance company,
+         * and a SEPARATE code rather than a widening of the one above.
+         *
+         * Reusing the office code for a company would make the name promise "office" while the act
+         * reached a company — the defect class this module measured in `aml.monitor` (gates an alert
+         * queue, promises monitored transactions) and `sanctions-pep.screen` (promises PEP screening
+         * against two SANCTIONS lists and no PEP source). A rename touches every role that holds a
+         * code in every office, so it is the last option considered, never the first.
+         *
+         * Narrower than its name in the same two ways: the service refuses a non-company target and
+         * refuses once the company holds ANY account. And what it hands over is SIX codes — self
+         * administration only — because an insurance company has nothing else to do in this product
+         * yet, which was raised as a stop condition before it was built.
+         */
+        "provider.insurance-company.administrator.invite",
+      ].sort(),
+    );
   });
 
   it("only references roles the seed actually installs", () => {
@@ -278,11 +325,154 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
   });
 });
 
+/*
+ * OWNER DECISION 57 — «لا يوجد عملاء بعد» on a register that could never fill.
+ *
+ * Three roles held `customer.read`, so `/customers` opened; the list beneath that gate is
+ * filtered to the customers the actor OWNS, and ownership is creator-assigned with no
+ * transfer path — `customer.create` is SALES alone, `customer.bulk-import` is the two
+ * administrator roles. So for CLAIMS, FINANCE and PLACEMENT the filter returned exactly
+ * zero rows permanently and by construction, and the screen said *there are no customers
+ * yet*: a false statement about the OFFICE rather than a true one about the reader.
+ *
+ * THE FIX IS THE GRANT, NOT THE STRING, and the second test here is why. Rewording the
+ * empty state would have been worse than leaving it: the two administrator roles own
+ * every row they import, so "none of these are yours" becomes false for them the moment
+ * they use the importer.
+ */
+describe("permission grid — owner decision 57, the customer register's empty state", () => {
+  const ALL_OWNERS = "customer.all-owners.read";
+
+  it("«لا يوجد عملاء بعد» — the three roles that could never own a customer hold the cross-owner read, BY NAME", () => {
+    const entry = PERMISSIONS.find((p) => p.code === ALL_OWNERS);
+    expect(entry, `${ALL_OWNERS} must exist in the grid`).toBeDefined();
+    /*
+     * AN EXACT SET, not a `toContain` per role. A containment check passes while a role
+     * nobody decided on arrives beside the seven, and this code is a CROSS-OWNER read:
+     * an extra holder is a disclosure somebody has to have argued for.
+     */
+    expect([...entry!.roles].sort()).toEqual(
+      [
+        RoleName.BRANCH_DEPARTMENT_MANAGER,
+        RoleName.CLAIMS_OFFICER,
+        RoleName.COMPLIANCE_OFFICER,
+        RoleName.EXECUTIVE_MANAGEMENT,
+        RoleName.EXTERNAL_AUDITOR,
+        RoleName.FINANCE_COLLECTIONS_OFFICER,
+        RoleName.PLACEMENT_TECHNICAL_OFFICER,
+        // The EIGHTH, 2026-10-28 — register row 2.2, the data-subject field. Same cause,
+        // one screen over: the DPO can never own a customer either, so the picker's owner
+        // filter returned zero rows for every word it was given.
+        RoleName.DATA_PROTECTION_OFFICER,
+      ].sort(),
+    );
+  });
+
+  /*
+   * THE DPO'S GRANT IS JUSTIFIED BY AN ABSENCE, SO THE ABSENCE IS WHAT IS PINNED.
+   *
+   * The owner's condition on this grant: if somebody later gives the DPO the 360° view,
+   * the test that justified the grant must FAIL rather than the grant quietly widening
+   * into a customer-file disclosure.
+   *
+   * `customer.all-owners.read` is evaluated at SIX decision sites in THREE services, all
+   * through `rbac-visibility.util.ts`. FIVE of them sit behind codes the DPO does not
+   * hold, which is why the grant opens exactly one route (`GET /customers/search`) rather
+   * than the customer file:
+   *
+   *   customer.service.ts#search           CUSTOMER_SEARCH_CODES    reached via `dsr.log`
+   *   customer.service.ts#list             customer.read            403
+   *   customer.service.ts#findOwnedOr...   customer.360-view.read   403
+   *   crm.service.ts#findVisibleCustomer   customer.360-view.read   403
+   *   kyc.service.ts#isCrossOwner  x2      kyc.capture / kyc.approve / screening.run  403
+   *
+   * Enumerated per code rather than asserted as one set, so the failure NAMES which door
+   * opened. Migration `20261213100000` refuses to apply on the same condition — two
+   * independent homes for one premise, deliberately, because this one is a disclosure.
+   */
+  it("the DPO's grant rests on it being unable to OPEN a customer file, and that absence is the thing pinned", () => {
+    const codes = new Set(codesGrantedTo(RoleName.DATA_PROTECTION_OFFICER));
+    expect(
+      codes.has(ALL_OWNERS),
+      `${ALL_OWNERS} must reach the DPO, or register row 2.2 reopens`,
+    ).toBe(true);
+    for (const code of [
+      "customer.360-view.read",
+      "customer.read",
+      "kyc.capture",
+      "kyc.approve",
+      "screening.run",
+    ]) {
+      expect(
+        codes.has(code),
+        `the DPO now holds ${code}. That is the absence which justified widening its customer SEARCH to every owner — re-decide the cross-owner grant rather than keeping both.`,
+      ).toBe(false);
+    }
+  });
+
+  it("«دفترها دفترها» — SALES and the two importing roles are still withheld it, which is what keeps an empty register TRUE for them", () => {
+    const holders = PERMISSIONS.find((p) => p.code === ALL_OWNERS)!.roles;
+    /*
+     * Asserted as an ABSENCE and separately from the set above, because it is a different
+     * claim: the set says who may read across owners, this says who must NOT — and for
+     * these three an empty list is an honest sentence rather than a gap. SALES sees its
+     * own book by design; the two administrator roles own every row they import, so
+     * `customersNoneYet` is literally true for them until they import one.
+     */
+    for (const role of [
+      RoleName.SALES_RELATIONSHIP_OFFICER,
+      OFFICE_ADMINISTRATOR_ROLE.name,
+      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+    ]) {
+      expect(
+        holders,
+        `${role} must NOT hold ${ALL_OWNERS} — read the note above before changing this`,
+      ).not.toContain(role);
+    }
+  });
+
+  it("no role is left being shown an empty register that can never fill", () => {
+    /*
+     * THE INVARIANT, and it is the one that outlives the three grants.
+     *
+     * A role is lied to by `/customers` when it can OPEN the screen (`customer.read`) and
+     * can neither see across owners nor ever become an owner. Measured before this
+     * decision that set was exactly {CLAIMS, FINANCE, PLACEMENT}; it must now stay empty,
+     * so granting `customer.read` to a fourth role that can do neither fails HERE rather
+     * than being discovered by somebody staring at an empty table.
+     *
+     * The two ways to own are enumerated rather than inferred: `customer.create` writes
+     * the actor as owner, and `customer.bulk-import` does the same for every imported row
+     * (`legacy-import.service.ts`). A third write path would have to be added here, which
+     * is the point — this test is also the list of ways a row gets an owner.
+     */
+    const codesFor = (role: string) => new Set(codesGrantedTo(role));
+    const OWNING_CODES = ["customer.create", "customer.bulk-import"];
+    // `string[]`, not `RoleName[]`: the office administrator is NOT in that enum — it
+    // predates office-scoped roles — and `ROLES.map` narrows to it, so concatenating
+    // the administrator's plain name is a type error rather than an oversight.
+    const everyRole: string[] = [
+      ...ROLES.map((r) => r.name as string),
+      OFFICE_ADMINISTRATOR_ROLE.name,
+    ];
+    const lied = everyRole.filter((role) => {
+      const codes = codesFor(role);
+      if (!codes.has("customer.read")) return false; // a 403, not an empty list
+      if (codes.has(ALL_OWNERS)) return false; // sees every customer
+      return !OWNING_CODES.some((c) => codes.has(c)); // can never own one
+    });
+    expect(
+      lied,
+      "these role(s) can open /customers and can neither read across owners nor ever own a customer, so the register is permanently empty and the screen's «لا يوجد عملاء بعد» is false for them",
+    ).toEqual([]);
+  });
+});
+
 // Office-scoped custom RBAC, PHASE 3 workstream D — the office administrator.
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 45 codes", () => {
+  it("holds exactly 47 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
@@ -295,6 +485,11 @@ describe("permission grid — the office administrator", () => {
     // written. NOT in ADDED_AFTER_THE_MIGRATION below, and the reason is worth stating: the legacy
     // administrator holds `customer.read` too (it went to every holder of the three source codes), so this
     // is not a divergence from the legacy role — it is the count pin that makes it a decision.
+    //
+    // 47 with module 0-ب item (e)'s `insurer.company.link` and `insurer.company.unlink`. An office
+    // administrator maintains the office's counterparty records, and deciding that one of them IS a
+    // particular registered company is part of that. Both also go to the legacy `ADMIN`, so the
+    // strict-subset property asserted below still holds and this is not a divergence either.
     // 44 with Part 4 step 4's `duty-segregation.mode.declare` — which DOES add a capability, deliberately,
     // and is therefore declared in ADDED_AFTER_THE_MIGRATION below.
     // 43 with four-action Phase 1 — which ADDED no capability: three umbrellas this role held
@@ -334,6 +529,11 @@ describe("permission grid — the office administrator", () => {
         "information-asset.manage",
         "insurance-line.create",
         "insurance-line.update",
+        // Module 0-ب item (e) — deciding that one of the office's counterparty records IS a
+        // particular registered company, and undoing that. Part of maintaining the register, which
+        // is what this role is for.
+        "insurer.company.link",
+        "insurer.company.unlink",
         "insurer.create",
         "insurer.deactivate",
         "insurer.directory.read",

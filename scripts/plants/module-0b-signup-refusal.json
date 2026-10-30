@@ -1,0 +1,14 @@
+{
+  "the-refusal-claims-no-route-exists": {
+    "_": "Put the stale claim back: tell the reader a second office cannot be onboarded through the application, when two provider routes create an Organization over HTTP. This is the exact regression the spec stayed green through for two commits, so the plant must now kill it — anchored on a SHORT distinctive fragment, not on the whole sentence.",
+    "file": "apps/api/src/repositories/organization.repository.ts",
+    "from": "'Signup is NOT how an office is onboarded: the platform provider registers one at '",
+    "to": "'A second office cannot currently be onboarded through the application at all. The provider registers one at '"
+  },
+  "the-writer-count-goes-back-to-two": {
+    "_": "Restore the measured-from-memory figure. Four non-spec `organization.create` call sites exist and two are reachable over HTTP; saying two leaves a reader searching for an endpoint that is there. Must kill the all-four-writers test.",
+    "file": "apps/api/src/repositories/organization.repository.ts",
+    "from": "'Phase 4 (§4.10). The four writers of Organization today are `packages/db/prisma/seed.ts` and '",
+    "to": "'Phase 4 (§4.10). The only two writers of Organization today are `packages/db/prisma/seed.ts` and '"
+  }
+}

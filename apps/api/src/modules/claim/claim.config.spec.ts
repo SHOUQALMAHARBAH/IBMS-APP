@@ -79,6 +79,51 @@ describe('resolveCoverageAtLossDate', () => {
     expect(onBoundary).toMatchObject({ ok: true, scheduleId: 'sched-v2' });
   });
 
+  /**
+   * THE CANCELLATION DATE IS THE FIRST DAY COVER DOES NOT APPLY, NOT THE LAST DAY IT DOES.
+   *
+   * The sibling test above pins `[from, to)` where a SUCCESSOR version exists, so the boundary day
+   * belongs to the new one. A cancellation closes the open schedule at its `effectiveFrom` and
+   * writes NO successor (`versionScheduleForEndorsement` returns null for one), so the boundary
+   * day belongs to nothing — which is the same rule and the opposite outcome.
+   *
+   * It is one day, and the day decides whether a claim is covered or refused. The other half of
+   * the product agrees: `cancellationReturnPremium` counts `unexpiredDays` FROM the cancellation
+   * date, so the client is refunded for that day and must not also be covered on it.
+   *
+   * Asserted rather than left consistent BY CONSTRUCTION, because a hint under that field is owed
+   * to the owner and will say which day it is — and a sentence on a screen is only as good as what
+   * pins the behaviour it describes.
+   */
+  it('a loss ON the cancellation date is NOT covered — the cancelled version has no successor', () => {
+    const CANCELLED_AT = d('2026-09-10T00:00:00.000Z');
+    const cancelled = [
+      {
+        id: 'sched-v1',
+        effectiveFrom: d('2026-01-01T00:00:00.000Z'),
+        effectiveTo: CANCELLED_AT,
+      },
+    ];
+
+    expect(
+      resolveCoverageAtLossDate({
+        schedules: cancelled,
+        expiryDate: EXPIRY,
+        lossDate: CANCELLED_AT,
+      }),
+    ).toMatchObject({ ok: false });
+
+    // The day BEFORE is still covered, which is what makes the assertion above about the boundary
+    // rather than about the fixture having no open schedule at all.
+    expect(
+      resolveCoverageAtLossDate({
+        schedules: cancelled,
+        expiryDate: EXPIRY,
+        lossDate: d('2026-09-09T23:59:59.999Z'),
+      }),
+    ).toMatchObject({ ok: true, scheduleId: 'sched-v1' });
+  });
+
   it('rejects a loss before cover incepted', () => {
     const r = resolveCoverageAtLossDate({
       schedules: ENDORSED_SCHEDULES,

@@ -199,6 +199,102 @@ describe('Legacy customer bulk import (e2e) — spec Part III §7', () => {
     expect(acmeRow?.contactEmailEnc).not.toContain('ops@acme.test');
   });
 
+  /*
+   * PART 3 OF 3 OF THE TEMPLATE ROUND TRIP — the half where a customer actually
+   * lands. The owner's walk asked for a downloadable template: «احنا احكينا مش رح
+   * يطلع من النظام زي قالب عشان المكتب يعبّيه بمعلومات عملائه كاملين و يرفعهم مرة
+   * وحدة».
+   *
+   * The generator is web-side and this parser is api-side, and no file can import
+   * both — so this test does NOT use `buildImportTemplate`. It reproduces the four
+   * PROPERTIES of the file it emits, each of which the parser has to tolerate and
+   * none of which any existing test exercised:
+   *
+   *   1. a leading UTF-8 BOM, which Excel needs for Arabic and which `parseCsv`
+   *      strips (its comment says a BOM survives an Excel "Save as CSV");
+   *   2. ARABIC column headings;
+   *   3. a heading carrying the mandatory marker in parentheses — «… (إلزامي)» —
+   *      so the office can see which columns are required with the file open;
+   *   4. CRLF line endings, Excel's own.
+   *
+   * If any one of those broke the match, `header.indexOf(heading.trim())` would
+   * return -1 and the column would be silently ignored — and for `legalName` that
+   * is every row rejected, after the office has filled the file in.
+   */
+  it('imports a file shaped exactly like the downloadable template — BOM, Arabic headings and all', async () => {
+    const app = await boot();
+    const admin = await makeUser(
+      app,
+      'template-admin',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+
+    const company = uniqueLabel('Al-Manara Medical');
+    // The headings the template emits: the screen's own labels, with the
+    // mandatory two marked. Written out here because this package cannot import
+    // the web's generator; `legacy-import-shape-parity.spec.ts` is what holds the
+    // FIELD LIST behind them to the api's own, in order.
+    const header = [
+      'الاسم القانوني (إلزامي)',
+      'نوع العميل (فرد / شركة) (إلزامي)',
+      'رقم التسجيل',
+      'الجنسية',
+      'البريد الإلكتروني',
+      'الهاتف',
+      'العنوان المسجَّل',
+    ];
+    const row = [
+      company,
+      'CORPORATE',
+      uniqueLabel('REG'),
+      '',
+      'ops@al-manara.test',
+      '+962790000000',
+      'عمّان',
+    ];
+    // The BOM and CRLF are the template's own bytes. Built with explicit escapes
+    // rather than a multi-line template literal: a newline typed inside one is LF,
+    // which would quietly make this the LF case and leave CRLF untested — and CRLF
+    // is what Excel writes, so it is the case that matters most.
+    const BOM = '﻿';
+    const csv = `${BOM}${header.join(',')}\r\n${row.join(',')}\r\n`;
+
+    const res = await request(app.getHttpServer())
+      .post('/imports/customers')
+      .set(bearer(admin.accessToken))
+      .field(
+        'mapping',
+        JSON.stringify({
+          legalName: header[0],
+          customerType: header[1],
+          registrationNumber: header[2],
+          nationality: header[3],
+          contactEmail: header[4],
+          contactPhone: header[5],
+          registeredAddress: header[6],
+        }),
+      )
+      .attach('file', Buffer.from(csv, 'utf8'), 'template.csv')
+      .expect(201);
+
+    const body = res.body as ImportBody;
+    // `rejected: 0` is the assertion that matters: a BOM clinging to the first
+    // heading would make `legalName` unmappable and the api would refuse the
+    // MAPPING outright, so this is also the BOM test.
+    expect(body.imported).toBe(1);
+    expect(body.rejected).toBe(0);
+
+    // AND THE CUSTOMER LANDED, with the values from the columns it was told about
+    // — not merely a count. A column silently ignored still leaves `imported: 1`.
+    const landed = await prisma.customer.findFirstOrThrow({
+      where: { legalName: company },
+    });
+    expect(landed.customerType).toBe('CORPORATE');
+    expect(landed.source).toBe('LEGACY_IMPORT');
+    expect(landed.registeredAddress).toBe('عمّان');
+    expect(landed.contactEmailEnc).not.toBeNull();
+  });
+
   it('imports the good rows and names the bad ones, rather than failing the batch', async () => {
     const app = await boot();
     const admin = await makeUser(

@@ -7,14 +7,13 @@ import { forgotPassword } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   buttonStyle,
-  authCardStyle,
   errorStyle,
   helperLinkStyle,
   inputStyle,
   labelStyle,
-  authPageStyle,
   successStyle,
 } from '../../../components/auth/auth-form.styles';
+import { AuthFrame } from '../../../components/ui';
 
 export default function ForgotPasswordPage() {
   const { t } = useLanguage();
@@ -43,8 +42,15 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main style={authPageStyle}>
-      <div style={authCardStyle}>
+    <AuthFrame>
+      {/*
+        The same frame `/login` wears. The pilot gave it only to the sign-in screen, and `/login`
+        LINKS here — so a person clicking «نسيت كلمة المرور؟» left the designed screen and landed
+        on the old bare card, which is this product's first impression going wrong one click in.
+        `pitch` is deliberately OMITTED: `AuthFrame`'s own comment already records why — a reader
+        who is already resetting a password is not being sold to, so the panel here is the mark
+        alone. No new words, and the frame renders its own `<main>`.
+      */}
         <h1 style={{ marginTop: 0 }}>{t('authForgotHeading')}</h1>
         {message ? (
           <>
@@ -84,7 +90,6 @@ export default function ForgotPasswordPage() {
         <p style={helperLinkStyle}>
           <Link href="/login">{t('authBackToSignIn')}</Link>
         </p>
-      </div>
-    </main>
+    </AuthFrame>
   );
 }

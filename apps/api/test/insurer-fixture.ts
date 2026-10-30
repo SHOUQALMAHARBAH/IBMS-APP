@@ -18,6 +18,9 @@ export async function makeInsurer(
   legalName: string,
   relationship: {
     financialStrengthRating?: string | null;
+    /** MODULE 0-ب ITEM (e) — required whenever a rating is given;
+     *  `Insurer_rating_carries_its_date` refuses either half alone. */
+    financialStrengthRatingAsOf?: Date | null;
     creditTermsDays?: number | null;
     rfqContactName?: string | null;
     rfqContactEmail?: string | null;
@@ -66,6 +69,9 @@ export async function makeLocalInsurer(
   relationship: {
     legalNameAr?: string | null;
     financialStrengthRating?: string | null;
+    /** MODULE 0-ب ITEM (e) — required whenever a rating is given;
+     *  `Insurer_rating_carries_its_date` refuses either half alone. */
+    financialStrengthRatingAsOf?: Date | null;
     creditTermsDays?: number | null;
     rfqContactName?: string | null;
     rfqContactEmail?: string | null;

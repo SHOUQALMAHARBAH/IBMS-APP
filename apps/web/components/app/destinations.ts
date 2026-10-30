@@ -1,4 +1,5 @@
 import type { TranslationKey } from '../../lib/i18n/translations';
+import type { IconName } from '../ui/Icon';
 import { hasAnyPermission } from '../../lib/auth/permissions';
 import type { MeResponse } from '../../lib/auth/auth-api';
 
@@ -23,10 +24,41 @@ export type Destination = {
   labelKey: TranslationKey;
   /** Holding ANY of these reveals the destination. Omitted = always visible. */
   permissions?: readonly string[];
+  /**
+   * ITEM (f), COMPANY HALF — reveal this destination only to these ORGANIZATION TYPES.
+   *
+   * A second gate rather than a wider `permissions`, because one destination genuinely has no
+   * permission to be gated on: `GET /company/registry-record` asks whether the caller IS the company
+   * whose record it shows, which is identity rather than capability. A code there would be a checkbox
+   * an administrator could uncheck to blind their own company to its own record, and it is not even
+   * expressible in the grid — see `insurance-company-administrator-grants.ts`.
+   *
+   * Leaving it ungated was the alternative and it is worse in both directions: `permissions` omitted
+   * means ALWAYS VISIBLE, so every brokerage user would be shown a card that answers 403 — which is
+   * precisely the defect the header above says was measured and shipped once already.
+   *
+   * Omitted = any type, so no existing destination changes. The two gates are ANDed: a destination
+   * may require both a code and a type, and nothing today requires both.
+   */
+  organizationTypes?: readonly string[];
+
+  /** Overrides the group's icon. Only where a destination genuinely reads differently. */
+  icon?: IconName;
 };
 
 export type DestinationGroup = {
   labelKey: TranslationKey;
+  /*
+   * ONE ICON PER GROUP, INHERITED BY ITS ITEMS, and REQUIRED so a twelfth group cannot ship
+   * without somebody deciding what it looks like.
+   *
+   * Per GROUP rather than per DESTINATION, and that is a measured choice rather than laziness:
+   * there are 11 groups and 84 destinations, so per-destination would be 84 separate judgements
+   * made in one sitting by whoever happened to be adding the field — and the reference screen's
+   * own groups hold one or two links each, which is why its per-link icons read as per-group
+   * ones. A destination that genuinely needs its own may override with `icon`.
+   */
+  icon: IconName;
   items: readonly Destination[];
 };
 
@@ -38,21 +70,35 @@ export type DestinationGroup = {
 export function canReach(
   // The same shape `hasAnyPermission` takes, so a caller cannot pass something narrower and get a
   // quietly permissive answer.
-  user: Pick<MeResponse, 'permissions'> | null | undefined,
+  user: Pick<MeResponse, 'permissions' | 'organizationType'> | null | undefined,
   destination: Destination,
 ): boolean {
+  /*
+   * BOTH GATES, ANDed. `organizationType` is OPTIONAL on `MeResponse` — ~80 spec files build that
+   * mock and a required field would fail every one of them over a value none of them are about — so
+   * an absent type means "unknown", and a destination that NAMES types is hidden rather than shown.
+   * Failing closed is the only safe default here: the alternative reveals a company-only card to
+   * every brokerage user whose mock predates this field.
+   */
+  if (
+    destination.organizationTypes &&
+    !destination.organizationTypes.includes(user?.organizationType ?? '')
+  ) {
+    return false;
+  }
   return (
     !destination.permissions || hasAnyPermission(user, destination.permissions)
   );
 }
 
-export const HOME: Destination = { href: '/', labelKey: 'navHome' };
+export const HOME: Destination = { href: '/', labelKey: 'navHome', icon: 'layout' };
 
 /** Declaration order is the DEFAULT group order, used by any role without an
  *  entry in NAV_ORDER_BY_ROLE. */
 export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   {
     labelKey: 'navGroupNewBusiness',
+    icon: 'plus',
     items: [
       { href: '/leads', labelKey: 'navLeads', permissions: ['lead.list.read'] },
       {
@@ -76,9 +122,34 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         permissions: ['program.read'],
       },
       {
+        /*
+         * RENAMED, 2026-10-19. This entry was labelled `navRfqMarket` — "RFQ / market" — and
+         * points at `/opportunities`. It was the only entry a reader would take for the RFQ screen,
+         * so the door was visible in the sidebar under exactly the right name and opened somewhere
+         * else; the RFQ list below had no entry at all. The label now says what it opens.
+         */
         href: '/opportunities',
-        labelKey: 'navRfqMarket',
+        labelKey: 'navOpportunitiesMarket',
         permissions: ['opportunity.read'],
+      },
+      {
+        /*
+         * THE RFQ LIST, connected. Owner's decision 12.
+         *
+         * THE EXACT SET THIS PRODUCES is `rfq.read`'s four holders:
+         * SALES_RELATIONSHIP_OFFICER, PLACEMENT_TECHNICAL_OFFICER, BRANCH_DEPARTMENT_MANAGER,
+         * EXECUTIVE_MANAGEMENT — asserted by name in `destination-organization-type.test.ts`. An
+         * EXISTING code, so no key is added to anybody's set.
+         *
+         * COMPLIANCE_OFFICER and DATA_PROTECTION_OFFICER deliberately do NOT appear here, even
+         * though `GET /rfqs` now admits them: their route is the LINK from the work that anchors
+         * them — an open DSR or an open screening case — and the list they may read is ONE
+         * customer's. A navigation entry would offer them a register they can only ever see a
+         * single customer of, which is the shape that teaches a person the product is broken.
+         */
+        href: '/rfqs',
+        labelKey: 'navRfqs',
+        permissions: ['rfq.read'],
       },
       // ## Why the insurer register lives HERE and not in Operations
       //
@@ -113,6 +184,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupClients',
+    icon: 'users',
     items: [
       // `customer.read`, not `customer.360-view.read`: the list moved onto the narrow code, and a nav
       // entry gated on the old one would hide a screen five roles can now open.
@@ -159,6 +231,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupPolicies',
+    icon: 'file',
     items: [
       {
         href: '/policies',
@@ -180,6 +253,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupFinance',
+    icon: 'coins',
     items: [
       {
         href: '/client-accounting',
@@ -215,6 +289,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupService',
+    icon: 'mail',
     items: [
       {
         href: '/service-requests',
@@ -250,6 +325,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupDashboards',
+    icon: 'bars',
     items: [
       {
         href: '/kpi-dashboard',
@@ -295,6 +371,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupPerformance',
+    icon: 'trend',
     items: [
       {
         href: '/sales-performance',
@@ -335,6 +412,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupPrivacy',
+    icon: 'lock',
     items: [
       {
         href: '/consent',
@@ -346,7 +424,11 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         href: '/retention-disposal',
         labelKey: 'navRetentionDisposal',
         permissions: [
-          'retention-schedule.manage',
+          // The umbrella split (module 0 close, decision 3). BOTH listed: a destination gate is
+          // satisfied by ANY of its codes, so a confirm-only holder must still be able to reach
+          // the screen — a gate nobody can satisfy makes a destination unreachable (§ 1.62).
+          'retention-schedule.update',
+          'retention-schedule.confirm',
           'legal-hold.manage',
           'retention.dispose.nominate',
           'retention.dispose.approve',
@@ -386,6 +468,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupCompliance',
+    icon: 'shield',
     items: [
       {
         href: '/transaction-monitoring',
@@ -461,6 +544,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupOperations',
+    icon: 'building',
     items: [
       {
         href: '/employees',
@@ -496,6 +580,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
   },
   {
     labelKey: 'navGroupAdmin',
+    icon: 'settings',
     items: [
       {
         href: '/access-recertification',
@@ -540,6 +625,42 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         labelKey: 'navProviderOffices',
         permissions: ['provider.office-state.read'],
       },
+      /*
+       * MODULE 0-ب ITEM (f), COMPANY HALF — gated on the ORGANIZATION TYPE and on no permission,
+       * because `GET /company/registry-record` has none: it asks whether the caller IS the company
+       * whose record it shows. Leaving `permissions` off alone would mean ALWAYS VISIBLE, so every
+       * brokerage user would be shown a card that answers 403 — the exact defect this file's header
+       * records as measured and shipped once already.
+       *
+       * It sits in ADMINISTRATION beside the operator's own screens rather than in a group of its
+       * own: a company administrator holds six self-administration codes, so this is the only other
+       * destination it will ever see, and a one-item group for it would read as a product area.
+       */
+      {
+        href: '/company-record',
+        labelKey: 'navCompanyRecord',
+        organizationTypes: ['INSURANCE_COMPANY'],
+      },
+      // MODULE 0-ب ITEM (d) — registering an office. Beside the provider dashboard because both
+      // are the platform operator's, and in ADMINISTRATION for the same measured reason: this code
+      // is PLATFORM-scoped and held only by the provider, which already sees this group.
+      //
+      // Its own destination rather than a control on `/provider-offices`: that screen reads every
+      // office's state and this one creates a tenant, and a create button on a cross-office report
+      // is a control whose blast radius does not match what the reader is looking at.
+      {
+        href: '/provider-register-office',
+        labelKey: 'navProviderRegisterOffice',
+        permissions: ['provider.office.register'],
+      },
+      // MODULE 0-ب ITEM (e) — the other kind of tenant. Its own destination rather than a tab on the
+      // office one: the two forms share perhaps half their fields, and a reader who has mistaken which
+      // they are filling in has already made the only mistake this screen can make.
+      {
+        href: '/provider-register-insurer',
+        labelKey: 'navProviderRegisterInsurer',
+        permissions: ['provider.insurer.register'],
+      },
       {
         href: '/settings/email',
         labelKey: 'navEmailIntegration',
@@ -552,6 +673,29 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         href: '/settings/roles',
         labelKey: 'navRoleAdmin',
         permissions: ['role.read'],
+        /*
+         * ITEM 7 — THE DOOR IS CLOSED TO THE PROVIDER, and a permission gate cannot close it.
+         *
+         * The provider holds `role.read` (and create/update/deactivate) deliberately: module 0
+         * item (b) gave it self-administration over its own users and roles. So the code does not
+         * separate it from an office, and withdrawing the code would take away a capability rather
+         * than hide a screen.
+         *
+         * What makes the screen wrong for the provider is the MATRIX, not the permission.
+         * `buildMatrix` skips every PLATFORM-scoped code — correct for an office, and exactly
+         * inverted here: the provider is shown all the office codes it will never use and not the
+         * five PLATFORM codes its own role actually holds. Inverting or parameterising that filter
+         * was considered and REFUSED by decision; the screen for the provider's own capabilities
+         * does not exist, which is recorded in the deferred register rather than half-built.
+         *
+         * An ALLOW-list rather than a new deny-list field: one mechanism for one concept, and it
+         * fails CLOSED, so a fourth organization type is hidden until somebody decides it belongs.
+         * The cost was measured before choosing — `canReach` hides a type-naming destination when
+         * the type is unknown, and only ONE of the 116 web specs reads this destination through
+         * `canReach` (`home-launcher.spec.ts`; the other three reach the screen with `page.goto`,
+         * which this gate does not govern).
+         */
+        organizationTypes: ['BROKERAGE_OFFICE', 'INSURANCE_COMPANY'],
       },
       {
         href: '/settings/duty-segregation',

@@ -136,7 +136,7 @@ test("prompts to pick a customer when none is in the URL", async ({ page }) => {
   await mockCrossSell(page);
 
   await page.goto("/cross-sell");
-  await expect(page.locator('p[role="alert"]')).toContainText("No customer selected");
+  await expect(page.locator('main [role="alert"]')).toContainText("No customer selected");
 });
 
 test("shows a friendly message when the user lacks read permission", async ({ page }) => {
@@ -144,7 +144,7 @@ test("shows a friendly message when the user lacks read permission", async ({ pa
   await mockCrossSell(page, { listStatus: 403 });
 
   await page.goto("/cross-sell?customerId=cust-1");
-  await expect(page.locator('p[role="alert"]')).toContainText("(cross-sell.read)");
+  await expect(page.locator('main [role="alert"]')).toContainText("(cross-sell.read)");
 });
 
 test("cross-sell list screen has no serious/critical accessibility violations @a11y", async ({

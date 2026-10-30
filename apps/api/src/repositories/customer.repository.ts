@@ -120,6 +120,30 @@ export class CustomerRepository {
   }
 
   /**
+   * Correct a customer's two SCREENING DISCRIMINATORS — `dateOfBirth` and `nationality`.
+   *
+   * A SECOND method rather than two more fields on `updateContactDetails`, and that is the whole
+   * point rather than a style choice. The 2026-09-28 deferral's safety condition 1 holds at three
+   * layers, and the second is *"the repository's single `customer.update` write accepts only those
+   * three in its TypeScript signature, so even a service bug cannot pass a name"*. Widening that
+   * signature would retire that layer for all six fields the deferral still covers; a sibling method
+   * accepting only these two retires it for nothing.
+   *
+   * So `legalName`, the four name parts, `nationalId` and `registrationNumber` are still not
+   * expressible in ANY repository write on this model. That is what the owner's strike left standing.
+   *
+   * NEVER CALL THIS WITHOUT RE-SCREENING. `CustomerService.correctIdentifiers` is the only caller and
+   * it re-screens; a second caller that skipped it would be the silent relaxation the AMLU rules
+   * refuse. `customer-identifier-correction.inventory.spec.ts` fails by name on one.
+   */
+  updateIdentifiers(
+    id: string,
+    data: { dateOfBirth?: Date; nationality?: string },
+  ): Promise<Customer> {
+    return this.prisma.client.customer.update({ where: { id }, data });
+  }
+
+  /**
    * Record a correction. The evidence the AMLU requires kept — "the verification mechanism and actions
    * taken … in internal records" — and, when `dsrId` is set, the evidence that a statutory request was
    * actually answered rather than attested to.
@@ -136,10 +160,31 @@ export class CustomerRepository {
     kycRecordId?: string;
     kycStatusBefore?: string;
     priorScreeningResultId?: string;
+    newScreeningResultId?: string;
   }): Promise<{ id: string }> {
     return this.prisma.client.customerIdentifierCorrection.create({
       data: input,
       select: { id: true },
+    });
+  }
+
+  /**
+   * Attach the re-screening result to a correction row already written.
+   *
+   * TWO WRITES RATHER THAN ONE, deliberately. The correction row is the evidence that an identifier
+   * changed, so it is written BEFORE the re-screen rather than after it: if the process dies between
+   * the two, a correction row with a null `newScreeningResultId` is a recoverable inconsistency that
+   * reads as *the re-screen is owed*, whereas a changed date of birth with no correction row at all is
+   * the silent identifier edit this whole mechanism exists to make impossible. The same argument, in
+   * the same words, as `ScreeningHoldService.assertClearToProceed` writing its release row first.
+   */
+  linkNewScreeningResult(
+    correctionIds: readonly string[],
+    newScreeningResultId: string,
+  ): Promise<{ count: number }> {
+    return this.prisma.client.customerIdentifierCorrection.updateMany({
+      where: { id: { in: [...correctionIds] }, newScreeningResultId: null },
+      data: { newScreeningResultId },
     });
   }
 
@@ -148,6 +193,29 @@ export class CustomerRepository {
     return this.prisma.client.customerIdentifierCorrection.count({
       where: { dsrId },
     });
+  }
+
+  /**
+   * THE ONE PLACE A REPORT LEARNS A CUSTOMER'S NAME, in decision 48's shape: ids in, a Map out,
+   * batched.
+   *
+   * `legalName` is NOT NULL on `Customer`, so a key that is present always carries a real name; a
+   * MISSING key means no such customer row, which reports NO NAME rather than the uuid.
+   *
+   * It selects `legalName` ALONE — never a contact field. Those are encrypted at rest precisely so
+   * a report cannot carry them, and a name-resolution helper that widened its select would be the
+   * quietest possible way to put a decrypted phone number into a payment-channel table.
+   */
+  async namesForCustomerIds(
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Map<string, string>> {
+    const unique = [...new Set(ids.filter((id): id is string => !!id))];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.client.customer.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, legalName: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.legalName]));
   }
 
   findById(id: string): Promise<Customer | null> {
@@ -269,6 +337,35 @@ export class CustomerRepository {
     ownerUserId: string | undefined,
   ): Promise<Customer[]> {
     const terms = [term, ...expandSearchTerms(term)];
+    /*
+     * THE OWNER FILTER AND THE ORDER ARE ON THIS INNER QUERY TOO, AND BOTH ARE THE FIX FOR A REAL
+     * DEFECT — register entry 34, found 2026-10-15.
+     *
+     * Before: this query took `LIMIT take` with NO owner filter and NO `ORDER BY`, and the owner
+     * filter was applied afterwards by the `findMany` below. So the bound was spent on rows the
+     * caller may not see, and **a broker searching for his own client could get nothing back**.
+     * MEASURED on db-test: 16 rows matched the term across 16 DISTINCT owners in one office against
+     * an inner bound of 10 — so six of those sixteen officers got an EMPTY result for a customer
+     * they own, and WHICH six changed between identical requests because nothing ordered this query.
+     *
+     * TENANCY WAS NEVER THE PROBLEM AND IS NOT TOUCHED. `Customer` carries RLS
+     * (`tenant_isolation: "organizationId" = current_setting('app.current_org_id', true)`) and
+     * `ibms_app` is neither the table owner nor a member of any role, so the policy applies to a
+     * `$queryRaw` exactly as it does to a `findMany` — measured. The missing filter was the OWNER
+     * one, which RLS knows nothing about.
+     *
+     * AND THIS DOES NOT WEAKEN THE DISCLOSURE BOUNDARY THE `findMany` BELOW REASONS ABOUT — it
+     * strengthens it, because fewer rows leave the database. Nothing moved INTO that `OR`; the
+     * outer `ownerUserId` stays ANDed with it, so a registration-number match is still owner-scoped.
+     *
+     * `Prisma.empty` rather than a `1=1`: `undefined` means "every owner", which is what a holder of
+     * the all-owners read gets and nobody else, and that caller must see the same unfiltered set it
+     * always did.
+     *
+     * The order matches the `orderBy` below for a reason: the inner query now returns the SAME
+     * prefix the outer one would have chosen, so the bound truncates the same rows at both layers
+     * instead of two different arbitrary tens.
+     */
     const nameMatches = await this.prisma.client.$queryRaw<{ id: string }[]>`
       SELECT id FROM "Customer"
       WHERE (${Prisma.join(
@@ -280,6 +377,12 @@ export class CustomerRepository {
         ),
         ' OR ',
       )})
+      ${
+        ownerUserId
+          ? Prisma.sql`AND "ownerUserId" = ${ownerUserId}`
+          : Prisma.empty
+      }
+      ORDER BY "legalName" ASC, id ASC
       LIMIT ${take}
     `;
 

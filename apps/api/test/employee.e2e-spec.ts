@@ -184,7 +184,9 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
     const branch = await request(app.getHttpServer())
       .post('/admin/branches')
       .set(bearer(admin.accessToken))
-      .send({ name: `EN Branch ${suffix}` })
+      // `nameAr` is REQUIRED on create since 2026-10-28 (owner decision); this body 400'd
+      // without it. The Arabic is the fixture vocabulary already used across this suite.
+      .send({ name: `EN Branch ${suffix}`, nameAr: `فرع ${suffix}` })
       .expect(201);
     const branchId = (branch.body as { id: string }).id;
 
@@ -541,7 +543,7 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       const res = await request(app.getHttpServer())
         .post('/admin/departments')
         .set(bearer(adminToken))
-        .send({ name: uniqueLabel(label) })
+        .send({ name: uniqueLabel(label), nameAr: `قسم ${uniqueLabel(label)}` })
         .expect(201);
       return (res.body as { id: string }).id;
     }
@@ -553,7 +555,10 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       const res = await request(app.getHttpServer())
         .post('/admin/branches')
         .set(bearer(adminToken))
-        .send({ name: uniqueLabel('hr-branch') })
+        .send({
+          name: uniqueLabel('hr-branch'),
+          nameAr: `فرع ${uniqueLabel('hr-branch')}`,
+        })
         .expect(201);
       return (res.body as { id: string }).id;
     }

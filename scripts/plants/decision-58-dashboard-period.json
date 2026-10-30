@@ -1,0 +1,44 @@
+{
+  "reader-default-back-to-last-month": {
+    "file": "apps/api/src/modules/management-reporting/sales-dashboard.service.ts",
+    "from": "    if (provided === 0) return currentUtcMonthRange(new Date());",
+    "to": "    if (provided === 0) return previousUtcMonthRange(new Date());",
+    "why": "The exact state she walked into: «قسم العملاء المحتملون بيطلع 0 مع إنه في عملاء محتملون جدد». Measured at the time, 120 leads all created in October against a default window of September, which held zero. Planted, it kills `period-default.inventory.spec.ts`'s reader test by name - and that spec exists because NOTHING observed this default before: with both reader defaults changed, all 25 management-reporting spec files still passed, 197 tests, which is exactly why a September window survived into her walk. The plant also leaves the import unused, so lint names the second half."
+  },
+  "scheduler-scores-an-unfinished-month": {
+    "file": "apps/api/src/modules/management-reporting/insurer-performance.scheduler.ts",
+    "from": "    const period = previousUtcMonthRange(new Date());",
+    "to": "    const period = currentUtcMonthRange(new Date());",
+    "why": "THE HALF THAT MUST NOT MOVE, and the reason decision 58 could not just repoint the helper. A monthly job scores a month ONCE IT HAS FULLY ELAPSED; pointed at the current month it writes a performance score for a month that is not over - stored, and then read as though it were final. The consequence is silent: the figure is simply smaller than it will be and nothing on any screen says so. Planted, it kills ONLY the scheduler test in `period-default.inventory.spec.ts`, which is why that assertion is separate from the two shape checks: the schedulers call the helper directly rather than through a `resolve…` method, so neither of those regexes can see them."
+  },
+  "snapshot-declared-period-scoped": {
+    "file": "apps/api/src/modules/management-reporting/policy-dashboard.config.ts",
+    "from": "  activePoliciesCount: 'asOf',",
+    "to": "  activePoliciesCount: 'period',",
+    "why": "Owner decision 58 taken LITERALLY - the period beside every figure - which is what this one-word change produces. `activePoliciesCount` reads `Policy.status` as of now REGARDLESS of the window, so the screen would print a period beside a figure that describes today: a confident false statement, which is a worse version of the bare number the decision exists to remove. WHY CORRECTED FROM THE RUN: this plant first claimed it kills the policy Playwright test. IT KILLED NOTHING - the Playwright spec stayed 4/4 and the config spec 3/3, for two reasons that are both recorded lessons. A PLAYWRIGHT FIXTURE SUPPLIES `metricScope` ITSELF, so a mock cannot corrupt what the api declares; and no api-side assertion read the declaration's VALUES at all, so the one thing that makes the two clauses correct was shipped unobserved. `POLICY_DASHBOARD_METRIC_SCOPE (owner decision 58)` in `policy-dashboard.config.spec.ts` is the observer that was missing, and the plant now fails its first test by name."
+  },
+  "screen-decides-the-clause-itself": {
+    "file": "apps/web/app/(app)/dashboards/sales/page.tsx",
+    "from": "                  testId=\"dsal-leads-new\"",
+    "to": "                  testId=\"dsal-leads-new\"\n                />\n                <div>{t('dashFigureDuringPeriod', { period: summary.periodLabel })}</div>\n                <FigurePeriod\n                  scope={summary.metricScope.leads}\n                  periodLabel={summary.periodLabel}\n                  generatedAt={summary.generatedAt}\n                  testId=\"dsal-leads-new-bypass\"",
+    "why": "A screen spelling the clause itself, which is the realistic bypass: it reads as a harmless shortcut and it skips `metricScope` entirely, so the figure gets a period whether or not it obeys one. On `/dashboards/policy` that is immediately a false sentence. Planted, it kills `report-provenance.test.ts`'s new single-source test by name - the same argument that file already makes for `ReportProvenance`, one level down: a component is only the single source while nothing bypasses it, and the eight hardcoded-English strings it replaced are the proof that convention alone does not hold."
+  },
+  "month-name-from-the-bare-arabic-locale": {
+    "file": "apps/web/lib/i18n/format.ts",
+    "from": "const AR_MONTH_LOCALE = 'ar-JO-u-nu-latn';",
+    "to": "const AR_MONTH_LOCALE = AR_LOCALE;",
+    "why": "The simplification somebody makes while tidying - reuse the locale constant that is already there - and it silently changes her vocabulary: `'ar'` renders October as «أكتوبر», not «تشرين الأول», which is the word she used in her own example. AND NO PLAYWRIGHT TEST CAN SEE IT: every mock in that suite reports `languagePreference: \"EN\"`, so both dashboard specs stay green. That is precisely why the measurement is pinned in `format.test.ts` instead - a pure function asserted at the unit layer, in BOTH languages. Planted, it kills the Levantine-month-name test and leaves all nine dashboard browser tests passing."
+  },
+  "the-year-in-arabic-indic-digits": {
+    "file": "apps/web/lib/i18n/format.ts",
+    "from": "const AR_MONTH_LOCALE = 'ar-JO-u-nu-latn';",
+    "to": "const AR_MONTH_LOCALE = 'ar-JO';",
+    "why": "The OTHER half of the same tag, and a separate plant because it breaks a different property: `'ar-JO'` gives «تشرين الأول» correctly and renders the year «٢٠٢٦». `AR_LOCALE`'s own note records why that matters - Eastern Arabic-Indic numerals are a real visual change from the Western digits every reference and policy number in this app uses - so this is the version that LOOKS right in a review and differs by numbering system alone. Planted, it kills the digits test, which is the only assertion in the repository that would notice."
+  },
+  "a-dashboard-fixture-short-of-metricScope": {
+    "file": "apps/web/e2e/bidi-text.spec.ts",
+    "from": "    metricScope: {\n      activePoliciesCount: \"asOf\",",
+    "to": "    metricScopeRemoved: {\n      activePoliciesCount: \"asOf\",",
+    "why": "THE DEFECT CI FOUND, in the one form that catches it before CI does. `bidi-text.spec.ts` is a THIRD copy of the policy-dashboard response, in a file whose subject is bidi isolation, and it was the one spec whose NAME does not say it mocks a dashboard - so I widened the two that do and missed it. The screen reads `undefined.activePoliciesCount`, dies during render, and the failure surfaces on a `<bdi>` locator that was never the problem, which is why this cost a CI round trip rather than a read. Planted, it kills the new fixture-shape guard in `report-provenance.test.ts` by name and prints the offending FILE - a vitest guard, so it is caught in seconds rather than nine minutes into the full Playwright suite."
+  }
+}

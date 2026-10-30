@@ -13,6 +13,8 @@ export const CUSTOMERS = {
     impRefusalAct: 'استيراد ملف عملاء',
     impUploadLegend: 'الملف وربط الأعمدة',
     impFileLabel: 'ملف CSV',
+    impTemplateButton: 'تنزيل قالب CSV',
+    impTemplateExampleWord: 'مثال',
     impMappingIntro:
       'اكتب اسم العمود في ملفك مقابل كل حقل. اترك الحقل فارغاً إن لم يكن في ملفك. ' +
       'الحقول المعلَّمة بنجمة مطلوبة.',
@@ -35,6 +37,25 @@ export const CUSTOMERS = {
       'الصفوف مستوردة، والمطابقات في قائمة مراجعة الجزاءات للفصل فيها.',
     impColLine: 'رقم السطر في ملفك',
     impColReason: 'السبب',
+
+    // THE DURABLE IMPORT REPORT — owner decision 43. Every Arabic run here is sliced out of a
+    // string already in the product: «سجل X» is this tree's own register-heading shape, the
+    // import word comes from `impSubmit`, the empty state is `coiRegEmpty` with its noun swapped,
+    // the load error is `endorsementLoadError` split around ITS noun (so the way-forward tail
+    // gate 14 measures comes across intact), and «بانتظار المراجعة» is sliced out of
+    // `dpowDpiaRegister`'s own parentheses.
+    //
+    // THERE ARE NO WORDS FOR `DUPLICATE` AND `BAD_DATA` AND NONE IS INVENTED HERE. Nothing in the
+    // whole i18n tree carries «مكرر» or «تكرار», so there is no source to slice; those two kinds
+    // render their MEMBER NAME, which is the eighteen-workflow-words decision and is less jarring
+    // on this table than elsewhere, because the `detail` beside it is the SERVER's own English
+    // sentence — this api has no message i18n at all. Two words the owner writes.
+    impPastHeading: 'سجل الاستيراد',
+    impPastNone: 'لا يوجد استيراد مسجّل في هذا المكتب بعد.',
+    impPastLoadError: 'تعذر تحميل سجل الاستيراد — حاول مرة أخرى.',
+    impIssueKindDuplicate: 'العميل موجود بالفعل',
+    impIssueKindBadData: 'تأكد من شكل البيانات التي أضفتها',
+    impIssueKindNeedsReview: 'بانتظار المراجعة',
     customersHeading: "العملاء",
     customersProcessIntro:
       "العملية 3-4 — اكتساب العملاء والتهيئة (أفراد وشركات)، اعرف عميلك، والملكية النفعية.",
@@ -89,9 +110,26 @@ export const CUSTOMERS = {
     customerCorrectCancel: "إلغاء",
     customerCorrectError: "تعذّر تسجيل التصحيح — حاول مرة أخرى.",
     customerCorrectRefusalAct: 'تصحيح بيانات الاتصال بالعميل',
+    // CORRECTED 2026-10-28: this named FOUR identifiers as uncorrectable and said the
+    // re-screening mechanism was not built. The owner struck her own 2026-09-28 deferral for TWO
+    // of them, and the mechanism now exists for those two — so the run «وتاريخ الميلاد والجنسية»
+    // is DELETED and nothing else changes. What is left is still true: the name and the national
+    // ID are not corrected anywhere, and no re-screening path exists for them.
     customerCorrectIdentifiersNote:
-      "الاسم وتاريخ الميلاد والجنسية ورقم الهوية لا تُصحَّح من هنا: تغييرها يستوجب " +
+      "الاسم  ورقم الهوية لا تُصحَّح من هنا: تغييرها يستوجب " +
       "إعادة الفحص مقابل قوائم العقوبات، وهذه الآلية لم تُبنَ بعد.",
+    // DERIVED, not typed. «تصحيح» is the first word of `customerCorrectRefusalAct`
+    // above; «تاريخ الميلاد والجنسية» and the clause after the colon are contiguous runs of the
+    // note immediately above, which named both fields and said what changing them requires.
+    customerCorrectIdentifiersOpen: "تصحيح تاريخ الميلاد والجنسية",
+    customerCorrectIdentifiersHeading: "تصحيح تاريخ الميلاد والجنسية",
+    customerCorrectIdentifiersIntro: "تاريخ الميلاد والجنسية: تغييرها يستوجب إعادة الفحص مقابل قوائم العقوبات.",
+    customerCorrectIdentifiersRefusalAct: "تصحيح تاريخ الميلاد والجنسية",
+    // SLICED from `customerCorrectIdentifiersNote` above, which names these two
+    // fields in one sentence — «الاسم وتاريخ الميلاد والجنسية ورقم الهوية». Not
+    // typed. Nationality needs no new key at all: `impFieldNationality` already
+    // ships «الجنسية» as a standalone label for the import field list.
+    customerFieldDateOfBirth: "تاريخ الميلاد",
     customerFieldNatureOfBusiness: "طبيعة النشاط",
     customerFieldLanguagePreference: "تفضيل اللغة",
     customerFieldGivenName: "الاسم الأول",
@@ -269,6 +307,8 @@ export const CUSTOMERS = {
     impRefusalAct: 'import a customer file',
     impUploadLegend: 'The file, and which column is which',
     impFileLabel: 'CSV file',
+    impTemplateButton: 'Download CSV template',
+    impTemplateExampleWord: 'example',
     impMappingIntro:
       'Name the column in your file for each field. Leave a field empty if your file does not ' +
       'carry it. Fields marked with an asterisk are required.',
@@ -293,6 +333,12 @@ export const CUSTOMERS = {
       'decided.',
     impColLine: 'Line in your file',
     impColReason: 'Reason',
+    impPastHeading: 'Import register',
+    impPastNone: 'Nobody in this office has run an import yet.',
+    impPastLoadError: 'Could not load the import register — try again.',
+    impIssueKindDuplicate: 'This customer already exists',
+    impIssueKindBadData: 'Check the format of the data you added',
+    impIssueKindNeedsReview: 'Awaiting review',
     customersHeading: "Customers",
     customersProcessIntro:
       "Process 3-4 — customer acquisition and onboarding (individual and corporate), KYC, and " +
@@ -349,10 +395,20 @@ export const CUSTOMERS = {
     customerCorrectCancel: "Cancel",
     customerCorrectError: "Could not record the correction — try again.",
     customerCorrectRefusalAct: "correct a customer's contact details",
+    // CORRECTED 2026-10-28 — see the Arabic side. Two of the four named here are correctable now.
     customerCorrectIdentifiersNote:
-      "Name, date of birth, nationality and national ID are not corrected here: " +
-      "changing one is a screening event against the sanctions lists, and that " +
-      "mechanism is not built yet.",
+      "Name and national ID are not corrected here: changing one is a screening " +
+      "event against the sanctions lists, and that mechanism is not built for them. " +
+      "Date of birth and nationality have their own form, which re-screens.",
+    customerCorrectIdentifiersOpen: "Correct date of birth or nationality",
+    customerCorrectIdentifiersHeading: "Correct date of birth or nationality",
+    customerCorrectIdentifiersIntro:
+      "Date of birth and nationality: changing either requires re-screening " +
+      "against the sanctions lists, which happens when you save.",
+    customerCorrectIdentifiersRefusalAct:
+      "correct a customer's date of birth or nationality",
+    // Sliced from the same sentence, capitalised for a label position.
+    customerFieldDateOfBirth: "Date of birth",
     customerFieldNatureOfBusiness: "Nature of business",
     customerFieldLanguagePreference: "Language preference",
     customerFieldGivenName: "Given name",

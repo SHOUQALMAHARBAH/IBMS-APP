@@ -6,6 +6,7 @@
 // collections are empty until Domains B / C / E land.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { CustomerType } from '../customer/customer-api';
 
 export type InteractionChannel =
   | 'MEETING'
@@ -90,7 +91,13 @@ export interface Customer360View {
   customer: {
     id: string;
     legalName: string;
-    customerType: string;
+    // THE UNION, not `string`, and that is what makes a raw member unrenderable.
+    // `/crm` printed this value verbatim — «INDIVIDUAL» in an Arabic paragraph —
+    // and the only reason the total `ENUM_LABEL.CustomerType` map could not be
+    // used was that this hand-copy was WIDER than the api's own type. A cast at the
+    // call site would have silenced the compiler and left a third value rendering
+    // `t(undefined)`; pointing at the exported union makes that unrepresentable.
+    customerType: CustomerType;
     status: CustomerStatus;
     ownerUserId: string;
   };

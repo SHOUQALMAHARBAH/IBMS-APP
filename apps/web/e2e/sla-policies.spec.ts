@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 import { expectNone } from "./support/anchored";
 
@@ -292,8 +293,15 @@ test("does NOT offer REGULATORY without sla.policy.regulatory, and says why", as
   const sourceType = page.getByTestId("new-sla-source-type");
   // Anchored on an option that IS offered, so "no REGULATORY option" cannot pass on an empty
   // select that never rendered.
+  //
+  // RE-POINTED, decision 59: the anchor named the raw ENUM MEMBER, which the select stopped
+  // rendering once «داخلي» / "Internal policy" arrived. The ABSENCE half below needed no
+  // change and that is not luck — `getByRole(name)` matches case-insensitive substrings, so
+  // "REGULATORY" still matches a "Regulatory" option if one is ever wrongly offered. The
+  // anchor is the half that had to move, which is the right way round: a stale ANCHOR fails
+  // loudly, where a stale absence assertion would quietly stop being able to fail at all.
   await expect(
-    sourceType.getByRole("option", { name: "INTERNAL_POLICY" }),
+    sourceType.getByRole("option", { name: "Internal policy" }),
   ).toHaveCount(1);
   await expect(
     sourceType.getByRole("option", { name: "REGULATORY" }),
@@ -703,4 +711,41 @@ test("renders in Arabic with RTL direction", async ({ page }) => {
   await expect(
     page.locator("table").getByText("ليست إلزاماً قانونياً"),
   ).toBeVisible();
+});
+
+test("sla-policies screen has no serious/critical accessibility violations @a11y", async ({
+  page,
+}) => {
+  /*
+   * THE SECOND OF THE TWO COMPLIANCE SCREENS THAT HAD NO @a11y TEST AT ALL. Measured when
+   * `/screening-health` gained its own: 84 of 121 specs carry one, and of the 37 that did not,
+   * these two were the only COMPLIANCE screens. One was written then; this is the other.
+   *
+   * IN ARABIC, for the same two reasons as its sibling: these words were written for that reading
+   * direction, and this screen is three TABLES — the policies, the holiday calendar and the
+   * occasions it still owes. `Table`'s own history here is a keyboard trap axe raised ONLY once a
+   * region actually overflowed, and this batch removed sixteen redundant scrollers across nine
+   * screens, so the markup around every table in the product moved.
+   *
+   * Anchored on content from each of the two surfaces the screen loads independently, so a run
+   * where one request escaped the mocks cannot pass as a clean a11y result over half a screen.
+   */
+  await mockAuth(page, ["COMPLIANCE_OFFICER"], "AR");
+  await mockPolicies(page, [internalPolicy, policy({ id: "p-1" })]);
+  await mockHolidays(page, [holidayRow()]);
+
+  await page.goto("/sla-policies");
+  await expect(
+    page.getByRole("heading", { name: "سياسات مستوى الخدمة" }),
+  ).toBeVisible();
+  await expect(
+    page.locator("table").first().getByText("ليست إلزاماً قانونياً"),
+  ).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(
+    results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical",
+    ),
+  ).toEqual([]);
 });

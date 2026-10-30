@@ -109,7 +109,7 @@ tidy-up afterwards: a developer reading an 11-row table will miss four pairs.
 
 Two structural facts that shape the design:
 
-- **Fourteen of the fifteen are NULL-guarded** — `(maker IS NULL) OR (checker IS NULL) OR (maker <> checker)`
+- **Fifteen of the sixteen are NULL-guarded** — `(maker IS NULL) OR (checker IS NULL) OR (maker <> checker)`
   — so "not yet decided" is not a violation. `AccessRecertificationItem` is the exception: both columns are
   NOT NULL and the constraint is unconditional.
 - **All 14 tables carry `organizationId`.** Whatever mechanism reads the office's mode can find the office.

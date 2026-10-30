@@ -31,35 +31,38 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { CorrectEmployeeRecord } from '../../../../components/supporting-operations/CorrectEmployeeRecord';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import {
-  errorStyle,
   successStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 import { CbjApprovalPanel } from '../../../../components/supporting-operations/CbjApprovalPanel';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
   display: 'grid',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   maxWidth: '26rem',
 };
 const labelStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: '0.2rem',
+  gap: 'var(--space-1)',
 };
 
 export default function EmployeeDetailPage() {
@@ -101,6 +104,9 @@ export default function EmployeeDetailPage() {
   const [password, setPassword] = useState('');
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
   const [branches, setBranches] = useState<OrgUnit[]>([]);
+  /* ITEM 8 — its own state. A refused picker list must not hide what the rest of the screen
+   * has: this page is mostly a record somebody came to read. */
+  const [listsMissing, setListsMissing] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
   const [roles, setRoles] = useState<RoleCatalogueEntry[]>([]);
@@ -137,27 +143,42 @@ export default function EmployeeDetailPage() {
 
   // Only fetched once someone opens the login form: three requests nobody needs on a page that is
   // mostly read.
+  //
+  // ITEM 8 — three lists where one refusal used to empty all three. The role list is the one that
+  // matters most here: with it gone the form cannot be submitted at all (a login needs a role), so
+  // naming it is the difference between "ask for `role.read`" and a form that refuses silently.
   useEffect(() => {
     if (!user || !canIssueLogin || !showLoginForm) return;
     void (async () => {
-      try {
-        const [d, b, r] = await Promise.all([
-          listDepartments(),
-          listBranches(),
-          listRoles(),
-        ]);
-        setDepartments(d);
-        setBranches(b);
-        // ACTIVE only: a retired role grants nothing, so offering one would hand the account a row
-        // that reads as access and confers none.
-        setRoles(r.filter((entry) => entry.status === 'ACTIVE'));
-      } catch {
-        setDepartments([]);
-        setBranches([]);
-        setRoles([]);
-      }
+      const { values, failures } = await loadIndependently([
+        {
+          key: 'departments',
+          label: t('commonListDepartments'),
+          load: listDepartments,
+        },
+        {
+          key: 'branches',
+          label: t('commonListBranches'),
+          load: listBranches,
+        },
+        { key: 'roles', label: t('commonListRoles'), load: listRoles },
+      ]);
+      setDepartments((values.departments as OrgUnit[] | undefined) ?? []);
+      setBranches((values.branches as OrgUnit[] | undefined) ?? []);
+      // ACTIVE only: a retired role grants nothing, so offering one would hand the account a row
+      // that reads as access and confers none.
+      setRoles(
+        ((values.roles as RoleCatalogueEntry[] | undefined) ?? []).filter(
+          (entry) => entry.status === 'ACTIVE',
+        ),
+      );
+      setListsMissing(
+        failures.length === 0
+          ? null
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+      );
     })();
-  }, [user, canIssueLogin, showLoginForm]);
+  }, [user, canIssueLogin, showLoginForm, t]);
 
   async function onCreateLogin(e: FormEvent) {
     e.preventDefault();
@@ -282,13 +303,16 @@ export default function EmployeeDetailPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('empdHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('empdHeading')} />
 
-      {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
+      {listsMissing ? (
+        <p role="status" data-lists-missing style={{ color: 'var(--ink-muted)' }}>
+          {listsMissing}
         </p>
+      ) : null}
+      {loadError ? (
+        <ErrorState title={loadError} />
       ) : null}
 
       {employee ? (
@@ -384,9 +408,7 @@ export default function EmployeeDetailPage() {
           </section>
 
           {actionError ? (
-            <p role="alert" style={errorStyle}>
-              {actionError}
-            </p>
+            <ErrorState title={actionError} />
           ) : null}
 
           <section style={sectionStyle} data-login-section>
@@ -491,7 +513,7 @@ export default function EmployeeDetailPage() {
                         key={r.id}
                         style={{
                           display: 'flex',
-                          gap: '0.4rem',
+                          gap: 'var(--space-2)',
                           alignItems: 'center',
                         }}
                       >
@@ -552,26 +574,27 @@ export default function EmployeeDetailPage() {
                 {t('empdNoTraining')}
               </p>
             ) : (
-              <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
+              <Card padded={false}>
+            <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('empdColTraining')}</th>
-                    <th style={head}>{t('empdColDue')}</th>
-                    <th style={head}>{t('empdColCompleted')}</th>
-                    <th style={head} />
+                    <Th>{t('empdColTraining')}</Th>
+                    <Th>{t('empdColDue')}</Th>
+                    <Th>{t('empdColCompleted')}</Th>
+                    <Th />
                   </tr>
                 </thead>
                 <tbody>
                   {employee.trainings.map((training) => (
-                    <tr key={training.id}>
-                      <td style={cell}>{training.trainingName}</td>
-                      <td style={cell}>
+                    <Tr key={training.id}>
+                      <Td>{training.trainingName}</Td>
+                      <Td>
                         {training.dueAt?.slice(0, 10) ?? '—'}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {training.completedAt?.slice(0, 10) ?? '—'}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {!training.completedAt ? (
                           <button
                             type="button"
@@ -580,11 +603,12 @@ export default function EmployeeDetailPage() {
                             {t('empdMarkComplete')}
                           </button>
                         ) : null}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
+          </Card>
             )}
           </section>
 
@@ -673,7 +697,7 @@ export default function EmployeeDetailPage() {
           ) : null}
         </>
       ) : loadError ? null : (
-        <p>{t('empdLoading')}</p>
+        <SkeletonList rows={4} label={t('empdLoading')} />
       )}
     </main>
   );

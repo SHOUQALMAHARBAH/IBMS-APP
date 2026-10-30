@@ -166,7 +166,7 @@ test('prompts to pick a customer when none is in the URL', async ({ page }) => {
   await mockPrograms(page);
 
   await page.goto('/insurance-programs');
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     'No customer selected',
   );
 });
@@ -178,7 +178,7 @@ test('shows a friendly message when the user lacks read permission', async ({
   await mockPrograms(page, { listStatus: 403 });
 
   await page.goto('/insurance-programs?customerId=cust-1');
-  await expect(page.locator('p[role="alert"]')).toContainText(
+  await expect(page.locator('main [role="alert"]')).toContainText(
     "(program.read)",
   );
 });

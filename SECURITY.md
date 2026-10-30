@@ -1,244 +1,396 @@
-# Security Guidelines
+# Security
 
-This document outlines security measures implemented in the IBMS application and best practices for developers.
+**Every claim in this file carries the command that demonstrates it.** That is not a style
+preference — it is the only thing separating this document from the two it replaces.
 
-## Implemented Security Measures
+> **2026-10-30 — `SECURITY_FIXES.md` IS MERGED INTO THIS FILE AND DELETED.** One subject in two
+> places is the shape this repository refuses everywhere else, and the two had drifted into direct
+> contradiction: this file told a reader that `common/sanitization.util.ts` was available for
+> sanitising special cases, while the other recorded deleting it, and the file does not exist. A
+> reader could not tell which half was current.
+>
+> **Then every claim in the merged file was re-measured, and 13 of 26 were false or stale.**
+> (That figure was reported as 10 until the findings were LISTED rather than recalled, which is
+> this file's own standard applied to its own correction; 26 is the count of distinct claims
+> examined, and the granularity is a judgement — the multer entry alone carried four wrong
+> version figures.) The ten in the sections below are corrected in place with their
+> measurement; the three worth naming here are: this file claimed a utility module that had been deleted; it recommended `npm audit fix`,
+> which in this repository has made npm **drop a package from the tree** so the gate went green
+> because the dependency had VANISHED; and the merged multer entry still argued its acknowledgement
+> on *there is no multipart route*, which stopped being true when the customer-import upload landed.
+>
+> **That last one is not an irony, it is the recorded failure repeating.** `SECURITY_FIXES.md`
+> opened with *"a security document that overstates its own coverage is worse than none — an
+> auditor relies on it, and so does the next engineer deciding what still needs doing"*, and it was
+> rewritten in 2026-09 precisely because an earlier revision had done that. The acknowledgement in
+> `scripts/audit-check.mjs` records why its premise is now pinned by a TEST rather than by prose:
+> four multer advisories were once accepted on a reachability argument that **had already been false
+> for sixteen days**. A record whose premise nothing checks is a record that goes quietly false.
 
-### 1. Authentication & Authorization
+---
 
-- **JWT-based authentication**: Access tokens are short-lived (15 minutes)
-- **Refresh token rotation**: Tokens are rotated on refresh
-- **Secure cookie storage**: Refresh tokens stored in `httpOnly`, `secure`, `sameSite=strict` cookies
-- **MFA enforcement**: Multi-factor authentication (TOTP) required for sensitive operations
-- **Role-Based Access Control (RBAC)**: Fine-grained permission checks on all endpoints
-- **Session validation**: Every access token request validates the session state
+## How to re-verify this file rather than trusting it
 
-### 2. Transport Security
+Every subsection below names a file and, where a figure is quoted, the command that produced it.
+If a claim here and the code disagree, **THE CODE IS RIGHT AND THIS FILE IS STALE.** Re-measure
+before quoting any number in it to anybody outside this repository.
 
-- **Mandatory TLS**: In production, all traffic must be over HTTPS
-- **HSTS header**: Strict-Transport-Security with 1-year max-age
-- **TLS database connection**: DATABASE_URL must use sslmode=require in production
-- **Secure cookies in production**: Secure flag set only when NODE_ENV=production
+```bash
+npm run test:security          # the dependency gate — see § Dependency posture
+npm run typecheck && npm run lint
+npx vitest run apps/api/src/common/multipart-upload-exposure.inventory.spec.ts
+```
 
-### 3. Input Validation & Sanitization
+---
 
-- **Request validation**: NestJS ValidationPipe with whitelist/forbidNonWhitelisted
-- **Type checking**: Full TypeScript coverage prevents type-related vulnerabilities
-- **DTOs**: All inputs validated against class-validator schemas
-- **Sanitization utilities**: Available in `common/sanitization.util.ts` for special cases
+## 1 · Authentication & authorization
 
-### 4. Output Encoding & XSS Prevention
+- **JWT access tokens, short-lived.** `TokenService.signAccessToken(payload, ttlMinutes)`.
+  **The TTL is a PER-OFFICE SETTING with a default of 15 minutes** —
+  `OfficeSecurityConfig.accessTokenTtlMinutes @default(15)` in `schema.prisma`, readable on
+  `security-config.read` and writable on `security-config.manage`. This file previously stated 15
+  minutes as a fixed fact; it is a default an office may change.
+- **Refresh token rotation** on every refresh, and the refreshed token carries the **session's**
+  organization rather than one the caller supplies — `auth.service.ts:507`, so a refresh cannot be
+  a way to re-issue a token for a different office.
+- **Cookie flags.** `httpOnly: true`, `sameSite: 'strict'`,
+  `secure: process.env.NODE_ENV === 'production'` — `auth/cookies.util.ts:8-10`.
+- **MFA (TOTP).** `MfaRequiredGuard` refuses every route until an authenticator is paired, with
+  `/settings/security` the only way through. `@RequireStepUp()` re-challenges for a small set of
+  high-consequence acts.
+- **Permissions, not role names.** `PermissionsGuard` resolves codes from `roleId`; roles are
+  per-office rows and a role NAME is not an identity, because two offices may each define a
+  "Manager" with different grants.
+- **`PermissionScope` is `OFFICE` or `PLATFORM`**, defaulting to the non-widening value. A
+  PLATFORM code may only be held by the provider organization, and three layers enforce it: the
+  matrix hides it, `RoleAdminService.setPermissions` refuses it, and the route checks the caller's
+  organization type. **A hidden control the API still honours is not a boundary** — which is why it
+  is all three.
 
-- **No dangerouslySetInnerHTML**: Avoided in React components
-- **HTML escaping**: All dynamic content escaped before rendering
-- **CSP header**: Content-Security-Policy restricts inline scripts
-- **X-XSS-Protection header**: Enables browser XSS protection
+## 2 · Tenant isolation
 
-### 5. SQL Injection Prevention
+**Two layers, and the second is the one that holds when application code forgets.**
 
-- **Prisma ORM**: Parameterized queries prevent SQL injection
-- **No raw SQL**: Avoided whenever possible; when used, only via Prisma.sql() with parameters
-- **Prepared statements**: All database queries use prepared statements
+- **Layer 1 — `tenantScopeExtension`** rewrites the Prisma argument object for every model carrying
+  `organizationId`, derived from the DMMF rather than a hand-kept list.
+- **Layer 2 — row-level security.** Measured 2026-10-30:
+  **139 distinct tables with `ENABLE ROW LEVEL SECURITY`, 13 of them `FORCE`d.**
 
-### 6. CSRF Protection
+```bash
+grep -rhoE 'ALTER TABLE "[A-Za-z_]+" ENABLE ROW LEVEL SECURITY' \
+  packages/db/prisma/migrations/*/migration.sql | grep -oE '"[A-Za-z_]+"' | sort -u | wc -l
+```
 
-- **Same-site cookies**: Refresh tokens use sameSite=strict
-- **CORS configuration**: Strict origin validation
-- **Token in httpOnly cookie**: CSRF tokens cannot be read by JavaScript
+**A policy on a model the extension does NOT scope is an outage rather than defence in depth** —
+the extension sets `app.current_org_id` only for models carrying the column, so a policy anywhere
+else matches nothing and the table reads empty for everyone.
+`tenant-scope.extension.spec.ts` guards that pairing.
 
-### 7. Rate Limiting
+**The one place a `security_invoker = false` view crosses an office boundary** is registered in
+`apps/api/test/security-definer-views.e2e-spec.ts` with its column allow-list and what it owes.
+The declaration IS the review, and the guard fails the moment such a view exists unregistered.
 
-- **Login rate limiting**: 5 attempts per 15 minutes per IP
-- **Password reset rate limiting**: 3 attempts per hour per IP
-- **MFA verification rate limiting**: 10 attempts per 15 minutes per IP
-- **In-memory store**: Per-IP rate limit tracking (Redis recommended for production)
+## 3 · Raw SQL
 
-### 8. Sensitive Data Protection
+**There are 37 raw queries in non-spec api code, and the honest claim is not that they are
+avoided.** This file previously said *"No raw SQL: avoided whenever possible"*, which understates
+both the count and what makes them safe.
 
-- **Field-level encryption**: Highly Confidential data (national IDs, emails, phones) encrypted at rest
-- **PII encryption**: Sensitive personal information encrypted with AES-256-GCM
-- **Log redaction**: Sensitive fields redacted from all logs:
-  - Authorization headers
-  - Cookies (Set-Cookie)
-  - Passwords and password hashes
-  - Tokens (access, refresh, MFA)
-  - Secrets
-  - Encrypted fields
-- **No request/response body logging**: Bodies never serialized in operational logs
+- Every one is a **tagged template** (`$queryRaw\`…\``), so interpolations are parameterised by
+  Prisma. The two occurrences of `$queryRawUnsafe` in non-spec code are not uses of it: they are
+  `tenant-scope.extension.ts:315-317` **wrapping** those methods so a raw query is org-aware.
+- `applyTenantScope` cannot filter a raw query — it rewrites an argument object and a raw query has
+  none — so those call sites are **protected by RLS alone**, which is what makes the isolation
+  promise true rather than aspirational.
 
-### 9. Security Headers
+```bash
+grep -rn 'queryRaw`\|executeRaw`\|queryRaw<' apps/api/src --include=*.ts | grep -v spec | wc -l
+```
 
-The following security headers are set on all responses:
+## 4 · Transport security
+
+- **HSTS** `max-age=31536000; includeSubDomains; preload`, production only —
+  `common/security-headers.middleware.ts:58`.
+- **Plain HTTP is rejected** in production, with `/health` and `/health/db` exempt so orchestrator
+  probes still work.
+- **`DATABASE_URL` must set `sslmode=require`** (or `verify-ca`/`verify-full`) in production, and
+  the API **refuses to start** otherwise — `main.ts:56`.
+
+## 5 · Response headers
+
+`common/security-headers.middleware.ts`, set in **every** environment:
 
 ```
-X-Content-Type-Options: nosniff           # Prevents MIME sniffing
-X-Frame-Options: DENY                     # Prevents clickjacking
-X-XSS-Protection: 1; mode=block           # Browser XSS protection
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
 Referrer-Policy: strict-origin-when-cross-origin
-Content-Security-Policy: default-src 'none'; script-src 'self'
+Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'
 Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
-Strict-Transport-Security: max-age=31536000 (production only)
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload   (production only)
 ```
 
-### 10. Error Handling
+**The CSP here is defence-in-depth on an API that serves no HTML or JS**, which that middleware's
+own comment says. This file previously listed it under XSS prevention as though it protected the
+web app; it does not, and the web app's own policy is a separate question.
 
-- **Generic error messages**: Sensitive implementation details not exposed to clients
-- **Error logging**: Full error details logged server-side only
-- **Stack traces**: Only shown in development (NODE_ENV != production)
+## 6 · Input validation
 
-### 11. Dependency Security
+- `ValidationPipe` with `whitelist` and `forbidNonWhitelisted`, so an unexpected field is a 400
+  naming it rather than a silently ignored value. That absence is load-bearing in places:
+  `UpdateCustomerContactDto` carries three fields and the identifiers are **absent by design**, so
+  each is refused by name.
+- **`common/sanitization.util.ts` DOES NOT EXIST** (measured 2026-10-30). This file claimed it
+  was available; it was deleted 2026-09-09 because it duplicated the `escapeHtml` in
+  `modules/document-generation/document-html.util.ts` — which every document template imports and
+  which has its own tests — plus an unused `validateJsonString`, and nothing imported it. **Two
+  `escapeHtml` implementations in one codebase is a drift hazard, and an untested unused one is not
+  a control.**
 
-- **npm audit**: Run `npm test:security` to check for known vulnerabilities
-- **Regular updates**: Dependencies updated regularly
-- **Audit fix**: Use `npm audit fix` to auto-patch known vulnerabilities
+## 7 · Output encoding
 
-### 12. Environment Security
+**`dangerouslySetInnerHTML` occurs exactly ONCE**, and this file's previous absolute claim that it
+is "avoided in React components" is what made that one site look like a violation. It is
+`app/layout.tsx:91`: a static, parameterless theme-flash script with **no user input of any kind**,
+documented at length in place. Measure before assuming a second:
 
-- **Environment variables**: Sensitive config never committed to git
-- `.env` files: Use `.env.example` as template
-- **Validation at startup**: JWT_ACCESS_SECRET and DATABASE_URL validated in production
+```bash
+grep -rn "dangerouslySetInnerHTML" apps/web --include=*.tsx --include=*.ts | grep -v node_modules
+```
 
-## Security Best Practices for Developers
+## 8 · Rate limiting
 
-### Do's
+`common/rate-limit.guard.ts` + `rate-limit.decorator.ts`. **Five endpoints, not "all routes":**
 
-✅ **Use parameterized queries** with Prisma
+| Decorator | Endpoints | Budget | Bucket |
+|---|---|---|---|
+| `@AuthRateLimit()` | `POST /auth/signup`, `POST /auth/login` | 5 / 15 min | `auth` |
+| `@MfaRateLimit()` | `POST /auth/mfa/totp/challenge/verify` | 10 / 15 min | `mfa` |
+| `@PasswordRateLimit()` | `POST /auth/forgot-password`, `POST /auth/reset-password` | 3 / hour | `password-reset` |
+
+**IT IS OFF UNLESS `NODE_ENV=production` OR `RATE_LIMIT_ENABLED=true`, AND `NODE_ENV` IS ASSIGNED
+NOWHERE IN THIS DEPLOYMENT** — not in `.env`, `.env.test`, `turbo.json` or any workspace
+`package.json`, and `RATE_LIMIT_ENABLED` is commented out in `.env.example`. So **in dev and CI the
+limiter does not run**, which `.env.example` already says and this file did not. That is deliberate:
+every request in dev and CI genuinely comes from 127.0.0.1, so a per-IP bucket lumps every user and
+every test into one — and an enforced 5-per-15-minutes made the integration suite unrunnable,
+verified at the time with a `429` on the sixth auth call.
+
+**EACH DECORATOR HAS ITS OWN NAMED BUCKET, AND THE MERGED FILE DESCRIBED THE OPPOSITE AS A
+FEATURE.** It said *"the three guards share one static store keyed by client IP, so cycling between
+endpoints does not buy a fresh budget"*. Sharing one bucket was the **BUG**: `resetTime` was stamped
+by whichever guard created the entry first, so a single request to `/auth/login` handed the
+password-reset guard a 15-minute window in place of its declared hour — 12 attempts/hour, a 4×
+bypass reachable with one extra request — and the shared counter meant an MFA retry consumed a
+legitimate user's login budget. Per-bucket is the fix, and that decorator file's own header records
+it.
+
+**`X-Forwarded-For` is honoured only when `TRUST_PROXY_HEADERS=true`.** It is client-supplied: when
+trusted unconditionally, an attacker rotating it got a fresh bucket per request and defeated the
+limiter entirely. Covered by a regression test.
+
+**Not covered:** per-process and in-memory, so a multi-replica deployment needs a shared store. No
+CAPTCHA and no anomaly-based lock beyond the per-account lockout in `AuthService`.
+
+## 9 · Sensitive data
+
+- **Field-level encryption, AES-256-GCM** — `common/crypto.util.ts:11`, random IV per value.
+- **Nine encrypted field names, not the three this file used to list.** It said "national IDs,
+  emails, phones", which understates: `nationalIdEnc`, `contactEmailEnc`, `contactPhoneEnc`,
+  `ibanEnc`, `secretEnc` (the TOTP secret), `webauthnPublicKeyEnc`, `oauthRefreshTokenEnc`,
+  `contactDetailsEnc`, and `beforeValueEnc`/`afterValueEnc` on identifier corrections.
+  `security/encrypted-fields.ts` is the map, pinned by exact equality so a new encrypted field is a
+  reviewed change rather than something that silently starts or fails to start encrypting.
+- **A random IV per value means an identifier CANNOT be searched** — the same number stored twice
+  is two different ciphertexts. That is a deliberate consequence, recorded where it bites.
+- **Log redaction**: authorization headers, `Set-Cookie`, passwords and hashes, access/refresh/MFA
+  tokens, secrets, encrypted fields. **No request or response body is ever serialised** in
+  operational logs.
+
+## 10 · The audit trail
+
+**`AuditLogEntry` is immutable by a database trigger, not by convention** —
+`20260826083942_add_audit_log_entry_immutability_trigger`, which raises
+`AuditLogEntry rows are immutable (Part 10.3) — % is not permitted` on UPDATE or DELETE.
+
+Two consequences worth knowing before writing a test or a teardown: **no fixture can delete an
+audit row**, so an organization that has ever had a user signed into it is permanently undeletable;
+and **nothing sensitive may be put in a snapshot**, because an immutable row is a row an erasure
+request can never reach. A data subject's own words and a date of birth are both recorded as
+absent for exactly that reason.
+
+The trail also stores **the roles the actor HELD at the time**, which is the one fact that cannot
+be reconstructed later: a role held in the past and never written down is unrecoverable.
+
+## 11 · Dependency posture
+
+**`npm run test:security` runs `scripts/audit-check.mjs`.** This file previously gave the command
+as `npm test:security` (which does not run) and described it as `npm audit --audit-level=high`
+(which it has not been since 2026-10-11).
+
+**Two sets, and only one fails the build** — owner decision, 2026-10-11:
+
+- **BLOCKING** — advisories reachable in what SHIPS, decided by npm's own `--omit=dev` rather than
+  re-derived from the lockfile. They fail the build unless acknowledged.
+- **REPORTED** — advisories that exist only in the dev tree. Printed every run, and a dev-only
+  CRITICAL prints its own line saying nothing will stop a merge on it. **The cost of that policy is
+  written at the top of the script**: two `tinypool` criticals fixed under it were themselves
+  devDependencies, so neither would have failed the build — they were fixed because somebody read
+  the output.
+
+It also collapses npm's cascade rows, refuses to pass if it parsed nothing, and fails once an
+acknowledgement passes its `reviewBy` date, so an acknowledgement cannot quietly become permanent.
+
+**DO NOT RUN `npm audit fix`, AND DO NOT REACH FOR AN OVERRIDE TO ESCAPE AN EXACT PIN.** This file
+used to recommend it. Measured here: a root override of `multer@^2.5.0` made npm **drop multer from
+the tree entirely**, and this gate then went **GREEN because the package had VANISHED** — which
+would have shipped a latent crash on the one route that uses it. **A green security gate is not
+evidence that a package was patched; check the version is INSTALLED, not merely absent from the
+audit.**
+
+### One acknowledged advisory, and its premise is pinned by a test
+
+**`multer` — GHSA-q7qp-rjg7-q26m / CVE-2026-113872**, DoS via a pending ASYNCHRONOUS `fileFilter`.
+The full entry is in `scripts/audit-check.mjs`; the parts that matter here:
+
+- **It is recorded as *the vulnerable code path does not exist in this product*, NEVER as *a known
+  vulnerability accepted*.** Owner decision 52, 2026-10-24. Those are different claims and the second is not
+  ours to make, because this system goes in front of a regulator. **Do not reword that entry into
+  the language of accepted risk.**
+- **The claim is the advisory's own sentence** — uploads using a synchronous `fileFilter` are not
+  affected. Measured: `fileFilter` appears **zero** times in `apps/api/src`; the single multipart
+  route (`modules/customer/legacy-import.controller.ts`) passes only
+  `limits: { fileSize, files: 1 }`; and `@nestjs/platform-express` injects none.
+- **THE PREMISE IS PINNED BY `apps/api/src/common/multipart-upload-exposure.inventory.spec.ts`**
+  (4 tests, passing), which asserts both facts by name over the whole api source — so the PREMISE
+  fails rather than the feature, and it fails for a SECOND upload route somebody adds. **A missing
+  `files` limit fails it too, because multer's own default is UNLIMITED**: reading *no `files` key*
+  as safe would be exactly backwards.
+- **No upgrade path, and it is a wait with a date rather than an exemption.** The fix exists in
+  multer 2.5.0; `@nestjs/platform-express` pins an EXACT `2.4.0` and every published version
+  **through 12.2.0** still does — checked one at a time rather than off the latest major.
+
+**This merged entry was itself stale in five places and is corrected above**: it said multer 2.2.0
+(it is 2.4.0), platform-express 11.2.3 (11.2.6), that 12.0.1 was the latest major (12.2.0), that
+the fix was in 2.3.0 (2.5.0), that four advisories were acknowledged (one is) — and, most
+seriously, **that "there is no multipart route" and the `FileInterceptor` grep returns nothing.**
+That grep now returns a route.
+
+### The lockfile's hoisting layout is load-bearing and undeclared
+
+Do not regenerate `package-lock.json` casually. Two things that have broken from it:
+
+- npm writes only the **current platform's** optional dependencies on a fresh resolve
+  (npm/cli#4828), so the Linux `@rollup/*` binaries CI needs get dropped and CI fails with
+  `Cannot find module @rollup/rollup-linux-x64-gnu`.
+- A regenerated tree **de-hoisted** `vitest` and `next` into per-workspace copies, and
+  `@testing-library/jest-dom` and `eslint-config-next` live at the root and resolve them by
+  hoisting — so the web unit tests and the web lint both broke, on every platform.
+
+Neither is visible without running `npm ci`. `vitest` must stay at ONE version across all three
+workspaces for the same reason.
+
+## 12 · Error handling and environment
+
+- Generic client-facing messages; full detail logged server-side; stack traces only when
+  `NODE_ENV !== 'production'`.
+- **Startup refuses rather than warns**: `JWT_ACCESS_SECRET` unset in production throws
+  (`main.ts:72`), as does a `DATABASE_URL` without `sslmode` (`main.ts:56`).
+- `.env` is never committed; `.env.example` is the template and carries **names only**.
+- **CORS** validates a single origin from `WEB_ORIGIN`, defaulting to `http://localhost:3000`
+  (`main.ts:101`).
+
+## 13 · Still open — tracked, not fixed
+
+| Gap | Where it is tracked |
+|---|---|
+| **Screening has real sanctions data and NO PEP data.** OFAC SDN and UN Consolidated ingest for real (`watchlist-fetchers.ts`); the built-in provider has **no PEP coverage and says so in its own code** rather than reporting a clean result it cannot support. The merged file's *"screening is simulated — no real provider"* was stale. | `IMPROVEMENTS.md` § 5.2 |
+| **No object storage anywhere.** A `Document` records a file — name, category, classification, uploader — and `storageRef` names a location nothing can fetch. So a mandatory-certificate column guarantees the certificate is FILED AND ATTRIBUTED, not that the bytes are retrievable. | `README.md` § Known gaps |
+| **Encryption at rest** is a deployment-time setting; no target chosen. | `IMPROVEMENTS.md` § 5.5 |
+| **Full bank/card data** deliberately not stored; a real payment run would need field encryption plus an access path. | `IMPROVEMENTS.md` § 5.6 |
+| **DAST is informational.** The CI ZAP baseline runs `fail_action: false` and needs a seeded scan user before it can gate. | `IMPROVEMENTS.md` § 1.6 |
+| **Distributed rate limiting** — per-process and in-memory. | § 8 above |
+| **Pre-transaction screening is a regulatory obligation and is not implemented** (measured 2026-09-27). Nothing in the invoice, refund, commission or collection paths consults a customer's screening state. | `README.md` § Known gaps |
+
+---
+
+## For developers
+
+### Do
+
+**Parameterise through Prisma**, including raw queries — use the tagged template, never string
+concatenation:
+
 ```typescript
-// Good
 const user = await prisma.user.findUnique({ where: { id: userId } });
-const custom = await prisma.$queryRaw`SELECT * FROM users WHERE id = ${userId}`;
+const rows = await prisma.$queryRaw`SELECT * FROM "User" WHERE id = ${userId}`;
 ```
 
-✅ **Validate all inputs** using DTOs
+**Validate through a DTO**, and remember that an ABSENT field can be the control:
+
 ```typescript
 export class CreateUserDto {
-  @IsEmail()
-  email!: string;
-  
-  @IsString()
-  @MinLength(8)
-  password!: string;
+  @IsEmail() email!: string;
+  @IsString() @MinLength(8) password!: string;
 }
 ```
 
-✅ **Encrypt sensitive data** using EncryptionService
-```typescript
-const encrypted = await encryptionService.encrypt(nationalId);
-```
+**Encrypt through `EncryptionService`**, and add the field to `security/encrypted-fields.ts` in the
+same change — the map is pinned by exact equality, so a field that is not in it does not encrypt.
 
-✅ **Use rate limiting** on sensitive endpoints
+**Rate-limit a new sensitive endpoint** with an existing decorator rather than a new guard, so it
+joins a declared bucket:
+
 ```typescript
 @Post('login')
 @AuthRateLimit()
-async login(@Body() dto: LoginDto) { ... }
+async login(@Body() dto: LoginDto) { /* … */ }
 ```
 
-✅ **Sanitize output** if it will be rendered as HTML
-```typescript
-const safe = escapeHtml(userInput);
-```
+**Escape through `document-html.util.ts`'s `escapeHtml`** — the one implementation, with tests.
 
-✅ **Log security events** to the audit trail
-```typescript
-await auditService.log({
-  action: 'USER_LOGIN',
-  entityId: userId,
-  changes: { ipAddress },
-});
-```
+**Write security-relevant acts to the audit trail**, never to the application log. An application
+log is not the audit trail: it is not queryable from the audit screen, not covered by the
+immutability trigger, and not retained on the same terms.
 
-### Don'ts
+### Don't
 
-❌ **Never log sensitive data**
-```typescript
-// Bad
-logger.info({ password, creditCard }); // Automatically redacted, but still bad practice
-```
+**Never log a secret**, even knowing redaction will catch it.
 
-❌ **Never concatenate SQL strings**
-```typescript
-// Bad - SQL Injection risk
-const query = `SELECT * FROM users WHERE email = '${email}'`;
-```
+**Never concatenate SQL.**
 
-❌ **Never trust user input without validation**
-```typescript
-// Bad
-const user = await prisma.user.findUnique({ where: { id: req.body.id } });
+**Never read a permission by role NAME.** An office defines its own role names, so a name-keyed
+lookup returns every same-named role across every office and hands the caller their UNION.
 
-// Good
-const { id } = new CreateUserDto(); // Validates after class-transformer
-const user = await prisma.user.findUnique({ where: { id } });
-```
+**Never add a field to `UpdateCustomerContactDto`.** That class being three fields is one of three
+layers keeping the screening identifiers uneditable, and
+`customer-identifier-correction.inventory.spec.ts` refuses any of the six in either DTO.
 
-❌ **Never bypass CORS/authentication**
-```typescript
-// Bad
-@Post('sensitive-data')
-@Public() // Don't use unless absolutely necessary
-```
+**Never put a data subject's own words, or a date of birth, in an audit snapshot** — the row is
+immutable, so that is personal data an erasure request can never reach.
 
-❌ **Never store secrets in code**
-```typescript
-// Bad
-const apiKey = 'sk_live_12345';
+**Never acknowledge an advisory without all four of**: a verified absence of an upgrade path
+(checked version by version, not off the latest major), a reachability argument that is the
+advisory's OWN sentence rather than your reading of it, a `reviewBy` date, and **a test pinning the
+premise**. The fourth is not optional, and the reason is in § 11.
 
-// Good
-const apiKey = process.env.STRIPE_API_KEY;
-```
+---
 
-❌ **Never expose stack traces in production**
-```typescript
-// Bad - middleware catches and logs everything
-app.use((error, req, res, next) => {
-  res.json({ error: error.stack }); // Exposes internals
-});
+## If you find a vulnerability
 
-// Good
-app.use((error, req, res, next) => {
-  logger.error(error); // Logged server-side only
-  res.status(500).json({ message: 'Internal server error' });
-});
-```
-
-## Security Testing
-
-### Run Security Audit
-```bash
-npm run test:security  # npm audit --audit-level=high
-```
-
-### Check for Vulnerable Dependencies
-```bash
-npm audit
-npm audit fix  # Auto-fix available vulnerabilities
-```
-
-### Manual Security Review
-- Review authentication flows
-- Verify rate limiting on sensitive endpoints
-- Check for hardcoded secrets
-- Verify CORS configuration
-- Test RBAC enforcement
-
-## Incident Response
-
-If a security vulnerability is discovered:
-
-1. **Do not commit or push** the fix
-2. **Document the vulnerability** with severity level
-3. **Create a private security branch** off main
-4. **Fix and test** the vulnerability
-5. **Request a security code review** before merging
-6. **Update SECURITY.md** with lessons learned
+1. **Do not open a public issue.**
+2. Document it with a severity and the command that demonstrates it.
+3. Work on a branch; request a security review before merging.
+4. If the fix rests on a premise ("this path is unreachable"), **pin that premise with a test in
+   the same change** — a record whose premise nothing checks goes quietly false, and this
+   repository has one measured instance of exactly that lasting sixteen days.
+5. Update this file, including the command.
 
 ## References
 
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [OWASP API Security](https://owasp.org/www-project-api-security/)
-- [NestJS Security Documentation](https://docs.nestjs.com/security/overview)
-- [PDPL No. 24/2023](./ibms-brain/meta/context/pcms-privacy-modules.md)
-
-## Contact
-
-For security concerns, contact the security team or submit a security report through the appropriate channels (do not open public issues for vulnerabilities).
+- [OWASP Top 10](https://owasp.org/www-project-top-ten/) ·
+  [OWASP API Security](https://owasp.org/www-project-api-security/) ·
+  [NestJS Security](https://docs.nestjs.com/security/overview)
+- PDPL No. 24/2023 — `ibms-brain/meta/context/pcms-privacy-modules.md`
+- `ibms-brain/meta/lex/sensitive-data-handling.md` ·
+  `ibms-brain/meta/lex/maker-checker-segregation.md`

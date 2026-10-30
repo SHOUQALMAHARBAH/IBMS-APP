@@ -125,3 +125,120 @@ test("says nothing on a KYC file approved by somebody other than its creator", a
   await expect(page.getByText("Rawabi Trading Co.")).toBeVisible();
   await expect(page.getByTestId("combined-duty-kyc-kyc-1")).toHaveCount(0);
 });
+
+/*
+ * «لما نضغط ع الأزرار الموظف رح يشعر بالضياع لأن فش اشي بيظهر اله ولا كأنه عمل
+ *  اشي… بس بنضغط زر وبنضيع فيه»
+ * — the owner's walk, 2026-10-26, about this queue.
+ *
+ * The act RAN. `KycQueue.run()` calls the route, hands the updated record to the
+ * parent and re-reads the screening hold — so a badge three columns away changed
+ * and nothing said why. A status cell quietly becoming a different word is not a
+ * statement that your action succeeded, which is the whole of what she reported.
+ *
+ * The request is HELD OPEN so the pending state is observable; fulfilling
+ * immediately would pass against a screen that is still silent to a person.
+ */
+const AWAITING_SCREENING: KycQueueRecord = {
+  ...TWO_PERSON,
+  id: "kyc-3",
+  status: "SUBMITTED",
+  approvedByUserId: null,
+  approvedAt: null,
+  customer: { legalName: "Petra Logistics", customerType: "CORPORATE" },
+};
+
+test("states what running the screening did, and says so while it is running", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [AWAITING_SCREENING]);
+  await page.route(
+    "http://localhost:4000/kyc-records/kyc-3/screening-hold",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          kycRecordId: "kyc-3",
+          level: "NO_HOLD",
+          releasable: false,
+          reasons: [],
+          releases: [],
+          lastScreenedAt: null,
+          configurationProblems: [],
+        },
+      }),
+  );
+
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    "http://localhost:4000/kyc-records/kyc-3/run-screening",
+    async (route) => {
+      await held;
+      await route.fulfill({
+        status: 201,
+        json: { ...AWAITING_SCREENING, status: "SCREENING" },
+      });
+    },
+  );
+
+  await page.goto("/customers/kyc-queue");
+  await page.getByRole("button", { name: "Run screening" }).click();
+
+  // IN FLIGHT, in the row the act belongs to.
+  await expect(page.getByTestId("kyc-queue-kyc-3-pending")).toHaveText(
+    "Working…",
+  );
+
+  release();
+
+  // AND THEN IT SAYS WHAT IT DID — naming the state the record is now in, which
+  // is composed from the column heading and the badge's own label, so not one
+  // word of it is newly written.
+  const outcome = page.getByTestId("kyc-queue-kyc-3-outcome");
+  await expect(outcome).toHaveText("Status: Screening");
+  await expect(outcome).toHaveAttribute("role", "status");
+  await expect(page.getByTestId("kyc-queue-kyc-3-pending")).toHaveCount(0);
+});
+
+test("a refused screening is announced in the row, not swallowed", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockQueue(page, [AWAITING_SCREENING]);
+  await page.route(
+    "http://localhost:4000/kyc-records/kyc-3/screening-hold",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          kycRecordId: "kyc-3",
+          level: "NO_HOLD",
+          releasable: false,
+          reasons: [],
+          releases: [],
+          lastScreenedAt: null,
+          configurationProblems: [],
+        },
+      }),
+  );
+  await page.route(
+    "http://localhost:4000/kyc-records/kyc-3/run-screening",
+    (route) =>
+      route.fulfill({
+        status: 422,
+        json: { message: "The watchlist has never been synced." },
+      }),
+  );
+
+  await page.goto("/customers/kyc-queue");
+  await page.getByRole("button", { name: "Run screening" }).click();
+
+  const failed = page.getByTestId("kyc-queue-kyc-3-error");
+  await expect(failed).toContainText("The watchlist has never been synced.");
+  await expect(failed).toHaveAttribute("role", "alert");
+  await expect(page.getByTestId("kyc-queue-kyc-3-outcome")).toHaveCount(0);
+});

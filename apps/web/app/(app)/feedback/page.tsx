@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
@@ -12,8 +12,18 @@ import {
   type Feedback,
 } from '../../../lib/customer-service/feedback-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
@@ -26,18 +36,6 @@ const CONTEXT_LABEL_KEY: Record<string, TranslationKey> = {
   post_renewal: 'fbContextPostRenewal',
 };
 
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function FeedbackPage() {
   const router = useRouter();
@@ -108,11 +106,11 @@ export default function FeedbackPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('fbHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('fbIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('fbHeading')}
+        description={t('fbIntro')}
+      />
 
       {canLog ? (
         <form
@@ -120,7 +118,7 @@ export default function FeedbackPage() {
           style={{
             margin: '1rem 0',
             display: 'grid',
-            gap: '0.4rem',
+            gap: 'var(--space-2)',
             maxWidth: '30rem',
           }}
         >
@@ -132,7 +130,7 @@ export default function FeedbackPage() {
             required
           />
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('fbContextLabel')}
             <select
@@ -148,11 +146,10 @@ export default function FeedbackPage() {
             </select>
           </label>
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('fbScoreLabel')}
             <input
-              aria-label={t('fbColScore')}
               type="number"
               min={1}
               max={5}
@@ -161,11 +158,10 @@ export default function FeedbackPage() {
             />
           </label>
           <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
           >
             {t('fbCommentsLabel')}
             <textarea
-              aria-label={t('fbColComments')}
               value={comments}
               onChange={(e) => setComments(e.target.value)}
               rows={3}
@@ -178,52 +174,51 @@ export default function FeedbackPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('fbNone')}</p>
+          <EmptyState title={t('fbNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('fbColCustomer')}</th>
-                  <th style={head}>{t('fbColContext')}</th>
-                  <th style={head}>{t('fbColScore')}</th>
-                  <th style={head}>{t('fbColComments')}</th>
-                  <th style={head}>{t('fbColSubmitted')}</th>
+                  <Th>{t('fbColCustomer')}</Th>
+                  <Th>{t('fbColContext')}</Th>
+                  <Th>{t('fbColScore')}</Th>
+                  <Th>{t('fbColComments')}</Th>
+                  <Th>{t('fbColSubmitted')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.customerId.slice(0, 8)}…</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    {/* RULE 2 — the name, never the id. */}
+                    <Td>
+                      <bdi>{r.customerName}</bdi>
+                    </Td>
+                    <Td>
                       {CONTEXT_LABEL_KEY[r.context] ? t(CONTEXT_LABEL_KEY[r.context]) : r.context}
-                    </td>
-                    <td style={cell}>{r.score ?? '—'}</td>
-                    <td style={cell}>{r.comments ?? '—'}</td>
-                    <td style={cell}>{r.submittedAt.slice(0, 10)}</td>
-                  </tr>
+                    </Td>
+                    <Td>{r.score ?? '—'}</Td>
+                    <Td>{r.comments ?? '—'}</Td>
+                    <Td>{r.submittedAt.slice(0, 10)}</Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
         // Loading only when nothing has failed — otherwise the error and a
         // "Loading…" line render together, which is the state-conflation
         // directive §2 is about. Same guard the complaints page uses.
-        <p>{t('fbLoading')}</p>
+        <SkeletonList rows={4} label={t('fbLoading')} />
       )}
     </main>
   );

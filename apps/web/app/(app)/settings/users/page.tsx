@@ -18,27 +18,29 @@ import {
   type RoleCatalogueEntry,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 
 /** The keys `ENUM_LABEL.RoleName` actually has — the eleven seeded names. A role
  *  an office defines is deliberately NOT one of these. */
 type LegacyRoleName = keyof typeof ENUM_LABEL.RoleName;
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const noRolesBadgeStyle: CSSProperties = {
   display: 'inline-block',
   padding: '0.1rem 0.4rem',
@@ -134,6 +136,10 @@ export default function UserAdminPage() {
   // rendered as their own labelled dropdowns rather than folded in with Roles.
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
   const [branches, setBranches] = useState<OrgUnit[]>([]);
+  /* ITEM 8 — its OWN state, deliberately not `loadError`. That one hides the user list below
+   * (`: loadError ? null :`), and a refused DEPARTMENTS list must not take the user list with
+   * it: provisioning is the screen's purpose and the pickers serve one form on it. */
+  const [listsMissing, setListsMissing] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
 
@@ -168,24 +174,48 @@ export default function UserAdminPage() {
   useEffect(() => {
     if (!user || !isAdmin) return;
     void (async () => {
-      try {
-        const [depts, brs, cat] = await Promise.all([
-          listDepartments(),
-          listBranches(),
-          // GET /rbac/roles needs `role.read`, which a holder of `user.manage`
-          // does not necessarily have.
-          canReadRoles ? listRoles() : Promise.resolve([]),
-        ]);
-        setDepartments(depts);
-        setBranches(brs);
-        setRoleCatalogue(cat);
-        // The grant dropdown's default is whatever the office actually has.
-        // No shared default any more: each row falls back to the first ACTIVE role at render time,
-        // so one row's choice cannot become another row's displayed value.
-      } catch {
-        // The form's own error line covers a failed submit; an empty dropdown
-        // is self-explanatory and must not blank the user list beside it.
-      }
+      /*
+       * ITEM 8 — THIS LOADER'S OLD `catch` SET NOTHING, and its comment said an empty dropdown is
+       * "self-explanatory". It is not: the owner met eight of them on
+       * `/provider-register-office` and concluded the screen was broken. It was also the worst of
+       * the nine, because `Promise.all` discarded the two lists that HAD arrived and then said
+       * nothing at all — so a 403 on roles alone emptied departments and branches as well, with no
+       * sentence anywhere on the screen.
+       *
+       * `loadIndependently` keeps what resolved and NAMES what did not. The second half is the one
+       * that matters: a person can act on "the roles list did not load" and cannot act on a blank
+       * select.
+       */
+      const { values, failures } = await loadIndependently([
+        {
+          key: 'departments',
+          label: t('commonListDepartments'),
+          load: listDepartments,
+        },
+        {
+          key: 'branches',
+          label: t('commonListBranches'),
+          load: listBranches,
+        },
+        // GET /rbac/roles needs `role.read`, which a holder of `user.manage`
+        // does not necessarily have. A caller without it is not a failure — there is nothing to
+        // report, so the entry is absent rather than named as a list that did not load.
+        ...(canReadRoles
+          ? [{ key: 'roles', label: t('commonListRoles'), load: listRoles }]
+          : []),
+      ]);
+      if (values.departments) setDepartments(values.departments as OrgUnit[]);
+      if (values.branches) setBranches(values.branches as OrgUnit[]);
+      if (values.roles)
+        setRoleCatalogue(values.roles as RoleCatalogueEntry[]);
+      // The grant dropdown's default is whatever the office actually has.
+      // No shared default any more: each row falls back to the first ACTIVE role at render time,
+      // so one row's choice cannot become another row's displayed value.
+      setListsMissing(
+        failures.length === 0
+          ? null
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+      );
     })();
   }, [user, isAdmin, canReadRoles, t]);
 
@@ -239,11 +269,11 @@ export default function UserAdminPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('usrUsersRoles')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('usrSelfServiceSignupCreatesAn')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('usrUsersRoles')}
+        description={t('usrSelfServiceSignupCreatesAn')}
+      />
 
       {isAdmin ? (
         <form
@@ -251,11 +281,11 @@ export default function UserAdminPage() {
           style={{
             margin: '1rem 0',
             display: 'grid',
-            gap: '0.4rem',
+            gap: 'var(--space-2)',
             maxWidth: '34rem',
           }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrFullName')}
             <input
               aria-label={t('usrFullName')}
@@ -264,7 +294,7 @@ export default function UserAdminPage() {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrEmail')}
             <input
               aria-label={t('usrEmail')}
@@ -274,10 +304,9 @@ export default function UserAdminPage() {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrPasswordMin12CharsWith')}
             <input
-              aria-label={t('usrPasswordAria')}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -285,7 +314,7 @@ export default function UserAdminPage() {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrDepartment')}
             <select
               aria-label={t('usrDepartment')}
@@ -316,7 +345,7 @@ export default function UserAdminPage() {
             What is left here is the account with NO person behind it — the external auditor — which is
             the only case this screen was ever the right place for.
           */}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('usrBranch')}
             <select
               aria-label={t('usrBranch')}
@@ -372,14 +401,15 @@ export default function UserAdminPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
+        <ErrorState title={actionError} />
+      ) : null}
+      {listsMissing ? (
+        <p role="status" data-lists-missing style={{ color: 'var(--ink-muted)' }}>
+          {listsMissing}
         </p>
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
@@ -394,30 +424,30 @@ export default function UserAdminPage() {
                 ? `${rows.length} من ${total}`
                 : `${rows.length} of ${total}`}
             </p>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+            <Card padded={false}>
+            <Table>
                 <thead>
                   <tr>
-                    <th style={head}>{t('usrName')}</th>
-                    <th style={head}>{t('usrEmail2')}</th>
-                    <th style={head}>{t('usrHrRecordColumn')}</th>
-                    <th style={head}>{t('usrRoles2')}</th>
-                    <th style={head}>{t('usrActive')}</th>
-                    <th style={head}>{t('usrAction')}</th>
+                    <Th>{t('usrName')}</Th>
+                    <Th>{t('usrEmail2')}</Th>
+                    <Th>{t('usrHrRecordColumn')}</Th>
+                    <Th>{t('usrRoles2')}</Th>
+                    <Th>{t('usrActive')}</Th>
+                    <Th>{t('usrAction')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((u) => (
-                    <tr key={u.id}>
-                      <td style={cell}>{u.fullName}</td>
-                      <td style={cell}>{u.email}</td>
+                    <Tr key={u.id}>
+                      <Td>{u.fullName}</Td>
+                      <Td>{u.email}</Td>
                       {/* The link is the organising idea, not a field on a form:
                           `User.employeeId` is unique, and once linked the HR
                           record's four-part official name becomes the display
                           name everywhere. An account with no HR record is a real
                           and visible state — somebody still owes this person an
                           employee record. */}
-                      <td style={cell} data-hr-link={u.employeeId ? 'linked' : 'none'}>
+                      <Td data-hr-link={u.employeeId ? 'linked' : 'none'}>
                         {u.employeeId ? (
                           <a href={`/employees/${u.employeeId}`}>
                             {t('usrHrRecordOpen')}
@@ -427,8 +457,8 @@ export default function UserAdminPage() {
                             {t('usrHrRecordNone')}
                           </span>
                         )}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {u.roles.length === 0 ? (
                           /* A badge, not the word "None". An account with no
                              roles can sign in and reach NOTHING, which reads as a
@@ -461,18 +491,18 @@ export default function UserAdminPage() {
                             </span>
                           ))
                         )}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {u.isActive
                           ? t('usrYes')
                           : t('usrNo')}
-                      </td>
-                      <td style={cell}>
+                      </Td>
+                      <Td>
                         {isAdmin ? (
                           <div
                             style={{
                               display: 'flex',
-                              gap: '0.3rem',
+                              gap: 'var(--space-2)',
                               flexWrap: 'wrap',
                             }}
                           >
@@ -528,16 +558,16 @@ export default function UserAdminPage() {
                             </button>
                           </div>
                         ) : null}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </Table>
+            </Card>
           </>
         )
       ) : loadError ? null : (
-        <p>{t('usrLoading')}</p>
+        <SkeletonList rows={4} label={t('usrLoading')} />
       )}
     </main>
   );

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
@@ -17,7 +21,11 @@ import {
   renameDepartment,
   type OrgUnit,
 } from '../../../../lib/admin/user-admin-api';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   buttonStyle,
   errorStyle,
@@ -84,22 +92,48 @@ export default function OrgUnitsPage() {
   const canUpdateBranch = hasPermission(user, 'branch.update');
   const canRetireBranch = hasPermission(user, 'branch.deactivate');
 
+  /*
+   * ITEM 8 — the two halves of this screen are independent and were loaded as if they were not.
+   *
+   * `Promise.all` plus `setDepartments(null)` meant a refused BRANCH read blanked the department
+   * table as well, under one sentence naming neither. This screen already understood the principle
+   * one layer up — `noAccess = !canReadDept && !canReadBranch` renders the half the reader holds —
+   * and the loader then threw that away on a refusal.
+   *
+   * `null` is reserved for "did not arrive", which is what the tables below already read it as, so
+   * a failed half stays `null` and the other half renders.
+   */
   const load = useCallback(async () => {
-    try {
-      const [d, b] = await Promise.all([
-        canReadDept ? listDepartments() : Promise.resolve([]),
-        canReadBranch ? listBranches() : Promise.resolve([]),
-      ]);
-      setDepartments(d);
-      setBranches(b);
-      setLoadError(null);
-    } catch (err) {
-      setDepartments(null);
-      setBranches(null);
-      setLoadError(
-        err instanceof ApiError ? err.message : t('orgUnitLoadError'),
-      );
-    }
+    const { values, failures } = await loadIndependently([
+      ...(canReadDept
+        ? [
+            {
+              key: 'departments',
+              label: t('commonListDepartments'),
+              load: listDepartments,
+            },
+          ]
+        : []),
+      ...(canReadBranch
+        ? [
+            {
+              key: 'branches',
+              label: t('commonListBranches'),
+              load: listBranches,
+            },
+          ]
+        : []),
+    ]);
+    setDepartments(canReadDept ? ((values.departments as OrgUnit[]) ?? null) : []);
+    setBranches(canReadBranch ? ((values.branches as OrgUnit[]) ?? null) : []);
+    const first = failures[0]?.error;
+    setLoadError(
+      failures.length === 0
+        ? null
+        : first instanceof ApiError
+          ? `${t('commonListsMissing')} ${namedFailures(failures)} — ${first.message}`
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
   }, [canReadDept, canReadBranch, t]);
 
   useEffect(() => {
@@ -136,10 +170,14 @@ export default function OrgUnitsPage() {
     return (e: FormEvent) => {
       e.preventDefault();
       const draft = kind === 'department' ? newDept : newBranch;
-      if (!draft.name.trim()) return;
+      // BOTH names, 2026-10-28. The Arabic used to be omitted when blank, which left a unit with no
+      // Arabic name on an Arabic-first platform — it then rendered as its Latin name to a reader who
+      // does not read it. Guarded here as well as by the input's `required`, because a screen must
+      // not send a request it already knows the api will refuse.
+      if (!draft.name.trim() || !draft.nameAr.trim()) return;
       const payload = {
         name: draft.name.trim(),
-        ...(draft.nameAr.trim() ? { nameAr: draft.nameAr.trim() } : {}),
+        nameAr: draft.nameAr.trim(),
       };
       void run(async () => {
         if (kind === 'department') {
@@ -190,6 +228,7 @@ export default function OrgUnitsPage() {
               <input
                 value={draft.nameAr}
                 onChange={(e) => setDraft({ ...draft, nameAr: e.target.value })}
+                required
                 style={inputStyle}
                 data-new-name-ar={kind}
               />
@@ -288,8 +327,8 @@ export default function OrgUnitsPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('orgUnitHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('orgUnitHeading')} />
       <p>{t('orgUnitIntro')}</p>
 
       {noAccess ? (
@@ -298,9 +337,7 @@ export default function OrgUnitsPage() {
         </p>
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
       {message ? (

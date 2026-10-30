@@ -1,13 +1,16 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { SentenceWithLink } from '../../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { type Prospect } from '../../../../lib/prospect/prospect-api';
 import { ProspectConversionForm } from '../../../../components/prospect/ProspectConversionForm';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
@@ -67,11 +70,11 @@ export default function NewProspectPage() {
   const canCaptureProspect = hasPermission(user, 'prospect.capture');
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('prosnHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('prosnIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('prosnHeading')}
+        description={t('prosnIntro')}
+      />
       {canCaptureProspect ? (
         <Suspense fallback={null}>
           <ConvertProspectForm />

@@ -148,6 +148,61 @@ afterAll(async () => {
     });
     await rawPrisma.role.deleteMany({ where: { id: { in: createdRoleIds } } });
   }
+
+  /*
+   * THE UNITS, which this file has been leaking since it was written — a PRE-EXISTING leak,
+   * measured 2026-10-28: db-test held **31 departments and 47 branches** against a seed that
+   * creates one of each per office, every surplus row a leftover of a previous run of this file.
+   * Its sibling comment above records the ROLE leak that `db:fixture:permissions:check` caught and
+   * says nothing about the units.
+   *
+   * SELECTED BY THE RUN TAG, DELETED BY ID. The tag is `ou${Date.now()}`, so it cannot match
+   * another office's unit the way the `LIKE 'OU%'` prefix above warns about — and resolving to ids
+   * first means a test that threw between its create and a push-list still gets cleaned, which a
+   * hand-kept array of ids cannot promise.
+   *
+   * AND IT REFUSES RATHER THAN CASCADING. If anything points at one of these units the delete is
+   * skipped and the reason is printed: a teardown that removed somebody else's `User` or `Employee`
+   * to tidy up would be worse than the leak it is clearing.
+   */
+  // Written out per model rather than indexed by a `kind` variable: Prisma's delegates are
+  // separately typed, so `rawPrisma[kind].findMany` is not callable under the union — `tsc` said
+  // so, which is the compiler asking for the honest two branches rather than a cast.
+  const deptIds = (
+    await rawPrisma.department.findMany({
+      where: { name: { contains: tag } },
+      select: { id: true },
+    })
+  ).map((d) => d.id);
+  if (deptIds.length > 0) {
+    const pointing =
+      (await rawPrisma.user.count({
+        where: { departmentId: { in: deptIds } },
+      })) +
+      (await rawPrisma.employee.count({
+        where: { departmentId: { in: deptIds } },
+      }));
+    if (pointing === 0) {
+      await rawPrisma.department.deleteMany({ where: { id: { in: deptIds } } });
+    }
+  }
+
+  const branchIds = (
+    await rawPrisma.branch.findMany({
+      where: { name: { contains: tag } },
+      select: { id: true },
+    })
+  ).map((b) => b.id);
+  if (branchIds.length > 0) {
+    const pointing =
+      (await rawPrisma.user.count({ where: { branchId: { in: branchIds } } })) +
+      (await rawPrisma.employee.count({
+        where: { branchId: { in: branchIds } },
+      }));
+    if (pointing === 0) {
+      await rawPrisma.branch.deleteMany({ where: { id: { in: branchIds } } });
+    }
+  }
 });
 
 describe('departments and branches — the four-action pilot', () => {
@@ -201,7 +256,11 @@ describe('departments and branches — the four-action pilot', () => {
     const created = await request(app!.getHttpServer())
       .post('/admin/branches')
       .set(bearer(fullToken))
-      .send({ name: `Irbid ${tag}` })
+      // `nameAr` is REQUIRED on create since 2026-10-28 (owner decision). The Arabic here is
+      // the word already used by the first department create in this file plus the run tag — a
+      // fixture name is not product copy and no new Arabic is typed for one; what this body has to
+      // prove is only that the field is PRESENT.
+      .send({ name: `Irbid ${tag}`, nameAr: `المطالبات ${tag}` })
       .expect(201);
     const id = (created.body as { id: string }).id;
 
@@ -215,7 +274,10 @@ describe('departments and branches — the four-action pilot', () => {
     await request(app!.getHttpServer())
       .post('/admin/branches')
       .set(bearer(viewOnlyToken))
-      .send({ name: `Refused ${tag}` })
+      // A COMPLETE body, deliberately: with `nameAr` omitted this would answer 400 from the
+      // DTO and the test would pass without the permission gate ever being reached — a refusal
+      // test that proves the wrong refusal.
+      .send({ name: `Refused ${tag}`, nameAr: `المطالبات ${tag}` })
       .expect(403);
     await request(app!.getHttpServer())
       .patch(`/admin/branches/${id}`)
@@ -232,7 +294,7 @@ describe('departments and branches — the four-action pilot', () => {
     const created = await request(app!.getHttpServer())
       .post('/admin/departments')
       .set(bearer(fullToken))
-      .send({ name: `Empty ${tag}` })
+      .send({ name: `Empty ${tag}`, nameAr: `المطالبات ${tag}` })
       .expect(201);
     const res = await request(app!.getHttpServer())
       .patch(`/admin/departments/${(created.body as { id: string }).id}`)
@@ -244,10 +306,11 @@ describe('departments and branches — the four-action pilot', () => {
 
   it('refuses a second LIVE unit with the same name, and frees the name once retired', async () => {
     const name = `Unique ${tag}`;
+    const nameAr = `المطالبات ${tag}`;
     const first = await request(app!.getHttpServer())
       .post('/admin/departments')
       .set(bearer(fullToken))
-      .send({ name })
+      .send({ name, nameAr })
       .expect(201);
     // The partial UNIQUE index is the enforcement, and `db:divergence` cannot see partial indexes —
     // its measured blind spot — so the invariant is asserted here as well as in the migration's own
@@ -255,7 +318,7 @@ describe('departments and branches — the four-action pilot', () => {
     await request(app!.getHttpServer())
       .post('/admin/departments')
       .set(bearer(fullToken))
-      .send({ name })
+      .send({ name, nameAr })
       .expect(409);
 
     await request(app!.getHttpServer())
@@ -269,7 +332,129 @@ describe('departments and branches — the four-action pilot', () => {
     await request(app!.getHttpServer())
       .post('/admin/departments')
       .set(bearer(fullToken))
-      .send({ name })
+      .send({ name, nameAr })
       .expect(201);
+  }, 300_000);
+
+  /*
+   * `nameAr` IS REQUIRED ON CREATE — owner decision, 2026-10-28.
+   *
+   * It was optional, and the consequence was a unit with no Arabic name on an Arabic-first
+   * platform: it rendered as its Latin name to a reader who does not read it, and the office that
+   * had not settled its wording was exactly the office that would never come back to it.
+   *
+   * Asserted ONE FIELD AT A TIME. A single request missing both names would pass while only `name`
+   * was still enforced — the shape `customer.e2e-spec.ts` refuses six identifiers one at a time for.
+   */
+  it('refuses a create with no Arabic name, and one with no Latin name, separately', async () => {
+    for (const [body, missing] of [
+      [{ name: `No Arabic ${tag}` }, 'nameAr'],
+      [{ nameAr: `المطالبات ${tag}` }, 'name'],
+    ] as const) {
+      const res = await request(app!.getHttpServer())
+        .post('/admin/departments')
+        .set(bearer(fullToken))
+        .send(body)
+        .expect(400);
+      expect(JSON.stringify(res.body)).toContain(missing);
+    }
+  }, 300_000);
+
+  /*
+   * BRINGING A RETIRED UNIT BACK — the route that did not exist, and the read that made it
+   * unreachable.
+   *
+   * Eight administration routes and no reactivate, while both list reads filtered
+   * `deactivatedAt: null` — so a retired unit vanished from the only screen that could show it and
+   * the only way back was a hand-written UPDATE. `Role` has had `POST /roles/:id/reactivate` since
+   * Phase 3 and `rbac.controller.ts` states the reason: hiding retired roles "would leave an office
+   * unable to reactivate one". Measured when this shipped, db-test held TWO retired departments in
+   * exactly that state.
+   *
+   * FOUR PROPERTIES IN ONE WALK, because they are one capability and a test per line would let the
+   * route exist while the read that reaches it does not:
+   *   (a) reactivating a LIVE unit is REFUSED rather than reported as a no-op;
+   *   (b) a retired unit is ABSENT from the default read and PRESENT under `?includeRetired=true`,
+   *       carrying `retiredAt` so a screen can tell it apart — without this the route is dead;
+   *   (c) reactivating puts it back in the DEFAULT read with `retiredAt: null`;
+   *   (d) reactivating onto a name a live unit has since taken is a 409, not a 500 — the partial
+   *       unique index is the enforcement and `asNameCollision` is what makes it readable.
+   *
+   * The ORDER is load-bearing: (d) has to come last, because taking the freed name before (c) would
+   * make the successful revival unreachable and the test would silently cover three of four.
+   */
+  it('brings a retired department back, and refuses the two ways that must not work', async () => {
+    const name = `Revived ${tag}`;
+    const nameAr = `المطالبات ${tag}`;
+    const created = await request(app!.getHttpServer())
+      .post('/admin/departments')
+      .set(bearer(fullToken))
+      .send({ name, nameAr })
+      .expect(201);
+    const id = (created.body as { id: string }).id;
+    expect((created.body as { retiredAt: string | null }).retiredAt).toBeNull();
+
+    // (a) While it is still live. A no-op 200 here would make an administrator believe they had
+    // changed something.
+    const tooSoon = await request(app!.getHttpServer())
+      .post(`/admin/departments/${id}/reactivate`)
+      .set(bearer(fullToken))
+      .expect(422);
+    expect((tooSoon.body as { message: string }).message).toContain(
+      'nothing to bring back',
+    );
+
+    await request(app!.getHttpServer())
+      .post(`/admin/departments/${id}/deactivate`)
+      .set(bearer(fullToken))
+      .expect(201);
+
+    // (b) Absent by default, present when asked for, and distinguishable.
+    const live = await request(app!.getHttpServer())
+      .get('/admin/departments')
+      .set(bearer(fullToken))
+      .expect(200);
+    expect((live.body as { id: string }[]).map((d) => d.id)).not.toContain(id);
+
+    const withRetired = await request(app!.getHttpServer())
+      .get('/admin/departments?includeRetired=true')
+      .set(bearer(fullToken))
+      .expect(200);
+    const row = (
+      withRetired.body as { id: string; retiredAt: string | null }[]
+    ).find((d) => d.id === id);
+    expect(
+      row,
+      'the retired unit must be reachable, or nothing can revive it',
+    ).toBeDefined();
+    expect(row!.retiredAt).not.toBeNull();
+
+    // (c) Back in service, and back in the DEFAULT read — the half a screen actually consumes.
+    const revived = await request(app!.getHttpServer())
+      .post(`/admin/departments/${id}/reactivate`)
+      .set(bearer(fullToken))
+      .expect(201);
+    expect((revived.body as { retiredAt: string | null }).retiredAt).toBeNull();
+    const liveAgain = await request(app!.getHttpServer())
+      .get('/admin/departments')
+      .set(bearer(fullToken))
+      .expect(200);
+    expect((liveAgain.body as { id: string }[]).map((d) => d.id)).toContain(id);
+
+    // (d) Retire it, let another unit take the name, and the revival must now collide.
+    await request(app!.getHttpServer())
+      .post(`/admin/departments/${id}/deactivate`)
+      .set(bearer(fullToken))
+      .expect(201);
+    await request(app!.getHttpServer())
+      .post('/admin/departments')
+      .set(bearer(fullToken))
+      .send({ name, nameAr })
+      .expect(201);
+    const collision = await request(app!.getHttpServer())
+      .post(`/admin/departments/${id}/reactivate`)
+      .set(bearer(fullToken))
+      .expect(409);
+    expect((collision.body as { message: string }).message).toContain(name);
   }, 300_000);
 });

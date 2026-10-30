@@ -8,11 +8,11 @@
  *
  * ## Why this is a component and not four lines copied per record
  *
- * There are FIFTEEN maker/checker pairs. The write side already learned this: twelve approve screens
+ * There are SIXTEEN maker/checker pairs. The write side already learned this: twelve approve screens
  * share one `CombinedDutyReasonField` because twelve textareas would be twelve places for the
  * WORDING to drift, and the wording is the load-bearing part. The same is true of reading it — a
  * reader who learns what this sentence means on one record must find it saying the same thing on the
- * next, and fifteen inline copies is fifteen chances for one to say less.
+ * next, and sixteen inline copies is sixteen chances for one to say less.
  *
  * ## Renders NOTHING when there is no act, and that is the common case
  *
@@ -30,7 +30,7 @@
 
 import { useLanguage } from '../../lib/i18n/language-context';
 
-/** Mirrors the api's `CombinedDutyActView`. One shape, so fifteen pairs cannot invent their own. */
+/** Mirrors the api's `CombinedDutyActView`. One shape, so sixteen pairs cannot invent their own. */
 export interface CombinedDutyActOnRecord {
   id: string;
   at: string;

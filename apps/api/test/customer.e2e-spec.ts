@@ -149,6 +149,11 @@ async function createIndividualCustomer(
       contactPhone: '+962-7-9000-0000',
       contactEmail: 'customer@example.test',
       languagePreference: 'AR',
+      // An individual's KYC file cannot be SUBMITTED without these two (the owner's decision of
+      // 2026-10-28) — screening resolves a match on the name TOGETHER with them, so a file without
+      // them is checked on the name alone.
+      dateOfBirth: '1990-01-01',
+      nationality: 'JO',
     })
     .expect(201);
   return res.body as CustomerBody;
@@ -498,6 +503,8 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
           contactPhone: phone,
           contactEmail: `nid-${Date.now()}@example.test`,
           languagePreference: 'AR',
+          dateOfBirth: '1990-01-01',
+          nationality: 'JO',
         })
         .expect(201);
 
@@ -705,6 +712,8 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
           nationalId: '9901012345',
           contactPhone: '+962-7-9000-0000',
           contactEmail: 'name-parts@example.test',
+          dateOfBirth: '1990-01-01',
+          nationality: 'JO',
           languagePreference: 'AR',
         })
         .expect(201);
@@ -738,6 +747,8 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
           nationalId: '9901012399',
           contactPhone: '+962-7-9000-1111',
           contactEmail: 'name-parts-min@example.test',
+          dateOfBirth: '1990-01-01',
+          nationality: 'JO',
           languagePreference: 'AR',
         })
         .expect(201);

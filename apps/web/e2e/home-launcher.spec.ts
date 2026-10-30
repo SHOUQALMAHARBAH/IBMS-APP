@@ -23,6 +23,12 @@ const ME_BASE = {
   idleTimeoutMinutes: 15,
   hardLogoutAfterIdleMinutes: 30,
   stepUpFresh: true,
+  /* ITEM 7 — `/settings/roles` now names the organization types it serves, and `canReach` hides a
+   * type-naming destination when the type is UNKNOWN. Without this field every card assertion here
+   * about the role screen would fail for the wrong reason: not because the gate works, but because
+   * the mock predates it. This file is the only one of the 116 that reads a destination through
+   * `canReach` for that screen — the other three reach it with `page.goto`. */
+  organizationType: "BROKERAGE_OFFICE",
 };
 
 async function mockAuth(page: Page, roles: string[], permissions?: string[]) {

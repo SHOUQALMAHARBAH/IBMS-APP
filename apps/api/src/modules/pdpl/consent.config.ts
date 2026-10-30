@@ -67,6 +67,23 @@ export interface ConsentRecordRow {
   grantedAt: Date | null;
   withdrawnAt: Date | null;
   createdAt: Date;
+  /**
+   * Batch six item 2, rule 2 — the register's Subject column rendered `Lead <8 chars of a uuid>`
+   * or a bare sliced uuid, so nobody could tell whose consent each row records. That is the one
+   * column a consent register exists for.
+   *
+   * THREE RELATIONS BECAUSE A RECORD NAMES ONE OF THREE SUBJECTS, and the service validates that at
+   * most one is set. All three are REQUIRED FIELDS with NULLABLE VALUES: required is what makes the
+   * compiler name every path that builds a row (an optional field would let a write project
+   * `undefined` — a name after a LIST and none after a GRANT), and nullable is the truth, since two
+   * of the three are always absent.
+   *
+   * Every one of the three name columns is NOT NULL on its own model (`Customer.legalName`,
+   * `Lead.fullName`, `InsuredPerson.fullName`), so whenever a subject is named there is a name.
+   */
+  customer: { legalName: string } | null;
+  lead: { fullName: string } | null;
+  insuredPerson: { fullName: string } | null;
 }
 
 export interface ConsentRecordView {
@@ -83,6 +100,16 @@ export interface ConsentRecordView {
   /** `granted && withdrawnAt === null` — an active, in-force consent. */
   isActive: boolean;
   createdAt: string;
+  /**
+   * Whichever subject this record names, BY NAME. Null only when the record names none — which the
+   * service forbids, so in practice this is always set; it is nullable because the three id columns
+   * are, and a view that claimed otherwise would be asserting a rule it does not enforce.
+   *
+   * The KIND is deliberately NOT on the wire: the screen already has the three ids and can see
+   * which one is set, so sending a `subjectKind` beside them would be a second home for one fact —
+   * and the copy is the one that drifts.
+   */
+  subjectName: string | null;
 }
 
 export function deriveConsentView(row: ConsentRecordRow): ConsentRecordView {
@@ -99,6 +126,17 @@ export function deriveConsentView(row: ConsentRecordRow): ConsentRecordView {
     withdrawnAt: row.withdrawnAt ? row.withdrawnAt.toISOString() : null,
     isActive: row.granted && row.withdrawnAt === null,
     createdAt: row.createdAt.toISOString(),
+    /*
+     * The ORDER is immaterial rather than a precedence rule: the service allows at most one of the
+     * three, so at most one of these is ever non-null. Written as a chain rather than a branch on
+     * the ids so that a record whose id and relation ever disagreed could not render a name from
+     * one subject beside the id of another.
+     */
+    subjectName:
+      row.customer?.legalName ??
+      row.lead?.fullName ??
+      row.insuredPerson?.fullName ??
+      null,
   };
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -11,8 +11,18 @@ import {
   type CrossBorderTransferRecord,
 } from '../../../lib/pdpl/cross-border-transfer-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -20,14 +30,6 @@ import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 const ROLES = [
   'cross-border-transfer.approve',
 ];
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 
 
 export default function CrossBorderTransfersPage() {
@@ -105,21 +107,17 @@ export default function CrossBorderTransfersPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('cbtHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('cbtIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('cbtHeading')}
+        description={t('cbtIntro')}
+      />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {canManage ? (
@@ -127,16 +125,15 @@ export default function CrossBorderTransfersPage() {
           onSubmit={(ev) => void submit(ev)}
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('cbtDescriptionFieldLabel')}
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+            {t('cbtDescriptionLabel')}
             <input
-              aria-label={t('cbtDescriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('cbtDestinationLabel')}
             <input
               aria-label={t('cbtDestinationLabel')}
@@ -145,7 +142,7 @@ export default function CrossBorderTransfersPage() {
               required
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('cbtLegalBasisLabel')}
             <select
               aria-label={t('cbtLegalBasisLabel')}
@@ -159,7 +156,7 @@ export default function CrossBorderTransfersPage() {
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('cbtEvidenceRefLabel')}
             <input
               aria-label={t('cbtEvidenceRefLabel')}
@@ -175,35 +172,44 @@ export default function CrossBorderTransfersPage() {
 
       {records ? (
         records.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('cbtNone')}</p>
+          <EmptyState title={t('cbtNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('cbtColDestination')}</th>
-                  <th style={head}>{t('cbtLegalBasisLabel')}</th>
-                  <th style={head}>{t('cbtDescriptionLabel')}</th>
-                  <th style={head}>{t('cbtColApprovedBy')}</th>
-                  <th style={head}>{t('cbtColTransferredAt')}</th>
+                  <Th>{t('cbtColDestination')}</Th>
+                  <Th>{t('cbtLegalBasisLabel')}</Th>
+                  <Th>{t('cbtDescriptionLabel')}</Th>
+                  <Th>{t('cbtColApprovedBy')}</Th>
+                  <Th>{t('cbtColTransferredAt')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {records.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.destinationCountry}</td>
-                    <td style={cell}>{r.legalBasis}</td>
-                    <td style={cell}>{r.description}</td>
-                    <td style={cell}>{r.approvedByUserId ? r.approvedByUserId.slice(0, 8) + '…' : '—'}</td>
-                    <td style={cell}>{r.transferredAt.slice(0, 10)}</td>
-                  </tr>
+                  <Tr key={r.id}>
+                    <Td>{r.destinationCountry}</Td>
+                    <Td>{r.legalBasis}</Td>
+                    <Td>{r.description}</Td>
+                    {/*
+                      * RULE 2 — WHO approved this transfer, by name. It rendered eight characters
+                      * of a uuid, which on the register evidencing that a named person authorised
+                      * personal data leaving the country identifies nobody. The em dash is the real
+                      * absent case: creation IS publishing in this module, so a record can exist
+                      * before anybody approved it.
+                      */}
+                    <Td>
+                      {r.approvedByName ? <bdi>{r.approvedByName}</bdi> : t('commonNameNotResolved')}
+                    </Td>
+                    <Td>{r.transferredAt.slice(0, 10)}</Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('cbtLoading')}</p>
+        <SkeletonList rows={4} label={t('cbtLoading')} />
       )}
     </main>
   );

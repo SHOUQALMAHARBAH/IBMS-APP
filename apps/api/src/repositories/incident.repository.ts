@@ -35,7 +35,16 @@ export interface IncidentScope {
  *
  * Part 4 step 5: on the record, not only in the report at `/internal-controls`.
  */
-const INCIDENT_INCLUDE = { classificationCombinedDutyAct: true } as const;
+/**
+ * Owner decision 56 — the containment log travels with the incident on EVERY read,
+ * because the screen that offers the contain button is the screen that must show what
+ * was already done. Newest first: a reader opening a live incident wants the most
+ * recent action, and the oldest is `containedAt` which the row already carries.
+ */
+const INCIDENT_INCLUDE = {
+  classificationCombinedDutyAct: true,
+  containmentActions: { orderBy: { takenAt: 'desc' } },
+} as const;
 
 export type IncidentReportWithAct = Prisma.IncidentReportGetPayload<{
   include: typeof INCIDENT_INCLUDE;
@@ -52,6 +61,30 @@ export class IncidentRepository {
         title: input.title,
         description: input.description,
         severity: input.severity,
+      },
+    });
+  }
+
+  /**
+   * PRIV-SRS-02 `containment_actions` — **Text (log), REQUIRED**, «Timestamped
+   * containment actions». APPEND, never update: the dictionary says log, and
+   * `IncidentService.contain` writes one of these BEFORE the status transition
+   * because `IncidentReport_contained_needs_an_action` refuses to stamp
+   * `containedAt` with an empty log.
+   *
+   * `organizationId` is supplied by `tenantScopeExtension`, never by hand.
+   */
+  appendContainmentAction(input: {
+    incidentReportId: string;
+    description: string;
+    actionTakenByUserId: string;
+  }): Promise<{ id: string }> {
+    return this.prisma.client.incidentContainmentAction.create({
+      select: { id: true },
+      data: {
+        incidentReportId: input.incidentReportId,
+        description: input.description,
+        actionTakenByUserId: input.actionTakenByUserId,
       },
     });
   }

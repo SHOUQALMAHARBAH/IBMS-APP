@@ -10,15 +10,23 @@ import {
   type SalesPerformance,
 } from '../../../lib/management-reporting/sales-performance-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  DateEcho,
+  EmptyState,
+  ErrorState,
+  Hint,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
-const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', margin: '1rem 0' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '26rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -140,31 +148,27 @@ export default function SalesPerformancePage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('spHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('spIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('spHeading')}
+        description={t('spIntro')}
+      />
 
       {isManager ? (
         <form onSubmit={onLookup} style={formStyle}>
           <h2>{t('spLookUp')}</h2>
-          <label style={labelStyle}>
-            {t('spOwnerUserIdLabel')}
-            <input
-              value={ownerUserId}
-              onChange={(e) => setOwnerUserId(e.target.value)}
-              placeholder={t('spOneEmployee')}
-            />
-          </label>
-          <label style={labelStyle}>
-            {t('dashBranchIdLabel')}
-            <input
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              placeholder={t('spOneTeam')}
-            />
-          </label>
+          <EntitySearch
+            kind="user"
+            value={ownerUserId}
+            onChange={setOwnerUserId}
+            label={t('spOwnerUserIdLabel')}
+          />
+          <EntitySearch
+            kind="branch"
+            value={branchId}
+            onChange={setBranchId}
+            label={t('dashBranchIdLabel')}
+          />
           <label style={labelStyle}>
             {t('spPeriodOptionalLabel')}
             <input
@@ -177,9 +181,7 @@ export default function SalesPerformancePage() {
       ) : null}
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {performance ? (
@@ -223,24 +225,32 @@ export default function SalesPerformancePage() {
               <h2>{performance.target ? t('spReviseButton') : t('spSetButton')}</h2>
               {!performance.target ? (
                 <>
-                  <label style={labelStyle}>
-                    {t('dashPeriodStart')}
+                  <div style={labelStyle}>
+                    <label htmlFor="sp-period-start">{t('dashPeriodStart')}</label>
                     <input
+                      id="sp-period-start"
+                      aria-describedby="sp-period-start-hint"
                       type="date"
                       value={targetPeriodStart}
                       onChange={(e) => setTargetPeriodStart(e.target.value)}
                       required
                     />
-                  </label>
-                  <label style={labelStyle}>
-                    {t('dashPeriodEnd')}
+                    <Hint id="sp-period-start-hint">{t('dashPeriodStartHint')}</Hint>
+                    <DateEcho value={targetPeriodStart} />
+                  </div>
+                  <div style={labelStyle}>
+                    <label htmlFor="sp-period-end">{t('dashPeriodEnd')}</label>
                     <input
+                      id="sp-period-end"
+                      aria-describedby="sp-period-end-hint"
                       type="date"
                       value={targetPeriodEnd}
                       onChange={(e) => setTargetPeriodEnd(e.target.value)}
                       required
                     />
-                  </label>
+                    <Hint id="sp-period-end-hint">{t('dashPeriodEndHint')}</Hint>
+                    <DateEcho value={targetPeriodEnd} />
+                  </div>
                 </>
               ) : null}
               <label style={labelStyle}>
@@ -257,18 +267,16 @@ export default function SalesPerformancePage() {
                 {performance.target ? 'Revise' : 'Set target'}
               </button>
               {targetError ? (
-                <p role="alert" style={errorStyle}>
-                  {targetError}
-                </p>
+                <ErrorState title={targetError} />
               ) : null}
               {targetMessage ? <p>{targetMessage}</p> : null}
             </form>
           ) : null}
         </>
       ) : loadError ? null : hasLookedUp ? null : isManager ? (
-        <p style={{ color: 'var(--ink-secondary)' }}>{t('spPickFirst')}</p>
+        <EmptyState title={t('spPickFirst')} />
       ) : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

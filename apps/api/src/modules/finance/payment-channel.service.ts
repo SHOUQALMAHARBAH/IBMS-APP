@@ -14,6 +14,8 @@ import {
 } from './finance.config';
 import type { CreatePaymentChannelDto } from './dto/create-payment-channel.dto';
 import type { ListPaymentChannelsQueryDto } from './dto/list-payment-channels-query.dto';
+import { CustomerRepository } from '../../repositories/customer.repository';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 /**
  * Process 38 — the approved `PaymentChannel` list (`payment-channel.read`/`.create`/`.deactivate` /
@@ -33,6 +35,10 @@ export class PaymentChannelService {
 
   constructor(
     private readonly channels: PaymentChannelRepository,
+    /* ITEM 1 — the owner's name, through each entity's OWN resolver. Provided independently rather
+     * than imported as a service: this codebase's cross-module rule. */
+    private readonly customers: CustomerRepository,
+    private readonly insurers: InsurerRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -91,7 +97,7 @@ export class PaymentChannelService {
       }),
     });
 
-    return derivePaymentChannelView(created);
+    return derivePaymentChannelView(created, await this.ownerNames([created]));
   }
 
   async disable(id: string, actorId: string): Promise<PaymentChannelView> {
@@ -100,14 +106,19 @@ export class PaymentChannelService {
       throw new NotFoundException(`Payment channel ${id} not found.`);
     }
     if (existing.status === 'disabled') {
-      return derivePaymentChannelView(existing); // idempotent
+      // idempotent
+      return derivePaymentChannelView(
+        existing,
+        await this.ownerNames([existing]),
+      );
     }
 
     const res = await this.channels.disable(id);
     if (res.count === 0) {
       // Raced to disabled by a concurrent call — reload and return it.
       const now = await this.channels.findById(id);
-      if (now) return derivePaymentChannelView(now);
+      if (now)
+        return derivePaymentChannelView(now, await this.ownerNames([now]));
       throw new NotFoundException(`Payment channel ${id} not found.`);
     }
 
@@ -129,7 +140,7 @@ export class PaymentChannelService {
           status: after.status,
         }),
       });
-      return derivePaymentChannelView(after);
+      return derivePaymentChannelView(after, await this.ownerNames([after]));
     }
     throw new NotFoundException(`Payment channel ${id} not found.`);
   }
@@ -143,7 +154,26 @@ export class PaymentChannelService {
       insurerId: query.insurerId,
       status: query.status,
     });
-    return rows.map(derivePaymentChannelView);
+    const names = await this.ownerNames(rows);
+    return rows.map((r) => derivePaymentChannelView(r, names));
+  }
+
+  /**
+   * ONE place the six projection sites get their names, so the either-or is spelled once. A channel
+   * carries exactly one of the two ids (the service refuses anything else on create), so the two
+   * resolvers' answers can share one Map keyed on whichever is set.
+   *
+   * BATCHED and run in PARALLEL: the two reads are independent, and a list of channels is as long
+   * as the office's bank arrangements.
+   */
+  private async ownerNames(
+    rows: readonly { customerId: string | null; insurerId: string | null }[],
+  ): Promise<Map<string, string>> {
+    const [byCustomer, byInsurer] = await Promise.all([
+      this.customers.namesForCustomerIds(rows.map((r) => r.customerId)),
+      this.insurers.namesForInsurerIds(rows.map((r) => r.insurerId)),
+    ]);
+    return new Map([...byCustomer, ...byInsurer]);
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {

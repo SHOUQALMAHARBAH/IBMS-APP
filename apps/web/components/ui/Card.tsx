@@ -1,9 +1,14 @@
 import type { CSSProperties, ReactNode } from 'react';
+import type { DataAttributes } from './data-attributes';
 
 /*
  * The standard content container. A Card carries a title only when the title
  * says something the content does not — frontend directive §3, nothing on a
  * page that is not earning its place.
+ *
+ * It forwards `data-*` — see `data-attributes.ts` for why a named `data-testid` was not enough.
+ * `/retention-disposal` hangs `data-testid` on two of its sections, and before this those two
+ * hooks type-checked and went nowhere.
  */
 export function Card({
   title,
@@ -12,6 +17,7 @@ export function Card({
   children,
   padded = true,
   style,
+  ...dataAttributes
 }: {
   title?: ReactNode;
   description?: ReactNode;
@@ -20,10 +26,11 @@ export function Card({
   children?: ReactNode;
   padded?: boolean;
   style?: CSSProperties;
-}) {
+} & DataAttributes) {
   const hasHeader = Boolean(title || description || actions);
   return (
     <section
+      {...dataAttributes}
       style={{
         background: 'var(--surface-card)',
         border: '1px solid var(--border-default)',
@@ -69,20 +76,27 @@ export function PageHeader({
   title,
   description,
   actions,
+  ...dataAttributes
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
-}) {
+} & DataAttributes) {
   return (
     <header
+      {...dataAttributes}
       style={{
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
         gap: 'var(--space-4)',
         flexWrap: 'wrap',
-        marginBottom: 'var(--space-6)',
+        /*
+         * NO BOTTOM MARGIN. `pageStackStyle` spaces a page's children with one gap, so a margin
+         * here is a second answer to the same question — and it was 22px against the page's own
+         * step, which is how a heading ends up fractionally further from its content on every
+         * screen than the sections below it are from each other.
+         */
       }}
     >
       <div style={{ minWidth: 0 }}>

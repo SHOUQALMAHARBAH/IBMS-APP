@@ -44,7 +44,7 @@ export function NeedsAssessmentForm({
   initialAnswers,
   onSaved,
 }: NeedsAssessmentFormProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [questions, setQuestions] = useState<NeedsAssessmentQuestion[] | null>(null);
   const [answers, setAnswers] = useState<Answers>(initialAnswers ?? {});
   const [error, setError] = useState<string | null>(null);
@@ -104,11 +104,19 @@ export function NeedsAssessmentForm({
       <form onSubmit={(e) => void handleSubmit(e)}>
         {(questions ?? []).map((q) => {
           const value = answers[q.id];
+          /*
+           * THE PROMPT THE READER CAN READ. Resolved here, once, and used by both branches
+           * below — a second `language === 'AR' ? …` in the number branch would be two places
+           * for one of them to be forgotten, which is exactly how the English prompt survived
+           * on this screen. No `??` fallback to `prompt`: the api field is REQUIRED, and a
+           * fallback would turn a missing Arabic question into an English one nobody notices.
+           */
+          const prompt = language === 'AR' ? q.promptAr : q.prompt;
           if (q.type === 'number') {
             return (
               <div key={q.id} style={questionRowStyle}>
                 <label htmlFor={`q-${q.id}`} style={{ ...labelStyle, ...questionPromptStyle, marginTop: 0 }}>
-                  {q.prompt}
+                  {prompt}
                 </label>
                 <input
                   id={`q-${q.id}`}
@@ -123,7 +131,7 @@ export function NeedsAssessmentForm({
           }
           return (
             <fieldset key={q.id} style={{ ...questionRowStyle, border: 'none', margin: 0, padding: '0.75rem 0' }}>
-              <legend style={{ ...questionPromptStyle, padding: 0 }}>{q.prompt}</legend>
+              <legend style={{ ...questionPromptStyle, padding: 0 }}>{prompt}</legend>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <label style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                   <input

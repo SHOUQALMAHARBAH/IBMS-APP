@@ -36,6 +36,7 @@ interface MfaEnrollBody {
 interface RetentionCaseBody {
   id: string;
   customerId: string;
+  customerName: string | null;
   reason: string;
   status: string;
   isClosed: boolean;
@@ -212,6 +213,17 @@ describe('Customer Retention (e2e) — backlog Part C #46', () => {
       'renewal_inactivity',
     ]);
     expect(cases.every((c) => c.status === 'open')).toBe(true);
+    /*
+     * RULE 2 — THE CUSTOMER'S NAME, ON THE RESPONSE BODY. Asserted on EVERY row of the list rather
+     * than on one, because this list is produced by the SWEEP: the rows are created by
+     * `escalateAndCreateRetentionCase` and read back by `findMany`, two different paths, and a name
+     * resolved on only one of them is the create-renders-nothing asymmetry the strict row type
+     * exists to prevent. Paired with an absence assertion on the id.
+     */
+    expect(
+      cases.every((c) => (c.customerName ?? '').includes('Retention E2E Co')),
+    ).toBe(true);
+    expect(cases.every((c) => c.customerName !== c.customerId)).toBe(true);
 
     const reasonFiltered = await request(app.getHttpServer())
       .get(`/retention-cases?customerId=${customer.id}&reason=lapse_risk`)

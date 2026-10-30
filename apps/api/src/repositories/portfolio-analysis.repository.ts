@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
-import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
+/* `INSURER_IDENTITY_SELECT` and `insurerName` were imported here and are GONE — `no-unused-vars`
+ * named them the moment `findInsurerNames` moved to `InsurerRepository`, which is also the proof
+ * that nothing else in this file used either. */
 
 export interface LineOrInsurerGroup {
   key: string;
@@ -66,15 +68,26 @@ export class PortfolioAnalysisRepository {
       );
   }
 
-  async findInsurerNames(
-    insurerIds: string[],
-  ): Promise<{ id: string; name: string }[]> {
-    const rows = await this.prisma.client.insurer.findMany({
-      where: { id: { in: insurerIds } },
-      select: INSURER_IDENTITY_SELECT,
-    });
-    return rows.map((r) => ({ id: r.id, name: insurerName(r) }));
-  }
+  /*
+   * `findInsurerNames` WAS HERE AND IS GONE — moved to `InsurerRepository.namesForInsurerIds`,
+   * which is the insurer's own repository and which resolves the name through
+   * `resolveInsurerCompanyFacts` rather than through `insurerName`.
+   *
+   * THE REASON IS A SECOND PRECEDENCE, NOT TIDINESS. `insurerName` reads the catalogue and the
+   * office's own row and NEVER `insuranceCompany`, so for an insurer linked to a registered company
+   * it answers the CATALOGUE name while `/insurers` answers the COMPANY name — two answers to
+   * "what is this insurer called", which is what decision 63 removed from the insurer VIEW and
+   * which this report had kept. `deriveInsurerView`'s own comment says so in as many words.
+   *
+   * MEASURED 2026-10-24, and the measurement is why this is a move rather than an emergency: NO
+   * `Insurer` row on either database carries an `insuranceCompanyId` (dev 0 of 19, db-test 0 of
+   * 306), because linking an insurer to a registered company is one of the capabilities batch
+   * five's triage recorded as unreachable from the product. So the two resolvers agree on every row
+   * that exists today and the defect is LATENT — it goes live on the first link.
+   *
+   * `insurerName` still has THIRTEEN other call sites, including the invoice and
+   * certificate-of-insurance documents, and they are NOT touched here: see register entry 132.
+   */
 
   /** Every issued policy's premium + its customer's segment/owner, capped
    * at `limit` — the caller reduces this into a by-customerType breakdown

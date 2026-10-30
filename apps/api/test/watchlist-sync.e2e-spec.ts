@@ -319,6 +319,11 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
         customerType: 'INDIVIDUAL',
         legalName: SANCTIONED_NAME.split(' ').reverse().join(' '),
         ownerUserId: sales.userId,
+        // Required before SUBMITTED since 2026-10-28 (`KycService.submit`). These four rows are
+        // created with RAW PRISMA, so they bypass `CreateCustomerDto` entirely — but the gate reads
+        // the customer ROW, not the request, so a raw fixture is refused at submit just the same.
+        dateOfBirth: new Date('1990-01-01T00:00:00.000Z'),
+        nationality: 'JO',
       },
     });
     const started = await request(app.getHttpServer())
@@ -386,6 +391,8 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
         customerType: 'INDIVIDUAL',
         legalName: fuzzyName,
         ownerUserId: sales.userId,
+        dateOfBirth: new Date('1990-01-01T00:00:00.000Z'),
+        nationality: 'JO',
       },
     });
     const started = await request(app.getHttpServer())
@@ -544,6 +551,8 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
         customerType: 'INDIVIDUAL',
         legalName: variantName,
         ownerUserId: sales.userId,
+        dateOfBirth: new Date('1990-01-01T00:00:00.000Z'),
+        nationality: 'JO',
       },
     });
     const started = await request(app.getHttpServer())
@@ -604,6 +613,8 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
         customerType: 'INDIVIDUAL',
         legalName: `${SANCTIONED_NAME} Rescreen`,
         ownerUserId: sales.userId,
+        dateOfBirth: new Date('1990-01-01T00:00:00.000Z'),
+        nationality: 'JO',
       },
     });
     const started = await request(app.getHttpServer())

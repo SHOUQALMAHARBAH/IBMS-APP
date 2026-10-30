@@ -31,12 +31,12 @@ async function orgUnitsForProvisioning(
   const department = await request(app.getHttpServer())
     .post('/admin/departments')
     .set(bearer(adminAccessToken))
-    .send({ name: `Spec Department ${suffix}` })
+    .send({ name: `Spec Department ${suffix}`, nameAr: `قسم ${suffix}` })
     .expect(201);
   const branch = await request(app.getHttpServer())
     .post('/admin/branches')
     .set(bearer(adminAccessToken))
-    .send({ name: `Spec Branch ${suffix}` })
+    .send({ name: `Spec Branch ${suffix}`, nameAr: `فرع ${suffix}` })
     .expect(201);
   provisioningOrgUnits = {
     departmentId: (department.body as { id: string }).id,

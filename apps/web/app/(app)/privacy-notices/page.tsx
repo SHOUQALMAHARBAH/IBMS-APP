@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -12,8 +12,18 @@ import {
   type PrivacyNotice,
 } from '../../../lib/pdpl/privacy-notice-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
@@ -21,14 +31,6 @@ import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 const ROLES = [
   'privacy-notice.publish',
 ];
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 
 
 export default function PrivacyNoticesPage() {
@@ -99,21 +101,17 @@ export default function PrivacyNoticesPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('pnHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('pnIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('pnHeading')}
+        description={t('pnIntro')}
+      />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {canManage ? (
@@ -121,7 +119,7 @@ export default function PrivacyNoticesPage() {
           onSubmit={(ev) => void submit(ev)}
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('pnTouchpointLabel')}
             <select
               aria-label={t('pnTouchpointLabel')}
@@ -135,7 +133,7 @@ export default function PrivacyNoticesPage() {
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('pnTextEnLabel')}
             <textarea
               aria-label={t('pnTextEnLabel')}
@@ -146,7 +144,7 @@ export default function PrivacyNoticesPage() {
               style={{ minWidth: '20rem' }}
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('pnTextArLabel')}
             <textarea
               aria-label={t('pnTextArLabel')}
@@ -166,27 +164,27 @@ export default function PrivacyNoticesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('pnNone')}</p>
+          <EmptyState title={t('pnNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('pnTouchpointLabel')}</th>
-                  <th style={head}>{t('pnColVersion')}</th>
-                  <th style={head}>{t('pnColPublished')}</th>
-                  <th style={head}>{t('pnColLegallyReviewed')}</th>
-                  <th style={head}>{t('pnColAction')}</th>
+                  <Th>{t('pnTouchpointLabel')}</Th>
+                  <Th>{t('pnColVersion')}</Th>
+                  <Th>{t('pnColPublished')}</Th>
+                  <Th>{t('pnColLegallyReviewed')}</Th>
+                  <Th>{t('pnColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((n) => (
-                  <tr key={n.id}>
-                    <td style={cell}>{n.touchpoint}</td>
-                    <td style={cell}>{n.versionNumber}</td>
-                    <td style={cell}>{n.publishedAt.slice(0, 10)}</td>
-                    <td style={cell}>{n.legallyReviewedAt ? n.legallyReviewedAt.slice(0, 10) : '—'}</td>
-                    <td style={cell}>
+                  <Tr key={n.id}>
+                    <Td>{n.touchpoint}</Td>
+                    <Td>{n.versionNumber}</Td>
+                    <Td>{n.publishedAt.slice(0, 10)}</Td>
+                    <Td>{n.legallyReviewedAt ? n.legallyReviewedAt.slice(0, 10) : '—'}</Td>
+                    <Td>
                       {canManage && !n.legallyReviewedAt ? (
                         <button
                           type="button"
@@ -198,15 +196,15 @@ export default function PrivacyNoticesPage() {
                       ) : (
                         '—'
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('pnLoading')}</p>
+        <SkeletonList rows={4} label={t('pnLoading')} />
       )}
     </main>
   );

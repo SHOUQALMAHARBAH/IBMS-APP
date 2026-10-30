@@ -21,11 +21,7 @@ import { OpportunityRepository } from '../../repositories/opportunity.repository
 import { RecommendationRepository } from '../../repositories/recommendation.repository';
 import { ClientDecisionRepository } from '../../repositories/client-decision.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
-import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
-import {
-  isBrokerLicenseCurrentlyLapsed,
-  pickCurrentTerm,
-} from '../compliance-risk/broker-license.config';
+import { LicenseGateService } from '../compliance-risk/license-gate.service';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { canReadAllPolicyOwners } from '../../common/rbac-visibility.util';
@@ -203,7 +199,7 @@ export interface PolicyPickerResult {
  *    `Quotation`, not the request body; the caller sets the inception date.
  *    The row takes the schema `@default(PLACEMENT_CONFIRMED)` — no engine
  *    transition (initial creation, same as an Opportunity created at
- *    `NEEDS_CONFIRMED`). Gated FIRST on `assertLicenseNotLapsed` (backlog
+ *    `NEEDS_CONFIRMED`). Gated FIRST on `LicenseGateService.assertMayPractise` (backlog
  *    Part C #51's "automatically block new business issuance once the
  *    license lapses") — see that method's own comment.
  *  - `recordIssuance` — record the insurer-issued policy: its number, the
@@ -291,13 +287,13 @@ export class PolicyService {
     private readonly recommendations: RecommendationRepository,
     private readonly clientDecisions: ClientDecisionRepository,
     private readonly customers: CustomerRepository,
-    private readonly brokerLicenses: BrokerLicenseRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     // Module 0 item (h). A REPOSITORY across the module boundary — this codebase's one
     // established cross-module shape — for the line's own `category`, which the role-scope
     // decision needs and this module has no other way to know.
     private readonly lines: InsuranceLineRepository,
+    private readonly licenseGate: LicenseGateService,
   ) {}
 
   /** Placement / Manager / Executive work the whole book; a Policy Checking
@@ -360,53 +356,25 @@ export class PolicyService {
     return { id: opportunity.id, customerId: opportunity.customerId };
   }
 
-  /** Process 51 (backlog Part C #51's first checkbox) — "automatically
-   * block new business issuance once the license lapses." Checked first in
-   * `place()`, before any other precondition — the cheapest, most
-   * fail-fast gate, and logically prior to everything else (an unlicensed
-   * broker may not even begin placing new business, regardless of how
-   * complete its opportunity/recommendation/decision chain is).
+  /*
+   * THE GATE MOVED, AND ITS THREE-ANSWER PROBLEM IS WHY.
    *
-   * ## ABSENCE BLOCKS. It used to pass, and the regulation is why that was wrong.
+   * The old private `assertLicenseNotLapsed` lived here, with exactly ONE caller, computing its
+   * own answer from `pickCurrentTerm` plus `isBrokerLicenseCurrentlyLapsed`. Meanwhile
+   * `deriveLicenseStanding` — decision 71's six states, with `mayPractise` beside them — had ZERO
+   * non-spec consumers, and `BrokerLicense.status` was a stored two-value third answer.
    *
-   * **CBJ Instructions No. 9 of 2026, art. 21/a/9** makes practising after a licence has ended a
-   * ground for administrative sanction. An office with NO licence term on record is not a milder
-   * case of that — it is further from compliant than one whose licence merely lapsed, because the
-   * lapsed office can at least show what it once held.
+   * The consequence was concrete: **a CBJ SUSPENSION blocked nothing.** The derivation knew about
+   * it and the gate never asked.
    *
-   * What stood here before was a fourteen-line argument for treating "no record configured" as
-   * "not blocked". Its reasoning was TEST CONVENIENCE: that dozens of policy/endorsement/claim/
-   * finance specs place a Policy without configuring a licence, and that blocking absence would
-   * fail all of them for a condition none of them are testing. That is a true observation about the
-   * test suite and not a reason to leave a regulatory gate open — so the suites and the seed now
-   * provide a licence, and this refuses.
-   *
-   * Nothing is derived from the stored `status` column alone — see
-   * `isBrokerLicenseCurrentlyLapsed` for why it is a live recompute rather than a stored-flag read,
-   * so the block is correct the INSTANT `expiresAt` passes rather than after some sweep has run. */
-  private async assertLicenseNotLapsed(): Promise<void> {
-    // The office's LATEST term, not the one covering today: between filing a renewal (due 45 days
-    // before expiry, art. 11) and the old term running out, an office legitimately holds two, and
-    // the newer one is what says whether it may practise.
-    const current = pickCurrentTerm(await this.brokerLicenses.findTerms());
-    if (!current) {
-      throw new UnprocessableEntityException(
-        'New business issuance is blocked — this office holds no CBJ broker license term on record.' +
-          ' Practising without a current licence is a ground for administrative sanction (CBJ' +
-          " Instructions No. 9 of 2026, art. 21/a/9). Record the office's licence and its" +
-          ' certificate at Compliance before placing new business.',
-      );
-    }
-    if (isBrokerLicenseCurrentlyLapsed(current, new Date())) {
-      throw new UnprocessableEntityException(
-        `New business issuance is blocked — the broker's CBJ license (${current.licenseNumber}) has lapsed` +
-          (current.status === 'lapsed'
-            ? '.'
-            : ` (expired ${current.expiresAt.toISOString()}).`) +
-          ' Contact Compliance to renew it before placing new business.',
-      );
-    }
-  }
+   * It is now `LicenseGateService.assertMayPractise`, a `@Global()` engine beside
+   * `WorkflowTransitionService` and `DutySegregationService` — because six acts in five modules
+   * must refuse, and five private copies would be five answers to one question. Both properties
+   * the old version was careful about survive and are asserted in
+   * `license-gate.inventory.spec.ts`: the LATEST term decides (not the one covering today — art.
+   * 11 lets an office hold two), and it is a LIVE RECOMPUTE rather than a stored-flag read, so
+   * the block is correct the instant `expiresAt` passes.
+   */
 
   /** Loads a `Policy` (with its schedules / documents / checking / delivery
    * context) and enforces the caller's visibility on its Customer; every
@@ -550,7 +518,7 @@ export class PolicyService {
     dto: PlacePolicyDto,
     actor: AuthenticatedUser,
   ): Promise<PolicyView> {
-    await this.assertLicenseNotLapsed();
+    await this.licenseGate.assertMayPractise('PLACE_POLICY');
 
     const opportunity = await this.loadVisibleOpportunity(
       dto.opportunityId,

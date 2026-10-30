@@ -14,6 +14,9 @@ import {
 const baseRow = (over: Partial<ComplaintRow> = {}): ComplaintRow => ({
   id: 'c-1',
   customerId: 'cust-1',
+  // RULE 2 — the name the view projects. Supplied here because `ComplaintRow` requires it:
+  // the strict type is what names every read path, which is why it is not optional.
+  customer: { legalName: 'Al-Yarmouk Trading Company' },
   claimId: null,
   policyId: null,
   issue: 'Claim payment was 200 JOD short of the assessed amount',

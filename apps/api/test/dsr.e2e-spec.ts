@@ -7,6 +7,17 @@ import { ensureRole, prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
+/*
+ * The transcribed request, shared by every create below.
+ *
+ * `requestText` and `intakeChannel` are REQUIRED by `CreateDsrDto` since 2026-10-28, and
+ * completing EVERY body here is not bookkeeping: three of these creates expect a 422, a 404
+ * and a 403, and an incomplete body turns each into a 400 — so the test would still pass and
+ * would be proving the DTO rather than the owner rule, the unknown customer or the missing
+ * permission it was written for.
+ */
+const REQUEST_TEXT = 'A copy of everything you hold about me.';
+
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
 function uniqueEmail(label: string): string {
@@ -34,6 +45,8 @@ interface DsrBody {
   customerId: string | null;
   insuredPersonId: string | null;
   type: string;
+  requestText: string | null;
+  intakeChannel: string | null;
   status: string;
   receivedAt: string;
   identityVerifiedAt: string | null;
@@ -111,6 +124,97 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
     sharedApp = undefined;
   });
 
+  /*
+   * THE TWO INTAKE FIELDS ARE REQUIRED, AND THE DTO IS THE ONLY THING THAT ENFORCES THEM.
+   *
+   * The columns are NULLABLE — the requests that predate them are not backfilled, because
+   * inventing what a data subject asked for is the one thing this record must never contain, and a
+   * `NOT VALID` CHECK fires on UPDATE so it would refuse the CLOSURE of those requests (measured:
+   * 18 on db-test, 14 of them OPEN). Migration `20261214100000` asserts the absence of both.
+   *
+   * ITS OWN TEST, NOT A BLOCK INSIDE THE LIFECYCLE WALK — and that is a correction from running
+   * the plants. With all three refusals inside the walk, each plant killed the SAME test with the
+   * same `expected 400, got 201`: the first failing assertion stops the block, so the other two
+   * were never reached and the message named no field. One-at-a-time is pointless if the failure
+   * cannot say WHICH, so the status is asserted with the field in its own message and the blank
+   * case stands apart — a blank is a different failure from an omission.
+   */
+  it('refuses an intake with no request text, and one with no channel, separately', async () => {
+    const app = await boot();
+    const sales = await makeUser(
+      app,
+      'dsr-req-floor',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `DSR E2E ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+      },
+    });
+
+    for (const [body, missing] of [
+      [
+        {
+          customerId: customer.id,
+          type: 'ACCESS',
+          intakeChannel: 'WEBSITE_FORM',
+        },
+        'requestText',
+      ],
+      [
+        { customerId: customer.id, type: 'ACCESS', requestText: REQUEST_TEXT },
+        'intakeChannel',
+      ],
+    ] as const) {
+      const refused = await request(app.getHttpServer())
+        .post('/dsr')
+        .set(bearer(sales.accessToken))
+        .send(body);
+      expect(
+        refused.status,
+        `omitting ${missing} must be refused — the DTO is the only guard, because the column is nullable for the requests that predate it`,
+      ).toBe(400);
+      expect(JSON.stringify(refused.body)).toContain(missing);
+    }
+  }, 300_000);
+
+  /*
+   * A BLANK REQUEST IS NOT A SHORT ONE — and this was a real defect my own test caught.
+   *
+   * The trim used to live in the SERVICE, after validation, so `@Length(3, …)` counted three
+   * SPACES as length 3, the body passed, and the trim then stored an EMPTY request. The transform
+   * is on the DTO now, BEFORE the length check — which is what `trimIfString`'s own comment says
+   * it is for — and the service does not trim at all, because two places that trim are two
+   * answers about what was stored.
+   */
+  it('refuses a request of nothing but whitespace', async () => {
+    const app = await boot();
+    const sales = await makeUser(
+      app,
+      'dsr-req-blank',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `DSR E2E ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+      },
+    });
+    await request(app.getHttpServer())
+      .post('/dsr')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerId: customer.id,
+        type: 'ACCESS',
+        requestText: '   ',
+        intakeChannel: 'WEBSITE_FORM',
+      })
+      .expect(400);
+  }, 300_000);
+
   it('walks an ACCESS request through the full lifecycle with the extension, SLA timers, and mandatory DPO sign-off', async () => {
     const app = await boot();
     const sales = await makeUser(
@@ -133,7 +237,11 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
     await request(app.getHttpServer())
       .post('/dsr')
       .set(bearer(sales.accessToken))
-      .send({ type: 'ACCESS' })
+      .send({
+        type: 'ACCESS',
+        requestText: REQUEST_TEXT,
+        intakeChannel: 'WEBSITE_FORM',
+      })
       .expect(422);
 
     // unknown customer -> 404
@@ -143,6 +251,8 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       .send({
         customerId: '11111111-1111-4111-8111-111111111111',
         type: 'ACCESS',
+        requestText: REQUEST_TEXT,
+        intakeChannel: 'WEBSITE_FORM',
       })
       .expect(404);
 
@@ -155,7 +265,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
     await request(app.getHttpServer())
       .post('/dsr')
       .set(bearer(outsider.accessToken))
-      .send({ customerId: customer.id, type: 'ACCESS' })
+      .send({
+        customerId: customer.id,
+        type: 'ACCESS',
+        requestText: REQUEST_TEXT,
+        intakeChannel: 'WEBSITE_FORM',
+      })
       .expect(403);
 
     // create — logged the same business day (receivedAt is stamped, not
@@ -163,12 +278,27 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
     const created = await request(app.getHttpServer())
       .post('/dsr')
       .set(bearer(sales.accessToken))
-      .send({ customerId: customer.id, type: 'ACCESS' })
+      .send({
+        customerId: customer.id,
+        type: 'ACCESS',
+        requestText: REQUEST_TEXT,
+        intakeChannel: 'WEBSITE_FORM',
+      })
       .expect(201);
     const dsr = created.body as DsrBody;
     expect(dsr.status).toBe('RECEIVED');
     expect(dsr.slaDueAt).not.toBeNull();
     expect(dsr.identityVerifiedAt).toBeNull();
+
+    /*
+     * WHAT WAS ASKED FOR, AND HOW IT ARRIVED — on the RESPONSE BODY, which is the layer no type
+     * can reach: `apps/web/lib/pdpl/dsr-api.ts` declares its own copy of this shape over HTTP.
+     *
+     * The request text is asserted as the TRIMMED words rather than merely present, because the
+     * service trims and a reader of this log needs the person's words and not their whitespace.
+     */
+    expect(dsr.requestText).toBe(REQUEST_TEXT);
+    expect(dsr.intakeChannel).toBe('WEBSITE_FORM');
 
     // the generic SlaTimer rows exist — TWO stages for the DSR workflows
     // (DPO at T-3 business days, General Manager at the due date itself)
@@ -328,7 +458,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       await request(app.getHttpServer())
         .post('/dsr')
         .set(bearer(sales.accessToken))
-        .send({ customerId: customer.id, type: 'DELETION' })
+        .send({
+          customerId: customer.id,
+          type: 'DELETION',
+          requestText: REQUEST_TEXT,
+          intakeChannel: 'WEBSITE_FORM',
+        })
         .expect(201)
     ).body as DsrBody;
     await request(app.getHttpServer())
@@ -371,7 +506,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       await request(app.getHttpServer())
         .post('/dsr')
         .set(bearer(sales.accessToken))
-        .send({ customerId: customer.id, type: 'DELETION' })
+        .send({
+          customerId: customer.id,
+          type: 'DELETION',
+          requestText: REQUEST_TEXT,
+          intakeChannel: 'WEBSITE_FORM',
+        })
         .expect(201)
     ).body as DsrBody;
     await request(app.getHttpServer())
@@ -427,7 +567,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       await request(app.getHttpServer())
         .post('/dsr')
         .set(bearer(sales.accessToken))
-        .send({ customerId: customer.id, type: 'DELETION' })
+        .send({
+          customerId: customer.id,
+          type: 'DELETION',
+          requestText: REQUEST_TEXT,
+          intakeChannel: 'WEBSITE_FORM',
+        })
         .expect(201)
     ).body as DsrBody;
     await request(app.getHttpServer())
@@ -493,7 +638,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       await request(app.getHttpServer())
         .post('/dsr')
         .set(bearer(sales.accessToken))
-        .send({ customerId: customer.id, type: 'DELETION' })
+        .send({
+          customerId: customer.id,
+          type: 'DELETION',
+          requestText: REQUEST_TEXT,
+          intakeChannel: 'WEBSITE_FORM',
+        })
         .expect(201)
     ).body as DsrBody;
     await request(app.getHttpServer())
@@ -534,7 +684,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       await request(app.getHttpServer())
         .post('/dsr')
         .set(bearer(sales.accessToken))
-        .send({ customerId: customer.id, type: 'CORRECTION' })
+        .send({
+          customerId: customer.id,
+          type: 'CORRECTION',
+          requestText: REQUEST_TEXT,
+          intakeChannel: 'WEBSITE_FORM',
+        })
         .expect(201)
     ).body as DsrBody;
 
@@ -559,7 +714,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       await request(app.getHttpServer())
         .post('/dsr')
         .set(bearer(sales.accessToken))
-        .send({ customerId: gatedCustomer.id, type: 'CORRECTION' })
+        .send({
+          customerId: gatedCustomer.id,
+          type: 'CORRECTION',
+          requestText: REQUEST_TEXT,
+          intakeChannel: 'WEBSITE_FORM',
+        })
         .expect(201)
     ).body as DsrBody;
     await request(app.getHttpServer())
@@ -677,7 +837,12 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
     const created = await request(app.getHttpServer())
       .post('/dsr')
       .set(bearer(dpo.accessToken))
-      .send({ customerId: customer.id, type: 'ACCESS' })
+      .send({
+        customerId: customer.id,
+        type: 'ACCESS',
+        requestText: REQUEST_TEXT,
+        intakeChannel: 'WEBSITE_FORM',
+      })
       .expect(201);
     const dsrId = (created.body as { id: string }).id;
 

@@ -8,10 +8,17 @@ import {
   type ExecutiveDashboardSummary,
 } from '../../../../lib/management-reporting/executive-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  DateEcho,
+  ErrorState,
+  Hint,
+  PageHeader,
+  SkeletonList,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { EntitySearch } from '../../../../components/ui/EntitySearch';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
@@ -88,11 +95,11 @@ export default function ExecutiveDashboardPage() {
   const h = summary?.headlines;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('execExecutiveDashboard')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('execTheSalesPolicyClaimsFinancial')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('execExecutiveDashboard')}
+        description={t('execTheSalesPolicyClaimsFinancial')}
+      />
 
       <form
         onSubmit={applyFilters}
@@ -104,44 +111,40 @@ export default function ExecutiveDashboardPage() {
           margin: '0.75rem 0',
         }}
       >
+        <EntitySearch
+          kind="branch"
+          value={branchId}
+          onChange={setBranchId}
+          label={t('execBranchId')}
+        />
         <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-        >
-          {t('execBranchId')}
-          <input
-            aria-label={t('dashBranchIdFilterAria')}
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-          />
-        </label>
-        <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
           {t('execInsuranceLine')}
           <input
-            aria-label={t('dashInsuranceLineFilterAria')}
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
-        <label
-          style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
-          {t('execAsOf')}
+          <label htmlFor="exec-as-of">{t('execAsOf')}</label>
           <input
-            aria-label={t('dashAsOfDateAria')}
+            id="exec-as-of"
+            aria-describedby="exec-as-of-hint"
             type="date"
             value={asOf}
             onChange={(e) => setAsOf(e.target.value)}
           />
-        </label>
+          <Hint id="exec-as-of-hint">{t('execAsOfHint')}</Hint>
+          <DateEcho value={asOf} />
+        </div>
         <button type="submit">{t('execApplyFilters')}</button>
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary && h ? (
@@ -229,7 +232,7 @@ export default function ExecutiveDashboardPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

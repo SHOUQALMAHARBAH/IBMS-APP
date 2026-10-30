@@ -21,8 +21,8 @@
   },
   "the-screen-collapses-the-three-licence-states": {
     "file": "apps/web/app/(app)/provider-offices/page.tsx",
-    "from": "                  {office.isCurrentlyLapsed === null\n                    ? t('providerOfficesNoTermOnRecord')\n                    : office.isCurrentlyLapsed",
-    "to": "                  {false\n                    ? t('providerOfficesNoTermOnRecord')\n                    : office.isCurrentlyLapsed"
+    "from": "                    : office.isCurrentlyLapsed === null\n                      ? t('providerOfficesNoTermOnRecord')",
+    "to": "                    : false\n                      ? t('providerOfficesNoTermOnRecord')"
   },
   "the-cross-office-banner-is-gone": {
     "file": "apps/web/app/(app)/provider-offices/page.tsx",

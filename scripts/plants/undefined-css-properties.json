@@ -1,0 +1,20 @@
+{
+  "surface-raised-reintroduced": {
+    "file": "apps/web/components/admin/DpoAssignmentSection.tsx",
+    "from": "                background: 'var(--surface-sunken)',",
+    "to": "                background: 'var(--surface-raised)',",
+    "why": "THE DEFECT ITSELF, re-planted on the exact block it was found on: the section carrying the owner's own Arabic DPO notice, which rendered with no surface behind it from the day it shipped. A bare `var()` on an undefined custom property is invalid at computed-value time, so the browser drops the WHOLE declaration. `npm run check:css-properties` fails naming the property and the file. Nothing else in this repository can see it — no compiler reads a stylesheet against a `.tsx` string, the CSS is never invalid, every Playwright assertion still passes because the text still renders, and axe passes because a missing background is not a contrast failure but a contrast ACCIDENT. That is the whole argument for a text-level join."
+  },
+  "a-declared-exception-silently-fixed": {
+    "file": "scripts/measurements/undefined-css-properties.py",
+    "from": "DECLARED_BARE: set[str] = set()",
+    "to": "DECLARED_BARE: set[str] = {\"--surface-raised @ apps/web/app/globals.css\"}",
+    "why": "THE STALE-DECLARATION HALF OF THE GATE, re-expressed because the set is EMPTY now. A row is added for a site that does not occur, and the gate fails naming it as a row to delete — which is what stops the declared list becoming a ceiling that quietly covers the next regression at that path. REPOINTED 2026-10-23 (batch seven item 3): this plant used to FIX a declared row (`--shadow-raised` on `EntitySearch`) and be refused for not removing its declaration. Batch seven closed all three remaining properties on the owner's ruling, so `DECLARED_BARE` is empty and there is no declared row left to fix — the plant's own premise was retired by the work it was guarding. `plant --self-test` refused it the moment the anchor went, which is the mechanism doing its job on evidence whose subject had disappeared rather than merely moved."
+  },
+  "reference-matcher-stops-matching": {
+    "file": "scripts/measurements/undefined-css-properties.py",
+    "from": "REFERENCE = re.compile(r\"var\\(\\s*(--[A-Za-z0-9_-]+)\\s*([,)])\")",
+    "to": "REFERENCE = re.compile(r\"varr\\(\\s*(--[A-Za-z0-9_-]+)\\s*([,)])\")",
+    "why": "THE NON-VACUITY FLOOR, aimed at the direction that reports a clean nothing. With the reference pattern broken, nothing is found anywhere and every assertion about undefined properties passes — the exact shape that has cost this repository four wrong measurements. The floor REFUSES BY NAME (`found only 0 references against a floor of 55`) instead of printing a green gate. The definition floor is deliberately NOT the one planted here: breaking THAT direction empties `defined` and reports every property in the tree as undefined, which is a flood nobody mistakes for success."
+  }
+}

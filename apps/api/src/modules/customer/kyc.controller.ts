@@ -20,7 +20,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  *
  * ## Why here, and why it takes a PROMISE
  *
- * KYC is the only one of the fifteen maker/checker pairs with no view layer — nine service methods
+ * KYC is the only one of the sixteen maker/checker pairs with no view layer — nine service methods
  * return the Prisma model directly, so the act relation reached the wire RAW, carrying `actedAt` /
  * `grantingRoleNames` / `multipleGrantingRoles` where every other pair sends the view's `at` / `roles`
  * / `hatAmbiguous`.
@@ -33,7 +33,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  * It takes a promise so every handler stays a one-line delegation: wrapping the awaited value instead
  * would make nine handlers `async` for no behavioural reason, and my first attempt at that marked the
  * constructor `async`. The controller is the HTTP boundary, which is where a wire shape belongs, and
- * `combinedDutyActView` remains the ONE definition of this shape for all fifteen pairs.
+ * `combinedDutyActView` remains the ONE definition of this shape for all sixteen pairs.
  */
 async function onWire<T extends { combinedDutyAct: CombinedDutyAct | null }>(
   pending: Promise<T>,

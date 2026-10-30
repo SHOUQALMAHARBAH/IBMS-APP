@@ -1,5 +1,11 @@
 'use client';
 
+import { pageStackStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -9,10 +15,8 @@ import {
   type RecertificationItem,
 } from '../../../lib/access-recertification/access-recertification-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { StartCyclePanel } from '../../../components/access-recertification/StartCyclePanel';
 import { RecertificationItemsTable } from '../../../components/access-recertification/RecertificationItemsTable';
-import { pageStyle } from '../../../components/access-recertification/access-recertification.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { AdminAccessRecord } from '../../../components/access-recertification/AdminAccessRecord';
 import { useLanguage } from '../../../lib/i18n/language-context';
@@ -77,11 +81,11 @@ export default function AccessRecertificationPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('acrHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>
-        {t('acrIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('acrHeading')}
+        description={t('acrIntro')}
+      />
 
       {canStartCycle ? <StartCyclePanel onCycleStarted={() => void loadItems()} /> : null}
 
@@ -95,11 +99,9 @@ export default function AccessRecertificationPage() {
 
       <section style={{ marginTop: '2rem' }}>
         <h2>{t('acrQueueHeading')}</h2>
-        {items === null && !loadError ? <p>{t('acrLoading')}</p> : null}
+        {items === null && !loadError ? <SkeletonList rows={4} label={t('acrLoading')} /> : null}
         {loadError ? (
-          <p role="alert" style={errorStyle}>
-            {loadError}
-          </p>
+          <ErrorState title={loadError} />
         ) : null}
         {items !== null && !loadError ? (
           <RecertificationItemsTable items={items} onItemDecided={handleItemDecided} />

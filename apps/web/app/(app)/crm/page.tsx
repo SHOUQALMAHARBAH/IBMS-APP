@@ -19,7 +19,12 @@ import {
   buttonStyle,
   errorStyle,
 } from '../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+} from '../../../components/ui';
+import { cardMetaStyle, pageStackStyle } from '../../../components/lead/lead.styles';
 import {
   crmCountRowStyle,
   crmFormRowStyle,
@@ -193,7 +198,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!view && !viewError) return <p>{t('crmLoading')}</p>;
+  if (!view && !viewError) return <SkeletonList rows={4} label={t('crmLoading')} />;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -203,7 +208,8 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             <bdi>{view.customer.legalName}</bdi>
           </h2>
           <p style={{ opacity: 0.8, marginTop: '0.2rem' }}>
-            {view.customer.customerType} — Status:{' '}
+            {t(ENUM_LABEL.CustomerType[view.customer.customerType])} —{' '}
+            {t('commonStatusLabel')}{' '}
             {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
           </p>
           <div style={crmCountRowStyle}>
@@ -284,9 +290,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             <p style={{ ...cardMetaStyle, opacity: 1 }}>{t('crmLogged')}</p>
           ) : null}
           {logError ? (
-            <p role="alert" style={errorStyle}>
-              {logError}
-            </p>
+            <ErrorState title={logError} />
           ) : null}
         </div>
       ) : viewError?.status === 403 ? (
@@ -340,9 +344,11 @@ export default function CrmPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('crmHeading')}</h1>
-      <p style={{ opacity: 0.8 }}>{t('crmIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('crmHeading')}
+        description={t('crmIntro')}
+      />
       <Suspense fallback={null}>
         <CrmFlow />
       </Suspense>

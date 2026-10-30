@@ -8,6 +8,11 @@ import { apiGet, apiPost } from '../auth/api-client';
 export interface InsurerPerformanceScore {
   id: string;
   insurerId: string;
+  /* Item 1 — the company's NAME, resolved by the api through `resolveInsurerCompanyFacts`, the one
+   * place that decides whether a registered company or the global catalogue answers. NULL means the
+   * insurer row is gone — this is a periodic SNAPSHOT, so a score can outlive its insurer — and
+   * never the uuid, which is the fallback that always renders something and hides the defect. */
+  insurerName: string | null;
   periodLabel: string;
   quoteResponseScore: string;
   claimsServiceScore: string;

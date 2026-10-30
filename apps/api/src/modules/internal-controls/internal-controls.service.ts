@@ -15,6 +15,7 @@ import {
   type PolicyCheckingCrossTableRow,
   type ScannedRow,
 } from './internal-controls.config';
+import { UserRepository } from '../../repositories/user.repository';
 
 /** The generated Prisma client's delegates all share this much of a shape —
  * enough to run the registry's uniform `findMany` without a 15-way switch
@@ -61,6 +62,8 @@ export class InternalControlsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    /** Item 1 — decision 48's resolver, the one place that answers "who did this". */
+    private readonly users: UserRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -77,7 +80,18 @@ export class InternalControlsService {
       this.scanPolicyCheckingIssuerPair(),
     ]);
 
-    const report = buildInternalControlsReport(pairResults, new Date());
+    /* ITEM 1 — resolve the violating colleagues' names AFTER classification, because which ids
+     * matter is not known until the classifiers have run. On a clean office this resolves NOTHING:
+     * zero violations is the expected outcome, so the unique-id list is empty and the resolver
+     * returns before any read. */
+    const userNames = await this.users.displayNamesForUserIds(
+      pairResults.flatMap((r) => r.violations.map((v) => v.userId)),
+    );
+    const report = buildInternalControlsReport(
+      pairResults,
+      new Date(),
+      userNames,
+    );
     await this.recordOutcome(actorUserId, report);
     return report;
   }

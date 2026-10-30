@@ -9,6 +9,27 @@ import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOn
 
 export const DSR_TYPES = ['ACCESS', 'CORRECTION', 'DELETION', 'OBJECTION'] as const;
 
+/**
+ * The four intake channels, mirroring the api's `DSR_INTAKE_CHANNELS`.
+ *
+ * A hand-copied list, like `DSR_TYPES` above and for the same reason — the web cannot import from
+ * the api. What keeps the two honest is `dsr-intake-channel.test.ts`, which parses the enum out of
+ * `schema.prisma` and compares BOTH this list and `ENUM_LABEL.DsrIntakeChannel` against it, so a
+ * fifth channel fails by name on the commit that adds it rather than rendering an option with no
+ * words.
+ */
+export const DSR_INTAKE_CHANNELS = [
+  'POST',
+  'TELEPHONE',
+  'IN_PERSON',
+  'WEBSITE_FORM',
+] as const;
+
+/** The api's floor and ceiling on the transcribed request. Mirrored so the textarea refuses what
+ *  the server would refuse, rather than letting an officer discover it on submit. */
+export const DSR_REQUEST_TEXT_MIN_LENGTH = 3;
+export const DSR_REQUEST_TEXT_MAX_LENGTH = 2000;
+
 export type DsrType = 'ACCESS' | 'CORRECTION' | 'DELETION' | 'OBJECTION';
 
 export type DsrStatus =
@@ -85,10 +106,19 @@ export function listDsrs(
   return apiGet(`/dsr${qs ? `?${qs}` : ''}`);
 }
 
+/**
+ * `requestText` and `intakeChannel` are REQUIRED by the api's DTO.
+ *
+ * Required here too, rather than optional: this file's types are hand-copied over HTTP and
+ * nothing checks them against the api, so an optional field would turn a 400 the compiler could
+ * have caught into one the officer discovers on submit.
+ */
 export function createDsr(body: {
   customerId?: string;
   insuredPersonId?: string;
   type: string;
+  requestText: string;
+  intakeChannel: string;
 }): Promise<DataSubjectRequest> {
   return apiPost('/dsr', body);
 }

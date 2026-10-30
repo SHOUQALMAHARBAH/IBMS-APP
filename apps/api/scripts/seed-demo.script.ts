@@ -672,7 +672,30 @@ function randomQuestionnaire(): Record<string, boolean | number> {
 
 interface ActorRoleDef {
   key: ActorKey;
-  role: RoleName;
+  /*
+   * A PLAIN STRING, NOT `RoleName`, and that widening is the whole fix for the insurer 403s.
+   *
+   * `RoleName` is the LEGACY eleven-member enum from before office-scoped roles, and it cannot name
+   * `OFFICE_ADMINISTRATOR` — the role that actually holds `insurer.create` and `insurer.deactivate`.
+   * So while this field was typed `RoleName` the script could not create the actor those two routes
+   * require, however the calls were written. `ensureRole` already takes a plain `string` for exactly
+   * this reason; this is the same lesson one layer up.
+   *
+   * MEASURED before changing anything, because the two possible fixes are opposites:
+   *
+   *   POST /insurers              requires `insurer.create`      -> held by OFFICE_ADMINISTRATOR alone
+   *   POST /insurers/:id/deactivate requires `insurer.deactivate`-> held by OFFICE_ADMINISTRATOR alone
+   *   SYSTEM_SECURITY_ADMINISTRATOR holds insurer.company.link, insurer.company.unlink,
+   *                               insurer.form.map, insurer.office-form.map — and neither of the above
+   *
+   * So the ROUTES ARE RIGHT. Registering a company and withdrawing it from dealing is office
+   * administration, not security administration, and the grid says so. The script was using
+   * `actors.admin` as a general-purpose administrator when the capability it needed belongs to a
+   * different role. Granting the security administrator `insurer.create` would have made this seed
+   * pass by widening a security role into the commercial register — and those codes sit OUTSIDE the
+   * office administrator's strict-subset-at-migration set deliberately (`ADDED_AFTER_THE_MIGRATION`).
+   */
+  role: string;
   label: string;
 }
 type ActorKey =
@@ -683,7 +706,8 @@ type ActorKey =
   | 'finance'
   | 'compliance'
   | 'manager'
-  | 'admin';
+  | 'admin'
+  | 'officeAdmin';
 
 /** The ONE definition of a demo actor's address. `ensureActor` creates the
  * account under it and `releaseActorsForHumanLogin` finds it again by it, so a
@@ -729,6 +753,21 @@ const ACTOR_ROLE_DEFS: ActorRoleDef[] = [
     key: 'admin',
     role: RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
     label: 'System Security Administrator',
+  },
+  /*
+   * THE OFFICE ADMINISTRATOR, added 2026-10-16 because two steps of this script were 403ing.
+   *
+   * Not in `RoleName` — see the note on `ActorRoleDef.role`. It is named as a string, which is what
+   * `ensureRole` has always taken, and `ensureActor` mirrors the role out of the default office, where
+   * the main seed creates it.
+   *
+   * It holds `insurer.create` and `insurer.deactivate`, which are the two the duplicate-name proof and
+   * the deactivation step need, so neither of those steps grants anybody anything new.
+   */
+  {
+    key: 'officeAdmin',
+    role: 'OFFICE_ADMINISTRATOR',
+    label: 'Office Administrator',
   },
 ];
 
@@ -1286,6 +1325,78 @@ async function proveDuplicateSpellingIsRefused(
   console.log(
     `  - duplicate-spelling demo verified: ${JSON.stringify(DUPLICATE_SPELLING_DEMO.attempt)} -> 409`,
   );
+}
+
+/**
+ * MODULE 0-ب ITEM (c) — give this office a licence term, so its pipelines are not refused.
+ *
+ * ## WHY THIS EXISTS, AND WHY IT IS NOT A WEAKENED GUARD
+ *
+ * All fifteen of office B's pipelines were refused by the art. 21/a/9 gate: an office with no licence
+ * term on record may not place new business. **The guard is right and is untouched.** What was wrong
+ * is that office B had no term, which is an ORDER problem rather than a design one:
+ * `ensureBrokerLicenseTerms` in the main seed covers EVERY brokerage office
+ * (`findMany({ type: 'BROKERAGE_OFFICE' })`) and is idempotent — but it runs during `db:seed`, when
+ * office B does not exist yet, and `seed:demo` then created the office and never gave it one.
+ *
+ * ## WHY A TERM RATHER THAN A DOCUMENTED ABSENCE
+ *
+ * The alternative was to declare office B deliberately unlicensed so the owner meets the guard on
+ * purpose. Rejected, for three measured reasons:
+ *
+ *   1. This script's own INTENT is fifteen pipelines in office B. Declaring the absence would mean
+ *      rewriting what the seed is for, not documenting what it does.
+ *   2. `docs/phase-2-walkthrough.md` routes entries 1-4 and 9 to office B precisely because office A's
+ *      accounts are MFA-bound, and its literal values are written for office B. With no policies,
+ *      invoices or claims there, those entries can be walked in neither office.
+ *   3. The guard is already demonstrable without sacrificing an office: `/regulatory-compliance`
+ *      renders the no-term state, and a reader who wants to meet the refusal can mark a term lapsed.
+ *
+ * ## THROUGH THE REAL ROUTE, AS THE COMPLIANCE OFFICER
+ *
+ * `POST /broker-license` requires `license.manage`, held by COMPLIANCE_OFFICER — an actor this script
+ * already creates. So this grants nobody anything new either. Going over HTTP rather than writing the
+ * row directly is this script's standing rule, and it matters here: the route is what attaches the
+ * certificate `Document` and writes the audit row, and a direct insert would produce a licence with
+ * no evidence behind it — the exact thing the NOT NULL certificate column exists to prevent.
+ *
+ * The placeholder is unmistakable, following the main seed's own convention: a `CBJ-DEMO-` number and
+ * a certificate named so it cannot be read as a real filing. Three calendar years ending 31 December
+ * (art. 10/b), derived from the current year so a later run cannot seed an already-expired term.
+ */
+async function ensureBrokerLicenseTermForOffice(
+  app: INestApplication<App>,
+  orgSlug: string,
+  complianceToken: string,
+  tally: Tally,
+): Promise<void> {
+  const existing = await request(app.getHttpServer())
+    .get('/broker-license')
+    .set(bearer(complianceToken));
+  if (existing.status === 200) {
+    const body = existing.body as { terms?: unknown[] };
+    // Idempotent, like the seeder it stands in for: a second run must not append a second term,
+    // which would also change which term `pickCurrentTerm` calls current.
+    if (Array.isArray(body.terms) && body.terms.length > 0) return;
+  }
+
+  const year = new Date().getUTCFullYear();
+  try {
+    await postAs(app, complianceToken, '/broker-license', {
+      licenseNumber: `CBJ-DEMO-${orgSlug.toUpperCase()}-${year}`,
+      issuedAt: new Date(Date.UTC(year, 0, 1)).toISOString(),
+      expiresAt: new Date(Date.UTC(year + 2, 11, 31)).toISOString(),
+      certificateFileName: `not-a-real-cbj-document--demo-seed-${orgSlug}.pdf`,
+      certificateStorageRef: `demo-seed/${orgSlug}/licence-certificate`,
+    });
+    bump(tally, 'created', 'brokerLicenseTerm');
+  } catch (err) {
+    tally.errors.push(
+      `could not record a licence term for ${orgSlug}: ${(err as Error).message}. ` +
+        'Every pipeline in this office will be refused by the art. 21/a/9 gate, which is the guard ' +
+        'working — the missing term is the defect, not the refusal.',
+    );
+  }
 }
 
 async function deactivateOneInsurerWithCommitments(
@@ -2309,7 +2420,14 @@ async function seedOrganization(
   const insurers = await ensureInsurersForOrg(orgId, tally);
   await ensureCommissionAgreements(orgId, insurers, tally);
   if (orgId === ORG_A_ID && actors.admin) {
-    await proveDuplicateSpellingIsRefused(app, actors.admin.token);
+    /*
+     * THE OFFICE ADMINISTRATOR, not the security administrator. `POST /insurers` requires
+     * `insurer.create`, which only OFFICE_ADMINISTRATOR holds — so this call used to answer 403 and
+     * the assertion below reported that the duplicate-name refusal "did not come", about a request
+     * the collision check never reached. A 403 and a 409 are different failures and the old wording
+     * could not tell them apart.
+     */
+    await proveDuplicateSpellingIsRefused(app, actors.officeAdmin.token);
   }
 
   console.log(`- ${NUM.employeesPerOrg} employees...`);
@@ -2343,6 +2461,23 @@ async function seedOrganization(
   }
 
   const allCustomers = [...standaloneCustomers, ...leadFunnelCustomers];
+
+  /*
+   * THE LICENCE TERM COMES BEFORE THE PIPELINES, and the order is the whole point.
+   *
+   * An office with no term on record may not place new business (art. 21/a/9), so recording the term
+   * after the pipelines would refuse every one of them and then licence an office with nothing in it —
+   * which is exactly what happened to office B before this call existed: fifteen refusals, no
+   * policies, no invoices, no claims, and a walkthrough describing an office that could not exist.
+   */
+  if (actors.compliance) {
+    await ensureBrokerLicenseTermForOffice(
+      app,
+      orgSlug,
+      actors.compliance.token,
+      tally,
+    );
+  }
 
   console.log(`- ${NUM.fullPipelinePerOrg} full sales-to-policy pipelines...`);
   const pipelineTargets = standaloneCustomers.slice(0, NUM.fullPipelinePerOrg);
@@ -2403,12 +2538,15 @@ async function seedOrganization(
 
   // LAST, because it has to pick an insurer that already holds policies — the deactivation screen
   // is only worth looking at when its five impact counts are not all zero.
-  if (actors.admin) {
+  // `insurer.deactivate` is OFFICE_ADMINISTRATOR's, not the security administrator's — so this
+  // step produced nothing at all until the actor was corrected, which is why office A's suspension
+  // screen read five zeros: the impact counts are computed by the route this never reached.
+  if (actors.officeAdmin) {
     console.log('- deactivating one insurer that has live commitments...');
     await deactivateOneInsurerWithCommitments(
       app,
       orgId,
-      actors.admin.token,
+      actors.officeAdmin.token,
       tally,
     );
   }

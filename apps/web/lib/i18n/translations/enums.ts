@@ -10,6 +10,33 @@
 // that let eight of them drift out of sync before this existed.
 export const ENUMS = {
   AR: {
+    // Module 0-ب item (c) — نوع ترخيص الوساطة (المادة 3/ب). محور مستقل تمامًا عن نوعي التأمين
+    // (عام/حياة) اللذين يُشتقّان من فروع الترخيص ولا يُخزَّنان.
+    // Module 0-ب item (b) — the brokerage office's own LEGAL FORM, which is a
+    // different axis from `BrokerageKind` below (direct vs reinsurance) and from the
+    // life/general split module 0 derives from the licence's branches.
+    //
+    // NEITHER WORD WAS TYPED. «مؤسسة فردية» is SLICED from the owner's own
+    // art. 3/a notice, `rcScopeOneTypeBasisNote`, which reads «هذا المكتب مسجّل
+    // كمؤسسة فردية (شخص طبيعي)» — so the word is hers, on this exact enum, and
+    // the parenthetical there is why the English keeps both halves.
+    //
+    // «شركة» is COPIED from `customerTypeCorporate`. That crosses from a CUSTOMER to
+    // this office, which is stated rather than hidden: it is the same legal-form
+    // distinction (a natural person against a registered company) and `BrokerKind` has
+    // exactly two members, so there is no partnership case for it to be wrong about.
+    // If the owner wants the office's form worded differently from a customer's, this
+    // is the key to change and the comment is why it reads as it does.
+    brokerKindCorporate: 'شركة',
+    brokerKindNaturalPerson: 'مؤسسة فردية',
+    brokerageKindDirect: 'وساطة تأمين مباشر',
+    brokerageKindReinsurance: 'وساطة إعادة تأمين',
+    // Module 0-ب item (c) — طريقة تبادل البيانات مع شركة التأمين. بيانات الدخول والمفاتيح
+    // لا تُحفظ في هذه الجداول إطلاقًا.
+    integrationMethodApi: 'ربط برمجي (API)',
+    integrationMethodPortal: 'بوابة إلكترونية',
+    integrationMethodEmail: 'بريد إلكتروني',
+    integrationMethodManual: 'يدوي',
     // AuditAction
     auditActionCreate: 'إنشاء',
     auditActionRead: 'اطّلاع',
@@ -34,9 +61,6 @@ export const ENUMS = {
     auditActionMfaFailed: 'فشل المصادقة الثنائية',
     auditActionStepUpVerified: 'تحقق إضافي ناجح',
     auditActionAccessWindowExpired: 'انتهاء نافذة الوصول',
-    // BrokerLicenseStatus
-    licStatusActive: 'سارية',
-    licStatusLapsed: 'منتهية',
     // ClaimStatus
     claimStatusNotified: 'مُبلَّغ عنها',
     claimStatusRegistered: 'مسجّلة',
@@ -150,6 +174,9 @@ export const ENUMS = {
     rrStatusOpen: 'مفتوح',
     rrStatusClosed: 'مغلق',
     // ScreeningAttemptOutcome
+    screenProviderBuiltIn: 'القائمة المحلية المزامنة',
+    screenProviderOnPremise: 'محرك فحص محلي',
+    screenProviderCommercial: 'مزوّد تجاري',
     screenOutcomeNoMatch: 'لا يوجد تطابق',
     screenOutcomePotentialMatch: 'تطابق محتمل',
     screenOutcomeNotConfigured: 'غير مُهيّأ',
@@ -159,10 +186,31 @@ export const ENUMS = {
     holdStatusReviewRequired: 'تتطلب مراجعة',
     holdStatusBlocked: 'محجوبة',
     // ScreeningMatchStatus
-    matchStatusPending: 'قيد الانتظار',
+    /*
+     * OWNER DECISION 59 — HER OWN WORD, and it stands OVER the string that was shipping.
+     *
+     * This read «قيد الانتظار». The rule is that a word is a slice of a shipping string
+     * OR it is hers; this one is hers, so the shipping string loses.
+     *
+     * HER REASON IS WHY THE WORD MATTERS RATHER THAN THE WORDING: the other two members
+     * are DECISION words. «مستبعد» and «مؤكَّد» are verdicts, so the trio reads as one
+     * family — no verdict yet · excluded · confirmed — whereas «قيد الانتظار» says *in a
+     * queue*, which is a statement about the system's backlog rather than about a
+     * decision somebody owes.
+     *
+     * THE VALUE CHANGED; NO SECOND KEY WAS ADDED. Two words for one state is exactly the
+     * inconsistency her walk reported, and a second key is how it happens — the KYC
+     * wizard and `/screening-matches` would each pick one. Both screens now read this
+     * key through `ENUM_LABEL.ScreeningMatchStatus`, which is what makes one word
+     * structural rather than coincidental.
+     */
+    matchStatusPending: 'لم يُبَتَّ فيه',
     matchStatusCleared: 'مستبعد',
     matchStatusConfirmed: 'مؤكَّد',
     // SlaPolicyStatus
+    // «الكل» copied from `insFilterAll`, for the FILTER's ALL pseudo-member — which
+    // is not an enum member, so `ENUM_LABEL.SlaPolicyStatus` has no slot for it.
+    slaPolFilterAll: 'الكل',
     slaPolStatusDraft: 'مسودة',
     slaPolStatusActive: 'سارية',
     slaPolStatusInactive: 'غير سارية',
@@ -308,6 +356,18 @@ export const ENUMS = {
     infoAssetTypeOther: 'أخرى',
   },
   EN: {
+    // Module 0-ب item (c) — the brokerage licence type (art. 3/b). A DIFFERENT AXIS from the
+    // life/general types, which are derived from the licence's branches and never stored.
+    brokerKindCorporate: 'Corporate',
+    brokerKindNaturalPerson: 'Natural person (sole establishment)',
+    brokerageKindDirect: 'Direct insurance brokerage',
+    brokerageKindReinsurance: 'Reinsurance brokerage',
+    // Module 0-ب item (c) — how the system exchanges data with an insurance company.
+    // Credentials and keys never enter these tables.
+    integrationMethodApi: 'API integration',
+    integrationMethodPortal: 'Web portal',
+    integrationMethodEmail: 'Email',
+    integrationMethodManual: 'Manual',
     // AuditAction
     auditActionCreate: 'Create',
     auditActionRead: 'Read',
@@ -333,9 +393,6 @@ export const ENUMS = {
     auditActionMfaFailed: 'MFA failed',
     auditActionStepUpVerified: 'Step-up verified',
     auditActionAccessWindowExpired: 'Access window expired',
-    // BrokerLicenseStatus
-    licStatusActive: 'Active',
-    licStatusLapsed: 'Lapsed',
     // ClaimStatus
     claimStatusNotified: 'Notified',
     claimStatusRegistered: 'Registered',
@@ -449,6 +506,9 @@ export const ENUMS = {
     rrStatusOpen: 'Open',
     rrStatusClosed: 'Closed',
     // ScreeningAttemptOutcome
+    screenProviderBuiltIn: 'Synced local list',
+    screenProviderOnPremise: 'On-premise screening engine',
+    screenProviderCommercial: 'Commercial provider',
     screenOutcomeNoMatch: 'No match',
     screenOutcomePotentialMatch: 'Potential match',
     screenOutcomeNotConfigured: 'Not configured',
@@ -462,6 +522,7 @@ export const ENUMS = {
     matchStatusCleared: 'Cleared',
     matchStatusConfirmed: 'Confirmed',
     // SlaPolicyStatus
+    slaPolFilterAll: 'All',
     slaPolStatusDraft: 'Draft',
     slaPolStatusActive: 'Active',
     slaPolStatusInactive: 'Inactive',

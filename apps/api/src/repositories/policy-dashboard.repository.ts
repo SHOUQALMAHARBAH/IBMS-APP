@@ -92,6 +92,10 @@ export class PolicyDashboardRepository {
     {
       policyId: string;
       policyNumber: string | null;
+      /** OWNER DECISION 50 — the customer's own name, so a policy with no number yet can be named
+       *  by the DEAL rather than by an internal id. `Policy.customerId` is NOT NULL with a real
+       *  relation, so this always resolves. */
+      customerName: string;
       insuranceLine: string;
       reason: string;
       appliedAt: Date;
@@ -107,7 +111,12 @@ export class PolicyDashboardRepository {
         },
         include: {
           endorsement: {
-            include: { policy: true },
+            // `customer` for owner decision 50 — see the return type above.
+            include: {
+              policy: {
+                include: { customer: { select: { legalName: true } } },
+              },
+            },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -117,6 +126,7 @@ export class PolicyDashboardRepository {
         rows.map((r) => ({
           policyId: r.endorsement.policy.id,
           policyNumber: r.endorsement.policy.policyNumber,
+          customerName: r.endorsement.policy.customer.legalName,
           insuranceLine: r.endorsement.policy.insuranceLine,
           reason: r.reason,
           appliedAt: r.endorsement.appliedAt!,

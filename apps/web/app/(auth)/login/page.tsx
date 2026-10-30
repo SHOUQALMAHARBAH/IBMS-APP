@@ -7,16 +7,31 @@ import { useRouter } from 'next/navigation';
 import { isMustChangePassword, login, verifyMfaChallenge } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { useAuth } from '../../../lib/auth/auth-context';
+import { AuthFrame, BrandPitch, Button, IconField } from '../../../components/ui';
 import {
-  buttonStyle,
-  authCardStyle,
+  authFormStyle,
+  authHeadingStyle,
+  authPromptStyle,
   errorStyle,
   helperLinkStyle,
-  inputStyle,
-  labelStyle,
-  authPageStyle,
 } from '../../../components/auth/auth-form.styles';
 
+/*
+ * THE SIGN-IN SCREEN — the first thing a client sees, and the first screen of the design batch.
+ *
+ * NOTHING ABOUT WHAT IT DOES CHANGED. The credentials submit, the MFA-challenge branch, the
+ * forced-password-change redirect and the deliberate absence of a sign-up link are all byte-for-
+ * byte the same decisions, including the one that matters most: only the VERIFY call can mean
+ * "bad code", so a failure after it is never reported as one. This is a presentation change, and
+ * `auth.spec.ts` is what holds that claim.
+ *
+ * WHAT CHANGED IS THE FRAME AND THE FIELDS: a brand panel whose mark draws itself in on load, and
+ * fields whose icon sits inside the control. `AuthFrame` carries the reasoning.
+ *
+ * THE PANEL'S PROSE ARRIVED AFTER THE PILOT and is the owner's own brand pack rather than words
+ * written here — see `BrandPitch`. The pilot shipped this panel deliberately wordless and said so;
+ * that was correct then and is no longer the state.
+ */
 export default function LoginPage() {
   const { t } = useLanguage();
   const router = useRouter();
@@ -78,79 +93,98 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={authPageStyle}>
-      <div style={authCardStyle}>
-        <h1 style={{ marginTop: 0 }}>{t('authSignInHeading')}</h1>
+    <AuthFrame pitch={<BrandPitch />}>
+      <h1 style={authHeadingStyle}>{t('authSignInHeading')}</h1>
 
-        {mfaChallengeToken ? (
-          <form onSubmit={(e) => void handleMfaSubmit(e)}>
-            <p style={{ opacity: 0.8 }}>{t('authMfaPrompt')}</p>
-            <label htmlFor="code" style={labelStyle}>
-              {t('authMfaCodeLabel')}
-            </label>
-            <input
-              id="code"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              autoFocus
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              style={inputStyle}
-            />
-            {error ? (
-              <p role="alert" style={errorStyle}>
-                {error}
-              </p>
-            ) : null}
-            <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-              {isSubmitting ? t('authVerifying') : t('authVerifyButton')}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={(e) => void handleCredentialsSubmit(e)}>
-            <label htmlFor="email" style={labelStyle}>
-              {t('authEmailLabel')}
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={inputStyle}
-            />
-            <label htmlFor="password" style={labelStyle}>
-              {t('authPasswordLabel')}
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={inputStyle}
-            />
-            {error ? (
-              <p role="alert" style={errorStyle}>
-                {error}
-              </p>
-            ) : null}
-            <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-              {isSubmitting ? t('authSigningIn') : t('authSignInButton')}
-            </button>
-            <p style={helperLinkStyle}>
-              <Link href="/forgot-password">{t('authForgotLink')}</Link>
+      {mfaChallengeToken ? (
+        <form
+          onSubmit={(e) => void handleMfaSubmit(e)}
+          style={authFormStyle}
+        >
+          {/* `--ink-secondary`, not `opacity: 0.8` — globals.css forbids muting text with opacity,
+              because it composites toward whatever is behind and axe measures the blend. */}
+          <p style={authPromptStyle}>{t('authMfaPrompt')}</p>
+          <IconField
+            id="code"
+            label={t('authMfaCodeLabel')}
+            icon="clock"
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            dir="ltr"
+            autoFocus
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          {error ? (
+            <p role="alert" style={errorStyle}>
+              {error}
             </p>
-            <p style={helperLinkStyle}>
-              {t('authNoAccount')} <Link href="/signup">{t('authSignUpLink')}</Link>
+          ) : null}
+          <Button type="submit" variant="primary" loading={isSubmitting} fullWidth>
+            {isSubmitting ? t('authVerifying') : t('authVerifyButton')}
+          </Button>
+        </form>
+      ) : (
+        <form
+          onSubmit={(e) => void handleCredentialsSubmit(e)}
+          style={authFormStyle}
+        >
+          <IconField
+            id="email"
+            label={t('authEmailLabel')}
+            icon="mail"
+            type="email"
+            autoComplete="username"
+            dir="ltr"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <IconField
+            id="password"
+            label={t('authPasswordLabel')}
+            icon="lock"
+            type="password"
+            autoComplete="current-password"
+            dir="ltr"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error ? (
+            <p role="alert" style={errorStyle}>
+              {error}
             </p>
-          </form>
-        )}
-      </div>
-    </main>
+          ) : null}
+          <Button type="submit" variant="primary" loading={isSubmitting} fullWidth>
+            {isSubmitting ? t('authSigningIn') : t('authSignInButton')}
+          </Button>
+          <p style={helperLinkStyle}>
+            <Link href="/forgot-password">{t('authForgotLink')}</Link>
+          </p>
+          {/*
+            * THE SIGN-UP LINK IS REMOVED, MODULE 0-ب ITEM 5, and it promised a path this product
+            * does not use.
+            *
+            * Offices are onboarded by the platform provider at `POST /provider/brokerage-offices`;
+            * the first user inside one arrives by invitation. Measured before removing: signup is
+            * NOT the bootstrap — a migration creates the default organization and the seed creates
+            * the provider, its role and the sample accounts, which `scripts/from-empty.sh` proves
+            * reaches a usable system from nothing. And signup assigns NO ROLE, so every account it
+            * ever made could authenticate and reach nothing: zero permissions, and `MfaRequiredGuard`
+            * refusing every route until TOTP is paired.
+            *
+            * THE ROUTE AND PAGE STAY, deliberately and measured: `POST /auth/signup` has 120
+            * references across the api e2e suite, which creates its users through it. Removing the
+            * route would take the suite down to fix a link. What is removed is the PROMISE on the
+            * one screen every reader starts at; `/signup` remains reachable by URL with its own
+            * four tests, and its refusal text — corrected this module — now names the provider
+            * routes rather than claiming no office can be onboarded at all.
+            */}
+        </form>
+      )}
+    </AuthFrame>
   );
 }

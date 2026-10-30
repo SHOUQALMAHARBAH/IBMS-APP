@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { ensureRole, prisma } from './tenant-prisma';
+import { ensureRole, prisma, rawPrisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 /**
@@ -52,6 +52,21 @@ const FIXTURE_PREFIX = `CRUD Fixture ${tag}`;
 const MASTER_PREFIX = `CRUD Fixture Master ${tag}`;
 
 async function removeFixtures(): Promise<void> {
+  /*
+   * THE COMPANY FIXTURE GOES FIRST, and it is deleted rather than left because an `Organization` row
+   * is a TENANT. It is safe to delete here only because nothing in this file ever signs into it:
+   * authenticating writes append-only `AuditLogEntry` rows whose `organizationId` FK is
+   * `ON DELETE RESTRICT` behind a trigger that refuses DELETE outright, so one login would make the
+   * row permanent and this suite would accumulate a company per run. Two brokerage offices were
+   * stranded proving exactly that in item (d).
+   *
+   * `rawPrisma`, because `Organization` carries no `organizationId` and is therefore not in the
+   * tenant-scoped set at all — the exported `prisma` cannot address it.
+   */
+  await rawPrisma.organization.deleteMany({
+    where: { type: 'INSURANCE_COMPANY', subdomain: { startsWith: 'crud-co-' } },
+  });
+
   const insurers = await prisma.insurer.findMany({
     where: {
       OR: [
@@ -221,6 +236,9 @@ describe('registering an insurer — both paths through one endpoint', () => {
       rfqContactPhone: '+962 6 500 1000',
       creditTermsDays: 45,
       financialStrengthRating: 'BBB+',
+      // MODULE 0-ب ITEM (e) — the pair. Submitting the rating alone is now a 422 naming both fields,
+      // which is asserted in its own test below rather than discovered here.
+      financialStrengthRatingAsOf: '2026-01-15',
     }).expect(201);
 
     const view = response.body as InsurerView;
@@ -807,4 +825,414 @@ describe('the permission split, and what absence looks like', () => {
       .set(bearer(admin.accessToken))
       .expect(400);
   }, 120_000);
+});
+
+/**
+ * DECISION 90 — A DATABASE CONSTRAINT MUST NEVER BE THE ERROR MESSAGE.
+ *
+ * The owner's governing decision in its sharpest local form. `Insurer_rating_carries_its_date` became
+ * enforceable in `20261125110000`, and `/insurers/new` has carried a financial-strength-rating input
+ * since long before this module — so without a form-level equivalent an office typing a rating would
+ * have met a raw constraint violation surfaced as a 500.
+ *
+ * Every assertion below is on the SENTENCE, not on the status alone and never on the SQLSTATE. A 422
+ * that could be any of several refusals tells a person nothing; the point of the decision is that the
+ * message names what to do.
+ */
+describe('decision 90 — the rating and its date, in words rather than a constraint', () => {
+  it('refuses a rating with no as-of date, and NAMES the date', async () => {
+    const response = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Undated Rating Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة تصنيف بلا تاريخ`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2000',
+        companyEmail: 'undated@example.test',
+        financialStrengthRating: 'A-',
+      })
+      .expect(422);
+
+    const message = String((response.body as { message: string }).message);
+    // THE SENTENCE, and the three things it has to contain: what is wrong, what to do, and why the
+    // rule exists. A message that said only "invalid" would satisfy a status assertion and fail a
+    // person.
+    expect(message).toMatch(/as.?at|as-of/i);
+    expect(message).toMatch(/clear the rating/i);
+    // And NOT the constraint. If this ever fails, somebody removed the service check and the database
+    // is answering the user directly — which is the whole of what decision 90 forbids.
+    expect(message).not.toContain('Insurer_rating_carries_its_date');
+    expect(message).not.toContain('23514');
+    expect(message).not.toMatch(/violates check constraint/i);
+  }, 120_000);
+
+  it('refuses an as-of date with no rating, and NAMES the rating', async () => {
+    // The other direction. Without it, an implementation that only checked one way would pass the
+    // test above while leaving the database to answer for the other.
+    const response = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Dateless Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة بلا تصنيف`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2001',
+        companyEmail: 'dateless@example.test',
+        financialStrengthRatingAsOf: '2026-01-15',
+      })
+      .expect(422);
+
+    const message = String((response.body as { message: string }).message);
+    expect(message).toMatch(/no financial strength rating/i);
+    expect(message).not.toMatch(/violates check constraint/i);
+  }, 120_000);
+
+  it('accepts the PAIR — so the refusals are about the rule and not about the field', async () => {
+    // The non-empty positive case. Without it, an implementation that refused every rating would pass
+    // both tests above.
+    const response = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Dated Rating Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة تصنيف مؤرَّخ`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2002',
+        companyEmail: 'dated@example.test',
+        financialStrengthRating: 'A+',
+        financialStrengthRatingAsOf: '2026-02-20',
+      })
+      .expect(201);
+
+    const view = response.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(view.financialStrengthRating).toBe('A+');
+    expect(view.financialStrengthRatingAsOf).toContain('2026-02-20');
+  }, 120_000);
+
+  it('reads the MERGED state on a PATCH, which is why the rule is not a decorator', async () => {
+    /*
+     * THE CASE A DTO COULD NEVER GET RIGHT. A PATCH carrying only the rating is CORRECT on a record
+     * that already has a date, and WRONG on one that does not. A class-level validator sees the body
+     * and not the row, so it would have to refuse both or accept both.
+     */
+    const dated = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Merged State Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة الحالة المدمجة`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2003',
+        companyEmail: 'merged@example.test',
+        financialStrengthRating: 'A',
+        financialStrengthRatingAsOf: '2026-03-01',
+      })
+      .expect(201);
+    const id = (dated.body as InsurerView).id;
+
+    /*
+     * ACCEPTED, AND THIS IS THE HALF THAT OBSERVES THE MERGE — found by planting, not by reading.
+     *
+     * The patch carries ONLY the as-of date, so the RATING can only come from the current row. Make
+     * the rule ignore `current` and this becomes "a date with no rating" and a 422. The rating-only
+     * patch below does NOT observe it: its body carries the rating, so the fallback is never reached
+     * and the plant left it green.
+     *
+     * Third time in this module that a plant has found a test which could not fail.
+     */
+    await request(app!.getHttpServer())
+      .patch(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .send({ financialStrengthRatingAsOf: '2026-04-01' })
+      .expect(200);
+
+    // ACCEPTED: the row already carries a date, so a rating-only patch is complete after the merge.
+    await request(app!.getHttpServer())
+      .patch(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .send({ financialStrengthRating: 'AA-' })
+      .expect(200);
+
+    /*
+     * REFUSED: the IDENTICAL body, on a record that has no date. Same patch, opposite answer — which
+     * is the whole claim, and no decorator could make it.
+     *
+     * The first version of this test tried to clear the DATE instead and got a 400, not a 422: an
+     * empty string is refused by the DTO's length rule before any service rule runs, and
+     * `emptyStringToUndefined` turns an empty date into "no change" rather than into a clear. So
+     * CLEARING a rating or its date is not expressible through this API at all — a pre-existing gap,
+     * not introduced here, and recorded in `docs/deferred-register.md` rather than worked around with
+     * a test that asserts something unreachable.
+     */
+    const undated = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Unrated Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة بلا تصنيف بعد`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 2004',
+        companyEmail: 'unrated@example.test',
+      })
+      .expect(201);
+
+    const refused = await request(app!.getHttpServer())
+      .patch(`/insurers/${(undated.body as InsurerView).id}`)
+      .set(bearer(admin.accessToken))
+      .send({ financialStrengthRating: 'AA-' })
+      .expect(422);
+    const message = String((refused.body as { message: string }).message);
+    expect(message).toMatch(/as.?at|as-of/i);
+    expect(message).not.toMatch(/violates check constraint/i);
+  }, 180_000);
+});
+
+/**
+ * DECISION 93 — ONE ACTION CLEARS THE RATING AND ITS DATE TOGETHER.
+ *
+ * The narrow exit from a gap this item found and did not create: neither half can be cleared through
+ * the ordinary PATCH, and clearing one alone would violate `Insurer_rating_carries_its_date`. The
+ * general fix is an API-wide pass and is recorded by name.
+ *
+ * THE BOUNDARY-FIXTURE RULE IS APPLIED HERE, which is why the second test exists: a suite that only
+ * exercised records WITH a rating would be entirely on one side of the boundary, and the similarity
+ * would pass the test rather than the correctness of the code.
+ */
+describe('decision 93 — clearing a rating and its date', () => {
+  it('clears BOTH in one write, and the response carries no constraint anywhere in it', async () => {
+    const created = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Clearable Rating Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة تصنيف قابل للمسح`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 3000',
+        companyEmail: 'clearable@example.test',
+        financialStrengthRating: 'BBB',
+        financialStrengthRatingAsOf: '2026-05-05',
+      })
+      .expect(201);
+    const id = (created.body as InsurerView).id;
+
+    const cleared = await request(app!.getHttpServer())
+      .delete(`/insurers/${id}/financial-strength-rating`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+
+    const view = cleared.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(view.financialStrengthRating).toBeNull();
+    expect(view.financialStrengthRatingAsOf).toBeNull();
+
+    // DECISION 90 holds on this route too: no SQLSTATE, no constraint name, no 500. Asserted on the
+    // whole body rather than on a message field, because a constraint can surface in any of them.
+    const body = JSON.stringify(cleared.body);
+    expect(body).not.toContain('Insurer_rating_carries_its_date');
+    expect(body).not.toContain('23514');
+    expect(body).not.toMatch(/violates check constraint/i);
+
+    // AND IT HELD, on a re-read rather than on the response the write returned — the §1.80 shape:
+    // a mapper can report a field it did not persist.
+    const reread = await request(app!.getHttpServer())
+      .get(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+    const after = reread.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(after.financialStrengthRating).toBeNull();
+    expect(after.financialStrengthRatingAsOf).toBeNull();
+  }, 180_000);
+
+  it('is a NO-OP on a record that carries neither — the other side of the boundary', async () => {
+    /*
+     * The non-empty negative case. Without it the suite would be entirely on the side where a rating
+     * exists, and an implementation that cleared something — or threw — on an unrated record would
+     * pass everything above.
+     *
+     * A no-op rather than the 409 the UNLINK raises, and the difference is what the operator's
+     * mistake would be: unlinking an unlinked record suggests they targeted the wrong one, while
+     * clearing a rating that was never there is harmless and idempotent.
+     */
+    const created = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(admin.accessToken))
+      .send({
+        legalName: `${FIXTURE_PREFIX} Never Rated Co.`,
+        legalNameAr: `${FIXTURE_PREFIX} شركة لم تُصنَّف قطّ`,
+        structure: 'CONVENTIONAL',
+        companyPhone: '+962 6 500 3001',
+        companyEmail: 'never-rated@example.test',
+      })
+      .expect(201);
+    const id = (created.body as InsurerView).id;
+
+    /*
+     * COUNTED BEFORE AND AFTER, not against zero. The first version asserted ZERO rows and failed on
+     * a CLEAN tree — the REGISTRATION itself writes an audit row for this insurer, so the count was
+     * never going to be nought. A test that fails for a reason other than the one it is about is a
+     * test nobody will trust the next time it fires.
+     */
+    const auditRowsBefore = await prisma.auditLogEntry.count({
+      where: { entityType: 'Insurer', entityId: id },
+    });
+
+    const response = await request(app!.getHttpServer())
+      .delete(`/insurers/${id}/financial-strength-rating`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+
+    const view = response.body as InsurerView & {
+      financialStrengthRatingAsOf: string | null;
+    };
+    expect(view.financialStrengthRating).toBeNull();
+    expect(view.financialStrengthRatingAsOf).toBeNull();
+    // The record is otherwise untouched — a no-op that quietly changed something else would satisfy
+    // the two assertions above.
+    expect(view.companyEmail).toBe('never-rated@example.test');
+
+    /*
+     * AND NO AUDIT ROW, WHICH IS THE ONLY OBSERVABLE DIFFERENCE — found by planting, not by reading.
+     *
+     * Removing the nothing-to-clear branch killed nothing at first: writing null over null produces
+     * an identical record, so every assertion above passed on both sides. What actually differs is
+     * that the write path LOGS A CHANGE THAT DID NOT HAPPEN — and an audit trail carrying entries for
+     * acts with no effect is worse than one carrying none, because it teaches a reader that its rows
+     * are noise.
+     *
+     * The boundary-fixture rule's second half, in practice: a fixture on each side is not enough if
+     * the two sides look the same under every assertion the test makes.
+     */
+    const auditRowsAfter = await prisma.auditLogEntry.count({
+      where: { entityType: 'Insurer', entityId: id },
+    });
+    expect(
+      auditRowsAfter,
+      'a no-op wrote an audit row — the trail now records a change that did not happen',
+    ).toBe(auditRowsBefore);
+  }, 180_000);
+
+  it('is refused to a caller without insurer.update', async () => {
+    await request(app!.getHttpServer())
+      .delete(
+        `/insurers/00000000-0000-4000-8000-000000000000/financial-strength-rating`,
+      )
+      .set(bearer(outsider.accessToken))
+      .expect(403);
+  }, 120_000);
+});
+
+describe('register entry 36 — a linked record is read-only ON THE SERVER, not only on the screen', () => {
+  /*
+   * WHAT WAS WRONG, AND WHY NO TEST COULD SEE IT.
+   *
+   * Linking an office's `Insurer` record to a registered insurance company sets `insuranceCompanyId`,
+   * and `officeMayEditCompanyFacts` then returns false — but that value was projected onto the VIEW
+   * and consumed by the screen alone. `PATCH /insurers/:id` refused a RENAME of a catalogue insurer
+   * and applied the rating rule, and said nothing about the company columns. So the office's copy was
+   * read-only in the browser while the server still honoured a direct `PATCH`: one layer, where item
+   * (j) established three for a boundary that matters.
+   *
+   * It survived because the link route had NO api e2e of any kind — measured at the module's close,
+   * `POST /insurers/:id/company-link` and its DELETE were addressed by no test in this suite. A
+   * greyed-out field is not evidence about a server.
+   *
+   * THE THIRD TEST IS THE ONE THAT MAKES THIS A BOUNDARY RATHER THAN A LOCK. A refusal that also
+   * refused the relationship terms would be a worse defect than the one being fixed: what this office
+   * pays and which lines it places are facts about the OFFICE, the registered company answers for
+   * none of them, and an office unable to record its own commission terms because it linked a company
+   * would have to unlink to do business.
+   */
+  let company: { id: string };
+  let insurerId: string;
+
+  beforeAll(async () => {
+    company = await rawPrisma.organization.create({
+      data: {
+        legalName: `${FIXTURE_PREFIX} Company`,
+        legalNameAr: 'شركة تأمين للاختبار',
+        type: 'INSURANCE_COMPANY',
+        // NULL exactly when the organization is an insurance company —
+        // `Organization_broker_kind_matches_type` refuses a value here in both directions.
+        subdomain: `crud-co-${tag}`,
+      },
+      select: { id: true },
+    });
+
+    const registered = await register({
+      legalName: `${FIXTURE_PREFIX} Linkable`,
+      legalNameAr: 'شركة قابلة للربط',
+    }).expect(201);
+    insurerId = (registered.body as InsurerView).id;
+
+    await request(app!.getHttpServer())
+      .post(`/insurers/${insurerId}/company-link`)
+      .set(bearer(admin.accessToken))
+      .send({ insuranceCompanyId: company.id })
+      .expect(201);
+  }, 300_000);
+
+  it('REFUSES a company fact on a linked record, naming the field and the way out', async () => {
+    const refused = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ companyPhone: '+962 6 111 1111' })
+      .expect(422);
+
+    const message = JSON.stringify(refused.body);
+    // DECISION 90: the field is NAMED. "Forbidden" with no field list sends somebody removing one
+    // key at a time until the request happens to succeed.
+    expect(message).toContain('companyPhone');
+    expect(message).toContain('unlink');
+    expect(message).not.toMatch(/violates (check|unique) constraint/i);
+
+    // AND THE WRITE DID NOT HAPPEN. A 422 proves what the route answered, not what it stored — this
+    // is the half that would still pass if the refusal were thrown after the update.
+    const after = await prisma.insurer.findUniqueOrThrow({
+      where: { id: insurerId },
+      select: { companyPhone: true },
+    });
+    expect(after.companyPhone).not.toBe('+962 6 111 1111');
+  }, 300_000);
+
+  it('refuses a RENAME of a linked record too — the name is the company own', async () => {
+    const refused = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ legalNameAr: 'اسم جديد' })
+      .expect(422);
+    // `legalNameAr` is not a member of `InsurerCompanyFields` — it has its own column — so it is the
+    // one key the derived-from-`companyFrom` list cannot cover by itself.
+    expect(JSON.stringify(refused.body)).toContain('legalNameAr');
+  }, 300_000);
+
+  it('still accepts the OFFICE relationship terms, which the company does not answer for', async () => {
+    const saved = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ rfqContactEmail: `ours-${tag}@example.test` })
+      .expect(200);
+    expect((saved.body as InsurerView).rfqContactEmail).toBe(
+      `ours-${tag}@example.test`,
+    );
+  }, 300_000);
+
+  it('UNLINKING gives the columns back — the refusal is the link, not a permanent lock', async () => {
+    await request(app!.getHttpServer())
+      .delete(`/insurers/${insurerId}/company-link`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+
+    const saved = await request(app!.getHttpServer())
+      .patch(`/insurers/${insurerId}`)
+      .set(bearer(admin.accessToken))
+      .send({ companyPhone: '+962 6 222 2222' })
+      .expect(200);
+    expect((saved.body as InsurerView).companyPhone).toBe('+962 6 222 2222');
+  }, 300_000);
 });

@@ -404,3 +404,62 @@ test("the audit rows show WHO, not a uuid", async ({ page }) => {
   await expect(page.locator('[data-audit-actor="user-2"]')).not.toContainText("user-2");
   await expect(page.locator('[data-audit-actor="user-9"]')).not.toContainText("user-9");
 });
+
+/*
+ * A STRAY ENTER BEFORE THE RESULTS LAND — the gap the keyboard test above could
+ * not see, and half of what the owner hit on /complaints.
+ *
+ * That test types, waits for the list, and THEN presses Enter — by which point a
+ * result set has landed and `setActive(0)` has run, so the old
+ * `if (open && active >= 0)` guard fired and the default was prevented. It proved
+ * the case that worked.
+ *
+ * `active` is -1 for the 250ms of debounce plus a round trip. Press Enter in that
+ * window and the old code called no `preventDefault`, so the surrounding form
+ * submitted with the id still EMPTY. The search route is held open here so the
+ * window is the whole test rather than a race.
+ */
+test("a stray Enter BEFORE any result lands must not submit the form", async ({
+  page,
+}) => {
+  // ON /transaction-monitoring, NOT /dsr, and that is the whole point of this test.
+  //
+  // The first version ran on /dsr and the plant that restores the old condition
+  // KILLED NOTHING — because /dsr's picker is `required`, so `setCustomValidity`
+  // (the sibling fix, for the submit BUTTON path) refuses the submit as well and
+  // masks this mechanism entirely. Two guards is right for the product and wrong
+  // for a test that claims to be about one of them.
+  //
+  // This screen's picker is OPTIONAL — it is her own 2.3 — so nothing is required,
+  // no custom validity is ever set, and `preventDefault` is the only thing standing
+  // between a stray Enter and a created alert. `patternType` already carries a
+  // default, so the form is genuinely submittable.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  const posts: string[] = [];
+  await page.route("http://localhost:4000/transaction-monitoring-alerts**", (route) => {
+    if (route.request().method() === "POST") {
+      posts.push(route.request().url());
+      return route.fulfill({ status: 201, json: {} });
+    }
+    return route.fulfill({ status: 200, json: [] });
+  });
+  // Held open: no option ever becomes active, which is the state the old guard
+  // treated as "nothing to prevent".
+  await page.route("http://localhost:4000/customers/search**", () => {});
+  await page.goto("/transaction-monitoring");
+
+  const field = page.locator('[data-entity-search-term="customer"]');
+  await field.focus();
+  await page.keyboard.type("Ahm");
+  await expect(
+    page.locator('[data-entity-search-list="customer"]'),
+  ).toBeHidden();
+  await page.keyboard.press("Enter");
+
+  expect(
+    posts,
+    "Enter with nothing selected must not submit the form it sits inside",
+  ).toEqual([]);
+  // And the term survives, so a stray Enter is not a lost field either.
+  await expect(field).toHaveValue("Ahm");
+});

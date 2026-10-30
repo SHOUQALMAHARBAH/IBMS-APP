@@ -1,6 +1,16 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+  DateEcho,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -8,8 +18,7 @@ import {
   type InsurerPayablesReport,
 } from '../../../lib/insurer-accounting/payables-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../../lib/i18n/format';
 import type { Language } from '../../../lib/i18n/translations';
@@ -25,16 +34,6 @@ function oldest(
   return '—';
 }
 
-const cellStyle: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'end',
-};
-const headCellStyle: CSSProperties = {
-  ...cellStyle,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 
 export default function InsurerAccountingPage() {
   const router = useRouter();
@@ -76,29 +75,28 @@ export default function InsurerAccountingPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('iaHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        {t('iaIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('iaHeading')}
+        description={t('iaIntro')}
+      />
 
-      <label
-        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
+      <div
+        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0', alignItems: 'baseline' }}
       >
-        {t('iaAsOf')}
+        <label htmlFor="ia-as-of">{t('iaAsOf')}</label>
         <input
+          id="ia-as-of"
           type="date"
-          aria-label={t('iaAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
         />
-      </label>
+        <DateEcho value={asOf} />
+      </div>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {data ? (
@@ -107,59 +105,54 @@ export default function InsurerAccountingPage() {
             {t('iaNone')}
           </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
-              <thead>
-                <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('iaColInsurer')}</th>
-                  <th style={headCellStyle}>{t('iaColOutstanding')}</th>
-                  <th style={headCellStyle}>{t('iaColInvoices')}</th>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('iaColOldest')}</th>
-                  <th style={headCellStyle}>{t('iaColRemittedToDate')}</th>
-                  <th style={headCellStyle}>{t('iaColRemittances')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.rows.map((r) => (
-                  <tr key={r.insurerId}>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
-                      <bdi>{r.insurerName}</bdi>
-                    </td>
-                    <td style={cellStyle}>{formatMoney(r.outstandingAmount, language)}</td>
-                    <td style={cellStyle}>{r.outstandingCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>
-                      {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt, language)}
-                    </td>
-                    <td style={cellStyle}>{formatMoney(r.remittedAmount, language)}</td>
-                    <td style={cellStyle}>{r.remittedCount}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td
-                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
-                  >
-                    {t('iaColTotal')}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {formatMoney(data.totals.outstandingAmount, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {data.totals.outstandingCount}
-                  </td>
-                  <td style={cellStyle} />
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {formatMoney(data.totals.remittedAmount, language)}
-                  </td>
-                  <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {data.totals.remittedCount}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('iaColInsurer')}</Th>
+                <Th>{t('iaColOutstanding')}</Th>
+                <Th>{t('iaColInvoices')}</Th>
+                <Th>{t('iaColOldest')}</Th>
+                <Th>{t('iaColRemittedToDate')}</Th>
+                <Th>{t('iaColRemittances')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <Tr key={r.insurerId}>
+                  <Td>
+                    <bdi>{r.insurerName}</bdi>
+                  </Td>
+                  <Td>{formatMoney(r.outstandingAmount, language)}</Td>
+                  <Td>{r.outstandingCount}</Td>
+                  <Td>
+                    {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt, language)}
+                  </Td>
+                  <Td>{formatMoney(r.remittedAmount, language)}</Td>
+                  <Td>{r.remittedCount}</Td>
+                </Tr>
+              ))}
+              {/* THE TOTALS ROW IS A ROW — see the same note on `/client-accounting`. */}
+              <Tr variant="total">
+                <Td>{t('iaColTotal')}</Td>
+                <Td numeric>
+                  {formatMoney(data.totals.outstandingAmount, language)}
+                </Td>
+                <Td numeric>
+                  {data.totals.outstandingCount}
+                </Td>
+                <Td />
+                <Td numeric>
+                  {formatMoney(data.totals.remittedAmount, language)}
+                </Td>
+                <Td numeric>
+                  {data.totals.remittedCount}
+                </Td>
+              </Tr>
+            </tbody>
+          </Table>
         )
       ) : loadError ? null : (
-        <p>{t('iaLoading')}</p>
+        <SkeletonList rows={4} label={t('iaLoading')} />
       )}
     </main>
   );

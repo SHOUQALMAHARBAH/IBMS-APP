@@ -45,7 +45,24 @@ export type UnscopedReason =
    * from the subdomain BEFORE login (§4.10), the login path will have an org
    * and this reason should shrink to session/token lookups only.
    */
-  'auth-bootstrap';
+  | 'auth-bootstrap'
+  /**
+   * SUBDOMAIN RESOLUTION, which is a different job from authentication and was wearing
+   * `auth-bootstrap`'s label until 2026-10-13.
+   *
+   * `GET /orgs/resolve` answers "which office is this?" from a subdomain BEFORE anyone has
+   * authenticated — there is no credential involved at all, and nothing about a user. Labelling it
+   * `auth-bootstrap` made the union report ONE reason while serving TWO, which is the family of
+   * defect this codebase keeps refusing: nothing is named after something it is not.
+   *
+   * Splitting it costs nothing and buys the thing the closed union exists for — a new reason now
+   * has to be a VISIBLE type edit rather than the quiet reuse of a label that does not fit. It also
+   * makes `unscoped-escape-hatches.inventory.spec.ts` able to say which bypass is which.
+   *
+   * It reads `Organization` only, which carries no `organizationId` and is not tenant-scoped at
+   * all — so this reason is the narrowest of the two by some distance.
+   */
+  | 'subdomain-resolution';
 
 interface OrgStore {
   organizationId: string | null;

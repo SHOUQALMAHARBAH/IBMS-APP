@@ -9,26 +9,26 @@ import {
   type KpiDashboardSummary,
 } from '../../../lib/management-reporting/kpi-dashboard-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
-const cell: CSSProperties = {
-  padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statRow: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '0.75rem',
+  gap: 'var(--space-3)',
 };
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -53,25 +53,27 @@ function StatusTable({ counts }: { counts: Record<string, number> }) {
   const { t } = useLanguage();
   const entries = Object.entries(counts);
   if (entries.length === 0) {
-    return <p style={{ color: 'var(--ink-secondary)' }}>{t('kpiNone')}</p>;
+    return <EmptyState title={t('kpiNone')} />;
   }
   return (
-    <table style={{ borderCollapse: 'collapse', minWidth: '20rem' }}>
+    <Card padded={false}>
+            <Table>
       <thead>
         <tr>
-          <th style={head}>{t('kpiColStatus')}</th>
-          <th style={head}>{t('kpiColCount')}</th>
+          <Th>{t('kpiColStatus')}</Th>
+          <Th>{t('kpiColCount')}</Th>
         </tr>
       </thead>
       <tbody>
         {entries.map(([status, count]) => (
-          <tr key={status}>
-            <td style={cell}>{status}</td>
-            <td style={cell}>{count}</td>
-          </tr>
+          <Tr key={status}>
+            <Td>{status}</Td>
+            <Td>{count}</Td>
+          </Tr>
         ))}
       </tbody>
-    </table>
+    </Table>
+          </Card>
   );
 }
 
@@ -108,14 +110,14 @@ export default function KpiDashboardPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('kpiHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('kpiIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('kpiHeading')}
+        description={t('kpiIntro')}
+      />
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {summary ? (
@@ -222,7 +224,7 @@ export default function KpiDashboardPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>{t('dashLoading')}</p>
+        <SkeletonList rows={4} label={t('dashLoading')} />
       )}
     </main>
   );

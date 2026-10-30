@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -13,8 +13,19 @@ import {
   type ServiceRequest,
 } from '../../../lib/customer-service/service-request-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import { actionErrorText } from '../../../lib/i18n/action-error';
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
@@ -36,18 +47,6 @@ const STATUS_LABEL_KEY: Record<string, TranslationKey> = {
   in_progress: 'srStatusInProgress',
   fulfilled: 'srStatusFulfilled',
   cancelled: 'srStatusCancelled',
-};
-
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
 };
 
 function slaLabel(r: ServiceRequest): string {
@@ -108,7 +107,7 @@ export default function ServiceRequestsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : t('srActionError'),
+        actionErrorText(err, t, 'srActionError'),
       );
     } finally {
       setBusy(false);
@@ -131,14 +130,14 @@ export default function ServiceRequestsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('srHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('srIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('srHeading')}
+        description={t('srIntro')}
+      />
 
       {canManage ? (
-        <form onSubmit={submit} style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}>
+        <form onSubmit={submit} style={{ margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '30rem' }}>
           <EntitySearch
             kind="customer"
             value={customerId}
@@ -146,7 +145,7 @@ export default function ServiceRequestsPage() {
             label={t('srCustomerIdLabel')}
             required
           />
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('srTypeLabel')}
             <select
               aria-label={t('srTypeLabel')}
@@ -160,10 +159,9 @@ export default function ServiceRequestsPage() {
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {t('srDetailLabel')}
             <input
-              aria-label={t('srColDetail')}
               value={detail}
               onChange={(e) => setDetail(e.target.value)}
             />
@@ -175,49 +173,48 @@ export default function ServiceRequestsPage() {
       ) : null}
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('srNone')}</p>
+          <EmptyState title={t('srNone')} />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('srColCustomer')}</th>
-                  <th style={head}>{t('srColType')}</th>
-                  <th style={head}>{t('srColDetail')}</th>
-                  <th style={head}>{t('srColStatus')}</th>
-                  <th style={head}>{t('srColSla')}</th>
-                  <th style={head}>{t('srColAction')}</th>
+                  <Th>{t('srColCustomer')}</Th>
+                  <Th>{t('srColType')}</Th>
+                  <Th>{t('srColDetail')}</Th>
+                  <Th>{t('srColStatus')}</Th>
+                  <Th>{t('srColSla')}</Th>
+                  <Th>{t('srColAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={cell}>{r.customerId.slice(0, 8)}…</td>
-                    <td style={cell}>
+                  <Tr key={r.id}>
+                    {/* RULE 2 — the name, never the id. */}
+                    <Td>
+                      <bdi>{r.customerName}</bdi>
+                    </Td>
+                    <Td>
                       {TYPE_LABEL_KEY[r.requestType as keyof typeof TYPE_LABEL_KEY]
                         ? t(TYPE_LABEL_KEY[r.requestType as keyof typeof TYPE_LABEL_KEY])
                         : r.requestType}
-                    </td>
-                    <td style={cell}>{r.detail ?? '—'}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{r.detail ?? '—'}</Td>
+                    <Td>
                       {STATUS_LABEL_KEY[r.status] ? t(STATUS_LABEL_KEY[r.status]) : r.status}
-                    </td>
-                    <td style={cell}>{slaLabel(r)}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{slaLabel(r)}</Td>
+                    <Td>
                       {canManage && !r.isClosed ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                           {r.status === 'open' ? (
                             <button
                               type="button"
@@ -235,7 +232,7 @@ export default function ServiceRequestsPage() {
                               setNotes((n) => ({ ...n, [r.id]: e.target.value }))
                             }
                           />
-                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                             <button
                               type="button"
                               disabled={busy}
@@ -263,15 +260,15 @@ export default function ServiceRequestsPage() {
                       ) : (
                         (r.outcomeNote ?? '—')
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('srLoading')}</p>
+        <SkeletonList rows={4} label={t('srLoading')} />
       )}
     </main>
   );

@@ -17,16 +17,30 @@
 // they were generated from the English.
 export const DASHBOARDS = {
   AR: {
+    /* DERIVED: `commonCurrentLabel` with its trailing colon dropped — the same run of
+       characters. The source is used INLINE before a figure, where the colon belongs; a
+       column header takes the words alone. No word was written. */
+    commonCurrentHeading: 'الحالي',
+
     // ---- shared dashboard chrome ----------------------------------------
-    dashBranchIdLabel: 'معرّف الفرع',
-    dashBranchIdFilterAria: 'تصفية حسب معرّف الفرع',
+    // WITHDRAWN with the fourteen pickers: `dashBranchIdFilterAria` and
+    // `dashInsurerIdFilterAria` were the `aria-label` on the raw inputs, and
+    // `EntitySearch` labels its own control. Their text read «تصفية حسب معرّف الفرع» —
+    // naming our surrogate key, which is exactly what decision 21 corrected in the
+    // LABEL beside them and never in the aria, because `identifier-labels.py` counts a
+    // PROMPT and an aria-label is not one. So two strings that still named a column
+    // went out with the inputs that carried them.
+    //
+    // `spOneEmployee` / `spOneTeam` were PLACEHOLDERS on /sales-performance; each
+    // ENTITY_SOURCES entry supplies its own (`entitySearchBranchPlaceholder`).
+    dashBranchIdLabel: 'اعرض فرعاً واحداً فقط',
     dashInsuranceLineLabel: 'فرع التأمين',
-    dashInsuranceLineFilterAria: 'تصفية حسب فرع التأمين',
-    dashInsurerIdLabel: 'معرّف شركة التأمين',
-    dashInsurerIdFilterAria: 'تصفية حسب معرّف شركة التأمين',
+    dashInsurerIdLabel: 'اعرض شركة تأمين واحدة فقط',
     dashPeriodLabel: 'تسمية الفترة',
     dashPeriodStart: 'بداية الفترة',
+    dashPeriodStartHint: 'أول يوم تُحسب عليه أرقام المبيعات.',
     dashPeriodEnd: 'نهاية الفترة',
+    dashPeriodEndHint: 'آخر يوم تُحسب عليه أرقام المبيعات.',
     dashPeriodLabelPlaceholder: 'مثال: 2026-08',
     dashApplyFilters: 'تطبيق عوامل التصفية',
     dashAsOf: 'كما في',
@@ -39,6 +53,26 @@ export const DASHBOARDS = {
     // Item 5 batch 1, violation 1 — the provenance line, previously hardcoded ENGLISH on eight of the
     // sixteen reporting screens. `provGeneratedAt` is when the report was COMPUTED; `provAsOf` is the date
     // the figures are measured TO. Different claims, deliberately different sentences.
+    /*
+     * OWNER DECISION 58 — THE PERIOD BESIDE THE FIGURE, not only at the top of the
+     * screen. Her words: «قسم العملاء المحتملون بيطلع 0 مع إنه في عملاء محتملون جدد»,
+     * and her instruction that a bare «١٢٠» is the defect — «١٢٠ خلال تشرين الأول».
+     *
+     * `/dashboards/sales` ALREADY printed a period line at the top (`provPeriod`) and
+     * she still read the screen as broken, which is the evidence that one line is not
+     * enough: the figure and its period have to be in the same glance.
+     *
+     * TWO CLAUSES, NOT ONE, and the second is what keeps the first honest: a metric
+     * the api declares `'asOf'` IGNORES the period filter, so printing «خلال …»
+     * beside it would be a new false claim of exactly the kind this decision exists
+     * to remove. Which clause a figure gets comes from `metricScope` on the wire.
+     *
+     * Both Arabic clauses are slices of strings already in this file — «خلال {window}»
+     * from `slaDashDueSoonMeaning` and «كما في {at}» from `provAsOf` — so no Arabic
+     * word was written for them.
+     */
+    dashFigureDuringPeriod: 'خلال {period}',
+    dashFigureAsOf: 'كما في {at}',
     provGeneratedAt: 'صُدِّر في {at}.',
     dcmpSelfApprovalViolations: 'حالات موافقة ذاتية',
     dcmpScanAsOf: '(حتى {at})',
@@ -88,14 +122,12 @@ export const DASHBOARDS = {
     spIntro:
       'العملاء المرتقبون الجدد المؤهَّلون مقارنةً بالحصة المستهدفة، لكل موظف علاقات/مبيعات أو لكل فرع أو فريق.',
     spLookUp: 'استعراض الأداء',
-    spOwnerUserIdLabel: 'معرّف المستخدم المسؤول',
+    spOwnerUserIdLabel: 'اعرض محفظة موظف واحد فقط',
     spPeriodOptionalLabel: 'تسمية الفترة (اختياري — الافتراضي هو الفترة الحالية)',
     spViewButton: 'عرض الأداء',
     spNoTarget: 'لم تُحدَّد حصة مستهدفة للفترة الحالية بعد.',
     spTargetNewProspects: 'الحصة المستهدفة — عملاء مرتقبون جدد',
     spPickFirst: 'اختر موظفاً أو فرعاً أعلاه.',
-    spOneEmployee: 'موظف واحد',
-    spOneTeam: 'فريق واحد',
     spActualNewProspects: 'الفعلي — عملاء مرتقبون جدد',
     spActualNewLeads: 'الفعلي — عملاء محتملون جدد',
     spAchievement: 'نسبة الإنجاز',
@@ -132,8 +164,8 @@ export const DASHBOARDS = {
     dpolHeading: 'لوحة الوثائق',
     dpolIntro:
       'الوثائق السارية والوثائق التي تقترب من الانتهاء لقطة حيّة كما هي الآن (وتنطبق نافذة التجديد على الوثائق المنتهية فقط). أما الوثائق الجديدة الصادرة والوثائق الملغاة (مع أسبابها) فمحصورة بالفترة المختارة، والافتراضي هو الشهر الميلادي السابق.',
+    dpolBeforeIssuance: '{customer} — قبل الإصدار',
     dpolRenewalWindowLabel: 'نافذة التجديد (بالأيام)',
-    dpolRenewalWindowAria: 'نافذة التجديد بالأيام',
     dpolActivePolicies: 'الوثائق السارية',
     dpolExpiringPolicies: 'الوثائق المنتهية (ضمن نافذة التجديد)',
     dpolNewIssued: 'الوثائق الجديدة الصادرة',
@@ -161,7 +193,7 @@ export const DASHBOARDS = {
     dclmColPremium: 'الأقساط (دينار أردني)',
     dclmColRatio: 'النسبة',
     dclmByClient: 'حسب العميل',
-    dclmByLine: 'حسب الفرع',
+    dclmByLine: 'حسب فرع التأمين',
     dclmByInsurer: 'حسب شركة التأمين',
     dclmLoadError: 'تعذّر تحميل لوحة المطالبات — حاول مرة أخرى.',
     dclmRefusalAct: 'عرض لوحة المطالبات',
@@ -222,20 +254,22 @@ export const DASHBOARDS = {
     diepBranchIdScopedLabel: 'معرّف الفرع (الموظفون فقط)',
     diepInsurerSection: 'أداء شركات التأمين (٤ محاور)',
     diepNoInsurerScores: 'لم تُحتسب درجات لأي شركة تأمين في هذه الفترة بعد.',
-    diepColInsurerId: 'معرّف شركة التأمين',
+    diepColInsurer: 'شركة التأمين',
     diepQuoteResponse: 'سرعة الاستجابة للعروض',
     diepClaimsService: 'خدمة المطالبات',
     diepPrice: 'السعر',
     diepServiceQuality: 'جودة الخدمة',
     diepEmployeeSection: 'إنجاز مؤشرات أداء الموظفين',
     diepNoEmployeeRecords: 'لم تُحتسب سجلات أداء لأي موظف في هذه الفترة بعد.',
-    diepColEmployeeId: 'معرّف الموظف',
+    diepColEmployee: 'الموظف',
     diepNewClients: 'عملاء جدد',
     diepPremiumWritten: 'الأقساط المكتتبة',
     diepCommissionEarned: 'العمولة المكتسبة',
     diepRenewalRate: 'معدّل التجديد',
     diepCrossSellRate: 'معدّل البيع المتبادل',
     diepLoadError: 'تعذّر تحميل لوحة أداء شركات التأمين والموظفين — حاول مرة أخرى.',
+    diepListInsurerScores: 'تقييمات شركات التأمين',
+    diepListEmployeeRecords: 'سجلّات أداء الموظفين',
     diepRefusalAct: 'عرض لوحة أداء شركات التأمين والموظفين',
 
     // ---- Insurer performance (#60) ----------------------------------------------
@@ -248,7 +282,9 @@ export const DASHBOARDS = {
     ipComputeNow: 'احتساب الآن',
     ipPeriodOptionalLabel: 'تسمية الفترة (اختياري)',
     ipPeriodStartOptionalLabel: 'بداية الفترة (اختياري)',
+    ipPeriodStartHint: 'أول يوم تُحسب عليه الأرقام في هذه الشاشة.',
     ipPeriodEndOptionalLabel: 'نهاية الفترة (اختياري)',
+    ipPeriodEndHint: 'آخر يوم تُحسب عليه الأرقام في هذه الشاشة.',
     ipComputeButton: 'احتساب',
     ipComputed: 'جرى احتساب الدرجة.',
     ipComputeError: 'تعذّر احتساب الدرجة.',
@@ -332,9 +368,10 @@ export const DASHBOARDS = {
     execExecutiveDashboard: 'لوحة الإدارة التنفيذية',
     execTheSalesPolicyClaimsFinancial:
       'ملخّص تنفيذي يجمع لوحات المبيعات والوثائق والمطالبات والمالية والامتثال. كل رقم مأخوذ كما هو من لوحته الأصلية — لا يُعاد احتسابه هنا، حتى لا يختلف الملخّص عمّا يلخّصه.',
-    execBranchId: 'رقم الفرع',
+    execBranchId: 'اعرض فرعاً واحداً فقط',
     execInsuranceLine: 'فرع التأمين',
     execAsOf: 'كما في تاريخ',
+    execAsOfHint: 'تُعرض أرقام اللوحة كما كانت في هذا التاريخ.',
     execApplyFilters: 'تطبيق المرشّحات',
     execSales: 'المبيعات',
     execNewLeads: 'عملاء محتملون جدد',
@@ -356,15 +393,19 @@ export const DASHBOARDS = {
       'الاستثناءات = تنبيهات غسل الأموال المفتوحة + سجل الاختراقات المفتوح.',
   },
   EN: {
-    dashBranchIdLabel: 'Branch ID',
-    dashBranchIdFilterAria: 'Branch ID filter',
+    /* DERIVED: `commonCurrentLabel` with its trailing colon dropped — the same run of
+       characters. The source is used INLINE before a figure, where the colon belongs; a
+       column header takes the words alone. No word was written. */
+    commonCurrentHeading: 'Current',
+
+    dashBranchIdLabel: 'Show one branch only',
     dashInsuranceLineLabel: 'Insurance line',
-    dashInsuranceLineFilterAria: 'Insurance line filter',
-    dashInsurerIdLabel: 'Insurer ID',
-    dashInsurerIdFilterAria: 'Insurer ID filter',
+    dashInsurerIdLabel: 'Show one insurance company only',
     dashPeriodLabel: 'Period label',
     dashPeriodStart: 'Period start',
+    dashPeriodStartHint: 'The first day sales figures are calculated from.',
     dashPeriodEnd: 'Period end',
+    dashPeriodEndHint: 'The last day sales figures are calculated to.',
     dashPeriodLabelPlaceholder: 'e.g. 2026-08',
     dashApplyFilters: 'Apply filters',
     dashAsOf: 'As of',
@@ -375,6 +416,8 @@ export const DASHBOARDS = {
     commonStatusLabel: 'Status:',
     commonCurrentLabel: 'Current:',
     // Item 5 batch 1, violation 1 — see the Arabic block for why these are two sentences and not one.
+    dashFigureDuringPeriod: 'during {period}',
+    dashFigureAsOf: 'as of {at}',
     provGeneratedAt: 'Generated {at}.',
     dcmpSelfApprovalViolations: 'Self-approval violations',
     dcmpScanAsOf: '(as of {at})',
@@ -422,14 +465,12 @@ export const DASHBOARDS = {
     spIntro:
       'New prospects qualified against quota, per Sales/Relationship Officer or per branch/team.',
     spLookUp: 'Look up performance',
-    spOwnerUserIdLabel: 'Owner user ID',
+    spOwnerUserIdLabel: 'Show the book of one officer only',
     spPeriodOptionalLabel: 'Period label (optional — defaults to the current period)',
     spViewButton: 'View performance',
     spNoTarget: 'No target set for the current period yet.',
     spTargetNewProspects: 'Target — new prospects',
     spPickFirst: 'Pick an employee or a branch above.',
-    spOneEmployee: 'one employee',
-    spOneTeam: 'one team',
     spActualNewProspects: 'Actual — new prospects',
     spActualNewLeads: 'Actual — new leads',
     spAchievement: 'Achievement',
@@ -464,8 +505,8 @@ export const DASHBOARDS = {
     dpolHeading: 'Policy Dashboard',
     dpolIntro:
       'Active policies and expiring policies are a live snapshot as of now (the renewal window applies to expiring policies only). New policies issued and cancelled policies (with reasons) are scoped to the selected period, which defaults to the previous calendar month.',
+    dpolBeforeIssuance: '{customer} — before issuance',
     dpolRenewalWindowLabel: 'Renewal window (days)',
-    dpolRenewalWindowAria: 'Renewal window in days',
     dpolActivePolicies: 'Active policies',
     dpolExpiringPolicies: 'Expiring policies (within renewal window)',
     dpolNewIssued: 'New policies issued',
@@ -492,7 +533,7 @@ export const DASHBOARDS = {
     dclmColPremium: 'Premium (JOD)',
     dclmColRatio: 'Ratio',
     dclmByClient: 'By client',
-    dclmByLine: 'By line',
+    dclmByLine: 'By insurance line',
     dclmByInsurer: 'By insurer',
     dclmLoadError: 'Could not load the Claims Dashboard — try again.',
     dclmRefusalAct: 'view the claims dashboard',
@@ -550,20 +591,22 @@ export const DASHBOARDS = {
     diepBranchIdScopedLabel: 'Branch ID (employees only)',
     diepInsurerSection: 'Insurer performance (4 axes)',
     diepNoInsurerScores: 'No insurer scores computed for this period yet.',
-    diepColInsurerId: 'Insurer ID',
+    diepColInsurer: 'Insurer',
     diepQuoteResponse: 'Quote response',
     diepClaimsService: 'Claims service',
     diepPrice: 'Price',
     diepServiceQuality: 'Service quality',
     diepEmployeeSection: 'Employee KPI achievement',
     diepNoEmployeeRecords: 'No employee performance records computed for this period yet.',
-    diepColEmployeeId: 'Employee ID',
+    diepColEmployee: 'Employee',
     diepNewClients: 'New clients',
     diepPremiumWritten: 'Premium written',
     diepCommissionEarned: 'Commission earned',
     diepRenewalRate: 'Renewal rate',
     diepCrossSellRate: 'Cross-sell rate',
     diepLoadError: 'Could not load the Insurer & Employee Performance Dashboard — try again.',
+    diepListInsurerScores: 'the insurer scores',
+    diepListEmployeeRecords: 'the employee performance records',
     diepRefusalAct: 'view the insurer and employee performance dashboard',
 
     ipHeading: 'Insurer Performance',
@@ -575,7 +618,9 @@ export const DASHBOARDS = {
     ipComputeNow: 'Compute now',
     ipPeriodOptionalLabel: 'Period label (optional)',
     ipPeriodStartOptionalLabel: 'Period start (optional)',
+    ipPeriodStartHint: 'The first day the figures on this screen are calculated from.',
     ipPeriodEndOptionalLabel: 'Period end (optional)',
+    ipPeriodEndHint: 'The last day the figures on this screen are calculated to.',
     ipComputeButton: 'Compute',
     ipComputed: 'Score computed.',
     ipComputeError: 'Could not compute the score.',
@@ -655,9 +700,10 @@ export const DASHBOARDS = {
     execExecutiveDashboard: 'Executive Dashboard',
     execTheSalesPolicyClaimsFinancial:
       'The Sales, Policy, Claims, Financial and Compliance dashboards rolled up. Every figure is lifted verbatim from the dashboard that produced it — nothing is recalculated here, so the summary can never disagree with what it summarises.',
-    execBranchId: 'Branch ID',
+    execBranchId: 'Show one branch only',
     execInsuranceLine: 'Insurance line',
     execAsOf: 'As of',
+    execAsOfHint: 'Dashboard figures are shown as they stood on this date.',
     execApplyFilters: 'Apply filters',
     execSales: 'Sales',
     execNewLeads: 'New leads',

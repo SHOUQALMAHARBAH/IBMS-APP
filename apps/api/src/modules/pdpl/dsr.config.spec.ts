@@ -20,6 +20,11 @@ function row(
     id: 'dsr-1',
     customerId: 'cust-1',
     insuredPersonId: null,
+    // The two intake columns. Carried because `DataSubjectRequestRow` requires them and the
+    // compiler said so — the same argument the comment below already makes about the relation:
+    // a fixture that omits a field the row type has is a fixture that lies.
+    requestText: 'A copy of everything you hold about me.',
+    intakeChannel: 'WEBSITE_FORM',
     // The read includes this relation now, so the fixture carries it. A fixture that omits a field
     // the row type has is a fixture that lies — the compiler caught this one, which is the argument
     // for the row type NOT making it optional just to keep the fixture quiet.

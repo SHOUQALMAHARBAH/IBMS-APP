@@ -1,11 +1,18 @@
 import { Module } from '@nestjs/common';
 import { ConsentController } from './consent.controller';
 import { ConsentService } from './consent.service';
+import { UserRepository } from '../../repositories/user.repository';
 import { ConsentRecordRepository } from '../../repositories/consent-record.repository';
 import { DsrController } from './dsr.controller';
 import { DsrService } from './dsr.service';
 import { DsrRepository } from '../../repositories/dsr.repository';
 import { RetentionScheduleController } from './retention-schedule.controller';
+import { RetentionNoticeController } from './retention-notice.controller';
+import { RetentionNoticeService } from './retention-notice.service';
+import { RetentionNoticeRepository } from '../../repositories/retention-notice.repository';
+import { RetentionArchiveController } from './retention-archive.controller';
+import { RetentionArchiveService } from './retention-archive.service';
+import { RetentionArchiveRepository } from '../../repositories/retention-archive.repository';
 import { RetentionScheduleService } from './retention-schedule.service';
 import { RetentionScheduleRepository } from '../../repositories/retention-schedule.repository';
 import { LegalHoldController } from './legal-hold.controller';
@@ -100,6 +107,9 @@ import { SlaModule } from '../sla/sla.module';
     ConsentController,
     DsrController,
     RetentionScheduleController,
+    // Batch 5 group 7b — the notice reads; it has no write path to a disposal.
+    RetentionNoticeController,
+    RetentionArchiveController,
     LegalHoldController,
     DisposalBatchController,
     CrossBorderTransferController,
@@ -110,12 +120,20 @@ import { SlaModule } from '../sla/sla.module';
     DpoWorkspaceController,
   ],
   providers: [
+    // Owner decision 48 — the two registers in this module name their actor through
+    // `UserRepository.displayNamesForUserIds`, the one place that applies the HR record where the
+    // account is linked. The other three modules that resolve an actor's name already injected it.
+    UserRepository,
     ConsentService,
     ConsentRecordRepository,
     DsrService,
     DsrRepository,
     RetentionScheduleService,
     RetentionScheduleRepository,
+    RetentionNoticeService,
+    RetentionArchiveService,
+    RetentionNoticeRepository,
+    RetentionArchiveRepository,
     LegalHoldService,
     LegalHoldRepository,
     // The DSR closure gate reads one fact from it: whether a correction was recorded against a CORRECTION

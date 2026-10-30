@@ -17,7 +17,7 @@ export const pageStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: 'var(--space-8)',
+  padding: 'var(--space-5)',
   background: 'var(--surface-page)',
 };
 
@@ -46,9 +46,16 @@ export const authPageStyle: CSSProperties = {
 export const cardStyle: CSSProperties = {
   width: '24rem',
   maxWidth: '100%',
-  padding: 'var(--space-8)',
+  padding: 'var(--space-5)',
   background: 'var(--surface-card)',
-  border: '1px solid var(--border-default)',
+  // LONGHAND, DELIBERATELY, and never the `border` shorthand: the variant below
+  // overrides `borderColor`, and React refuses to update a longhand on a rerender when the
+  // shorthand is also set — *"can lead to styling bugs"*, which is its own warning
+  // and not a style preference. Measured across the web tree: FOUR pairs had this
+  // shape, and `style-shorthand-conflict.test.ts` refuses a fifth.
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'var(--border-default)',
   borderRadius: 'var(--radius-xl)',
   boxShadow: 'var(--shadow-md)',
 };
@@ -103,13 +110,19 @@ export const inputStyle: CSSProperties = {
 };
 
 export const buttonStyle: CSSProperties = {
-  marginTop: 'var(--space-6)',
+  marginTop: 'var(--space-4)',
   width: '100%',
   padding: 'var(--space-2) var(--space-4)',
   fontFamily: 'inherit',
   fontSize: 'var(--text-base)',
   fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
-  color: '#ffffff',
+  // `--on-brand`, NOT a literal white, and the arithmetic is the reason: the dark theme flips
+  // `--brand-600` to a light blue (#6bb0e6), where white measures 2.34:1 against the 7.70:1
+  // the token gives. `Button`'s own `primary` variant already carried this exact note by name
+  // and this file kept the literal — on the sign-in button, which is the first thing the
+  // product shows anybody. Invisible to `literal-colours.py` until it read `.ts` as well as
+  // `.tsx`, and invisible to axe because Playwright runs one theme.
+  color: 'var(--on-brand)',
   background: 'var(--brand-600)',
   border: '1px solid var(--brand-600)',
   borderRadius: 'var(--radius-md)',
@@ -172,4 +185,26 @@ export const manualKeyStyle: CSSProperties = {
   // A long key must wrap rather than widen the card.
   overflowWrap: 'anywhere',
   direction: 'ltr',
+};
+
+/*
+ * THE PRE-SIGN-IN FORM, inside `AuthFrame`'s form panel.
+ *
+ * These three live here rather than inline on the screen for the reason the inline-style ratchet
+ * exists: five auth screens share this shape, and five copies of `display: grid; gap` are five
+ * chances for them to stop agreeing. `--space-4` is the scale's 16px step.
+ */
+export const authFormStyle: CSSProperties = {
+  display: 'grid',
+  gap: 'var(--space-4)',
+};
+
+export const authHeadingStyle: CSSProperties = {
+  fontSize: 'var(--text-xl)',
+};
+
+/** A line of guidance above a field — never `opacity`, which globals.css forbids for text. */
+export const authPromptStyle: CSSProperties = {
+  fontSize: 'var(--text-sm)',
+  color: 'var(--ink-secondary)',
 };

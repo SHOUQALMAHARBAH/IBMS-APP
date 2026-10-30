@@ -119,9 +119,15 @@ describe('deriveInsurerPerformanceScoreView', () => {
       serviceQualityScore: new Prisma.Decimal('50'),
       computedAt: new Date('2026-09-01T06:00:00.000Z'),
     };
-    expect(deriveInsurerPerformanceScoreView(row)).toEqual({
+    expect(
+      deriveInsurerPerformanceScoreView(
+        row,
+        new Map([['insurer-1', 'Jordan Insurance Co']]),
+      ),
+    ).toEqual({
       id: 'score-1',
       insurerId: 'insurer-1',
+      insurerName: 'Jordan Insurance Co',
       periodLabel: '2026-08',
       quoteResponseScore: '85.50',
       claimsServiceScore: '100.00',
@@ -129,5 +135,29 @@ describe('deriveInsurerPerformanceScoreView', () => {
       serviceQualityScore: '50.00',
       computedAt: '2026-09-01T06:00:00.000Z',
     });
+  });
+
+  /* ITEM 1's OTHER BRANCH, and it is not decoration: `InsurerPerformanceScore` is a PERIODIC
+   * SNAPSHOT, so a score can outlive the insurer row it scores. The name must then report NOTHING
+   * — never the uuid, which is the `?? id` fallback that always produces something to render and
+   * reintroduces the defect the budget is about. A test asserting only the resolved name would
+   * pass against exactly that. */
+  it('reports NO name rather than the uuid when the insurer row is gone', () => {
+    const row = {
+      id: 'score-1',
+      organizationId: 'org-1',
+      insurerId: 'insurer-gone',
+      periodLabel: '2026-08',
+      quoteResponseScore: new Prisma.Decimal('85.5'),
+      claimsServiceScore: new Prisma.Decimal('100'),
+      priceScore: new Prisma.Decimal('62.25'),
+      serviceQualityScore: new Prisma.Decimal('50'),
+      computedAt: new Date('2026-09-01T06:00:00.000Z'),
+    };
+    const view = deriveInsurerPerformanceScoreView(row, new Map());
+    expect(view.insurerName).toBeNull();
+    /* The claim is about the NAME, not about the id's absence: `insurerId` is legitimately on the
+     * wire. Asserting the id is absent from the whole view fails on correct code. */
+    expect(view.insurerName).not.toBe(row.insurerId);
   });
 });

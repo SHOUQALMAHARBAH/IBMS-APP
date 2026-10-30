@@ -1,6 +1,13 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { Transform } from 'class-transformer';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { emptyStringToUndefined } from '../../../common/dto.util';
+import { NoFloorDeclarationDto } from './no-floor-declaration.dto';
 
 /** M06 — `PATCH /retention-schedule/:id` (`retention-schedule.manage`).
  * Blocked once `confirmedByLegalCounselAt` is set — see
@@ -17,4 +24,10 @@ export class UpdateRetentionScheduleItemDto {
   @Transform(emptyStringToUndefined)
   @IsString()
   legalBasis?: string;
+
+  /** See the create DTO: optional here, decided in the service, because a DTO cannot see the floor. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NoFloorDeclarationDto)
+  noFloorDeclaration?: NoFloorDeclarationDto;
 }

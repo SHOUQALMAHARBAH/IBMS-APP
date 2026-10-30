@@ -6,8 +6,15 @@ import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { ApiError } from "../../../lib/auth/api-client";
-import { errorStyle } from "../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../components/lead/lead.styles";
+import {
+  Card,
+  ErrorState,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from "../../../components/ui";
+import { pageStackStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import {
   activateSlaPolicy,
@@ -27,18 +34,6 @@ const STATUSES: (SlaPolicyStatus | "ALL")[] = [
   "DRAFT",
   "INACTIVE",
 ];
-
-const cell: CSSProperties = {
-  padding: "0.45rem 0.75rem",
-  borderBottom: "1px solid var(--border-subtle)",
-  textAlign: "start",
-  verticalAlign: "top",
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
 
 /** Regulatory is visually distinct from every other source, deliberately. The
  * whole point of the feature is that a reader can tell at a glance whether
@@ -158,13 +153,13 @@ export default function SlaPoliciesPage() {
   };
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>{t('slapSlaPolicies')}</h1>
       <p style={{ opacity: 0.75, maxWidth: "50rem" }}>
         {t('slapEveryDeadlineInTheSystem')}
       </p>
 
-      <div style={{ display: "flex", gap: "0.4rem", margin: "1rem 0" }}>
+      <div style={{ display: "flex", gap: 'var(--space-2)', margin: "1rem 0" }}>
         {STATUSES.map((s) => (
           <button
             key={s}
@@ -173,7 +168,9 @@ export default function SlaPoliciesPage() {
             disabled={busy}
             style={{ fontWeight: s === status ? 700 : 400 }}
           >
-            {s}
+            {s === 'ALL'
+              ? t('slaPolFilterAll')
+              : t(ENUM_LABEL.SlaPolicyStatus[s])}
           </button>
         ))}
       </div>
@@ -183,14 +180,10 @@ export default function SlaPoliciesPage() {
       <NewSlaPolicyForm onCreated={() => void load(status)} />
 
       {actionError ? (
-        <p role="alert" style={errorStyle}>
-          {actionError}
-        </p>
+        <ErrorState title={actionError} />
       ) : null}
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {rows ? (
@@ -199,22 +192,22 @@ export default function SlaPoliciesPage() {
             {t('slapNoPolicies')}
           </p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", minWidth: "72rem" }}>
+          <Card padded={false}>
+            <Table>
               <thead>
                 <tr>
-                  <th style={head}>{t('slapProcess')}</th>
-                  <th style={head}>{t('slapDuration')}</th>
-                  <th style={head}>{t('slapSource')}</th>
-                  <th style={head}>{t('slapCalendar')}</th>
-                  <th style={head}>{t('slapStatus')}</th>
-                  <th style={head}>{t('slapAction')}</th>
+                  <Th>{t('slapProcess')}</Th>
+                  <Th>{t('slapDuration')}</Th>
+                  <Th>{t('slapSource')}</Th>
+                  <Th>{t('slapCalendar')}</Th>
+                  <Th>{t('slapStatus')}</Th>
+                  <Th>{t('slapAction')}</Th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((p) => (
-                  <tr key={p.id}>
-                    <td style={cell}>
+                  <Tr key={p.id}>
+                    <Td>
                       <div style={{ fontWeight: 600 }}>{p.policyName}</div>
                       <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
                         {p.policyCode}
@@ -223,10 +216,10 @@ export default function SlaPoliciesPage() {
                         {p.processType}
                         {p.workflowState ? ` · ${p.workflowState}` : ""}
                       </div>
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {canUpdate ? (
-                        <div style={{ display: "flex", gap: "0.3rem" }}>
+                        <div style={{ display: "flex", gap: 'var(--space-2)' }}>
                           <input
                             aria-label={t('slapDurationAria', { name: p.policyName })}
                             type="number"
@@ -247,8 +240,8 @@ export default function SlaPoliciesPage() {
                           {p.durationValue} {unitLabel(p.durationUnit)}
                         </span>
                       )}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       <span
                         style={sourceBadgeStyle(p.isRegulatory)}
                         data-regulatory={p.isRegulatory ? "true" : "false"}
@@ -260,18 +253,18 @@ export default function SlaPoliciesPage() {
                           {t('slapNotALegalRequirement')}
                         </div>
                       ) : null}
-                    </td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>
                       {p.calendarType === "CONTINUOUS_24_7"
                         ? t('slap247')
                         : p.calendarType === "CUSTOM"
                           ? t('slapCustom')
                           : t('slapJordanWorkingDays')}
-                    </td>
-                    <td style={cell}>{t(ENUM_LABEL.SlaPolicyStatus[p.status])}</td>
-                    <td style={cell}>
+                    </Td>
+                    <Td>{t(ENUM_LABEL.SlaPolicyStatus[p.status])}</Td>
+                    <Td>
                       {canUpdate || canDeactivate ? (
-                        <div style={{ display: "flex", gap: "0.3rem" }}>
+                        <div style={{ display: "flex", gap: 'var(--space-2)' }}>
                           {canUpdate ? (
                           <button
                             type="button"
@@ -323,12 +316,12 @@ export default function SlaPoliciesPage() {
                           {t('slapReadOnly')}
                         </span>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
+          </Card>
         )
       ) : loadError ? null : (
         // The loading state directive §2 requires; this page rendered

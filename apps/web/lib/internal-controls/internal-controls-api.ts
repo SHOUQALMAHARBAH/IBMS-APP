@@ -12,6 +12,9 @@ export interface SelfApprovalViolation {
   makerField: string;
   checkerField: string;
   userId: string;
+  /* Item 1 — the colleague's name, resolved by the api. NULL means the account is gone, never the
+   * uuid. */
+  userName: string | null;
   dbCheckConstraint: string | null;
 }
 

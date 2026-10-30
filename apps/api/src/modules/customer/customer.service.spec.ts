@@ -12,6 +12,8 @@ import type { AuditService } from '../audit/audit.service';
 import type { EncryptionService } from '../security/encryption.service';
 import type { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
 import type { DuplicateNameWarningRepository } from '../../repositories/duplicate-name-warning.repository';
+import type { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import type { ScreeningService } from './screening.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
@@ -103,6 +105,25 @@ function makeDeps() {
     record: recordWarning,
   } as unknown as DuplicateNameWarningRepository;
 
+  // THE IDENTIFIER-CORRECTION COLLABORATORS (the owner's 2026-10-28 strike).
+  //
+  // Doubles rather than `undefined`, and the default is NO KYC FILE — which is the commonest real
+  // state by a wide margin: measured, dev holds 1,538 customers and 2 KYC records. A correction on a
+  // customer with no file re-screens nothing, so every pre-existing test in this file is unaffected,
+  // and a test that wants the re-screen says so by pointing `findLatestByCustomerId` at a file.
+  const findLatestKyc = vi.fn().mockResolvedValue(null);
+  const findScreeningResults = vi.fn().mockResolvedValue([]);
+  const kycRecords = {
+    findLatestByCustomerId: findLatestKyc,
+    findScreeningResultsByKycRecordId: findScreeningResults,
+  } as unknown as KycRecordRepository;
+  const screeningRun = vi
+    .fn()
+    .mockResolvedValue({ results: [{ id: 'screening-new' }] });
+  const screening = {
+    run: screeningRun,
+  } as unknown as ScreeningService;
+
   return {
     service: new CustomerService(
       customers,
@@ -111,8 +132,13 @@ function makeDeps() {
       encryption,
       reveal,
       duplicateWarnings,
+      kycRecords,
+      screening,
     ),
     mocks: {
+      findLatestKyc,
+      findScreeningResults,
+      screeningRun,
       create,
       findById,
       findMany,

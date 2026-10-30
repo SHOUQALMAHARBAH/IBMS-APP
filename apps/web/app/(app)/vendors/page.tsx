@@ -14,8 +14,17 @@ import {
   type VendorType,
 } from '../../../lib/supporting-operations/vendor-api';
 import { ApiError } from '../../../lib/auth/api-client';
-import { errorStyle } from '../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../components/lead/lead.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  SkeletonList,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { pageStackStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
@@ -25,8 +34,8 @@ const cell: CSSProperties = {
   textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '26rem' };
+const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
 
 export default function VendorsPage() {
   const { t } = useLanguage();
@@ -112,11 +121,11 @@ export default function VendorsPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('venHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('venIntro')}
-      </p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('venHeading')}
+        description={t('venIntro')}
+      />
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
         <label htmlFor="vendor-search" style={{ marginInlineEnd: '0.5rem' }}>
@@ -135,9 +144,7 @@ export default function VendorsPage() {
       </form>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       <form onSubmit={onCreate} style={formStyle}>
@@ -160,9 +167,7 @@ export default function VendorsPage() {
           </select>
         </label>
         {formError ? (
-          <p role="alert" style={errorStyle}>
-            {formError}
-          </p>
+          <ErrorState title={formError} />
         ) : null}
         <button type="submit">{t('venSubmitButton')}</button>
       </form>
@@ -173,19 +178,20 @@ export default function VendorsPage() {
             {searchTerm ? t('venNoneMatch') : t('venNone')}
           </p>
         ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
+          <Card padded={false}>
+            <Table>
             <thead>
               <tr>
-                <th style={head}>{t('venColName')}</th>
-                <th style={head}>{t('venColType')}</th>
-                <th style={head}>{t('venColRiskTier')}</th>
+                <Th>{t('venColName')}</Th>
+                <Th>{t('venColType')}</Th>
+                <Th>{t('venColRiskTier')}</Th>
                 <th style={head} />
               </tr>
             </thead>
             <tbody>
               {vendors.map((vendor) => (
-                <tr key={vendor.id}>
-                  <td style={cell}>
+                <Tr key={vendor.id}>
+                  <Td>
                     {editingId === vendor.id ? (
                       <input
                         dir="auto"
@@ -195,10 +201,10 @@ export default function VendorsPage() {
                     ) : (
                       <bdi>{vendor.name}</bdi>
                     )}
-                  </td>
-                  <td style={cell}>{vendor.vendorType}</td>
-                  <td style={cell}>{vendor.riskTier ?? 'unassigned'}</td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>{vendor.vendorType}</Td>
+                  <Td>{vendor.riskTier ?? 'unassigned'}</Td>
+                  <Td>
                     {editingId === vendor.id ? (
                       <button type="button" onClick={() => saveEdit(vendor.id)}>
                         {t('commonSave')}
@@ -211,14 +217,15 @@ export default function VendorsPage() {
                         <Link href={`/vendors/${vendor.id}`}>{t('venManageButton')}</Link>
                       </>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
+          </Card>
         )
       ) : loadError ? null : (
-        <p>{t('venLoading')}</p>
+        <SkeletonList rows={4} label={t('venLoading')} />
       )}
 
     </main>

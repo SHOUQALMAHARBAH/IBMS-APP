@@ -9,6 +9,7 @@ import {
   listConsentRecords,
   requestConsentWithdrawal,
   type ConsentRecord,
+  type ConsentPurpose,
 } from '../../lib/pdpl/consent-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { hasPermission } from '../../lib/auth/permissions';
@@ -24,7 +25,9 @@ import { permissionRefusal } from '../../lib/i18n/permission-refusal';
 // CRUD exist yet for a widget to attach to.
 
 interface Props {
-  purpose: string;
+  /* The union, not `string`: this widget hands its value straight to
+   * `createConsentRecord`, so a loose prop here is a loose write. */
+  purpose: ConsentPurpose;
   label: string;
   defaultConsentTextVersion: string;
   customerId?: string;
@@ -147,7 +150,10 @@ export function ConsentCaptureWidget({
     >
       <h3 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>{label}</h3>
       {error ? (
-        <p role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>
+        <p
+          role="alert"
+          style={{ color: 'var(--danger-ink)', fontSize: '0.85rem' }}
+        >
           {error}
         </p>
       ) : null}
@@ -167,7 +173,7 @@ export function ConsentCaptureWidget({
             {record.consentTextVersion})
           </span>
           <button type="button" disabled={busy} onClick={() => void withdraw()}>
-            {busy ? t('consWithdrawing') : 'Withdraw'}
+            {busy ? t('consWithdrawing') : t('consWithdrawButton')}
           </button>
         </div>
       ) : (

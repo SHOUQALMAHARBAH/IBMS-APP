@@ -13,9 +13,12 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
-  errorStyle,
 } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -30,6 +33,7 @@ import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeD
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../../lib/i18n/format';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 
 export default function UpSellRecommendationDetailPage() {
@@ -93,7 +97,7 @@ export default function UpSellRecommendationDetailPage() {
   const canConvert = hasPermission(user, 'up-sell.convert');
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>
@@ -109,14 +113,15 @@ export default function UpSellRecommendationDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {recommendation ? (
         <>
-          <h1>{t('upsdHeading')}</h1>
+          <PageHeader title={t('upsdHeading')} />
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='UpSellRecommendation' entityId={recommendation.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             <span style={upSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[recommendation.status])}</span>
           </p>
@@ -245,9 +250,7 @@ export default function UpSellRecommendationDetailPage() {
           ) : null}
 
           {actionError ? (
-            <p role="alert" style={errorStyle}>
-              {actionError}
-            </p>
+            <ErrorState title={actionError} />
           ) : null}
         </>
       ) : null}

@@ -13,6 +13,15 @@ const row = (
   retentionPeriodMonths: 120,
   legalBasis: 'DRAFT',
   confirmedByLegalCounselAt: null,
+  // Explicit, not omitted: under a `Partial<T>` spread an omitted field becomes `| undefined`,
+  // which is what the compiler complains about rather than the omission itself.
+  combinedDutyAct: null,
+  // Batch 5 group 6 — the no-floor declaration, all five explicit for the same reason.
+  noFloorNoticeShown: null,
+  noFloorReason: null,
+  noFloorAcknowledgedAt: null,
+  noFloorAcknowledgedByUserId: null,
+  noFloorAcknowledgedMonths: null,
   ...over,
 });
 

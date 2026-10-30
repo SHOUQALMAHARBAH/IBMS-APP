@@ -38,7 +38,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  * typecheck and to a mocked Playwright test; the proof against the real producer lives in
  * `duty-segregation-combined.e2e-spec.ts`.
  *
- * TWO acts, projected SEPARATELY and never merged. `NeedsAssessment` is the only one of the fifteen
+ * TWO acts, projected SEPARATELY and never merged. `NeedsAssessment` is the only one of the sixteen
  * carrying two pairs, and a single field would say "somebody doubled up here" without saying whether it
  * was the REVIEW or the APPROVAL — which is the distinction the two database columns exist to keep.
  *

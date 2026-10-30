@@ -107,6 +107,10 @@ test("creates and signs a Data Processing Agreement", async ({ page }) => {
           signedAt: null,
           assessedByUserId: "user-1",
           dpoApprovedByUserId: null,
+          // Item 4(a). The assessor is named; nothing has approved this yet, so the approver name
+          // is null — and the screen must render NOTHING for it rather than an empty "approved by".
+          assessedByName: "سامر عبدالله الحوراني",
+          dpoApprovedByName: null,
           // The endpoint returns this now. Null: nothing has DPO-approved this agreement yet.
           combinedDutyAct: null,
           expiresAt: null,
@@ -217,6 +221,10 @@ const SELF_APPROVED_DPA = {
   signedAt: "2026-09-06T09:00:00.000Z",
   assessedByUserId: "user-1",
   dpoApprovedByUserId: "user-1",
+  // Item 4(a) — the two people by NAME, resolved by the api. Here they are the SAME person, which
+  // is what makes this fixture the self-approval case.
+  assessedByName: "سامر عبدالله الحوراني",
+  dpoApprovedByName: "سامر عبدالله الحوراني",
   combinedDutyAct: {
     id: "cda-dpa-1",
     at: "2026-09-08T00:00:00.000Z",
@@ -251,6 +259,31 @@ test("shows that one person both assessed and DPO-approved an agreement, and why
     "data-combined-duty-pair",
     "DataProcessingAgreement_maker_checker_distinct",
   );
+
+  /*
+   * ITEM 4(a) — WHO APPROVED IT, which this register did not say.
+   *
+   * A DPA is what makes sending personal data to a third party lawful at all, and its approval is
+   * a maker/checker decision with a database CHECK behind it — so the screen reported WHETHER it
+   * was approved and never BY WHOM. Both sides are named now, because a reader cannot see that
+   * two people were involved from one name.
+   *
+   * This is also why BOTH halves are asserted here rather than one: on this fixture the assessor
+   * and the approver are the SAME person, so a test reading only one name could not tell a
+   * self-approval from a two-person agreement — which is exactly what the combined-duty act above
+   * exists to make visible.
+   */
+  await expect(
+    page.locator('[data-dpa-approver="dpa-9"]'),
+  ).toContainText("approved by سامر عبدالله الحوراني");
+  await expect(
+    page.locator('[data-dpa-assessor="dpa-9"]'),
+  ).toContainText("سامر عبدالله الحوراني");
+  // Each row carries its OWN hook keyed on the agreement id, so a vendor with several agreements
+  // cannot have one row's approver read as another's — and so neither assertion can pass by
+  // matching text anywhere on the page, which `check:absence` exists to forbid.
+  // The budget does NOT move for this: `/vendors/[id]`'s counted identifier is the PRESENCE TEST
+  // gating the approve control, which never reached a reader. Register entry 134.
 });
 
 test("prints DPO approved and declares nothing when two people agreed", async ({
@@ -271,6 +304,10 @@ test("prints DPO approved and declares nothing when two people agreed", async ({
             ...SELF_APPROVED_DPA,
             id: "dpa-10",
             dpoApprovedByUserId: "user-9",
+            // Item 4(a) — a DIFFERENT person, and therefore a different NAME. Spreading
+            // SELF_APPROVED_DPA would otherwise carry user-1's name onto user-9's approval, so
+            // the fixture would be asserting data the api could never produce.
+            dpoApprovedByName: "ليلى محمود الزعبي",
             combinedDutyAct: null,
           },
         ],
@@ -278,12 +315,25 @@ test("prints DPO approved and declares nothing when two people agreed", async ({
   );
 
   await page.goto("/vendors/vendor-1");
-  // The POSITIVE claim is the anchor: the cell prints the approved marker, which is true of a two-person
-  // approval. Asserting silence alone would pass on a cell that had stopped rendering the declaration.
-  // `exact` is what makes this an anchor rather than a near-miss: the self-approved cell carries the same
-  // word PLUS the declaration, so an inexact match would be satisfied by either row.
+  /*
+   * RE-POINTED BY ITEM 4(a), AND THE REVERSAL IS STATED. This asserted the approved cell's
+   * accessible name was EXACTLY "yes", and its own comment explained why: the self-approved cell
+   * carried that word PLUS a declaration, so `exact` was what told the two rows apart.
+   *
+   * Item 4(a) adds the APPROVER'S NAME to every approved cell, so neither row's name is "yes" any
+   * more and the old anchor cannot match either. The property it was about is kept and
+   * STRENGTHENED: the two-person case is now visible AS two people — a different name from the
+   * assessor's — where before it was only inferable from the ABSENCE of a declaration.
+   *
+   * The silence half (no combined-duty declaration on this row) is asserted immediately below and
+   * is unchanged; it is the assertion that would pass vacuously on its own, which is why the
+   * positive anchor comes first.
+   */
   await expect(
-    page.getByRole("cell", { name: "yes", exact: true }),
-  ).toBeVisible();
+    page.locator('[data-dpa-approver="dpa-10"]'),
+  ).toContainText("approved by ليلى محمود الزعبي");
+  await expect(
+    page.locator('[data-dpa-assessor="dpa-10"]'),
+  ).toContainText("سامر عبدالله الحوراني");
   await expect(page.getByTestId("combined-duty-dpa-dpa-10")).toHaveCount(0);
 });

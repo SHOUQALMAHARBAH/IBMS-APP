@@ -56,7 +56,7 @@ export function PrivacyNoticeDisplay({ touchpoint, canRead }: Props) {
     >
       <h3 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>{t('pnHeading')}</h3>
       {error ? (
-        <p role="alert" style={{ color: '#b91c1c' }}>
+        <p role="alert" style={{ color: 'var(--danger-ink)' }}>
           {error}
         </p>
       ) : notice === undefined ? (

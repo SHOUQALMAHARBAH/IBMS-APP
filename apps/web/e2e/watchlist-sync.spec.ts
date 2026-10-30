@@ -177,10 +177,29 @@ test("lists every generation and marks which one screening runs against", async 
 
   await page.goto("/watchlist-sync");
   await expect(page.getByTestId("watchlist-generations")).toBeVisible();
+  // RE-POINTED 2026-10-27, and the reversal is the point rather than a test detail:
+  // this asserted the raw member names `PUBLISHED` and `SUPERSEDED`, which WAS the
+  // defect. `DatasetVersionStatus` has carried a full Arabic label set all along
+  // and this cell rendered none of it, one line below a cell that correctly uses
+  // `ENUM_LABEL.WatchlistSource`. The property the test is about — which generation
+  // screening runs against — is unchanged and is now asserted on the words a reader
+  // actually sees.
   await expect(page.getByTestId("generation-status-ver-1")).toHaveText(
-    "PUBLISHED",
+    "Published",
   );
   await expect(page.getByTestId("generation-status-ver-old")).toHaveText(
+    "Superseded",
+  );
+  // And the member name is GONE FROM THE CELL, which is the half that would pass
+  // again if the label were dropped. SCOPED to the cell and not the section: the
+  // section's own intro paragraph legitimately names the state in prose — "The
+  // PUBLISHED one is what screening runs against right now" — and a section-wide
+  // absence failed on correct code because of it. The recorded rule, paid for
+  // again: scope an absence to the element it is about.
+  await expect(page.getByTestId("generation-status-ver-1")).not.toContainText(
+    "PUBLISHED",
+  );
+  await expect(page.getByTestId("generation-status-ver-old")).not.toContainText(
     "SUPERSEDED",
   );
 });
@@ -298,4 +317,82 @@ test("watchlist-sync screen has no serious/critical accessibility violations @a1
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+/*
+ * «الأزرار الي فيها مش شغالة، بضغط عليها ما بيظهر الي اشي»
+ * — the owner's walk, 2026-10-26, about this screen.
+ *
+ * The buttons WERE working. `runWatchlistSync` fetches `treasury.gov` and
+ * `scsanctions.un.org` with a 120-second timeout and two retries per source
+ * (`watchlist-fetchers.ts#downloadOptions`), so the act can legitimately be in
+ * flight for about six minutes — and the only thing that changed on screen was
+ * `disabled`. Her conclusion was the reasonable one.
+ *
+ * The request is HELD OPEN here on purpose. A pending state that exists for
+ * twenty milliseconds is a pending state nobody ever sees, so a test that
+ * fulfils immediately would pass against a screen that is still silent in
+ * practice.
+ */
+test("says work is under way while the sync runs, and then says what it did", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockStatus(page);
+
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("http://localhost:4000/watchlist-sync/run", async (route) => {
+    await held;
+    await route.fulfill({
+      status: 201,
+      json: [
+        { source: "OFAC_SDN", status: "succeeded", recordCount: 19329 },
+        { source: "UN_CONSOLIDATED", status: "succeeded", recordCount: 743 },
+      ],
+    });
+  });
+
+  await page.goto("/watchlist-sync");
+  await page.getByRole("button", { name: "Sync watchlists now" }).click();
+
+  // IN FLIGHT. Before this, nothing here changed at all.
+  const pending = page.getByTestId("ws-action-pending");
+  await expect(pending).toHaveText("Working…");
+  await expect(pending).toHaveAttribute("role", "status");
+
+  release();
+
+  // FINISHED, and the outcome NAMES what happened per source rather than
+  // saying "done" — a success line carrying no information is the silence it
+  // replaced with an extra step.
+  const outcome = page.getByTestId("ws-action-outcome");
+  await expect(outcome).toContainText("OFAC SDN");
+  await expect(outcome).toContainText("UN consolidated list");
+  await expect(outcome).toContainText("records");
+  await expect(outcome).toHaveAttribute("role", "status");
+  // And the pending line is gone, so the two cannot both stand.
+  await expect(page.getByTestId("ws-action-pending")).toHaveCount(0);
+});
+
+test("a failed sync is announced as a failure, not as a quiet nothing", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockStatus(page);
+  await page.route("http://localhost:4000/watchlist-sync/run", (route) =>
+    route.fulfill({ status: 503, json: { message: "OFAC is unreachable" } }),
+  );
+
+  await page.goto("/watchlist-sync");
+  await page.getByRole("button", { name: "Sync watchlists now" }).click();
+
+  // `role="alert"`, not the outcome's polite `role="status"` — a failure is not
+  // a quieter kind of success.
+  const failed = page.getByTestId("ws-action-error");
+  await expect(failed).toContainText("OFAC is unreachable");
+  await expect(failed).toHaveAttribute("role", "alert");
+  await expect(page.getByTestId("ws-action-outcome")).toHaveCount(0);
 });

@@ -3,6 +3,7 @@ import {
   pairByConstraint,
   type MakerCheckerConstraint,
 } from '../../common/maker-checker-pairs.config';
+import { DECLARATION_REASON_MIN_LENGTH } from '../../common/declaration-reason';
 import { assertDifferentActors } from '../../common/maker-checker.util';
 import { CombinedDutyActRepository } from '../../repositories/combined-duty-act.repository';
 import { OrganizationRepository } from '../../repositories/organization.repository';
@@ -10,7 +11,14 @@ import { PermissionRepository } from '../../repositories/permission.repository';
 import { UserRepository } from '../../repositories/user.repository';
 
 /** Matching the discard reason and the national-ID reveal justification. */
-export const COMBINED_DUTY_REASON_MIN_LENGTH = 10;
+/**
+ * TEN, and the figure now lives in `common/declaration-reason.ts` so there is exactly one of it.
+ *
+ * The retention no-floor declaration (batch 5 group 6) needed the same minimum, and writing `10`
+ * a second time would have been the drift the owner named: "two different minimums for one concept
+ * is the drift we keep paying for". This export is unchanged for its three importers.
+ */
+export const COMBINED_DUTY_REASON_MIN_LENGTH = DECLARATION_REASON_MIN_LENGTH;
 
 export interface ResolveDutySegregationInput {
   /** Which of the 15 pairs. A compile-time union, so a typo cannot reach a message or a column. */

@@ -1,13 +1,15 @@
 'use client';
 
+import {
+  ErrorState,
+} from '../../../../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
-  pageStyle,
+  pageStackStyle,
   smallButtonStyle,
 } from '../../../../components/lead/lead.styles';
 import {
@@ -18,6 +20,7 @@ import {
 import type { LeadSource, LeadStatus } from '../../../../lib/lead/lead-api';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { leadStatusLabelKey } from '../../../../lib/lead/lead-status';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 // Typed, not `string`: these two are printed to a person, so they go through
 // ENUM_LABEL, and that lookup only compiles against the real vocabulary.
@@ -81,15 +84,27 @@ export default function LeadDetailPage() {
 
   if (isLoading2) {
     return (
-      <div style={pageStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('leaddLoading')}</p>
-      </div>
+      </main>
     );
   }
 
   if (loadError) {
     return (
-      <div style={pageStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         {/*
           `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
           role, so a sighted reader saw the error and a screen-reader user was never told — the screen
@@ -97,9 +112,7 @@ export default function LeadDetailPage() {
           other screen in this app announces it; `test/load-error-alert.test.ts` now fails a load-error
           branch that does not.
         */}
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
         <button
           type="button"
           style={smallButtonStyle}
@@ -107,15 +120,21 @@ export default function LeadDetailPage() {
         >
           {t('leaddBackToList')}
         </button>
-      </div>
+      </main>
     );
   }
 
   if (!lead) {
     return (
-      <div style={pageStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('leaddNotFound2')}</p>
-      </div>
+      </main>
     );
   }
 
@@ -126,10 +145,19 @@ export default function LeadDetailPage() {
   const displayStatus = statusKey ? t(statusKey) : lead.status;
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: '1.5rem' }}>
+    <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
+      <h1>
         {t('leaddLeadDetails')} — <bdi>{lead.fullName}</bdi>
       </h1>
+      <p style={{ margin: '0 0 1rem' }}>
+        <WorkflowHistoryLink entityType='Lead' entityId={lead.id} />
+      </p>
 
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
@@ -213,6 +241,6 @@ export default function LeadDetailPage() {
       >
         {t('leaddBack')}
       </button>
-    </div>
+    </main>
   );
 }

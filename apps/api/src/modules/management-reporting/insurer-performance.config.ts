@@ -46,6 +46,23 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export interface InsurerPerformanceScoreView {
   id: string;
   insurerId: string;
+  /**
+   * ITEM 1 — the company's name, resolved by the api through
+   * `InsurerRepository.namesForInsurerIds`, which calls the one resolver that decides whether a
+   * registered company or the global catalogue answers for the name.
+   *
+   * REQUIRED, never optional, and that is the whole mechanism: this view is shared by TWO screens
+   * (`/dashboards/insurer-employee-performance` and `/planning-export`, through
+   * `PlanningExportSummary.market`) plus three service methods, and an optional field would let any
+   * one of them keep projecting `undefined` while the others carried a name — a name after one read
+   * and none after another, which is the `IncidentReport.load()` defect and is invisible to every
+   * test that happens to exercise the other path.
+   *
+   * NULLABLE because an insurer row can be gone while a computed score for that period remains:
+   * `InsurerPerformanceScore` is a periodic snapshot. A missing key reports NO NAME — never the id,
+   * which is the fallback that looks like it always works and reintroduces the defect.
+   */
+  insurerName: string | null;
   periodLabel: string;
   quoteResponseScore: string;
   claimsServiceScore: string;
@@ -113,10 +130,14 @@ export function daysBetween(from: Date, to: Date): number {
 
 export function deriveInsurerPerformanceScoreView(
   row: InsurerPerformanceScore,
+  /** Resolved by `InsurerRepository.namesForInsurerIds`. A REQUIRED parameter rather than an
+   * optional one, so the compiler names every call site — it named four. */
+  insurerNames: Map<string, string>,
 ): InsurerPerformanceScoreView {
   return {
     id: row.id,
     insurerId: row.insurerId,
+    insurerName: insurerNames.get(row.insurerId) ?? null,
     periodLabel: row.periodLabel,
     quoteResponseScore: row.quoteResponseScore.toFixed(2),
     claimsServiceScore: row.claimsServiceScore.toFixed(2),

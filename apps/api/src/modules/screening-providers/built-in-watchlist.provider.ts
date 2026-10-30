@@ -18,7 +18,7 @@ import {
   readScreeningConfig,
   type ScreeningProviderConfig,
 } from './screening-provider.config';
-import { capability } from './screening-provider.types';
+import { capability, cautions, describes } from './screening-provider.types';
 import type { CapabilityState } from './screening-provider.types';
 
 /**
@@ -223,46 +223,64 @@ export class BuiltInWatchlistProvider implements ScreeningProvider {
         true,
         hasData,
         hasData
-          ? 'OFAC SDN + UN Consolidated, synced locally.'
-          : 'Configured, but the local cache is empty — the sync has never completed.',
+          ? describes('BUILT_IN_SANCTIONS_SYNCED')
+          : // AN EMPTY CACHE MEANS NOBODY HAS BEEN SCREENED AGAINST ANYTHING, on the default
+            // provider. Classified a CAUTION by this code rather than by the owner, on her own
+            // stated criterion for the other three — *the customer was not screened*.
+            cautions('BUILT_IN_CACHE_EMPTY'),
       ),
-      capability(
-        'PEP',
-        false,
-        false,
-        false,
-        'This provider has NO PEP data. PEP screening requires a commercial provider or an on-premise dataset that includes PEP data.',
-      ),
+      // HER CAUTION, AND THE MOST IMPORTANT ROW IN THE TABLE: a deployment running only this
+      // provider has NO PEP coverage, so a reader must not take this row's three dashes for an
+      // absence of risk.
+      capability('PEP', false, false, false, cautions('BUILT_IN_NO_PEP_DATA')),
       capability(
         'WATCHLIST',
         false,
         false,
         false,
-        'Only sanctions lists are synced.',
+        describes('BUILT_IN_SANCTIONS_ONLY'),
       ),
-      capability('ADVERSE_MEDIA', false, false, false, 'Not available.'),
-      capability('INDIVIDUAL', true, true, hasData, 'Names are matched.'),
-      capability('ENTITY', true, true, hasData, 'Legal names are matched.'),
+      capability(
+        'ADVERSE_MEDIA',
+        false,
+        false,
+        false,
+        describes('BUILT_IN_ADVERSE_MEDIA_UNAVAILABLE'),
+      ),
+      capability(
+        'INDIVIDUAL',
+        true,
+        true,
+        hasData,
+        describes('BUILT_IN_INDIVIDUAL_NAMES'),
+      ),
+      capability(
+        'ENTITY',
+        true,
+        true,
+        hasData,
+        describes('BUILT_IN_ENTITY_LEGAL_NAMES'),
+      ),
       capability(
         'BATCH',
         true,
         true,
         hasData,
-        'Batched locally; no external rate limit applies.',
+        describes('BUILT_IN_BATCH_LOCAL'),
       ),
       capability(
         'ONGOING_MONITORING',
         true,
         true,
         hasData,
-        'The 4-hourly re-screening batch plus re-screening on list update.',
+        describes('BUILT_IN_MONITORING_SCHEDULE'),
       ),
       capability(
         'WEBHOOKS',
         false,
         false,
         false,
-        'Not applicable to a local cache.',
+        describes('BUILT_IN_WEBHOOKS_NOT_APPLICABLE'),
       ),
     ];
   }

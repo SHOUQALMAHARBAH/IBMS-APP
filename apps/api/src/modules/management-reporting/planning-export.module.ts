@@ -4,6 +4,7 @@ import { PlanningExportService } from './planning-export.service';
 import { PortfolioAnalysisRepository } from '../../repositories/portfolio-analysis.repository';
 import { InsurerPerformanceRepository } from '../../repositories/insurer-performance.repository';
 import { AuditModule } from '../audit/audit.module';
+import { InsurerRepository } from '../../repositories/insurer.repository';
 
 /**
  * Process 65 (backlog Part C #65, Domain G — closes Domain G's build order,
@@ -30,6 +31,7 @@ import { AuditModule } from '../audit/audit.module';
   imports: [AuditModule],
   controllers: [PlanningExportController],
   providers: [
+    InsurerRepository,
     PlanningExportService,
     PortfolioAnalysisRepository,
     InsurerPerformanceRepository,

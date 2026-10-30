@@ -50,10 +50,20 @@ const SCOPED_WRITERS = [
 /**
  * Write surfaces that carry a line and are deliberately NOT scoped, each with its reason.
  *
- * These are not exemptions of convenience. All five record what the OFFICE or one of its PEOPLE is
- * LICENSED for — which is the INPUT to scope, not a thing scope governs. Scoping them would mean a
- * GENERAL-scoped administrator could not record the office's own life licence, which inverts the
- * relationship: the licence is what makes a scope possible, so a scope cannot gate the licence.
+ * These are not exemptions of convenience — but they are NOT ONE ARGUMENT EITHER, and this header
+ * used to say they were ("all six record what the OFFICE or one of its PEOPLE is LICENSED for").
+ * Three of its own entries never fitted that sentence: `role-admin.service.ts` writes the scope,
+ * and the two insurer files are catalogue and configuration. A header that over-generalises is how
+ * a seventh row gets waved through under a reason that does not apply to it, so the three kinds are
+ * named instead:
+ *
+ *   (1) THE INPUT TO SCOPE — what the office, its people, or a counterparty is LICENSED for.
+ *       Scoping these inverts the relationship: the licence is what makes a scope possible, so a
+ *       scope cannot gate the licence. A GENERAL-scoped administrator must still be able to record
+ *       the office's own life licence.
+ *   (2) CONFIGURATION THAT IS NOT BUSINESS — a catalogue row or a form mapping. Nothing is placed
+ *       in a line by writing one.
+ *   (3) THE SCOPE ITSELF — scoping that would make a scope unchangeable once set.
  */
 const UNSCOPED_WRITERS: Record<string, string> = {
   'modules/compliance-risk/broker-license-scope.service.ts':
@@ -66,6 +76,38 @@ const UNSCOPED_WRITERS: Record<string, string> = {
     "an office's own mapping of an insurer form — a configuration row, not business",
   'modules/rbac/services/role-admin.service.ts':
     'writes the SCOPE itself; scoping that would make a scope unchangeable once set',
+  /*
+   * MODULE 0-ب ITEM (d). The same argument as `broker-license-scope.service.ts` one step earlier in
+   * the office's life, and a second argument that only applies here: the writer is the PROVIDER, and
+   * the provider holds no role in the office being created — there is no scope to be within. The
+   * office does not exist until this transaction commits, so a scope check would be asking a
+   * question about a tenant that has no roles, no users and no grants yet.
+   */
+  'modules/provider/office-registration.service.ts':
+    "the office's FIRST licensed branches, written by the provider at registration — the input to scope, before any role exists to be scoped",
+  /*
+   * MODULE 0-ب ITEM (e). Kind (1), and it reaches further from an office than any other row here —
+   * three reasons, each sufficient on its own:
+   *
+   * (a) IT IS A THIRD PARTY'S LICENCE. `InsurerLicensedLine` records what an INSURANCE COMPANY is
+   *     licensed to write. Role scope narrows what an office's own staff may place in a line; a
+   *     company's licence is not business placed in a line by anybody, and the screen says so
+   *     explicitly because `InsurerDirectory.lines` renders identically and IS market behaviour.
+   *
+   * (b) IT IS NOT AN OFFICE'S DATA AT ALL. The row is keyed by `insuranceCompanyId` and carries NO
+   *     `organizationId` — deliberately, and measured: naming that column `organizationId` would
+   *     have put the table in `tenantScopeExtension`'s scoped set, which derives from the DMMF by
+   *     EXACT FIELD NAME, and a company's own licensed lines would then have been invisible to
+   *     every office but one. Role scope is a narrowing WITHIN an office's book; this row is
+   *     outside it.
+   *
+   * (c) THE WRITER IS THE PROVIDER, as in item (d) one row above. The provider holds no role in any
+   *     office, so there is no scope to be within — and if a provider role were ever given one, the
+   *     effect would be a GENERAL-scoped operator unable to record a company's LIFE licence, which
+   *     is a fact about a third party rather than anything the provider brokers.
+   */
+  'modules/provider/insurance-company-registration.service.ts':
+    "an INSURANCE COMPANY's own licensed lines, written by the provider at registration — a third party's licence, on a row that carries no organizationId at all",
 };
 
 function read(relative: string): string | null {
@@ -120,7 +162,7 @@ describe('item (h): every line-writing service decides the role scope', () => {
         `${relative} is named in UNSCOPED_WRITERS and does not exist — re-point the row rather than deleting it.`,
       ).not.toBeNull();
     }
-  });
+  }, 30_000);
 
   it('each one calls assertWithinRoleScope', () => {
     for (const relative of SCOPED_WRITERS) {
@@ -134,8 +176,25 @@ describe('item (h): every line-writing service decides the role scope', () => {
           'known, or add a row to UNSCOPED_WRITERS with a reason that survives review.',
       ).toBe(true);
     }
-  });
+  }, 30_000);
 
+  /*
+   * AN EXPLICIT TIMEOUT, AND IT IS NOT A MITIGATION FOR A FLAKE.
+   *
+   * Every test in this file READS THE WHOLE API SOURCE TREE from disk. Measured under a parallel
+   * `vitest run src/common`: 6915ms, against vitest's 5000ms default — so it passes alone every
+   * time and fails under load, which looks exactly like flakiness and is not. It is I/O cost.
+   *
+   * Raising a timeout is normally the wrong move — this repository has a recorded lesson about
+   * mitigations that buy time and hide the next crossing. The distinction here is that nothing is
+   * being hidden: the assertion is correct, the work is genuinely file I/O over hundreds of files,
+   * and 5s is simply the wrong budget for it. The alternative — leaving it — means CI goes red on
+   * load and somebody learns to re-run the suite until it is green, which is how a real failure
+   * gets dismissed later.
+   *
+   * `screen-copy.test.ts` has the same shape for the same reason and is recorded as a known flake;
+   * this one is fixed rather than recorded, because CI does run `src/common`.
+   */
   it('NO OTHER service writes a line without deciding scope', () => {
     /*
      * The half that makes this a guard rather than a checklist: a NEW write surface is found by
@@ -161,7 +220,7 @@ describe('item (h): every line-writing service decides the role scope', () => {
         'UNSCOPED_WRITERS in this spec with a reason. An over-selected file is a one-line row with ' +
         'an argument; an unchecked one is a scope a request walks around.',
     ).toEqual([]);
-  });
+  }, 30_000);
 
   it('the matcher really does find line-writing files — not vacuous', () => {
     // If `writesALine` ever stops recognising the shape, every assertion above passes over an
@@ -174,7 +233,7 @@ describe('item (h): every line-writing service decides the role scope', () => {
       found.length,
       'the line-writing matcher found nothing at all — its shape has drifted and every check in this file is now vacuous.',
     ).toBeGreaterThanOrEqual(4);
-  });
+  }, 30_000);
 });
 
 describe('item (h): the scope decision has exactly one home', () => {
@@ -228,14 +287,14 @@ describe('item (h): the scope decision has exactly one home', () => {
         'ONE home: call `withinRoleScope` or `assertWithinRoleScope`. A second copy of the ' +
         'comparison is how one of the two comes back looser than it went in.',
     ).toEqual([]);
-  });
+  }, 30_000);
 
   it('and the one home really contains the comparison — not vacuous', () => {
     const decision = read(DECISION_FILE);
     expect(decision).not.toBeNull();
     expect(decision).toContain('scope.category');
     expect(decision).toContain('lineIds');
-  });
+  }, 30_000);
 });
 
 /**
@@ -273,13 +332,13 @@ describe('item (h): permission codes are not duplicated per insurance type', () 
         "scope, not to the code — otherwise the catalogue doubles and an office's grid becomes two " +
         'grids that can disagree.',
     ).toEqual([]);
-  });
+  }, 30_000);
 
   it('the catalogue is really being read — not vacuous', () => {
     // 219 codes at the time of writing. The floor is lower so an unrelated catalogue change does
     // not fail this, and far above zero so a drifted regex cannot pass over an empty set.
     expect(permissionCodes().length).toBeGreaterThan(200);
-  });
+  }, 30_000);
 });
 
 describe('item (h): the decision itself', () => {
@@ -295,7 +354,7 @@ describe('item (h): the decision itself', () => {
     const unscoped = { roleId: 'r1', category: null, lineIds: [] };
     expect(scopeCovers(unscoped, GENERAL)).toBe(true);
     expect(scopeCovers(unscoped, LIFE)).toBe(true);
-  });
+  }, 30_000);
 
   it('an EMPTY branch list covers every branch within the type', () => {
     const general = { roleId: 'r1', category: 'GENERAL' as const, lineIds: [] };
@@ -304,7 +363,7 @@ describe('item (h): the decision itself', () => {
       true,
     );
     expect(scopeCovers(general, LIFE)).toBe(false);
-  });
+  }, 30_000);
 
   it('a named branch list covers only those branches', () => {
     const narrow = {
@@ -316,7 +375,7 @@ describe('item (h): the decision itself', () => {
     expect(scopeCovers(narrow, { category: 'GENERAL', lineId: 'line-x' })).toBe(
       false,
     );
-  });
+  }, 30_000);
 
   it('several roles UNION, never intersect', () => {
     /*
@@ -337,7 +396,7 @@ describe('item (h): the decision itself', () => {
       roleScopes: [{ roleId: 'r1', category: 'GENERAL' as const, lineIds: [] }],
     };
     expect(withinRoleScope(onlyGeneral, LIFE)).toBe(false);
-  });
+  }, 30_000);
 
   it('NO scopes at all is unrestricted, and so is an absent field', () => {
     // The ordinary case for every office that has not configured a scope, and the reason this
@@ -345,5 +404,5 @@ describe('item (h): the decision itself', () => {
     // outage on the deploy that added the column.
     expect(withinRoleScope({ roleScopes: [] }, GENERAL)).toBe(true);
     expect(withinRoleScope({ roleScopes: undefined }, LIFE)).toBe(true);
-  });
+  }, 30_000);
 });

@@ -1,16 +1,68 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, RetentionScheduleItem } from '@ibms/db';
+import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * MODULE 0 CLOSE — the sixteenth pair's act has to reach the RECORD, so every read carries it.
+ *
+ * Found by `combined-duty-projection.py` the moment that measurement could run again: this pair
+ * was the one entry of sixteen WRITING the act and showing nobody, so a period one person both set
+ * and confirmed under a declared COMBINED mode read as an ordinary two-person confirmation.
+ */
+export const RETENTION_SCHEDULE_ITEM_INCLUDE = {
+  combinedDutyAct: true,
+} satisfies Prisma.RetentionScheduleItemInclude;
+
+/**
+ * THE STRICT PAYLOAD TYPE, and it is the load-bearing half rather than decoration.
+ *
+ * `IncidentReport.load()` once declared the BARE model, so every read path through it projected
+ * `undefined` while `create()` projected the act — a defect no test saw and the compiler could not
+ * see either, because a missing relation on a bare model is not a type error. Declaring the
+ * payload makes `tsc` name any read that forgets the include.
+ */
+export type RetentionScheduleItemWithCombinedDuty =
+  Prisma.RetentionScheduleItemGetPayload<{
+    include: typeof RETENTION_SCHEDULE_ITEM_INCLUDE;
+  }>;
 
 export interface CreateRetentionScheduleItemInput {
   recordCategory: string;
   retentionPeriodMonths: number;
   legalBasis: string | null;
+  /**
+   * THE NO-FLOOR DECLARATION, all five or none — the database CHECK says so, because an
+   * acknowledgement missing its sentence, its reason, its actor or its period would let
+   * "acknowledged" mean "somebody ticked a box".
+   */
+  noFloorNoticeShown?: string | null;
+  noFloorReason?: string | null;
+  noFloorAcknowledgedAt?: Date | null;
+  noFloorAcknowledgedByUserId?: string | null;
+  noFloorAcknowledgedMonths?: number | null;
+  /** MODULE 0 CLOSE, DECISION 3 — the MAKER. Required at the input boundary even though the column is
+   *  nullable: the column is nullable for FOUR PRE-EXISTING ROWS nobody recorded an actor for, and
+   *  every row written from here on has one. Optional here would make the maker half forgettable. */
+  setByUserId: string;
 }
 
 export interface UpdateRetentionScheduleItemInput {
   retentionPeriodMonths?: number;
   legalBasis?: string | null;
+  /**
+   * THE NO-FLOOR DECLARATION, all five or none — the database CHECK says so, because an
+   * acknowledgement missing its sentence, its reason, its actor or its period would let
+   * "acknowledged" mean "somebody ticked a box".
+   */
+  noFloorNoticeShown?: string | null;
+  noFloorReason?: string | null;
+  noFloorAcknowledgedAt?: Date | null;
+  noFloorAcknowledgedByUserId?: string | null;
+  noFloorAcknowledgedMonths?: number | null;
+  /** RE-STAMPED ON EVERY EDIT, not only on create. The maker is whoever last SET the period, because
+   *  that is the person the confirmation must differ from — carrying the original creator forward
+   *  would let A create, B edit, and B confirm their own figure. */
+  setByUserId: string;
 }
 
 /** M06 — owns `RetentionScheduleItem` writes. `recordCategory` is a real
@@ -24,13 +76,17 @@ export class RetentionScheduleRepository {
 
   create(
     input: CreateRetentionScheduleItemInput,
-  ): Promise<RetentionScheduleItem> {
-    return this.prisma.client.retentionScheduleItem.create({ data: input });
+  ): Promise<RetentionScheduleItemWithCombinedDuty> {
+    return this.prisma.client.retentionScheduleItem.create({
+      data: input,
+      include: RETENTION_SCHEDULE_ITEM_INCLUDE,
+    });
   }
 
-  findById(id: string): Promise<RetentionScheduleItem | null> {
+  findById(id: string): Promise<RetentionScheduleItemWithCombinedDuty | null> {
     return this.prisma.client.retentionScheduleItem.findUnique({
       where: { id },
+      include: RETENTION_SCHEDULE_ITEM_INCLUDE,
     });
   }
 
@@ -42,25 +98,28 @@ export class RetentionScheduleRepository {
    * resolved organizationId and restore a unique read. */
   findByRecordCategory(
     recordCategory: string,
-  ): Promise<RetentionScheduleItem | null> {
+  ): Promise<RetentionScheduleItemWithCombinedDuty | null> {
     return this.prisma.client.retentionScheduleItem.findFirst({
       where: { recordCategory },
+      include: RETENTION_SCHEDULE_ITEM_INCLUDE,
     });
   }
 
-  findMany(): Promise<RetentionScheduleItem[]> {
+  findMany(): Promise<RetentionScheduleItemWithCombinedDuty[]> {
     return this.prisma.client.retentionScheduleItem.findMany({
       orderBy: { recordCategory: 'asc' },
+      include: RETENTION_SCHEDULE_ITEM_INCLUDE,
     });
   }
 
   update(
     id: string,
     input: UpdateRetentionScheduleItemInput,
-  ): Promise<RetentionScheduleItem> {
+  ): Promise<RetentionScheduleItemWithCombinedDuty> {
     return this.prisma.client.retentionScheduleItem.update({
       where: { id },
       data: input,
+      include: RETENTION_SCHEDULE_ITEM_INCLUDE,
     });
   }
 
@@ -68,10 +127,26 @@ export class RetentionScheduleRepository {
    * in the `where`, the race-safe-invariants shape, since confirmation is a
    * one-time legal act, not an editable field. 0 rows means it was already
    * confirmed. */
-  confirm(id: string, confirmedAt: Date): Promise<Prisma.BatchPayload> {
+  confirm(
+    id: string,
+    confirmedAt: Date,
+    confirmedByUserId: string,
+    combinedDutyActId: string | null,
+  ): Promise<Prisma.BatchPayload> {
     return this.prisma.client.retentionScheduleItem.updateMany({
       where: { id, confirmedByLegalCounselAt: null },
-      data: { confirmedByLegalCounselAt: confirmedAt },
+      data: {
+        confirmedByLegalCounselAt: confirmedAt,
+        /* THE ACTOR THE DATE NEVER HAD. `RetentionScheduleItem_confirmation_carries_its_actor`
+         * refuses one without the other going forward, so these two move together by construction. */
+        confirmedByLegalCounselByUserId: confirmedByUserId,
+        /* NULL for every ordinary two-person confirmation; an act id only when the office has
+         * DECLARED merged duties and the engine resolved one. Passing it is not optional — the CHECK
+         * refuses a self-confirmation whose escape column is null, so dropping this argument turns a
+         * declared combined act into a 500. That is the backstop working, and it is why the engine's
+         * return value is threaded rather than discarded. */
+        combinedDutyActId,
+      },
     });
   }
 }

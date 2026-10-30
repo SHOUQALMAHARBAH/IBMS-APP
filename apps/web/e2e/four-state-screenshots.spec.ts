@@ -130,7 +130,7 @@ test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async 
     }),
   );
   await page.goto(page.url());
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toBeVisible();
   await capture(page, "customers", "error");
 });
 
@@ -158,7 +158,7 @@ test("four-state screenshots: /customers/[id] (item #3 bidi, item #4 name split)
     route.fulfill({ status: 200, json: [] }),
   );
   await page.goto("/customers/cust-1");
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toBeVisible();
   await capture(page, "customers-detail", "error");
   await page.unroute("http://localhost:4000/customers/cust-1");
 
@@ -244,7 +244,7 @@ test("four-state screenshots: /watchlist-sync (item #2 RTL layout mirroring)", a
   // load are independent reads of the same screen, and a 403 fails both. Asserting a
   // COUNT rather than `.first()` keeps this honest — it says "the error state is
   // reported", and it would notice a section that silently rendered nothing.
-  await expect(page.locator('p[role="alert"]')).toHaveCount(2);
+  await expect(page.locator('main [role="alert"]')).toHaveCount(2);
   await capture(page, "watchlist-sync", "error");
   await page.unroute("http://localhost:4000/watchlist-sync/status**");
 
@@ -322,7 +322,7 @@ test("four-state screenshots: /complaints (item #7 slice — complaint acknowled
     route.fulfill({ status: 403, json: { message: "no" } }),
   );
   await page.goto(page.url());
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toBeVisible();
   await capture(page, "complaints", "error");
   await page.unroute("http://localhost:4000/complaints**");
 
@@ -460,7 +460,7 @@ test("four-state screenshots: /rfqs/[id] — error (item #7 slice — quotation 
     route.fulfill({ status: 404, json: { message: "RFQ not found" } }),
   );
   await page.goto("/rfqs/rfq-1");
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toBeVisible();
   await capture(page, "rfq-detail", "error");
 });
 
@@ -675,7 +675,7 @@ test("four-state screenshots: /opportunities/[id] (item #7 slices — recommenda
     route.fulfill({ status: 404, json: { message: "not found" } }),
   );
   await page.goto("/opportunities/opp-1");
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toBeVisible();
   await capture(page, "opportunity-detail", "error");
   await page.unroute("http://localhost:4000/opportunities/opp-1");
 
@@ -779,7 +779,7 @@ test("four-state screenshots: /prospects (item #6 bilingual search)", async ({
     route.fulfill({ status: 403, json: { message: "no" } }),
   );
   await page.goto(page.url());
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toBeVisible();
   await capture(page, "prospects", "error");
 });
 
@@ -824,6 +824,6 @@ test("four-state screenshots: /vendors (item #6 bilingual search)", async ({
     route.fulfill({ status: 403, json: { message: "no" } }),
   );
   await page.goto(page.url());
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  await expect(page.locator('main [role="alert"]')).toBeVisible();
   await capture(page, "vendors", "error");
 });

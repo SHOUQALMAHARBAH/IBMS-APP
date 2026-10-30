@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PERMISSION_CATALOGUE } from '../e2e/fixtures/role-permissions';
+import { lookupOptional } from '../lib/i18n/translations';
 
 /*
  * TWO RULES THAT COVER EVERY SCREEN — item 5, rules 6 and 3.
@@ -63,6 +64,21 @@ function sources(): Array<[string, string]> {
 }
 
 describe('every screen speaks both languages (rule 6)', () => {
+  /*
+   * AN EXPLICIT TIMEOUT, AND IT RETIRES A RECORDED FLAKE RATHER THAN HIDING ONE.
+   *
+   * This test SHELLS OUT to `scripts/measurements/hardcoded-ui-english.py`, which takes ~0.8s alone
+   * and has been measured at 20,980ms under a full four-workspace parallel run — against vitest's
+   * 5000ms default, which `apps/web` does not override. It was recorded as a known fragility with
+   * the note that CI cannot reach it because the frontend job runs `--filter=web` alone; it was then
+   * hit again locally at 5556ms in an ordinary `vitest run` of this workspace, which is well inside
+   * what CI does.
+   *
+   * Raising a timeout is normally the wrong move and this repository has the lesson written down.
+   * The distinction is the same one `role-scope.inventory.spec.ts` makes: nothing is being hidden.
+   * The assertion is correct, the work is a Python subprocess over the whole screen tree, and 5s is
+   * simply the wrong budget for it. Leaving it means a red build nobody believes.
+   */
   it('has no user-facing English written into it', () => {
     // The MEASUREMENT is the guard. Re-implementing the scan in TypeScript would give two detectors that
     // can disagree, and the one behind the build would be the one nobody re-runs by hand.
@@ -79,24 +95,58 @@ describe('every screen speaks both languages (rule 6)', () => {
       output = String((err as { stdout?: string }).stdout ?? err);
     }
 
-    const m = /strings\s+(\d+)/.exec(output);
+    /*
+     * RE-POINTED FROM `strings` TO `undeclared`, AND THE REVERSAL IS STATED.
+     *
+     * This read the TOTAL and required zero — a flat ban, which is what it should be and
+     * what it stays for every shape the detector knew about. What changed is that the
+     * detector learned FAILURE MODE 7 (a parenthetical, in two forms) and the total went
+     * 0 -> 10 across nine screens: markers like `(capped)`, `(overdue)` and `(lapsed)`
+     * that were there all along and that no pattern could see.
+     *
+     * THE TEN ARE DECLARED, NOT FORGIVEN, and the distinction is the whole design.
+     * `DECLARED_PARENTHETICALS` in the script names each `screen|string` pair with what it
+     * MEANS, and the script fails on a finding nobody declared AND on a declared row that
+     * no longer occurs — so a translation is recorded by DELETING its row, and a stale row
+     * cannot sit there covering whatever lands next. Keyed on the exact pair, so the
+     * declaration cannot become a hiding place for a DIFFERENT kind of finding on the same
+     * screen: a `PROSE` or `ONE_WORD_LABEL` hit still fails flat.
+     *
+     * Each of the ten needs an Arabic word from the owner, which is why they are declared
+     * rather than fixed — they are ten decisions, not ten engineering tasks, and they are
+     * listed in `docs/screen-pass-measurement.md` § 9 as NOT-YET-WRITTEN for her walk.
+     *
+     * THE TOTAL IS STILL READ AND STILL PRINTED in the failure message below, so the real
+     * figure is never hidden behind the declaration.
+     */
+    const total = /strings\s+(\d+)/.exec(output);
+    const m = /undeclared\s+(\d+)/.exec(output);
     // A scan that produced no parsable total is NOT a pass — the same rule `test-summary.mjs` enforces
     // one level up. Blank is not zero.
     expect(
-      m,
+      total,
       'The hardcoded-English scan produced no total. That is not a clean result — it means the scan did ' +
         `not run. Output was:\n${output.slice(-1500)}`,
+    ).not.toBeNull();
+    expect(
+      m,
+      'The scan printed no `undeclared` line. Blank is not zero — if that line is gone the ' +
+        'declaration machinery has been removed and this gate is reading nothing. Output ' +
+        `was:\n${output.slice(-1500)}`,
     ).not.toBeNull();
     expect(failed, `the scan exited non-zero:\n${output.slice(-1500)}`).toBe(
       false,
     );
     expect(
       Number(m?.[1]),
-      `Hardcoded user-facing English found. This platform is Arabic-first, so an untranslated string is ` +
-        `read by nobody in the primary language. Add the key to a dictionary in ` +
-        `lib/i18n/translations/ and render it through t(). Full output:\n${output}`,
+      `UNDECLARED hardcoded user-facing English found (the total is ${total?.[1]}, of which ` +
+        `${m?.[1]} is not declared). This platform is Arabic-first, so an untranslated ` +
+        `string is read by nobody in the primary language. Add the key to a dictionary in ` +
+        `lib/i18n/translations/ and render it through t(). DECLARING it is not the ordinary ` +
+        `fix — the rows in DECLARED_PARENTHETICALS are the owner's own backlog, each one a ` +
+        `status marker whose meaning she has to decide. Full output:\n${output}`,
     ).toBe(0);
-  });
+  }, 60_000);
 });
 
 /*
@@ -120,8 +170,45 @@ describe('every screen speaks both languages (rule 6)', () => {
  * was introduced by a REFORMAT — prettier wrapped a line and `{r.entityId}` moved to a JSX-text position
  * the rule did not recognise. The violation never changed; only its formatting did. So this budget pins
  * what the detector can currently see, which is not the same as what exists.
+ *
+ * 29 -> 24 on 2026-10-23 (batch five item 1a), lowered by exactly what was fixed: five screens whose
+ * Customer column rendered the first eight characters of a uuid now render the customer's name,
+ * resolved by the api. `/complaints`, `/feedback`, `/service-requests`, `/retention-cases`,
+ * `/communications`.
+ *
+ * THIS FIGURE IS A SECOND HOME FOR THE ONE IN `scripts/measurements/rendered-identifiers.py`.
+ *
+ * CORRECTED 2026-10-27 (module 0-c group 7). The paragraph here used to say the two were
+ * "different implementations (this one is this file's own regex pass, the script's is its own)"
+ * and "deliberately independent". THAT WAS NEVER TRUE: this test has shelled out to that same
+ * script since the commit that wrote it (`0906707`), so there is ONE detector and this is a
+ * second home for the NUMBER, not for the measurement.
+ *
+ * The distinction is not pedantry — it is what the owner's walk proved. The claim said what kept
+ * them honest was independence, and the seventh blind spot (`??` read as a ternary) showed the
+ * opposite: one detector, one blind spot, and two numbers agreeing on a figure that was wrong by
+ * four. Independence would have caught it; a shared subprocess cannot.
+ *
+ * What IS true and worth keeping: both directions still fail here, and this copy caught the stale
+ * 29 the moment the script's count fell.
+ *
+ * 10 -> 12 on 2026-10-27, and the figure ROSE because the instrument was corrected rather than
+ * because anything was added — every newly-visible site predates the batch, which the script's
+ * own note proves by commit and date. Two of the four the widening found are closed in that same
+ * commit through decision 48's resolver.
+ *
+ * 24 -> 19 on 2026-10-23 (batch six item 2). The floor cannot reach 0 in this module: six of the
+ * nineteen are DEFERRED-BY-DECISION to module 7 (owner decision 46 — a readable handle for a
+ * settlement or a commission entry means inventing this product's first numbering scheme, and
+ * that belongs with the money), and four more need a decision rather than a name.
+ *
+ * 19 -> 18 on 2026-10-23 (batch seven item 2).
+ *
+ * 18 -> 16 on 2026-10-23 (batch eight). The floor still cannot be 0: six rows are
+ * DEFERRED-BY-DECISION to module 7 (decision 46), and `/audit-trail`'s polymorphic `entityId`
+ * counts BY DECISION 49 — it is labelled with its type's Arabic word now, and the id stays.
  */
-const RENDERED_IDENTIFIER_BUDGET = 29;
+const RENDERED_IDENTIFIER_BUDGET = 12;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {
@@ -155,7 +242,14 @@ ${output.slice(-1200)}`,
       `The budget is stale — only ${count} identifiers remain, so lower RENDERED_IDENTIFIER_BUDGET to ` +
         'that number. A budget that stays above the real count stops being a ratchet.',
     ).toBe(RENDERED_IDENTIFIER_BUDGET);
-  });
+    // THE SAME EXPLICIT TIMEOUT RULE 6 ALREADY CARRIES, applied to its sibling. This test shells
+    // out to a Python measurement over the whole screen tree exactly as that one does, and it was
+    // left on vitest's 5000ms default — so it failed once in a full workspace run while the repo's
+    // 6-workspace typecheck was executing, and passed twice cleanly on its own. Rule 6's own note
+    // above makes the argument and this is the other half of it: the assertion is correct, the work
+    // is a subprocess, and 5s is the wrong budget for it. The gap was a fix applied to one of two
+    // identical mechanisms.
+  }, 60_000);
 });
 
 describe('a load error announces itself (rule 3)', () => {
@@ -553,5 +647,68 @@ describe('a load failure tells the reader what to do (rules 3 and 4)', () => {
           `follow it. Full output:\n${output}`,
       ).toBe(0);
     }
+    // The THIRD subprocess in this file, and the last one still on the 5000ms default. Timed for the
+    // same reason as the two above rather than waiting for it to be the one that goes red.
+  }, 60_000);
+});
+
+describe('owner decision 54: the truncation note still names the real scan limit', () => {
+  /*
+   * THE STRING NAMES A NUMBER THAT LIVES SOMEWHERE ELSE, WHICH IS A LIE WAITING TO HAPPEN.
+   *
+   * «فُحِص أول ٢٠٠٠٠ سجل» — *the first 20000 records were scanned* — is the owner's own wording,
+   * and `INTERNAL_CONTROLS_SCAN_LIMIT` is declared in the API. If that constant ever moves, the
+   * sentence on screen becomes false and nothing else in this repository can see it: no type
+   * connects an api constant to an i18n string, and the screen renders whatever the dictionary
+   * says.
+   *
+   * TIED BY AN ASSERTION RATHER THAN INTERPOLATED, and the reason is the owner's digits.
+   * Interpolating would render the figure through `formatNumber`, which keeps digits WESTERN —
+   * silently overruling her «٢٠٠٠٠». Arabic-Indic numerals written INTO prose are this
+   * dictionary's established convention (measured: 210 such characters across 14 files, including
+   * `dsrExtendButton`'s «١٥ يوماً»), while `formatNumber`'s Western digits are for figures
+   * rendered from DATA. So her bytes stand and this test is what keeps them true.
+   *
+   * BOTH LANGUAGES, each against its own rendering of the same constant — the Arabic in
+   * Arabic-Indic digits, the English in Western ones with a thousands separator. A test checking
+   * only one half would pass while the other went stale.
+   */
+  const limit = (() => {
+    const source = fs.readFileSync(
+      path.join(
+        __dirname,
+        '../../api/src/modules/internal-controls/internal-controls.config.ts',
+      ),
+      'utf8',
+    );
+    const m = /INTERNAL_CONTROLS_SCAN_LIMIT\s*=\s*(\d+)/.exec(source);
+    return m ? Number(m[1]) : null;
+  })();
+
+  it('reads the constant at all — a null here is a broken parser, not a missing limit', () => {
+    expect(
+      limit,
+      'INTERNAL_CONTROLS_SCAN_LIMIT could not be read out of internal-controls.config.ts. That is ' +
+        'this parser breaking rather than the constant going away; without it both assertions ' +
+        'below would compare against NaN and pass on nothing.',
+    ).not.toBeNull();
+    expect(limit).toBeGreaterThan(0);
+  });
+
+  it('both truncation notes name the limit the scan actually uses', () => {
+    const arabicIndic = String(limit).replace(/\d/g, (d) =>
+      String.fromCharCode(0x0660 + Number(d)),
+    );
+    const message =
+      'The truncation note on /internal-controls names a different number from ' +
+      `INTERNAL_CONTROLS_SCAN_LIMIT (${String(limit)}). That note is the only thing telling a ` +
+      'reader the scan was INCOMPLETE — there may be self-approval violations past the limit — ' +
+      'so a wrong figure there makes a partial scan look like a measured one. Update the string ' +
+      'to match the constant (the Arabic is the OWNER\'S, decision 54: change the digits only, ' +
+      'in Arabic-Indic, and nothing else).';
+    expect(lookupOptional('AR', 'icTruncatedNote') ?? '', message).toContain(arabicIndic);
+    expect(lookupOptional('EN', 'icTruncatedNote') ?? '', message).toContain(
+      String(limit).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+    );
   });
 });

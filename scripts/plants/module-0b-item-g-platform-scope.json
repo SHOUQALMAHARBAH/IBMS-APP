@@ -1,0 +1,8 @@
+{
+  "an-office-action-is-made-platform-scoped": {
+    "_": "Item (g) reads 'PLATFORM scope on every permission this module adds'. Taken literally that covers insurer.company.link, which is an OFFICE action: an office links its own Insurer counterparty row to a registered company. This plant takes the literal reading and runs it. The expected result is a REFUSAL BY NAME from the permission grid guard, because a PLATFORM code must carry an EMPTY role list and this one names an office role — which is the system proving the literal reading wrong rather than me asserting it.",
+    "file": "packages/db/prisma/seed-data/permissions.ts",
+    "from": "    code: \"insurer.company.link\",\n    module: \"insurance-operations\",",
+    "to": "    code: \"insurer.company.link\",\n    module: \"insurance-operations\",\n    scope: \"PLATFORM\","
+  }
+}

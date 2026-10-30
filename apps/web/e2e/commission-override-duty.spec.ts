@@ -4,7 +4,7 @@ import type { OpportunityWithContext } from "../lib/opportunity/opportunity-api"
 import type { Policy } from "../lib/policy/policy-api";
 
 /**
- * THE COMBINED-DUTY ACT ON A MANUAL COMMISSION OVERRIDE — the most urgent of the fifteen projections.
+ * THE COMBINED-DUTY ACT ON A MANUAL COMMISSION OVERRIDE — the most urgent of the sixteen projections.
  *
  * `CommissionLedgerEntry_maker_checker_distinct` requires that whoever REQUESTS a manual override of
  * the broker's commission is not whoever approves it. In an office that declared COMBINED mode one

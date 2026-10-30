@@ -16,12 +16,20 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(page: Page, roles: string[], language = "EN") {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        languagePreference: language,
+        roles,
+        permissions: permissionsForRoles(roles),
+      },
+    }),
   );
 }
 
@@ -132,4 +140,36 @@ test("employee performance screen has no serious/critical accessibility violatio
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+test("the period fields carry the owner's hint, wired to the control, and echo the date back", async ({
+  page,
+}) => {
+  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"], "AR");
+  await mockList(page);
+
+  await page.goto("/employee-performance");
+
+  // HER SENTENCE, BY CONTENT. A presence check on the element would pass against a key that
+  // resolved to the English half, which is how a half-translated screen ships green.
+  const start = page.getByLabel("بداية الفترة (اختياري)");
+  await expect(start).toBeVisible();
+  await expect(
+    page.getByText("أول يوم تُحسب عليه الأرقام في هذه الشاشة."),
+  ).toBeVisible();
+
+  // THE ASSOCIATION IS REAL, not merely adjacent: `aria-describedby` is what makes a screen
+  // reader announce the hint as the field's description. A hint rendered beside a control it is
+  // not wired to is a hint only one of the two readers gets.
+  const describedBy = await start.getAttribute("aria-describedby");
+  expect(describedBy).toBeTruthy();
+  await expect(page.locator(`#${describedBy}`)).toHaveText(
+    "أول يوم تُحسب عليه الأرقام في هذه الشاشة.",
+  );
+
+  // THE ECHO. Typed into a month-first control, `2026-03-04` is 4 March; the Arabic rendering is
+  // DAY-first, so the reader sees the two numbers in the other order and can tell which was read.
+  await start.fill("2026-03-04");
+  await expect(page.locator('[data-date-echo="2026-03-04"]')).toHaveText(
+    "4‏/3‏/2026",
+  );
 });

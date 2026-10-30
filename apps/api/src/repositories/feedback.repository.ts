@@ -1,6 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import type { CustomerFeedback } from '@ibms/db';
+import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+
+const WITH_CUSTOMER = {
+  /*
+   * RULE 2 — WHICH CUSTOMER, BY NAME. This screen rendered the first eight characters of a uuid,
+   * which identifies nobody: the column exists to say who the row is about.
+   */
+  include: { customer: { select: { legalName: true } } },
+} as const;
+
+/**
+ * The read shape, DERIVED from the include rather than written out — so the include and the type
+ * cannot disagree, and a field added to one reaches the other.
+ */
+export type FeedbackWithCustomer = Prisma.CustomerFeedbackGetPayload<
+  typeof WITH_CUSTOMER
+>;
 
 export interface CreateFeedbackInput {
   customerId: string;
@@ -30,8 +46,9 @@ export class FeedbackRepository {
       .then((n) => n > 0);
   }
 
-  create(input: CreateFeedbackInput): Promise<CustomerFeedback> {
+  create(input: CreateFeedbackInput): Promise<FeedbackWithCustomer> {
     return this.prisma.client.customerFeedback.create({
+      ...WITH_CUSTOMER,
       data: {
         customerId: input.customerId,
         context: input.context,
@@ -42,12 +59,19 @@ export class FeedbackRepository {
     });
   }
 
-  findById(id: string): Promise<CustomerFeedback | null> {
-    return this.prisma.client.customerFeedback.findUnique({ where: { id } });
+  findById(id: string): Promise<FeedbackWithCustomer | null> {
+    return this.prisma.client.customerFeedback.findUnique({
+      where: { id },
+      ...WITH_CUSTOMER,
+    });
   }
 
-  findMany(scope: FeedbackScope, take: number): Promise<CustomerFeedback[]> {
+  findMany(
+    scope: FeedbackScope,
+    take: number,
+  ): Promise<FeedbackWithCustomer[]> {
     return this.prisma.client.customerFeedback.findMany({
+      ...WITH_CUSTOMER,
       where: {
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
         ...(scope.context ? { context: scope.context } : {}),

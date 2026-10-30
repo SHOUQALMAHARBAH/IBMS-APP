@@ -17,10 +17,13 @@ import type { RecordAuditEntryInput } from '../audit/audit.service';
 import {
   documentAuditSnapshot,
   highestClassification,
+  type DocumentPickerResult,
   type PolicyFileClassificationView,
 } from './document.config';
 import type { CreateDocumentVersionDto } from './dto/create-document-version.dto';
 import type { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
+import type { SearchDocumentsDto } from '../../common/picker-search.dto';
+import { PICKER_MAX_RESULTS } from '../../common/picker-search.config';
 
 const P2002 = 'P2002';
 
@@ -58,6 +61,48 @@ export class DocumentService {
     const document = await this.documents.findById(id);
     if (!document) throw new NotFoundException('Document not found');
     return document;
+  }
+
+  /**
+   * OWNER DECISION 41 — the document chooser's source, so `/audit-trail`'s document-history field can
+   * be filled by picking a NAME instead of pasting a uuid.
+   *
+   * Gated on `document.read` ALONE, which is a departure from the picker rule and is argued in
+   * `common/picker-search.config.ts`: adding `document-history.read` would hand a read-only auditor a
+   * name search over every document in the office. The EXTERNAL_AUDITOR therefore has no chooser and
+   * keeps the typed field — asserted, not worked around.
+   *
+   * The audit row is NOT `safeAudit`: the record of who searched the document register for what IS the
+   * control, so a failure to write it fails the request. Its `entityId` is the ACTOR, not a document —
+   * this row is about a person searching and there is no single document it happened to, which is the
+   * shape the customer, employee and policy searches already use.
+   */
+  async searchForPicker(
+    dto: SearchDocumentsDto,
+    actorUserId: string,
+  ): Promise<DocumentPickerResult[]> {
+    const rows = await this.documents.searchForPicker(
+      dto.q,
+      PICKER_MAX_RESULTS.document,
+    );
+
+    await this.audit.record({
+      userId: actorUserId,
+      action: 'READ',
+      entityType: 'DocumentSearch',
+      entityId: actorUserId,
+      afterValue: {
+        term: dto.q,
+        matchedDocumentIds: rows.map((r) => r.id),
+        matchCount: rows.length,
+        // A silently cut list reads as a complete answer — "these are the only three files on this
+        // policy" when there are forty.
+        truncated: rows.length === PICKER_MAX_RESULTS.document,
+      },
+      isSensitiveDataAccess: true,
+    });
+
+    return rows;
   }
 
   /** Creates version N+1 of the chain `id` currently leads. `id` must be the

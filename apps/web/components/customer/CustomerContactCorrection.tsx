@@ -6,6 +6,7 @@ import {
   updateCustomerContactDetails,
   type CustomerContactCorrection as CorrectionInput,
 } from '../../lib/customer/customer-api';
+import { Button, Card } from '../ui';
 import { ApiError } from '../../lib/auth/api-client';
 import { useAuth } from '../../lib/auth/auth-context';
 import { useLanguage } from '../../lib/i18n/language-context';
@@ -35,14 +36,19 @@ import { permissionRefusal } from '../../lib/i18n/permission-refusal';
  *
  * WHAT THIS DELIBERATELY CANNOT CORRECT
  * ------------------------------------
- * Name, date of birth, nationality, national ID. Those are screening identifiers:
- * the AMLU requires a fresh screen on a change to any of them, and that mechanism
- * does not exist yet (§ 1.59 — nothing in the product reads a customer's screening
- * standing, so "re-screening required" would be a state with no consumer). The
- * server refuses them structurally: `UpdateCustomerContactDto` does not declare
- * them, and `forbidNonWhitelisted` turns their presence into a 400 naming the
- * field. This note says so on screen, because an officer who cannot find the name
- * field should be told why rather than left to conclude the form is broken.
+ * Name and national ID. Those are screening identifiers: the AMLU requires a fresh
+ * screen on a change to either, and no re-screening path exists for them. The server
+ * refuses them structurally: `UpdateCustomerContactDto` does not declare them, and
+ * `forbidNonWhitelisted` turns their presence into a 400 naming the field. This note
+ * says so on screen, because an officer who cannot find the name field should be told
+ * why rather than left to conclude the form is broken.
+ *
+ * CORRECTED 2026-10-28 — this block named FOUR fields and said the mechanism "does not
+ * exist yet". The owner struck her own 2026-09-28 deferral for DATE OF BIRTH and
+ * NATIONALITY, and `CustomerIdentifierCorrection` beside this file is that mechanism:
+ * it demands a written reason, records the before and the after, and re-screens. The old
+ * sentence was true when written and is kept here rather than deleted, because it is what
+ * explains why the sibling control exists at all.
  */
 
 const field: CSSProperties = { display: 'grid', gap: '0.2rem' };
@@ -109,8 +115,8 @@ export function CustomerContactCorrection({
 
   if (!open) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         data-testid="customer-correct-open"
         onClick={() => {
           setOpen(true);
@@ -118,16 +124,16 @@ export function CustomerContactCorrection({
         }}
       >
         {t('customerCorrectOpen')}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <section
-      style={{ display: 'grid', gap: '0.5rem', maxWidth: '32rem' }}
+    <Card
+      title={t('customerCorrectHeading')}
+      style={{ display: 'grid', gap: 'var(--space-2)', maxWidth: '32rem' }}
       data-testid="customer-correct-form"
     >
-      <h3 style={{ margin: 0 }}>{t('customerCorrectHeading')}</h3>
       <p style={muted}>{t('customerCorrectIntro')}</p>
 
       {error && (
@@ -190,9 +196,8 @@ export function CustomerContactCorrection({
         {t('customerCorrectIdentifiersNote')}
       </p>
 
-      <div style={{ display: 'flex', gap: '0.4rem' }}>
-        <button
-          type="button"
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <Button
           data-testid="customer-correct-submit"
           // At least one of the three values: the service refuses an empty
           // correction with a 422, and a screen must not send one.
@@ -200,9 +205,9 @@ export function CustomerContactCorrection({
           onClick={() => void submit()}
         >
           {t('customerCorrectSubmit')}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
           data-testid="customer-correct-cancel"
           onClick={() => {
             setOpen(false);
@@ -211,8 +216,8 @@ export function CustomerContactCorrection({
           }}
         >
           {t('customerCorrectCancel')}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }

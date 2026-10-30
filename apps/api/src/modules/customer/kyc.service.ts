@@ -153,8 +153,63 @@ export class KycService {
     return kyc;
   }
 
+  /**
+   * DATE OF BIRTH AND NATIONALITY ARE MANDATORY BEFORE `SUBMITTED` — the owner's decision of
+   * 2026-10-28, INDIVIDUAL customers only, at this transition and not at creation.
+   *
+   * ## WHY HERE AND NOT ON `CreateCustomerDto`
+   *
+   * That DTO's own comment is the reason and it still holds: *"a broker often onboards before every
+   * identity document is in hand, and refusing the customer record would push the work out of the
+   * system entirely."* Capturing a lead-turned-customer with a name and a phone number is legitimate;
+   * SUBMITTING their file for a sanctions check with no discriminators is not, because the check then
+   * runs on a NAME ALONE — which `buildScreeningSubjects` records as *"the single largest source of
+   * false positives"* against ~19,000 sanctions entries.
+   *
+   * So the gate sits at the first moment the data is actually needed. Everything before it is
+   * unaffected: a customer record, a KYC file in DRAFT, a needs assessment, a quote.
+   *
+   * ## IT COULD NOT SHIP ALONE, AND THAT IS WHY THE CORRECTION ROUTE IS IN THE SAME COMMIT
+   *
+   * Before `PATCH /customers/:id/identifiers` existed, these two fields were settable ONLY at
+   * creation — `UpdateCustomerContactDto` omits them and `forbidNonWhitelisted` refuses them. So this
+   * gate on its own would make every customer already on file permanently un-submittable, with no
+   * route in the product to fix it. The owner's instruction was explicit: *"Shipping the gate alone is
+   * not an option, even as a step."*
+   *
+   * ## WHAT IT BLOCKS TODAY, MEASURED
+   *
+   * Dev holds 840 individuals of which **839 carry both fields**, and 2 KYC records of which none is
+   * in DRAFT — so on the owner's own database this refuses nothing. The exposure it closes is
+   * forward-looking, which is the honest claim; db-test is the other way round (497 of 510 individuals
+   * carry neither, 100 files in DRAFT) because it is the cumulative e2e database.
+   *
+   * ## THE BLAST RADIUS IS THIS ROUTE AND NOTHING ELSE
+   *
+   * Measured: `kyc.submit` has exactly ONE caller (its own controller route), and
+   * `legacy-import.service.ts` contains no transition at all — so the bulk importer does not reach
+   * this and `customer.bulk-import` is unaffected.
+   */
   async submit(id: string, actorUserId: string): Promise<KycRecordWithAct> {
-    await this.findOwnedKyc(id, actorUserId);
+    const kyc = await this.findOwnedKyc(id, actorUserId);
+
+    // A SECOND READ rather than widening `KYC_INCLUDE`: that payload type is shared by every read and
+    // write of a KYC record, and the one place that needs the customer's discriminators is here. The
+    // established shape one file away — `ScreeningService.run` does exactly this read for exactly
+    // these fields.
+    const customer = await this.customers.findById(kyc.customerId);
+    if (customer && customer.customerType === 'INDIVIDUAL') {
+      const missing = [
+        customer.dateOfBirth === null ? 'dateOfBirth' : null,
+        customer.nationality === null ? 'nationality' : null,
+      ].filter((field): field is string => field !== null);
+      if (missing.length > 0) {
+        throw new UnprocessableEntityException(
+          `KYCRecord ${id}: cannot submit an individual's file without ${missing.join(' and ')}. Screening resolves a potential match on the name together with the date of birth and nationality (Jordan AMLU: "further search should be made with the other identifiers"), so a file submitted without them is checked on the name alone. Record the missing value with PATCH /customers/${kyc.customerId}/identifiers.`,
+        );
+      }
+    }
+
     await this.workflow.transition({
       entityType: 'KYCRecord',
       entityId: id,

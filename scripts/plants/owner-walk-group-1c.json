@@ -1,0 +1,26 @@
+{
+  "a-negative-finding-rendered-as-nothing": {
+    "file": "apps/web/app/(app)/incidents/page.tsx",
+    "from": "                          {inc.touchesPersonalData === null\n                            ? \"—\"\n                            : t(inc.touchesPersonalData ? \"commonYes\" : \"commonNo\")}",
+    "to": "                          {inc.touchesPersonalData ?? \"—\"}",
+    "why": "THE EXACT SHORTCUT THE CONSTRAINT FORBIDS, and it is the idiomatic one - eleven sibling sites in this app spell a nullable projection `x ?? '—'`. `??` falls back on null and undefined ONLY, so `false` passes straight through and React renders a boolean as NOTHING: the DPO's finding that no personal data is involved becomes an empty cell, which reads as an assessment nobody performed. Planted, it kills «ما قيّمت ولا عملت شي» is NOT what `false` and 0 mean. The test asserts both the word AND the absence of an em dash, so this plant is caught by the first half and a `|| '—'` variant by the second."
+  },
+  "nobody-affected-rendered-as-a-gap": {
+    "file": "apps/web/app/(app)/incidents/page.tsx",
+    "from": "                          {inc.subjectsAffectedEstimate === null\n                            ? \"—\"\n                            : formatNumber(inc.subjectsAffectedEstimate, language)}",
+    "to": "                          {inc.subjectsAffectedEstimate\n                            ? formatNumber(inc.subjectsAffectedEstimate, language)\n                            : \"—\"}",
+    "why": "The second half of the same constraint and a DIFFERENT operator, which is why it is a separate plant: `0` is falsy, so a truthiness test renders the em dash for an estimate of zero - reporting that nobody wrote a figure down when somebody recorded that nobody was affected. On an incident that is the difference between a notifiable personal-data breach and one that is not. Planted, it kills the same test on its `not.toContainText('—')` assertion, which is the half the `??` plant above cannot reach."
+  },
+  "containment-offered-once-and-then-hidden": {
+    "file": "apps/web/app/(app)/incidents/page.tsx",
+    "from": "                      {canContain &&\n                      (inc.status === \"REPORTED\" || inc.status === \"CONTAINED\") ? (",
+    "to": "                      {canContain && inc.status === \"REPORTED\" ? (",
+    "why": "The screen half of «containment is PLURAL». PRIV-SRS-02 types `containment_actions` as a LOG and the api APPENDS - proven by an e2e that contains twice and reads a two-entry log back - so gating the control on REPORTED alone leaves the second and every later action unreachable from the product while the route still accepts them: a capability nobody can exercise, the class `docs/unreachable-routes-triage.md` exists for, and invisible to every api test. Planted, it kills 'containment is PLURAL - the control is still there on a contained incident'."
+  },
+  "a-uuid-in-place-of-a-person": {
+    "file": "apps/web/app/(app)/incidents/page.tsx",
+    "from": "                              <bdi>{a.actionTakenByName ?? \"—\"}</bdi>",
+    "to": "                              <bdi>{a.actionTakenByName ?? a.actionTakenByUserId}</bdi>",
+    "why": "Decision 48's rule in the one place it can be broken quietly, and it is the plausible edit: the id is right there on the row and falling back to it always produces something to render, which is why `?? id` is the shape `RENDERED_IDENTIFIER_BUDGET` exists to count. A containment log naming a uuid tells a regulator nothing about who isolated the system. Planted, it kills the log test on its `not.toContainText('99999999')` assertion - which is also why that test carries a row whose name did NOT resolve: with every fixture name resolving, this plant would be invisible."
+  }
+}

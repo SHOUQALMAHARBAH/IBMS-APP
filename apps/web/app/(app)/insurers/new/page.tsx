@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -18,11 +19,14 @@ import {
   type InsuranceLine,
 } from '../../../../lib/insurer/insurance-line-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
 import {
   fieldStyle,
   formRowStyle,
-  pageStyle,
+  pageStackStyle,
   sectionStyle,
 } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
@@ -159,8 +163,8 @@ export default function RegisterInsurerPage() {
   if (isLoading || !user) return null;
   if (!canRegister)
     return (
-      <main style={pageStyle}>
-        <h1>{t('insNewHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('insNewHeading')} />
         <p role="alert" style={errorStyle}>
           {permissionRefusal(t, 'insNewRefusalAct', 'insurer.create')}
         </p>
@@ -168,9 +172,11 @@ export default function RegisterInsurerPage() {
     );
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('insNewHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('insNewIntro')}</p>
+    <main style={pageStackStyle}>
+      <PageHeader
+        title={t('insNewHeading')}
+        description={t('insNewIntro')}
+      />
 
       <form onSubmit={submit}>
         <fieldset style={sectionStyle}>
@@ -396,9 +402,7 @@ export default function RegisterInsurerPage() {
         </fieldset>
 
         {formError ? (
-          <p role="alert" style={errorStyle}>
-            {formError}
-          </p>
+          <ErrorState title={formError} />
         ) : null}
 
         <button type="submit" disabled={busy}>

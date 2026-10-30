@@ -56,9 +56,15 @@ describe('deriveEmployeePerformanceRecordView', () => {
       renewalRatePercent: new Prisma.Decimal('80'),
       crossSellRatePercent: null,
     };
-    expect(deriveEmployeePerformanceRecordView(row)).toEqual({
+    expect(
+      deriveEmployeePerformanceRecordView(
+        row,
+        new Map([['employee-1', 'سامر عبدالله الحوراني']]),
+      ),
+    ).toEqual({
       id: 'record-1',
       employeeId: 'employee-1',
+      employeeName: 'سامر عبدالله الحوراني',
       periodLabel: '2026-08',
       newClients: 3,
       premiumWrittenJod: '12500.500',
@@ -80,8 +86,34 @@ describe('deriveEmployeePerformanceRecordView', () => {
       renewalRatePercent: new Prisma.Decimal('0'),
       crossSellRatePercent: null,
     };
-    const view = deriveEmployeePerformanceRecordView(row);
+    const view = deriveEmployeePerformanceRecordView(row, new Map());
     expect(view.renewalRatePercent).toBe('0.00');
     expect(view.crossSellRatePercent).toBeNull();
+  });
+
+  /* ITEM 1's OTHER BRANCH. An `EmployeePerformanceRecord` is a periodic SNAPSHOT, so it can outlive
+   * the employee row it scores — somebody who has left. The name must then report NOTHING, never
+   * the uuid: `?? row.employeeId` is the fallback that always renders something and is exactly the
+   * defect the rendered-identifier budget counts. A test asserting only the resolved name would
+   * pass against it. */
+  it('reports NO name rather than the uuid when the employee row is gone', () => {
+    const row: EmployeePerformanceRecord = {
+      id: 'record-3',
+      organizationId: 'org-1',
+      employeeId: 'employee-gone',
+      periodLabel: '2026-08',
+      newClients: 0,
+      premiumWritten: null,
+      commissionEarned: null,
+      renewalRatePercent: null,
+      crossSellRatePercent: null,
+    };
+    const view = deriveEmployeePerformanceRecordView(row, new Map());
+    expect(view.employeeName).toBeNull();
+    /* NOT `expect(JSON.stringify(view)).not.toContain(id)` — my first version asserted that, and it
+     * is WRONG rather than merely weak: `employeeId` is legitimately ON THE WIRE (the screen keys
+     * its rows on it), so that assertion fails on correct code. The claim is about the NAME field,
+     * which must never fall back to the id. */
+    expect(view.employeeName).not.toBe(row.employeeId);
   });
 });

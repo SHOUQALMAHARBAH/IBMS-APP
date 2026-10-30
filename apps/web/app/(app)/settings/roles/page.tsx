@@ -1,5 +1,15 @@
 'use client';
 
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  Card,
+  ErrorState,
+  PageHeader,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../../components/ui';
 import {
   type CSSProperties,
   type FormEvent,
@@ -39,8 +49,7 @@ import {
   type RoleAdminEntry,
   type RoleWithGrants,
 } from '../../../../lib/admin/role-admin-api';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle } from '../../../../components/lead/lead.styles';
+import { pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   listDutySegregationReadiness,
   type DutySegregationReadiness,
@@ -63,25 +72,14 @@ const STATUS_ORDER: Record<DutySegregationReadiness['status'], number> = {
  *  office defines is deliberately NOT one of these. */
 type LegacyRoleName = keyof typeof ENUM_LABEL.RoleName;
 
-const cell: CSSProperties = {
-  padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid var(--border-subtle)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-};
-const head: CSSProperties = {
-  ...cell,
-  fontWeight: 600,
-  borderBottom: '2px solid var(--border-default)',
-};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = {
   margin: '1rem 0',
   display: 'grid',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   maxWidth: '30rem',
 };
-const labelStyle: CSSProperties = { display: 'grid', gap: '0.2rem' };
+const labelStyle: CSSProperties = { display: 'grid', gap: 'var(--space-1)' };
 const badgeStyle: CSSProperties = {
   display: 'inline-block',
   padding: '0.1rem 0.4rem',
@@ -531,14 +529,12 @@ export default function RoleAdminPage() {
   if (isLoading || !user) return null;
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('roleHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('roleHeading')} />
       <p>{t('roleIntro')}</p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle} data-testid="roles-load-error">
-          {loadError}
-        </p>
+        <ErrorState title={loadError} data-testid="roles-load-error" />
       ) : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
 
@@ -571,67 +567,9 @@ export default function RoleAdminPage() {
           defect: the thing a person just asked for was rendered last. Create, then the open
           editor, then the table — which is also the users screen's arrangement. */}
 
-      {readinessError ? (
-        <p
-          role="alert"
-          style={errorStyle}
-          data-testid="duty-segregation-load-error"
-        >
-          {readinessError}
-        </p>
-      ) : null}
-      {readiness ? (
-        <section style={sectionStyle} data-duty-segregation>
-          <h2>{t('dutySegHeading')}</h2>
-          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>
-            {t('dutySegIntro')}
-          </p>
-          <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
-            <thead>
-              <tr>
-                <th style={head}>{t('dutySegColOperation')}</th>
-                <th style={head}>{t('dutySegColPermission')}</th>
-                <th style={head}>{t('dutySegColHolders')}</th>
-                <th style={head}>{t('dutySegColStatus')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* WORST FIRST. Sorted by how badly the office is missing a second person, not
-                  alphabetically and not by entity: a row saying "nobody can complete this" is the reason
-                  the list exists, and it must not be below fourteen rows saying "ready". */}
-              {[...readiness]
-                .sort(
-                  (a, b) =>
-                    STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
-                    a.entityType.localeCompare(b.entityType),
-                )
-                .map((row) => (
-                  <tr
-                    key={row.constraint ?? row.entityType + row.pairLabel}
-                    data-duty-row={row.status}
-                  >
-                    <td style={cell}>{row.entityType}</td>
-                    <td style={cell}>
-                      <code>{row.checkerPermission}</code>
-                    </td>
-                    <td style={cell}>{row.holderCount}</td>
-                    <td style={cell}>
-                      {row.status === 'NOBODY'
-                        ? t('dutySegStatusNobody')
-                        : row.status === 'SINGLE_HOLDER'
-                          ? t('dutySegStatusSingle')
-                          : t('dutySegStatusReady')}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
 
       {canCreate ? (
-        <section style={sectionStyle}>
-          <h2>{t('roleCreateHeading')}</h2>
+        <Card title={t('roleCreateHeading')}>
           <form onSubmit={onCreate} style={formStyle}>
             {/* English name FIRST, because the machine name is derived from it and a person should
                 see the cause before the effect. Required — owner decision, 2026-09-24 — precisely
@@ -702,6 +640,70 @@ export default function RoleAdminPage() {
               {busy ? t('roleCreating') : t('roleCreateButton')}
             </button>
           </form>
+        </Card>
+      ) : null}
+
+      {/* THE TWO-PERSON-OPERATIONS GRID SITS BELOW THE CREATE FORM, moved 2026-10-16 on the
+          owner's instruction after she walked this screen: whoever opens it opens it to create a
+          role, and the grid is reference read afterwards. The comment above this screen's first
+          section already stated that order — "the thing a person just asked for was rendered
+          last... Create, then the editor, then the table" — and this block was still above it,
+          so the rule was written down and not followed. */}
+      {readinessError ? (
+        <p
+          role="alert"
+          style={errorStyle}
+          data-testid="duty-segregation-load-error"
+        >
+          {readinessError}
+        </p>
+      ) : null}
+      {readiness ? (
+        <section style={sectionStyle} data-duty-segregation>
+          <h2>{t('dutySegHeading')}</h2>
+          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>
+            {t('dutySegIntro')}
+          </p>
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('dutySegColOperation')}</Th>
+                <Th>{t('dutySegColPermission')}</Th>
+                <Th>{t('dutySegColHolders')}</Th>
+                <Th>{t('dutySegColStatus')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* WORST FIRST. Sorted by how badly the office is missing a second person, not
+                  alphabetically and not by entity: a row saying "nobody can complete this" is the reason
+                  the list exists, and it must not be below fourteen rows saying "ready". */}
+              {[...readiness]
+                .sort(
+                  (a, b) =>
+                    STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+                    a.entityType.localeCompare(b.entityType),
+                )
+                .map((row) => (
+                  <tr
+                    key={row.constraint ?? row.entityType + row.pairLabel}
+                    data-duty-row={row.status}
+                  >
+                    <Td>{row.entityType}</Td>
+                    <Td>
+                      <code>{row.checkerPermission}</code>
+                    </Td>
+                    <Td>{row.holderCount}</Td>
+                    <Td>
+                      {row.status === 'NOBODY'
+                        ? t('dutySegStatusNobody')
+                        : row.status === 'SINGLE_HOLDER'
+                          ? t('dutySegStatusSingle')
+                          : t('dutySegStatusReady')}
+                    </Td>
+                  </tr>
+                ))}
+            </tbody>
+          </Table>
         </section>
       ) : null}
 
@@ -931,23 +933,23 @@ export default function RoleAdminPage() {
 
       {roles && roles.length > 0 ? (
         <section style={sectionStyle}>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <Table>
             <thead>
               <tr>
-                <th style={head}>{t('roleTableName')}</th>
-                <th style={head}>{t('roleTableStatus')}</th>
-                <th style={head}>{t('roleTableHolders')}</th>
-                <th style={head}>{t('roleTablePermissions')}</th>
-                <th style={head}>{t('roleTableMfa')}</th>
+                <Th>{t('roleTableName')}</Th>
+                <Th>{t('roleTableStatus')}</Th>
+                <Th>{t('roleTableHolders')}</Th>
+                <Th>{t('roleTablePermissions')}</Th>
+                <Th>{t('roleTableMfa')}</Th>
                 {canActOnRow ? (
-                  <th style={head}>{t('roleTableActions')}</th>
+                  <Th>{t('roleTableActions')}</Th>
                 ) : null}
               </tr>
             </thead>
             <tbody>
               {roles.map((role) => (
-                <tr key={role.id} data-role={role.name}>
-                  <td style={cell}>
+                <Tr key={role.id} data-role={role.name}>
+                  <Td>
                     <bdi>{roleLabel(role)}</bdi>
                     {role.isSystem ? (
                       <span
@@ -958,19 +960,19 @@ export default function RoleAdminPage() {
                         {t('roleSystemBadge')}
                       </span>
                     ) : null}
-                  </td>
-                  <td style={cell} data-status={role.status}>
+                  </Td>
+                  <Td data-status={role.status}>
                     {role.status === 'ACTIVE'
                       ? t('roleStatusActive')
                       : t('roleStatusInactive')}
-                  </td>
-                  <td style={cell}>{role.holderCount}</td>
-                  <td style={cell}>{role.permissionCount}</td>
-                  <td style={cell}>
+                  </Td>
+                  <Td>{role.holderCount}</Td>
+                  <Td>{role.permissionCount}</Td>
+                  <Td>
                     {role.requiresMfaAlways ? t('roleMfaAlwaysLabel') : '—'}
-                  </td>
+                  </Td>
                   {canActOnRow ? (
-                    <td style={cell}>
+                    <Td>
                       <button
                         type="button"
                         onClick={() => void openMatrix(role.id)}
@@ -1004,12 +1006,12 @@ export default function RoleAdminPage() {
                           {t('roleDeleteButton')}
                         </button>
                       ) : null}
-                    </td>
+                    </Td>
                   ) : null}
-                </tr>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </section>
       ) : null}
 

@@ -11,6 +11,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerContactDto } from './dto/update-customer-contact.dto';
+import { CorrectCustomerIdentifiersDto } from './dto/correct-customer-identifiers.dto';
 import { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import { SearchCustomersDto } from './dto/search-customers.dto';
 import { CUSTOMER_SEARCH_CODES } from '../../common/picker-search.config';
@@ -150,6 +151,38 @@ export class CustomerController {
    * refused by the DTO, because changing one is a screening event under the AMLU rules and ships with the
    * re-screening mechanism: https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions
    */
+  /**
+   * Correct a customer's DATE OF BIRTH or NATIONALITY — the owner's narrow strike of her own
+   * 2026-09-28 deferral (2026-10-28). INDIVIDUAL customers only.
+   *
+   * ## THE SAME PERMISSION AS THE CONTACT CORRECTION, AND THAT IS A DECISION
+   *
+   * `customer.update` gates both. No code is minted, for the reason the org-unit reactivate route
+   * records one batch earlier: correcting a customer's record is ONE capability, and a second code
+   * would let an office grant the power to fix a phone number while withholding the power to fix a
+   * date of birth — a split nobody asked for, on a path whose whole purpose is answering a statutory
+   * correction request. What separates the two is not who may call them but what each one DOES: this
+   * one demands a written reason, records the before and the after, and re-screens.
+   *
+   * ## WHY A SEPARATE ROUTE RATHER THAN TWO MORE FIELDS ON `PATCH :id`
+   *
+   * Because `UpdateCustomerContactDto` being a three-field class IS the first of the three layers
+   * that keep the other six identifiers uneditable (the 2026-09-28 deferral's safety condition 1).
+   * Widening it would retire that layer for `legalName`, the four name parts, `nationalId` and
+   * `registrationNumber` as well — all of which the owner's strike deliberately leaves in place.
+   *
+   * Declared ABOVE `@Patch(':id')` so the more specific path is registered first.
+   */
+  @RequirePermissions('customer.update')
+  @Patch(':id/identifiers')
+  correctIdentifiers(
+    @Param('id') id: string,
+    @Body() dto: CorrectCustomerIdentifiersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.customers.correctIdentifiers(id, dto, user);
+  }
+
   @RequirePermissions('customer.update')
   @Patch(':id')
   updateContactDetails(

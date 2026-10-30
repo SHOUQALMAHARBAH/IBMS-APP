@@ -1,0 +1,20 @@
+{
+  "nullish-read-as-a-ternary-again": {
+    "file": "scripts/measurements/rendered-identifiers.py",
+    "from": "            if re.match(r'\\s*(?:\\?[^.?]|&&|\\|\\||\\)|\\s*:\\s*$)', after):",
+    "to": "            if re.match(r'\\s*(?:\\?[^.]|&&|\\|\\||\\)|\\s*:\\s*$)', after):",
+    "why": "THE SEVENTH BLIND SPOT, and the owner found it by reading a screen. `[^.]` was written to let OPTIONAL CHAINING through and let NULLISH COALESCING through with it, because the second `?` of `??` satisfies it — so the ONE SHAPE this budget exists to count, the `?? id` fallback, was the one shape it could not see. Planted, `rendered-identifiers.py --self-test` fails by name on 'THE SEVENTH MISS' and the scan falls from 12 to 10 while the budget stays 12, so the gate ALSO fails in its down direction. Two independent failures from one character."
+  },
+  "resolver-falls-back-to-the-uuid": {
+    "file": "apps/api/src/modules/needs-assessment/needs-assessment.service.ts",
+    "from": "        ? (names.get(r.reviewedByUserId) ?? null)",
+    "to": "        ? (names.get(r.reviewedByUserId) ?? r.reviewedByUserId)",
+    "why": "Decision 48's rule in the one place it can be broken quietly: a MISSING key means NO NAME and must never become the uuid. This is the exact shape found live on `/internal-controls` and `/settings/duty-segregation`, both of which read `name ?? userId ?? '-'`. Kills exactly one test — 'reports NO NAME, never the uuid, for an id the resolver cannot resolve' — and leaves the other two name assertions passing, which is why the double resolves only SOME of the ids the tests pass: a double that answered for everything could not tell a resolved name from this fallback."
+  },
+  "needs-assessment-names-dropped-from-the-list-path": {
+    "file": "apps/api/src/modules/needs-assessment/needs-assessment.service.ts",
+    "from": "    return this.withNames(await this.assessments.findMany(filter));",
+    "to": "    return (await this.assessments.findMany(filter)) as never;",
+    "why": "The REQUIRED field on `NeedsAssessmentWithNames` is what made the compiler name all ten return sites, so this plant needs a cast to even compile — which is itself the evidence that an OPTIONAL field would have shipped a name after a REVIEW and none after a LIST, the `IncidentReport.load()` defect. With the cast it kills 'resolves a LIST in ONE query, not one per row' on the names rather than on the call count."
+  }
+}

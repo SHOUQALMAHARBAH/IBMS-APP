@@ -10,8 +10,13 @@ import {
 } from '../../../../lib/opportunity/opportunity-api';
 import { listRfqs, type Rfq, type RfqInsurerStatus } from '../../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
-import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
+import { buttonStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  EmptyState,
+  ErrorState,
+  SkeletonList,
+} from '../../../../components/ui';
+import { cardMetaStyle, pageStackStyle } from '../../../../components/lead/lead.styles';
 import {
   rfqActionsStyle,
   rfqBadgeStyle,
@@ -29,6 +34,7 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate } from '../../../../lib/i18n/format';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 
 const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
@@ -154,7 +160,7 @@ export default function OpportunityDetailPage() {
   const canDiscardClaim = hasPermission(user, 'claim.discard');
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <button
         type="button"
         onClick={() =>
@@ -170,14 +176,15 @@ export default function OpportunityDetailPage() {
       </button>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {opportunity ? (
         <>
           <h1>{t('oppDetailHeading', { id: opportunity.id.slice(0, 8) })}</h1>
+          <p style={{ margin: '0 0 1rem' }}>
+            <WorkflowHistoryLink entityType='Opportunity' entityId={opportunity.id} />
+          </p>
           <p style={{ opacity: 0.8 }}>
             {t('oppDetailStatusLine', { status: t(OPPORTUNITY_STATUS_LABEL_KEY[opportunity.status]) })}
           </p>
@@ -222,9 +229,9 @@ export default function OpportunityDetailPage() {
 
           <h2 style={{ marginTop: '2rem' }}>{t('oppRfqsHeading')}</h2>
           {rfqs === null ? (
-            <p>{t('commonLoading')}</p>
+            <SkeletonList rows={4} label={t('commonLoading')} />
           ) : rfqs.length === 0 ? (
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('oppRfqsNone')}</p>
+            <EmptyState title={t('oppRfqsNone')} />
           ) : (
             <div style={{ marginTop: '1rem' }}>
               {rfqs.map((rfq) => (
@@ -238,7 +245,7 @@ export default function OpportunityDetailPage() {
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      gap: '1rem',
+                      gap: 'var(--space-4)',
                       flexWrap: 'wrap',
                     }}
                   >

@@ -5,6 +5,7 @@ import { PermissionRepository } from '../../repositories/permission.repository';
 import { UserRepository } from '../../repositories/user.repository';
 import { DutySegregationService } from './duty-segregation.service';
 import { DutySegregationModeService } from './duty-segregation-mode.service';
+import { DpoDesignationService } from './dpo-designation.service';
 import { DutySegregationController } from './duty-segregation.controller';
 import { AuditModule } from '../audit/audit.module';
 
@@ -21,6 +22,7 @@ import { AuditModule } from '../audit/audit.module';
   controllers: [DutySegregationController],
   providers: [
     DutySegregationModeService,
+    DpoDesignationService,
     DutySegregationService,
     OrganizationRepository,
     PermissionRepository,

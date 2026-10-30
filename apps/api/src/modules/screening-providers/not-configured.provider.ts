@@ -1,4 +1,4 @@
-import { capability } from './screening-provider.types';
+import { capability, describes } from './screening-provider.types';
 import type {
   CapabilityState,
   ProviderHealth,
@@ -76,7 +76,12 @@ export class NotConfiguredProvider implements ScreeningProvider {
    * reports what the SELECTED adapter would offer once configured, so an
    * operator can see what they are missing rather than a blank table. */
   capabilities(): CapabilityState[] {
-    const note = `Not configured${this.missing.length > 0 ? ` — missing ${this.missing.join(', ')}` : ''}.`;
+    // The settings list is a PARAM rather than part of the sentence: it is a run of machine
+    // names (`SCREENING_BASE_URL`, …) and does not translate.
+    const note =
+      this.missing.length > 0
+        ? describes('NOT_CONFIGURED_MISSING', { list: this.missing.join(', ') })
+        : describes('NOT_CONFIGURED');
     return (
       [
         'SANCTIONS',

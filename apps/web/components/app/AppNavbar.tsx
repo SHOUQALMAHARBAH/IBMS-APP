@@ -9,9 +9,9 @@ import { logout } from '../../lib/auth/auth-api';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { initialsFrom } from '../../lib/i18n/initials';
 import { ThemeToggle } from './ThemeToggle';
+import { Breadcrumb } from './Breadcrumb';
 import {
   avatarStyle,
-  navbarBrandStyle,
   navbarStyle,
   profileDeptStyle,
   profileMenuItemStyle,
@@ -24,12 +24,17 @@ import {
 } from './app.styles';
 
 /*
- * The top bar: wordmark at the leading edge, controls at the trailing edge.
+ * The top bar: WHERE YOU ARE at the leading edge, controls at the trailing edge.
  *
- * Full width, ABOVE the sidebar rather than only over the content column, so
- * the wordmark sits at the true leading edge of the screen. That is why
- * `brandStyle` left `AppNav` — two brand marks stacked diagonally is what the
- * alternative looks like.
+ * Full width, ABOVE the sidebar rather than only over the content column.
+ *
+ * THE BRAND WENT BACK TO THE RAIL, and the note that used to stand here was right about the
+ * reason it left: two brand marks stacked diagonally is what the alternative looks like. What
+ * changed is that there is only ONE now, and the owner named its place — *"where the shell names
+ * the application (the sidebar header, the login screen, the browser tab title)"* — which is also
+ * the arrangement the approved reference screen uses: brand in the rail, where-you-are in the bar.
+ * The organization's own name went with it, as the lockup's subtitle, so the office is named once
+ * rather than twice.
  *
  * Leading/trailing rather than left/right throughout: the whole bar mirrors
  * under `dir="rtl"` for free, the same way `shellStyle`'s plain flex row
@@ -80,21 +85,25 @@ export function AppNavbar() {
 
   return (
     <nav aria-label={t('navbarAria')} style={navbarStyle}>
-      <Link href="/" style={navbarBrandStyle}>
-        IBMS
-      </Link>
+      <Breadcrumb />
 
       <div style={trailingGroupStyle}>
         {/* Item 1b landed: the reserved slot is a real button with a badge,
             exactly as the placeholder comment said it would become. */}
         <NotificationBell />
 
-        <div role="group" aria-label={t('language')} style={{ display: 'flex', gap: 'var(--space-1)' }}>
+        <div
+          role="group"
+          aria-label={t('language')}
+          style={{ display: 'flex', gap: 'var(--space-1)' }}
+        >
           <button
             type="button"
             aria-pressed={language === 'AR'}
             onClick={() => setLanguage('AR')}
-            style={language === 'AR' ? navbarToggleActiveStyle : navbarToggleStyle}
+            style={
+              language === 'AR' ? navbarToggleActiveStyle : navbarToggleStyle
+            }
           >
             {t('switchToArabic')}
           </button>
@@ -102,7 +111,9 @@ export function AppNavbar() {
             type="button"
             aria-pressed={language === 'EN'}
             onClick={() => setLanguage('EN')}
-            style={language === 'EN' ? navbarToggleActiveStyle : navbarToggleStyle}
+            style={
+              language === 'EN' ? navbarToggleActiveStyle : navbarToggleStyle
+            }
           >
             {t('switchToEnglish')}
           </button>
@@ -125,7 +136,9 @@ export function AppNavbar() {
             </span>
             <span style={{ display: 'grid', minWidth: 0 }}>
               <span style={profileNameStyle}>{user.fullName}</span>
-              {department ? <span style={profileDeptStyle}>{department}</span> : null}
+              {department ? (
+                <span style={profileDeptStyle}>{department}</span>
+              ) : null}
             </span>
           </summary>
 
@@ -140,7 +153,11 @@ export function AppNavbar() {
             <button
               type="button"
               onClick={() => void handleSignOut()}
-              style={{ ...profileMenuItemStyle, width: '100%', textAlign: 'start' }}
+              style={{
+                ...profileMenuItemStyle,
+                width: '100%',
+                textAlign: 'start',
+              }}
             >
               {t('signOut')}
             </button>

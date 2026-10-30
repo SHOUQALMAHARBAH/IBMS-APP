@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { DateEcho, Hint } from '../ui/Field';
 import {
   addFixedHolidaysForYear,
   addMovingOccasion,
@@ -325,15 +326,21 @@ export function SlaHolidayCalendar() {
             margin: '0.75rem 0',
           }}
         >
-          <label style={fieldStyle}>
-            <span style={{ fontSize: '0.8rem' }}>{t('slapHolidayDate')}</span>
+          <div style={fieldStyle}>
+            <label htmlFor="sla-holiday-day" style={{ fontSize: '0.8rem' }}>
+              {t('slapHolidayDate')}
+            </label>
             <input
+              id="sla-holiday-day"
+              aria-describedby="sla-holiday-day-hint"
               type="date"
               data-testid="sla-holiday-date"
               value={day}
               onChange={(e) => setDay(e.target.value)}
             />
-          </label>
+            <Hint id="sla-holiday-day-hint">{t('slapHolidayDateHint')}</Hint>
+            <DateEcho value={day} />
+          </div>
           <label style={fieldStyle}>
             <span style={{ fontSize: '0.8rem' }}>{t('slapHolidayName')}</span>
             <input

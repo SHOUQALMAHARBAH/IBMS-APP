@@ -37,13 +37,17 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { useRouter } from 'next/navigation';
 import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
-import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
+import {
+  ErrorState,
+  PageHeader,
+} from '../../../../components/ui';
+import { pageStackStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import {
   connectEmailIntegration,
   emailAuthorizeUrl,
@@ -277,12 +281,12 @@ export default function EmailIntegrationPage() {
     }
   }
 
-  if (isLoading) return <main style={pageStyle}>{t('emailLoading')}</main>;
+  if (isLoading) return <main style={pageStackStyle}>{t('emailLoading')}</main>;
 
   if (!canRead) {
     return (
-      <main style={pageStyle}>
-        <h1>{t('emailHeading')}</h1>
+      <main style={pageStackStyle}>
+        <PageHeader title={t('emailHeading')} />
         <p role="alert" style={errorStyle}>
           {permissionRefusal(t, 'emailRefusalAct', 'email.integration.read')}
         </p>
@@ -291,17 +295,15 @@ export default function EmailIntegrationPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <h1>{t('emailHeading')}</h1>
+    <main style={pageStackStyle}>
+      <PageHeader title={t('emailHeading')} />
       <p style={{ color: 'var(--ink-secondary)', maxWidth: '50rem' }}>
         {t('emailIntro')}
       </p>
 
       {/* ERROR state — the load failed, so there is nothing to report about the mailbox. */}
       {loadError !== null && (
-        <p role="alert" style={errorStyle} data-testid="email-load-error">
-          {loadError}
-        </p>
+        <ErrorState title={loadError} data-testid="email-load-error" />
       )}
 
       {/* LOADING state. */}
@@ -353,9 +355,7 @@ export default function EmailIntegrationPage() {
 
       {actionError !== null && (
         <section style={sectionStyle}>
-          <p role="alert" style={errorStyle} data-testid="email-action-error">
-            {actionError}
-          </p>
+          <ErrorState title={actionError} data-testid="email-action-error" />
           {/* Implementation detail, for whoever holds `diagnostics.view` — a code, never a role name. */}
           {gapDetail !== null && (
             <p
@@ -377,7 +377,7 @@ export default function EmailIntegrationPage() {
           </h2>
 
           {status.connected ? (
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => void runVerify()}

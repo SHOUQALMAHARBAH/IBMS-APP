@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { InsurerController } from './insurer.controller';
 import { InsurerService } from './insurer.service';
+import { InsurerCompanyLinkService } from './insurer-company-link.service';
 import { InsuranceLineController } from './insurance-line.controller';
 import { InsuranceLineService } from './insurance-line.service';
 import { InsurerRepository } from '../../repositories/insurer.repository';
@@ -46,6 +47,10 @@ import { AuditModule } from '../audit/audit.module';
   ],
   providers: [
     InsurerService,
+    // MODULE 0-ب ITEM (e), DECISION 63 — its own service, not a method on `InsurerService`: linking
+    // is not an edit, it decides which SOURCE answers, and it reaches `Organization` which that
+    // service has no business reading.
+    InsurerCompanyLinkService,
     InsurerRepository,
     InsuranceLineService,
     InsuranceLineRepository,

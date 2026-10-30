@@ -1,0 +1,26 @@
+{
+  "the-office-scoped-note-is-dropped": {
+    "_": "Remove the sentence saying the thirteen fields are recorded by the OFFICE instead. The form then reads as thirteen gaps rather than as decision 63. Must kill the STATES test.",
+    "file": "apps/web/app/(app)/provider-register-insurer/page.tsx",
+    "from": "          <p style={noteStyle} data-testid=\"office-scoped-note\">\n            {t('regInsPublishedChannelsNote')}\n          </p>",
+    "to": "          <p style={noteStyle} data-testid=\"office-scoped-note\" hidden>\n            {t('regInsPublishedChannelsNote')}\n          </p>"
+  },
+  "the-two-source-hint-is-dropped": {
+    "_": "Remove the sentence saying which fact the licensed lines are. A reader then cannot tell the company's LICENCE from what offices have recorded BUYING — the two-source rule's whole point. Must kill the WHICH FACT test.",
+    "file": "apps/web/app/(app)/provider-register-insurer/page.tsx",
+    "from": "            <p style={noteStyle} data-testid=\"licensed-lines-hint\">\n              {t('regInsLicensedLinesHint')}\n            </p>",
+    "to": "            <p style={noteStyle} data-testid=\"licensed-lines-hint\" hidden>\n              {t('regInsLicensedLinesHint')}\n            </p>"
+  },
+  "the-servers-refusal-becomes-generic": {
+    "_": "Replace the API's own sentence with the screen's generic load error. Six distinct refusals then read identically, and the one that needs a different person to fix it is indistinguishable. Must kill the server-refusal test.",
+    "file": "apps/web/app/(app)/provider-register-insurer/page.tsx",
+    "from": "        error instanceof ApiError ? error.message : t('regOfficeLoadError'),",
+    "to": "        t('regOfficeLoadError'),"
+  },
+  "the-permission-check-is-dropped": {
+    "_": "The screen renders its form to a reader who cannot submit it — a control leading to a refusal, which the frontend directive forbids. Must kill the refusal test.",
+    "file": "apps/web/app/(app)/provider-register-insurer/page.tsx",
+    "from": "  if (!canRegister) {",
+    "to": "  if (false) {"
+  }
+}

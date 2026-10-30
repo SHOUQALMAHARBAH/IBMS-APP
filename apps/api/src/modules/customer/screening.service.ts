@@ -491,10 +491,26 @@ export class ScreeningService {
  * never treated as a screening determination — conflating a self-declaration
  * with a provider finding would corrupt both.
  *
- * The customer model does not currently capture date of birth, nationality or
- * country, so only names are available today. The contract supports those
- * attributes because name-only matching manufactures false positives; filling
- * them needs the KYC data model to capture them first.
+ * ## S2 OF THE NAMED SHORT PASS — THIS DENIED TWO COLUMNS THAT EXIST
+ *
+ * It used to say: "the customer model does not currently capture date of birth, nationality or
+ * country, so only names are available today ... filling them needs the KYC data model to capture
+ * them first." Measured: `Customer.dateOfBirth` and `Customer.nationality` BOTH EXIST, and
+ * `buildScreeningSubjects` — one file away, in this module — FILLS BOTH, for the customer and for
+ * every UBO. So the claim was false and the conclusion drawn from it was backwards.
+ *
+ * The damage is specific rather than cosmetic. This is the single largest source of false positives
+ * in the product: ~19,000 sanctions entries, where name-only matching manufactures them. A reader
+ * deciding whether to improve match quality would have concluded the data model needs extending
+ * first — and so would have left in place the very improvement that had already shipped.
+ *
+ * WHAT IS ACTUALLY SENT: full name, entity type, date of birth and nationality. Null where unknown,
+ * never guessed — an absent date of birth is "we do not know", which a reviewer weighs differently
+ * from "it does not match". A CORPORATE customer legitimately has neither of its own; those belong
+ * to the natural persons behind it, which is what the UBO subjects carry.
+ *
+ * WHAT IS GENUINELY NOT CAPTURED is `country` — there is no such column on `Customer` (measured, and
+ * no `countryId` either). One of the three was true, which is how the sentence survived.
  */
 /** True when the provider returned at least one candidate worth a case. */
 function anyHitFromProvider(execution: ScreeningExecution): boolean {

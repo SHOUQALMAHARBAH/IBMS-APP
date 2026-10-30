@@ -6,6 +6,8 @@ import {
 import { PaymentChannelService } from './payment-channel.service';
 import type { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { CustomerRepository } from '../../repositories/customer.repository';
+import type { InsurerRepository } from '../../repositories/insurer.repository';
 
 const channelRow = (over: Record<string, unknown> = {}) => ({
   id: 'pc-1',
@@ -33,12 +35,26 @@ function makeService(over: Partial<Record<string, unknown>> = {}) {
     disable: vi.fn().mockResolvedValue({ count: 1 }),
     ...over,
   };
+  /* Real Maps, not empty ones: empty makes every `ownerName` null and a test asserting a name
+   * would be passing on the double. */
+  const customers = {
+    namesForCustomerIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['cust-1', 'شركة اليرموك للتأمين']])),
+  };
+  const insurers = {
+    namesForInsurerIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['ins-1', 'Jordan Insurance Co']])),
+  };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new PaymentChannelService(
     channels as unknown as PaymentChannelRepository,
+    customers as unknown as CustomerRepository,
+    insurers as unknown as InsurerRepository,
     audit as unknown as AuditService,
   );
-  return { service, channels, audit };
+  return { service, channels, customers, insurers, audit };
 }
 
 describe('PaymentChannelService.create (Process 38)', () => {

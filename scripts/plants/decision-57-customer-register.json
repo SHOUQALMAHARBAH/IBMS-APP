@@ -1,0 +1,20 @@
+{
+  "claims-returned-to-the-empty-register": {
+    "file": "packages/db/prisma/seed-data/permissions.ts",
+    "from": "      CLAIMS,\n      FINANCE,\n      PLACEMENT,\n      DPO,",
+    "to": "      FINANCE,\n      PLACEMENT,\n      DPO,",
+    "why": "Decision 57 undone for ONE role, which is the shape a grid edit actually takes - nobody removes three at once. Planted, it kills TWO tests and the second is the one that matters: the exact-set assertion fails by name, AND the invariant fails with `expected [ 'CLAIMS_OFFICER' ] to deeply equal []`, because a Claims Officer who holds `customer.read` and can neither read across owners nor ever own a customer is back to being shown «لا يوجد عملاء بعد» over a register that can never fill. Two tests because they are two claims - WHO holds it, and that NOBODY is lied to - and a reader needs to know which one a future edit broke."
+  },
+  "sales-given-the-cross-owner-read": {
+    "file": "packages/db/prisma/seed-data/permissions.ts",
+    "from": "      DPO,\n    ],\n  },\n  {\n    code: \"customer-file.all-owners.read\",",
+    "to": "      DPO,\n      SALES,\n    ],\n  },\n  {\n    code: \"customer-file.all-owners.read\",",
+    "why": "The helpful edit in the other direction, and the one decision 57 explicitly refuses: «دفترها دفترها». A Sales Officer handed the cross-owner read sees every colleague's book, which is the whole of what the owner filter exists to prevent and is NOT a side effect anybody would notice from a screen - the list simply gets longer. Planted, it kills the exact-set test and the withheld-absence test, and the absence test is the one carrying the reason. Also the realistic regression: SALES is the role whose screen that filter is most visible on, so it is the one somebody 'fixes' next."
+  },
+  "a-fourth-role-shown-an-empty-register": {
+    "file": "packages/db/prisma/seed-data/permissions.ts",
+    "from": "      CLAIMS,\n      FINANCE,\n      ADMIN,\n      OFFICE_ADMIN,\n    ],",
+    "to": "      CLAIMS,\n      FINANCE,\n      ADMIN,\n      OFFICE_ADMIN,\n      POLICY_CHECK,\n    ],",
+    "why": "THE PLANT THAT PROVES THE INVARIANT OBSERVES SOMETHING, and it kills ONLY that test - the exact set of cross-owner holders is unchanged and so is the withheld absence. Letting the Policy Checking Officer 'see customers' is an entirely plausible grant: it holds `policy.check` and reads policies all day. But it can neither read across owners nor ever own a customer, so `/customers` would open and be permanently, structurally empty while telling it there are no customers in the office. Planted, the invariant fails with `expected [ 'POLICY_CHECKING_OFFICER' ] to deeply equal []` and its message names the sentence that becomes false. This is the one plant whose target is a role the decision never mentions, which is why it is the one that proves the test is about a PROPERTY rather than about three names."
+  }
+}

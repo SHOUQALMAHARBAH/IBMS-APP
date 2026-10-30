@@ -44,7 +44,15 @@ import sys
 
 REGISTRY = os.path.join('apps', 'api', 'src', 'common', 'maker-checker-pairs.config.ts')
 MODULES = os.path.join('apps', 'api', 'src', 'modules')
+MIGRATIONS = os.path.join('packages', 'db', 'prisma', 'migrations')
 VIEW = 'combinedDutyActView'
+
+# The INDEPENDENT WITNESS for the pair count — the CHECK constraints the migrations actually
+# create. `[A-Za-z_]+` and not `[A-Za-z]+`: five of the sixteen names carry a second underscore
+# (`Complaint_closure_...`, `NeedsAssessment_reviewer_...`), and the narrower class silently
+# truncated them to `closure` and `reviewer`, which read as four unknown names and five missing
+# ones. A count taken from a mis-matching pattern is not a count.
+CONSTRAINT_NAME = re.compile(r'[A-Za-z_]+_maker_checker_distinct')
 
 FIELD = re.compile(r"(\w+):\s*(?:'([^']*)'|(true|false))")
 
@@ -69,6 +77,7 @@ BY_CALL_SITE = {
     ('kyc.controller.ts', 'row.combinedDutyAct'): 'KYCRecord_maker_checker_distinct',
     ('data-sharing-approval.config.ts', 'row.combinedDutyAct'): 'DataSharingApproval_maker_checker_distinct',
     ('disposal-batch.config.ts', 'row.combinedDutyAct'): 'DisposalBatch_maker_checker_distinct',
+    ('retention-schedule.config.ts', 'row.combinedDutyAct'): 'RetentionScheduleItem_maker_checker_distinct',
     # Two entries for ONE pair: this module has no view layer, so the controller projects — once for the
     # single-row handlers and once for the list. KYC is the other module shaped this way (§ 1.80).
     ('data-processing-agreement.controller.ts', 'row.combinedDutyAct'): 'DataProcessingAgreement_maker_checker_distinct',
@@ -122,14 +131,75 @@ def label(pair):
 
 
 def read_sources():
-    """{path: text} for the registry and every non-spec module file."""
+    """{path: text} for the registry, every non-spec module file, and every migration.
+
+    The migrations are in here so the CROSS-CHECK below can be planted in memory exactly as every
+    other column is — a gate whose plant has to touch the real tree is a gate nobody runs.
+    """
     out = {REGISTRY: io.open(REGISTRY, encoding='utf-8', errors='replace').read()}
     for root, _, files in os.walk(MODULES):
         for name in files:
             if name.endswith('.ts') and '.spec.' not in name:
                 path = os.path.join(root, name)
                 out[path] = io.open(path, encoding='utf-8', errors='replace').read()
+    for root, _, files in os.walk(MIGRATIONS):
+        for name in files:
+            if name.endswith('.sql'):
+                path = os.path.join(root, name)
+                out[path] = io.open(path, encoding='utf-8', errors='replace').read()
     return out
+
+
+def constraints_in_migrations(sources):
+    """Every `*_maker_checker_distinct` CHECK constraint the migrations name."""
+    found = set()
+    for path, text in sources.items():
+        if path.endswith('.sql'):
+            found.update(CONSTRAINT_NAME.findall(text))
+    return found
+
+
+def cross_check(sources):
+    """THE PAIR COUNT IS DERIVED, NEVER PINNED TO A LITERAL.
+
+    This replaced `assert r['pairs'] == 15`, which had been failing before the measurement ran
+    since the sixteenth pair landed — the identical failure `permission-reachability.py` had on a
+    hand-written count of a generated file. Bumping the literal restores the script and keeps the
+    defect; the seventeenth pair would kill it again.
+
+    So the registry is compared to the DATABASE's own constraints as the migrations create them,
+    BY NAME and in BOTH directions. A parser that stops matching fails; a registry entry whose
+    constraint no migration creates fails too, which is the direction a reconstructed name trips
+    and the direction the literal could never see.
+    """
+    registered = {p['dbCheckConstraint'] for p in parse_pairs(sources[REGISTRY])}
+    in_sql = constraints_in_migrations(sources)
+
+    # Non-vacuity FIRST: an empty either side means a parser stopped working, and comparing two
+    # empty sets is the clean-looking nothing this whole file exists to refuse.
+    assert registered, (
+        'parsed ZERO pairs out of %s — the parser has stopped matching, not the registry has '
+        'emptied. Do not relax this.' % REGISTRY
+    )
+    assert in_sql, (
+        'found ZERO `*_maker_checker_distinct` constraints under %s — the pattern has stopped '
+        'matching. Do not relax this.' % MIGRATIONS
+    )
+
+    missing_sql = sorted(registered - in_sql)
+    assert not missing_sql, (
+        'the registry names %s, which NO migration creates. Either the constraint name was '
+        'reconstructed rather than copied from the migration (this has happened twice), or a pair '
+        'was registered without the CHECK that enforces it — in which case nothing in the database '
+        'refuses the self-approval.' % missing_sql
+    )
+    missing_registry = sorted(in_sql - registered)
+    assert not missing_registry, (
+        'the migrations create %s, which no `MAKER_CHECKER_REGISTRY` entry claims. A pair the '
+        'registry does not know about is one this measurement cannot report on, and one '
+        '`MakerCheckerConstraint` cannot name.' % missing_registry
+    )
+    return len(registered)
 
 
 def parse_pairs(registry_text):
@@ -150,6 +220,10 @@ def measure(sources):
 
     call_args = []
     for path, text in sources.items():
+        # `.ts` only — the migrations are in `sources` for the cross-check, and a `.sql` file that
+        # one day contains this string must not be attributed as a projection.
+        if not path.endswith('.ts'):
+            continue
         if path.endswith('duty-segregation.view.ts'):
             continue
         base = os.path.basename(path)
@@ -184,7 +258,11 @@ def measure(sources):
 def report():
     sources = read_sources()
     r = measure(sources)
-    assert r['pairs'] == 15, 'expected 15 registered pairs, parsed %d' % r['pairs']
+    derived = cross_check(sources)
+    assert derived == r['pairs'], (
+        'cross_check and measure disagree on the pair count (%d vs %d) — they read the same '
+        'registry through the same parser, so this cannot differ' % (derived, r['pairs'])
+    )
 
     # A BY_CALL_SITE value must name a REAL constraint. Without this, a typo'd or reconstructed constraint
     # name makes its pair read as UNPROJECTED while a screen is showing it — under-reporting, the direction
@@ -199,7 +277,11 @@ def report():
         '`maker-checker-pairs.config.ts` rather than reconstructing it.' % bogus
     )
 
-    print('registered maker/checker pairs        %3d' % r['pairs'])
+    print(
+        'registered maker/checker pairs        %3d   (DERIVED — matches the %d '
+        '`*_maker_checker_distinct` CHECK constraints the migrations create, by name, both ways)'
+        % (r['pairs'], derived)
+    )
     print('  dormant (ESTIMATE — see header)     %3d' % len(r['dormant']))
     print('  live                                %3d' % r['live'])
     print('    projecting the act on the record  %3d' % len(r['projecting']))
@@ -266,6 +348,38 @@ def self_test():
         if 'no row of BY_CALL_SITE claims' not in str(err):
             raise
         print('  %-56s ok' % 'an unmapped call site is refused')
+
+    # 4. THE CROSS-CHECK THAT REPLACED THE DEAD LITERAL, planted in BOTH directions. A gate nobody
+    #    plants is a gate nobody has tested, and this one replaced an assertion that had been
+    #    failing for a day before anybody noticed, because nothing ran it.
+    for name, path, find, replace, needle in (
+        (
+            'a registry entry whose constraint no migration creates is refused',
+            REGISTRY,
+            "dbCheckConstraint: 'Refund_maker_checker_distinct'",
+            "dbCheckConstraint: 'Refund_maker_checker_distinctt'",
+            'NO migration creates',
+        ),
+        (
+            'a migration constraint no registry entry claims is refused',
+            os.path.join(
+                MIGRATIONS,
+                '20261128100000_retention_schedule_maker_checker',
+                'migration.sql',
+            ),
+            'RetentionScheduleItem_maker_checker_distinct',
+            'RetentionScheduleItemX_maker_checker_distinct',
+            'no `MAKER_CHECKER_REGISTRY` entry claims',
+        ),
+    ):
+        try:
+            cross_check(planted(path, find, replace))
+            print('  %-56s *** NO ERROR RAISED ***' % name)
+            failures.append(name)
+        except AssertionError as err:
+            if needle not in str(err):
+                raise
+            print('  %-56s ok' % name)
 
     print()
     if failures:

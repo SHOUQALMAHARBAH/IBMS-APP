@@ -1,0 +1,14 @@
+{
+  "a-capital-shortfall-refuses-the-registration": {
+    "_": "The governing decision, broken: art. 4/a read as a gate. An office the Central Bank has already licensed is refused on a count we are not certain the regulator shares. Must kill the REFUSES NOTHING test.",
+    "file": "apps/api/src/modules/provider/office-registration.service.ts",
+    "from": "        const licenseIssuedAt = parseCalendarDate(",
+    "to": "        if (!capital.capitalIsUnrecorded && !capital.meetsRequirement) {\n          throw new UnprocessableEntityException('capital below the art. 4/a requirement');\n        }\n        const licenseIssuedAt = parseCalendarDate("
+  },
+  "the-matcher-stops-finding-capital-reads": {
+    "_": "Break the symbol list so the scan finds nothing. Without the non-vacuity floor the refusal assertion would then pass against an empty set. Must kill the floor test.",
+    "file": "apps/api/src/modules/compliance-risk/capital-never-refuses.inventory.spec.ts",
+    "from": "  'assessCapital',\n  'requiredCapitalForScope',\n  'requiredCapitalForType',\n  'capitalIsUnrecorded',\n  'paidUpCapital',",
+    "to": "  'noSuchSymbolAnywhere',"
+  }
+}

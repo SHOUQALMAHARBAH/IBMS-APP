@@ -1,5 +1,8 @@
 'use client';
 
+import {
+  ErrorState,
+} from '../../../../components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { PolicyCheckingBlock } from '../../../../components/policy/PolicyCheckingBlock';
 import { NotifyClaimForm } from '../../../../components/claim/NotifyClaimForm';
@@ -14,9 +17,8 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { policyStatusLabelKey } from '../../../../lib/policy/policy-status';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
-import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
-  pageStyle,
+  pageStackStyle,
   smallButtonStyle,
 } from '../../../../components/lead/lead.styles';
 import {
@@ -24,6 +26,7 @@ import {
   profileFieldValueStyle,
   profileGridStyle,
 } from '../../../../components/prospect/prospect.styles';
+import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
 /**
  * DERIVED from the API client's own `Policy`, not re-declared beside it.
@@ -101,15 +104,27 @@ export default function PolicyDetailPage() {
 
   if (isLoading2) {
     return (
-      <div style={pageStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('poldLoading')}</p>
-      </div>
+      </main>
     );
   }
 
   if (loadError) {
     return (
-      <div style={pageStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         {/*
           `<p role="alert">`, not a bare `<div>`. This screen rendered its load failure in a div with no
           role, so a sighted reader saw the error and a screen-reader user was never told — the screen
@@ -117,9 +132,7 @@ export default function PolicyDetailPage() {
           other screen in this app announces it; `test/load-error-alert.test.ts` now fails a load-error
           branch that does not.
         */}
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
         <button
           type="button"
           style={smallButtonStyle}
@@ -127,15 +140,21 @@ export default function PolicyDetailPage() {
         >
           {t('poldBackToList')}
         </button>
-      </div>
+      </main>
     );
   }
 
   if (!policy) {
     return (
-      <div style={pageStyle}>
+      <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
         <p>{t('poldNotFound2')}</p>
-      </div>
+      </main>
     );
   }
 
@@ -148,11 +167,20 @@ export default function PolicyDetailPage() {
   const displayStatus = statusKey ? t(statusKey) : policy.status;
 
   return (
-    <div style={pageStyle}>
-      <h1 style={{ marginBottom: '1.5rem' }}>
+    <main style={pageStackStyle}>
+      {/*
+        `<main>`, not a `<div>`. A page with no `main` landmark is a page a screen reader cannot
+        skip to, and these are record screens where the rail is long — so the cost falls on
+        exactly the reader who most needs the shortcut. All four branches take it, because a
+        landmark present only in the populated state is one the loading and refused states lack.
+      */}
+      <h1>
         {t('poldPolicyDetails')}{' '}
         {policy.policyNumber && `— ${policy.policyNumber}`}
       </h1>
+      <p style={{ margin: '0 0 1rem' }}>
+        <WorkflowHistoryLink entityType='Policy' entityId={policy.id} />
+      </p>
 
       {/* Core Policy Information */}
       <div style={{ marginBottom: '2rem' }}>
@@ -309,6 +337,6 @@ export default function PolicyDetailPage() {
       >
         {t('poldBack')}
       </button>
-    </div>
+    </main>
   );
 }

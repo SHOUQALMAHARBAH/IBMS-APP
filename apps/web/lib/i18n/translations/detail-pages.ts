@@ -350,6 +350,8 @@ export const DETAIL_PAGES = {
     nadNotFound:
       'تعذّر العثور على تقييم الاحتياجات هذا — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.',
     nadLoadError: 'تعذّر تحميل تقييم الاحتياجات — حاول مرة أخرى.',
+    nadListAssessment: 'هذا التقييم',
+    nadListQuestionnaire: 'قائمة الأسئلة',
     nadSubmitError: 'تعذّر الإرسال للمراجعة — حاول مرة أخرى.',
     nadStatusPendingReview: 'بانتظار المراجعة',
     nadStatusReviewed: 'تمت مراجعته',
@@ -858,6 +860,8 @@ export const DETAIL_PAGES = {
     nadNotFound:
       'This needs assessment could not be found — it may not exist, or you may not have access to it.',
     nadLoadError: 'Could not load this needs assessment — try again.',
+    nadListAssessment: 'this needs assessment',
+    nadListQuestionnaire: 'the questionnaire',
     nadSubmitError: 'Could not submit for review — try again.',
     nadStatusPendingReview: 'Pending review',
     nadStatusReviewed: 'Reviewed',

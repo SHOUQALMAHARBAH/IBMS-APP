@@ -22,12 +22,14 @@ export class BranchRepository {
     return this.prisma.client.branch.findFirst({ where: { id } });
   }
 
-  list(): Promise<Branch[]> {
-    // LIVE units only. A retired one keeps every existing assignment readable on the person's
-    // record; it simply stops being offered for new ones, and this is the read every picker uses.
+  /**
+   * LIVE units by default — see `DepartmentRepository.list`, which carries the full reasoning for
+   * `includeRetired` and why it defaults to false. Kept as a pointer rather than a second copy.
+   */
+  list(includeRetired = false): Promise<Branch[]> {
     return this.prisma.client.branch.findMany({
-      where: { deactivatedAt: null },
-      orderBy: { name: 'asc' },
+      where: includeRetired ? {} : { deactivatedAt: null },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
   }
 
@@ -69,6 +71,15 @@ export class BranchRepository {
     return this.prisma.client.branch.update({
       where: { id },
       data: { deactivatedAt: new Date() },
+    });
+  }
+
+  /** Bring a retired branch back — see `DepartmentRepository.reactivate`, which carries the reason
+   *  and the note on why the name collision is the partial unique index's job and not a check. */
+  reactivate(id: string) {
+    return this.prisma.client.branch.update({
+      where: { id },
+      data: { deactivatedAt: null },
     });
   }
 }

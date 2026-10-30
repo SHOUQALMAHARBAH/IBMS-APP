@@ -14,6 +14,7 @@ import { SecurityModule } from './modules/security/security.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { ScreeningProvidersModule } from './modules/screening-providers/screening-providers.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
+import { LicenseGateModule } from './modules/compliance-risk/license-gate.module';
 import { DutySegregationModule } from './modules/duty-segregation/duty-segregation.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { ProspectModule } from './modules/prospect/prospect.module';
@@ -41,6 +42,8 @@ import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module
 import { NotificationModule } from './modules/notification/notification.module';
 import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
+import { ProviderModule } from './modules/provider/provider.module';
+import { CompanyModule } from './modules/company/company.module';
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
 import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 import { RenewalModule } from './modules/renewal/renewal.module';
@@ -95,6 +98,9 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // Depends on AuditModule's global AuditService for the TRANSITION audit
     // row every transition() call writes.
     WorkflowModule,
+    // `@Global()` beside WorkflowModule and for the same reason — six acts in five modules must
+    // refuse an office that may not practise, and one answer is the whole point.
+    LicenseGateModule,
     // Part 4 — the one place an office's declared duty-segregation mode is applied. `@Global()` for the
     // same reason WorkflowModule is: nineteen call sites in fourteen modules pass through it.
     DutySegregationModule,
@@ -300,6 +306,9 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // recurring re-screen moved to a 4-hourly cadence to match.
     // sanctions-pep.screen / Compliance.
     ComplianceRiskModule,
+    // Module 0-ب — the platform operator registers offices and insurance companies.
+    ProviderModule,
+    CompanyModule,
     // Process 56 — a read-only scan across every maker/checker pair's DB
     // CHECK constraint (plus the one cross-table pair no single-table CHECK
     // can express) for a self-approval violation. internal-controls.view /

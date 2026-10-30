@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from '../auth/api-client';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../auth/api-client';
 import type { InsuranceLine } from './insurance-line-api';
 
 /**
@@ -57,6 +57,12 @@ export interface Insurer {
   companyCorrespondenceAddress: string | null;
 
   financialStrengthRating: string | null;
+  /**
+   * WHEN that rating was formed. The api has always sent it and this interface DROPPED it, so the
+   * screen showed a solvency judgement with no date on it — which is the exact state decision 93
+   * exists to prevent, one layer up from the clear. Hand-copied over HTTP, so nothing could see it.
+   */
+  financialStrengthRatingAsOf: string | null;
   creditTermsDays: number | null;
   rfqContactName: string | null;
   rfqContactEmail: string | null;
@@ -170,6 +176,30 @@ export function updateInsurer(
   body: UpdateInsurerInput,
 ): Promise<Insurer> {
   return apiPatch(`/insurers/${encodeURIComponent(id)}`, body);
+}
+
+/**
+ * DECISION 93 — clear the rating and its as-of date TOGETHER, owner decision 43.
+ *
+ * The screen RENDERED the rating and could not clear it, so this route had no caller at all. Its
+ * whole point is that the two fields move together: a rating with a stale date is a judgement about
+ * an insurer's solvency attributed to a month that has passed.
+ *
+ * `insurer.update` and no new code — this is a correction to the office's own relationship record,
+ * which is what that permission is for, and the controller records the argument: a code per action
+ * would be a checkbox on the Role screen for something nobody administers separately.
+ *
+ * NO CONFIRMATION STEP, and that is a decision with a cost attached. The act is a correction rather
+ * than a disposal, and the audit row carries BOTH halves of what was there as `beforeValue`, so the
+ * old rating is recoverable by a person reading the trail. What is NOT recoverable from the product
+ * is re-ENTERING it: measured, `updateInsurer` below has no caller anywhere in `apps/web`, so no
+ * screen sets a rating either. That is an adjacent gap rather than this one, and it is reported
+ * rather than closed here.
+ */
+export function clearFinancialStrengthRating(id: string): Promise<Insurer> {
+  return apiDelete(
+    `/insurers/${encodeURIComponent(id)}/financial-strength-rating`,
+  );
 }
 
 /** The impact BEFORE deciding — a GET that changes nothing, so the confirmation step can show

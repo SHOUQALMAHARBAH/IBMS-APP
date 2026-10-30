@@ -32,6 +32,11 @@ function makeService(
   };
   const users = {
     findById: vi.fn().mockResolvedValue({ id: 'user-1' }),
+    /* Item 1 — decision 48's resolver. A REAL Map, so a test asserting the owner's name observes
+     * the code rather than an empty double. */
+    displayNamesForUserIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['user-1', 'سامر عبدالله الحوراني']])),
     ...over.users,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
@@ -123,6 +128,50 @@ describe('InformationAssetService.get', () => {
     const { service } = makeService();
     const asset = await service.get('asset-1');
     expect(asset.id).toBe('asset-1');
+  });
+
+  /*
+   * ITEM 1 — THE VIEW, ON ALL FOUR PATHS. Written because the suite passed the moment the view
+   * landed WITHOUT observing it: every existing assertion reads one field (`asset.id`,
+   * `asset.name`), so the raw row and the view are indistinguishable to them. A change nothing can
+   * see is a change nobody will notice reverting.
+   *
+   * All four paths are asserted, which is what the REQUIRED field on the view buys: an optional
+   * one would let create/get/update keep sending nothing while the list carried a name.
+   */
+  it('names the accountable colleague on every path — create, list, get and update', async () => {
+    const { service } = makeService();
+    const created = await service.create(
+      {
+        name: 'Policy archive',
+        assetType: 'policy_data',
+        ownerUserId: 'user-1',
+        classification: 'HIGHLY_CONFIDENTIAL',
+      },
+      'actor-1',
+    );
+    expect(created.ownerName).toBe('سامر عبدالله الحوراني');
+    expect((await service.list({}))[0].ownerName).toBe('سامر عبدالله الحوراني');
+    expect((await service.get('asset-1')).ownerName).toBe(
+      'سامر عبدالله الحوراني',
+    );
+    expect(
+      (await service.update('asset-1', { name: 'Renamed Asset' }, 'actor-1'))
+        .ownerName,
+    ).toBe('سامر عبدالله الحوراني');
+  });
+
+  /* THE OTHER BRANCH. `InformationAsset.ownerUserId` carries no foreign key (the service checks the
+   * owner exists in application code at both WRITE paths, which says nothing about a later
+   * deletion), so an owner whose account is gone is a real state. It reports NO name — never the
+   * uuid, which is the `?? id` fallback that always renders something. */
+  it('reports NO owner name rather than the uuid when the account is gone', async () => {
+    const { service } = makeService({
+      users: { displayNamesForUserIds: vi.fn().mockResolvedValue(new Map()) },
+    });
+    const asset = await service.get('asset-1');
+    expect(asset.ownerName).toBeNull();
+    expect(asset.ownerName).not.toBe(asset.ownerUserId);
   });
 
   it('404s for an unknown asset', async () => {

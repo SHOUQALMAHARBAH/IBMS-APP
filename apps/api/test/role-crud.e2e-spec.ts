@@ -212,7 +212,20 @@ describe('isSystem is a protection flag and grants NOTHING', () => {
     });
     expect(stored.nameEn).toBe(`Protected Legacy ${tag}`);
     expect(stored.status).toBe('ACTIVE');
-    expect(stored.permissions).toHaveLength(1);
+    /*
+     * THE CODE, not the count. The role was seeded with `lead.list.read` and the re-grant above
+     * was refused — so what this must prove is that the ORIGINAL grant survived, and a count of
+     * one is equally satisfied by the refusal having swapped it for something else.
+     *
+     * Converted on 2026-10-13 after a count check in `seed.ts` accepted `customer.create` in place
+     * of `permission.read` on the provider role, and the grant was really written. A quantity
+     * assertion cannot see a substitution.
+     */
+    const storedCodes = await prisma.permission.findMany({
+      where: { id: { in: stored.permissions.map((rp) => rp.permissionId) } },
+      select: { code: true },
+    });
+    expect(storedCodes.map((c) => c.code)).toEqual(['lead.list.read']);
   }, 300_000);
 });
 

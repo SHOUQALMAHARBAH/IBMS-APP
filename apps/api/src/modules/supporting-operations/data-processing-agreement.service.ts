@@ -12,6 +12,8 @@ import { VendorRepository } from '../../repositories/vendor.repository';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import { UserRepository } from '../../repositories/user.repository';
+import type { DpaActorNames } from './vendor.config';
 
 /** Process 71 (backlog Part C #71, Domain H) — `DataProcessingAgreement`'s
  * first real writer. The maker (`assessedByUserId`, this module's own
@@ -25,6 +27,8 @@ export class DataProcessingAgreementService {
 
   constructor(
     private readonly dpas: DataProcessingAgreementRepository,
+    /** Item 4(a) — decision 48's resolver, the one place that answers "who did this". */
+    private readonly users: UserRepository,
     private readonly vendors: VendorRepository,
     private readonly audit: AuditService,
     private readonly dutySegregation: DutySegregationService,
@@ -33,7 +37,7 @@ export class DataProcessingAgreementService {
   async create(
     vendorId: string,
     actorUserId: string,
-  ): Promise<DataProcessingAgreementWithAct> {
+  ): Promise<DataProcessingAgreementWithAct & DpaActorNames> {
     const vendor = await this.vendors.findById(vendorId);
     if (!vendor) throw new NotFoundException('Vendor not found');
 
@@ -50,21 +54,24 @@ export class DataProcessingAgreementService {
       afterValue: { vendorId, assessedByUserId: actorUserId },
     });
 
-    return dpa;
+    return (await this.withNames([dpa]))[0];
   }
 
   async listByVendor(
     vendorId: string,
-  ): Promise<DataProcessingAgreementWithAct[]> {
+  ): Promise<(DataProcessingAgreementWithAct & DpaActorNames)[]> {
     const vendor = await this.vendors.findById(vendorId);
     if (!vendor) throw new NotFoundException('Vendor not found');
-    return this.dpas.findByVendorId(vendorId);
+    const rows = await this.dpas.findByVendorId(vendorId);
+    /* BATCHED — one resolve for the whole register rather than two per row, which is how a
+     * vendor with a long agreement history stops loading. */
+    return this.withNames(rows);
   }
 
   async sign(
     id: string,
     actorUserId: string,
-  ): Promise<DataProcessingAgreementWithAct> {
+  ): Promise<DataProcessingAgreementWithAct & DpaActorNames> {
     const existing = await this.dpas.findById(id);
     if (!existing)
       throw new NotFoundException('Data Processing Agreement not found');
@@ -85,7 +92,7 @@ export class DataProcessingAgreementService {
       afterValue: { signedAt: now.toISOString() },
     });
 
-    return signed;
+    return (await this.withNames([signed]))[0];
   }
 
   /** `dpa.approve` (DPO only) — the checker step. `assertDifferentActors`
@@ -96,7 +103,7 @@ export class DataProcessingAgreementService {
     actorUserId: string,
     /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
     combinedDutyReason?: string,
-  ): Promise<DataProcessingAgreementWithAct> {
+  ): Promise<DataProcessingAgreementWithAct & DpaActorNames> {
     const existing = await this.dpas.findById(id);
     if (!existing)
       throw new NotFoundException('Data Processing Agreement not found');
@@ -131,7 +138,32 @@ export class DataProcessingAgreementService {
       isSensitiveDataAccess: true,
     });
 
-    return approved;
+    return (await this.withNames([approved]))[0];
+  }
+
+  /**
+   * ONE place the four projection paths get their names, so the pair is resolved identically
+   * wherever a DPA is returned. Decision 48's resolver takes IDS and is batched; a MISSING key
+   * reports NO NAME, never the uuid.
+   */
+  private async withNames<
+    T extends {
+      assessedByUserId: string | null;
+      dpoApprovedByUserId: string | null;
+    },
+  >(rows: readonly T[]): Promise<(T & DpaActorNames)[]> {
+    const names = await this.users.displayNamesForUserIds(
+      rows.flatMap((r) => [r.assessedByUserId, r.dpoApprovedByUserId]),
+    );
+    return rows.map((r) => ({
+      ...r,
+      assessedByName: r.assessedByUserId
+        ? (names.get(r.assessedByUserId) ?? null)
+        : null,
+      dpoApprovedByName: r.dpoApprovedByUserId
+        ? (names.get(r.dpoApprovedByUserId) ?? null)
+        : null,
+    }));
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {

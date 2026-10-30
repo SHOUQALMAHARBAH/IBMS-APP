@@ -1,18 +1,36 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import {
+  Card,
+  ErrorState,
+  Note,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from '../../../components/ui';
+import { Fragment, type CSSProperties, useCallback, useEffect, useState } from "react";
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { ApiError } from "../../../lib/auth/api-client";
-import { errorStyle } from "../../../components/auth/auth-form.styles";
-import { pageStyle } from "../../../components/lead/lead.styles";
+import { pageStackStyle } from "../../../components/lead/lead.styles";
+import { formatDate } from '../../../lib/i18n/format';
 import { useLanguage } from "../../../lib/i18n/language-context";
 import {
+  loadIndependently,
+  namedFailures,
+} from '../../../lib/load-independently';
+import {
+  CAPABILITY_NOTE_LABEL_KEY,
   getScreeningHealth,
   getScreeningOverview,
+  PROVIDER_CAPABILITY_LABEL_KEY,
+  type ProviderHealthStatus,
+  type ScreeningAttemptOutcome,
   type ScreeningHealth,
   type ScreeningOverview,
+  type ScreeningProviderKind,
 } from "../../../lib/screening/screening-config-api";
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
 
@@ -25,34 +43,12 @@ import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
  * about.
  */
 
-const card: CSSProperties = {
-  border: "1px solid var(--border-default)",
-  borderRadius: 6,
-  padding: "1rem",
-  marginBottom: "1rem",
-  maxWidth: "46rem",
-};
-
-const headCell: CSSProperties = {
-  padding: "0.35rem 0.7rem",
-  textAlign: "start",
-  fontWeight: 600,
-  borderBottom: "2px solid var(--border-default)",
-};
-
-const bodyCell: CSSProperties = {
-  padding: "0.35rem 0.7rem",
-  textAlign: "start",
-  verticalAlign: "top",
-  borderBottom: "1px solid #f3f4f6",
-};
-
 const row: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: "1rem",
+  gap: 'var(--space-4)',
   padding: "0.3rem 0",
-  borderBottom: "1px solid #f3f4f6",
+  borderBottom: "1px solid var(--border-subtle)",
 };
 
 function statusStyle(status: string): CSSProperties {
@@ -71,7 +67,6 @@ export default function ScreeningHealthPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { language, t } = useLanguage();
-  const isArabic = language === "AR";
 
   const [health, setHealth] = useState<ScreeningHealth | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,31 +74,36 @@ export default function ScreeningHealthPage() {
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      // Both in one pass: the provider answers "can I reach it right now?",
-      // the overview answers "how many customers were actually screened?".
-      // A screen showing only the first is the one that reads green while a
-      // third of screenings are failing.
-      const [nextHealth, nextOverview] = await Promise.all([
-        getScreeningHealth(),
-        getScreeningOverview(30),
-      ]);
-      setHealth(nextHealth);
-      setOverview(nextOverview);
-      setLoadError(null);
-    } catch (err) {
-      setHealth(null);
-      setOverview(null);
-      setLoadError(
-        err instanceof ApiError && err.status === 403
+    // Both in one pass: the provider answers "can I reach it right now?",
+    // the overview answers "how many customers were actually screened?".
+    // A screen showing only the first is the one that reads green while a
+    // third of screenings are failing.
+    //
+    // ITEM 8 — which is exactly why losing one must not blank the other. The old shape set BOTH to
+    // null on either failure, so a refused overview produced a screen claiming nothing at all is
+    // known about screening, including the provider status that had answered. Each panel renders
+    // what arrived and the sentence names what did not.
+    const { values, failures } = await loadIndependently([
+      { key: 'health', label: t('shListHealth'), load: getScreeningHealth },
+      {
+        key: 'overview',
+        label: t('shListOverview'),
+        load: () => getScreeningOverview(30),
+      },
+    ]);
+    setHealth((values.health as ScreeningHealth | undefined) ?? null);
+    setOverview((values.overview as ScreeningOverview | undefined) ?? null);
+    const refused = failures.find(
+      (f) => f.error instanceof ApiError && f.error.status === 403,
+    );
+    setLoadError(
+      failures.length === 0
+        ? null
+        : failures.length === 2 && refused
           ? permissionRefusal(t, 'shRefusalAct', 'sanctions-pep.screen')
-          : err instanceof ApiError
-            ? err.message
-            : t('shCouldNotLoadScreeningHealth'),
-      );
-    } finally {
-      setLoaded(true);
-    }
+          : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+    );
+    setLoaded(true);
   }, [t]);
 
   useEffect(() => {
@@ -121,40 +121,41 @@ export default function ScreeningHealthPage() {
 
   if (isLoading || !user) return null;
 
-  const statusLabel = (status: string): string => {
-    if (!isArabic) return status;
-    const ar: Record<string, string> = {
-      HEALTHY: "سليم",
-      DEGRADED: "متدهور",
-      UNAVAILABLE: "غير متاح",
-      NOT_CONFIGURED: "غير مهيأ",
-    };
-    return ar[status] ?? status;
-  };
+  /*
+   * BOTH OF THESE WERE LOCAL ARABIC MAPS THAT RETURNED THE RAW TOKEN TO AN ENGLISH READER.
+   *
+   * Each opened `if (!isArabic) return status`, so on a compliance screen an English reader saw
+   * `HEALTHY` and `built_in` verbatim — and the four health words were a second, undiacriticised
+   * copy of `ENUM_LABEL.ProviderHealthStatus`, which has shipped both languages the whole time.
+   * The same dead-vocabulary shape owner answer 2 is about, two maps over, found by reading the
+   * file for the two rows she named.
+   *
+   * AND THERE IS NO FALL-THROUGH LEFT, which is better than what replaced them first. My own
+   * first version typed both parameters `string` and kept a `?? token` fallback, with a note
+   * claiming the fields "arrive over HTTP as `string`". `tsc` refused it (TS7053) and was right:
+   * this client has declared `ProviderHealthStatus` and `ScreeningProviderKind` all along, and
+   * `health.status` / `health.provider` are already typed with them — only my two signatures said
+   * `string`. Taking the unions makes each lookup TOTAL, so a fifth member is a compile error in
+   * `ENUM_LABEL` rather than a raw token on a compliance screen. That is owner answer 2's own
+   * mechanism, applied to the two maps she did not name.
+   */
+  const statusLabel = (status: ProviderHealthStatus): string =>
+    t(ENUM_LABEL.ProviderHealthStatus[status]);
 
-  const providerLabel = (kind: string): string => {
-    if (!isArabic) return kind;
-    const ar: Record<string, string> = {
-      built_in: "القائمة المحلية المزامنة",
-      on_premise: "محرك فحص محلي",
-      commercial: "مزوّد تجاري",
-    };
-    return ar[kind] ?? kind;
-  };
+  const providerLabel = (kind: ScreeningProviderKind): string =>
+    t(ENUM_LABEL.ScreeningProviderKind[kind]);
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStackStyle}>
       <h1>
         {t('shScreeningHealth')}
       </h1>
-      <p style={{ opacity: 0.75, maxWidth: "46rem" }}>
+      <p style={{ color: 'var(--ink-secondary)', maxWidth: "46rem" }}>
         {t('shWhichProviderActuallyPerformsScreening')}
       </p>
 
       {loadError ? (
-        <p role="alert" style={errorStyle}>
-          {loadError}
-        </p>
+        <ErrorState title={loadError} />
       ) : null}
 
       {!loaded ? (
@@ -165,10 +166,7 @@ export default function ScreeningHealthPage() {
 
       {health ? (
         <>
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shProvider')}
-            </h2>
+          <Card title={t('shProvider')}>
             <div style={row}>
               <span>{t('shStatus')}</span>
               <span
@@ -202,84 +200,129 @@ export default function ScreeningHealthPage() {
               <span>{t('shName')}</span>
               <span>{health.providerName}</span>
             </div>
-            <p style={{ marginBottom: 0, opacity: 0.85 }}>{health.detail}</p>
+            <p style={{ marginBottom: 0, color: 'var(--ink-secondary)' }}>{health.detail}</p>
 
             {health.missing.length > 0 ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {/*
-                  Was an `isArabic ? … : …` ternary. BOTH languages were present, so this was never a
-                  missing translation — it was three strings the i18n parity guard and the collision check
-                  could not see, because they bypassed the dictionary. Moved in so they are audited with
-                  the rest.
-                */}
-                {t('shMissingConfig', { missing: health.missing.join(', ') })}
-              </p>
+              /*
+                Was an `isArabic ? … : …` ternary. BOTH languages were present, so this was never a
+                missing translation — it was three strings the i18n parity guard and the collision
+                check could not see, because they bypassed the dictionary. Moved in so they are
+                audited with the rest.
+              */
+              <ErrorState
+                title={t('shMissingConfig', { missing: health.missing.join(', ') })}
+              />
             ) : null}
-          </section>
+          </Card>
 
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shCapabilities')}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shCapabilities')}>
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shSupportedMeansTheAdapterImplements')}
             </p>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ borderCollapse: "collapse", minWidth: "34rem" }}>
+            {/*
+              NO SECOND SCROLLER. This screen used to wrap the table in its own
+              `overflow-x: auto` div, and `Table` has provided one since batch 3 — WITH
+              `tabIndex={0}`, because a scroll container nothing can focus is a region a keyboard
+              user cannot scroll at all. An unfocusable scroller around a focusable one is that
+              same defect one level out, and axe is silent about it because the OUTER div rarely
+              overflows. Measured: 17 sites across 10 files still do this.
+            */}
+            <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>
+                    <Th>
                       {t('shCapability')}
-                    </th>
-                    <th style={headCell}>{t('shSupported')}</th>
-                    <th style={headCell}>
+                    </Th>
+                    <Th>{t('shSupported')}</Th>
+                    <Th>
                       {t('shConfigured')}
-                    </th>
-                    <th style={headCell}>
+                    </Th>
+                    <Th>
                       {t('shOperational')}
-                    </th>
+                    </Th>
                   </tr>
                 </thead>
                 <tbody>
                   {health.capabilities.map((c) => (
-                    <tr key={c.capability} data-capability={c.capability}>
-                      <td style={bodyCell}>
-                        <div style={{ fontWeight: 600 }}>{c.capability}</div>
-                        <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                          {c.note}
+                    <Fragment key={c.capability}>
+                    <Tr data-capability={c.capability}>
+                      <Td>
+                        <div
+                          style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}
+                        >
+                          {t(PROVIDER_CAPABILITY_LABEL_KEY[c.capability])}
                         </div>
-                      </td>
-                      <td style={bodyCell} data-supported={String(c.supported)}>
+                        {c.note.kind === 'CAUTION' ? null : (
+                          <div
+                            style={{ fontSize: "0.8rem", color: 'var(--ink-secondary)' }}
+                            data-note-kind={c.note.kind}
+                          >
+                            {t(
+                              CAPABILITY_NOTE_LABEL_KEY[c.note.key],
+                              c.note.params,
+                            )}
+                          </div>
+                        )}
+                      </Td>
+                      <Td data-supported={String(c.supported)}>
                         {c.supported ? "✓" : "—"}
-                      </td>
-                      <td
-                        style={bodyCell}
+                      </Td>
+                      <Td
                         data-configured={String(c.configured)}
                       >
                         {c.configured ? "✓" : "—"}
-                      </td>
-                      <td
-                        style={bodyCell}
+                      </Td>
+                      <Td
                         data-operational={String(c.operational)}
                       >
                         {c.operational ? "✓" : "—"}
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
+                    {/*
+                      A CAUTION IS NOT A FOOTNOTE, AND IT DOES NOT FIT ONE CELL.
+
+                      Three of these sentences were named by the owner as WARNINGS rather than
+                      descriptions, and the commercial one rides a row whose three columns all
+                      tick — so grey text under the name would make a caution look like
+                      decoration, which is the defect she named by hand.
+
+                      It spans the row because MEASURED on a 390px phone the capability column is
+                      111px, a `Note` spends ~47 of that on padding, icon and gap, and the text
+                      then rendered at 62px wide and 299px TALL. Her own rule for the ring
+                      caption: where a thing does not fit the space, change the SPACE.
+
+                      NO `role`, deliberately. A live region is for content that UPDATES; these
+                      are static from first render and are reached in document order. What tells
+                      a reader who cannot see the box is the SENTENCE, which says the thing
+                      explicitly — the icon is decorative and carries no label, so the colour is
+                      redundant encoding rather than the only encoding.
+                    */}
+                    {c.note.kind === 'CAUTION' ? (
+                      <Tr data-capability-caution={c.capability}>
+                        <Td colSpan={4}>
+                          <Note
+                            tone="warning"
+                            icon="alert"
+                            data-note-kind={c.note.kind}
+                          >
+                            {t(
+                              CAPABILITY_NOTE_LABEL_KEY[c.note.key],
+                              c.note.params,
+                            )}
+                          </Note>
+                        </Td>
+                      </Tr>
+                    ) : null}
+                    </Fragment>
                   ))}
                 </tbody>
-              </table>
-            </div>
+            </Table>
             {!health.pepOperational ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {t('shPepScreeningIsNotOperational')}
-              </p>
+              <ErrorState title={t('shPepScreeningIsNotOperational')} />
             ) : null}
-          </section>
+          </Card>
 
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shDataset')}
-            </h2>
+          <Card title={t('shDataset')}>
             <div style={row}>
               <span>{t('shVersion')}</span>
               <span>{health.datasetVersion ?? "—"}</span>
@@ -288,21 +331,18 @@ export default function ScreeningHealthPage() {
               <span>{t('shLastUpdated')}</span>
               <span>
                 {health.datasetUpdatedAt
-                  ? health.datasetUpdatedAt.slice(0, 16).replace("T", " ")
+                  ? formatDate(health.datasetUpdatedAt, language)
                   : "—"}
               </span>
             </div>
             <div style={row}>
               <span>{t('shCheckedAt')}</span>
-              <span>{health.checkedAt.slice(0, 16).replace("T", " ")}</span>
+              <span>{formatDate(health.checkedAt, language)}</span>
             </div>
-          </section>
+          </Card>
 
-          <section style={card}>
-            <h2 style={{ marginTop: 0 }}>
-              {t('shMatchingRules')}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shMatchingRules')}>
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shTheseThresholdsAreConfigurableAnd')}
             </p>
             <div style={row}>
@@ -328,25 +368,20 @@ export default function ScreeningHealthPage() {
               </span>
             </div>
             {health.thresholdProblems.length > 0 ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {health.thresholdProblems.join("; ")}
-              </p>
+              <ErrorState title={health.thresholdProblems.join("; ")} />
             ) : null}
-          </section>
+          </Card>
         </>
       ) : null}
       {overview ? (
         <>
           {/* ---------------- screening volume ---------------- */}
-          <section style={card} data-testid="ops-attempts">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shScreeningAttempts', { days: overview.windowDays })}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shScreeningAttempts', { days: overview.windowDays })} data-testid="ops-attempts">
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shAHealthCheckAnswersWhether')}
             </p>
             {overview.attempts.total === 0 ? (
-              <p data-testid="ops-attempts-empty" style={{ opacity: 0.7 }}>
+              <p data-testid="ops-attempts-empty" style={{ color: 'var(--ink-secondary)' }}>
                 {t('shNoScreeningAttemptsRecordedIn')}
               </p>
             ) : (
@@ -367,7 +402,7 @@ export default function ScreeningHealthPage() {
                     style={{
                       color:
                         overview.attempts.unresolved > 0
-                          ? "#b91c1c"
+                          ? "var(--danger-ink)"
                           : undefined,
                     }}
                   >
@@ -375,61 +410,58 @@ export default function ScreeningHealthPage() {
                     {Math.round(overview.attempts.unresolvedRate * 100)}%)
                   </strong>
                 </div>
-                {Object.entries(overview.attempts.byOutcome).map(
-                  ([outcome, count]) => (
-                    <div key={outcome} style={row} data-outcome={outcome}>
-                      <span>{outcome}</span>
-                      <span>{count}</span>
-                    </div>
-                  ),
-                )}
+                {/* OWNER ANSWER 3, AND IT NEEDED NO WORD. These keys are
+                    `ScreeningAttemptOutcome` members — there is no `CLEAR` and no `ERROR` on
+                    this wire — and `ENUM_LABEL.ScreeningAttemptOutcome` has mapped all five to
+                    bilingual keys since before this screen rendered one raw. Her own `ERROR`
+                    word, «تعذّر الفحص», IS `screenOutcomeUnableToScreen`. */}
+                {(
+                  Object.entries(overview.attempts.byOutcome) as [
+                    ScreeningAttemptOutcome,
+                    number,
+                  ][]
+                ).map(([outcome, count]) => (
+                  <div key={outcome} style={row} data-outcome={outcome}>
+                    <span>{t(ENUM_LABEL.ScreeningAttemptOutcome[outcome])}</span>
+                    <span>{count}</span>
+                  </div>
+                ))}
                 {overview.attempts.unresolved > 0 ? (
-                  <p
-                    role="alert"
-                    style={{ ...errorStyle, marginTop: "0.75rem" }}
-                  >
-                    {t('shTheseCustomersWereNotScreened')}
-                  </p>
+                  <ErrorState title={t('shTheseCustomersWereNotScreened')} />
                 ) : null}
               </>
             )}
-          </section>
+          </Card>
 
           {/* ---------------- failures ---------------- */}
           {overview.attempts.recentUnresolved.length > 0 ? (
-            <section style={card} data-testid="ops-failures">
-              <h2 style={{ marginTop: 0 }}>
-                {t('shMostRecentFailures')}
-              </h2>
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+            <Card title={t('shMostRecentFailures')} data-testid="ops-failures">
+              <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>{t('shOutcome')}</th>
-                    <th style={headCell}>
+                    <Th>{t('shOutcome')}</Th>
+                    <Th>
                       {t('shProvider2')}
-                    </th>
-                    <th style={headCell}>{t('shReason')}</th>
+                    </Th>
+                    <Th>{t('shReason')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {overview.attempts.recentUnresolved.map((row_) => (
-                    <tr key={row_.correlationId}>
-                      <td style={bodyCell}>{t(ENUM_LABEL.ScreeningAttemptOutcome[row_.outcome])}</td>
-                      <td style={bodyCell}>{row_.providerName}</td>
+                    <Tr key={row_.correlationId}>
+                      <Td>{t(ENUM_LABEL.ScreeningAttemptOutcome[row_.outcome])}</Td>
+                      <Td>{row_.providerName}</Td>
                       {/* The reason names the remedy, never the customer. */}
-                      <td style={bodyCell}>{row_.failureReason ?? "—"}</td>
-                    </tr>
+                      <Td>{row_.failureReason ?? "—"}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
-            </section>
+              </Table>
+            </Card>
           ) : null}
 
           {/* ---------------- holds and case workload ---------------- */}
-          <section style={card} data-testid="ops-holds">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shHoldsAndCaseWorkload')}
-            </h2>
+          <Card title={t('shHoldsAndCaseWorkload')} data-testid="ops-holds">
             <div style={row}>
               <span>
                 {t('shDecidableFilesCurrentlyHeld')}
@@ -465,59 +497,48 @@ export default function ScreeningHealthPage() {
               >
                 <thead>
                   <tr>
-                    <th style={headCell}>
+                    <Th>
                       {t('shCaseState')}
-                    </th>
-                    <th style={headCell}>{t('shCount')}</th>
+                    </Th>
+                    <Th>{t('shCount')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(overview.caseWorkload).map(
                     ([state, count]) => (
-                      <tr key={state} data-case-state={state}>
-                        <td style={bodyCell}>{state}</td>
-                        <td style={bodyCell}>{count}</td>
-                      </tr>
+                      <Tr key={state} data-case-state={state}>
+                        <Td>{state}</Td>
+                        <Td>{count}</Td>
+                      </Tr>
                     ),
                   )}
                 </tbody>
               </table>
             ) : (
-              <p style={{ opacity: 0.7 }} data-testid="ops-cases-empty">
+              <p style={{ color: 'var(--ink-secondary)' }} data-testid="ops-cases-empty">
                 {t('shNoOpenCases')}
               </p>
             )}
             {overview.holds.configurationProblems.length > 0 ? (
-              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {overview.holds.configurationProblems.join(" ")}
-              </p>
+              <ErrorState title={overview.holds.configurationProblems.join(" ")} />
             ) : null}
-          </section>
+          </Card>
 
           {/* ---------------- dataset generations ---------------- */}
-          <section style={card} data-testid="ops-datasets">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shSanctionsListGenerations')}
-            </h2>
-            <p style={{ opacity: 0.75, marginTop: 0 }}>
+          <Card title={t('shSanctionsListGenerations')} data-testid="ops-datasets">
+            <p style={{ color: 'var(--ink-secondary)', marginTop: 0 }}>
               {t('shAScreeningReadsOnlyThe')}
             </p>
             {overview.datasets.length === 0 ? (
-              <p
-                role="alert"
-                style={errorStyle}
-                data-testid="ops-datasets-empty"
-              >
-                {t('shNoGenerationExistsNoSync')}
-              </p>
+              <ErrorState title={t('shNoGenerationExistsNoSync')} data-testid="ops-datasets-empty" />
             ) : (
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>{t('shSource')}</th>
-                    <th style={headCell}>{t('shStatus2')}</th>
-                    <th style={headCell}>{t('shRecords')}</th>
-                    <th style={headCell}>{t('shAdded')}</th>
+                    <Th>{t('shSource')}</Th>
+                    <Th>{t('shStatus2')}</Th>
+                    <Th>{t('shRecords')}</Th>
+                    <Th>{t('shAdded')}</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -527,49 +548,48 @@ export default function ScreeningHealthPage() {
                       data-dataset-status={d.status}
                       data-dataset-source={d.source}
                     >
-                      <td style={bodyCell}>{t(ENUM_LABEL.WatchlistSource[d.source])}</td>
-                      <td style={bodyCell}>
+                      <Td>{t(ENUM_LABEL.WatchlistSource[d.source])}</Td>
+                      <Td>
                         <span style={statusStyle(d.status)}>{t(ENUM_LABEL.DatasetVersionStatus[d.status])}</span>
                         {d.rejectionReason ? (
-                          <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                          <div style={{ fontSize: "0.75rem", color: 'var(--ink-secondary)' }}>
                             {d.rejectionReason}
                           </div>
                         ) : null}
                         {d.rollbackReason ? (
-                          <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                          <div style={{ fontSize: "0.75rem", color: 'var(--ink-secondary)' }}>
                             {t('shRolledBack')}
                             {d.rollbackReason}
                           </div>
                         ) : null}
-                      </td>
-                      <td style={bodyCell}>{d.recordCount ?? "—"}</td>
-                      <td style={bodyCell}>{d.addedCount ?? "—"}</td>
+                      </Td>
+                      <Td>{d.recordCount ?? "—"}</Td>
+                      <Td>{d.addedCount ?? "—"}</Td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
-          </section>
+          </Card>
 
           {/* ---------------- schedules ---------------- */}
-          <section style={card} data-testid="ops-schedules">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shRecurringWork')}
-            </h2>
+          <Card title={t('shRecurringWork')} data-testid="ops-schedules">
             <div style={row}>
               <span>
                 {t('shRecurringReScreen')}
               </span>
               <span data-testid="ops-next-rescreen">
-                {overview.schedules.rescreenBatch.nextRunAt ??
-                  (t('shUnknown'))}
+                {overview.schedules.rescreenBatch.nextRunAt
+                  ? formatDate(overview.schedules.rescreenBatch.nextRunAt, language)
+                  : t('shUnknown')}
               </span>
             </div>
             <div style={row}>
               <span>{t('shListSync')}</span>
               <span data-testid="ops-next-sync">
-                {overview.schedules.listSync.nextRunAt ??
-                  (t('shUnknown2'))}
+                {overview.schedules.listSync.nextRunAt
+                  ? formatDate(overview.schedules.listSync.nextRunAt, language)
+                  : t('shUnknown2')}
               </span>
             </div>
             <div style={row}>
@@ -577,51 +597,52 @@ export default function ScreeningHealthPage() {
                 {t('shLastSuccessfulSync')}
               </span>
               <span data-testid="ops-last-sync-success">
-                {overview.schedules.listSync.lastSuccessAt ??
-                  (t('shNever'))}
+                {overview.schedules.listSync.lastSuccessAt
+                  ? formatDate(overview.schedules.listSync.lastSuccessAt, language)
+                  : t('shNever')}
               </span>
             </div>
-          </section>
+          </Card>
 
           {/* ---------------- sync history ---------------- */}
-          <section style={card} data-testid="ops-sync-history">
-            <h2 style={{ marginTop: 0 }}>
-              {t('shSyncHistory')}
-            </h2>
+          <Card title={t('shSyncHistory')} data-testid="ops-sync-history">
             {overview.listSync.length === 0 ? (
-              <p style={{ opacity: 0.7 }} data-testid="ops-sync-empty">
+              <p style={{ color: 'var(--ink-secondary)' }} data-testid="ops-sync-empty">
                 {t('shNoSyncHasRunYet')}
               </p>
             ) : (
-              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={headCell}>{t('shSource2')}</th>
-                    <th style={headCell}>{t('shStatus3')}</th>
-                    <th style={headCell}>{t('shRecords2')}</th>
+                    <Th>{t('shSource2')}</Th>
+                    <Th>{t('shStatus3')}</Th>
+                    <Th>{t('shRecords2')}</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {overview.listSync.map((r, i) => (
-                    <tr key={`${r.source}-${r.startedAt}-${i}`}>
-                      <td style={bodyCell}>{t(ENUM_LABEL.WatchlistSource[r.source])}</td>
-                      <td style={bodyCell}>
+                    <Tr key={`${r.source}-${r.startedAt}-${i}`}>
+                      <Td>{t(ENUM_LABEL.WatchlistSource[r.source])}</Td>
+                      <Td>
                         {t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}
                         {r.errorMessage ? (
                           <div
-                            style={{ fontSize: "0.75rem", color: "#b91c1c" }}
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "var(--danger-ink)",
+                            }}
                           >
                             {r.errorMessage}
                           </div>
                         ) : null}
-                      </td>
-                      <td style={bodyCell}>{r.recordCount ?? "—"}</td>
-                    </tr>
+                      </Td>
+                      <Td>{r.recordCount ?? "—"}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
-          </section>
+          </Card>
         </>
       ) : null}
     </main>

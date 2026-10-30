@@ -114,6 +114,47 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
     // EXECUTIVE_MANAGEMENT holds `employee-performance.view` and NOT `employee.national-id.reveal`.
     // Before 2026-10-02 this request was a 403 on the screen built for this role.
     const exec = await makeUser('picker-exec', 'EXECUTIVE_MANAGEMENT');
+
+    /*
+     * A ROW COMES BACK — added 2026-10-28, and this test used to assert a 200 alone.
+     *
+     * Its sibling two tests down asserted the same way and WAS hollow: the DPO's customer
+     * search returned 200 with an EMPTY ARRAY for the whole period it was broken, because the
+     * OWNER FILTER sits below the gate. Measured here before adding this: the employee search
+     * is a plain `contains` with NO owner filter (employees have no owner), office-scoped by
+     * RLS — so this test was weak rather than hollow, and nothing was hiding behind it. The
+     * assertion is added anyway, because *weak* was indistinguishable from *hollow* until
+     * somebody read the body.
+     *
+     * `contains`, not a tsquery — unlike the customer search one test below, where a sliced
+     * term matches nothing. A substring of the name is the right query HERE and the wrong one
+     * THERE, which is why each is written against its own repository.
+     */
+    /*
+     * Written with the tenant-scoped client rather than through `POST /employees`, which
+     * would need an admin holding `employee.create`, a department and a branch — none of
+     * which this test is about. `nationalIdEnc` is NOT NULL and is encrypted at the SERVICE
+     * layer rather than by a Prisma extension, so a raw write stores the string given and
+     * nothing here ever reads it back — the shape `conflict-of-interest.e2e-spec.ts`
+     * documents and uses. The compiler is what said so: my first version omitted it.
+     */
+    const employee = await prisma.employee.create({
+      data: {
+        fullName: `Pickeremp ${runId()}`,
+        nationalIdEnc: `not-a-real-national-id-${runId()}`,
+      },
+      select: { id: true },
+    });
+    const found = await request(app.getHttpServer())
+      .get('/employees/search')
+      .query({ q: 'Pickeremp' })
+      .set(bearer(exec.accessToken))
+      .expect(200);
+    expect(
+      (found.body as { id: string }[]).map((r) => r.id),
+      'the Executive searched for an employee that exists and got nothing back — a 200 proves only that the ROUTE admitted them',
+    ).toContain(employee.id);
+
     await request(app.getHttpServer())
       .get('/employees/search')
       .query({ q: 'ah' })
@@ -150,6 +191,54 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
     // DATA_PROTECTION_OFFICER holds `dsr.log` and NOT `customer.read`. `/dsr` is their screen, and the
     // field built to replace a search-box-plus-select was unusable by them the day after it shipped.
     const dpo = await makeUser('picker-dpo', 'DATA_PROTECTION_OFFICER');
+
+    /*
+     * A ROW COMES BACK, AND THIS ASSERTION WAS MISSING UNTIL 2026-10-28.
+     *
+     * This test asserted a 200 and nothing about the body — so it passed for the whole period the
+     * DPO could find NOTHING, while its own title said the opposite. The gate was open (`dsr.log`
+     * is in `CUSTOMER_SEARCH_CODES`, which is what this test was written for); the OWNER FILTER
+     * one line below it in `customer.service.ts#search` returned zero rows for every word, because
+     * the DPO can never own a customer. Register row 2.2 in the owner's own words:
+     * «في حقل صاحب البيانات لما أبحث عن عميل موجود بيحكيلي إنه غير متوفر».
+     *
+     * The customer is owned by somebody ELSE, deliberately — that is the whole property. A
+     * customer the DPO owned would come back through the filter rather than past it, and this
+     * role cannot own one anyway (`customer.create` is SALES alone).
+     */
+    const owner = await makeUser(
+      'picker-dpo-owner',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    /*
+     * A WHOLE TOKEN, and my first attempt at this test proved why it matters.
+     *
+     * The name search is `"searchVector" @@ websearch_to_tsquery(...)`, which matches TOKENS
+     * and does NOT prefix-match. I first queried `legalName.slice(0, 12)`, which cut the random
+     * suffix in half — so the term tokenised to `… & 1` against a row holding `… & 1792…` and
+     * matched NOTHING. The assertion failed with `expected [] to include <id>`, which is
+     * exactly what the real defect looks like: I nearly reported the grant as not having
+     * worked. So the distinctive part is its own token and the query is that token entire.
+     */
+    const token = `Dpopicker${runId()}`;
+    const legalName = `${token} Subject`;
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName,
+        ownerUserId: owner.userId,
+      },
+    });
+    const found = await request(app.getHttpServer())
+      .get('/customers/search')
+      .query({ q: token })
+      .set(bearer(dpo.accessToken))
+      .expect(200);
+    expect(
+      (found.body as { id: string }[]).map((r) => r.id),
+      'the DPO searched for a customer that exists and got nothing back — register row 2.2, which is the OWNER FILTER and not the gate',
+    ).toContain(customer.id);
+
     await request(app.getHttpServer())
       .get('/customers/search')
       .query({ q: 'ahm' })
@@ -310,6 +399,214 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
       'claimsContactName',
       'claimsContactEmail',
       'claimsContactPhone',
+    ]) {
+      expect(row).not.toHaveProperty(withheld);
+    }
+  });
+
+  /**
+   * A4 — BOTH READERS OF `/audit-trail` CAN ALREADY REACH THE CUSTOMER SEARCH, WHICH IS WHY OWNER
+   * DECISION 41 NEEDED NO NEW ROUTE FOR IT.
+   *
+   * The sibling test above names the DATA_PROTECTION_OFFICER, because that is the role the customer
+   * picker's widening was built for. It says nothing about the two roles that stand on `/audit-trail`,
+   * and A4 rests entirely on them: `customer.read` is in `CUSTOMER_SEARCH_CODES` and is held by
+   * COMPLIANCE_OFFICER and EXTERNAL_AUDITOR alike (measured off the seeded grid), so the chooser that
+   * fills `wfEntityId` when the chosen type is `Customer` needed wiring and not a route.
+   *
+   * Asserted BY ROLE rather than by code, for the same reason the whole file is: the decision was
+   * "which of the eighteen entities can both these roles already search", and only the grid answers it.
+   * If this ever goes red, the chooser on that screen is dead for the role it went red for — and
+   * nothing on the screen would say so, because an unreachable search just returns no matches.
+   */
+  it('A4 — COMPLIANCE_OFFICER and EXTERNAL_AUDITOR can both reach the customer search', async () => {
+    const app = await boot();
+    /*
+     * A ROW COMES BACK FOR BOTH — added 2026-10-28; this asserted a 200 alone.
+     *
+     * Its sibling in this file WAS hollow that way: the DPO's search returned 200 with an
+     * EMPTY ARRAY for the whole period it was broken, because the OWNER FILTER sits below the
+     * gate. Measured before adding this: both these roles hold `customer.all-owners.read`, so
+     * neither was hiding a defect — and a 200 could not have told the difference, which is
+     * the whole reason the assertion is here.
+     *
+     * The customer is owned by a THIRD person, which is what the cross-owner read is about.
+     * A WHOLE token: the name search is a tsquery and does not prefix-match, so a sliced term
+     * matches nothing and looks exactly like the defect.
+     */
+    const owner = await makeUser(
+      'picker-a4-owner',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const token = `Pickera4${runId()}`;
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `${token} Subject`,
+        ownerUserId: owner.userId,
+      },
+      select: { id: true },
+    });
+    for (const role of ['COMPLIANCE_OFFICER', 'EXTERNAL_AUDITOR'] as const) {
+      const actor = await makeUser(`picker-cust-${role.toLowerCase()}`, role);
+      const found = await request(app.getHttpServer())
+        .get('/customers/search')
+        .query({ q: token })
+        .set(bearer(actor.accessToken))
+        .expect(200);
+      expect(
+        (found.body as { id: string }[]).map((r) => r.id),
+        `${role} searched for a customer that exists, owned by somebody else, and got nothing back`,
+      ).toContain(customer.id);
+      await request(app.getHttpServer())
+        .get('/customers/search')
+        .query({ q: 'ahm' })
+        .set(bearer(actor.accessToken))
+        .expect(200);
+      // The floor is not relaxed for either of them.
+      await request(app.getHttpServer())
+        .get('/customers/search')
+        .query({ q: 'ah' })
+        .set(bearer(actor.accessToken))
+        .expect(400);
+    }
+  });
+
+  /**
+   * THE DOCUMENT PICKER, AND ITS ABSENCE FOR THE EXTERNAL AUDITOR IS HALF THE ASSERTION.
+   *
+   * Owner decision 41 gates `GET /documents/search` on `document.read` ALONE, which is a DELIBERATE
+   * departure from the rule this whole file exists to enforce: the screen that types a `documentId` is
+   * `/audit-trail`, whose document-history section is gated on `document-history.read`, so the rule as
+   * written would add that code here.
+   *
+   * `picker-route-reachability.mjs` will NOT flag it, and I asserted the opposite before measuring:
+   * run today that script prints SIX picker sections and no DOCUMENT one, reporting `0 stuck`,
+   * because its SCREEN side (`picker-route-permissions.py`) carries no `documentId` field for
+   * `/audit-trail` — so the pair that would be reported does not exist. **THIS TEST IS THEREFORE
+   * WHAT DEFENDS THE NARROWNESS. There is no measurement standing behind it.**
+   *
+   * It is overruled because the remedy is worse than the fault. Measured on the seeded grid,
+   * `document-history.read` is held by COMPLIANCE_OFFICER and EXTERNAL_AUDITOR; adding it would hand a
+   * READ-ONLY AUDITOR a name search over every document in the office — every KYC pack, every incident
+   * report, every disposal batch's evidence — when what that role is entitled to is the history of a
+   * document it already has the id of. A chooser is a directory; an id lookup is not.
+   *
+   * So BOTH halves are asserted, and the second is what makes the absence a decision rather than a
+   * capability regression: the auditor is refused the chooser AND still reaches document history by id.
+   * Without that second half this test would be indistinguishable from having broken the auditor's own
+   * screen.
+   */
+  it('the document picker admits COMPLIANCE_OFFICER and refuses the EXTERNAL_AUDITOR, who keeps document history by id', async () => {
+    const app = await boot();
+
+    // COMPLIANCE_OFFICER holds `document.read` AND `document-history.read`, so this is the role the
+    // chooser exists for — the one reader of `/audit-trail` who can use it.
+    const compliance = await makeUser('picker-doc-co', 'COMPLIANCE_OFFICER');
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: 'pol' })
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+
+    const auditor = await makeUser('picker-doc-auditor', 'EXTERNAL_AUDITOR');
+
+    // THE ABSENCE, ASSERTED. A 403 here is the decision, not a defect to be widened away.
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: 'pol' })
+      .set(bearer(auditor.accessToken))
+      .expect(403);
+
+    // AND THE OTHER HALF — the capability the auditor keeps. 404 rather than 403 on an id that does
+    // not exist is exactly the discriminator: it proves the permission gate ADMITTED this role and the
+    // route then failed to find the record, so nothing was taken away by the refusal above. A fixture
+    // document is not needed for that, and would only weaken what the status code already says.
+    const unknownDocumentId = '00000000-0000-4000-8000-000000000000';
+    await request(app.getHttpServer())
+      .get(`/audit-trail/documents/${unknownDocumentId}/history`)
+      .set(bearer(auditor.accessToken))
+      .expect(404);
+
+    // THE FLOOR. Three characters for a document, the largest of the seven registers, and whitespace
+    // trims to empty rather than matching everything.
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: 'po' })
+      .set(bearer(compliance.accessToken))
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/documents/search')
+      .query({ q: '   ' })
+      .set(bearer(compliance.accessToken))
+      .expect(400);
+  });
+
+  it('the document picker returns a name and what tells two files apart, and nothing else', async () => {
+    // `storageRef` is an internal object-storage key and the uploader is a person; neither belongs in a
+    // dropdown. `fileName` DOES cross, and that is consistent with `documentAuditSnapshot` deliberately
+    // withholding it: that snapshot's reason is that a filename can name an insured person or describe a
+    // medical event, so it must not be copied into the append-only audit table — while this view goes
+    // only to a holder of `document.read`, which is the permission that already returns every filename
+    // through `GET /documents`.
+    const app = await boot();
+    const compliance = await makeUser('picker-doc-shape', 'COMPLIANCE_OFFICER');
+
+    /**
+     * THE FIXTURE CREATES WHAT IT NEEDS — it does not hunt for it.
+     *
+     * The first version searched for `'pol'` on the assumption that a cumulative db-test holds a
+     * "policy.pdf", and the non-vacuity guard below caught it: nothing matched, so every shape
+     * assertion would have been skipped while the test reported green. That is the recorded
+     * `makeCommissionFreePolicy` lesson — a fixture that FINDS is a fixture whose result depends on
+     * what earlier specs happened to leave behind, and a from-nothing database holds none of it.
+     *
+     * The name is run-unique, so the term cannot match anything but this row and the assertion is
+     * about the SHAPE rather than about a count. `policyId` and `customerId` are both left null —
+     * nullable by design, and attaching the document to either would add FK teardown for nothing.
+     */
+    const marker = `zzpickerdoc${runId()}`;
+    const doc = await prisma.document.create({
+      data: {
+        category: 'OTHER',
+        classification: 'INTERNAL',
+        fileName: `${marker}.pdf`,
+        storageRef: `s3://ibms/picker-gate-e2e/${marker}.pdf`,
+        uploadedByUserId: compliance.userId,
+      },
+    });
+
+    let rows: Record<string, unknown>[];
+    try {
+      const res = await request(app.getHttpServer())
+        .get('/documents/search')
+        .query({ q: marker })
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      rows = res.body as Record<string, unknown>[];
+    } finally {
+      await prisma.document.delete({ where: { id: doc.id } });
+    }
+
+    const row = rows[0];
+    if (!row)
+      throw new Error(
+        'the document this test just created was not found by its own unique name — the matcher stopped matching, and the shape assertions below would be vacuous',
+      );
+    // An EXACT key set, because a disclosure leak arrives as an ADDITION and every `not.toHaveProperty`
+    // keeps passing while a new field appears beside it.
+    expect(Object.keys(row).sort()).toEqual([
+      'category',
+      'fileName',
+      'id',
+      'versionNumber',
+    ]);
+    for (const withheld of [
+      'storageRef',
+      'uploadedByUserId',
+      'classification',
+      'customerId',
+      'policyId',
     ]) {
       expect(row).not.toHaveProperty(withheld);
     }

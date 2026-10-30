@@ -31,6 +31,9 @@ const DSRS = [
     customerId: "11111111-1111-1111-1111-111111111111",
     insuredPersonId: null,
     type: "ACCESS",
+    // The endpoint carries these now. This row is a request logged AFTER they shipped.
+    requestText: "Please send me a copy of everything you hold about me.",
+    intakeChannel: "WEBSITE_FORM",
     status: "IN_PROGRESS",
     receivedAt: "2026-09-01T09:00:00.000Z",
     identityVerifiedAt: "2026-09-01T10:00:00.000Z",
@@ -54,6 +57,12 @@ const DSRS = [
     customerId: "22222222-2222-2222-2222-222222222222",
     insuredPersonId: null,
     type: "DELETION",
+    // NULL ON PURPOSE — a request that PREDATES these columns, which is why they are nullable:
+    // the eighteen on db-test are not backfilled, because inventing what a data subject asked
+    // for is the one thing this record must never contain. A screen has to render *not recorded*
+    // for these, which is a different fact from an empty request.
+    requestText: null,
+    intakeChannel: null,
     status: "CLOSED",
     receivedAt: "2026-08-01T09:00:00.000Z",
     identityVerifiedAt: "2026-08-01T10:00:00.000Z",
@@ -375,4 +384,70 @@ test("says nothing on a request closed by somebody other than its logger", async
   await expect(page.getByTestId("combined-duty-dsr-dsr-2")).toHaveCount(0);
   // And not on the open one either, which nothing has closed at all.
   await expect(page.getByTestId("combined-duty-dsr-dsr-1")).toHaveCount(0);
+});
+
+/*
+ * THE INTAKE FORM SENDS WHAT WAS ASKED FOR AND HOW IT ARRIVED — both REQUIRED by the api.
+ *
+ * This test exists because the two inputs shipped with the api rather than with the design batch,
+ * and the reason is that a required field with no input is not a deferred screen: `POST /dsr`
+ * would 400 on every submit from the only screen that logs a request. So what is asserted is the
+ * PAIR — the controls are there, and the values reach the request body.
+ *
+ * The channel is CHANGED from its default rather than accepted, because a select asserted at its
+ * default proves only that a default exists.
+ */
+test("logs a request carrying the subject's own words and the channel it arrived through", async ({
+  page,
+}) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await mockDsrs(page);
+  let posted: Record<string, unknown> | null = null;
+  await page.route("http://localhost:4000/dsr", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    posted = route.request().postDataJSON() as Record<string, unknown>;
+    return route.fulfill({ status: 201, json: DSRS[0] });
+  });
+
+  // The customer picker is an `EntitySearch`, which renders a COMBOBOX and not a plain textbox —
+  // `getByRole('textbox', { name: 'Customer' })` timed out on it. Driven through its own hooks,
+  // the way `complaints.spec.ts` already drives the same component.
+  await page.route("http://localhost:4000/customers/search**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: "11111111-1111-1111-1111-111111111111",
+          legalName: "Al-Yarmouk Trading Company",
+          customerType: "CORPORATE",
+          status: "ACTIVE",
+        },
+      ],
+    }),
+  );
+
+  await page.goto("/dsr");
+  const customerField = page.locator('[data-entity-search-term="customer"]');
+  await customerField.fill("Yar");
+  await expect(
+    page.locator('[data-entity-search-list="customer"]'),
+  ).toBeVisible();
+  await customerField.press("Enter");
+
+  await page.getByLabel("The request as received").fill("  A copy of my file.  ");
+  await page
+    .getByLabel("How the request arrived")
+    .selectOption("TELEPHONE");
+  await page.getByRole("button", { name: "Log request" }).click();
+
+  await expect.poll(() => posted !== null).toBe(true);
+  const body = posted as unknown as {
+    requestText: string;
+    intakeChannel: string;
+  };
+  // TRIMMED by the screen, so the api's own trim is not the only one — a request padded with
+  // spaces would otherwise satisfy a length floor and store nothing, which is the defect the
+  // api-side e2e caught on this very field.
+  expect(body.requestText).toBe("A copy of my file.");
+  expect(body.intakeChannel).toBe("TELEPHONE");
 });

@@ -15,7 +15,8 @@ import {
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { queryBoolean } from '../../../common/dto.util';
+import { emptyStringToUndefined, queryBoolean } from '../../../common/dto.util';
+import { IsCalendarDate } from '../../../common/is-calendar-date.validator';
 
 /**
  * Insurer management — the DTOs for an office's own insurer records.
@@ -190,6 +191,28 @@ export class RegisterInsurerDto {
   @Length(1, 20)
   @Matches(NO_CONTROL_CHARACTERS, printable('financialStrengthRating'))
   financialStrengthRating?: string;
+
+  /**
+   * MODULE 0-ب ITEM (e) — THE DATE THE RATING WAS AS AT, and the agency that published it.
+   *
+   * `Insurer_rating_carries_its_date` refuses either half alone from `20261125110000` onward, so a
+   * rating submitted without a date is a CONSTRAINT VIOLATION — which decision 90 forbids a user from
+   * ever meeting. `InsurerService.assertRatingCarriesItsDate` is the form-level equivalent and
+   * produces a sentence naming both fields; the CHECK stays as the backstop for every other writer.
+   *
+   * The rule is NOT a decorator here, and that is item (e)'s own lesson repeated: it is about the
+   * MERGED state of the row after a PATCH, not about this body. A PATCH carrying only the rating is
+   * fine on a record that already has a date and wrong on one that does not, and a DTO cannot see the
+   * row.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsCalendarDate()
+  financialStrengthRatingAsOf?: string;
+
+  @IsOptional()
+  @IsUUID()
+  ratingAgencyId?: string;
 }
 
 /**
@@ -300,6 +323,28 @@ export class UpdateInsurerDto {
   @Length(1, 20)
   @Matches(NO_CONTROL_CHARACTERS, printable('financialStrengthRating'))
   financialStrengthRating?: string;
+
+  /**
+   * MODULE 0-ب ITEM (e) — THE DATE THE RATING WAS AS AT, and the agency that published it.
+   *
+   * `Insurer_rating_carries_its_date` refuses either half alone from `20261125110000` onward, so a
+   * rating submitted without a date is a CONSTRAINT VIOLATION — which decision 90 forbids a user from
+   * ever meeting. `InsurerService.assertRatingCarriesItsDate` is the form-level equivalent and
+   * produces a sentence naming both fields; the CHECK stays as the backstop for every other writer.
+   *
+   * The rule is NOT a decorator here, and that is item (e)'s own lesson repeated: it is about the
+   * MERGED state of the row after a PATCH, not about this body. A PATCH carrying only the rating is
+   * fine on a record that already has a date and wrong on one that does not, and a DTO cannot see the
+   * row.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsCalendarDate()
+  financialStrengthRatingAsOf?: string;
+
+  @IsOptional()
+  @IsUUID()
+  ratingAgencyId?: string;
 }
 
 /**

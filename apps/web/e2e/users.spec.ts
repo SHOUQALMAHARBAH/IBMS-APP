@@ -152,13 +152,13 @@ async function mockAdmin(page: Page, users: unknown[] = USERS) {
   await page.route("http://localhost:4000/admin/departments", (route) =>
     route.fulfill({
       status: 200,
-      json: [{ id: "dept-1", name: "Claims", nameAr: "المطالبات" }],
+      json: [{ id: "dept-1", name: "Claims", nameAr: "المطالبات", retiredAt: null }],
     }),
   );
   await page.route("http://localhost:4000/admin/branches", (route) =>
     route.fulfill({
       status: 200,
-      json: [{ id: "branch-1", name: "Amman", nameAr: "عمّان" }],
+      json: [{ id: "branch-1", name: "Amman", nameAr: "عمّان", retiredAt: null }],
     }),
   );
   await page.route("http://localhost:4000/employees", (route) =>

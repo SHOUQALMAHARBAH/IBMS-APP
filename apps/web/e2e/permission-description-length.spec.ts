@@ -171,8 +171,19 @@ test("a long permission description wraps rather than truncating, and does not b
         text: (node.textContent ?? "").length,
         clipped: node.scrollHeight > node.clientHeight + 1,
         rowOverflow: row ? row.scrollWidth > row.clientWidth + 1 : false,
-        pageOverflow:
-          document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+        /*
+         * THE CONTENT COLUMN, NOT `documentElement`. The shell is `100dvh` with
+         * `overflow: hidden` now, so horizontal overflow is clipped there and never reaches
+         * `<html>` — this read was `document.documentElement.scrollWidth > clientWidth`, which
+         * after that change is permanently false and makes the assertion below unable to fail.
+         * `[data-app-content]` is the element a reader scrolls, which is what the question was
+         * always about.
+         */
+        pageOverflow: (() => {
+          const col = document.querySelector("[data-app-content]");
+          if (!col) throw new Error("no [data-app-content] — the shell changed shape");
+          return col.scrollWidth > col.clientWidth + 1;
+        })(),
       };
     });
 
@@ -230,7 +241,13 @@ test("the longest line the owner actually wrote renders in full, from the dictio
       text: node.textContent ?? "",
       clipped: node.scrollHeight > node.clientHeight + 1,
       rowOverflow: row ? row.scrollWidth > row.clientWidth + 1 : false,
-      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      // See the note on the same read above: the content column is the scroller now, and reading
+      // `documentElement` here would be an assertion that can no longer fail.
+      pageOverflow: (() => {
+        const col = document.querySelector("[data-app-content]");
+        if (!col) throw new Error("no [data-app-content] — the shell changed shape");
+        return col.scrollWidth > col.clientWidth + 1;
+      })(),
     };
   });
 
