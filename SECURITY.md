@@ -9,9 +9,12 @@ preference — it is the only thing separating this document from the two it rep
 > sanitising special cases, while the other recorded deleting it, and the file does not exist. A
 > reader could not tell which half was current.
 >
-> **Then every claim in the merged file was re-measured, and 10 of 26 were false or stale.** The
-> seven in the sections below are corrected in place with their measurement; the three worth naming
-> here are: this file claimed a utility module that had been deleted; it recommended `npm audit fix`,
+> **Then every claim in the merged file was re-measured, and 13 of 26 were false or stale.**
+> (That figure was reported as 10 until the findings were LISTED rather than recalled, which is
+> this file's own standard applied to its own correction; 26 is the count of distinct claims
+> examined, and the granularity is a judgement — the multer entry alone carried four wrong
+> version figures.) The ten in the sections below are corrected in place with their
+> measurement; the three worth naming here are: this file claimed a utility module that had been deleted; it recommended `npm audit fix`,
 > which in this repository has made npm **drop a package from the tree** so the gate went green
 > because the dependency had VANISHED; and the merged multer entry still argued its acknowledgement
 > on *there is no multipart route*, which stopped being true when the customer-import upload landed.
