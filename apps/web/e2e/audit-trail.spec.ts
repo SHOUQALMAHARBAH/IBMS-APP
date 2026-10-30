@@ -17,12 +17,20 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(page: Page, roles: string[], language = "EN") {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        languagePreference: language,
+        roles,
+        permissions: permissionsForRoles(roles),
+      },
+    }),
   );
 }
 
@@ -411,4 +419,24 @@ test("audit trail screen has no serious/critical accessibility violations @a11y"
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+test("the two date filters keep their visible label and no longer carry a duplicate aria-label", async ({
+  page,
+}) => {
+  // THE PREMISE THIS CORRECTS WAS MINE. The owner's table recorded these two as having NOTHING
+  // visible beside them, which came from `date-input-labels.py` reporting "aria-label only" for a
+  // text node its anchor could not read -- `{t('atFromLabel')}{' '}`, a label followed by a JSX
+  // space. They DO have a visible label, and the aria merely repeated its own key: so no text
+  // changed and what went is the chance of the two drifting.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"], "AR");
+  await page.route("http://localhost:4000/audit-trail?**", (route) =>
+    route.fulfill({ status: 200, json: paged(AUDIT_ROWS) }),
+  );
+
+  await page.goto("/audit-trail");
+  for (const label of ["من تاريخ", "إلى تاريخ"]) {
+    const field = page.getByLabel(label);
+    await expect(field).toBeVisible();
+    await expect(field).not.toHaveAttribute("aria-label", /./);
+  }
 });

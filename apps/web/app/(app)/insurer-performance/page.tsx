@@ -11,8 +11,10 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   Card,
+  DateEcho,
   EmptyState,
   ErrorState,
+  Hint,
   PageHeader,
   Table,
   Td,
@@ -195,22 +197,30 @@ export default function InsurerPerformancePage() {
             onChange={(e) => setComputePeriodLabel(e.target.value)}
           />
         </label>
-        <label style={labelStyle}>
-          {t('ipPeriodStartOptionalLabel')}
+        <div style={labelStyle}>
+          <label htmlFor="ip-period-start">{t('ipPeriodStartOptionalLabel')}</label>
           <input
+            id="ip-period-start"
+            aria-describedby="ip-period-start-hint"
             type="date"
             value={computePeriodStart}
             onChange={(e) => setComputePeriodStart(e.target.value)}
           />
-        </label>
-        <label style={labelStyle}>
-          {t('ipPeriodEndOptionalLabel')}
+          <Hint id="ip-period-start-hint">{t('ipPeriodStartHint')}</Hint>
+          <DateEcho value={computePeriodStart} />
+        </div>
+        <div style={labelStyle}>
+          <label htmlFor="ip-period-end">{t('ipPeriodEndOptionalLabel')}</label>
           <input
+            id="ip-period-end"
+            aria-describedby="ip-period-end-hint"
             type="date"
             value={computePeriodEnd}
             onChange={(e) => setComputePeriodEnd(e.target.value)}
           />
-        </label>
+          <Hint id="ip-period-end-hint">{t('ipPeriodEndHint')}</Hint>
+          <DateEcho value={computePeriodEnd} />
+        </div>
         <button type="submit" disabled={!insurerId}>
           {t('ipComputeButton')}
         </button>

@@ -17,8 +17,10 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   Card,
+  DateEcho,
   EmptyState,
   ErrorState,
+  Hint,
   PageHeader,
   SkeletonList,
   Table,
@@ -208,15 +210,22 @@ export default function CommissionRatesPage() {
               inputMode="decimal"
             />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            {t('crateEffectiveFromLabel')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label htmlFor="crate-effective-from">
+              {t('crateEffectiveFromLabel')}
+            </label>
             <input
+              id="crate-effective-from"
+              aria-describedby="crate-effective-from-hint"
               type="date"
-              aria-label={t('crateEffectiveFromLabel')}
               value={effectiveFrom}
               onChange={(e) => setEffectiveFrom(e.target.value)}
             />
-          </label>
+            <Hint id="crate-effective-from-hint">
+              {t('crateEffectiveFromHint')}
+            </Hint>
+            <DateEcho value={effectiveFrom} />
+          </div>
           <button type="submit" disabled={busy}>
             {busy ? t('crateSavingButton') : t('crateOpenWindowButton')}
           </button>

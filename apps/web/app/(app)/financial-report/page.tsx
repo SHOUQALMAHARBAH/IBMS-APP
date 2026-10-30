@@ -2,6 +2,7 @@
 
 import {
   Card,
+  DateEcho,
   EmptyState,
   ErrorState,
   PageHeader,
@@ -90,18 +91,19 @@ export default function FinancialReportPage() {
         description={t('frIntro')}
       />
 
-      <label
-        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
+      <div
+        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0', alignItems: 'baseline' }}
       >
-        {t('frAsOf')}
+        <label htmlFor="fr-as-of">{t('frAsOf')}</label>
         <input
+          id="fr-as-of"
           type="date"
-          aria-label={t('frAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
         />
-      </label>
+        <DateEcho value={asOf} />
+      </div>
 
       {loadError ? (
         <ErrorState title={loadError} />

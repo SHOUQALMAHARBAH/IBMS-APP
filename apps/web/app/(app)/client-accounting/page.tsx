@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  DateEcho,
   EmptyState,
   ErrorState,
   PageHeader,
@@ -103,18 +104,19 @@ export default function ClientAccountingPage() {
         description={t('caIntro')}
       />
 
-      <label
-        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
+      <div
+        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0', alignItems: 'baseline' }}
       >
-        {t('caAsOf')}
+        <label htmlFor="ca-as-of">{t('caAsOf')}</label>
         <input
+          id="ca-as-of"
           type="date"
-          aria-label={t('caAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
         />
-      </label>
+        <DateEcho value={asOf} />
+      </div>
 
       {loadError ? (
         <ErrorState title={loadError} />

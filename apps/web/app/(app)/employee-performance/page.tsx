@@ -11,8 +11,10 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   Card,
+  DateEcho,
   EmptyState,
   ErrorState,
+  Hint,
   PageHeader,
   Table,
   Td,
@@ -227,22 +229,30 @@ export default function EmployeePerformancePage() {
             onChange={(e) => setComputePeriodLabel(e.target.value)}
           />
         </label>
-        <label style={labelStyle}>
-          {t('ipPeriodStartOptionalLabel')}
+        <div style={labelStyle}>
+          <label htmlFor="ep-period-start">{t('ipPeriodStartOptionalLabel')}</label>
           <input
+            id="ep-period-start"
+            aria-describedby="ep-period-start-hint"
             type="date"
             value={computePeriodStart}
             onChange={(e) => setComputePeriodStart(e.target.value)}
           />
-        </label>
-        <label style={labelStyle}>
-          {t('ipPeriodEndOptionalLabel')}
+          <Hint id="ep-period-start-hint">{t('ipPeriodStartHint')}</Hint>
+          <DateEcho value={computePeriodStart} />
+        </div>
+        <div style={labelStyle}>
+          <label htmlFor="ep-period-end">{t('ipPeriodEndOptionalLabel')}</label>
           <input
+            id="ep-period-end"
+            aria-describedby="ep-period-end-hint"
             type="date"
             value={computePeriodEnd}
             onChange={(e) => setComputePeriodEnd(e.target.value)}
           />
-        </label>
+          <Hint id="ep-period-end-hint">{t('ipPeriodEndHint')}</Hint>
+          <DateEcho value={computePeriodEnd} />
+        </div>
         <button type="submit" disabled={!employeeId}>
           {t('epComputeButton')}
         </button>

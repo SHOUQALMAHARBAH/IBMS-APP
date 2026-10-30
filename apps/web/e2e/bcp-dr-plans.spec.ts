@@ -15,12 +15,20 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(page: Page, roles: string[], language = "EN") {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        languagePreference: language,
+        roles,
+        permissions: permissionsForRoles(roles),
+      },
+    }),
   );
 }
 
@@ -129,4 +137,38 @@ test("bcp-dr-plans screen has no serious/critical accessibility violations @a11y
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+test("the next-test-due input has a real label now — it had none at all", async ({ page }) => {
+  // The one row the date measurement could not read: no label, no `aria-label`, no `id`, no
+  // `htmlFor`. It renders only after a button is pressed, which is why the a11y suite had never
+  // seen it. Her sentence is the LABEL, because there was no label for a hint to sit under.
+  await mockAuth(page, ["SYSTEM_SECURITY_ADMINISTRATOR"], "AR");
+  await page.route("http://localhost:4000/bcp-dr-plans/coverage", (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        { scenario: "system_outage", hasPlan: true, plans: [PLAN] },
+        ...COVERAGE.slice(1),
+      ],
+    }),
+  );
+
+  await page.goto("/bcp-dr-plans");
+
+  // ANCHORED, and `e2e-anchored-reads.test.ts` caught this one before it shipped: `toHaveCount(0)`
+  // passes on its FIRST poll, so an absence with nothing positive asserted before it cannot tell
+  // "correctly withheld" from "the page has not rendered yet". The control that OPENS the row is
+  // the anchor, because it proves the row this assertion is about is on screen.
+  const open = page.getByRole("button", { name: "تسجيل اختبار" });
+  await expect(open).toBeVisible();
+  await expect(page.locator('input[type="date"]')).toHaveCount(0);
+
+  await open.click();
+  const field = page.getByLabel("تاريخ الفحص القادم للخطة.");
+  await expect(field).toBeVisible();
+
+  await field.fill("2027-09-06");
+  await expect(page.locator('[data-date-echo="2027-09-06"]')).toHaveText(
+    "6‏/9‏/2027",
+  );
 });

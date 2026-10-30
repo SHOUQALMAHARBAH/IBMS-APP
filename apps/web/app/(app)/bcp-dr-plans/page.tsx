@@ -16,6 +16,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   Card,
+  DateEcho,
   ErrorState,
   PageHeader,
   SkeletonList,
@@ -198,11 +199,24 @@ export default function BcpDrPlansPage() {
                       <Td>
                         {testingId === plan.id ? (
                           <>
+                            {/* NO WRAPPER, and that is the inline-styles ratchet rather than a
+                             * taste: a styled `div` here is a NEW SCREEN site and that budget may
+                             * only FALL. The echo is a `<p>`, so it breaks the line on its own and
+                             * the cell stacks anyway.
+                             *
+                             * The first version of this comment NAMED the attribute it is about
+                             * and counted as the site, because the gate reads TEXT — which is its
+                             * own recorded limit, met inside the comment explaining it. */}
+                            <label htmlFor="bcp-next-test-due">
+                              {t('bcpNextTestDueLabel')}
+                            </label>{' '}
                             <input
+                              id="bcp-next-test-due"
                               type="date"
                               value={nextTestDueAt}
                               onChange={(e) => setNextTestDueAt(e.target.value)}
-                            />{' '}
+                            />
+                            <DateEcho value={nextTestDueAt} />
                             <button type="button" onClick={() => submitTest(plan.id)}>
                               {t('commonSave')}
                             </button>

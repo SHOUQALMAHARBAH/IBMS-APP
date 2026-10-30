@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { DateEcho, Hint } from '../ui/Field';
 import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
@@ -411,10 +412,15 @@ export function EndorsementSection({
             <label htmlFor="end-effective">{t('endorsementEffectiveFromInputLabel')}</label>
             <input
               id="end-effective"
+              aria-describedby="end-effective-hint"
               type="date"
               value={effectiveFrom}
               onChange={(ev) => setEffectiveFrom(ev.target.value)}
             />
+            <Hint id="end-effective-hint">
+              {t('endorsementEffectiveFromHint')}
+            </Hint>
+            <DateEcho value={effectiveFrom} />
           </div>
           <button
             type="button"

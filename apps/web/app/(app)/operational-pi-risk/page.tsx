@@ -333,7 +333,6 @@ export default function OperationalPiRiskPage() {
           <label style={labelStyle}>
             {t('opPiExpiresFieldLabel')}
             <input
-              aria-label={t('opPiExpiresAtLabel')}
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}

@@ -14,7 +14,7 @@ export { ActionStatus } from './ActionStatus';
 export { Badge, type BadgeTone } from './Badge';
 export { Card, PageHeader } from './Card';
 export { EmptyState, ErrorState } from './EmptyState';
-export { Field, Select, TextArea, TextInput } from './Field';
+export { DateEcho, Field, Hint, Select, TextArea, TextInput } from './Field';
 export { FigurePeriod } from './FigurePeriod';
 export { ReportProvenance } from './ReportProvenance';
 export { SelectedValueDescription } from './SelectedValueDescription';

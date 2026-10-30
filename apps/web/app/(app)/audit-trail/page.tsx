@@ -423,7 +423,6 @@ function AuditTrailScreen() {
             {t('atFromLabel')}{' '}
             <input
               type="date"
-              aria-label={t('atFromLabel')}
               value={browseFrom}
               onChange={(e) => setBrowseFrom(e.target.value)}
             />
@@ -432,7 +431,6 @@ function AuditTrailScreen() {
             {t('atToLabel')}{' '}
             <input
               type="date"
-              aria-label={t('atToLabel')}
               value={browseToDate}
               onChange={(e) => setBrowseToDate(e.target.value)}
             />

@@ -52,7 +52,7 @@ export const COMPLIANCE_RISK = {
     // ---- Watchlist sync (#49) --------------------------------------------
     wsHeading: 'مزامنة قوائم العقوبات',
     shMissingConfig:
-      'إعدادات ناقصة: {missing}. الفحص الآلي غير مهيأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
+      'إعدادات ناقصة: {missing}. الفحص الآلي غير مُهيّأ، ومراجعة الامتثال مطلوبة قبل متابعة سير العمل.',
     shScreeningAttempts: 'عمليات الفحص (آخر {days} يومًا)',
     shHoldsReleased: 'حالات رفع الإيقاف (آخر {days} يومًا)',
     wsRescreenSummary:
@@ -329,7 +329,7 @@ export const COMPLIANCE_RISK = {
     opRiskTypeLabel: 'نوع الخطر',
     opRiskDescriptionLabel: 'وصف الخطر',
     opEventDescriptionFieldLabel: 'الوصف',
-    opPiExpiresFieldLabel: 'تنتهي في',
+    opPiExpiresFieldLabel: 'تاريخ انتهاء المسؤولية المهنية',
     opPiInsurerFieldLabel: 'شركة التأمين',
     opRiskDescriptionFieldLabel: 'الوصف',
     opColType: 'النوع',
@@ -344,7 +344,6 @@ export const COMPLIANCE_RISK = {
     opColInsurer: 'شركة التأمين',
     opPiCoverageLimitLabel: 'حد التغطية (دينار أردني)',
     opColCoverageLimit: 'حد التغطية',
-    opPiExpiresAtLabel: 'تاريخ انتهاء المسؤولية المهنية',
     opExpires: 'ينتهي في',
     opClaimsHistoryLabel: 'ملخّص سجل المطالبات',
     opColClaimsHistory: 'سجل المطالبات',
@@ -917,7 +916,7 @@ export const COMPLIANCE_RISK = {
     opRiskTypeLabel: 'Risk type',
     opRiskDescriptionLabel: 'Risk description',
     opEventDescriptionFieldLabel: 'Description',
-    opPiExpiresFieldLabel: 'Expires',
+    opPiExpiresFieldLabel: 'PI expires at',
     opPiInsurerFieldLabel: 'Insurer',
     opRiskDescriptionFieldLabel: 'Description',
     opColType: 'Type',
@@ -932,7 +931,6 @@ export const COMPLIANCE_RISK = {
     opColInsurer: 'Insurer',
     opPiCoverageLimitLabel: 'Coverage limit (JOD)',
     opColCoverageLimit: 'Coverage limit',
-    opPiExpiresAtLabel: 'PI expires at',
     opExpires: 'Expires',
     opClaimsHistoryLabel: 'claims history summary',
     opColClaimsHistory: 'Claims history',

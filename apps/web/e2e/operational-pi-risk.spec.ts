@@ -15,12 +15,20 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(page: Page, roles: string[], language = "EN") {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        languagePreference: language,
+        roles,
+        permissions: permissionsForRoles(roles),
+      },
+    }),
   );
 }
 
@@ -133,4 +141,16 @@ test("operational/PI risk screen has no serious/critical accessibility violation
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+test("the PI expiry field says WHOSE expiry, which only its aria-label used to", async ({
+  page,
+}) => {
+  // «تنتهي في» seen, «تاريخ انتهاء المسؤولية المهنية» spoken. The invisible one names the policy
+  // it is about; the visible one did not say what expires at all.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"], "AR");
+
+  await page.goto("/operational-pi-risk");
+  const field = page.getByLabel("تاريخ انتهاء المسؤولية المهنية");
+  await expect(field).toBeVisible();
+  await expect(field).not.toHaveAttribute("aria-label", /./);
 });

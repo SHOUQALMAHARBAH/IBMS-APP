@@ -9,7 +9,9 @@ import {
 } from '../../../../lib/management-reporting/executive-dashboard-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
+  DateEcho,
   ErrorState,
+  Hint,
   PageHeader,
   SkeletonList,
 } from '../../../../components/ui';
@@ -125,17 +127,20 @@ export default function ExecutiveDashboardPage() {
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
-        <label
+        <div
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}
         >
-          {t('execAsOf')}
+          <label htmlFor="exec-as-of">{t('execAsOf')}</label>
           <input
-            aria-label={t('dashAsOfDateAria')}
+            id="exec-as-of"
+            aria-describedby="exec-as-of-hint"
             type="date"
             value={asOf}
             onChange={(e) => setAsOf(e.target.value)}
           />
-        </label>
+          <Hint id="exec-as-of-hint">{t('execAsOfHint')}</Hint>
+          <DateEcho value={asOf} />
+        </div>
         <button type="submit">{t('execApplyFilters')}</button>
       </form>
 

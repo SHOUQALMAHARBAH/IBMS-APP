@@ -220,6 +220,7 @@ export const OPERATIONS = {
     bcpScenario: 'السيناريو',
     bcpCreateHeading: 'تسجيل خطة جديدة',
     bcpRecordTestButton: 'تسجيل اختبار',
+    bcpNextTestDueLabel: 'تاريخ الفحص القادم للخطة.',
     bcpNoPlanOnFile: '— لا توجد خطة مسجّلة',
     bcpRefusalAct: 'عرض خطط استمرارية العمل والتعافي من الكوارث وصيانتها',
 
@@ -899,6 +900,7 @@ export const OPERATIONS = {
     bcpScenario: 'Scenario',
     bcpCreateHeading: 'Record a new plan',
     bcpRecordTestButton: 'Record test',
+    bcpNextTestDueLabel: 'The next test date for this plan.',
     bcpNoPlanOnFile: '— no plan on file',
     bcpRefusalAct:
       'view and maintain the business-continuity and disaster-recovery plans',

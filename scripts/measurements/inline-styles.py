@@ -75,7 +75,16 @@ SCREEN_BUDGET = 1099
 # and rule 8(d) forbids writing one; the owner answered that on 2026-10-29 by pointing at her own
 # bilingual flyers and the reference page that composes three of their capability lines. Six sites:
 # the panel's own grid, its two paragraphs, the chip list, a chip, and the chip icon's colour.
-UI_BUDGET = 126
+#
+# 127 with `DateEcho` — the ninth primitive, and the one case this budget's own rule permits a RISE
+# for. It renders the date the system UNDERSTOOD under a date field, because `<input type="date">`
+# shows its placeholder in the USER AGENT's order: here MONTH-FIRST, so `03/04` meaning 3 April is
+# stored as 4 March — a valid date, silently wrong, on a screen that moves money between ageing
+# buckets. A hint cannot carry the format, which belongs to the user agent and differs per machine.
+# ONE site: the echoed line itself. `Hint`, added in the same commit, is NOT a rise — it is
+# `Field`'s own hint paragraph extracted so that the nine screens that do not go through `Field`
+# have one appearance and one `aria-describedby` wiring rather than nine hand-rolled ones.
+UI_BUDGET = 127
 
 UI_DIR = pathlib.Path("apps/web/components/ui")
 

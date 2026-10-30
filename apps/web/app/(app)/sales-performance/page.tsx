@@ -11,8 +11,10 @@ import {
 } from '../../../lib/management-reporting/sales-performance-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import {
+  DateEcho,
   EmptyState,
   ErrorState,
+  Hint,
   PageHeader,
   SkeletonList,
 } from '../../../components/ui';
@@ -223,24 +225,32 @@ export default function SalesPerformancePage() {
               <h2>{performance.target ? t('spReviseButton') : t('spSetButton')}</h2>
               {!performance.target ? (
                 <>
-                  <label style={labelStyle}>
-                    {t('dashPeriodStart')}
+                  <div style={labelStyle}>
+                    <label htmlFor="sp-period-start">{t('dashPeriodStart')}</label>
                     <input
+                      id="sp-period-start"
+                      aria-describedby="sp-period-start-hint"
                       type="date"
                       value={targetPeriodStart}
                       onChange={(e) => setTargetPeriodStart(e.target.value)}
                       required
                     />
-                  </label>
-                  <label style={labelStyle}>
-                    {t('dashPeriodEnd')}
+                    <Hint id="sp-period-start-hint">{t('dashPeriodStartHint')}</Hint>
+                    <DateEcho value={targetPeriodStart} />
+                  </div>
+                  <div style={labelStyle}>
+                    <label htmlFor="sp-period-end">{t('dashPeriodEnd')}</label>
                     <input
+                      id="sp-period-end"
+                      aria-describedby="sp-period-end-hint"
                       type="date"
                       value={targetPeriodEnd}
                       onChange={(e) => setTargetPeriodEnd(e.target.value)}
                       required
                     />
-                  </label>
+                    <Hint id="sp-period-end-hint">{t('dashPeriodEndHint')}</Hint>
+                    <DateEcho value={targetPeriodEnd} />
+                  </div>
                 </>
               ) : null}
               <label style={labelStyle}>

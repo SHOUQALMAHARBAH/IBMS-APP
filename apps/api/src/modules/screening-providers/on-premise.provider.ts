@@ -198,12 +198,20 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
         pepConfigured,
         pepConfigured && reachable,
         pepConfigured
-          ? // CLASSIFIED A CAUTION BY THIS CODE, NOT BY THE OWNER, and it is the one row in this
-            // batch whose Arabic and English do not make the same claim. The English opens
-            // *Depends on whether* and the table she was given dropped that clause, so her sentence
-            // renders the truncation faithfully and ASSERTS what the English hedges. Its tail is
-            // still *verify before relying on it*, which is an instruction not to rely on it — so
-            // it renders as a caution, and the wording is in the register for her to settle.
+          ? // CLASSIFIED A CAUTION BY THIS CODE, NOT BY THE OWNER — and that classification is
+            // what the sentence now reads like.
+            //
+            // CORRECTED 2026-10-30: this was the one row whose Arabic and English did not make the
+            // same claim. The English opens *Depends on whether*; the table she was given had lost
+            // that clause, so her Arabic rendered the truncation faithfully and ASSERTED what the
+            // English hedges — on a caution about whether politically exposed persons are screened
+            // at all. The clause went missing when the sentences were extracted FOR her rather
+            // than when she wrote them, so it was never hers to drop; she has since supplied the
+            // sentence with the hedge restored, and the two halves agree.
+            //
+            // The half worth keeping is HOW it was found: by comparing the two languages against
+            // each other, not by reading either alone. A bilingual pair where one half makes a
+            // stronger claim than the other is a defect neither reader can see.
             cautions('ON_PREMISE_PEP_VERIFY', { name: dataset })
           : // HER CAUTION: a sanctions-scoped dataset searches no PEP data at all.
             cautions('ON_PREMISE_PEP_SANCTIONS_ONLY', { name: dataset }),

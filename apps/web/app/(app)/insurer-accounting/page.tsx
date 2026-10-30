@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  DateEcho,
   ErrorState,
   PageHeader,
   SkeletonList,
@@ -80,18 +81,19 @@ export default function InsurerAccountingPage() {
         description={t('iaIntro')}
       />
 
-      <label
-        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
+      <div
+        style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0', alignItems: 'baseline' }}
       >
-        {t('iaAsOf')}
+        <label htmlFor="ia-as-of">{t('iaAsOf')}</label>
         <input
+          id="ia-as-of"
           type="date"
-          aria-label={t('iaAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
         />
-      </label>
+        <DateEcho value={asOf} />
+      </div>
 
       {loadError ? (
         <ErrorState title={loadError} />

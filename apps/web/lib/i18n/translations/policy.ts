@@ -67,6 +67,7 @@ export const POLICY = {
     endorsementTypePositive: 'إيجابي (يضيف قسط)',
     endorsementTypeNegative: 'سلبي (يُرجع قسط)',
     endorsementEffectiveFromInputLabel: 'ساري من',
+    endorsementEffectiveFromHint: 'أول يوم يسري فيه الملحق.',
     endorsementAdvanceButton: 'تقديم إلى المؤمِّن',
     endorsementCalculateButton: 'حساب التعديل',
     // «إلغاء» from `rcActionKindCancellation`. CORRECT here and nowhere near the
@@ -392,6 +393,7 @@ export const POLICY = {
     endorsementTypePositive: 'Positive (adds premium)',
     endorsementTypeNegative: 'Negative (returns premium)',
     endorsementEffectiveFromInputLabel: 'Effective from',
+    endorsementEffectiveFromHint: 'The first day the endorsement applies.',
     endorsementAdvanceButton: 'Advance to insurer',
     endorsementCalculateButton: 'Calculate adjustment',
     endorsementCancellationLabel: 'Cancellation',
