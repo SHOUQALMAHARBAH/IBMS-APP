@@ -467,6 +467,45 @@ rediscovered — see § 2 for the same convention applied to in-session bugs):
 
 ---
 
+## A completion claim made without running the gate that would have checked it
+
+> **This section is the surviving content of `STATUS_90_PERCENT_COMPLETE.md`, deleted 2026-10-30.**
+
+That file reported, on 2026-09-09, that all seven Part G verification gates passed, that
+2,416/2,417 unit tests and 309/309 e2e tests passed, that four named fixes were "fully verified",
+and that the system was "ready for staging/UAT as-is". A follow-up pass ran the gates it named.
+**Seven of its claims were false, and two of the four "fixes" it reported had shipped defects:**
+
+| it claimed | what running the gate showed |
+|---|---|
+| all 7 Part G gates passing | `npm run lint` **failed** (2 errors in `apps/web`); `npm run test:security` **failed** (8 high advisories) |
+| "the 1 unit failure is `app.controller.spec.ts`" | the failure was `security-headers.middleware.spec.ts`, broken by its own security-fixes commit |
+| "309/309 e2e passing (100%)" | that is the **web** suite. The **api** e2e suite was never run, and could not have passed: the new rate limiter 429s the sixth auth call and all 63 spec files sign up repeatedly |
+| fix #1 commission reconciliation "fully verified" | it injected `CommissionRepository` into `InvoiceService` without providing it in `FinanceModule`. **The API could not boot.** Unit tests build the service by hand, so none of them could see it |
+| fix #3 partial payments "enables real-world installment workflows" | it dropped `Receipt.invoiceId @unique` and shipped **no application logic**, reinstating a P0 and turning the `P2002` handler into dead code |
+| fix #2 refund disbursement "completes the payment-execution step" | `refund.disburse` was never seeded, so the endpoint 403'd for every role — and it checked no approval, so an at-threshold refund could be paid with nobody having approved it |
+| "ready for staging/UAT as-is" | a production-seeded database had no user able to sign in and no way to grant anyone a role |
+
+All of those were fixed at the time. **The lesson is not any one of them — it is that every claim
+in that document was made without running the gate that would have checked it**, and that the
+document then read as evidence for a whole month. Three of its seven failures are specifically
+invisible to the gate its author did run: a missing DI provider cannot be seen by unit tests that
+construct the service by hand, an unseeded permission cannot be seen by a mocked web suite, and a
+dropped unique constraint cannot be seen by anything that does not write two rows.
+
+**Its TITLE is why it was deleted rather than archived.** A file called
+`STATUS_90_PERCENT_COMPLETE` is read by its name long before its contents, and that name asserted
+something nobody had verified since September. Four engineers join this repository next week and
+would have found it in week one. The warning box it carried — honest, detailed, and at the top —
+was not enough, because a name is read first and a box is read second.
+
+**So: a completion figure is evidence only if the command that produced it is in the same
+sentence.** That is the same rule as § The standing rule for every number this file publishes, one
+level up: that rule is about a count being movable by a plant, and this one is about a count having
+been run at all.
+
+---
+
 ## 1. CI & test-infrastructure failures
 
 ### 1.1 `P0` — Two e2e specs time out in the full `apps/api` suite
