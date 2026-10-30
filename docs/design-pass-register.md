@@ -179,7 +179,7 @@ Each is something the pass found and deliberately left, with what it would take 
 | 4e | **`/internal-controls/combined-duty-acts` is mocked by NO Playwright spec and its declared-acts half has never been exercised in a browser.** Found while writing that screen's capture: there was no working fixture to copy, so the first attempt was paraphrased from the type and silently rendered nothing. | The capture now exercises it. A real assertion on that section belongs with whoever owns COMBINED mode — it is the section the whole mode rests on. |
 | 5b | **The collapsed rail is a STRIP, not a drawer.** Its `<details>` groups stay closed, so it costs about one brand lockup and one search field of height. | A drawer needs a toggle, a focus trap and an escape key — three pieces of BEHAVIOUR, which §4(h) does not allow this batch to add. It is the better answer whenever somebody is allowed to build it. |
 | 5c | **The rail's layout lives in inline styles, which is why the responsive rule needs `!important`.** | Moving it to CSS is a larger change than a responsive fix should carry. Recorded so the `!important` is read as a consequence rather than as carelessness. |
-| 6 | **The two new CI steps are committed locally and NOT PUSHED.** `check:token-contrast` and `check:inline-styles` are wired in `package.json` (so `npm run check:screen-pass` runs both) and their `ci.yml` steps sit in an unpushed commit: GitHub refuses a push touching a workflow file from a token without `workflow` scope, and this machine's keyring token holds `gist, read:org, repo`. **No credential was written to disk to get around it** — the credential-safety hook refuses that and is right to, since it cannot tell a credential store from a leak. | **STILL OPEN 2026-10-30, AND THE ORIGINAL CLAIM IN THIS ROW WAS RIGHT: THE STEPS ARE STILL NOT PUSHED.** The push was refused a SECOND time, naming `workflow` — so what batch 14 corrected here is not the row's status but its ARITHMETIC: **IT WAS ONE STEP, NOT THREE.** Measured rather than trusted: `check:token-contrast` and `check:inline-styles` are already in `ci.yml` at lines 124 and 133, and the held branch's own diff proves it — `5a17f08` adds exactly ONE step and *"Inline styling may only fall"* appears in it as unchanged CONTEXT. So only `check:opacity-muting` was ever absent. Both are WRITTEN now — `check:opacity-muting` and the new `check:literal-colours` — and NEITHER IS IN CI, held on `wire-both-design-gates-into-ci`, named for what it does because a hash moves, and `wire-opacity-gate-into-ci` is SUPERSEDED (it sat four commits behind carrying the same 13 lines). The half of this row that outlived its figures is the reason it was written: a gate nobody runs is a number nobody can trust. |
+| 6 | **The two new CI steps are committed locally and NOT PUSHED.** `check:token-contrast` and `check:inline-styles` are wired in `package.json` (so `npm run check:screen-pass` runs both) and their `ci.yml` steps sit in an unpushed commit: GitHub refuses a push touching a workflow file from a token without `workflow` scope, and this machine's keyring token holds `gist, read:org, repo`. **No credential was written to disk to get around it** — the credential-safety hook refuses that and is right to, since it cannot tell a credential store from a leak. | **CLOSED 2026-10-30, AND ONLY NOW — BY A GREEN RUN NAMING BOTH STEPS.** This row's own history is the argument for waiting: it was marked CLOSED once on the strength of the YAML being written, and that was false by the next command, because the push was then refused a SECOND time naming `workflow`. What settled it was not a credential at all — **the push authenticates as an OAuth App** (`gist, read:org, repo`), which is what the refusal said and what a fine-grained PAT would never say, so the owner's own token carrying **Workflows: read and write** was never on that path and no reissue of it could have moved this. She edited `ci.yml` in the browser, where her account permissions apply and no credential is involved, in `960d236`. **THE EVIDENCE IS THE RUN, NOT THE FILE**: run `41014740507`, `frontend` job, step **14** *Opacity used to mute text may only fall* and step **15** *No hand-written colour outside the token set*, both `success`, read off the run's own step list — and `check-ci.sh` reports *2 workflow run(s), all green* plus *every check-run green too*. Both held branches are DELETED: `wire-both-design-gates-into-ci` differed from the landed file only by two trailing spaces, and `wire-opacity-gate-into-ci` was found **five commits behind — 81 files, 3,655 deletions** — so keeping it meant holding a branch that reverts the whole batch, which is this register's own recorded held-branch trap in its worst form yet. **What batch 14 corrected here was the ARITHMETIC and not the status**: it was ONE step absent, not three, because `check:token-contrast` and `check:inline-styles` were already at lines 124 and 133. The half that outlived every figure is the reason the row was written: a gate nobody runs is a number nobody can trust. |
 | 7 | **SIXTEEN screens still wrap a `<Table>` in their OWN `overflow-x: auto` div.** `Table` has provided a scroll container since batch 3 **with `tabIndex={0}`**, because a scroll container nothing can focus is a region a keyboard user cannot scroll at all — so an unfocusable one wrapping it is that defect one level out. Measured 17 sites across 10 files; `/screening-health`'s is fixed. **axe is silent**: `scrollable-region-focusable` fires only when a region actually OVERFLOWS, and the inner scroller absorbs the overflow first. `client-accounting`, `financial-report`, `insurer-accounting`, `regulatory-compliance`, `retention-disposal` ×6, `ropa-entries`, `screening-matches`, `sla-dashboard` ×3, `watchlist-sync`. | **CLOSED 2026-10-30 (batch 14 § 5).** Sixteen removed across nine files, each close matched by DEPTH COUNTING because `</div>` nests; `SCREEN_BUDGET` 1099 → 1083, exactly one site per wrapper. **Re-measured first, and the measurement classified them independently: 28 wrappers exist, of which exactly 16 wrap the PRIMITIVE — her list to the site. The other 12 hold a RAW `<table>`, where that div is the ONLY scroller**, so removing it there would be the regression rather than the fix — and those twelve are therefore batch 3's keyboard trap still UNFIXED, which is the one item this register leaves both mechanical-ish and open. **And removing them dropped a live test hook**: `watchlist-sync`'s wrapper carried `data-testid="watchlist-runs"`, read by two assertions — the `data-*` class from the other direction, five having been dropped BY components before. It rides the `<Table>` now, which forwards them. |
 | 8 | **`ProviderHealth.providerName` is English on an Arabic screen** — «الاسم» reads `Built-in watchlist cache (OFAC SDN + UN Consolidated)` beside a TYPE that reads «القائمة المحلية المزامنة». Declared as `readonly name` on each adapter, which is why a sweep over display-FIELD names (`note`, `detail`, …) did not see it. | **~~No Arabic exists for it~~ — MEASURED 2026-10-30 AND THAT CLAIM WAS TOO STRONG (batch 14 § 11), which matters because it was repeated to the owner.** `scripts/measurements/api-display-strings.py` re-derives it: `'On-premise screening engine'` is **byte-identical** to `screenProviderOnPremise`, whose «محرك فحص محلي» ships; `'Commercial screening provider'` is ONE WORD from `screenProviderCommercial`; only the built-in name has no single twin, and its two parts both ship. **AND THE REAL FINDING IS THAT THE ARABIC IS ALREADY ON THAT SCREEN EIGHT LINES ABOVE** — the «المزوّد» row renders `ENUM_LABEL.ScreeningProviderKind` in Arabic and «الاسم» renders `providerName` raw in English, so for two of the three this is a SECOND answer to a question already answered, in the wrong language. **Reported and NOT shipped by her instruction**, because the honest fix is removing a row from a compliance screen or putting a KEY on the wire, and she reads the derivation first. `ProviderHealth.detail` is a DIFFERENT answer: two of its ten are already covered bilingually by `shMissingConfig` (rendered as a duplicate directly beneath the English), three carry a RAW runtime fragment whose CARRIER SENTENCE is still localisable, and five interpolate only numbers or URLs. |
 | 5 | **~~The four other `(auth)` screens do not yet use `AuthFrame`~~ — CLOSED 2026-10-30 (batch 14 § 6).** THE ORIGINAL CLAIM: `/login` links to `/forgot-password`, which still wore the old card — this product's first impression going wrong one click in. | All four wear the frame, with `pitch` OMITTED because `AuthFrame`'s own comment anticipated exactly these four in advance: *a reader who is already resetting a password does not need selling to*. No new words, and the frame renders its own `<main>`, so each screen shed two inline style sites as well. |
@@ -1911,7 +1911,10 @@ runs locally. **Its CI step is written and is NOT on the branch**: GitHub refuse
 creates or updates a workflow file without `workflow` scope, and the credential this machine
 defaults to does not carry it.
 
-It is held as a single 13-line commit on the local branch **`wire-opacity-gate-into-ci`**,
+**CLOSED 2026-10-30 — the step runs in CI (`960d236`, run `41014740507`, `frontend` step 14,
+`success`), and the branch below is DELETED.** The narrative is kept because its diagnosis was
+right and its conclusion about the credential was not: it was held as a single 13-line commit on
+the local branch **`wire-opacity-gate-into-ci`**,
 rather than sitting in the working tree where it would be the most losable thing in the repository.
 It was kept OFF `module-0b/provider-registration` deliberately: any commit touching `ci.yml` blocks
 the push of the ENTIRE branch, so leaving it in line would hold every later commit hostage to one
@@ -2035,7 +2038,43 @@ its own comment says it is *"emphasised because it is the one the API reports se
 that reason."* It was not emphasised at all. `--warning-ink` is the token that means this. The two
 survivors are `--danger-solid` (above) and `--font-geist-mono` inside `globals.css` itself.
 
-### 3 · `/bcp-dr-plans` — three of five closed, and the two words are hers
+### 3 · `/bcp-dr-plans` — FIVE OF FIVE CLOSED 2026-10-30, the last two by her own words
+
+**HER TWO WORDS, SUPPLIED AFTER THIS SCREEN STOPPED RATHER THAN GUESSED:** `never` →
+«لم يُفحَص بعد» (`bcpNeverTested`), `not scheduled` → «غير مجدول» (`bcpNoTestScheduled`). Both
+verified NFC as written, so nothing was reordered, and both built from codepoints rather than
+pasted through a shell.
+
+**THE MEASUREMENT THAT JUSTIFIES THE STOP, NOW THAT THE ANSWER IS IN.** «غير مجدول» IS the vendor
+twin «غير مجدولة» minus its taa marbuta — one character — **and that is exactly why it was not
+derivable rather than evidence that it was.** Dropping ة to change grammatical gender is
+morphology; it is only correct because this particular adjective's two forms differ by that letter,
+and a slice-based derivation would have produced it *for free* while applying Arabic morphology by
+accident. **A one-character cut that changes gender is the trap, not the licence.**
+
+**AND «لم يُفحَص بعد» IS DECISION 60's OWN FRAME.** `commonNotAssessedYet` is «لم» + «يُقيَّم» +
+«بعد»; hers is «لم» + «يُفحَص» + «بعد» — identical prefix, identical suffix, identical diacritic
+placement (damma after the yeh, fatha on the penultimate consonant), only the root differs. So it
+reads to an Arabic reader as the same family, which is the property she protected when she insisted
+her «مستبعد»/«مؤكَّد»/«لم يُبَتَّ فيه» trio read as one. **It is NOT that key and must not be
+pointed at it**: a plan not ASSESSED and a plan not TESTED are different claims, and
+`declared-vocabulary.test.ts` refuses a fourth key carrying one of her three words.
+
+**AND THERE WAS A SHIPPING ARABIC WORD FOR AN ENGLISH `never` ONE SCREEN OVER, AND IT IS THE WRONG
+ONE** — found by following an unrelated grep hit rather than by looking. `shNever` on
+`/screening-health` is «لا يوجد» — *none exists*, a statement about the RECORD — where hers is a
+statement about the PLAN. That is decision 60's own «غير متوفّر» / «لم يُقيَّم بعد» distinction, and
+reusing it would have said the plan has no test record rather than that it has not been tested.
+**So the near match existed and was wrong in a way only reading it could show, which is her own
+rule: a near match is not a match.**
+
+**ONE DIVERGENCE REPORTED RATHER THAN REWORDED.** The English is UNCHANGED (`never` /
+`not scheduled`), so no English reader sees any difference — but her Arabic carries «بعد» (*yet*)
+and `never` does not. Both are true of the same row; the English is simply the terser half, which is
+the opposite of this dictionary's usual direction. Fixing it means writing English prose for her
+screen, and nothing in this batch needed a new word.
+
+### 3a · The original stop, kept because the reasoning is what produced the right answer
 
 CLOSED: both literal colours; both `.slice(0, 10)` dates now through `formatDate`; and **the raw
 `system_outage` section heading, which needed no word at all** — `ENUM_LABEL.BcpDrScenario` ships
@@ -2043,7 +2082,8 @@ all five bilingually and the `<select>` eighteen lines above already rendered it
 two answers to what a scenario is called: you pick «انقطاع الأنظمة» and the section you created is
 headed `system_outage`. **Found by opening the phone capture, not by any gate.**
 
-**STILL OWED, AND THE REASON IS SHARPER THAN *nothing ships*.** Measured both:
+**WHAT WAS OWED, AND THE REASON WAS SHARPER THAN *nothing ships*.** Measured both, and both
+measurements held up when her words arrived:
 
 - **`'not scheduled'` HAS A BYTE-IDENTICAL ENGLISH TWIN** — `vendNotScheduled`, doing the identical
   job on `/vendors/[id]`: a next-due date nobody has set. **And its Arabic cannot be reused.**
@@ -2175,10 +2215,21 @@ run where one request escaped the mocks cannot pass as a clean a11y result over 
 branch's own diff confirms it: `5a17f08` adds exactly one step, and *"Inline styling may only fall"*
 appears in it as unchanged CONTEXT. So only **`check:opacity-muting`** was absent.
 
-Both steps are WRITTEN and **NEITHER IS PUSHED**: the push was refused a second time, naming
-`workflow` — so they are held on `wire-both-design-gates-into-ci`, named for what it does rather
-than by a hash that moves. The previously held branch `wire-opacity-gate-into-ci`
-is **superseded** — it sat four commits behind and carried the same 13 lines.
+**BOTH STEPS NOW RUN IN CI — CLOSED 2026-10-30, and the evidence is a RUN rather than the file.**
+The push was refused a second time naming `workflow`; what settled it was not a credential at all.
+**The push authenticates as an OAuth App** (`gist, read:org, repo`) — which is exactly what the
+refusal said, and what a fine-grained PAT would never say — so the owner's own token carrying
+**Workflows: read and write** was never on that path, and no reissue of it could have moved this.
+She edited `ci.yml` in the browser instead, where her account permissions apply and no credential
+is involved, in `960d236`.
+
+Read off run `41014740507`'s own step list for the `frontend` job: step **14** *Opacity used to
+mute text may only fall* `success`, step **15** *No hand-written colour outside the token set*
+`success`. Both held branches are DELETED — `wire-both-design-gates-into-ci` differed from the
+landed file only by two trailing spaces, and `wire-opacity-gate-into-ci` was by then **five commits
+behind, 81 files and 3,655 deletions**, so keeping it meant holding a branch that reverts the whole
+batch. That is this register's own held-branch trap in its worst form yet, and it is why a held
+branch that is no longer held gets deleted rather than left for the next person.
 
 ### 10 · What stays deferred, and why
 
@@ -2267,11 +2318,18 @@ across every cell of twelve tables, where `design-pass-sections.py` has refused 
 
 **So: one item, measured, with both options and why neither is a one-liner.**
 
-**AND ONE THING IS OPEN WITHOUT BEING WORK, which the answer above would otherwise hide:** the two
-CI steps are written and refused, so `check:opacity-muting` and `check:literal-colours` run locally
-and not in CI. That is not an engineering task — the push needs `workflow` scope on the credential
-and the refusal names it — but it IS the thing this repository has paid for three times, so it does
-not get to sit in the deferred table as though somebody chose it. It is one push.
+**OWNER DECISION 2026-10-30: THE TWELVE ARE NOT DONE NOW, AND THAT IS A DEFERRAL RATHER THAN AN
+OMISSION.** She ruled on it knowing exactly what it is — that the cheap fix introduces a second
+defect and the honest one is a markup sweep across every cell of twelve tables — so this row stays
+here with both sizes and its reason, and waits for whoever owns those screens. The thing that must
+not happen to it is somebody closing it with `tabIndex={0}` because the diff is small.
+
+**AND THE ONE THING THAT WAS OPEN WITHOUT BEING WORK IS CLOSED.** This paragraph previously said the
+two CI steps were written and refused, so `check:opacity-muting` and `check:literal-colours` ran
+locally and not in CI, and that it was one push rather than an engineering task. Both now run:
+`960d236`, run `41014740507`, `frontend` steps 14 and 15, both `success`. **The push was never the
+route** — it authenticates as an OAuth App, which no personal token's scope can change — and the
+owner landed the file through the browser editor instead.
 
 **Everything else in this register is either closed, deferred with a reason, or a word that is
 hers.**

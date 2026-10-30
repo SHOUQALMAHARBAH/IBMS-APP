@@ -193,16 +193,20 @@ export default function BcpDrPlansPage() {
                       <Td>{plan.rpoHours ?? '—'}</Td>
                       <Td>
                         {/*
-                          `.slice(0, 10)` prints the ISO date, so an Arabic reader saw
+                          `.slice(0, 10)` printed the ISO date here, so an Arabic reader saw
                           `2027-09-06` where every other date in the product renders through
-                          `formatDate`. The 'never' beside it is BARE ENGLISH and is NOT fixed
-                          here — see the register: a byte-identical English twin ships
-                          (`vendNotScheduled`) and its Arabic cannot be reused, because it agrees
-                          with a feminine noun and this screen's subject is «الفحص».
+                          `formatDate`.
+
+                          The two absence words beside it are the OWNER'S, supplied after this
+                          screen stopped rather than guessed — «غير مجدول» is masculine, agreeing
+                          with «الفحص», where the byte-identical English twin one screen over
+                          (`vendNotScheduled`) carries the FEMININE «غير مجدولة». Her form is the
+                          twin minus its taa marbuta, which is precisely why it was not derivable:
+                          a one-character cut that changes grammatical gender is morphology.
                         */}
                         {plan.lastTestedAt
                           ? formatDate(plan.lastTestedAt, language)
-                          : 'never'}
+                          : t('bcpNeverTested')}
                       </Td>
                       <Td>
                         {plan.nextTestDueAt ? (
@@ -217,7 +221,7 @@ export default function BcpDrPlansPage() {
                             {isOverdue(plan.nextTestDueAt) ? ` ${t('statusOverdue')}` : ''}
                           </span>
                         ) : (
-                          'not scheduled'
+                          t('bcpNoTestScheduled')
                         )}
                       </Td>
                       <Td>

@@ -222,6 +222,27 @@ export const OPERATIONS = {
     bcpRecordTestButton: 'تسجيل اختبار',
     bcpNextTestDueLabel: 'تاريخ الفحص القادم للخطة.',
     bcpNoPlanOnFile: '— لا توجد خطة مسجّلة',
+    // THE OWNER'S OWN WORDS, and «غير مجدول» is MASCULINE deliberately. A byte-identical
+    // English twin ships one screen over — `vendNotScheduled`, 'not scheduled' — whose Arabic
+    // is «غير مجدولة», FEMININE, agreeing with «المراجعة»; this screen's subject is «الفحص»,
+    // masculine, which is her own noun for it from `bcpNextTestDueLabel`. Measured: her form IS
+    // the twin minus its taa marbuta, and that is exactly why it could not be derived —
+    // dropping ة to change grammatical gender is MORPHOLOGY, and a slice that happens to be
+    // one character is the trap, not the licence. DO NOT POINT EITHER KEY AT THE VENDOR TWIN.
+    //
+    // «لم يُفحَص بعد» is decision 60's own frame — `commonNotAssessedYet` is «لم» + «يُقيَّم» +
+    // «بعد», identical prefix, suffix and diacritic placement, only the root differs. It is NOT
+    // that key and must not be pointed at it either: a plan not ASSESSED and a plan not TESTED
+    // are different claims, and `declared-vocabulary.test.ts` refuses a fourth key carrying one
+    // of her three words.
+    //
+    // AND THERE IS A SHIPPING ARABIC WORD FOR AN ENGLISH `never` ONE SCREEN OVER, AND IT IS
+    // THE WRONG ONE: `shNever` on /screening-health is «لا يوجد» — *none exists*, a statement
+    // about the RECORD, where hers is a statement about the PLAN. That is decision 60's own
+    // «غير متوفّر» / «لم يُقيَّم بعد» distinction, and reusing it would have said the plan has
+    // no test record rather than that it has not been tested.
+    bcpNeverTested: 'لم يُفحَص بعد',
+    bcpNoTestScheduled: 'غير مجدول',
     bcpRefusalAct: 'عرض خطط استمرارية العمل والتعافي من الكوارث وصيانتها',
 
     // ---- Information assets (#69) ---------------------------------------------------
@@ -901,6 +922,12 @@ export const OPERATIONS = {
     bcpRecordTestButton: 'Record test',
     bcpNextTestDueLabel: 'The next test date for this plan.',
     bcpNoPlanOnFile: '— no plan on file',
+    // UNCHANGED from what these two cells already rendered as bare literals, so no English
+    // reader sees any difference. One measured divergence, reported rather than reworded: her
+    // Arabic carries «بعد» (YET) and `never` does not — both true of the same row, but the
+    // English is the terser half, which is the opposite of this dictionary's usual direction.
+    bcpNeverTested: 'never',
+    bcpNoTestScheduled: 'not scheduled',
     bcpRefusalAct:
       'view and maintain the business-continuity and disaster-recovery plans',
 
