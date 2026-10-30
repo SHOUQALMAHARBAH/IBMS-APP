@@ -2397,7 +2397,7 @@ real screening (A.3/#3-4), the remaining PDPL systems, the drafted/unsourced
 values, reporting SQL aggregation, standalone refund raise, and the
 over-payment → `Refund` bridge. The `test:security` gate now runs
 `scripts/audit-check.mjs`, which acknowledges exactly one advisory (`multer`,
-unreachable and unfixable — see `SECURITY_FIXES.md` § 3) and fails on anything
+unreachable and unfixable — see `SECURITY.md` § One acknowledged advisory, and its premise is pinned by a test) and fails on anything
 else.
 
 **A.1 — Authentication & Session Management (Part 10.1)**

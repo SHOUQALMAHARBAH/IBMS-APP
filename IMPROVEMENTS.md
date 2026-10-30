@@ -379,7 +379,7 @@ correct in both `package.json` and the lockfile, and `npm ls` reporting
 `invalid` was a stale local `node_modules`. Regenerating `package-lock.json`
 on that mis-diagnosis broke CI (dropped Linux `@rollup/*` binaries; de-hoisted
 `vitest`/`next` away from `@testing-library/jest-dom` and `eslint-config-next`).
-The lockfile is restored verbatim — see `SECURITY_FIXES.md` § 2. **Treat this
+The lockfile is restored verbatim — see `SECURITY.md` § The lockfile's hoisting layout is load-bearing and undeclared (that reasoning moved there 2026-10-30 when `SECURITY_FIXES.md` was merged and deleted). **Treat this
 lockfile's hoisting as load-bearing.**
 
 *Found during that pass, not previously tracked, now fixed:*
@@ -431,7 +431,7 @@ lockfile's hoisting as load-bearing.**
   §5.9. Both now have one.
 - `P2` `common/sanitization.util.ts` was dead code duplicating
   `document-html.util.ts`'s `escapeHtml`. Deleted.
-- `P2` `SECURITY_FIXES.md` asserted fixes that did not exist in the tree.
+- `P2` `SECURITY_FIXES.md` asserted fixes that did not exist in the tree. **The file is merged into `SECURITY.md` and deleted, 2026-10-30 — and it had done it AGAIN**: its multer acknowledgement still argued *there is no multipart route* after the customer-import upload landed, which is this very entry's shape recurring in the document that records it.
   Rewritten against verified evidence.
 - `P0` **Found in this pass's own self-review, before commit:** the first cut
   of the partial-payments change moved the "is this invoice settled?" test out
