@@ -266,9 +266,12 @@ truncation.
 | 6 | `/screening-health`'s screening outcomes | **«لا يوجد تطابق، الفحص نظيف», «مطابقة محتملة», «تعذّر الفحص»** — with the `CLEAR` sentence trimmed BY HER after being shown it renders beside a COUNT rather than on one customer's record | **NONE OF THEM WAS NEEDED, and that is the finding.** The keys are `ScreeningAttemptOutcome` — five members, no `CLEAR` and no `ERROR` — and `ENUM_LABEL.ScreeningAttemptOutcome` has mapped all five to bilingual keys the whole time; `screenOutcomeUnableToScreen` IS «تعذّر الفحص», her own word. **Her token names came off my own fixture**, which invented two members that cannot occur. Reported, not swapped in |
 | 8 | `/screening-health`'s nine capability words | **all nine, and «التغطية الإعلامية السلبية» was decided TWICE** — she rejected «الأخبار السلبية» as not clear enough to a clerk and chose the AML term herself | `PROVIDER_CAPABILITY_LABEL_KEY` is TOTAL with no `\| null` left and the screen's fall-through to the raw token is DELETED. The rejected word is the one a later reader would guess, which is why it is written down |
 | 9 | `/screening-health`'s 27 capability NOTES | **26 of the 27, her own Arabic** — grouped by the adapter that builds each, because the same capability means different things per provider | A note is a KEY on the wire now, not a sentence. **The 27th was not in her table**: the built-in SANCTIONS row is a ternary and she was given its FALSE branch, so the note an Arabic reader sees on the DEFAULT provider in the normal case had no word — DERIVED from `wsIntro` as a contiguous run in both languages rather than asked for |
-| 9b | the on-premise PEP note | **ONE CLAUSE IS OWED AND THE DEFECT IS UPSTREAM OF HER.** The shipping English opens *Depends on whether* dataset "{name}" ingested PEP collections; the table she was given dropped that clause, so her Arabic renders the truncation faithfully and ASSERTS what the English HEDGES | Hers ships verbatim — its tail is still *verify before relying on it* — and it renders NOWHERE today, needing `on_premise` with a non-sanctions dataset. One line from her closes it |
+| 9b | the on-premise PEP note | **ANSWERED 2026-10-30 — she restored the clause herself**, so the Arabic now opens «حسب ما إذا كانت» against the English's own *Depends on whether*. THE ORIGINAL ROW, because the defect was UPSTREAM of her: the shipping English hedges, the table she was given had lost that clause, and her Arabic rendered the truncation faithfully and ASSERTED what the English HEDGES | `shNoteOnPremisePepVerify`. **It was caught by comparing the two languages against each other rather than by reading either alone** — a bilingual pair where one half makes a stronger claim than the other is a defect neither reader can see. The clause went missing when the sentences were extracted FOR her, not when she wrote them, so it was never hers to drop |
 | 10 | the `CLEAR` sentence | **WITHDRAWN BY HER.** `screenOutcomeNoMatch` keeps «لا يوجد تطابق»: *the product can demonstrate that no match was found; it cannot demonstrate that a customer is clean, and on a compliance screen the weaker claim is the true one* | Nothing changed. Recorded as HER decision with that reason, because the label now reads like half a sentence and is not |
-| 11 | the date fields | **GREGORIAN ONLY — «نحسمها ميلادي فقط- حاليا»**, with «حالياً» part of the decision; and a HINT under the label naming which date it is | Recorded where the date-control deferral lives. **The hints are measured, not written**: 12 sites owe one, 28 do not, and the twelve are named above. The MONTH-FIRST format defect a hint cannot reach is proposed separately |
+| 11 | the date fields | **ANSWERED IN FULL 2026-10-30 — NINE SENTENCES, and her measurement is what made it nine.** 19 fields were worth reading; six already had their Arabic shipping as an invisible `aria-label` (*what is heard becomes what is seen*), two were DECIDED to stay bare, one cannot have a word until the behaviour is measured, and 20 never needed one. Plus **GREGORIAN ONLY — «نحسمها ميلادي فقط- حاليا»**, with «حالياً» part of the decision | Nine key pairs, `Hint` and `DateEcho`, four labels that took their spoken sentence and six aria-labels withdrawn. **NOT ONE of the nine sites goes through `Field`**, so its `hint` slot — which the previous batch said this would reuse — was not reachable at any of them; `Hint` is extracted from `Field` instead. The MONTH-FIRST defect a hint cannot reach is closed in Arabic and NOT in English, measured |
+| 12 | the aria-vs-visible class | **COUNT IT AND STOP** — *if it is six, this is closed; if it is sixty, the owner needs to know that before anyone decides what to do* | **IT IS 54**, by `aria-vs-visible-label.py` over 209 aria-labels in 73 files — and split by WHICH READER LOSES: **FULLER 8** (the eye loses, her class), **THINNER 10** (the EAR loses a qualifier), **UNRELATED 36** (22 of them naming a deliberately-written `*Aria` key, so most of that bucket is the matcher). **The sharpest row is not in her six**: `/settings/users`' password field tells the eye the policy and the ear «كلمة المرور». Nothing beyond her six was changed |
+| 13 | «تتوقّف التغطية» on the endorsement form | **SHE DELIBERATELY DID NOT WRITE THIS ONE** — *is the date entered the LAST day cover applies, or the FIRST day it does not? One day apart, and one day decides whether a claim is covered or refused* | **MEASURED: it is the FIRST day cover does NOT apply**, and both halves of the product agree — the schedule closes at `effectiveTo := effectiveFrom` with no successor and `claim.config.ts` reads `effectiveFrom <= lossDate < effectiveTo`, while `cancellationReturnPremium` counts `unexpiredDays` FROM that date, so the client is refunded for it. **No finding** — the behaviour is consistent and the label is not wrong, only ambiguous by one day. Her sentence is owed and should say *the first day cover no longer applies* |
+| 14 | «مُهيّأ» the POSITIVE word | **NOT ASKED** — her ruling names the negative phrase «غير مُهيّأ», which is now one spelling across all 8 sites | The positive word meaning *configured* ships four times, **three without the damma (`shConfigured` among them) and once with it (`provStateConfigured`)**. It is PRE-EXISTING on `/screening-health`, which already renders `shConfigured` «مهيّأ» beside `screenOutcomeNotConfigured` «غير مُهيّأ» — so the normalisation neither caused it nor closed it. Four sites, one word |
 | 7 | the `Ring` caption | **«١٤ مطالبة مفتوحة من ٦٦»** — *{open} open claims of {total}*, the string `Ring` has required since it was written | `dclmOpenClaimsOfTotal` in `plurals.ts`, and a `Ring` on `/dashboards/claims`. `other` is her run with the numerals replaced; `few` slices `execOpenClaims` verbatim; **`zero`, `one` and `two` are OMITTED** because «مطالبتان» ships nowhere — the «محاولتان» dual again. **And her caption did not fit the space**: it drew as 9px SVG text inside the ring and spilled past the arc, so the COMPONENT moved it under the label. Her words untouched |
 
 ### The shell: the window stops scrolling
@@ -379,6 +382,31 @@ opens, the conversion must be VISIBLE rather than silent.
 **THIS DOES NOT AUTHORISE THE DATE CONTROL.** It removes the thing that blocked it; the control
 itself is still not built and is not an engineer's to start.
 
+#### OWNER DECISION, 2026-10-30 — TWO FIELDS STAY BARE, AND THAT IS DECIDED RATHER THAN UNFINISHED
+
+`/regulatory-compliance`'s «ينتهي الإيقافُ في (إن كان محدَّدًا)» and the claim card's «استلم العميل
+مبلغ التسوية بتاريخ» get **no hint**. Her reason: the label already says everything, and a hint over
+a clear label is noise — **and noise is how people stop reading hints, which costs us the ones that
+matter.** Recorded as DECIDED so the next reader does not "complete" the set.
+
+#### OWNER DECISION, 2026-10-30 — «غير مُهيّأ» IS THE SPELLING
+
+The fully-marked one, damma U+064F and shadda U+0651. The phrase shipped THREE ways and two of
+them could appear on `/screening-health` at once; it is now one spelling across all eight sites.
+**These are the same word in Arabic, so this is a NORMALISATION and not a rewording** — no
+sentence's sense changes and no new string was written: the canonical bytes were READ OUT of
+`provStateNotConfigured` rather than typed.
+
+**AND A GREP COULD NOT HAVE FOUND THE SET**: `grep «مهي»` cannot match «مُهيّأ», because a damma
+sits between the م and the ه — so the first reading listed only the undiacriticised sites and
+silently omitted the three that were already correct. `scripts/measurements/not-configured-spelling.py`
+compares on the form with every Arabic combining mark REMOVED, and re-derives the figure.
+
+**IS A DIACRITIC-CONSISTENCY CHECK BUILDABLE? Asked and not answered, and not built here.** What
+one would need is a DECLARED vocabulary of words whose marking is decided, because the general
+question — *is this the same word differently marked?* — needs Arabic morphology and would fire on
+every legitimate inflection.
+
 **AND IT IS NOT THE SAME QUESTION AS THE HIJRI HOLIDAYS**, which was answered long ago and is
 unchanged: the Eid dates are not computed in code, because in Jordan they are set by official
 decision and can differ by a day from any calendar conversion — they are entered by hand each year.
@@ -439,7 +467,7 @@ the invisible one; this repository has recorded that class four times, and `incT
 same shape (the invisible one better than the visible one). **The hint she is being asked for would
 make the visible label say what the invisible one already says.**
 
-**ONE INPUT HAS NO LABEL AT ALL** — `bcp-dr-plans/page.tsx:202`, a bare `<input type="date">` in a
+**ONE INPUT HAS NO LABEL AT ALL — CLOSED 2026-10-30 by her row 9, «تاريخ الفحص القادم للخطة.», as a LABEL rather than a hint because there was no label for a hint to sit under** — `bcp-dr-plans/page.tsx:202`, a bare `<input type="date">` in a
 table cell with no `<label>`, no `htmlFor` and no `aria-label`. It renders only after *Record test*
 is pressed, which is why the a11y suite has never seen it: axe scans what is on the page.
 
@@ -1578,6 +1606,291 @@ cross-package parity guard here for the reason the other four sit in `packages/d
 place that can SEE both packages. Six tests, planted four ways — a key added in the api alone (kills
 3), a caution demoted to a description (1), a declared key no adapter builds (1), a `null` back in a
 label map (1).
+
+### Batch 13 — the date fields: nine sentences, six labels, and a class that is 54 rather than six
+
+**Her measurement reshaped the job before any of it was built.** The script found **19 date fields
+worth reading** and she wrote a word for **nine** — two were decided to stay bare, six already had
+their Arabic shipping as an invisible `aria-label`, and one cannot have a word until somebody
+measures what the product does. Twenty more never needed one.
+
+#### 1 — SIX FIELDS WHERE THE ARABIC WAS ALREADY SHIPPING, SPOKEN ONLY
+
+Her framing is the finding: *a blind reader was better informed than a sighted one, which is
+backwards — the aria is supposed to be a FLOOR, not a better version.*
+
+| screen | seen | spoken | what changed |
+|---|---|---|---|
+| `/client-accounting` | «كما في» | **«تاريخ الرصيد»** | `caAsOf` took the spoken value; `caAsOfDateAria` WITHDRAWN |
+| `/financial-report` | «كما في» | **«تاريخ الرصيد»** | `frAsOf` took it; `frAsOfDateAria` WITHDRAWN |
+| `/insurer-accounting` | «كما في» | **«تاريخ الرصيد»** | `iaAsOf` took it; `iaAsOfDateAria` WITHDRAWN |
+| `/operational-pi-risk` | «تنتهي في» | **«تاريخ انتهاء المسؤولية المهنية»** | `opPiExpiresFieldLabel` took it; `opPiExpiresAtLabel` WITHDRAWN |
+| `/audit-trail` ×2 | **«من تاريخ» / «إلى تاريخ»** | the same two | **NO TEXT CHANGED** — see below |
+
+**NO ARABIC WAS TYPED.** The value is MOVED programmatically out of the aria key into the label key
+and the aria key is then withdrawn in both languages — the `pcColOwnerType` treatment, where the
+key whose NAME describes what it now is survives. A retyped «تاريخ الرصيد» is a shadda/vowel trap
+for no gain.
+
+**AND HER PREMISE ABOUT `/audit-trail` WAS FALSE, BECAUSE MY OWN SCRIPT TOLD HER SO.** Her table
+records those two as having nothing visible. They have a visible label, and the aria merely
+repeated its own key — `aria-label={t('atFromLabel')}` beside `{t('atFromLabel')}`. The script
+reported *"aria-label only — no visible text"* because `BARE_KEY` was anchored at BOTH ends and the
+line reads `{t('atFromLabel')}{' '}`, a text node followed by a JSX space. **Third instance of a
+wrong measurement of mine becoming an owner input**, after the two capture fixtures. The aria still
+goes — one key used twice is a drift risk and nothing else — but no string moved.
+
+#### 2 — THE CLASS SHE ASKED ME TO COUNT AND STOP: 54, NOT SIX
+
+`scripts/measurements/aria-vs-visible-label.py`, over every control in the web tree:
+**209 aria-labels across 73 files — DIVERGENT 54, DUPLICATE 7, REDUNDANT 89, ARIA-ONLY 47,
+UNRESOLVED 12.**
+
+**That is the BEFORE figure, which is what she asked for.** After this batch's own six (plus
+`/dashboards/executive`) it reads **201 across 70 — DIVERGENT 49 (fuller 8, thinner 10, unrelated
+31), REDUNDANT 86** — so five divergences and three redundancies are closed and **49 remain**.
+
+**54 is not a number anybody can act on, so it is split by WHICH READER LOSES**, and reading the
+bucket rather than counting it found that **the class runs in BOTH directions and the second one is
+the one she was not shown**:
+
+| direction | count | what it means |
+|---|---|---|
+| **FULLER** | 8 | the spoken text CONTAINS the seen text — **the eye loses**. Her class |
+| **THINNER** | 10 | the seen text CONTAINS the spoken text — **the EAR loses**, and what it loses is a qualifier |
+| **UNRELATED** | 36 | neither contains the other — a different sentence, OR the resolver found a NEIGHBOURING control's label. **22 of the 36 name a deliberately-written `*Aria` key**, the signature of a control meant to have only an aria, so most of this bucket is the matcher rather than a defect |
+
+**THE SHARPEST ROW IS NOT IN HER SIX AND IT IS A THINNER.** `/settings/users`' password field: seen
+«كلمة المرور (١٢ محرفاً على الأقل، مع حرف كبير وصغير ورقم ورمز)», spoken «كلمة المرور». **A
+screen-reader user is never told the password policy** — they type one, it is refused, and nothing
+on the field ever said what was required. `pcAccountAria`'s recorded defect, in the direction nobody
+proof-reads. Six more of the ten drop «(اختياري)», so a screen-reader user cannot tell which fields
+are optional on six screens.
+
+**So the honest answer to her question is 18 real plus 36 that need reading by hand.** Not six, not
+sixty. **Nothing in this class was fixed beyond her six**, which is what she asked for.
+
+#### 3 — TWO FIELDS DECIDED TO STAY BARE
+
+| screen | label | |
+|---|---|---|
+| `/regulatory-compliance` | «ينتهي الإيقافُ في (إن كان محدَّدًا)» | **no hint, by her decision** |
+| the claim card | «استلم العميل مبلغ التسوية بتاريخ» | **no hint, by her decision** |
+
+**Recorded as DECIDED, not as unfinished**, so the next reader does not "complete" the set. Her
+reason: a hint over a clear label is noise, and noise is how people stop reading the hints that
+matter.
+
+#### 4 — THE COVER-CEASES MEASUREMENT: THE DATE IS THE FIRST DAY COVER DOES **NOT** APPLY
+
+`EndorsementSection.tsx`'s «تتوقّف التغطية» is bound to `cancelDate`, and `cancelDate` **exists
+nowhere in the api** — the web submits it as the endorsement's `effectiveFrom`. So the question is
+what `effectiveFrom` means for a cancellation, and **both halves of the product answer the same
+way**:
+
+* **the schedule.** `versionScheduleForEndorsement` closes the open schedule with
+  `effectiveTo := effectiveFrom` and, for a cancellation, writes **no successor**. For an ordinary
+  endorsement the successor OPENS at that same instant, so the interval must be half-open or the
+  boundary day would sit in two versions at once — and `claim.config.ts` says so in its own words:
+  **`effectiveFrom <= lossDate < effectiveTo`**, with `t < s.effectiveTo.getTime()` in the code and
+  a test named *"treats the version boundary as [from, to)"*. A cancellation therefore leaves the
+  boundary day belonging to nothing: **a loss ON that date resolves to no schedule.**
+* **the money.** `cancellationReturnPremium` counts `unexpiredDays` as
+  `daysBetween(cancellationDate, expiryDate)` — so **day D itself is refunded to the client.** A
+  client who is refunded for a day must not also be covered on it.
+
+**Consistent, so there is no finding — and the label «تتوقّف التغطية» / *Cover ceases* is not wrong,
+only ambiguous by one day.** Her sentence is owed and it should say *the first day cover no longer
+applies*, never *the last day of cover*.
+
+**ONE TEST WAS ADDED BEYOND THE LETTER OF THE INSTRUCTION, with the reason.** The cancellation case
+was consistent BY CONSTRUCTION and asserted nowhere — the sibling test covers an endorsement
+boundary, where a successor exists. A sentence on a screen is only as good as what pins the
+behaviour it describes, so `claim.config.spec.ts` now asserts that a loss on the cancellation date
+is NOT covered and that the day before still is. Planted with `<=` for `<`: both boundary tests die,
+each for its own reason.
+
+#### 5 — THE NINE SENTENCES, AND WHERE EACH RENDERS
+
+| # | key | renders on | her sentence |
+|---|---|---|---|
+| 1 | `execAsOfHint` | `/dashboards/executive` | تُعرض أرقام اللوحة كما كانت في هذا التاريخ. |
+| 2 | `ipPeriodStartHint` | **`/employee-performance` AND `/insurer-performance`** | أول يوم تُحسب عليه الأرقام في هذه الشاشة. |
+| 3 | `ipPeriodEndHint` | **both of the same two** | آخر يوم تُحسب عليه الأرقام في هذه الشاشة. |
+| 4 | `dashPeriodStartHint` | `/sales-performance` | أول يوم تُحسب عليه أرقام المبيعات. |
+| 5 | `dashPeriodEndHint` | `/sales-performance` | آخر يوم تُحسب عليه أرقام المبيعات. |
+| 6 | `crateEffectiveFromHint` | `/commission` | أول يوم تسري فيه نسبة العمولة هذه. |
+| 7 | `endorsementEffectiveFromHint` | the endorsement form | أول يوم يسري فيه الملحق. |
+| 8 | `slapHolidayDateHint` | the holiday calendar | تاريخ يوم العطلة. |
+| 9 | `bcpNextTestDueLabel` | `/bcp-dr-plans` — **a LABEL, not a hint** | تاريخ الفحص القادم للخطة. |
+
+**Rows 2 and 3 are ONE shared pair and must not be split.** Her sentence says *the figures on this
+screen* rather than naming employees or insurers precisely so that it is true on both — a split is
+two more of her sentences for a gain she has already declined.
+
+**Row 9 is a LABEL because there was no label.** That input had no label, no `aria-label`, no `id`
+and no `htmlFor` — the one row the measurement could not read at all — and it renders only after a
+button is pressed, which is why the a11y suite had never seen it. **The cell is a stack now**, which
+is the space changing rather than her sentence: a label that long beside an input and a Save button
+in one table cell is the caution-in-a-111px-column shape again.
+
+**NOT ONE OF THE NINE GOES THROUGH `Field`** — measured, and it changes the mechanism. All nine are
+a raw `<label>` wrapper or a `<div><label htmlFor>` pair, so the `hint` slot the previous batch said
+this would reuse is not reachable at any of them without converting six screens onto a primitive
+that changes a control's width and a label's type scale. **`Hint` is extracted from `Field` instead**
+and `Field` now renders it, so there is one home for what a hint looks like and one wiring
+(`aria-describedby`) for how it is announced. A hint left INSIDE a wrapping `<label>` becomes part
+of the accessible NAME rather than the description — the cheaper edit, and the wrong one.
+
+#### 6 — THE ECHO, AND THE HALF OF IT THAT DOES NOT WORK IN ENGLISH
+
+`DateEcho` renders the chosen date through `formatDate` under the field, on all 14 inputs this batch
+touched. `aria-hidden` and deliberately NOT in `aria-describedby`: a date input already announces
+its own value, so an echo in the accessibility tree is the same fact twice on every focus — which is
+why `Field`'s `hint` slot was measured as the wrong home for it.
+
+**The Date is built at LOCAL midnight from the ISO parts, never `new Date('2026-03-04')`** — that
+parses as UTC midnight and `toLocaleDateString` renders in local time, so west of UTC the echo would
+show THE DAY BEFORE. `SlaHolidayCalendar` already carries that warning in its own words.
+
+**AND MEASURED RATHER THAN ASSUMED, which found the limit:**
+
+| language | `formatDate(4 March 2026)` | calendar | digits |
+|---|---|---|---|
+| AR (`'ar'`) | **`4‏/3‏/2026`** — DAY-first | gregory | Western |
+| EN | **`3/4/2026`** — MONTH-first | gregory | Western |
+
+So the echo **closes the ambiguity in Arabic**, where the two numbers appear in the other order from
+the one that was typed — and **does NOT close it in English**, where `formatDate` reproduces the
+same month-first order as the input's own placeholder. It disambiguates only when one number exceeds
+12, and is silent in exactly the case it exists for. **Her decision «ميلادي فقط — حالياً» is
+satisfied either way**: both are Gregorian, measured.
+
+**The closure needs no new words and is NOT taken here**: a LONG month form, for which
+`AR_MONTH_LOCALE = 'ar-JO-u-nu-latn'` already exists in `format.ts` and produces «تشرين الأول 2026»
+— but that constant's own note scopes it to one job, so widening it is hers.
+
+#### 7 — THE HEDGE RESTORED, AND HOW IT WAS FOUND
+
+`shNoteOnPremisePepVerify`'s Arabic now opens **«حسب ما إذا كانت»**, matching the English's own
+*Depends on whether*. It read «تتضمّن فعلاً» — *the dataset DOES include PEP data* — which ASSERTED
+what the English HEDGES, on a caution about whether politically exposed persons are screened at all.
+The clause went missing when the sentences were extracted **for** her, not when she wrote them, so
+it was never hers to drop.
+
+**It was caught by comparing the two languages against each other, not by reading either alone.** A
+bilingual pair where one half makes a stronger claim than the other is a defect neither an Arabic
+reader nor an English reader can see. The note stays a `CAUTION`, which it already was and now
+reads like.
+
+#### 8 — «غير مُهيّأ» IS THE SPELLING, AND A GREP COULD NOT HAVE FOUND THE SET
+
+**Owner decision, 2026-10-30: the fully-marked «غير مُهيّأ» (damma U+064F AND shadda U+0651).**
+These are the same word in Arabic, so this is a NORMALISATION and not a rewording: no sentence's
+sense changes and no new string is written.
+
+**`grep «مهي» CANNOT MATCH «مُهيّأ»**, because a damma sits between the م and the ه — so the first
+reading of this listed only the undiacriticised sites and silently omitted the three that were
+already correct. A sweep that reports a subset reads exactly like a sweep that found everything.
+`scripts/measurements/not-configured-spelling.py` compares on the form with every Arabic combining
+mark REMOVED.
+
+**Measured: 12 lines carry the word, 8 as the negative PHRASE and 4 as the positive word alone.**
+Five spellings before, three after:
+
+| | before | after |
+|---|---|---|
+| PHRASE «غير مُهيّأ» | 3 | **8 — all of them** |
+| PHRASE «غير مهيّأ» | 3 | 0 |
+| PHRASE «غير مهيأ» | 2 | 0 |
+
+**Her table named two shadda-only sites and there are THREE** — the third is
+`shNoteCommercialWebhooksNotConfigured`, which is FEMININE («غير مهيّأة», agreeing with «إشعارات»).
+The agreement is untouched; the canonical run covers only the four bare letters of the word itself.
+**The canonical bytes were READ OUT of `provStateNotConfigured` rather than typed**, so they cannot
+differ from the three that were already right.
+
+**AND THERE IS A SECOND SPLIT SHE HAS NOT BEEN ASKED ABOUT.** The POSITIVE word «مهيّأ» meaning
+*configured* ships four times — three without the damma, including `shConfigured`, and once with it
+(`provStateConfigured`). **It is PRE-EXISTING on `/screening-health`**, which already renders
+`shConfigured` «مهيّأ» beside `screenOutcomeNotConfigured` «غير مُهيّأ», so this change neither
+causes it nor closes it. Four sites, one word, hers to rule on.
+
+**IS A DIACRITIC-CONSISTENCY CHECK BUILDABLE? Asked, not answered, and not built in this batch.**
+The owner has now paid for this twice. What a check would need is a declared vocabulary of words
+whose marking is decided, because the general question — *is this the same word differently
+marked?* — needs Arabic morphology and would fire on every legitimate inflection.
+
+#### 9 — SEVEN DEFECTS IN MY OWN INSTRUMENTS, every one found by reading output rather than counting it
+
+Three were recorded in batch 12. Four more here, and **all four UNDER-report, which is the direction
+that looks like a clean result**:
+
+* **(5) the aria-label was searched FORWARD ONLY** from the `type="date"` line. Attribute order is
+  the author's choice: `/operational-pi-risk` and `/dashboards/executive` both write `aria-label`
+  ABOVE `type="date"`, so both read as having no divergence at all. **She found the first by hand.**
+  It searches the input ELEMENT now, both directions.
+* **(6) `BARE_KEY` was anchored at BOTH ends**, so `{t('atFromLabel')}{' '}` did not match and
+  `/audit-trail`'s two inputs were reported as having NO VISIBLE LABEL. **That false reading reached
+  her own table.** A START anchor is sufficient and is all that was ever needed.
+* **(7) the divergence compared KEYS, not TEXT** — surfaced by fixing (5). Three inputs on
+  `/regulatory-compliance` appeared as *ARIA OVERRIDES THE VISIBLE LABEL* while both keys hold
+  «تاريخ الإصدار». Two keys and one sentence is a drift risk, not a divergence, and calling it one
+  would have put three screens on a list of things that need nothing changed.
+* **(8) the sibling import RAN the whole measurement as a side effect**, because `main()` was
+  unguarded — so the two scripts' reports interleaved and a reader could not tell which figure came
+  from which run.
+
+#### 10 — AND OPENING THE PICTURES MEASURED THE TWO CELLS THIS BATCH RESTRUCTURED, AND FOUND A FIFTH DEFECT
+
+A throwaway probe at 1440px and 390px, then deleted:
+
+| | desktop | phone |
+|---|---|---|
+| `/bcp-dr-plans` cell / label | 406x86 / 154x19 (one line) | **143x128 / 109x40** (two lines, inside the cell) |
+| `/client-accounting` echo | 46x18 | 46x18 |
+| `document.scrollWidth` vs viewport | 1440 vs 1440 | **390 vs 390** |
+
+**No horizontal overflow at either width**, so the stacked cell is the space changing rather than
+the sentence — which is her own rule and the ring caption's own treatment.
+
+**AND IT STACKS WITH NO WRAPPER, WHICH THE RATCHET DECIDED RATHER THAN TASTE.** The first version
+wrapped the cell in a styled `div`, and `check:inline-styles` refused at **SCREEN 1100 against a
+budget of 1099** — that budget may only FALL. The echo is a `<p>`, so it breaks the line on its own
+and the cell stacks anyway; the figures above are the version without it.
+
+**AND THE COMMENT EXPLAINING THAT REMOVAL WAS ITSELF COUNTED AS A SITE.** It named the attribute it
+was about, the gate reads TEXT, and the count stayed at 1100 after the wrapper was gone — **this
+repository's own recorded limit, met inside the comment explaining it.** Found by diffing the
+per-file counts against HEAD rather than by re-reading the diff.
+
+**The desktop capture is what the batch is for, in one line:** «تاريخ الرصيد» · `03/04/2026` ·
+`2026/3/4`. The label says WHICH date, the control shows the user agent's month-first order, and
+the echo shows the same date arranged differently — so a reader who typed `03/04` meaning 3 April
+can see that it was read as 4 March.
+
+**AND THE PHONE CAPTURE FOUND A FIFTH WAY `/bcp-dr-plans` IS BEHIND.** Its section heading renders
+the RAW enum member `system_outage` while the `<select>` **five lines above it** renders
+`t(ENUM_LABEL.BcpDrScenario[s])` — so one screen gives two answers to what a scenario is called:
+you pick «انقطاع النظام» from the dropdown and the section you created is headed `system_outage`.
+The map is complete and bilingual and already in use on that same screen. **The dead-vocabulary
+class, found by opening a picture rather than by any gate** — and recorded rather than fixed,
+because she moved that screen to its own batch. It needs no words, which is what makes that batch
+cheap.
+
+**AND `e2e-anchored-reads.test.ts` CAUGHT A VACUOUS ASSERTION IN ONE OF THIS BATCH'S OWN NEW
+TESTS, BEFORE IT SHIPPED.** The `/bcp-dr-plans` test opened with
+`await expect(page.locator('input[type="date"]')).toHaveCount(0)` and nothing positive asserted
+first — and `toHaveCount(0)` passes on its FIRST poll, so it could not tell *correctly withheld*
+from *the page has not rendered yet*. That guard exists because `navbar.spec.ts` asserted exactly
+that for 107 commits; **this is the first time it has fired on its own stated scenario in a test
+written the same day.** The anchor is the control that OPENS the row, which proves the row the
+assertion is about is on screen.
+
+**AND MY OWN EDIT TOOL WROTE SIX SCREENS AND THEN REFUSED.** It wrote each file as it finished and
+raised on the last, leaving six half-converted on disk and making the next run's anchors miss. **A
+refusal that has already edited the tree is worse than no refusal, because it reads as "nothing
+happened".** It computes every file before writing any, now.
 
 ### Held back — one commit that needs a workflow-scoped push
 
