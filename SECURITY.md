@@ -137,8 +137,8 @@ web app; it does not, and the web app's own policy is a separate question.
   naming it rather than a silently ignored value. That absence is load-bearing in places:
   `UpdateCustomerContactDto` carries three fields and the identifiers are **absent by design**, so
   each is refused by name.
-- **`common/sanitization.util.ts` DOES NOT EXIST.** This file claimed it was available; it was
-  deleted 2026-09-09 because it duplicated the `escapeHtml` in
+- **`common/sanitization.util.ts` DOES NOT EXIST** (measured 2026-10-30). This file claimed it
+  was available; it was deleted 2026-09-09 because it duplicated the `escapeHtml` in
   `modules/document-generation/document-html.util.ts` — which every document template imports and
   which has its own tests — plus an unused `validateJsonString`, and nothing imported it. **Two
   `escapeHtml` implementations in one codebase is a drift hazard, and an untested unused one is not
@@ -251,7 +251,7 @@ audit.**
 The full entry is in `scripts/audit-check.mjs`; the parts that matter here:
 
 - **It is recorded as *the vulnerable code path does not exist in this product*, NEVER as *a known
-  vulnerability accepted*.** Owner decision 52. Those are different claims and the second is not
+  vulnerability accepted*.** Owner decision 52, 2026-10-24. Those are different claims and the second is not
   ours to make, because this system goes in front of a regulator. **Do not reword that entry into
   the language of accepted risk.**
 - **The claim is the advisory's own sentence** — uploads using a synchronous `fileFilter` are not
@@ -307,7 +307,7 @@ workspaces for the same reason.
 | **Full bank/card data** deliberately not stored; a real payment run would need field encryption plus an access path. | `IMPROVEMENTS.md` § 5.6 |
 | **DAST is informational.** The CI ZAP baseline runs `fail_action: false` and needs a seeded scan user before it can gate. | `IMPROVEMENTS.md` § 1.6 |
 | **Distributed rate limiting** — per-process and in-memory. | § 8 above |
-| **Pre-transaction screening is a regulatory obligation and is not implemented.** Nothing in the invoice, refund, commission or collection paths consults a customer's screening state. | `README.md` § Known gaps |
+| **Pre-transaction screening is a regulatory obligation and is not implemented** (measured 2026-09-27). Nothing in the invoice, refund, commission or collection paths consults a customer's screening state. | `README.md` § Known gaps |
 
 ---
 
