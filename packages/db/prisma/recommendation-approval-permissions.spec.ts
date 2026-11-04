@@ -92,25 +92,70 @@ function enforcedPermission(source: string, pathFragment: string): string {
   return matches[matches.length - 1]![1]!;
 }
 
+/*
+ * NO REGEX IS BUILT FROM A VALUE, in either helper below, and CodeQL is why.
+ *
+ * The first version of `grantedRoles` interpolated the permission code into a `new RegExp` after
+ * `code.replace(/\./g, "\\.")` — escaping the dot and NOT the backslash. CodeQL flagged exactly
+ * that on this file: `js/incomplete-sanitization`, HIGH, "This does not escape backslash
+ * characters in the input." It was right. The input here comes from our own `@RequirePermissions`
+ * decorator rather than from a request, so it was not exploitable — but a half-escape is the
+ * defect whether or not today's caller is friendly, and this repository's rule is that an advisory
+ * is fixed or recorded NOT-EXPOSED with a test pinning its premise, never waved through.
+ *
+ * Fixed by REMOVING THE CLASS rather than completing the escape: a literal `indexOf` search cannot
+ * be escaped wrongly, because nothing is escaped. It is also more exact than the regex it replaces
+ * — see the entry-boundary check below, which the old `{0,600}` window only approximated.
+ */
+
 /** The permission code a named `hasPermission` binding on the screen reads. */
 function boundPermission(source: string, variable: string): string {
-  const m = new RegExp(
-    `const ${variable} = hasPermission\\(user, '([^']+)'\\)`,
-  ).exec(source);
+  const needle = `const ${variable} = hasPermission(user, '`;
+  const at = source.indexOf(needle);
   expect(
-    m,
+    at,
     `the screen has no "const ${variable} = hasPermission(user, '...')" binding`,
-  ).not.toBeNull();
-  return m![1]!;
+  ).toBeGreaterThan(-1);
+
+  const from = at + needle.length;
+  const end = source.indexOf("'", from);
+  expect(end, `the binding for ${variable} has no closing quote`).toBeGreaterThan(
+    -1,
+  );
+  return source.slice(from, end);
 }
 
 /** Every role name granted a code in the seeded catalogue. */
 function grantedRoles(catalogue: string, code: string): string[] {
-  const entry = new RegExp(
-    `code:\\s*"${code.replace(/\./g, "\\.")}"[\\s\\S]{0,600}?roles:\\s*\\[([^\\]]*)\\]`,
-  ).exec(catalogue);
-  expect(entry, `"${code}" is not in the seeded permission catalogue`).not.toBeNull();
-  return entry![1]!
+  const at = catalogue.indexOf(`code: "${code}"`);
+  expect(
+    at,
+    `"${code}" is not in the seeded permission catalogue`,
+  ).toBeGreaterThan(-1);
+
+  /*
+   * BOUNDED BY THE NEXT ENTRY, not by a character count. The regex this replaces allowed 600
+   * characters between the code and its `roles:`, which is a guess that silently reads the NEXT
+   * entry's roles if a description ever grows past it. The next `code: "` is where this entry
+   * actually ends.
+   */
+  const nextEntry = catalogue.indexOf('code: "', at + 1);
+  const limit = nextEntry === -1 ? catalogue.length : nextEntry;
+
+  const rolesAt = catalogue.indexOf("roles:", at);
+  expect(
+    rolesAt > -1 && rolesAt < limit,
+    `"${code}" has no roles list before the next catalogue entry`,
+  ).toBe(true);
+
+  const open = catalogue.indexOf("[", rolesAt);
+  const close = catalogue.indexOf("]", open);
+  expect(open > -1 && close > open && close < limit, `"${code}" roles list is malformed`).toBe(
+    true,
+  );
+
+  return catalogue
+    .slice(open + 1, close)
     .split(",")
     .map((r) => r.trim())
     .filter((r) => r.length > 0);
