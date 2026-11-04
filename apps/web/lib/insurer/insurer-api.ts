@@ -126,6 +126,20 @@ export type RegisterInsurerInput = {
   underwriterContact?: string;
   creditTermsDays?: number;
   financialStrengthRating?: string;
+  /**
+   * REQUIRED BY THE DATABASE WHENEVER THE RATING IS PRESENT, and absent from this type until now.
+   *
+   * `Insurer_rating_carries_its_date` is a CHECK — both fields or neither — and
+   * `InsurerService.assertRatingCarriesItsDate` is its form-level twin, whose message tells the
+   * caller to "Enter the as-of date beside the rating". There was no such field to enter it in, and
+   * no field in this type to carry it, so every rating typed on /insurers/new was answered 422 and
+   * the instruction in that answer named something that did not exist.
+   *
+   * Nor was it recoverable later: `updateInsurer` has no caller anywhere in `apps/web`, so the
+   * rating could be CLEARED from /insurers/[id] and never set — a one-way door. The api has
+   * accepted this field on both routes the whole time.
+   */
+  financialStrengthRatingAsOf?: string;
 } & (
   | { insurerMasterId: string; legalName?: never; legalNameAr?: never }
   | { insurerMasterId?: never; legalName: string; legalNameAr: string }
