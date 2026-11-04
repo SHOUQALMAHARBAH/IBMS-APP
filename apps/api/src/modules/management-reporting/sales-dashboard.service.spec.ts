@@ -64,15 +64,65 @@ describe('SalesDashboardService.resolvePeriod', () => {
 });
 
 describe('SalesDashboardService.summary', () => {
-  it('resolves branchId to concrete user ids and forwards them to every owner-scoped query', async () => {
+  /**
+   * THE FILTER SPLIT IN TWO -- owner decision, 2026-11-04 -- AND THIS TEST'S OLD TITLE WAS THE
+   * DEFECT STATED OUT LOUD: "forwards them to EVERY owner-scoped query".
+   *
+   * That was true and it was the problem. One `branchId` fed the lead counts
+   * (`Lead.ownerUserId`) AND the premium/commission figures (`Policy.placedByUserId`) -- two
+   * different sets of people under a single label reading "show one branch only".
+   *
+   * So `branchId` must now reach the POLICY queries and NOT the lead ones, and
+   * `leadOwnerBranchId` must reach the lead ones. Asserted in both directions, because either
+   * alone passes on an implementation that wires the wrong param to the wrong set.
+   */
+  it('branchId reaches the policy queries and NOT the lead counts', async () => {
     const { service, repo } = makeService();
     await service.summary({ branchId: 'branch-1' }, 'u-actor');
+    expect(repo.findUserIdsInBranch).toHaveBeenCalledWith('branch-1');
+    // The policy figures take the placer set...
+    expect(repo.sumIssuedPremium).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerUserIds: ['u-1', 'u-2'] }),
+      expect.any(Date),
+      expect.any(Date),
+      expect.any(Boolean),
+    );
+    // ...and the lead counts are left alone, which is the whole of the split.
+    expect(repo.countNewLeads).toHaveBeenCalledWith(
+      undefined,
+      expect.any(Date),
+      expect.any(Date),
+    );
+  });
+
+  it('leadOwnerBranchId reaches the lead counts and NOT the policy queries', async () => {
+    const { service, repo } = makeService();
+    await service.summary({ leadOwnerBranchId: 'branch-1' }, 'u-actor');
     expect(repo.findUserIdsInBranch).toHaveBeenCalledWith('branch-1');
     expect(repo.countNewLeads).toHaveBeenCalledWith(
       ['u-1', 'u-2'],
       expect.any(Date),
       expect.any(Date),
     );
+    expect(repo.sumIssuedPremium).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerUserIds: undefined }),
+      expect.any(Date),
+      expect.any(Date),
+      expect.any(Boolean),
+    );
+  });
+
+  it('resolves the two branches independently when both are given', async () => {
+    const { service, repo } = makeService();
+    await service.summary(
+      { branchId: 'branch-1', leadOwnerBranchId: 'branch-2' },
+      'u-actor',
+    );
+    // TWO lookups, not one reused: the filters are independent, so a reader may scope the money
+    // to one branch and the pipeline to another.
+    expect(repo.findUserIdsInBranch).toHaveBeenCalledWith('branch-1');
+    expect(repo.findUserIdsInBranch).toHaveBeenCalledWith('branch-2');
+    expect(repo.findUserIdsInBranch).toHaveBeenCalledTimes(2);
   });
 
   it('does not resolve a branch when none is given', async () => {
