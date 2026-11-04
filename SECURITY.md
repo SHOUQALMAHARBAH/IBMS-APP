@@ -73,13 +73,27 @@ npx vitest run apps/api/src/common/multipart-upload-exposure.inventory.spec.ts
 
 - **Layer 1 — `tenantScopeExtension`** rewrites the Prisma argument object for every model carrying
   `organizationId`, derived from the DMMF rather than a hand-kept list.
-- **Layer 2 — row-level security.** Measured 2026-10-30:
-  **139 distinct tables with `ENABLE ROW LEVEL SECURITY`, 13 of them `FORCE`d.**
+- **Layer 2 — row-level security.** Re-measured 2026-11-04 against a **genuinely fresh cluster**
+  built from the migrations alone: **138 tables with `ENABLE ROW LEVEL SECURITY`, 12 of them
+  `FORCE`d** — and the same 138 / 12 on `db` and on `db-test`.
 
-```bash
-grep -rhoE 'ALTER TABLE "[A-Za-z_]+" ENABLE ROW LEVEL SECURITY' \
-  packages/db/prisma/migrations/*/migration.sql | grep -oE '"[A-Za-z_]+"' | sort -u | wc -l
+```sql
+-- Ask the DATABASE, not the migration history.
+SELECT count(*) FILTER (WHERE c.relrowsecurity)      AS enabled,
+       count(*) FILTER (WHERE c.relforcerowsecurity) AS forced
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relkind = 'r';
 ```
+
+**CORRECTED 2026-11-04 — this said 139 and 13, and the METHOD is why.** The previous command grepped
+`ALTER TABLE … ENABLE ROW LEVEL SECURITY` out of `packages/db/prisma/migrations/*/`, which counts
+what was ever *written* and cannot see a later `DROP TABLE`. The whole one-row difference is
+`InsurerLicensedLine`: `20261125100000_insurer_licensed_lines_are_a_company_fact` drops and recreates
+it **without** `organizationId`, because a licensed line is a company fact rather than a tenant's
+row — and a `DROP` takes the table's RLS setting with it. So RLS is correctly OFF there (a policy on
+a table carrying no `organizationId` matches nothing, forever — the next paragraph is that rule), the
+recreate is right, and only the figure was wrong. **A static grep over migration history is a claim
+about the repository; this document's claims are about the database.**
 
 **A policy on a model the extension does NOT scope is an outage rather than defence in depth** —
 the extension sets `app.current_org_id` only for models carrying the column, so a policy anywhere
