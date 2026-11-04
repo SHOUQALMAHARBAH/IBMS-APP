@@ -33,9 +33,9 @@ export const DASHBOARDS = {
     //
     // `spOneEmployee` / `spOneTeam` were PLACEHOLDERS on /sales-performance; each
     // ENTITY_SOURCES entry supplies its own (`entitySearchBranchPlaceholder`).
-    dashBranchIdLabel: 'اعرض فرعاً واحداً فقط',
     dashBranchPlacingOfficerLabel: 'فرع موظّف الاكتتاب والتنسيب',
     dashBranchCustomerFileOwnerLabel: 'فرع مالك ملفِّ العميل',
+    dashBranchLeadFileOwnerLabel: 'فرع مالك ملفِّ العميل المحتمل أو المرتقب',
     dashBranchEmployeeSelfLabel: 'فرع الموظّف',
     dashInsuranceLineLabel: 'فرع التأمين',
     dashInsurerIdLabel: 'اعرض شركة تأمين واحدة فقط',
@@ -400,9 +400,9 @@ export const DASHBOARDS = {
        column header takes the words alone. No word was written. */
     commonCurrentHeading: 'Current',
 
-    dashBranchIdLabel: 'Show one branch only',
     dashBranchPlacingOfficerLabel: 'Branch of the placing officer',
     dashBranchCustomerFileOwnerLabel: 'Branch of the customer file owner',
+    dashBranchLeadFileOwnerLabel: 'Branch of the lead or prospect file owner',
     dashBranchEmployeeSelfLabel: 'Branch of the employee',
     dashInsuranceLineLabel: 'Insurance line',
     dashInsurerIdLabel: 'Show one insurance company only',

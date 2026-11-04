@@ -167,7 +167,7 @@ export default function SalesPerformancePage() {
             kind="branch"
             value={branchId}
             onChange={setBranchId}
-            label={t('dashBranchIdLabel')}
+            label={t('dashBranchLeadFileOwnerLabel')}
           />
           <label style={labelStyle}>
             {t('spPeriodOptionalLabel')}

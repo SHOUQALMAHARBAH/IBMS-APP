@@ -20,6 +20,17 @@ Two matcher blind spots produced two wrong figures in one day, both UNDER-report
   * And the third was not a count but a MEANING: `ownerUserId: { in: ... }` was read as "the
     customer file's owner" everywhere, when `sales-dashboard` and `sales-performance` apply it
     to `Lead` and `Prospect`. A field name is not a meaning — the MODEL decides.
+  * And the FOURTH, caught only when the owner's label for that meaning named PROSPECTS and the
+    measurement did not: `Prospect` carries `salesOwnerUserId`, so the pattern anchored on a
+    lowercase `o` could not see `sales-performance.repository.ts:104`. Four counts for one item,
+    every one UNDER — which is the direction that looks clean.
+
+## WHY `--check` HAS DECLARED TOTALS
+
+Because "a script that fails when its own total moves" is what this was credited for being, and
+the first version only PRINTED. A report nobody compares against anything is a number, not a
+guard: the four under-counts above were all found by a person noticing, which is exactly what a
+declared total removes. Raise or lower EXPECTED deliberately, in the commit that moves it.
 
 So the patterns below are declared WITH the model they belong to, and the script fails if its own
 total moves without the table being updated.
@@ -79,7 +90,13 @@ PATTERNS: list[tuple[str, str, str]] = [
 # `ownerUserId: { in: ... }` is AMBIGUOUS on its own — it is Customer on one screen and Lead or
 # Prospect on another — so it is resolved by reading the model off the enclosing query instead of
 # by pattern. This is the one that produced a wrong MEANING rather than a wrong count.
-BARE_OWNER = re.compile(r"ownerUserId: \{ in: [A-Za-z]+(?:\.ownerUserIds)?")
+# ...and the FIELD NAME ITSELF VARIES, which is a fourth under-count in one item: `Prospect`
+# carries `salesOwnerUserId`, not `ownerUserId`, so a pattern anchored on a lowercase `o` skipped
+# `sales-performance.repository.ts:104` entirely. The owner's label for this meaning names
+# prospects explicitly; the measurement did not, until it was asked to.
+BARE_OWNER = re.compile(
+    r"(?:sales)?[Oo]wnerUserId: \{ in: [A-Za-z]+(?:\.ownerUserIds)?"
+)
 MODEL_CALL = re.compile(r"this\.prisma\.client\.([A-Za-z]+)\.")
 
 CUSTOMER_MODELS = {"customer"}
@@ -131,6 +148,17 @@ def branch_deriving_services() -> list[str]:
     return out
 
 
+# Measured 2026-11-04. Change these in the commit that changes the tree, never to make a run pass.
+EXPECTED_SITES = 19
+EXPECTED_REPOS = 10
+EXPECTED_PER_MEANING = {
+    "POLICY_PLACER": 9,
+    "CUSTOMER_OWNER": 5,
+    "LEAD_OWNER": 4,
+    "EMPLOYEE_SELF": 1,
+}
+
+
 def main() -> int:
     check = "--check" in sys.argv
     found = scan()
@@ -172,11 +200,25 @@ def main() -> int:
 
     if check:
         print()
-        if len(MEANINGS) > 1:
-            print(
-                f"{len(MEANINGS)} meanings share one label today. This is a REPORT, not a gate: "
-                "it falls to 1 only when every site carries its own label."
-            )
+        drift = []
+        if total != EXPECTED_SITES:
+            drift.append(f"sites {total} != declared {EXPECTED_SITES}")
+        if len(repos) != EXPECTED_REPOS:
+            drift.append(f"repositories {len(repos)} != declared {EXPECTED_REPOS}")
+        for key, n in EXPECTED_PER_MEANING.items():
+            got = len(found[key])
+            if got != n:
+                drift.append(f"{key} {got} != declared {n}")
+        if drift:
+            print("FAIL: the measurement moved and the declaration did not.")
+            for d in drift:
+                print(f"    {d}")
+            print()
+            print("A site APPEARING is a new place one label answers two questions; a site")
+            print("DISAPPEARING is one that now carries its own. Both are decisions, so update")
+            print("EXPECTED in the commit that causes them — never to make this run pass.")
+            return 1
+        print(f"OK: {total} sites across {len(repos)} repositories, at the declared figures.")
     return 0
 
 
