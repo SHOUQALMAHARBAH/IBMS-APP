@@ -18,6 +18,8 @@ import {
   type RoleCatalogueEntry,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
+import Link from 'next/link';
+import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import {
   Card,
   ErrorState,
@@ -136,6 +138,21 @@ export default function UserAdminPage() {
   // rendered as their own labelled dropdowns rather than folded in with Roles.
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
   const [branches, setBranches] = useState<OrgUnit[]>([]);
+  /**
+   * THE BUTTON WAS PERMANENTLY GREY AND NOTHING SAID WHY.
+   *
+   * `disabled` has always required a department AND a branch, while the only helper line under it
+   * talks about ROLES — so when either list is empty the two selects offer nothing but «اختر»,
+   * the button never enables, and the real blocker is never named. `/settings/org-units` records
+   * where that ends up: *"offered two empty dropdowns … the API answered 400 — which reached the
+   * owner as 'the create button is broken'."* The cause was fixed there; the explanation was not.
+   *
+   * Same flag, same sentence and same `data-account-blocked` hook as `/employees`, which already
+   * solved this for the account it creates. Nothing new is written: `empAccountNeedsOrgUnits` and
+   * `empOrgUnitsLink` are reused verbatim in both languages, and the sentence is screen-agnostic
+   * ("A login needs a department and a branch…") so one answer serves both screens.
+   */
+  const orgUnitsReady = departments.length > 0 && branches.length > 0;
   /* ITEM 8 — its OWN state, deliberately not `loadError`. That one hides the user list below
    * (`: loadError ? null :`), and a refused DEPARTMENTS list must not take the user list with
    * it: provisioning is the screen's purpose and the pickers serve one form on it. */
@@ -383,6 +400,14 @@ export default function UserAdminPage() {
               </label>
             ))}
           </fieldset>
+          {orgUnitsReady ? null : (
+            // Not a silent disable: the refusal names the way forward and links to it — the
+            // /employees treatment, copied rather than reinvented.
+            <p role="alert" style={errorStyle} data-account-blocked>
+              {t('empAccountNeedsOrgUnits')}{' '}
+              <Link href="/settings/org-units">{t('empOrgUnitsLink')}</Link>
+            </p>
+          )}
           <button
             type="submit"
             disabled={busy || roleIds.length === 0 || !departmentId || !branchId}

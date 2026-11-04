@@ -169,6 +169,53 @@ async function mockAdmin(page: Page, users: unknown[] = USERS) {
   );
 }
 
+/**
+ * THE CREATE BUTTON WAS PERMANENTLY GREY AND NOTHING SAID WHY.
+ *
+ * `disabled` has always required a department AND a branch, while the only helper line under it
+ * talks about ROLES. With either list empty the two selects offer nothing to pick, the button never
+ * enables, and the real blocker is never named — which is how this reached the owner as "the create
+ * button is broken".
+ *
+ * The notice is `/employees`' own, reused verbatim in both languages rather than reworded, so there
+ * is one answer to one question. The `data-account-blocked` hook is that screen's too.
+ */
+test("names the missing prerequisite when the office has no departments or branches", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/admin/users**", (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    return route.fulfill({ status: 200, json: { users: USERS, total: USERS.length } });
+  });
+  // The whole point: BOTH lists empty, which is what an office created before default org units
+  // looked like and what the screen had no words for.
+  await page.route("http://localhost:4000/admin/departments", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/admin/branches", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/employees", (route) =>
+    route.fulfill({ status: 200, json: EMPLOYEES }),
+  );
+  await page.route("http://localhost:4000/rbac/roles", (route) =>
+    route.fulfill({ status: 200, json: ROLE_CATALOGUE }),
+  );
+
+  await page.goto("/settings/users");
+
+  const blocked = page.locator("[data-account-blocked]");
+  await expect(blocked).toBeVisible();
+  // The sentence names the two things that are missing — not roles, which is what the old helper
+  // line said — and carries the way forward as a real link.
+  await expect(blocked).toContainText("department");
+  await expect(blocked).toContainText("branch");
+  await expect(
+    blocked.getByRole("link", { name: "Departments & branches" }),
+  ).toHaveAttribute("href", "/settings/org-units");
+});
+
 test("shows one row per person, with the state of the HR link on each", async ({
   page,
 }) => {
