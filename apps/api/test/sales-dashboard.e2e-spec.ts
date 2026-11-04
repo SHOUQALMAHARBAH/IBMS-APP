@@ -282,7 +282,20 @@ describe('Sales Dashboard (e2e) — backlog Part E / Process #64', () => {
     expect(res.upSell.convertedCount).toBeGreaterThanOrEqual(1);
   });
 
-  it('scopes leads/premium/commission to one branch when branchId is given, but never cross-sell/up-sell (no owner dimension)', async () => {
+  /**
+   * THE FILTER SPLIT IN TWO — owner decision, 2026-11-04 — AND THIS TEST IS WHY IT NEEDED TO.
+   *
+   * It used to assert that `branchId` scoped the LEAD count, and it was right: one param drove
+   * both the lead counts (`Lead.ownerUserId`) and the premium/commission figures
+   * (`Policy.placedByUserId`). Those are two different sets of people, and a manager filtering by
+   * one branch was shown both under a single label reading "show one branch only".
+   *
+   * So the assertion is INVERTED on purpose and the reversal is stated rather than quietly
+   * rewritten: `branchId` must now leave the lead count ALONE, and `leadOwnerBranchId` must scope
+   * it. Both directions, because either one alone passes on an implementation that wires the
+   * wrong param to the wrong set.
+   */
+  it('branchId scopes the policy figures and NOT the lead counts; leadOwnerBranchId scopes the leads', async () => {
     const app = await boot();
     const manager = await makeUser(
       app,
@@ -330,7 +343,38 @@ describe('Sales Dashboard (e2e) — backlog Part E / Process #64', () => {
         .expect(200)
     ).body as SalesDashboardBody;
 
-    expect(scoped.leads.newLeadsCount).toBe(1);
-    expect(scoped.leads.newLeadsCount).toBeLessThan(before.leads.newLeadsCount);
+    // `branchId` is the PLACING OFFICER's branch now, so it must not touch the lead counts.
+    expect(scoped.leads.newLeadsCount).toBe(before.leads.newLeadsCount);
+
+    const byLeadOwner = (
+      await request(app.getHttpServer())
+        .get(
+          `/dashboards/sales?periodLabel=${PERIOD_LABEL}&periodStart=${PERIOD_START}&periodEnd=${PERIOD_END}&leadOwnerBranchId=${branch.id}`,
+        )
+        .set(bearer(manager.accessToken))
+        .expect(200)
+    ).body as SalesDashboardBody;
+
+    // And the new param IS what scopes them — to the single lead this test created.
+    expect(byLeadOwner.leads.newLeadsCount).toBe(1);
+    expect(byLeadOwner.leads.newLeadsCount).toBeLessThan(
+      before.leads.newLeadsCount,
+    );
+
+    /*
+     * INDEPENDENT, which is the whole point of two controls: a reader may scope the pipeline to
+     * one branch and the money to another. Sent together, each still does only its own job --
+     * the lead count follows `leadOwnerBranchId` and is unaffected by `branchId` naming a branch
+     * whose officers placed nothing.
+     */
+    const both = (
+      await request(app.getHttpServer())
+        .get(
+          `/dashboards/sales?periodLabel=${PERIOD_LABEL}&periodStart=${PERIOD_START}&periodEnd=${PERIOD_END}&branchId=${branch.id}&leadOwnerBranchId=${branch.id}`,
+        )
+        .set(bearer(manager.accessToken))
+        .expect(200)
+    ).body as SalesDashboardBody;
+    expect(both.leads.newLeadsCount).toBe(1);
   });
 });

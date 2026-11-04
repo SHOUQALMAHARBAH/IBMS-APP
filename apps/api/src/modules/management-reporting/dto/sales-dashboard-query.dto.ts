@@ -11,10 +11,39 @@ import { emptyStringToUndefined, trimIfString } from '../../../common/dto.util';
  * three for an explicit window (422 on a partial override).
  */
 export class SalesDashboardQueryDto {
+  /**
+   * THE BRANCH OF WHOEVER **PLACED THE POLICY** — `Policy.placedByUserId`.
+   *
+   * Owner decision, 2026-11-04: this filter SPLITS, because one control was answering two
+   * different questions on one screen. `branchId` keeps the policy meaning (the premium and
+   * commission figures), and `leadOwnerBranchId` below carries the other.
+   *
+   * A manager filtering by one branch was shown premium figures scoped to the officers who PLACED
+   * the cover and lead counts scoped to the officers who OWN THE LEAD FILE, under a single label
+   * reading "show one branch only" — two different sets of people, with nothing on the screen to
+   * tell them apart.
+   */
   @IsOptional()
   @Transform(emptyStringToUndefined)
   @IsUUID()
   branchId?: string;
+
+  /**
+   * THE BRANCH OF WHOEVER **OWNS THE LEAD FILE** — `Lead.ownerUserId`.
+   *
+   * Scopes the two lead counts only. Separate from `branchId` because the two resolve against
+   * different columns and a reader cannot be expected to know which one a figure used.
+   *
+   * MEASURED, and it corrected the brief: this meaning was taken to be the CUSTOMER file's owner
+   * and it is the LEAD file's. `scripts/measurements/branch-filter-meanings.py` reads the Prisma
+   * MODEL at each site rather than the field name, which is what separated them — `ownerUserId`
+   * is `Customer`'s on `/dashboards/compliance` and `Lead`'s here, and a field name is not a
+   * meaning.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsUUID()
+  leadOwnerBranchId?: string;
 
   @IsOptional()
   @Transform(trimIfString)

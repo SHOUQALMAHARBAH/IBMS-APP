@@ -122,7 +122,7 @@ export default function ComplianceDashboardPage() {
           kind="branch"
           value={branchId}
           onChange={setBranchId}
-          label={t('dashBranchIdLabel')}
+          label={t('dashBranchCustomerFileOwnerLabel')}
         />
         <button type="submit">{t('dashApplyFilters')}</button>
       </form>

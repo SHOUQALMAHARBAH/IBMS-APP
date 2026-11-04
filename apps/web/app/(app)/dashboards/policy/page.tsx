@@ -105,7 +105,7 @@ export default function PolicyDashboardPage() {
           kind="branch"
           value={branchId}
           onChange={setBranchId}
-          label={t('dashBranchIdLabel')}
+          label={t('dashBranchPlacingOfficerLabel')}
         />
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           {t('dashInsuranceLineLabel')}

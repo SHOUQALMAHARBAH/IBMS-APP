@@ -40,6 +40,7 @@ export default function SalesDashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [branchId, setBranchId] = useState('');
+  const [leadOwnerBranchId, setLeadOwnerBranchId] = useState('');
   const [insuranceLine, setInsuranceLine] = useState('');
   const [insurerId, setInsurerId] = useState('');
   const [periodLabel, setPeriodLabel] = useState('');
@@ -55,6 +56,7 @@ export default function SalesDashboardPage() {
       setSummary(
         await getSalesDashboard({
           branchId: branchId.trim() || undefined,
+          leadOwnerBranchId: leadOwnerBranchId.trim() || undefined,
           insuranceLine: insuranceLine.trim() || undefined,
           insurerId: insurerId.trim() || undefined,
           periodLabel: periodLabel.trim() || undefined,
@@ -75,6 +77,7 @@ export default function SalesDashboardPage() {
     }
   }, [
     branchId,
+    leadOwnerBranchId,
     insuranceLine,
     insurerId,
     periodLabel,
@@ -120,6 +123,27 @@ export default function SalesDashboardPage() {
           kind="branch"
           value={branchId}
           onChange={setBranchId}
+          label={t('dashBranchPlacingOfficerLabel')}
+        />
+        {/*
+          TWO FILTERS, BY THE OWNER'S DECISION OF 2026-11-04, because one was answering two
+          questions. `branchId` scopes the premium and commission figures by
+          `Policy.placedByUserId`; this one scopes the two lead counts by `Lead.ownerUserId`. A
+          manager filtering by one branch was shown two different sets of people under a single
+          label reading "show one branch only", with nothing on the screen to tell them apart.
+
+          THIS CONTROL KEEPS THE OLD GENERIC LABEL ON PURPOSE. The owner ratified three labels and
+          this meaning is a FOURTH, found only when the measurement read the Prisma MODEL instead
+          of the field name: `ownerUserId` is `Customer`'s on `/dashboards/compliance` and `Lead`'s
+          here. Pointing it at the customer-file-owner label would put the word CUSTOMER over a
+          count of LEADS -- a false label rather than an unfinished one, and an unfinished label is
+          the failure this repository prefers, because a wrong one is indistinguishable from a
+          decided one. The word is owed and it is hers.
+        */}
+        <EntitySearch
+          kind="branch"
+          value={leadOwnerBranchId}
+          onChange={setLeadOwnerBranchId}
           label={t('dashBranchIdLabel')}
         />
         <label

@@ -169,7 +169,7 @@ export default function ClaimsDashboardPage() {
               kind="branch"
               value={branchId}
               onChange={setBranchId}
-              label={t('dashBranchIdLabel')}
+              label={t('dashBranchPlacingOfficerLabel')}
             />
             <Field label={t('dashInsuranceLineLabel')}>
               {(props) => (
