@@ -48,5 +48,10 @@
     "file": "apps/api/src/modules/auth/cookies.util.spec.ts",
     "from": "  beforeEach(() => {\n    vi.resetModules();\n  });",
     "to": "  beforeEach(() => {\n    // no reset\n  });"
+  },
+  "absence-anchor-hidden-in-a-helper": {
+    "file": "apps/web/e2e/insurers.spec.ts",
+    "from": "  await expectNone(\n    page.locator(\"[data-insurer-rating]\"),\n    page.locator(\"[data-insurer-rating-input]\"),\n  );",
+    "to": "  await expect(page.locator(\"[data-insurer-rating]\")).toHaveCount(0);"
   }
 }

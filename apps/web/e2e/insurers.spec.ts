@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectNone } from "./support/anchored";
 
 /**
  * The insurer screens — list, register, detail, and the deactivation step.
@@ -669,13 +670,31 @@ test("replaces the read-only view while editing, so no stale copy sits beside an
   );
   await openEditPanel(page);
 
-  // Anchored on the panel being open (inside the helper), so this absence cannot be satisfied by a
-  // blank page.
-  await expect(page.locator("[data-insurer-rating]")).toHaveCount(0);
+  /*
+   * `expectNone`, NOT a bare `toHaveCount(0)` — and the first version of this test was the bare
+   * form with its anchor inside `openEditPanel`. `test/e2e-anchored-reads.test.ts` killed it, and it
+   * was right twice over: the guard reads each test BLOCK, so an anchor hidden in a helper is
+   * invisible to it, and a reader of this test sees a body that opens with an absence. Worse, an
+   * anchor in a helper silently disappears the day somebody edits the helper.
+   *
+   * THE ANCHOR COMES FROM THE SAME RENDER AS THE ABSENT THING, which is the rule `expectNone`'s own
+   * comment states and which that helper cannot enforce for itself. The read-only rating and the
+   * panel's rating INPUT are the two branches of ONE conditional render, so the input being visible
+   * is proof the swap has HAPPENED — not merely that something on the page rendered.
+   */
+  await expectNone(
+    page.locator("[data-insurer-rating]"),
+    page.locator("[data-insurer-rating-input]"),
+  );
 
-  // And cancelling brings it back, which proves the absence was the swap rather than a crash.
+  // And cancelling brings it back, which proves the absence above was the swap rather than a crash.
+  // Same rule in the other direction: the read-only rating is the anchor for the panel's absence,
+  // because the two appear and disappear together.
   await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.locator("[data-insurer-edit-panel]")).toHaveCount(0);
+  await expectNone(
+    page.locator("[data-insurer-edit-panel]"),
+    page.locator("[data-insurer-rating]"),
+  );
   await expect(page.locator("[data-insurer-rating]")).toContainText("A-");
 });
 
