@@ -28,5 +28,20 @@
     "file": "apps/api/src/modules/customer/screening-schedule.util.ts",
     "from": "    const job = new CronJob(expression, () => {});",
     "to": "    const job = new CronJob('0 * * * * *', () => {});"
+  },
+  "insurer-edit-sends-the-whole-form": {
+    "file": "apps/web/components/insurer/InsurerEditPanel.tsx",
+    "from": "      if (next === '' || next === original[key].trim()) continue;",
+    "to": "      if (next === '') continue;"
+  },
+  "insurer-rating-date-not-required": {
+    "file": "apps/web/components/insurer/InsurerEditPanel.tsx",
+    "from": "            required={ratingTyped}\n            data-insurer-rating-as-of-input=\"\"",
+    "to": "            data-insurer-rating-as-of-input=\"\""
+  },
+  "insurer-edit-control-ignores-the-permission": {
+    "file": "apps/web/app/(app)/insurers/[id]/page.tsx",
+    "from": "      {canCorrect && !editing ? (",
+    "to": "      {!editing ? ("
   }
 }

@@ -108,3 +108,23 @@ export const lineChipOfficeStyle: CSSProperties = {
   ...lineChipStyle,
   borderStyle: 'dashed',
 };
+
+/**
+ * The correction panel's section intro, and its action row.
+ *
+ * Declared here rather than inline for the reason `check:inline-styles` exists: that ratchet MAY
+ * ONLY FALL, and `InsurerEditPanel` landed three sites over it (1086 against 1083). Raising the
+ * budget to make a screen land is exactly what the gate refuses, so the declarations moved instead
+ * — which is also where the rest of this screen's styling already lives.
+ */
+export const editIntroStyle: CSSProperties = {
+  color: 'var(--ink-secondary)',
+  fontSize: 'var(--text-sm)',
+};
+
+/** Save beside Cancel. `gap` rather than a margin on one of them, so the order can mirror under
+ *  `dir="rtl"` without either button carrying a side-specific rule. */
+export const editActionsStyle: CSSProperties = {
+  display: 'flex',
+  gap: 'var(--space-2)',
+};

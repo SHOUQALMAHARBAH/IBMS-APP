@@ -93,14 +93,24 @@ MISSING_METHOD_BUDGET = 9
 # is this script's whole job, and it is the only one of the two that can see this row.
 #
 # Measured 2026-11-05: 535 api routes, 388 verb-aware web paths, 20 of 346 route-addressing client
-# helpers called by nothing, 19 routes in this bucket.
+# helpers called by nothing, 19 routes in this bucket — 18 by the end of the batch, see below.
 #
 # AND THE FIRST RUN OF IT DISPROVED A SPOT-CHECK THE INSTRUMENT HAD RECORDED ABOUT ITSELF.
 # `dead-client-helpers.py` said `listSlaHolidays` "really is called by nothing ... and its route is
 # still perfectly reachable, through that other helper". It is not: `getHolidayYear` addresses
 # `GET /sla/holidays/year/:year`, a DIFFERENT route, so `GET /sla/holidays` is addressed by the dead
 # helper alone. A hand spot-check of a route is only as good as whether the two paths were compared.
-DEAD_ONLY_METHOD_BUDGET = 19
+#
+# 19 -> 18 IN THE SAME BATCH, AND THIS GATE FIRED ON THE AUTHOR WHO ADDED IT — which is the only kind
+# of evidence that a two-directional ratchet works. `PATCH /insurers/:id` left the bucket because
+# `InsurerEditPanel` is the first caller `updateInsurer` has ever had.
+#
+# IT IS THE *WIRED* KIND OF DROP, and the sibling's own history insists the two be told apart: a fall
+# here can mean a control was built (progress) or that the matcher stopped being wrong (an instrument
+# correction). This one is a control. The dead-helper figure moves with it — 20 of 346 becomes 19 of
+# 346, because `updateInsurer` is simply no longer one of them. Both numbers move together on
+# purpose; if only one moves, read the matcher before the code.
+DEAD_ONLY_METHOD_BUDGET = 18
 
 # Blank is not zero, on both sides — see the sibling's floors for the argument, which applies
 # identically here and for the same two failure shapes.
