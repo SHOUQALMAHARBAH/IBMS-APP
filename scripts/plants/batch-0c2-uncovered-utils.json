@@ -1,0 +1,32 @@
+{
+  "discard-reason-not-trimmed": {
+    "file": "apps/api/src/common/discard.util.ts",
+    "from": "  const trimmed = reason.trim();",
+    "to": "  const trimmed = reason;"
+  },
+  "endorsement-tightened-after-submission": {
+    "file": "apps/api/src/common/discard.config.ts",
+    "from": "    discardableWhen: (row) =>\n      row.status !== 'APPLIED' && row.status !== 'CLIENT_NOTIFIED',",
+    "to": "    discardableWhen: (row) => row.status === 'DRAFT',"
+  },
+  "customer-visibility-reads-the-file-grant": {
+    "file": "apps/api/src/common/rbac-visibility.util.ts",
+    "from": "  if (customer.ownerUserId === actor.id) return true;\n  return canReadAllCustomerOwners(actor);",
+    "to": "  if (customer.ownerUserId === actor.id) return true;\n  return canReadAllCustomerFileOwners(actor);"
+  },
+  "refresh-cookie-loses-its-path-scope": {
+    "file": "apps/api/src/modules/auth/cookies.util.ts",
+    "from": "  path: '/auth',",
+    "to": "  path: '/',"
+  },
+  "refresh-cookie-stops-being-httponly": {
+    "file": "apps/api/src/modules/auth/cookies.util.ts",
+    "from": "  httpOnly: true,",
+    "to": "  httpOnly: false,"
+  },
+  "next-cron-run-ignores-its-expression": {
+    "file": "apps/api/src/modules/customer/screening-schedule.util.ts",
+    "from": "    const job = new CronJob(expression, () => {});",
+    "to": "    const job = new CronJob('0 * * * * *', () => {});"
+  }
+}
