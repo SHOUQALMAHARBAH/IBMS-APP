@@ -123,7 +123,15 @@ export default function OpportunityDetailPage() {
   // `isFinance` four finance ones, so granting any single one of them to
   // another role updated the API and left this screen unchanged.
   const canCaptureQuotation = hasPermission(user, 'quotation.capture');
-  const canNegotiate = hasPermission(user, 'quotation.negotiate');
+  // The two controls in RecommendationSection are guarded by two DIFFERENT endpoints, so they
+  // read two permissions. They were one prop bound to `quotation.negotiate`, which is PLACEMENT's
+  // alone: the placement officer saw both controls and both calls 403'd, the manager saw
+  // neither, and an over-threshold recommendation could be neither approved nor sent by
+  // anybody. `hasPermission` takes a plain `string`, so a typo here grants nothing SILENTLY
+  // and `tsc` cannot see it — both codes are asserted against the seeded catalogue by
+  // `packages/db/prisma/recommendation-approval-permissions.spec.ts`.
+  const canSetThreshold = hasPermission(user, 'opportunity.set-target-threshold');
+  const canApproveRecommendation = hasPermission(user, 'recommendation.approve');
   const canDiscloseCoi = hasPermission(user, 'conflict-of-interest.disclose');
   const canCaptureDecision = hasPermission(user, 'client-decision.capture');
   const canPlacePolicy = hasPermission(user, 'policy.create');
@@ -273,7 +281,8 @@ export default function OpportunityDetailPage() {
           <RecommendationSection
             opportunity={opportunity}
             isPlacement={canCaptureQuotation}
-            isManager={canNegotiate}
+            canSetThreshold={canSetThreshold}
+            canApprove={canApproveRecommendation}
             isCompliance={canDiscloseCoi}
             canDiscard={canDiscardRecommendation}
             onOpportunityChanged={() => void load()}

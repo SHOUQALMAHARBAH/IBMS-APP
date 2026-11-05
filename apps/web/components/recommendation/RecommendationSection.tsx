@@ -52,7 +52,26 @@ const FACTOR_LABEL_KEY: Record<keyof RationaleFactors, TranslationKey> = {
 interface Props {
   opportunity: OpportunityWithContext;
   isPlacement: boolean;
-  isManager: boolean;
+  /**
+   * TWO PROPS, NOT ONE, BECAUSE TWO DIFFERENT ENDPOINTS GUARD THESE TWO CONTROLS.
+   *
+   * They were a single `isManager` bound to `quotation.negotiate`, and the grant table says what
+   * that produced: `quotation.negotiate` is PLACEMENT's alone, while the two endpoints behind these
+   * controls enforce `opportunity.set-target-threshold` (MANAGER, EXEC) and `recommendation.approve`
+   * (MANAGER). So the placement officer saw both controls and was answered 403 by both, the manager
+   * saw neither, and an over-threshold recommendation could be neither approved nor sent BY ANYBODY.
+   *
+   * `isManager` was also the wrong SHAPE as well as the wrong value: one boolean cannot carry two
+   * permissions that are granted to different sets of roles — EXEC holds the threshold one and not
+   * the approval — so widening the single flag could not have fixed this either.
+   *
+   * Named after the permission each endpoint actually enforces, which is this screen's own stated
+   * rule ("one permission per control, named after what the endpoint behind that control actually
+   * enforces") and the reason the role-name era was ended: a name like `isManager` invites the next
+   * reader to bind it to whatever a manager happens to hold.
+   */
+  canSetThreshold: boolean;
+  canApprove: boolean;
   isCompliance: boolean;
   /** `recommendation.discard` — its own code, not implied by the ability to draft one. */
   canDiscard: boolean;
@@ -71,7 +90,8 @@ const EMPTY_FACTORS: RationaleFactors = {
 export function RecommendationSection({
   opportunity,
   isPlacement,
-  isManager,
+  canSetThreshold,
+  canApprove,
   canDiscard,
   isCompliance,
   onOpportunityChanged,
@@ -173,7 +193,7 @@ export function RecommendationSection({
         </p>
       ) : null}
 
-      {isManager ? (
+      {canSetThreshold ? (
         <div
           style={{ ...quoteFieldStyle, maxWidth: "22rem", marginTop: "1rem" }}
         >
@@ -416,7 +436,7 @@ export function RecommendationSection({
               marginTop: "0.6rem",
             }}
           >
-            {isManager &&
+            {canApprove &&
             rec.approvalRequired &&
             !rec.approvedByUserId &&
             !rec.sentToClientAt &&

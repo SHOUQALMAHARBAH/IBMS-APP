@@ -33,7 +33,10 @@ export const DASHBOARDS = {
     //
     // `spOneEmployee` / `spOneTeam` were PLACEHOLDERS on /sales-performance; each
     // ENTITY_SOURCES entry supplies its own (`entitySearchBranchPlaceholder`).
-    dashBranchIdLabel: 'اعرض فرعاً واحداً فقط',
+    dashBranchPlacingOfficerLabel: 'فرع موظّف الاكتتاب والتنسيب',
+    dashBranchCustomerFileOwnerLabel: 'فرع مالك ملفِّ العميل',
+    dashBranchLeadFileOwnerLabel: 'فرع مالك ملفِّ العميل المحتمل أو المرتقب',
+    dashBranchEmployeeSelfLabel: 'فرع الموظّف',
     dashInsuranceLineLabel: 'فرع التأمين',
     dashInsurerIdLabel: 'اعرض شركة تأمين واحدة فقط',
     dashPeriodLabel: 'تسمية الفترة',
@@ -251,7 +254,6 @@ export const DASHBOARDS = {
     diepIntro:
       'درجة أداء شركة التأمين على أربعة محاور (البند #60) وإنجاز مؤشرات أداء الموظفين (البند #61) لفترة واحدة. ويحصر معرّف شركة التأمين جدولَ الشركات بدرجة شركة واحدة سبق احتسابها؛ أما تحديد النطاق بالفرع فينطبق على أداء الموظفين فقط — إذ إنّ درجة شركة التأمين رقم على مستوى المحفظة كلها بلا بُعد فرعي. ولا يحمل أي من الجدولين بُعد فرع تأمين خاصاً به.',
     diepInsurerIdScopedLabel: 'معرّف شركة التأمين (جدول الشركات فقط)',
-    diepBranchIdScopedLabel: 'معرّف الفرع (الموظفون فقط)',
     diepInsurerSection: 'أداء شركات التأمين (٤ محاور)',
     diepNoInsurerScores: 'لم تُحتسب درجات لأي شركة تأمين في هذه الفترة بعد.',
     diepColInsurer: 'شركة التأمين',
@@ -398,7 +400,10 @@ export const DASHBOARDS = {
        column header takes the words alone. No word was written. */
     commonCurrentHeading: 'Current',
 
-    dashBranchIdLabel: 'Show one branch only',
+    dashBranchPlacingOfficerLabel: 'Branch of the placing officer',
+    dashBranchCustomerFileOwnerLabel: 'Branch of the customer file owner',
+    dashBranchLeadFileOwnerLabel: 'Branch of the lead or prospect file owner',
+    dashBranchEmployeeSelfLabel: 'Branch of the employee',
     dashInsuranceLineLabel: 'Insurance line',
     dashInsurerIdLabel: 'Show one insurance company only',
     dashPeriodLabel: 'Period label',
@@ -588,7 +593,6 @@ export const DASHBOARDS = {
     diepIntro:
       "Insurer performance score across 4 axes (backlog #60) and employee KPI achievement (backlog #61) for one period. Insurer ID scopes the insurer table to a single insurer's already-computed score; branch scoping applies only to employee performance — an insurer's score is a book-wide figure with no branch dimension. Neither table has an insurance-line dimension of its own.",
     diepInsurerIdScopedLabel: 'Insurer ID (insurer table only)',
-    diepBranchIdScopedLabel: 'Branch ID (employees only)',
     diepInsurerSection: 'Insurer performance (4 axes)',
     diepNoInsurerScores: 'No insurer scores computed for this period yet.',
     diepColInsurer: 'Insurer',

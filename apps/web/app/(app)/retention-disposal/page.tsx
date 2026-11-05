@@ -1435,15 +1435,59 @@ export default function RetentionDisposalPage() {
                           </button>
                         ) : null}
                         {canManageSchedule && !s.isConfirmed ? (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              void run(() => confirmRetentionScheduleItem(s.id))
-                            }
-                          >
-                            {t('rdConfirmButton')}
-                          </button>
+                          (() => {
+                            /*
+                             * A ONE-PERSON OFFICE COULD NEVER CONFIRM A PERIOD IT SET ITSELF.
+                             *
+                             * This button sent `{}`, while `confirm` resolves the sixteenth
+                             * maker/checker pair against `setByUserId` — so in an office that has
+                             * declared COMBINED the confirmer IS the maker, the engine demanded a
+                             * reason, and the 422 came back every time. The category stayed a draft
+                             * forever and `/retention-disposal`'s expired-periods view stayed
+                             * permanently empty.
+                             *
+                             * The fix is the adjacent pattern, not a weakening: the duty-segregation
+                             * rule is untouched and nothing is granted. `dpoApproveDisposalBatch`
+                             * four blocks below does exactly this, and three more pairs on this
+                             * screen do it too.
+                             */
+                            const needs = needsCombinedDutyDeclaration({
+                              mode: user.dutySegregationMode,
+                              makerUserId: s.setByUserId,
+                              currentUserId: user.id,
+                              alreadyDecided: s.isConfirmed,
+                            });
+                            const declaration = declarations[s.id] ?? '';
+                            return (
+                              <>
+                                {needs ? (
+                                  <CombinedDutyReasonField
+                                    id={s.id}
+                                    value={declaration}
+                                    onChange={(next) =>
+                                      setDeclarations((prev) => ({ ...prev, [s.id]: next }))
+                                    }
+                                  />
+                                ) : null}
+                                <button
+                                  type="button"
+                                  disabled={
+                                    busy || (needs && combinedDutyTooShort(declaration))
+                                  }
+                                  onClick={() =>
+                                    void run(() =>
+                                      confirmRetentionScheduleItem(
+                                        s.id,
+                                        needs ? declaration.trim() : undefined,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  {t('rdConfirmButton')}
+                                </button>
+                              </>
+                            );
+                          })()
                         ) : null}
                       </div>
                     </Td>

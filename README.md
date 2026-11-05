@@ -300,7 +300,18 @@ docker compose up -d db
 # migration stops `migrate deploy` dead. Needs `APP_DB_PASSWORD` in the environment.
 npm run db:provision-app-role
 
-npm run db:migrate:dev
+# `deploy`, NOT `dev` — CORRECTED 2026-11-04 after walking this on a genuinely fresh cluster.
+# This line said `npm run db:migrate:dev`, and that command APPLIES all 164 migrations correctly
+# and then asks «Enter a name for the new migration» — because `schema.prisma` cannot express
+# several things the migrations create, so `migrate dev` reads them as drift to be undone. The
+# migration it offers to write DROPS 16 foreign keys (15 of them the cross-tenant
+# `*_same_org_fkey` integrity constraints), the 3 GIN full-text indexes, and 6 generated-column
+# definitions. Type a name, press enter, and tenant isolation is quietly weakened on your machine.
+# `migrate deploy` only applies what is pending: it never prompts and never diffs against
+# `schema.prisma`. Verified on a fresh cluster — 164 applied, 138 tables with RLS (12 FORCEd),
+# all 15 `same_org` FKs present.
+npm run db:migrate:deploy
+
 npm run db:seed   # per-office roles + the global permission catalogue — RBAC needs these
 
 # Everything else, run natively:

@@ -320,6 +320,55 @@ test("registration offers ONE identity path at a time", async ({ page }) => {
   await expect(page.getByLabel("Company in the catalogue")).toHaveCount(0);
 });
 
+/**
+ * THE FINANCIAL RATING COULD NEVER BE SAVED FROM THIS FORM.
+ *
+ * `Insurer_rating_carries_its_date` is a CHECK — both fields or neither — and
+ * `InsurerService.assertRatingCarriesItsDate` is its form-level twin, whose message says "Enter the
+ * as-of date beside the rating". There WAS no such field, and `CreateInsurerInput` had nowhere to
+ * carry one, so every rating typed here was answered 422 and the instruction in that answer named
+ * something that did not exist.
+ *
+ * The named workaround — "enter it from the company page" — did not exist either: measured,
+ * `updateInsurer` has no caller anywhere in `apps/web`, so a rating could be CLEARED from
+ * /insurers/[id] and never set. A one-way door.
+ *
+ * Asserted in BOTH directions, because the CHECK is symmetric and a one-way guard would let the
+ * other half through.
+ */
+test("the financial rating and its as-of date require each other", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurer-masters**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/insurance-lines", (route) =>
+    route.fulfill({ status: 200, json: [MOTOR_LINE, OFFICE_LINE] }),
+  );
+
+  await page.goto("/insurers/new");
+
+  const rating = page.getByLabel("Financial strength rating", { exact: true });
+  const asOf = page.getByLabel("Financial strength rating date");
+
+  // The field that did not exist.
+  await expect(asOf).toBeVisible();
+
+  // Neither filled: the pair is legal empty — an office may hold no rating for an insurer.
+  await expect(rating).not.toHaveAttribute("required", "");
+  await expect(asOf).not.toHaveAttribute("required", "");
+
+  // A rating alone is the state the database refuses, so the form asks for the date.
+  await rating.fill("A+");
+  await expect(asOf).toHaveAttribute("required", "");
+
+  // And the other way round, which a one-directional guard would miss.
+  await rating.fill("");
+  await asOf.fill("2026-01-31");
+  await expect(rating).toHaveAttribute("required", "");
+});
+
 test("insurer screens have no serious/critical accessibility violations @a11y", async ({
   page,
 }) => {

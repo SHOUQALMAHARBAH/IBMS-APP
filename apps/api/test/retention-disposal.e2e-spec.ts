@@ -34,6 +34,9 @@ interface RetentionScheduleItemBody {
   recordCategory: string;
   retentionPeriodMonths: number;
   legalBasis: string | null;
+  /** The sixteenth pair's MAKER — whoever last set the period. Null only on the four seeded rows
+   *  nobody recorded an author for; a row created over HTTP carries the actor who created it. */
+  setByUserId: string | null;
   confirmedByLegalCounselAt: string | null;
   isConfirmed: boolean;
   /** The sixteenth pair's act, ON THE RECORD — null for every ordinary two-person confirmation. */
@@ -1017,8 +1020,29 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
         'noFloorDeclaration',
         'recordCategory',
         'retentionPeriodMonths',
+        // THE FOURTH FIELD THIS ASSERTION HAS CAUGHT THE MOMENT IT LANDED, and the first one it
+        // caught in CI rather than locally — which is the finding, not the fix. `setByUserId` is
+        // the sixteenth pair's MAKER, projected 2026-11-04 so the screen can decide whether a
+        // combined-duty reason is owed BEFORE it sends the confirm; without it a one-person office
+        // could never confirm a period it had set itself.
+        //
+        // I ran the unit specs over the module I touched and not this one. The question that
+        // answers is "which specs exercise the screen" — the question that matters is "which
+        // specs assert about the SHAPE I moved", and this exact key set is the only thing in the
+        // repository that does. CI has now answered that twice.
+        'setByUserId',
       ]);
       expect(unsourcedBody.combinedDutyAct).toBeNull();
+      /*
+       * THE MAKER IS THE PERSON WHO SET THE PERIOD, and asserted as that rather than as "not
+       * null" — which is the whole point of the field: `confirm` resolves the sixteenth pair
+       * against it, so a wrong id is a wrong duty-segregation decision, not a cosmetic slip.
+       *
+       * My first version of this line asserted `toBeNull()` and was wrong: null belongs to the
+       * four SEEDED rows nobody recorded an author for, and this row is one the test just created
+       * over HTTP. Caught by running it rather than by reading it back.
+       */
+      expect(unsourcedBody.setByUserId).toBe(compliance.userId);
       /*
        * RE-POINTED WITH THE REVERSAL STATED, not relaxed.
        *

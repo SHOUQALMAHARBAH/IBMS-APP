@@ -165,7 +165,7 @@ export default function FinancialDashboardPage() {
           kind="branch"
           value={branchId}
           onChange={setBranchId}
-          label={t('dashBranchIdLabel')}
+          label={t('dashBranchPlacingOfficerLabel')}
         />
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}

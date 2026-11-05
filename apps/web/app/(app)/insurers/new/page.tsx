@@ -77,6 +77,7 @@ export default function RegisterInsurerPage() {
   const [lineIds, setLineIds] = useState<string[]>([]);
   const [creditTermsDays, setCreditTermsDays] = useState('');
   const [financialStrengthRating, setFinancialStrengthRating] = useState('');
+  const [financialStrengthRatingAsOf, setFinancialStrengthRatingAsOf] = useState('');
   const [rfqContactName, setRfqContactName] = useState('');
   const [rfqContactEmail, setRfqContactEmail] = useState('');
   const [claimsContactName, setClaimsContactName] = useState('');
@@ -138,6 +139,9 @@ export default function RegisterInsurerPage() {
           : {}),
         ...(financialStrengthRating.trim()
           ? { financialStrengthRating: financialStrengthRating.trim() }
+          : {}),
+        ...(financialStrengthRatingAsOf
+          ? { financialStrengthRatingAsOf }
           : {}),
         ...(rfqContactName.trim() ? { rfqContactName: rfqContactName.trim() } : {}),
         ...(rfqContactEmail.trim() ? { rfqContactEmail: rfqContactEmail.trim() } : {}),
@@ -357,7 +361,24 @@ export default function RegisterInsurerPage() {
               <input
                 aria-label={t('insNewRatingLabel')}
                 value={financialStrengthRating}
+                /* EACH HALF IS REQUIRED ONLY WHEN THE OTHER IS FILLED, which is the api's rule
+                   stated in the form rather than discovered from a 422: `assertRatingCarriesItsDate`
+                   and the `Insurer_rating_carries_its_date` CHECK both demand BOTH fields or
+                   NEITHER. Expressing it this way needs no new error string — the user agent says
+                   the field is needed, at the field — and leaving the pair wholly blank stays
+                   legal, because an office may genuinely hold no rating for an insurer. */
+                required={financialStrengthRatingAsOf !== ''}
                 onChange={(e) => setFinancialStrengthRating(e.target.value)}
+              />
+            </label>
+            <label style={fieldStyle}>
+              {t('insNewRatingAsOfLabel')}
+              <input
+                aria-label={t('insNewRatingAsOfLabel')}
+                type="date"
+                value={financialStrengthRatingAsOf}
+                required={financialStrengthRating.trim() !== ''}
+                onChange={(e) => setFinancialStrengthRatingAsOf(e.target.value)}
               />
             </label>
           </div>

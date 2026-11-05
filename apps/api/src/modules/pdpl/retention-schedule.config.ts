@@ -37,6 +37,9 @@ export interface RetentionScheduleItemRow {
    */
   retentionPeriodMonths: number | null;
   legalBasis: string | null;
+  /** The maker of the sixteenth pair — whoever LAST SET the period, re-stamped on every edit.
+   *  Null on the four pre-existing rows nobody recorded an author for. */
+  setByUserId: string | null;
   confirmedByLegalCounselAt: Date | null;
   /**
    * THE SIXTEENTH PAIR'S ESCAPE COLUMN, as a RELATION rather than an id — "writes the column" was
@@ -80,6 +83,19 @@ export interface RetentionScheduleItemView {
     floorMonths: number;
   } | null;
   legalBasis: string | null;
+  /**
+   * THE MAKER, ON THE WIRE — added 2026-11-04, and the screen could not work without it.
+   *
+   * `confirm` resolves duty segregation against `setByUserId`, so in an office that has declared
+   * COMBINED the server needs a reason when the confirmer is the same person. The screen had no way
+   * to know that: it sent `{}` unconditionally, the engine refused with 422, and a one-person office
+   * could never confirm a period it had set itself — the category stayed a draft forever and the
+   * expired-periods dashboard stayed permanently empty.
+   *
+   * Null is NOT a self-confirmation and must not be read as one: ids are compared, so a null maker
+   * can never equal the checker. The four unattributed rows stay confirmable by anybody.
+   */
+  setByUserId: string | null;
   confirmedByLegalCounselAt: string | null;
   /** `confirmedByLegalCounselAt !== null` — a plain convenience flag so a
    * caller never has to derive "is this confirmed?" from a nullable
@@ -134,6 +150,7 @@ export function deriveRetentionScheduleItemView(
     recordCategory: row.recordCategory,
     retentionPeriodMonths: row.retentionPeriodMonths,
     legalBasis: row.legalBasis,
+    setByUserId: row.setByUserId,
     confirmedByLegalCounselAt: row.confirmedByLegalCounselAt
       ? row.confirmedByLegalCounselAt.toISOString()
       : null,

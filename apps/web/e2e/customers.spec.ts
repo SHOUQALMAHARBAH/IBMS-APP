@@ -482,6 +482,14 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.getByLabel("Given name").fill("Ahmad");
   await page.getByLabel("Family name").fill("Al-Fulani");
   await page.getByLabel("National ID").fill("9901012345");
+  // REQUIRED AS OF 2026-11-04, by the owner's decision. `kyc.submit` refuses an individual's file
+  // without these two — screening resolves a potential match on the name TOGETHER WITH the date of
+  // birth and nationality — so the wizard that presented them as optional was walking the officer
+  // into a rejection five steps later. These four tests failed the moment they became `required`,
+  // which is the blast radius saying so out loud rather than a spec quietly asserting an impossible
+  // path.
+  await page.getByLabel("Date of birth").fill("1999-01-01");
+  await page.getByLabel("Nationality").fill("JO");
   await page.getByLabel("Contact phone").fill("+962-7-9000-0000");
   await page.getByLabel("Contact email").fill("ahmad@example.test");
   await page.getByRole("button", { name: "Create customer & start KYC" }).click();
@@ -498,6 +506,98 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.getByRole("button", { name: "Submit for compliance review" }).click();
 
   await expect(page).toHaveURL("/customers/cust-1");
+});
+
+/**
+ * THE WIZARD REFUSES TO ADVANCE WITHOUT THE TWO SCREENING DISCRIMINATORS.
+ *
+ * Owner decision, 2026-11-04. Before it both fields were optional on the screen, and
+ * `kyc.service.ts#submit` refused the file five steps later: *"cannot submit an individual's file
+ * without dateOfBirth and nationality"*. So the officer completed the whole wizard and was rejected
+ * for two fields presented as optional four screens earlier, with the only repair on another screen.
+ *
+ * ASSERTED ON THE BEHAVIOUR, NOT THE ATTRIBUTE. `toHaveAttribute("required")` would pass on a field
+ * the browser never actually blocks; what matters is that the step does not advance, which is what
+ * the officer experiences. The documents heading is the next step, so its ABSENCE is the assertion.
+ *
+ * Only `dateOfBirth` is left blank: one missing field proves the gate, where omitting both could
+ * pass on a form that checks only nationality.
+ */
+test("the wizard will not leave the profile step without a date of birth", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route(
+    "http://localhost:4000/customers/duplicate-name-check**",
+    (route) =>
+      route.fulfill({ status: 200, json: { canonicalKey: "k", matches: [] } }),
+  );
+  // EVERY CALL ON THE ONWARD PATH IS ROUTED, and this test was VACUOUS before it was.
+  //
+  // With only `/customers` mocked, removing `required` let the create through and the wizard then
+  // stalled on an unrouted request — so "Supporting documents" was absent either way and the test
+  // passed against the very defect it exists to catch. The plant found that, not a re-reading.
+  //
+  // Routed so that the ONLY thing which can stop the step advancing is the empty required field.
+  await page.route("http://localhost:4000/customers", (route) =>
+    route.fulfill({ status: 201, json: CUSTOMER }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1", (route) =>
+    route.fulfill({ status: 200, json: CUSTOMER }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/kyc", (route) =>
+    route.fulfill({ status: 201, json: KYC_RECORD }),
+  );
+  await page.route(
+    "http://localhost:4000/customers/cust-1/documents",
+    (route) => route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route(
+    "http://localhost:4000/privacy-notices/current**",
+    (route) => route.fulfill({ status: 200, json: { notice: null } }),
+  );
+
+  await page.goto("/customers/new");
+  await page.getByRole("button", { name: "Individual" }).click();
+  await page.getByLabel("Given name").fill("Ahmad");
+  await page.getByLabel("Family name").fill("Al-Fulani");
+  await page.getByLabel("National ID").fill("9901012345");
+  await page.getByLabel("Nationality").fill("JO");
+  await page.getByLabel("Contact phone").fill("+962-7-9000-0000");
+  await page.getByLabel("Contact email").fill("ahmad@example.test");
+
+  // THE ASSERTION IS POSITIVE, AND THE FIRST VERSION OF IT RACED.
+  //
+  // It read `expect(documentsHeading).toHaveCount(0)` immediately after the click — which a page
+  // that has not re-rendered YET satisfies just as well as a page that refused to advance. Planted
+  // against the un-required field, it passed; the defect was in the test, not the plant, and the
+  // second plant is what found it.
+  //
+  // A blocked native submit focuses the first invalid control, so `toBeFocused` is TRUE only in the
+  // refused case and Playwright retries it until the timeout — it cannot be satisfied by a page
+  // that is merely slow. The request counter is the belt: native validation issues NO request at
+  // all, and by the time focus has settled any create would already have been sent.
+  let createCalls = 0;
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url() === "http://localhost:4000/customers")
+      createCalls += 1;
+  });
+
+  await page
+    .getByRole("button", { name: "Create customer & start KYC" })
+    .click();
+
+  await expect(page.getByLabel("Date of birth")).toBeFocused();
+  expect(createCalls).toBe(0);
+  await expect(
+    page.getByRole("heading", { name: "Supporting documents" }),
+  ).toHaveCount(0);
 });
 
 /**
@@ -542,6 +642,14 @@ async function fillIndividualProfile(page: Page) {
   await page.getByLabel("Given name").fill("Ahmad");
   await page.getByLabel("Family name").fill("Al-Fulani");
   await page.getByLabel("National ID").fill("9901012345");
+  // REQUIRED AS OF 2026-11-04, by the owner's decision. `kyc.submit` refuses an individual's file
+  // without these two — screening resolves a potential match on the name TOGETHER WITH the date of
+  // birth and nationality — so the wizard that presented them as optional was walking the officer
+  // into a rejection five steps later. These four tests failed the moment they became `required`,
+  // which is the blast radius saying so out loud rather than a spec quietly asserting an impossible
+  // path.
+  await page.getByLabel("Date of birth").fill("1999-01-01");
+  await page.getByLabel("Nationality").fill("JO");
   await page.getByLabel("Contact phone").fill("+962-7-9000-0000");
   await page.getByLabel("Contact email").fill("ahmad@example.test");
 }

@@ -535,9 +535,23 @@ export function CustomerOnboardingWizard() {
                 form was the only one that did not, so the control was built end
                 to end with no way to feed it.
 
-                NOT `required`: whether either is mandatory is the owner's
-                decision, because a broker may genuinely not hold a date of birth
-                at first contact. The question is in the walk register. */}
+                `required` AS OF 2026-11-04, BY THE OWNER'S DECISION — this comment
+                previously read *"NOT `required`: whether either is mandatory is the
+                owner's decision, because a broker may genuinely not hold a date of
+                birth at first contact. The question is in the walk register."* That
+                was the right call while the question was open, and she has now
+                answered it.
+
+                What the optionality produced: `kyc.service.ts#submit` REFUSES an
+                individual's file with 422 when either is null — so five wizard steps
+                completed, and the file was rejected for two fields presented as
+                optional four screens earlier, with the repair only on a different
+                screen.
+
+                And the original worry turns out to be nearly empty here, measured:
+                `nationalId` on this same step is ALREADY `required`, and in Jordan a
+                date of birth and nationality are printed on the very document that
+                national id comes from. A broker who holds the id holds both. */}
             {customerType === 'INDIVIDUAL' ? (
               <div style={formRowStyle}>
                 <div style={fieldStyle}>
@@ -547,6 +561,7 @@ export function CustomerOnboardingWizard() {
                   <input
                     id="cust-date-of-birth"
                     type="date"
+                    required
                     max={TODAY_ISO}
                     value={dateOfBirth}
                     onChange={(e) => setDateOfBirth(e.target.value)}
@@ -559,6 +574,7 @@ export function CustomerOnboardingWizard() {
                   </label>
                   <input
                     id="cust-nationality"
+                    required
                     maxLength={2}
                     pattern="[A-Za-z]{2}"
                     value={nationality}

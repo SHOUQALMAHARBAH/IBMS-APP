@@ -40,6 +40,7 @@ export default function SalesDashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [branchId, setBranchId] = useState('');
+  const [leadOwnerBranchId, setLeadOwnerBranchId] = useState('');
   const [insuranceLine, setInsuranceLine] = useState('');
   const [insurerId, setInsurerId] = useState('');
   const [periodLabel, setPeriodLabel] = useState('');
@@ -55,6 +56,7 @@ export default function SalesDashboardPage() {
       setSummary(
         await getSalesDashboard({
           branchId: branchId.trim() || undefined,
+          leadOwnerBranchId: leadOwnerBranchId.trim() || undefined,
           insuranceLine: insuranceLine.trim() || undefined,
           insurerId: insurerId.trim() || undefined,
           periodLabel: periodLabel.trim() || undefined,
@@ -75,6 +77,7 @@ export default function SalesDashboardPage() {
     }
   }, [
     branchId,
+    leadOwnerBranchId,
     insuranceLine,
     insurerId,
     periodLabel,
@@ -120,7 +123,34 @@ export default function SalesDashboardPage() {
           kind="branch"
           value={branchId}
           onChange={setBranchId}
-          label={t('dashBranchIdLabel')}
+          label={t('dashBranchPlacingOfficerLabel')}
+        />
+        {/*
+          TWO FILTERS, BY THE OWNER'S DECISION OF 2026-11-04, because one was answering two
+          questions. `branchId` scopes the premium and commission figures by
+          `Policy.placedByUserId`; this one scopes the two lead counts by `Lead.ownerUserId`. A
+          manager filtering by one branch was shown two different sets of people under a single
+          label reading "show one branch only", with nothing on the screen to tell them apart.
+
+          THIS MEANING IS THE FOURTH, and it was found only when the measurement read the Prisma
+          MODEL instead of the field name: `ownerUserId` is `Customer`'s on
+          `/dashboards/compliance` and `Lead`'s here. It shipped one round LATER than the other
+          three, with this control deliberately wearing the old generic label in between --
+          pointing it at the customer-file-owner word would have put CUSTOMER over a count of
+          LEADS, which is a false label where a generic one is merely unfinished.
+
+          «فرع مالك ملفِّ العميل المحتمل أو المرتقب» is the owner's, and she approved the
+          INFLECTION explicitly: singularising «العملاء المحتملون» / «العملاء المرتقبون» is
+          MORPHOLOGY, not derivation, and morphology is the one operation that may never be
+          performed on her behalf. Her label names PROSPECTS as well as leads, which is also what
+          exposed a site the measurement had missed -- `Prospect` carries `salesOwnerUserId`, a
+          field name no pattern anchored on `ownerUserId` could see.
+        */}
+        <EntitySearch
+          kind="branch"
+          value={leadOwnerBranchId}
+          onChange={setLeadOwnerBranchId}
+          label={t('dashBranchLeadFileOwnerLabel')}
         />
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}

@@ -64,6 +64,10 @@ export interface RetentionScheduleItem {
     floorMonths: number;
   } | null;
   legalBasis: string | null;
+  /** The MAKER — whoever last set the period. Needed HERE because the screen decides whether a
+   *  combined-duty reason is owed before it sends the confirm; null on the four unattributed rows,
+   *  which can never be a self-confirmation because ids are compared. */
+  setByUserId: string | null;
   confirmedByLegalCounselAt: string | null;
   isConfirmed: boolean;
   /**
@@ -355,8 +359,22 @@ export function updateRetentionScheduleItem(
 
 export function confirmRetentionScheduleItem(
   id: string,
+  combinedDutyReason?: string,
 ): Promise<RetentionScheduleItem> {
-  return apiPost(`/retention-schedule/${id}/confirm`, {});
+  /*
+   * THE REASON IS SENT WHEN THE OFFICE OWES ONE, and this used to send `{}` unconditionally.
+   *
+   * `RetentionScheduleService.confirm` resolves the sixteenth maker/checker pair against
+   * `setByUserId`. In a one-person office — one that has declared COMBINED — the confirmer IS the
+   * maker, so the engine demanded a reason, the body never carried one, and the call was refused
+   * with 422 every time: the category stayed a draft forever and the expired-periods dashboard
+   * stayed permanently empty. An ordinary two-person confirmation still sends nothing and is
+   * unchanged, exactly like `approveDisposalBatchAsDpo` below.
+   */
+  return apiPost(
+    `/retention-schedule/${id}/confirm`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 // --- Legal holds -----------------------------------------------

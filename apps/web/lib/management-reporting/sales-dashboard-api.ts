@@ -52,7 +52,11 @@ export interface SalesDashboardSummary {
 
 export function getSalesDashboard(
   opts: {
+    /** The branch of whoever PLACED the policy — scopes the premium and commission figures. */
     branchId?: string;
+    /** The branch of whoever owns the LEAD file — scopes the two lead counts. Split from
+     *  `branchId` by owner decision 2026-11-04: one control was answering two questions. */
+    leadOwnerBranchId?: string;
     insuranceLine?: string;
     insurerId?: string;
     periodLabel?: string;
@@ -62,6 +66,8 @@ export function getSalesDashboard(
 ): Promise<SalesDashboardSummary> {
   const params = new URLSearchParams();
   if (opts.branchId) params.set('branchId', opts.branchId);
+  if (opts.leadOwnerBranchId)
+    params.set('leadOwnerBranchId', opts.leadOwnerBranchId);
   if (opts.insuranceLine) params.set('insuranceLine', opts.insuranceLine);
   if (opts.insurerId) params.set('insurerId', opts.insurerId);
   if (opts.periodLabel) params.set('periodLabel', opts.periodLabel);

@@ -67,11 +67,28 @@ export class SalesDashboardService {
     const period = this.resolvePeriod(query);
     const { periodStart, periodEnd } = period;
 
-    const ownerUserIds = query.branchId
+    /*
+     * TWO SETS, FROM TWO PARAMS — owner decision, 2026-11-04.
+     *
+     * `placerUserIds` scopes the premium and commission figures by `Policy.placedByUserId`;
+     * `leadOwnerUserIds` scopes the two lead counts by `Lead.ownerUserId`. One `branchId` used to
+     * feed both, so a manager filtering by one branch was shown two different sets of people
+     * under one label and had no way to know.
+     *
+     * Resolved independently rather than from one lookup, because the two filters are now
+     * independent: a reader may scope the money to one branch and the pipeline to another, which
+     * is the whole point of splitting them.
+     */
+    const placerUserIds = query.branchId
       ? (await this.repo.findUserIdsInBranch(query.branchId)).map((u) => u.id)
       : undefined;
+    const leadOwnerUserIds = query.leadOwnerBranchId
+      ? (await this.repo.findUserIdsInBranch(query.leadOwnerBranchId)).map(
+          (u) => u.id,
+        )
+      : undefined;
     const policyFilters = {
-      ownerUserIds,
+      ownerUserIds: placerUserIds,
       insuranceLine: query.insuranceLine,
       insurerId: query.insurerId,
     };
@@ -87,9 +104,9 @@ export class SalesDashboardService {
       upSellTotal,
       upSellConverted,
     ] = await Promise.all([
-      this.repo.countNewLeads(ownerUserIds, periodStart, periodEnd),
+      this.repo.countNewLeads(leadOwnerUserIds, periodStart, periodEnd),
       this.repo.countConvertedToProspectLeads(
-        ownerUserIds,
+        leadOwnerUserIds,
         periodStart,
         periodEnd,
       ),

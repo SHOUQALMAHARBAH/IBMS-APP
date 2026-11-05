@@ -150,7 +150,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
           kind="branch"
           value={branchId}
           onChange={setBranchId}
-          label={t('diepBranchIdScopedLabel')}
+          label={t('dashBranchEmployeeSelfLabel')}
         />
         <button type="submit">{t('dashApplyFilters')}</button>
       </form>

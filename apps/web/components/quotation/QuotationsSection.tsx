@@ -11,6 +11,7 @@ import {
 } from '../../lib/quotation/quotation-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { useLanguage } from '../../lib/i18n/language-context';
+import { Hint } from '../ui/Field';
 import { formatDateTime, formatMoney } from '../../lib/i18n/format';
 import type { RfqInsurerSubmission } from '../../lib/rfq/rfq-api';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
@@ -503,8 +504,32 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 id="quote-commission"
                 value={form.commissionRatePercent}
                 inputMode="decimal"
+                aria-describedby="quote-commission-hint"
                 onChange={(e) => set('commissionRatePercent', e.target.value)}
               />
+              {/*
+                THE FIELD STAYS OPTIONAL AND THE WARNING IS WHY — owner decision, 2026-11-04.
+
+                An empty rate is a GATE WITH NO EXIT: it disables the conflict-of-interest check
+                (`recommendation.config.ts` returns not-flagged with no rate), makes a later
+                cancellation or negative endorsement impossible to compute
+                (`endorsement.service.ts`: "a commission reversal cannot be auto-computed"), and a
+                quotation is not editable after placement. Nothing said so at the point of entry.
+
+                NOT MADE REQUIRED, and the reason is the owner's: `null` is a LEGITIMATE value —
+                a standing `CommissionAgreement` may govern the rate instead — so demanding a
+                number would make an officer FABRICATE the input to a conflict-of-interest check,
+                and a fabricated rate is indistinguishable from a real one where a blank is
+                visibly blank.
+
+                Through `Hint` with `aria-describedby`, never a hand-rolled `<p>`: one appearance
+                for what a hint looks like, one wiring for how it is announced. The label here is
+                a SIBLING of the input rather than wrapping it, so the hint is a description and
+                not part of the accessible name.
+              */}
+              <Hint id="quote-commission-hint">
+                {t('quoteCommissionRateHint')}
+              </Hint>
             </div>
           </div>
           <div style={quoteFieldStyle}>
