@@ -3,10 +3,19 @@
 
     Usage:  python scripts/measurements/unreachable-routes.py <out.json>   (from the repo root)
 
-A MEASUREMENT, NOT A GATE, and deliberately so. Nothing runs this automatically. It needed four
-corrections before it stopped reporting working screens as unreachable, and a matcher with that history
-does not belong behind a red build — the first false red teaches everyone to ignore it. Re-run it when
-you want the number, read the OUTPUT rather than the count, and see IMPROVEMENTS § 1.44 for the
+IT IS A GATE. `--check` runs in CI through `npm run check:screen-pass`, which `ci.yml` calls.
+
+CORRECTED 2026-11-05, AND THE CLAIM THAT STOOD HERE IS THE FINDING. This header said "A MEASUREMENT,
+NOT A GATE, and deliberately so. Nothing runs this automatically" — with a stated reason: it needed
+four corrections before it stopped reporting working screens as unreachable, and a matcher with that
+history does not belong behind a red build, because the first false red teaches everyone to ignore it.
+That reasoning was good and the sentence became false when the script was wired into
+`check:screen-pass`. A file that tells its reader it is harmless while CI fails on it is worse than
+either state on its own, and this one is consulted precisely by somebody trying to find out why a
+build went red.
+
+The protection the old sentence was reaching for is the FLOORS and the two-directional budgets below,
+not the absence of a gate. Read the OUTPUT rather than the count, and see IMPROVEMENTS § 1.44 for the
 triaged findings and for the four false-positive classes so the next run starts ahead of this one.
 
 Section 1.44 measured at CONTROLLER-PREFIX level and said so. Its blind spot is a controller whose
@@ -19,6 +28,9 @@ Two false-positive classes had to be closed before any number here was worth rea
      route does not have, so every filtered list read as uncalled.
 """
 import io, os, re, json, sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dead_helpers  # noqa: E402  — the blind spot below, made countable
 
 API = 'apps/api/src'
 WEB = ['apps/web/lib', 'apps/web/app', 'apps/web/components']
@@ -245,7 +257,13 @@ def web_calls():
     is "does any web code address this path at all", which is 1.44's own question.
     """
     paths = set()
+    dead_paths = set()
     unresolved = 0
+    # THE BLIND SPOT, MADE COUNTABLE (2026-11-05). Body spans of every exported client helper that
+    # nothing calls. A path addressed only from inside one of these is addressed by code no screen
+    # can run — see `dead_helpers.py` for why answering that needs no call graph. Offsets line up
+    # because that module blanks comments in place rather than deleting them.
+    DEAD_SPANS = dead_helpers.dead_helper_spans()
     for base in WEB:
         for root, _, files in os.walk(base):
             if 'node_modules' in root or '.next' in root:
@@ -254,7 +272,9 @@ def web_calls():
                 if not f.endswith(('.ts', '.tsx')):
                     continue
                 src = io.open(os.path.join(root, f), encoding='utf-8', errors='replace').read()
+                spans = DEAD_SPANS.get(os.path.abspath(os.path.join(root, f)), [])
                 for m in CALL.finditer(src):
+                    sink = dead_paths if dead_helpers.inside_any(spans, m.start()) else paths
                     # WAS `PATHARG.match(...)`, WHICH IS ANCHORED AT `^` AND READ ONLY AN ARGUMENT
                     # BEGINNING WITH A QUOTE. Failure mode 5 was fixed for the VERB-AWARE pass and
                     # left here, so this pass still could not see a ternary or a helper — it
@@ -269,19 +289,21 @@ def web_calls():
                         p = norm(raw)
                         if not p:
                             continue
-                        paths.add(p)
+                        sink.add(p)
                         # Also record every wildcard-free stem, so a concatenated querystring or a
                         # sub-resource does not hide the parent route.
                         stem = p
                         while stem.endswith('*'):
                             stem = stem[:-1].strip('/')
                             if stem:
-                                paths.add(stem)
-    return paths, unresolved
+                                sink.add(stem)
+    # A path addressed from BOTH a live call site and a dead helper is reached. Only the paths
+    # nothing live addresses belong in the declared bucket.
+    return paths, dead_paths - paths, unresolved
 
 
 routes = api_routes()
-paths, UNRESOLVED_FIRST_ARGS = web_calls()
+paths, DEAD_ONLY_PATHS, UNRESOLVED_FIRST_ARGS = web_calls()
 print('api routes       :', len(routes))
 print('web path shapes  :', len(paths))
 # DECLARED BLINDNESS. Every client call whose first argument yielded no path even after one level of
@@ -305,14 +327,26 @@ def segments_match(web, api):
     return all(x == '*' or y == '*' or x == y for x, y in zip(a, b))
 
 
+def _addresses(candidates, path):
+    """Does any web path shape in `candidates` address this route?"""
+    if path in candidates:
+        return True
+    # The web may address a LONGER path whose stem is this route.
+    if any(c.startswith(path + '/') for c in candidates):
+        return True
+    return any(segments_match(c, path) for c in candidates)
+
+
+# `unreached` KEEPS ITS MEANING: no web code addresses the route at all, whether or not anything
+# calls that code. Measured against every shape this matcher can see, live or dead, so the figure
+# below is comparable with every earlier run and the budget does not move for a reclassification.
+addressed = paths | DEAD_ONLY_PATHS
+
 unreached = []
 for verb, path, f in routes:
-    if path in paths or (verb, path) in NOT_WEB_CALLABLE:
+    if (verb, path) in NOT_WEB_CALLABLE:
         continue
-    # The web may address a LONGER path whose stem is this route.
-    if any(c.startswith(path + '/') for c in paths):
-        continue
-    if any(segments_match(c, path) for c in paths):
+    if _addresses(addressed, path):
         continue
     unreached.append((verb, path, f))
 
@@ -327,6 +361,34 @@ for f in sorted(by_file):
     print(f)
     for r in sorted(by_file[f]):
         print('    ', r)
+
+# ---------------------------------------------------------------------------------------------
+# THE SECOND FIGURE, AND WHY IT IS NOT FOLDED INTO THE FIRST.
+#
+# A route whose only client helper is one NOTHING CALLS is addressed by code no screen can run. It
+# was counted REACHED here for as long as this script has existed, and the blind spot was recorded
+# only in the comment further down — prose a reader of the output never sees. `updateInsurer` is the
+# proven case: it addresses `PATCH /insurers/:id`, nothing in `apps/web` calls it, and that route
+# appeared in NEITHER findings list while the office could not edit an insurer record at all.
+#
+# Gated SEPARATELY rather than merged, for the reason the controller count is: these are two
+# different findings with two different fixes, and they move in opposite directions. "Nobody wrote a
+# client" is answered by writing one. "The client exists and no screen calls it" is answered by
+# wiring a control — and merging them would let one close while the other opens with the total
+# unchanged.
+dead_only = [
+    (verb, path, f)
+    for verb, path, f in routes
+    if (verb, path) not in NOT_WEB_CALLABLE
+    and _addresses(DEAD_ONLY_PATHS, path)
+    and not _addresses(paths, path)
+]
+
+print('')
+print('ADDRESSED ONLY FROM A HELPER NOTHING CALLS:', len(dead_only), 'route(s)')
+print('')
+for verb, path, f in sorted(dead_only, key=lambda r: (r[2], r[1])):
+    print('    %-7s /%-45s %s' % (verb, path, f.replace('apps/api/src/modules/', '')))
 
 _positional = [a for a in sys.argv[1:] if not a.startswith('--')]
 if _positional:
@@ -396,7 +458,27 @@ if _positional:
 # figures are an UPPER BOUND on reachability. 19 of 337 route-addressing helpers are called by
 # nothing; `updateInsurer` is the proven case — it addresses `PATCH /insurers/:id`, nothing calls it,
 # and that route is in NEITHER findings list.
+#
+# FIXED 2026-11-05, AND THE FIGURE ABOVE WAS STALE WHEN FIXED: it was 20 of 346, not 19 of 337, and
+# one of the 19 (`updateLanguagePreference`) was a FALSE POSITIVE — imported as
+# `patchLanguagePreference`, so a name-only matcher read a live helper as dead. See
+# `dead_helpers.py`, which resolves the alias exactly and declares the bias it takes when in doubt.
+# It reads 19 of 346 by the end of this batch, because `InsurerEditPanel` became the first caller
+# `updateInsurer` ever had — so one of the 20 is now genuinely live.
+#
+# THE BLIND SPOT IS A NUMBER NOW, in both passes, and `UNREACHED_BY_PATH_BUDGET` DELIBERATELY DID
+# NOT MOVE. The 13 still means what it has always meant — no web code addresses this route at all —
+# measured against every path shape this matcher can see, live or dead, so the figure stays
+# comparable with every run recorded above. The new bucket is counted beside it rather than folded
+# in, because "nobody wrote a client" and "the client exists and no screen calls it" have different
+# fixes and can move in opposite directions.
 UNREACHED_BY_PATH_BUDGET = 13
+
+# The second figure. 9 here against 19 in the verb-aware pass, and the gap is the point: this pass is
+# verb-agnostic, so a route reads as addressed whenever ANY verb on its path is called live —
+# `PATCH /insurers/:id` is hidden here by `GET /insurers/:id` and is visible only in the sibling.
+# So this number is the WEAKER of the two and must not be read as the size of the class.
+DEAD_ONLY_BY_PATH_BUDGET = 9
 # 11 -> 10 in the same move. `provider.controller.ts` leaves the list entirely, which is also the
 # controller whose TWO `@Controller` prefixes failure mode 6 collapsed into one — so the file that
 # produced both of this measurement's known defects is the file both fixes remove from the findings.
@@ -446,6 +528,16 @@ if '--check' in sys.argv:
             print('This half is what stops the ratchet becoming a ceiling.')
             _fail = True
 
+        if len(dead_only) != DEAD_ONLY_BY_PATH_BUDGET:
+            print('')
+            print('unreachable-routes: FAILED — %d route(s) addressed ONLY from a helper nothing '
+                  'calls, against a declared %d. Set DEAD_ONLY_BY_PATH_BUDGET to %d if that is the '
+                  'intent.' % (len(dead_only), DEAD_ONLY_BY_PATH_BUDGET, len(dead_only)))
+            print('Gated in BOTH directions: a rise is a client function written with no control, '
+                  'and a fall is one that was wired or deleted — neither should be silent.')
+            print('The verb-aware sibling carries the larger figure; read that one first.')
+            _fail = True
+
         if len(by_file) != UNREACHED_CONTROLLER_BUDGET:
             print('')
             print('unreachable-routes: FAILED — %d controller(s) carry an unreached route, against '
@@ -459,5 +551,6 @@ if '--check' in sys.argv:
     if _fail:
         sys.exit(1)
     print('')
-    print('unreachable-routes: at its declared budget — %d route(s) across %d controller(s).'
-          % (UNREACHED_BY_PATH_BUDGET, UNREACHED_CONTROLLER_BUDGET))
+    print('unreachable-routes: at its declared budget — %d route(s) across %d controller(s), '
+          'plus %d addressed only from a helper nothing calls.'
+          % (UNREACHED_BY_PATH_BUDGET, UNREACHED_CONTROLLER_BUDGET, DEAD_ONLY_BY_PATH_BUDGET))

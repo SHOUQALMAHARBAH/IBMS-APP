@@ -19,7 +19,13 @@ one of those is reported as METHOD-UNKNOWN rather than as unreachable. Guessing 
 code, which is the mistake the first pass had to be corrected for four times. A METHOD-UNKNOWN row
 is a question for a person, not a finding.
 
-Run from the repo root. A measurement, never a gate — the same reasoning as its sibling.
+Run from the repo root. **IT IS A GATE**: `--check` runs in CI through `npm run check:screen-pass`.
+
+CORRECTED 2026-11-05. This line said "A measurement, never a gate — the same reasoning as its
+sibling", and the sibling's header carried the same claim in longer form. Both were true when
+written and both became false when the scripts were wired into `check:screen-pass`. Two files
+telling their reader they are harmless, while CI fails on them, is the worst version of a stale
+claim: these are the files somebody opens to find out why a build went red.
 """
 import io
 import os
@@ -65,13 +71,36 @@ OPAQUE = {'apiFetch', 'authFetch', 'request'}
 # ---------------------------------------------------------------------------- the ratchet
 #
 # Decision 34's fault (3), the half the by-path pass is structurally blind to. Gated SEPARATELY from
-# its sibling's 20 rather than summed, because the two are found by different matchers: one total
+# its sibling's figure rather than summed, because the two are found by different matchers: one total
 # would let this matcher break (reporting 0) while the other rose by the same amount, and the gate
 # would stay green across a real regression.
 #
 # Measured 2026-10-22: 530 api routes against 388 verb-aware web paths, 9 addressed by path but not
 # by method, 0 reached only through an opaque helper. Matched the screen-pass measurement document.
 MISSING_METHOD_BUDGET = 9
+
+# THE THIRD FIGURE, ADDED 2026-11-05 — and this is the pass where the recorded case actually lands.
+#
+# A method addressed ONLY from inside a client helper nothing calls. Both passes counted these as
+# reachable since they were written, because each reads the path and verb out of every resolvable
+# call site INCLUDING the one inside the helper's own declaration. The blind spot was written down
+# in a COMMENT in the sibling and in `dead-client-helpers.py` — prose a reader of the output never
+# sees — while `--check` printed "at its declared budget" and nothing else.
+#
+# `PATCH /insurers/:id` is the proven case and it is HERE rather than in the sibling, which is why
+# fixing only the by-path pass would have left it invisible: that pass is verb-agnostic, so
+# `insurers/*` reads as addressed because `GET /insurers/:id` genuinely is. Separating GET from PATCH
+# is this script's whole job, and it is the only one of the two that can see this row.
+#
+# Measured 2026-11-05: 535 api routes, 388 verb-aware web paths, 20 of 346 route-addressing client
+# helpers called by nothing, 19 routes in this bucket.
+#
+# AND THE FIRST RUN OF IT DISPROVED A SPOT-CHECK THE INSTRUMENT HAD RECORDED ABOUT ITSELF.
+# `dead-client-helpers.py` said `listSlaHolidays` "really is called by nothing ... and its route is
+# still perfectly reachable, through that other helper". It is not: `getHolidayYear` addresses
+# `GET /sla/holidays/year/:year`, a DIFFERENT route, so `GET /sla/holidays` is addressed by the dead
+# helper alone. A hand spot-check of a route is only as good as whether the two paths were compared.
+DEAD_ONLY_METHOD_BUDGET = 19
 
 # Blank is not zero, on both sides — see the sibling's floors for the argument, which applies
 # identically here and for the same two failure shapes.
@@ -80,9 +109,17 @@ MINIMUM_VERB_AWARE_PATHS = 300
 
 
 def web_calls_by_verb():
-    """{normalised path -> set of methods}, plus the set of paths reached opaquely."""
+    """{path -> live methods}, {path -> methods reached only from a dead helper}, opaque paths.
+
+    The second map is the blind spot this pass shared with the by-path one until 2026-11-05: the
+    method was recorded from every resolvable call site INCLUDING the one inside a client helper's
+    own declaration, so `PATCH /insurers/:id` counted as addressed by method while nothing in
+    `apps/web` called `updateInsurer`. See `dead_helpers.py`.
+    """
     by_path = {}
+    dead_by_path = {}
     opaque_paths = set()
+    dead_spans = base.dead_helpers.dead_helper_spans()
     for root_dir in base.WEB:
         for root, _, files in os.walk(root_dir):
             if 'node_modules' in root or '.next' in root:
@@ -93,8 +130,10 @@ def web_calls_by_verb():
                 src = io.open(
                     os.path.join(root, f), encoding='utf-8', errors='replace'
                 ).read()
+                spans = dead_spans.get(os.path.abspath(os.path.join(root, f)), [])
                 for m in base.CALL.finditer(src):
                     helper = m.group(1) or m.group(2)
+                    sink = dead_by_path if base.dead_helpers.inside_any(spans, m.start()) else by_path
                     # EVERY path literal in the first argument, not just one anchored at its
                     # start. `base.PATHARG` requires the argument to BEGIN with a quote, which
                     # a ternary does not -- and this pass is where that matters, because it
@@ -117,36 +156,49 @@ def web_calls_by_verb():
                         if not path:
                             continue
                         if helper in OPAQUE:
+                            # An opaque call stays opaque wherever it sits: the method is unknown,
+                            # so "unknown AND dead" is not a sharper claim than "unknown".
                             opaque_paths.add(path)
                             continue
                         method = HELPER_METHOD.get(helper)
                         if method:
-                            by_path.setdefault(path, set()).add(method)
-    return by_path, opaque_paths
+                            sink.setdefault(path, set()).add(method)
+    return by_path, dead_by_path, opaque_paths
 
 
 def main():
     routes = base.api_routes()
-    by_path, opaque = web_calls_by_verb()
+    by_path, dead_by_path, opaque = web_calls_by_verb()
 
-    # The first pass's own answer, so the delta is visible rather than asserted.
-    path_only = set(by_path) | opaque
+    # The first pass's own answer, so the delta is visible rather than asserted. Dead paths are
+    # included for the same reason they are there: "the first pass already reports this one" has to
+    # mean the same thing in both scripts, or the two disagree about which rows each one owns.
+    path_only = set(by_path) | set(dead_by_path) | opaque
 
     missing_method = []
     unknown_method = []
+    dead_only_method = []
     for method, path, controller in routes:
         matched_paths = [w for w in path_only if base.segments_match(w, path)]
         if not matched_paths:
             continue  # the first pass already reports this one
         methods = set()
+        dead_methods = set()
         opaque_hit = False
         for w in matched_paths:
             methods |= by_path.get(w, set())
+            dead_methods |= dead_by_path.get(w, set())
             if w in opaque:
                 opaque_hit = True
+        row = (method, path, controller)
         if method in methods:
             continue
-        row = (method, path, controller)
+        # THE NEW ROW, and it is checked BEFORE the two older buckets. A method addressed only from
+        # inside a helper nothing calls is a sharper finding than "not addressed by method": the
+        # client exists, so the fix is a control rather than a client.
+        if method in dead_methods:
+            dead_only_method.append(row)
+            continue
         (unknown_method if opaque_hit else missing_method).append(row)
 
     print('api routes                :', len(routes))
@@ -160,6 +212,16 @@ def main():
     print('first pass, which counts them as reachable.')
     print()
     for method, path, controller in sorted(missing_method, key=lambda r: (r[2], r[1], r[0])):
+        print('    %-6s /%s' % (method, path))
+        print('           %s' % controller)
+    print()
+    print(
+        'ADDRESSED ONLY FROM A HELPER NOTHING CALLS: %d route(s) — the client exists and no'
+        % len(dead_only_method)
+    )
+    print('screen calls it, so the fix is a CONTROL, not a client function.')
+    print()
+    for method, path, controller in sorted(dead_only_method, key=lambda r: (r[2], r[1], r[0])):
         print('    %-6s /%s' % (method, path))
         print('           %s' % controller)
     print()
@@ -187,6 +249,22 @@ def main():
               % (len(by_path), MINIMUM_VERB_AWARE_PATHS))
         return 1
 
+    dead_actual = len(dead_only_method)
+    if dead_actual > DEAD_ONLY_METHOD_BUDGET:
+        print()
+        print('unreachable-routes-by-verb: FAILED — %d route(s) addressed ONLY from a helper '
+              'nothing calls, against a budget of %d.' % (dead_actual, DEAD_ONLY_METHOD_BUDGET))
+        print('A route in this bucket has a client function and no control: writing another client '
+              'function will not move it. Wire a screen to the one that exists, or delete it.')
+        print('Do NOT raise the budget.')
+        return 1
+    if dead_actual < DEAD_ONLY_METHOD_BUDGET:
+        print()
+        print('unreachable-routes-by-verb: FAILED — only %d remain, so lower '
+              'DEAD_ONLY_METHOD_BUDGET to %d.' % (dead_actual, dead_actual))
+        print('This half is what stops the ratchet becoming a ceiling.')
+        return 1
+
     actual = len(missing_method)
     if actual > MISSING_METHOD_BUDGET:
         print()
@@ -206,7 +284,9 @@ def main():
         return 1
 
     print()
-    print('unreachable-routes-by-verb: at its declared budget of %d.' % MISSING_METHOD_BUDGET)
+    print('unreachable-routes-by-verb: at its declared budgets — %d addressed by path but not by '
+          'method, %d addressed only from a helper nothing calls.'
+          % (MISSING_METHOD_BUDGET, DEAD_ONLY_METHOD_BUDGET))
     return 0
 
 
