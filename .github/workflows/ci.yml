@@ -197,6 +197,9 @@ jobs:
       - name: Screen pass — every load error says what to fix, in both languages
         run: python scripts/measurements/load-error-way-forward.py --check
 
+      - name: Screen pass — the dead-helper matcher still works
+        run: npm run check:dead-helpers
+        
       # The two route gates are SEPARATE on purpose. One total would let this matcher break
       # (reporting 0) while the other rose by the same amount, leaving the gate green across a real
       # regression — and the by-verb half is structurally invisible to the by-path half, which is
