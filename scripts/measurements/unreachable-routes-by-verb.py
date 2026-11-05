@@ -19,7 +19,9 @@ one of those is reported as METHOD-UNKNOWN rather than as unreachable. Guessing 
 code, which is the mistake the first pass had to be corrected for four times. A METHOD-UNKNOWN row
 is a question for a person, not a finding.
 
-Run from the repo root. **IT IS A GATE**: `--check` runs in CI through `npm run check:screen-pass`.
+Run from the repo root. **IT IS A GATE**: `ci.yml` runs this script's `--check` directly, as the
+`frontend` step named *Screen pass — no route unreachable by method*. Not through
+`npm run check:screen-pass` — that is the LOCAL chain, and `ci.yml` names the two scripts itself.
 
 CORRECTED 2026-11-05. This line said "A measurement, never a gate — the same reasoning as its
 sibling", and the sibling's header carried the same claim in longer form. Both were true when

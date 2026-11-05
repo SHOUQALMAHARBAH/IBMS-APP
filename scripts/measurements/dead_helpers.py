@@ -4,6 +4,25 @@
     python scripts/measurements/dead_helpers.py              # the figures
     python scripts/measurements/dead_helpers.py --self-test   # planted inputs, in both directions
 
+## WHERE THE SELF-TEST RUNS, AND WHERE IT DOES NOT — measured, not assumed
+
+`npm run check:dead-helpers` is wired into `npm run check:screen-pass`, ORDERED BEFORE the two
+reachability gates that consume this module, so a broken matcher says so rather than letting them
+print a plausible wrong number.
+
+**It is NOT in `ci.yml`, and that is the honest state.** Measured 2026-11-05: `ci.yml` does not call
+`check:screen-pass` at all — it invokes six `npm run check:*` scripts plus a handful of measurement
+scripts DIRECTLY, including `unreachable-routes.py --check` and `unreachable-routes-by-verb.py
+--check` as the two *Screen pass* steps in the `frontend` job. So the two consumers ARE CI gates and
+this self-test is not: locally `check:screen-pass` orders it first, and in CI nothing checks the
+module before the gates that depend on it run.
+
+A `ci.yml` step is therefore OWED. It cannot be pushed from here — this repository's own record is
+that the push authenticates as an OAuth App without `workflow` scope, and the two steps that landed
+on 2026-10-30 were edited in the browser by the owner, where account permissions apply and no
+credential is involved. Until it lands, this is exactly the unwired-script state this repository
+already records against itself, and saying so is better than implying coverage that is not there.
+
 ## Why this is a module and not a third report
 
 `unreachable-routes.py` and `unreachable-routes-by-verb.py` read the path out of every resolvable

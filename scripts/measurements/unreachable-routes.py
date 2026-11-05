@@ -3,7 +3,15 @@
 
     Usage:  python scripts/measurements/unreachable-routes.py <out.json>   (from the repo root)
 
-IT IS A GATE. `--check` runs in CI through `npm run check:screen-pass`, which `ci.yml` calls.
+IT IS A GATE. `ci.yml` runs `python scripts/measurements/unreachable-routes.py --check` DIRECTLY,
+as the `frontend` step named *Screen pass — no route unreachable by path*.
+
+CORRECTED TWICE on 2026-11-05, and the second correction is a precision one worth having: the first
+pass at this header said the gate runs "through `npm run check:screen-pass`, which `ci.yml` calls".
+`ci.yml` does NOT call that chain — it invokes six `npm run check:*` scripts and then these two
+scripts directly as python steps. A reader following the wrong mechanism goes looking for a CI step
+that does not exist. `check:screen-pass` is the LOCAL chain; the CI steps are separate and must be
+kept in step with it by hand.
 
 CORRECTED 2026-11-05, AND THE CLAIM THAT STOOD HERE IS THE FINDING. This header said "A MEASUREMENT,
 NOT A GATE, and deliberately so. Nothing runs this automatically" — with a stated reason: it needed
