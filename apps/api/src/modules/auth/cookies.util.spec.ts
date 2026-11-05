@@ -79,11 +79,21 @@ function fakeResponse(): {
 }
 
 /*
- * The re-imported module's own shape. `await import()` resolves to `any` here — the api compiles to
- * CommonJS, so the type-aware lint rules cannot see through the dynamic form — and an annotated
- * binding does not help, because the unsafety is in the VALUE rather than the declaration. An
- * explicit assertion is the honest fix: it is a cast away from `any`, so it is not redundant, and
- * `typeof setRefreshTokenCookie` means it still breaks if the module stops exporting the function.
+ * The re-imported module's own shape, loaded through `vi.importActual` rather than a bare
+ * `await import()`.
+ *
+ * THAT IS NOT A STYLE CHOICE — `tsc` REFUSED THE BARE FORM, and vitest and eslint both passed it.
+ * This package sets `module`/`moduleResolution` to `nodenext`, which applies ESM resolution rules to
+ * a DYNAMIC import while leaving the static one alone. So `import('./cookies.util')` wants the
+ * `./cookies.util.js` extension and fails with TS2307 — three times, in a file whose own static
+ * `import ... from './cookies.util'` at the top resolves perfectly. Exactly the shape this
+ * repository's register already records: vitest does not typecheck, lint does not typecheck, and
+ * only `tsc` sees it.
+ *
+ * `vi.importActual` takes a plain string, so TypeScript performs no module resolution on it at all,
+ * and its generic parameter gives the result a real type — which also removed the `any` the lint
+ * rules had objected to in the bare form. It is the semantically correct call too: "load the real
+ * module, bypassing mocks", which is what re-reading a frozen module-level constant needs.
  */
 type CookiesModule = { setRefreshTokenCookie: typeof setRefreshTokenCookie };
 
@@ -210,7 +220,7 @@ describe('the secure flag, which is decided once at module load', () => {
 
   it('is true under production', async () => {
     process.env.NODE_ENV = 'production';
-    const mod = (await import('./cookies.util')) as CookiesModule;
+    const mod = await vi.importActual<CookiesModule>('./cookies.util');
     const { res, set } = fakeResponse();
     mod.setRefreshTokenCookie(res, RAW_TOKEN, EXPIRES);
     expect(set[0].options.secure).toBe(true);
@@ -218,7 +228,7 @@ describe('the secure flag, which is decided once at module load', () => {
 
   it('is false otherwise, because local development has no TLS', async () => {
     process.env.NODE_ENV = 'development';
-    const mod = (await import('./cookies.util')) as CookiesModule;
+    const mod = await vi.importActual<CookiesModule>('./cookies.util');
     const { res, set } = fakeResponse();
     mod.setRefreshTokenCookie(res, RAW_TOKEN, EXPIRES);
     expect(set[0].options.secure).toBe(false);
@@ -231,7 +241,7 @@ describe('the secure flag, which is decided once at module load', () => {
    */
   it('is frozen at import, so flipping the variable afterwards changes nothing', async () => {
     process.env.NODE_ENV = 'development';
-    const mod = (await import('./cookies.util')) as CookiesModule;
+    const mod = await vi.importActual<CookiesModule>('./cookies.util');
 
     process.env.NODE_ENV = 'production';
     const { res, set } = fakeResponse();

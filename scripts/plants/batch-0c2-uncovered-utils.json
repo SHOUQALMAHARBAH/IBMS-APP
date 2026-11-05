@@ -43,5 +43,10 @@
     "file": "apps/web/app/(app)/insurers/[id]/page.tsx",
     "from": "      {canCorrect && !editing ? (",
     "to": "      {!editing ? ("
+  },
+  "secure-flag-tests-reuse-a-cached-module": {
+    "file": "apps/api/src/modules/auth/cookies.util.spec.ts",
+    "from": "  beforeEach(() => {\n    vi.resetModules();\n  });",
+    "to": "  beforeEach(() => {\n    // no reset\n  });"
   }
 }
