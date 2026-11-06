@@ -236,6 +236,22 @@ a second BROKERAGE_OFFICE survives a crashed run. More directly: `reset-db-test.
 isolation result rests on — that the API's `ibms_app` role exists and holds its grants on the rebuilt
 tables. A reset therefore proves the premise rather than disturbing it.
 
+**AND THAT WAS THEN RUN RATHER THAN LEFT AS AN ARGUMENT: `tenant-isolation.e2e-spec.ts` is
+36/36 against the reset database**, 2026-11-06, which is the premise demonstrated instead of
+reasoned about.
+
+**ONE TRAP WORTH RECORDING, BECAUSE IT LOOKS EXACTLY LIKE A BROKEN DATABASE.** The first
+attempt reported `1 failed, 36 skipped` with
+`PrismaClientInitializationError: Environment variable not found: DATABASE_URL` pointing at
+`rawPrisma.organizationEmailIntegration.deleteMany()` — a stack that reads as *the reset broke
+the schema*. It is nothing of the kind: `vitest run --config test/vitest-e2e.config.ts` invoked
+directly loads no environment, and the real entry point is
+`dotenv -e ../../.env.test -- vitest run --config ./test/vitest-e2e.config.ts`
+(`apps/api/package.json:21`). **Run an e2e spec through `npm run test:e2e -w api`, or prefix
+`dotenv -e ../../.env.test --` by hand** — otherwise a configuration mistake arrives wearing the
+costume of a data-layer failure, immediately after a reset, which is the worst possible moment
+to be handed a misleading error.
+
 **WHAT IS NOT DONE HERE, deliberately: nothing.** This is a measurement. Whether the remedy is fix
 option 1, a teardown on the three role-creating specs, or capping what `startCycle` enumerates in a
 test environment is a decision with a cost attached, and it is the owner's.
