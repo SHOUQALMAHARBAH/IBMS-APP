@@ -162,6 +162,21 @@ export type UpdateInsurerInput = Partial<{
   underwriterContact: string;
   creditTermsDays: number;
   financialStrengthRating: string;
+  /**
+   * MISSING FROM THIS TYPE UNTIL 2026-11-05, and the api has accepted it on PATCH all along.
+   *
+   * `UpdateInsurerDto` declares it with `@IsCalendarDate()`, and `Insurer_rating_carries_its_date`
+   * is a CHECK over the MERGED row — both columns or neither. So a PATCH carrying only
+   * `financialStrengthRating` is refused on a record that has no date, and without this field there
+   * was no way to send one. The same omission was closed on `RegisterInsurerInput` in module 0-c
+   * batch 1; the update half was not, because nothing called `updateInsurer` at all, so no
+   * typechecking error and no test could point at it.
+   *
+   * `ratingAgencyId` is DELIBERATELY still absent. The DTO accepts it, and `apps/web` references it
+   * NOWHERE — no picker, no list of agencies, no label in either language — so adding a bare uuid
+   * field would be a control nobody can fill in. Counted, not built.
+   */
+  financialStrengthRatingAsOf: string;
 }>;
 
 export function listInsurers(

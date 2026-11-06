@@ -13,8 +13,13 @@ import {
   type Insurer,
   type InsurerStatusImpact,
 } from '../../../../lib/insurer/insurer-api';
+import {
+  listInsuranceLines,
+  type InsuranceLine,
+} from '../../../../lib/insurer/insurance-line-api';
 import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
 import {
+  Button,
   ErrorState,
   SkeletonList,
 } from '../../../../components/ui';
@@ -31,6 +36,7 @@ import {
   lineChipStyle,
 } from '../../../../components/insurer/insurer.styles';
 import { DeactivatedInsurerBadge } from '../../../../components/insurer/DeactivatedInsurerBadge';
+import { InsurerEditPanel } from '../../../../components/insurer/InsurerEditPanel';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
@@ -86,6 +92,16 @@ export default function InsurerDetailPage() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ratingError, setRatingError] = useState<string | null>(null);
+  /*
+   * THE CORRECTION PANEL — the first caller `updateInsurer` has ever had.
+   *
+   * `lines` is fetched ONLY when the panel is opened, not on page load: the read-only view renders
+   * the insurer's own `linesOffered`, so the catalogue is needed to CHANGE the selection and nothing
+   * else. Fetching it up front would make every reader of this screen pay for a control most of them
+   * cannot see.
+   */
+  const [editing, setEditing] = useState(false);
+  const [lines, setLines] = useState<InsuranceLine[] | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -188,6 +204,49 @@ export default function InsurerDetailPage() {
       {!insurer.isActive ? (
         <p data-deactivated-notice="">{t('insDeactivatedNotice')}</p>
       ) : null}
+
+      {/*
+        THE CONTROL EXISTS ONLY WHERE THE READER MAY USE IT — the frontend directive's own rule, and
+        the same `insurer.update` the clear control beside the rating already asks for. No role gains
+        anything: this is the code that permission was always for.
+
+        The panel REPLACES the two read-only sections rather than sitting beside them, so there is
+        never a stale copy of a field on screen next to the input editing it.
+      */}
+      {canCorrect && !editing ? (
+        <div>
+          <Button
+            type="button"
+            data-insurer-edit-open=""
+            onClick={() => {
+              setEditing(true);
+              if (lines === null)
+                void (async () => {
+                  setLines(await listInsuranceLines().catch(() => []));
+                })();
+            }}
+          >
+            {t('commonEdit')}
+          </Button>
+        </div>
+      ) : null}
+
+      {editing ? (
+        lines === null ? (
+          <SkeletonList rows={4} label={t('commonLoading')} />
+        ) : (
+          <InsurerEditPanel
+            insurer={insurer}
+            lines={lines}
+            onSaved={(updated) => {
+              setInsurer(updated);
+              setEditing(false);
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        )
+      ) : (
+        <>
 
       <section style={sectionStyle}>
         <h2>{t('insDetailCompanyHeading')}</h2>
@@ -306,6 +365,8 @@ export default function InsurerDetailPage() {
           {field('insDetailUnderwriterLabel', insurer.underwriterContact)}
         </div>
       </section>
+        </>
+      )}
 
       {canDeactivate ? (
         <section style={sectionStyle}>
