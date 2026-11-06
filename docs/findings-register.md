@@ -143,6 +143,103 @@ would remove the human judgement entirely.
   the reviewer-pool selection to be deterministic-and-fair would also stop this
   test being load-sensitive.
 
+
+**2026-11-06 — WHAT REFILLS IT, MEASURED. The three figures have three different answers, and only
+two of them have a writer that can be named.** Entry 52's re-bloat clause fired on 2026-11-06:
+db-test held **5,239 active users, 71,861 audit rows and 29 roles** against the post-reset 12 / 0 /
+13. The clause treats the symptom, and nobody had measured the cause. Every figure below is a query
+run against db-test on 2026-11-06, and the reset that reads 2026-10-18 below is `8cbc303`.
+
+**AND THE TWO NUMBERS THIS ENTRY HAS ALWAYS QUOTED MISS THE SECOND-LARGEST TABLE.** Users and audit
+rows are not where the volume is, by themselves: on 2026-11-06 db-test holds **153,355 rows across
+every table**, and `AuditLogEntry` (71,861) plus `AccessRecertificationItem` (**41,835**) are
+**74.1%** of them. The recertification table has never appeared in this entry.
+
+**ROLES — ONE writer family, and this repository had already asked for exactly this measurement.**
+29 roles is **13 seeded plus 16 left behind by specs**: 15 named `E2E_PLATFORM_GRANT_<epoch>` and
+one `E2E_SCOPED_<epoch>`, all 16 in the DEFAULT office. The three creating sites are
+`brokerage-office-registration.e2e-spec.ts:626`, `provider-office-state.e2e-spec.ts:762` and
+`role-scope.e2e-spec.ts:141` — each builds its name from a clock, so no name is ever reused and no
+row is ever removed. **Their own names date them**, independently of any column: 14 of the 16 were
+stamped 2026-10-21 and none later, so the role count has stood at 29 since then.
+`provider-self-administration.e2e-spec.ts:56` states in its own comment that *"Sixteen roles are
+owed a teardown by whichever spec creates them, and finding which is its own measurement"* — this is
+that measurement, and the split it recorded on 2026-10-28 (14 ACTIVE, 15 INACTIVE) reproduces
+exactly on 2026-11-06.
+
+**AND THAT LEAK HAS ALREADY CHANGED A TEST'S RESULT, not merely its duration** — which is the half
+of this entry that was always about elapsed time. The same comment records
+`provider-self-administration.e2e-spec.ts` failing with *expected 'INACTIVE' to be 'ACTIVE'* without
+the route under test having written anything, because the leaked INACTIVE roles were **the majority
+of the table** and an unordered `findFirstOrThrow` picked one. Proven pre-existing by running that
+file at HEAD with everything else stashed.
+
+**AUDIT ROWS — ONE dominant writer, 58% of the table, AND IT COMPOUNDS.** Of 71,861 audit rows,
+**41,850 carry `entityType = 'AccessRecertificationItem'`**; the next three are `User` (11,154),
+`Customer` (2,964) and `Organization` (1,295). `AccessRecertificationService.startCycle` enumerates
+`findActiveSubjectUserIds()` — **every active user in the office** — and writes one item row and one
+audit row per subject. So the cost of one call is a function of every previous run's residue, and the
+25 cycles in db-test on 2026-11-06 show it directly, in five batches of five (five runs of
+`rbac.e2e-spec.ts`, which opens five cycles):
+
+| Cycle batch | Items written per cycle |
+|---|---|
+| 2026-10-20 08:19 | ~345 |
+| 2026-10-21 09:19 | ~1,120 |
+| 2026-10-23 19:25 | ~2,057 |
+| 2026-10-28 04:05 | ~2,359 |
+| 2026-10-28 14:32 | ~2,486 |
+
+**A 7.2-fold rise in the cost of the same five tests over eight days**, from the same code. The
+default office now holds 5,075 active users, so **the next cycle opened against db-test as it stands
+on 2026-11-06 writes about 5,075 item rows and 5,075 audit rows** — against 12 on a reset database.
+The service's own comment already names the symptom (*"the O(N) sequential writes here were what
+pushed `startCycle` past the e2e test timeout once the shared test DB had accumulated enough
+users"*), which is this entry's §1.1 symptom from the inside: **the heaviest consumer of the residue
+is also the largest producer of it.**
+
+**USERS — NO single writer, and deletion is structurally IMPOSSIBLE.** 5,271 users arrived in **77
+distinct bursts** between 2026-10-18 05:49 and 2026-11-05 22:10 (a burst being a gap of more than
+fifteen minutes between consecutive creations); the largest single burst created **913 users in 50
+minutes** on 2026-10-21. There is no dominant fixture: grouped by the first token of the local part
+of the e-mail, the biggest family is `retention-*` at **1,009 of 5,271 (19%)**, then `picker-*` 381,
+`dsr-*` 194, `provider-*` 166 — a long tail of roughly forty. **100 of the spec files define their
+own `makeUser`, across 907 call sites**, and not one of them deletes a user.
+
+**That is not untidiness — `brokerage-office-registration.e2e-spec.ts:578` measured it by trying**:
+`rawPrisma.user.deleteMany` fails with **SQLSTATE 23001, `AuditLogEntry_userId_fkey` RESTRICT**, and
+`AuditLogEntry` is append-only BY DATABASE TRIGGER, so the audit rows cannot be removed either. **A
+test user is permanent the moment it does anything.** This is why fix option 2 above (truncate in a
+`beforeAll`) is not the cheap half of option 1 but a different operation entirely, and why per-file
+teardown is not on the table at all: the only two instruments that work are a fresh database per
+file and a full reset.
+
+**THE RATE, AND A CORRECTION TO THIS ENTRY'S OWN WORDING.** The 2026-10-18 reset started from
+`reset-db-test.sh`'s own recorded pre-reset state — **9,077 active users, 356,062 audit rows, 47
+roles** — and reached 12 / 0 / 13. Nineteen days later it reads 5,239 / 71,861 / 29, which is **about
+276 active users and 3,782 audit rows a day**, and **58% of the pre-reset user count already back**.
+At that rate the user count returns to its 2026-10-18 value around 2026-11-20. **So "a reset buys
+months and not more", written above, is itself optimistic and is corrected here rather than
+deleted**: measured on this cycle it buys about **five weeks** on the user count, and the reasoning
+it was making — that the accumulation restarts on the next run and option 1 is the answer — is
+exactly right and is why the figure matters.
+
+**AND THE RESET DOES NOT INVALIDATE THE TENANT-ISOLATION PROOF'S PREMISE — it is the one thing that
+re-establishes it.** Measured 2026-11-06: db-test holds exactly two organizations, the default
+brokerage office (`00000000-...-000000000001`) and the PROVIDER `GO Global`
+(`00000000-...-0000000000f0`), both seeded with fixed sentinel ids rather than created by any test.
+`tenant-isolation.e2e-spec.ts` **creates office B itself** at `ORG_B_ID`
+(`00000000-...-0000000000b2`, line 313), so the proof depends on the seeded shape rather than on
+accumulated state, and `assertOneOrganization()` in `apps/api/test/utils/test-app.ts` fails loudly if
+a second BROKERAGE_OFFICE survives a crashed run. More directly: `reset-db-test.sh` runs
+**`db:test:privileges`** as one of its four post-reset gates, which is precisely the premise the
+isolation result rests on — that the API's `ibms_app` role exists and holds its grants on the rebuilt
+tables. A reset therefore proves the premise rather than disturbing it.
+
+**WHAT IS NOT DONE HERE, deliberately: nothing.** This is a measurement. Whether the remedy is fix
+option 1, a teardown on the three role-creating specs, or capping what `startCycle` enumerates in a
+test environment is a decision with a cost attached, and it is the owner's.
+
 ### 1.2 `P1` — MFA/TOTP timing flake in shared `makeUser` helpers
 
 - **Symptom:** intermittent `expected 200 "OK", got 400 "Bad Request"` at the
