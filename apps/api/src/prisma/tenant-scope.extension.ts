@@ -300,10 +300,10 @@ export function withOrgAwareTransactions(
    * it genuinely matters rather than merely belting-and-bracing.
    *
    * The application layer cannot filter raw SQL: `applyTenantScope` rewrites a
-   * Prisma argument object, and a raw query has none. Those **22** consumer
-   * call sites (full-text search, `FOR UPDATE` row locks, the watchlist
-   * containment query, the two invoice branch filters, the two SECURITY
-   * DEFINER view reads — measured 2026-11-06; this said "ten")
+   * Prisma argument object, and a raw query has none. Those **21** consumer
+   * call sites, across 11 files (full-text search, `FOR UPDATE` row locks, the
+   * watchlist containment query, the two invoice branch filters, the two
+   * SECURITY DEFINER view reads)
    * are therefore protected by RLS ALONE — which is exactly spec §1's promise
    * that "a raw/forgotten query without the app-layer filter still can't cross
    * tenants". Wrapping them here is what makes that true instead of aspirational.
@@ -311,6 +311,21 @@ export function withOrgAwareTransactions(
    * It also caught these: the moment the policies went live, the four full-text
    * search e2e tests started returning nothing, because their raw queries were
    * the only reads in the system with no Organization pinned.
+   *
+   * **CORRECTED 2026-11-06, TWICE IN ONE DAY, AND THE SECOND CORRECTION IS THE
+   * INSTRUCTIVE ONE.** This read "ten call sites", was corrected to "22" with a
+   * method recorded beside it in `docs/multi-tenancy-rls.md`, and **that method
+   * was itself wrong in both of its inputs** — it claimed 30 non-spec lines of
+   * which 8 were this file, where the real numbers are 44 and 10. The two errors
+   * nearly cancelled, so 22 landed within one of the truth by coincidence.
+   *
+   * The figure is 21 because 34 consumer lines contain **13 COMMENTS naming the
+   * method rather than calling it** (four in `user.repository.ts`, three in
+   * `customer.repository.ts`, three more across `legacy-import.*`). Strip
+   * comment lines before counting — a comment explaining why a query is raw is
+   * not a raw query, and this repository has been caught by that shape before.
+   * The full derivation is in `docs/multi-tenancy-rls.md` § Raw SQL and is
+   * re-runnable; **re-run it rather than quoting this number.**
    */
   const RAW_METHODS = new Set([
     '$queryRaw',

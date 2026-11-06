@@ -2,18 +2,36 @@
 
 Multi-tenancy Phase 2 step 8. Companion to `ibms-system-multitenancy-spec.md` §1.
 
-> **`ibms-system-multitenancy-spec.md` IS NOT IN THIS REPOSITORY. Recorded 2026-11-06 (module 0-c
-> batch 5).** Measured: `git grep -l ibms-system-multitenancy-spec` returns this file and nothing
-> else, and no file of that name exists anywhere in the tree. This document cites it **five** times
-> — §1 (twice, including the line above), §3.1, §4.10 and §7 — so a reader following any of them
-> finds nothing, and the authority for tenant isolation is a document the team cannot open.
+> **`ibms-system-multitenancy-spec.md` IS NOT IN THIS REPOSITORY — BUT IT DOES EXIST, AND IT WAS
+> FOUND AND READ. Recorded 2026-11-06 (module 0-c batch 5).** Measured first:
+> `git grep -l ibms-system-multitenancy-spec` returns this file and nothing else, and no file of that
+> name is anywhere in the tree. This document cites it **five** times — §1 (twice, including the line
+> above), §3.1, §4.10 and §7 — so a reader following any of them found nothing, and the authority for
+> tenant isolation was a document the team could not open.
 >
-> **That matters more here than for an ordinary dangling pointer**, because this is the isolation
-> reference. Two consequences, both stated rather than worked around:
+> **It is held OUTSIDE the repository, in the owner's document set, as
+> `waseet360-all-/ibms-system-multitenancy-spec.md`** (53 KB, titled *IBMS — Multi-Tenant
+> Architecture, Authentication/MFA/Session, & Confirmed Review Recommendations (v3)*). So the
+> citations are not dangling in the sense of pointing at nothing — they point at something real that
+> is simply not vendored. **Getting it into the repository, or replacing the citations with one that
+> resolves, is the owner's call and is recorded in `docs/deferred-register.md`.**
 >
-> 1. A reported internal-numbering defect in that spec (a pointer to §6 whose definitions are in §5,
->    and numbering that jumps §8 → §10) **cannot be fixed from this repository** — the file is not
->    here to fix.
+> **AND EVERY CITATION OF IT IN THIS REPOSITORY WAS THEN CHECKED AGAINST THE FILE, which is the
+> thing nobody could do before. All of them resolve:**
+>
+> | Cited as | In the spec | Says what the citing file claims |
+> |---|---|---|
+> | §1 (here) | `## 1. What "complete isolation" means here` | yes |
+> | §10.4 (`docs/frontend-ux-directive.md` ×3, `AppNav.tsx`) | `## 10.4 Role-based UI must hide, not just block` | yes |
+> | §10.6 (`docs/frontend-ux-directive.md` ×2) | `## 10.6 UI/UX simplicity — design guardrails` | yes |
+> | §6.3 (`docs/deferred-register.md`) | **numbered item 3 within `## 6. Per-tenant email integration`**, not a heading | yes — it is the *secure authenticated link, never the payload in the body* rule |
+>
+> Two consequences remain, both stated rather than worked around:
+>
+> 1. A reported internal-numbering defect **inside that spec** (a pointer to §6 whose definitions are
+>    in §5, and numbering that jumps §8 → §10 — **the missing §9 is confirmed: the file has no
+>    section 9 at all**) is still not fixable from this repository, because the file is the owner's
+>    document rather than a repo artefact. Nothing in this repository cites §9.
 > 2. Until it is vendored or replaced, **this document plus
 >    `apps/api/test/tenant-isolation.e2e-spec.ts` are the operative authority**: the spec's §-numbered
 >    claims are unverifiable against their source, while the tests are executable. The suite was
@@ -154,12 +172,32 @@ into.
 
 ## Raw SQL
 
-**22 consumer call sites** use `$queryRaw`/`$executeRaw` — full-text search, `FOR UPDATE`
+**21 consumer call sites** use `$queryRaw`/`$executeRaw` — full-text search, `FOR UPDATE`
 row locks, the watchlist containment query, the two invoice branch filters, the two
-`SECURITY DEFINER` view reads. (Measured 2026-11-06:
-`git grep -n '\$queryRaw\|\$executeRaw' -- apps/api/src` returns 30 non-spec lines, of which 8
-are the mechanism in `tenant-scope.extension.ts` itself. This said **ten**.) The application
+`SECURITY DEFINER` view reads. The application
 layer **cannot** filter those: it rewrites a Prisma argument object, and raw SQL has none.
+
+> **CORRECTED 2026-11-06, AND THE LESSON IS THAT A STATED METHOD IS NOT ENOUGH — IT HAS TO BE
+> RE-RUN.** This said **ten** until 2026-11-06, was corrected to **22** the same day *with its
+> method written beside it*, and the method was still wrong: it claimed 30 non-spec lines of which
+> 8 were the mechanism. **Both inputs were wrong — there are 44 non-spec lines and 10 of them are
+> the mechanism — and the two errors very nearly cancelled**, which is how 22 came within one of
+> the right answer by coincidence and would have been believed.
+>
+> The derivation, re-runnable in full:
+>
+> ```
+> P='\$queryRaw|\$executeRaw|\$queryRawUnsafe|\$executeRawUnsafe'
+> git grep -nE "$P" -- 'apps/api/src/**' ':!*.spec.ts'                    # 44 non-spec lines
+> git grep -nE "$P" -- 'apps/api/src/prisma/tenant-scope.extension.ts'    # 10 are the mechanism
+> # 34 consumer lines remain — of which 13 are COMMENTS naming the method, not calls,
+> # so the figure is 21 CALL SITES across 11 files.
+> ```
+>
+> **Strip the comment lines before counting.** Thirteen of the thirty-four are prose explaining why
+> a given query is raw — `customer.repository.ts` alone holds three and `user.repository.ts` four —
+> and this repository has already been caught by exactly that: a comment quoting the thing being
+> counted is counted as an instance of it unless comments are stripped first.
 
 They are therefore protected by RLS alone, which is exactly the guarantee spec
 §1 describes. `withOrgAwareTransactions` runs them inside the same
