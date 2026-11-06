@@ -143,6 +143,119 @@ would remove the human judgement entirely.
   the reviewer-pool selection to be deterministic-and-fair would also stop this
   test being load-sensitive.
 
+
+**2026-11-06 — WHAT REFILLS IT, MEASURED. The three figures have three different answers, and only
+two of them have a writer that can be named.** Entry 52's re-bloat clause fired on 2026-11-06:
+db-test held **5,239 active users, 71,861 audit rows and 29 roles** against the post-reset 12 / 0 /
+13. The clause treats the symptom, and nobody had measured the cause. Every figure below is a query
+run against db-test on 2026-11-06, and the reset that reads 2026-10-18 below is `8cbc303`.
+
+**AND THE TWO NUMBERS THIS ENTRY HAS ALWAYS QUOTED MISS THE SECOND-LARGEST TABLE.** Users and audit
+rows are not where the volume is, by themselves: on 2026-11-06 db-test holds **153,355 rows across
+every table**, and `AuditLogEntry` (71,861) plus `AccessRecertificationItem` (**41,835**) are
+**74.1%** of them. The recertification table has never appeared in this entry.
+
+**ROLES — ONE writer family, and this repository had already asked for exactly this measurement.**
+29 roles is **13 seeded plus 16 left behind by specs**: 15 named `E2E_PLATFORM_GRANT_<epoch>` and
+one `E2E_SCOPED_<epoch>`, all 16 in the DEFAULT office. The three creating sites are
+`brokerage-office-registration.e2e-spec.ts:626`, `provider-office-state.e2e-spec.ts:762` and
+`role-scope.e2e-spec.ts:141` — each builds its name from a clock, so no name is ever reused and no
+row is ever removed. **Their own names date them**, independently of any column: 14 of the 16 were
+stamped 2026-10-21 and none later, so the role count has stood at 29 since then.
+`provider-self-administration.e2e-spec.ts:56` states in its own comment that *"Sixteen roles are
+owed a teardown by whichever spec creates them, and finding which is its own measurement"* — this is
+that measurement, and the split it recorded on 2026-10-28 (14 ACTIVE, 15 INACTIVE) reproduces
+exactly on 2026-11-06.
+
+**AND THAT LEAK HAS ALREADY CHANGED A TEST'S RESULT, not merely its duration** — which is the half
+of this entry that was always about elapsed time. The same comment records
+`provider-self-administration.e2e-spec.ts` failing with *expected 'INACTIVE' to be 'ACTIVE'* without
+the route under test having written anything, because the leaked INACTIVE roles were **the majority
+of the table** and an unordered `findFirstOrThrow` picked one. Proven pre-existing by running that
+file at HEAD with everything else stashed.
+
+**AUDIT ROWS — ONE dominant writer, 58% of the table, AND IT COMPOUNDS.** Of 71,861 audit rows,
+**41,850 carry `entityType = 'AccessRecertificationItem'`**; the next three are `User` (11,154),
+`Customer` (2,964) and `Organization` (1,295). `AccessRecertificationService.startCycle` enumerates
+`findActiveSubjectUserIds()` — **every active user in the office** — and writes one item row and one
+audit row per subject. So the cost of one call is a function of every previous run's residue, and the
+25 cycles in db-test on 2026-11-06 show it directly, in five batches of five (five runs of
+`rbac.e2e-spec.ts`, which opens five cycles):
+
+| Cycle batch | Items written per cycle |
+|---|---|
+| 2026-10-20 08:19 | ~345 |
+| 2026-10-21 09:19 | ~1,120 |
+| 2026-10-23 19:25 | ~2,057 |
+| 2026-10-28 04:05 | ~2,359 |
+| 2026-10-28 14:32 | ~2,486 |
+
+**A 7.2-fold rise in the cost of the same five tests over eight days**, from the same code. The
+default office now holds 5,075 active users, so **the next cycle opened against db-test as it stands
+on 2026-11-06 writes about 5,075 item rows and 5,075 audit rows** — against 12 on a reset database.
+The service's own comment already names the symptom (*"the O(N) sequential writes here were what
+pushed `startCycle` past the e2e test timeout once the shared test DB had accumulated enough
+users"*), which is this entry's §1.1 symptom from the inside: **the heaviest consumer of the residue
+is also the largest producer of it.**
+
+**USERS — NO single writer, and deletion is structurally IMPOSSIBLE.** 5,271 users arrived in **77
+distinct bursts** between 2026-10-18 05:49 and 2026-11-05 22:10 (a burst being a gap of more than
+fifteen minutes between consecutive creations); the largest single burst created **913 users in 50
+minutes** on 2026-10-21. There is no dominant fixture: grouped by the first token of the local part
+of the e-mail, the biggest family is `retention-*` at **1,009 of 5,271 (19%)**, then `picker-*` 381,
+`dsr-*` 194, `provider-*` 166 — a long tail of roughly forty. **100 of the spec files define their
+own `makeUser`, across 907 call sites**, and not one of them deletes a user.
+
+**That is not untidiness — `brokerage-office-registration.e2e-spec.ts:578` measured it by trying**:
+`rawPrisma.user.deleteMany` fails with **SQLSTATE 23001, `AuditLogEntry_userId_fkey` RESTRICT**, and
+`AuditLogEntry` is append-only BY DATABASE TRIGGER, so the audit rows cannot be removed either. **A
+test user is permanent the moment it does anything.** This is why fix option 2 above (truncate in a
+`beforeAll`) is not the cheap half of option 1 but a different operation entirely, and why per-file
+teardown is not on the table at all: the only two instruments that work are a fresh database per
+file and a full reset.
+
+**THE RATE, AND A CORRECTION TO THIS ENTRY'S OWN WORDING.** The 2026-10-18 reset started from
+`reset-db-test.sh`'s own recorded pre-reset state — **9,077 active users, 356,062 audit rows, 47
+roles** — and reached 12 / 0 / 13. Nineteen days later it reads 5,239 / 71,861 / 29, which is **about
+276 active users and 3,782 audit rows a day**, and **58% of the pre-reset user count already back**.
+At that rate the user count returns to its 2026-10-18 value around 2026-11-20. **So "a reset buys
+months and not more", written above, is itself optimistic and is corrected here rather than
+deleted**: measured on this cycle it buys about **five weeks** on the user count, and the reasoning
+it was making — that the accumulation restarts on the next run and option 1 is the answer — is
+exactly right and is why the figure matters.
+
+**AND THE RESET DOES NOT INVALIDATE THE TENANT-ISOLATION PROOF'S PREMISE — it is the one thing that
+re-establishes it.** Measured 2026-11-06: db-test holds exactly two organizations, the default
+brokerage office (`00000000-...-000000000001`) and the PROVIDER `GO Global`
+(`00000000-...-0000000000f0`), both seeded with fixed sentinel ids rather than created by any test.
+`tenant-isolation.e2e-spec.ts` **creates office B itself** at `ORG_B_ID`
+(`00000000-...-0000000000b2`, line 313), so the proof depends on the seeded shape rather than on
+accumulated state, and `assertOneOrganization()` in `apps/api/test/utils/test-app.ts` fails loudly if
+a second BROKERAGE_OFFICE survives a crashed run. More directly: `reset-db-test.sh` runs
+**`db:test:privileges`** as one of its four post-reset gates, which is precisely the premise the
+isolation result rests on — that the API's `ibms_app` role exists and holds its grants on the rebuilt
+tables. A reset therefore proves the premise rather than disturbing it.
+
+**AND THAT WAS THEN RUN RATHER THAN LEFT AS AN ARGUMENT: `tenant-isolation.e2e-spec.ts` is
+36/36 against the reset database**, 2026-11-06, which is the premise demonstrated instead of
+reasoned about.
+
+**ONE TRAP WORTH RECORDING, BECAUSE IT LOOKS EXACTLY LIKE A BROKEN DATABASE.** The first
+attempt reported `1 failed, 36 skipped` with
+`PrismaClientInitializationError: Environment variable not found: DATABASE_URL` pointing at
+`rawPrisma.organizationEmailIntegration.deleteMany()` — a stack that reads as *the reset broke
+the schema*. It is nothing of the kind: `vitest run --config test/vitest-e2e.config.ts` invoked
+directly loads no environment, and the real entry point is
+`dotenv -e ../../.env.test -- vitest run --config ./test/vitest-e2e.config.ts`
+(`apps/api/package.json:21`). **Run an e2e spec through `npm run test:e2e -w api`, or prefix
+`dotenv -e ../../.env.test --` by hand** — otherwise a configuration mistake arrives wearing the
+costume of a data-layer failure, immediately after a reset, which is the worst possible moment
+to be handed a misleading error.
+
+**WHAT IS NOT DONE HERE, deliberately: nothing.** This is a measurement. Whether the remedy is fix
+option 1, a teardown on the three role-creating specs, or capping what `startCycle` enumerates in a
+test environment is a decision with a cost attached, and it is the owner's.
+
 ### 1.2 `P1` — MFA/TOTP timing flake in shared `makeUser` helpers
 
 - **Symptom:** intermittent `expected 200 "OK", got 400 "Bad Request"` at the
@@ -6283,7 +6396,20 @@ system is used for anything.
 
 ## 5. Security & compliance threats / gaps
 
-### 5.1 `P0` — Part D (PDPL / M-series) is mostly unbuilt — M03 landed 2026-09-04
+### 5.1 ~~`P0` — Part D (PDPL / M-series) is mostly unbuilt~~ — **BUILT. RETIRED 2026-11-06 (module 0-c batch 5).**
+
+> **This section is kept for its per-item detail and its reasoning; its HEADLINE is false and was
+> last true before 1 October 2026.** Re-measured 2026-11-06 against the live tree:
+> **`apps/api/src/modules/pdpl/` holds 74 non-spec files and 13 controllers**
+> (`find apps/api/src/modules/pdpl -name '*.ts' ! -name '*.spec.ts' | wc -l`;
+> `find apps/api/src/modules/pdpl -name '*.controller.ts' | wc -l`).
+> All of Part D items #1–#9 shipped — consent touchpoints, DSR (M04), retention and disposal
+> (M06), cross-border transfer, data sharing (M08), DPIA (M10), notices, RoPA and the DPO
+> workspace. `docs/scope-and-gaps.md` is the authority on what remains.
+>
+> **Read any `P0` in this file as dated, not current.** The 2026-10-30 move carried these
+> sections across unchanged, so relocation did not refresh them — which is the defect that
+> produced the standing rule that *an absence claim rots and a presence does not*.
 
 - **`ConsentRecord` capture/withdrawal is now built** (M03 — `apps/api/src/
   modules/pdpl/`, `ibms-brain/meta/context/consent-management.md`): a grant
@@ -6537,7 +6663,21 @@ breakdown, #40 financial summary) are unchanged and still in-memory.
 
 ## 7. Frontend / UX gaps
 
-### 7.1 `P1` — Part F (bilingual UI) is entirely unbuilt
+### 7.1 ~~`P1` — Part F (bilingual UI) is entirely unbuilt~~ — **COMPLETE. RETIRED 2026-11-06 (module 0-c batch 5).**
+
+> **The sharpest wrong claim in this file: *entirely unbuilt* against a product whose every
+> screen is bilingual.** Re-measured 2026-11-06:
+> **106 screens under `apps/web/app/(app)/` plus 5 under `(auth)` — 111 — and 22 translation
+> dictionaries** (`find "apps/web/app/(app)" -name page.tsx | wc -l`;
+> `ls apps/web/lib/i18n/translations/*.ts | wc -l`).
+> All eight Part F items shipped: language switch, RTL, bidi, Arabic-first input and sorting,
+> locale formatting, full-text search, all six bilingual document types, four-state capture
+> evidence. Items #5 and #6 are PARTIAL on their own named edges (Hijri, multi-currency,
+> same-script typo tolerance) — see `ibms-brain/meta/context/bilingual-ui.md`.
+>
+> `CLAUDE.md` says "all 93 screens", which is now also stale in the other direction — it was
+> 89 + 4 when written and the live count is 106 + 5. **Neither figure should be quoted without
+> re-running the two commands above.**
 
 - No instant language switch, no RTL layout for Arabic, no bidi handling for
   mixed-content fields, no Arabic-first input (keyboards, national-ID name
@@ -6550,7 +6690,16 @@ breakdown, #40 financial summary) are unchanged and still in-memory.
   error / populated) with a screenshot each before it counts as done (Part F
   last bullet) — current screens are functional but not audited for this.
 
-### 7.2 `P2` — Part E (dashboards) is unbuilt
+### 7.2 ~~`P2` — Part E (dashboards) is unbuilt~~ — **BUILT AND AUDITED. RETIRED 2026-11-06 (module 0-c batch 5).**
+
+> Re-measured 2026-11-06: **7 dashboard screens exist under
+> `apps/web/app/(app)/dashboards/`** (`find "apps/web/app/(app)/dashboards" -name page.tsx | wc -l`)
+> — one more than the six this section says "don't exist". Part E shipped complete and was then
+> audited, which found and fixed one UI filter gap (`insurerId`).
+>
+> The clause below that credits #40 with the Financial Dashboard's figures is still correct and is
+> why this is retired rather than deleted: the dashboards consume the reporting modules' own
+> repositories, so the build order it describes is real history.
 
 - The six dashboards (Sales, Policy, Claims, Financial, Compliance, Insurer &
   Employee Performance) don't exist. #40 built the Financial Dashboard's
@@ -6561,9 +6710,21 @@ breakdown, #40 financial summary) are unchanged and still in-memory.
 
 ---
 
-## 8. Not-yet-started backlog scope
+## 8. ~~Not-yet-started backlog scope~~ — **DOMAINS F, G AND H ARE ALL BUILT. RETIRED 2026-11-06 (module 0-c batch 5).**
 
-Tracked in `README.md` § "Scope status" — listed here only so this file is a
+> **Every domain this section files as not started is complete.** Re-measured 2026-11-06 by
+> counting controllers in the modules that implement them
+> (`find apps/api/src/modules/<m> -name '*.controller.ts' | wc -l`):
+> **`compliance-risk` 11, `management-reporting` 13, `supporting-operations` 7 — 31 controllers.**
+> Domain F (#47–57), Domain G (#58–65) and Domain H (#66–74) all shipped;
+> `docs/scope-and-gaps.md` records Domain F and Domain H as COMPLETE by name.
+>
+> The pointer below is also broken: **`README.md` § "Scope status" moved to
+> `docs/scope-and-gaps.md` on 2026-10-30**, and that file — not this one — is the authority on
+> scope. This section is kept because its per-domain item lists are still a usable index of what
+> each domain contains.
+
+Tracked in `docs/scope-and-gaps.md` § "Scope status" — listed here only so this file is a
 complete picture. **Not** improvements to existing code; net-new build.
 
 - ~~**Domain E — Customer Service (#41–46)**~~ — **complete**, moved out of

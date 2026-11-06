@@ -285,8 +285,11 @@ export class VendorService {
     return updated;
   }
 
-  /** Backlog #71 checkbox 1 — a queryable readiness check, not a live
-   * gate (see `vendor.config.ts`'s header comment). */
+  /** Backlog #71 checkbox 1 — the queryable form of a rule that IS enforced
+   * elsewhere: `data-sharing-approval.service.ts:76` refuses a share with a
+   * 422 when it is not ready. This endpoint only ANSWERS; it refuses nothing,
+   * which is why a screen can call it to show why a share would fail.
+   * Corrected 2026-11-06 — it said "not a live gate". */
   async dataShareReadiness(id: string): Promise<DataShareReadiness> {
     const vendor = await this.vendors.findById(id);
     if (!vendor) throw new NotFoundException('Vendor not found');

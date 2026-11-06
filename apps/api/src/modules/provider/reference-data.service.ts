@@ -14,8 +14,14 @@ import { PrismaService } from '../../prisma/prisma.service';
  * The registration screen needs ALL of them to render its first frame. Eight requests would mean
  * eight loading states on one form and eight ways for it to half-arrive; a screen that can show its
  * country picker but not its bank picker is worse than one that waits. They are also small and
- * static — 43 rows across all eight, measured — so there is nothing to paginate and nothing to
- * filter.
+ * static — **44 rows across all eight as at 2026-11-06** (Bank 14, City 12, LegalForm 7,
+ * RatingAgency 4, Currency 3, BusinessModel 2, Country 1, LicensingAuthority 1), measured by
+ * counting the rows on the dev database rather than the seed arrays — so there is nothing to
+ * paginate and nothing to filter.
+ *
+ * The figure carries its date because it moved: this said **43** and a row was added afterwards.
+ * It is a sizing argument, not an invariant, so a drift of one does not change the design — but a
+ * figure quoted without its as-of point reads as a count somebody can check and fail to reproduce.
  *
  * ## WHY NO `InsuranceLine`
  *

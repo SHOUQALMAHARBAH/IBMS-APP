@@ -305,12 +305,32 @@ for (const lang of LANGS) {
 // --- Claim ----------------------------------------------------------------
 
 /*
- * There is NO standalone claims screen in this app, and that is a real finding
- * rather than an omission in this sweep: `AppNav`'s own comment records that
- * the "Claims" nav group "held exactly one item, an analytics screen, with no
- * operational claims screen to sit beside", and was dissolved. Claims are
- * operated through `ClaimSection` on `/opportunities/[id]`, which is therefore
- * the screen item 7's "Claim" stage names. Logged in README § Known gaps.
+ * CORRECTED 2026-11-06 (module 0-c batch 5). THIS COMMENT SAID "There is NO
+ * standalone claims screen in this app, and that is a real finding rather than
+ * an omission in this sweep". **`/claims` EXISTS.**
+ *
+ * Measured: `apps/web/app/(app)/claims/page.tsx` is 347 lines
+ * (`wc -l`), and it is wired into navigation —
+ * `apps/web/components/app/destinations.ts` names `'/claims'`.
+ * `docs/scope-and-gaps.md:1488` records it as "CLOSED — the Claims Officer now
+ * has a screen (`/claims`)". The claim was true when this sweep was written:
+ * the "Claims" nav group had been dissolved for holding only an analytics
+ * screen, and that history is real. It stopped being true when the operational
+ * screen landed, and nothing re-read this file.
+ *
+ * WHAT IS STILL OWED, AND IT IS NOT A ONE-LINE FIX: the captures below still
+ * exercise `ClaimSection` on `/opportunities/[id]`, which is a legitimate
+ * surface and worth keeping — a claim IS operated there. But the "Claim" stage
+ * of this sweep should capture `/claims` itself, four states × two languages,
+ * and that needs route mocks for the claims LIST endpoint (this file has none;
+ * every mock here is opportunity-shaped), then a forced rebuild and a
+ * Playwright run. Sized and recorded rather than half-done, because a capture
+ * set pointed at a screen whose empty and error states were never mocked would
+ * produce eight believable pictures of the wrong thing — the recorded
+ * screenshot-fixture defect, which this repository has already paid for twice.
+ *
+ * The pointer is also fixed: README § Known gaps moved to
+ * `docs/scope-and-gaps.md` on 2026-10-30.
  */
 
 const OPPORTUNITY: OpportunityWithContext = {

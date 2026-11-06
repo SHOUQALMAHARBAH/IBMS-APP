@@ -50,7 +50,7 @@ export class PolicyDashboardService {
     if (provided === 0) return currentUtcMonthRange(new Date());
     if (provided !== 3) {
       throw new UnprocessableEntityException(
-        'periodLabel, periodStart, and periodEnd must all be supplied together, or all omitted for the previous calendar month',
+        'periodLabel, periodStart, and periodEnd must all be supplied together, or all omitted for the current calendar month',
       );
     }
     const periodStart = parseCalendarDate(query.periodStart!, 'periodStart');
