@@ -80,15 +80,28 @@ export interface ResolveSlaTimerParams {
  * would make `SlaTimer` rows created for a workflow whose sweep hasn't run
  * yet indistinguishable from ones with no escalation target at all.
  *
- * **No domain module calls `startTimer()`/`resolve()` yet for 13 of the 14
- * registry entries** — same root cause as A.6/A.7: no Part C business
- * module (`DataSubjectRequestService`, `IncidentService`, etc.) exists to
- * call it from. The one exception:
- * `AccessRecertificationService.startCycle()` calls `startTimer()` for
- * `quarterly_access_review` — see README.md § Known gaps, A.8, for exactly
- * which workflows still only carry their SLA deadline on their own inline
- * field (`DataSubjectRequest.slaDueAt`, `DisposalBatch.slaDueAt`, etc.)
- * without a matching generic `SlaTimer` row yet.
+ * **CORRECTED 2026-11-06 (module 0-c batch 5). This comment said "No domain
+ * module calls `startTimer()`/`resolve()` yet for 13 of the 14 registry
+ * entries", with `AccessRecertificationService.startCycle()` as the one
+ * exception.** It was true when written — the root cause it named was real:
+ * no Part C business module existed to call it from. Both halves are now
+ * false, and measured rather than estimated:
+ *
+ *   - the registry holds **20** entries, not 14
+ *     (`grep -cE "workflowName: '[a-z_]+'" sla-registry.config.ts`);
+ *   - **every one of the 20 has a caller in domain code** — the set
+ *     difference between the registry's `workflowName` values and the ones
+ *     passed to `startTimer`/`resolve` outside this module is EMPTY;
+ *   - there are **28** call sites: 13 `startTimer` and 15 `resolve`
+ *     (`git grep -c "slaTimer.startTimer(\|sla.startTimer("` and the
+ *     `resolve` equivalent, over `apps/api/src`, excluding specs).
+ *
+ * It is corrected rather than deleted because what it was reaching for still
+ * matters: the generic `SlaTimer` row and a workflow's own inline deadline
+ * field (`DataSubjectRequest.slaDueAt`, `DisposalBatch.slaDueAt`) are two
+ * different records of one deadline, and a workflow that writes only the
+ * inline field is still invisible to the sweep. That is the property worth
+ * checking on a new entry — not the count, which is what rotted.
  */
 @Injectable()
 export class SlaTimerService {

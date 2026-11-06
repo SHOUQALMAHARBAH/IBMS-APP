@@ -2,13 +2,34 @@
 
 Multi-tenancy Phase 2 step 8. Companion to `ibms-system-multitenancy-spec.md` §1.
 
+> **`ibms-system-multitenancy-spec.md` IS NOT IN THIS REPOSITORY. Recorded 2026-11-06 (module 0-c
+> batch 5).** Measured: `git grep -l ibms-system-multitenancy-spec` returns this file and nothing
+> else, and no file of that name exists anywhere in the tree. This document cites it **five** times
+> — §1 (twice, including the line above), §3.1, §4.10 and §7 — so a reader following any of them
+> finds nothing, and the authority for tenant isolation is a document the team cannot open.
+>
+> **That matters more here than for an ordinary dangling pointer**, because this is the isolation
+> reference. Two consequences, both stated rather than worked around:
+>
+> 1. A reported internal-numbering defect in that spec (a pointer to §6 whose definitions are in §5,
+>    and numbering that jumps §8 → §10) **cannot be fixed from this repository** — the file is not
+>    here to fix.
+> 2. Until it is vendored or replaced, **this document plus
+>    `apps/api/test/tenant-isolation.e2e-spec.ts` are the operative authority**: the spec's §-numbered
+>    claims are unverifiable against their source, while the tests are executable. The suite was
+>    re-run 2026-11-06 — **36/36**, with the owner-connection comparison inside it as its own
+>    positive control.
+>
+> Getting the spec into the repo (or recording that it is deliberately external, and where it lives)
+> is owed and is the owner's call.
+
 Tenant isolation here is two independent layers. This document is about the
 second one, and specifically about the thing that quietly defeats it.
 
 | Layer | Where | What breaks it |
 |---|---|---|
 | 1 — application | `apps/api/src/prisma/tenant-scope.extension.ts` injects `organizationId` into every query, and refuses to run one with no Organization in context | a bug in that extension |
-| 2 — database | PostgreSQL RLS policies on all 118 tenant-scoped tables, keyed to `app.current_org_id` | connecting as the table **owner** |
+| 2 — database | PostgreSQL RLS policies on all **138** tenant-scoped tables, keyed to `app.current_org_id` | connecting as the table **owner** |
 
 Neither layer depends on the other. That is the point: a mistake in the
 `where`-injection does not switch off RLS, and a forgotten `SET LOCAL` does not
@@ -21,7 +42,7 @@ switch off the `where`-injection.
 **PostgreSQL exempts a table's OWNER from that table's own RLS policies.**
 
 The tables are owned by `ibms` — the role that runs migrations and the seed. If
-the API connects as `ibms`, all 118 policies are still there, still correct, and
+the API connects as `ibms`, all 138 policies are still there, still correct, and
 completely ineffective. Nothing errors. Nothing warns. `SELECT` just returns
 every office's rows.
 
@@ -133,9 +154,12 @@ into.
 
 ## Raw SQL
 
-Ten call sites use `$queryRaw`/`$executeRaw` — full-text search, `FOR UPDATE`
-row locks, the watchlist containment query. The application layer **cannot**
-filter those: it rewrites a Prisma argument object, and raw SQL has none.
+**22 consumer call sites** use `$queryRaw`/`$executeRaw` — full-text search, `FOR UPDATE`
+row locks, the watchlist containment query, the two invoice branch filters, the two
+`SECURITY DEFINER` view reads. (Measured 2026-11-06:
+`git grep -n '\$queryRaw\|\$executeRaw' -- apps/api/src` returns 30 non-spec lines, of which 8
+are the mechanism in `tenant-scope.extension.ts` itself. This said **ten**.) The application
+layer **cannot** filter those: it rewrites a Prisma argument object, and raw SQL has none.
 
 They are therefore protected by RLS alone, which is exactly the guarantee spec
 §1 describes. `withOrgAwareTransactions` runs them inside the same
@@ -175,7 +199,11 @@ anonymous lookups: login by email, refresh, and password reset.
 ## Verifying it is actually on
 
 ```sql
--- 118 expected
+-- 138 expected, measured against the live catalogue 2026-11-06 on BOTH `db` and `db-test`.
+-- This said 118, so a developer running the check on a correct database read it as wrong by 20.
+-- Do not re-derive this figure by grepping the migrations: that counts what was ever written and
+-- cannot see a later DROP, which is exactly how SECURITY.md once carried 139/13 against a real
+-- 138/12.
 SELECT count(*) FROM pg_policies WHERE schemaname = 'public';
 
 -- must be false for the API's role

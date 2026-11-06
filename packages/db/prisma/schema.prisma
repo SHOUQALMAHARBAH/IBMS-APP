@@ -4934,9 +4934,27 @@ enum DsrStatus {
 
 /// Part 4.1 core entity / Part 6.2 (M04). SLA: Access/Deletion 15 business
 /// days (Access +15 extension allowed, reason logged); Correction/Objection
-/// 10 business days. A Deletion DSR with an open retention flag cannot be
-/// closed "fully fulfilled" — must force PARTIALLY_FULFILLED with a
-/// retentionScheduleReference.
+/// 10 business days. A Deletion DSR cannot be closed "fully fulfilled" while
+/// an active `LegalHold` names the data subject.
+///
+/// CORRECTED 2026-11-06 (module 0-c batch 5). This said "a Deletion DSR with an
+/// open retention FLAG ... must FORCE PARTIALLY_FULFILLED with a
+/// retentionScheduleReference", and both halves misdescribe the mechanism:
+///
+///   - the test is not a flag. `dsr.service.ts:401` runs a live
+///     `LegalHoldRepository.hasActiveHoldForSubject()` query against M06's
+///     register. The `confirmNoOpenRetentionHold` attestation still covers the
+///     case with NO formally-placed hold, which the register cannot detect.
+///   - nothing is FORCED. `fulfil()` REFUSES with a 422
+///     (`dsr.service.ts:406-409`) and tells the officer to use
+///     partially-fulfil, referencing the hold. The status does not move, so
+///     code written against "it will coerce the status for me" would be wrong.
+///
+/// The sentence was honest when M04 shipped — M06 did not exist, so the
+/// attestation was all there was — and the service's own header records that
+/// widening. It is corrected rather than deleted because the OBLIGATION it
+/// states is unchanged: a deletion must not read as fully fulfilled while
+/// something still requires the data to be kept.
 model DataSubjectRequest {
   id                             String                         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this

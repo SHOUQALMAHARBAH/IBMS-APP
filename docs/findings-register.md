@@ -6283,7 +6283,20 @@ system is used for anything.
 
 ## 5. Security & compliance threats / gaps
 
-### 5.1 `P0` — Part D (PDPL / M-series) is mostly unbuilt — M03 landed 2026-09-04
+### 5.1 ~~`P0` — Part D (PDPL / M-series) is mostly unbuilt~~ — **BUILT. RETIRED 2026-11-06 (module 0-c batch 5).**
+
+> **This section is kept for its per-item detail and its reasoning; its HEADLINE is false and was
+> last true before 1 October 2026.** Re-measured 2026-11-06 against the live tree:
+> **`apps/api/src/modules/pdpl/` holds 74 non-spec files and 13 controllers**
+> (`find apps/api/src/modules/pdpl -name '*.ts' ! -name '*.spec.ts' | wc -l`;
+> `find apps/api/src/modules/pdpl -name '*.controller.ts' | wc -l`).
+> All of Part D items #1–#9 shipped — consent touchpoints, DSR (M04), retention and disposal
+> (M06), cross-border transfer, data sharing (M08), DPIA (M10), notices, RoPA and the DPO
+> workspace. `docs/scope-and-gaps.md` is the authority on what remains.
+>
+> **Read any `P0` in this file as dated, not current.** The 2026-10-30 move carried these
+> sections across unchanged, so relocation did not refresh them — which is the defect that
+> produced the standing rule that *an absence claim rots and a presence does not*.
 
 - **`ConsentRecord` capture/withdrawal is now built** (M03 — `apps/api/src/
   modules/pdpl/`, `ibms-brain/meta/context/consent-management.md`): a grant
@@ -6537,7 +6550,21 @@ breakdown, #40 financial summary) are unchanged and still in-memory.
 
 ## 7. Frontend / UX gaps
 
-### 7.1 `P1` — Part F (bilingual UI) is entirely unbuilt
+### 7.1 ~~`P1` — Part F (bilingual UI) is entirely unbuilt~~ — **COMPLETE. RETIRED 2026-11-06 (module 0-c batch 5).**
+
+> **The sharpest wrong claim in this file: *entirely unbuilt* against a product whose every
+> screen is bilingual.** Re-measured 2026-11-06:
+> **106 screens under `apps/web/app/(app)/` plus 5 under `(auth)` — 111 — and 22 translation
+> dictionaries** (`find "apps/web/app/(app)" -name page.tsx | wc -l`;
+> `ls apps/web/lib/i18n/translations/*.ts | wc -l`).
+> All eight Part F items shipped: language switch, RTL, bidi, Arabic-first input and sorting,
+> locale formatting, full-text search, all six bilingual document types, four-state capture
+> evidence. Items #5 and #6 are PARTIAL on their own named edges (Hijri, multi-currency,
+> same-script typo tolerance) — see `ibms-brain/meta/context/bilingual-ui.md`.
+>
+> `CLAUDE.md` says "all 93 screens", which is now also stale in the other direction — it was
+> 89 + 4 when written and the live count is 106 + 5. **Neither figure should be quoted without
+> re-running the two commands above.**
 
 - No instant language switch, no RTL layout for Arabic, no bidi handling for
   mixed-content fields, no Arabic-first input (keyboards, national-ID name
@@ -6550,7 +6577,16 @@ breakdown, #40 financial summary) are unchanged and still in-memory.
   error / populated) with a screenshot each before it counts as done (Part F
   last bullet) — current screens are functional but not audited for this.
 
-### 7.2 `P2` — Part E (dashboards) is unbuilt
+### 7.2 ~~`P2` — Part E (dashboards) is unbuilt~~ — **BUILT AND AUDITED. RETIRED 2026-11-06 (module 0-c batch 5).**
+
+> Re-measured 2026-11-06: **7 dashboard screens exist under
+> `apps/web/app/(app)/dashboards/`** (`find "apps/web/app/(app)/dashboards" -name page.tsx | wc -l`)
+> — one more than the six this section says "don't exist". Part E shipped complete and was then
+> audited, which found and fixed one UI filter gap (`insurerId`).
+>
+> The clause below that credits #40 with the Financial Dashboard's figures is still correct and is
+> why this is retired rather than deleted: the dashboards consume the reporting modules' own
+> repositories, so the build order it describes is real history.
 
 - The six dashboards (Sales, Policy, Claims, Financial, Compliance, Insurer &
   Employee Performance) don't exist. #40 built the Financial Dashboard's
@@ -6561,9 +6597,21 @@ breakdown, #40 financial summary) are unchanged and still in-memory.
 
 ---
 
-## 8. Not-yet-started backlog scope
+## 8. ~~Not-yet-started backlog scope~~ — **DOMAINS F, G AND H ARE ALL BUILT. RETIRED 2026-11-06 (module 0-c batch 5).**
 
-Tracked in `README.md` § "Scope status" — listed here only so this file is a
+> **Every domain this section files as not started is complete.** Re-measured 2026-11-06 by
+> counting controllers in the modules that implement them
+> (`find apps/api/src/modules/<m> -name '*.controller.ts' | wc -l`):
+> **`compliance-risk` 11, `management-reporting` 13, `supporting-operations` 7 — 31 controllers.**
+> Domain F (#47–57), Domain G (#58–65) and Domain H (#66–74) all shipped;
+> `docs/scope-and-gaps.md` records Domain F and Domain H as COMPLETE by name.
+>
+> The pointer below is also broken: **`README.md` § "Scope status" moved to
+> `docs/scope-and-gaps.md` on 2026-10-30**, and that file — not this one — is the authority on
+> scope. This section is kept because its per-domain item lists are still a usable index of what
+> each domain contains.
+
+Tracked in `docs/scope-and-gaps.md` § "Scope status" — listed here only so this file is a
 complete picture. **Not** improvements to existing code; net-new build.
 
 - ~~**Domain E — Customer Service (#41–46)**~~ — **complete**, moved out of

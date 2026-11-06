@@ -146,7 +146,7 @@ export const DASHBOARDS = {
     // ---- Sales dashboard ----------------------------------------------------
     dsalHeading: 'لوحة المبيعات',
     dsalIntro:
-      'العملاء المحتملون الجدد ومعدّل التحويل، والأقساط المكتتبة (أعمال جديدة مقابل تجديد)، وإيرادات العمولة، وتحويل فرص البيع المتبادل والبيع الإضافي. والافتراضي هو الشهر الميلادي السابق.',
+      'العملاء المحتملون الجدد ومعدّل التحويل، والأقساط المكتتبة (أعمال جديدة مقابل تجديد)، وإيرادات العمولة، وتحويل فرص البيع المتبادل والبيع الإضافي. والافتراضي هو الشهر الميلادي الحالي.',
     dsalNewLeads: 'عملاء محتملون جدد',
     dsalConvertedToProspect: 'المحوَّلون إلى عملاء مرتقبين',
     dsalConversionRate: 'معدّل التحويل',
@@ -166,7 +166,7 @@ export const DASHBOARDS = {
     // ---- Policy dashboard ---------------------------------------------------
     dpolHeading: 'لوحة الوثائق',
     dpolIntro:
-      'الوثائق السارية والوثائق التي تقترب من الانتهاء لقطة حيّة كما هي الآن (وتنطبق نافذة التجديد على الوثائق المنتهية فقط). أما الوثائق الجديدة الصادرة والوثائق الملغاة (مع أسبابها) فمحصورة بالفترة المختارة، والافتراضي هو الشهر الميلادي السابق.',
+      'الوثائق السارية والوثائق التي تقترب من الانتهاء لقطة حيّة كما هي الآن (وتنطبق نافذة التجديد على الوثائق المنتهية فقط). أما الوثائق الجديدة الصادرة والوثائق الملغاة (مع أسبابها) فمحصورة بالفترة المختارة، والافتراضي هو الشهر الميلادي الحالي.',
     dpolBeforeIssuance: '{customer} — قبل الإصدار',
     dpolRenewalWindowLabel: 'نافذة التجديد (بالأيام)',
     dpolActivePolicies: 'الوثائق السارية',
@@ -490,7 +490,7 @@ export const DASHBOARDS = {
 
     dsalHeading: 'Sales Dashboard',
     dsalIntro:
-      'New leads and conversion rate, premium written (new vs. renewal), commission income, and cross-sell/up-sell opportunity conversion. Defaults to the previous calendar month.',
+      'New leads and conversion rate, premium written (new vs. renewal), commission income, and cross-sell/up-sell opportunity conversion. Defaults to the current calendar month.',
     dsalNewLeads: 'New leads',
     dsalConvertedToProspect: 'Converted to Prospect',
     dsalConversionRate: 'Conversion rate',
@@ -509,7 +509,7 @@ export const DASHBOARDS = {
 
     dpolHeading: 'Policy Dashboard',
     dpolIntro:
-      'Active policies and expiring policies are a live snapshot as of now (the renewal window applies to expiring policies only). New policies issued and cancelled policies (with reasons) are scoped to the selected period, which defaults to the previous calendar month.',
+      'Active policies and expiring policies are a live snapshot as of now (the renewal window applies to expiring policies only). New policies issued and cancelled policies (with reasons) are scoped to the selected period, which defaults to the current calendar month.',
     dpolBeforeIssuance: '{customer} — before issuance',
     dpolRenewalWindowLabel: 'Renewal window (days)',
     dpolActivePolicies: 'Active policies',

@@ -19,9 +19,23 @@
  *      represents a generic "access grant" at all. This process therefore
  *      builds `computeDataShareReadiness()` as a pure, queryable rule
  *      (`GET /vendors/:id/data-share-readiness`) rather than inventing the
- *      M08 workflow — an honest, forward-compatible gate with NO live
- *      enforcement call site yet, not a claim that anything is actually
- *      blocked today.
+ *      M08 workflow — an honest, forward-compatible gate.
+ *
+ *      **CORRECTED 2026-11-06 (module 0-c batch 5). This said the rule had
+ *      "NO live enforcement call site yet, not a claim that anything is
+ *      actually blocked today". It IS enforced, and a data share IS
+ *      blocked.** Measured: `data-sharing-approval.service.ts:65` calls
+ *      `computeDataShareReadiness()` and lines 76-78 throw
+ *      `UnprocessableEntityException` (**422**) when `!readiness.ready`,
+ *      naming the reasons. `pdpl.module.ts:68` already recorded this —
+ *      it says M08's arrival made `computeDataShareReadiness()` "live for
+ *      the first time" — so the codebase contradicted itself in two files
+ *      for as long as both stood.
+ *
+ *      The reasoning is kept because it was right about the SHAPE: this is
+ *      still a pure, queryable rule rather than an invented M08 workflow,
+ *      and the enforcement lives at the M08 call site rather than in here.
+ *      What changed is that the call site now exists.
  *   2. A mandatory DPA for Medium/High tier, additional DPO approval for
  *      High tier before the first share — `DataProcessingAgreement`'s own
  *      doc comment already states this; its maker/checker pair
@@ -130,8 +144,10 @@ export interface DataShareReadiness {
 }
 
 /** Pure: backlog #71's checkbox 1, "risk tiering ... before any data share
- * or access grant" — a queryable readiness computation, not a live gate
- * (see this file's header comment for why no live call site exists yet).
+ * or access grant" — a queryable readiness computation. It is PURE; the
+ * refusal is the caller's. `data-sharing-approval.service.ts:76` turns a
+ * `ready: false` into a 422, so this IS enforced — corrected 2026-11-06,
+ * having said "not a live gate ... no live call site exists yet".
  * `activeDpa` is the vendor's own currently-signed, unexpired
  * `DataProcessingAgreement` (or `null` if none) — resolving which DPA
  * counts as "active" is the repository's job

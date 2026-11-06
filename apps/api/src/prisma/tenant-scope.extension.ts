@@ -300,8 +300,10 @@ export function withOrgAwareTransactions(
    * it genuinely matters rather than merely belting-and-bracing.
    *
    * The application layer cannot filter raw SQL: `applyTenantScope` rewrites a
-   * Prisma argument object, and a raw query has none. Those ten call sites
-   * (full-text search, `FOR UPDATE` row locks, the watchlist containment query)
+   * Prisma argument object, and a raw query has none. Those **22** consumer
+   * call sites (full-text search, `FOR UPDATE` row locks, the watchlist
+   * containment query, the two invoice branch filters, the two SECURITY
+   * DEFINER view reads — measured 2026-11-06; this said "ten")
    * are therefore protected by RLS ALONE — which is exactly spec §1's promise
    * that "a raw/forgotten query without the app-layer filter still can't cross
    * tenants". Wrapping them here is what makes that true instead of aspirational.

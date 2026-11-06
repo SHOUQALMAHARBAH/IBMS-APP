@@ -8,9 +8,21 @@
  *     Encryption/Key Management, A.4 Immutable Audit Trail, A.9 Data
  *     Masking, A.10 Infra/Deployment) are real but each carries its OWN
  *     already-tracked gap (hardware-token MFA, a real KMS/HSM,
- *     encryption-at-rest, unwired `assertSecureChannel`/
- *     `assertExportAllowed` callers, Dev/Test/UAT/Prod separation) — all
- *     documented in this repo's own README § Known gaps, not restated here.
+ *     encryption-at-rest, an unwired `assertExportAllowed`,
+ *     Dev/Test/UAT/Prod separation) — all documented in
+ *     `docs/scope-and-gaps.md` § Known gaps, not restated here.
+ *
+ *     **CORRECTED 2026-11-06 (module 0-c batch 5): this said "unwired
+ *     `assertSecureChannel`/`assertExportAllowed` callers" and only half of
+ *     that is true.** Measured with
+ *     `git grep -n "assertSecureChannel\|assertExportAllowed" apps/api/src`:
+ *     `assertSecureChannel` HAS a live caller —
+ *     `data-sharing-approval.service.ts:51` — so naming it unwired sent a
+ *     reader looking for a gap that had been closed. `assertExportAllowed`
+ *     genuinely has no production caller: its only occurrences are its own
+ *     definition and its spec. One name was removed from the list rather
+ *     than the clause being deleted, because the other half is still a real
+ *     gap and still belongs here.
  *   - `IncidentReport` (#55) is genuinely built and its own doc comment
  *     already frames it as a "unified SECURITY + personal-data breach
  *     workflow" — a real, working cyber-incident reporting path, though it
