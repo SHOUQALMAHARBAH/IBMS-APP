@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectNone } from "./support/anchored";
 
 /**
  * The insurer screens — list, register, detail, and the deactivation step.
@@ -501,4 +502,236 @@ test("OWNER DECISION 43 — the rating shows WHEN it was formed, and one control
   // AND THE CONTROL IS GONE, because there is nothing left to clear — which also keeps the api's own
   // no-op branch unreachable from the screen rather than merely harmless.
   await expect(page.getByTestId("insurer-clear-rating")).toHaveCount(0);
+});
+
+/* ===================================================================================================
+ * MODULE 0-c BATCH 2 ITEM 1 — THE CORRECTION PANEL, the first caller `updateInsurer` ever had.
+ *
+ * Measured before it was built: `updateInsurer` existed with its route and its permission, and
+ * NOTHING in `apps/web` called it, so the office could not edit an insurer record at all. The
+ * sharpest consequence is the one the decision-43 test covers from the other side — the clear control
+ * could remove the office's own solvency judgement and no screen could put one back.
+ *
+ * Both reachability gates counted `PATCH /insurers/:id` as REACHED throughout, because each reads the
+ * path and verb out of every resolvable client call INCLUDING the one inside the helper's own
+ * declaration. That is a declared, gated number in both passes now.
+ * =================================================================================================*/
+
+/** Opens the panel and resolves once its inputs are on screen. */
+async function openEditPanel(page: Page) {
+  await page.route("http://localhost:4000/insurance-lines", (route) =>
+    route.fulfill({ status: 200, json: [MOTOR_LINE, OFFICE_LINE] }),
+  );
+  await page.goto("/insurers/ins-1");
+  await expect(
+    page.getByRole("heading", { name: "Al-Yarmouk Insurance" }),
+  ).toBeVisible();
+  await page.locator("[data-insurer-edit-open]").click();
+  await expect(page.locator("[data-insurer-edit-panel]")).toBeVisible();
+}
+
+test("an office administrator can correct an insurer record, which nothing could do before", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurers/ins-1", (route) =>
+    route.fulfill({ status: 200, json: ACTIVE_INSURER }),
+  );
+  await openEditPanel(page);
+
+  // The panel is PRE-FILLED from the record. A blank form would be a different product — it would
+  // read as "register again" and, because the payload is a diff, would send nothing at all.
+  await expect(page.locator("[data-insurer-rating-input]")).toHaveValue("A-");
+  await expect(page.locator("[data-insurer-rating-as-of-input]")).toHaveValue(
+    "2026-03-01",
+  );
+});
+
+/*
+ * THE SINGLE MOST DEFECT-PRONE PROPERTY, so it is asserted on the REQUEST BODY rather than on the
+ * screen: only the field that CHANGED is sent.
+ *
+ * `UpdateInsurerDto` validates each optional field when present, so `companyEmail: ''` is a 400 from
+ * `@IsEmail()` and `companyWebsite: ''` a 400 from `@IsUrl()`. A regression into "send the whole
+ * form" would therefore refuse every record carrying a blank optional field — which is almost all of
+ * them — and it would do so with a validation message naming a field the user never touched.
+ */
+test("sends ONLY the changed field, because a full-form PATCH would 400 on any blank optional", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurers/ins-1", (route) => {
+    if (route.request().method() !== "PATCH")
+      return route.fulfill({ status: 200, json: ACTIVE_INSURER });
+    return route.fulfill({
+      status: 200,
+      json: { ...ACTIVE_INSURER, companyPhone: "+962 6 500 9999" },
+    });
+  });
+  await openEditPanel(page);
+
+  await page.getByLabel("Phone", { exact: true }).fill("+962 6 500 9999");
+
+  const [request] = await Promise.all([
+    page.waitForRequest(
+      (r) => r.url().endsWith("/insurers/ins-1") && r.method() === "PATCH",
+    ),
+    page.locator("[data-insurer-edit-save]").click(),
+  ]);
+
+  const body = request.postDataJSON() as Record<string, unknown>;
+  // An EXACT key set, not `toHaveProperty`. The defect being guarded is an ADDITION — every other
+  // field riding along — and only an exact set fails on one.
+  expect(Object.keys(body).sort()).toEqual(["companyPhone"]);
+  expect(body.companyPhone).toBe("+962 6 500 9999");
+});
+
+/*
+ * THE RATING AND ITS DATE REQUIRE EACH OTHER — the form-level twin of
+ * `Insurer_rating_carries_its_date`, which is a CHECK over the MERGED row and so cannot live in the
+ * DTO.
+ *
+ * ASSERTED ON THE POSITIVE SIGNAL. A blocked native submit FOCUSES the first invalid control, so
+ * `toBeFocused` is something a slow page cannot fake — where an absence assertion straight after a
+ * click cannot tell *refused* from *not yet*. That is this repository's own recorded lesson from the
+ * onboarding-wizard guard, applied rather than relearned.
+ */
+test("refuses a rating with no as-of date, and points at the empty control", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+
+  // A record with NEITHER half set, so what is tested is typing a rating onto a record that has no
+  // date — not clearing an existing one.
+  let patches = 0;
+  await page.route("http://localhost:4000/insurers/ins-1", (route) => {
+    if (route.request().method() === "PATCH") {
+      patches += 1;
+      return route.fulfill({ status: 200, json: ACTIVE_INSURER });
+    }
+    return route.fulfill({
+      status: 200,
+      json: {
+        ...ACTIVE_INSURER,
+        financialStrengthRating: null,
+        financialStrengthRatingAsOf: null,
+      },
+    });
+  });
+
+  await openEditPanel(page);
+  await page.locator("[data-insurer-rating-input]").fill("BBB+");
+  await page.locator("[data-insurer-edit-save]").click();
+
+  // The browser blocked the submit and moved focus to the control it is blocked on.
+  await expect(page.locator("[data-insurer-rating-as-of-input]")).toBeFocused();
+  expect(patches).toBe(0);
+
+  // AND THE OTHER DIRECTION, which is what makes the refusal above mean something rather than
+  // describing a form that can never be submitted: filling the date lets it through.
+  await page.locator("[data-insurer-rating-as-of-input]").fill("2026-09-01");
+  const [request] = await Promise.all([
+    page.waitForRequest(
+      (r) => r.url().endsWith("/insurers/ins-1") && r.method() === "PATCH",
+    ),
+    page.locator("[data-insurer-edit-save]").click(),
+  ]);
+  const body = request.postDataJSON() as Record<string, unknown>;
+  expect(Object.keys(body).sort()).toEqual([
+    "financialStrengthRating",
+    "financialStrengthRatingAsOf",
+  ]);
+});
+
+test("offers nothing to save until something changes", async ({ page }) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurers/ins-1", (route) =>
+    route.fulfill({ status: 200, json: ACTIVE_INSURER }),
+  );
+  await openEditPanel(page);
+
+  // A no-op PATCH writes an audit row saying somebody changed an insurer record when nothing did.
+  await expect(page.locator("[data-insurer-edit-save]")).toBeDisabled();
+  await page.getByLabel("Phone", { exact: true }).fill("+962 6 500 1111");
+  await expect(page.locator("[data-insurer-edit-save]")).toBeEnabled();
+});
+
+/*
+ * THE PANEL REPLACES THE READ-ONLY SECTIONS rather than sitting beside them. Two copies of the same
+ * field on screen at once — one stale, one being edited — is the state where a reader cannot tell
+ * which value the record holds.
+ */
+test("replaces the read-only view while editing, so no stale copy sits beside an input", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurers/ins-1", (route) =>
+    route.fulfill({ status: 200, json: ACTIVE_INSURER }),
+  );
+  await openEditPanel(page);
+
+  /*
+   * `expectNone`, NOT a bare `toHaveCount(0)` — and the first version of this test was the bare
+   * form with its anchor inside `openEditPanel`. `test/e2e-anchored-reads.test.ts` killed it, and it
+   * was right twice over: the guard reads each test BLOCK, so an anchor hidden in a helper is
+   * invisible to it, and a reader of this test sees a body that opens with an absence. Worse, an
+   * anchor in a helper silently disappears the day somebody edits the helper.
+   *
+   * THE ANCHOR COMES FROM THE SAME RENDER AS THE ABSENT THING, which is the rule `expectNone`'s own
+   * comment states and which that helper cannot enforce for itself. The read-only rating and the
+   * panel's rating INPUT are the two branches of ONE conditional render, so the input being visible
+   * is proof the swap has HAPPENED — not merely that something on the page rendered.
+   */
+  await expectNone(
+    page.locator("[data-insurer-rating]"),
+    page.locator("[data-insurer-rating-input]"),
+  );
+
+  // And cancelling brings it back, which proves the absence above was the swap rather than a crash.
+  // Same rule in the other direction: the read-only rating is the anchor for the panel's absence,
+  // because the two appear and disappear together.
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expectNone(
+    page.locator("[data-insurer-edit-panel]"),
+    page.locator("[data-insurer-rating]"),
+  );
+  await expect(page.locator("[data-insurer-rating]")).toContainText("A-");
+});
+
+test("a reader with insurer.read and not insurer.update sees no correction control", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("http://localhost:4000/insurers/ins-1", (route) =>
+    route.fulfill({ status: 200, json: ACTIVE_INSURER }),
+  );
+
+  await page.goto("/insurers/ins-1");
+  // Anchored twice: the page rendered, AND there is a record with fields to correct. Without the
+  // second half this absence would pass against an empty insurer.
+  await expect(
+    page.getByRole("heading", { name: "Al-Yarmouk Insurance" }),
+  ).toBeVisible();
+  await expect(page.locator("[data-insurer-rating]")).toContainText("A-");
+  await expect(page.locator("[data-insurer-edit-open]")).toHaveCount(0);
+});
+
+test("the correction panel has no serious/critical accessibility violations @a11y", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurers/ins-1", (route) =>
+    route.fulfill({ status: 200, json: ACTIVE_INSURER }),
+  );
+  // Its own test rather than a path in the loop above: this markup renders only after a button is
+  // pressed, and the a11y suite has never seen a state like that on this screen. The
+  // `/bcp-dr-plans` input with no label at all is the recorded precedent — invisible to axe because
+  // it appears only after a click.
+  await openEditPanel(page);
+
+  const results = await new AxeBuilder({ page }).analyze();
+  const serious = results.violations.filter(
+    (v) => v.impact === "serious" || v.impact === "critical",
+  );
+  expect(serious, serious.map((v) => v.id).join(", ")).toEqual([]);
 });
