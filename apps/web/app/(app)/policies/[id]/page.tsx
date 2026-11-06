@@ -15,6 +15,7 @@ import type {
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 import { policyStatusLabelKey } from '../../../../lib/policy/policy-status';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import {
@@ -22,6 +23,7 @@ import {
   smallButtonStyle,
 } from '../../../../components/lead/lead.styles';
 import {
+  detailSectionStyle,
   profileFieldLabelStyle,
   profileFieldValueStyle,
   profileGridStyle,
@@ -60,7 +62,7 @@ export default function PolicyDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [policy, setPolicy] = useState<PolicyDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -252,6 +254,54 @@ export default function PolicyDetailPage() {
         </div>
       </div>
 
+      {/* THE POLICY'S OWN PREMIUM, OUTSIDE THE RECOMMENDATION GUARD — moved 2026-11-06.
+           Both premium rows were inside `{policy.recommendation?.recommendedQuotation && …}`, so on
+           a policy with no recommendation chain the screen showed NO premium at all. These two
+           figures are `Policy`'s own always-present wire fields; only the insurer, deductible and
+           commission below genuinely belong to the quotation, and they stay inside the guard. */}
+      <div style={detailSectionStyle}>
+        <div style={profileGridStyle}>
+          {/* ROWS 16 AND 71 — fixed 2026-11-06 (module 0-c batch 6).
+               This read `policy.recommendation.recommendedQuotation.premium` RAW: the QUOTED
+               premium, unformatted, with no currency and no thousands separator, on the screen a
+               person opens to see what a policy costs. `formatMoney` was used ZERO times in this
+               whole file.
+               It now reads the POLICY'S OWN fields. `requestedPremium` is the same figure the
+               quotation carried — `PlacePolicyDto` takes it from the accepted recommendation — so
+               nothing is lost by sourcing it from the policy, and the optional `recommendation`
+               chain stops being load-bearing for the one number that must always render.
+               `issuedPremium` is the premium the insurer actually issued, has been on this wire
+               all along, and appeared NOWHERE on this screen. It renders only once issued, under
+               the shipping `policyIssuedPremiumLabel` («القسط الصادر»), so no word was invented.
+               STILL OWED AND NOT GUESSED: `policy.premiumVariance` is on the wire too and is the
+               figure a checker actually acts on, and NO shipping Arabic names a premium variance.
+               One word is owed; it is the owner's, and inventing it here is exactly what this
+               batch may not do. `poldPremium` («القسط») is likewise unqualified beside an issued
+               premium — a second word of hers would settle it. */}
+          <div>
+            <div style={profileFieldLabelStyle}>{t('poldPremium')}</div>
+            <div style={profileFieldValueStyle}>
+              <bdi>
+                {formatMoney(policy.requestedPremium, language, policy.currency)}
+              </bdi>
+            </div>
+          </div>
+
+          {policy.issuedPremium !== null && (
+            <div>
+              <div style={profileFieldLabelStyle}>
+                {t('policyIssuedPremiumLabel')}
+              </div>
+              <div style={profileFieldValueStyle}>
+                <bdi>
+                  {formatMoney(policy.issuedPremium, language, policy.currency)}
+                </bdi>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Recommendation & Commercial Terms */}
       {policy.recommendation?.recommendedQuotation && (
         <div style={{ marginBottom: '2rem' }}>
@@ -272,19 +322,16 @@ export default function PolicyDetailPage() {
               </div>
             )}
 
-            <div>
-              <div style={profileFieldLabelStyle}>{t('poldPremium')}</div>
-              <div style={profileFieldValueStyle}>
-                <bdi>{policy.recommendation.recommendedQuotation.premium}</bdi>
-              </div>
-            </div>
-
             {policy.recommendation.recommendedQuotation.deductible && (
               <div>
                 <div style={profileFieldLabelStyle}>{t('poldDeductible')}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>
-                    {policy.recommendation.recommendedQuotation.deductible}
+                    {formatMoney(
+                      policy.recommendation.recommendedQuotation.deductible,
+                      language,
+                      policy.currency,
+                    )}
                   </bdi>
                 </div>
               </div>
@@ -295,7 +342,11 @@ export default function PolicyDetailPage() {
                 <div style={profileFieldLabelStyle}>{t('poldCommission')}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>
-                    {policy.recommendation.recommendedQuotation.commission}
+                    {formatMoney(
+                      policy.recommendation.recommendedQuotation.commission,
+                      language,
+                      policy.currency,
+                    )}
                   </bdi>
                 </div>
               </div>

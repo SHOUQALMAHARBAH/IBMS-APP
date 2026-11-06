@@ -105,9 +105,32 @@ export function recordVendorAnnualReview(id: string): Promise<Vendor> {
   return apiPost(`/vendors/${id}/annual-review`);
 }
 
-export function terminateVendor(id: string): Promise<Vendor> {
+/**
+ * ROW 29 — THE ATTESTATION IS THE CALLER'S NOW, NOT THIS FUNCTION'S. Changed 2026-11-06.
+ *
+ * This hardcoded `confirmDataReturnOrDestruction: true`. `TerminateVendorDto`'s own comment says
+ * what that flag is: *"there is no automated verification that a vendor actually returned or
+ * destroyed the data it held, so this is a deliberate, conscious attestation by the officer
+ * terminating the relationship, not a system-verified fact."* The web was signing it for them —
+ * one click, no checkbox, no reason, and the record then said an officer had attested.
+ *
+ * Making it a REQUIRED parameter does not by itself obtain the attestation, and this comment does
+ * not pretend otherwise. What it does is make the obligation impossible to inherit by accident: a
+ * second caller (a bulk termination, a different screen) can no longer get a signed declaration for
+ * free, and every call site now names the value it is asserting.
+ *
+ * **WHAT IS STILL OWED, AND IT IS A SENTENCE: the screen has no checkbox, because no shipping
+ * Arabic says this.** Measured 2026-11-06: nothing in `apps/web/lib/i18n/translations/` carries an
+ * attestation label of this kind. The one call site below therefore still passes `true`, which is
+ * the unchanged behaviour, and the control is recorded as owed rather than invented — the
+ * declaration a person signs is the owner's words and nobody else's.
+ */
+export function terminateVendor(
+  id: string,
+  confirmDataReturnOrDestruction: boolean,
+): Promise<Vendor> {
   return apiPost(`/vendors/${id}/terminate`, {
-    confirmDataReturnOrDestruction: true,
+    confirmDataReturnOrDestruction,
   });
 }
 

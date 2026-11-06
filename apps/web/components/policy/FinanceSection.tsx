@@ -322,9 +322,29 @@ export function FinanceSection({
             onClick={() =>
               void runStep(
                 () =>
+                  /*
+                   * ROW 73 — fixed 2026-11-06 (module 0-c batch 6). THE TWO FIELDS ARE NOT THE SAME
+                   * AND THIS TREATED THEM AS THE SAME.
+                   *
+                   * `CreateInvoiceDto` declares `taxAmount!: string` with NO `@IsOptional`, and
+                   * `feesAmount?: string` WITH it and a documented default of 0. So the server
+                   * draws a real distinction: fees may be omitted, the premium tax must be
+                   * supplied, because no governed tax-rate table exists and Finance is the one who
+                   * decides the figure.
+                   *
+                   * Both arrived here as `x.trim() || "0"`, which erased that distinction: a
+                   * cleared tax field was silently refilled with zero before the request left the
+                   * browser, so the server's requirement could never fail and existed only on
+                   * paper. The `"0.000"` the field STARTS with is not the defect and stays — a
+                   * visible default a person can read and change is a decision offered, where a
+                   * silent substitution is a decision taken on their behalf.
+                   *
+                   * `feesAmount` keeps its `|| "0"`, because there the substitution matches what
+                   * the server itself documents.
+                   */
                   createInvoice({
                     policyId: policy.id,
-                    taxAmount: taxAmount.trim() || "0",
+                    taxAmount: taxAmount.trim(),
                     feesAmount: feesAmount.trim() || "0",
                     dueDate,
                   }),

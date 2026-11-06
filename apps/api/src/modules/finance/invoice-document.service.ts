@@ -71,7 +71,15 @@ export class InvoiceDocumentService {
     const language: DocumentLanguage =
       requestedLanguage ?? customer.languagePreference;
 
-    const receipt = invoice.receipts[0] ?? null;
+    /*
+     * EVERY receipt, oldest first. Changed 2026-11-06 (module 0-c batch 6).
+     *
+     * This was `invoice.receipts[0] ?? null`. `INVOICE_CYCLE_INCLUDE` orders receipts
+     * `receivedAt: 'asc'`, so it was deterministically the FIRST instalment — and the template read
+     * *a receipt exists* as "Paid", so an invoice of 1,000 with one 100 instalment told the client
+     * their bill was settled. The array is passed through in the repository's order and the template
+     * decides settlement by SUMMING it.
+     */
 
     const html = buildInvoiceHtml(
       {
@@ -87,13 +95,11 @@ export class InvoiceDocumentService {
         feesAmount: invoice.feesAmount,
         totalAmount: invoice.totalAmount,
         currency: invoice.currency,
-        receipt: receipt
-          ? {
-              amount: receipt.amount,
-              method: receipt.method,
-              receivedAt: receipt.receivedAt,
-            }
-          : null,
+        receipts: invoice.receipts.map((receipt) => ({
+          amount: receipt.amount,
+          method: receipt.method,
+          receivedAt: receipt.receivedAt,
+        })),
         bodyEn: template?.bodyEn ?? FALLBACK_BODY_EN,
         bodyAr: template?.bodyAr ?? FALLBACK_BODY_AR,
       },

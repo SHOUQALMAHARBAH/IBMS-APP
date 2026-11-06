@@ -88,6 +88,55 @@ test("a user without the permission sees a friendly message", async ({
   ).toBeVisible();
 });
 
+/*
+ * ROW 28 — THE GATES, PROVEN. Added 2026-11-06 (module 0-c batch 6).
+ *
+ * This screen checked NO permission until this batch: eight controls, including "terminate
+ * contract" and the DPO's own DPA approval, rendered for anybody who could open the page and
+ * answered 403 when pressed.
+ *
+ * The permission set is routed DIRECTLY rather than through `permissionsForRoles`, because no
+ * seeded role holds `vendor.read` WITHOUT also holding `vendor.update` and `vendor.deactivate` —
+ * all four readers are COMPLIANCE / MANAGER / ADMIN / OFFICE_ADMIN. That is a fact about the seed,
+ * not about the screen, and the screen's gating has to be correct for an office that defines its
+ * own roles, which is exactly what office-scoped RBAC lets it do. `screenshots()`-style role
+ * refusal does not apply here: this is a permission set, not a role name.
+ */
+test("a reader who cannot manage vendors sees the record and NONE of the management controls", async ({
+  page,
+}) => {
+  await page.route("**/auth/refresh", (route) =>
+    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+  );
+  await page.route("**/auth/me", (route) =>
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], permissions: ["vendor.read"] },
+    }),
+  );
+  await page.route("http://localhost:4000/vendors/vendor-1", (route) =>
+    route.fulfill({ status: 200, json: VENDOR }),
+  );
+  await page.route(
+    "http://localhost:4000/vendors/vendor-1/data-processing-agreements",
+    (route) => route.fulfill({ status: 200, json: [] }),
+  );
+
+  await page.goto("/vendors/vendor-1");
+
+  // THE ANCHOR, from the same render as the absences below: the record itself is on screen, so the
+  // page loaded and the controls are missing because they are GATED — not because nothing rendered.
+  await expect(page.getByText("High Risk Cloud Vendor")).toBeVisible();
+
+  for (const name of [
+    "Terminate (confirm data return/destruction)",
+    "Revoke access",
+    "Create a new DPA",
+  ]) {
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  }
+});
+
 test("creates and signs a Data Processing Agreement", async ({ page }) => {
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await page.route("http://localhost:4000/vendors/vendor-1", (route) =>

@@ -208,7 +208,7 @@ describe('every screen speaks both languages (rule 6)', () => {
  * DEFERRED-BY-DECISION to module 7 (decision 46), and `/audit-trail`'s polymorphic `entityId`
  * counts BY DECISION 49 — it is labelled with its type's Arabic word now, and the id stays.
  */
-const RENDERED_IDENTIFIER_BUDGET = 12;
+const RENDERED_IDENTIFIER_BUDGET = 11;
 
 describe('no identifier reaches a reader (rule 2)', () => {
   it('does not render more identifiers than the recorded budget', () => {
