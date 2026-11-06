@@ -92,7 +92,26 @@ export class PortfolioAnalysisRepository {
   /** Every issued policy's premium + its customer's segment/owner, capped
    * at `limit` — the caller reduces this into a by-customerType breakdown
    * and (via `findBranchNamesForOwners`) a by-branch breakdown, since
-   * neither field lives on `Policy` itself. */
+   * neither field lives on `Policy` itself.
+   *
+   * ## THE `orderBy` IS NOT DECORATION — ADDED 2026-11-06 (module 0-c batch 6)
+   *
+   * This was `take: limit` with NO ordering. SQL guarantees nothing about the order of an
+   * unordered read, so once the book outgrew the cap, WHICH 5,000 policies were sampled was
+   * decided by the query plan — and the client-segment and geography breakdowns, which are
+   * reduced from exactly this set, could therefore change between two openings of the same
+   * screen with no data having changed. A figure somebody acts on must not do that.
+   *
+   * `issuedPremium desc` rather than an arbitrary stable key, and the reason is what the cap
+   * distorts: both breakdowns are PREMIUM-WEIGHTED, so if truncation bites, the honest sample is
+   * the one carrying the most premium. `id asc` is the tie-break, because `issuedPremium` is not
+   * unique and ordering by a non-unique column alone is not deterministic either — two policies
+   * at the same premium would still be free to swap, which is the same defect one level down.
+   *
+   * It does NOT make a truncated figure correct — it makes it STABLE and the least distorted
+   * sample available. `PortfolioAnalysisService.warnIfTruncated` is what says the figure is
+   * partial, and it already existed; this is the half that was missing.
+   */
   findPoliciesForCrossTableGrouping(
     limit: number,
   ): Promise<PolicyForCrossTableGrouping[]> {
@@ -103,6 +122,7 @@ export class PortfolioAnalysisRepository {
           issuedPremium: true,
           customer: { select: { customerType: true, ownerUserId: true } },
         },
+        orderBy: [{ issuedPremium: 'desc' }, { id: 'asc' }],
         take: limit,
       })
       .then((rows) =>

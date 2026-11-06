@@ -48,6 +48,7 @@ import {
   commissionReversalAmount,
   commissionReversalAuditSnapshot,
   endorsementAuditSnapshot,
+  premiumInForce,
   refundAuditSnapshot,
   refundNeedsApproval,
   signedPremiumAdjustment,
@@ -412,8 +413,39 @@ export class EndorsementService {
       'effectiveFrom',
     );
     this.assertEffectiveWithinCover('effectiveFrom', cancellationDate, policy);
-    const { returnPremium } = cancellationReturnPremium({
+
+    /*
+     * THE REFUND IS COMPUTED FROM THE PREMIUM IN FORCE, NOT THE PREMIUM AT ISSUANCE.
+     * Changed 2026-11-06 (module 0-c batch 6).
+     *
+     * This passed `policy.issuedPremium` straight in. `issuedPremium` is written ONCE, by
+     * `recordIssuance`, and never again — measured: nothing under `modules/endorsement` writes it,
+     * and an endorsement records its money as a signed `premiumAdjustment` on its own row instead.
+     * So a policy issued at 1,000 that took an applied +500 endorsement was covered for 1,500 and
+     * refunded pro-rata on 1,000: the client is short-changed on every positive endorsement and
+     * over-refunded on every negative one, by exactly the unexpired share of the adjustment.
+     *
+     * The cancellation endorsement being created here is NOT in the sum — it does not exist yet at
+     * this point, which is why the sum is taken before `createCancellationEndorsement` rather than
+     * needing to exclude itself. The `findLiveCancellation` guard above is what guarantees there is
+     * no OTHER live cancellation whose adjustment could be double-counted.
+     */
+    const appliedAdjustments =
+      await this.endorsements.sumAppliedPremiumAdjustments(policyId);
+    const premiumNow = premiumInForce({
       issuedPremium: policy.issuedPremium,
+      appliedAdjustments,
+    });
+    if (compareMoney(premiumNow, 0) <= 0) {
+      // Not clamped to zero: a non-positive premium in force means the applied endorsements have
+      // cancelled out or exceeded the issued premium, which is a data fault upstream. Computing a
+      // pro-rata share of it would return a plausible number for an impossible policy.
+      throw new UnprocessableEntityException(
+        `Policy ${policyId} has an issued premium of ${formatMoney(policy.issuedPremium)} and applied endorsement adjustments of ${formatMoney(appliedAdjustments)}, leaving a premium in force of ${formatMoney(premiumNow)} — a cancellation return premium cannot be computed from a non-positive premium.`,
+      );
+    }
+    const { returnPremium } = cancellationReturnPremium({
+      issuedPremium: premiumNow,
       inceptionDate: policy.inceptionDate,
       expiryDate: policy.expiryDate,
       cancellationDate,

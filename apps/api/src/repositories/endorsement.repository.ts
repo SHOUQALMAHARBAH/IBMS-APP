@@ -8,6 +8,7 @@ import type {
   Refund,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { quantizeMoney } from '../common/money.util';
 
 const ENDORSEMENT_INCLUDE = {
   cancellation: true,
@@ -150,6 +151,46 @@ export class EndorsementRepository {
         status: { not: 'CLIENT_NOTIFIED' },
       },
     });
+  }
+
+  /**
+   * The signed sum of every premium adjustment that has actually TAKEN EFFECT on a policy — added
+   * 2026-11-06 (module 0-c batch 6) for the cancellation return premium.
+   *
+   * `Policy.issuedPremium` is written ONCE, at issuance, and never again — measured: the only write
+   * in the codebase is `recordIssuance`, and nothing under `modules/endorsement` writes it at all.
+   * An endorsement records its money as `premiumAdjustment` on its OWN row. So the premium in force
+   * today is `issuedPremium + Σ(adjustments that were applied)`, and reading `issuedPremium` alone
+   * gives the premium as at the day the policy was issued.
+   *
+   * `APPLIED` and `CLIENT_NOTIFIED` only, and that is the whole correctness of this read: an
+   * endorsement sitting at `REQUESTED`, `SUBMITTED_TO_INSURER`, `INSURER_CONFIRMED`,
+   * `FINANCIAL_ADJUSTMENT_CALCULATED` or `REFUND_APPROVAL_PENDING` has NOT changed the cover, so
+   * counting it would refund against money the client was never charged. `CLIENT_NOTIFIED` is
+   * included because it is `APPLIED`'s successor, not an alternative to it.
+   *
+   * `discardedAt: null`, for the reason `findLiveCancellation` above gives: a withdrawn endorsement
+   * must not move a figure.
+   *
+   * `premiumAdjustment` is ALREADY SIGNED on the row — `signedPremiumAdjustment` stores a NEGATIVE
+   * type as `subtractMoney(0, q)` — so this is a plain sum and must NOT be re-signed by the caller.
+   *
+   * Returns `Prisma.Decimal`, never a number: `_sum` on a `Decimal(18,3)` column comes back as a
+   * `Decimal`, and a policy with no applied endorsements yields `null`, which becomes a quantized
+   * zero rather than being coerced.
+   */
+  async sumAppliedPremiumAdjustments(
+    policyId: string,
+  ): Promise<Prisma.Decimal> {
+    const { _sum } = await this.prisma.client.endorsement.aggregate({
+      where: {
+        policyId,
+        discardedAt: null,
+        status: { in: ['APPLIED', 'CLIENT_NOTIFIED'] },
+      },
+      _sum: { premiumAdjustment: true },
+    });
+    return quantizeMoney(_sum.premiumAdjustment ?? 0);
   }
 
   stampCancellationClientNotified(id: string): Promise<Cancellation> {

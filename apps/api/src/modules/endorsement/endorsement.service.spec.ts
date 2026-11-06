@@ -183,6 +183,19 @@ function makeDeps(opts: DepsOpts = {}) {
       },
     );
   const findLiveCancellation = vi.fn().mockResolvedValue(null);
+  /*
+   * Added 2026-11-06 (module 0-c batch 6). `requestCancellation` now computes the return premium
+   * from the premium IN FORCE — `issuedPremium` plus the adjustments that were APPLIED — rather
+   * than from the issuance figure alone.
+   *
+   * It defaults to ZERO rather than to a signed amount, deliberately: zero is the state of a policy
+   * with no applied endorsements, which is what every pre-existing test in this file is about, so
+   * their expected figures are unchanged and keep asserting what they always asserted. A test that
+   * wants the new behaviour overrides it, as the one below does.
+   */
+  const sumAppliedPremiumAdjustments = vi
+    .fn()
+    .mockResolvedValue(new Prisma.Decimal('0'));
 
   const findById = vi
     .fn()
@@ -222,6 +235,7 @@ function makeDeps(opts: DepsOpts = {}) {
     createCancellationEndorsement,
     createRefundAndReversal,
     findLiveCancellation,
+    sumAppliedPremiumAdjustments,
     findById,
     findRefundById,
     findManyByPolicyId,
@@ -349,6 +363,7 @@ function makeDeps(opts: DepsOpts = {}) {
       createCancellationEndorsement,
       createRefundAndReversal,
       findLiveCancellation,
+      sumAppliedPremiumAdjustments,
       findById,
       findRefundById,
       updatePremiumAdjustment,
@@ -509,6 +524,62 @@ describe('EndorsementService', () => {
           entityType: 'Cancellation',
         }),
       );
+    });
+
+    /*
+     * ROW 70, AT THE SERVICE LEVEL — added 2026-11-06 (module 0-c batch 6).
+     *
+     * The test above is the SAME policy with no applied endorsements, and its 600.000 is unchanged.
+     * This one gives it an applied +600 adjustment. `Policy.issuedPremium` still reads 1200 — it is
+     * written once at issuance and never rewritten — so the old code refunded 600 on a policy the
+     * client was being charged 1800 for. On the premium in force it is 900.
+     */
+    it('computes the refund from the premium IN FORCE, not the premium at issuance', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.sumAppliedPremiumAdjustments.mockResolvedValue(
+        new Prisma.Decimal('600.000'),
+      );
+      const view = await service.requestCancellation(
+        'pol-1',
+        {
+          reason: 'client sold the insured property',
+          basis: 'pro_rata',
+          effectiveFrom: new Date(
+            INCEPTION.getTime() + 180 * DAY,
+          ).toISOString(),
+        } as never,
+        placement(),
+      );
+      // (1200 + 600) × 180/360 = 900.000, where the old behaviour gave 600.000.
+      expect(view.cancellation?.returnPremium).toBe('900.000');
+      expect(view.premiumAdjustment).toBe('-900.000');
+      // Asked for the RIGHT policy — a sum over the wrong policy would be a plausible number from
+      // somebody else's endorsements.
+      expect(mocks.sumAppliedPremiumAdjustments).toHaveBeenCalledWith('pol-1');
+    });
+
+    it('REFUSES when applied endorsements have cancelled out the premium, rather than refunding zero', async () => {
+      // A clamp to zero here would hand back a computable refund for a policy whose premium in
+      // force is not positive — a data fault upstream rendered as a plausible figure. The refusal
+      // names both components so the reader can see which one is wrong.
+      const { service, mocks } = makeDeps();
+      mocks.sumAppliedPremiumAdjustments.mockResolvedValue(
+        new Prisma.Decimal('-1200.000'),
+      );
+      await expect(
+        service.requestCancellation(
+          'pol-1',
+          {
+            reason: 'client sold the insured property',
+            basis: 'pro_rata',
+            effectiveFrom: new Date(
+              INCEPTION.getTime() + 180 * DAY,
+            ).toISOString(),
+          } as never,
+          placement(),
+        ),
+      ).rejects.toThrow(/premium in force/);
+      expect(mocks.createCancellationEndorsement).not.toHaveBeenCalled();
     });
 
     it('422 when the policy has no issued premium / period on record', async () => {

@@ -2,6 +2,7 @@ import { UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import type { EndorsementType } from '@ibms/db';
 import {
+  addMoney,
   applyPercentage,
   formatMoney,
   quantizeMoney,
@@ -88,6 +89,29 @@ export function signedPremiumAdjustment(
 ): Prisma.Decimal {
   const q = quantizeMoney(amount);
   return type === 'NEGATIVE' ? subtractMoney(0, q) : q;
+}
+
+/**
+ * The premium IN FORCE on a policy today — added 2026-11-06 (module 0-c batch 6).
+ *
+ * `Policy.issuedPremium` is the premium as at ISSUANCE and is never rewritten; an endorsement
+ * records its money on its own row as a signed `premiumAdjustment`. So a policy issued at 1,000
+ * that took a +500 endorsement is covered for 1,500, and `issuedPremium` still reads 1,000.
+ *
+ * Every monetary operation here is `money.util.ts`: `addMoney` quantizes to the fils and returns a
+ * `Prisma.Decimal`. No `Number`, no `parseFloat`, no naked `round` — `appliedAdjustments` arrives
+ * as a `Decimal` straight off a `_sum` over a `Decimal(18,3)` column and stays one.
+ *
+ * **It can be NEGATIVE, and that is not clamped here.** A policy whose applied endorsements have
+ * reduced the premium below zero is a data fault, not a cancellation to compute, and swallowing it
+ * with a `Math.max`-shaped clamp would turn a wrong figure into a plausible one. The caller
+ * refuses, so the refusal names the policy.
+ */
+export function premiumInForce(input: {
+  issuedPremium: Prisma.Decimal | string;
+  appliedAdjustments: Prisma.Decimal | string;
+}): Prisma.Decimal {
+  return addMoney(input.issuedPremium, input.appliedAdjustments);
 }
 
 /**

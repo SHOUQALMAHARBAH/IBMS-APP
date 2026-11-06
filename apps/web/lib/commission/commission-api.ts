@@ -20,6 +20,30 @@ export interface CommissionAgreement {
   isOpen: boolean;
 }
 
+/**
+ * `CommissionLedgerEntry.status` — a HAND-WRITTEN COPY of the api's
+ * `COMMISSION_ENTRY_STATUSES` (`apps/api/src/modules/commission/commission.config.ts`), because the
+ * web has no import path into an api module. Added 2026-11-06 (module 0-c batch 6).
+ *
+ * It was `status: string`, and that bare type is the whole reason row 72 could happen: the screen's
+ * label map was `Record<string, TranslationKey>` over FOUR keys, of which `calculated` and
+ * `approved` ARE NOT MEMBERS AT ALL (they cannot occur), while `reversed` — which can — was absent
+ * and fell through to a `commissionStatusDraft` default. So of the three statuses that really
+ * exist, TWO rendered as «مسوَّدة» / "Draft": a posted-not-collected entry, and a fully clawed-back
+ * one. A reversed commission reading "Draft" is the dangerous half.
+ *
+ * Declared in the same `as const` array shape as the api's so that
+ * `packages/db/prisma/commission-status-parity.spec.ts` can read BOTH files with one pattern — a
+ * fourth status added in the api alone is otherwise invisible here: the lookup would return
+ * `undefined`, `t(undefined)` renders nothing, and the status cell would silently go blank.
+ */
+export const COMMISSION_ENTRY_STATUSES = [
+  'outstanding',
+  'paid',
+  'reversed',
+] as const;
+export type CommissionEntryStatus = (typeof COMMISSION_ENTRY_STATUSES)[number];
+
 export interface CommissionEntry {
   id: string;
   policyId: string;
@@ -30,7 +54,7 @@ export interface CommissionEntry {
   grossAmount: string;
   overrideAmount: string | null;
   effectiveAmount: string;
-  status: string;
+  status: CommissionEntryStatus;
   isManualOverride: boolean;
   overrideReason: string | null;
   overrideRequestedByUserId: string | null;

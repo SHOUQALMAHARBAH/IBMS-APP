@@ -7,6 +7,8 @@ import { ensureRole, prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 import { makeInsurer } from './insurer-fixture';
+import { PortfolioAnalysisRepository } from '../src/repositories/portfolio-analysis.repository';
+import { OrgContextService } from '../src/common/org-context/org-context.service';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -243,5 +245,100 @@ describe('Portfolio Analysis (e2e) — backlog Part C #62', () => {
     const indivAfter = findRow(after.byClientSegment, 'INDIVIDUAL');
     expect(corpAfter?.policyCount).toBe(corpBefore + 1);
     expect(indivAfter?.policyCount).toBe(indivBefore + 1);
+  });
+  /*
+   * ROW 85 — THE CAPPED READ IS DETERMINISTIC NOW. Added 2026-11-06 (module 0-c batch 6).
+   *
+   * `findPoliciesForCrossTableGrouping` was `take: limit` with NO `orderBy`. SQL guarantees nothing
+   * about the order of an unordered read, so once the book outgrew the cap, WHICH policies fed the
+   * client-segment and geography breakdowns was the query plan's choice — and both figures could
+   * change between two openings of the same screen with no data having changed.
+   *
+   * Exercised through the REPOSITORY rather than over HTTP, because the limit is a parameter and the
+   * route always passes `PORTFOLIO_ANALYSIS_READ_LIMIT` (5,000) — a figure no fixture should try to
+   * exceed. `app.get(...)` is the established way to reach one: `last-administrator-lock`,
+   * `company-record-shape` and `brokerage-office-registration` all do it.
+   *
+   * WHY THIS FAILS ON THE OLD CODE rather than passing by luck: the three policies are inserted in
+   * strictly ASCENDING premium order, and Postgres appends new rows to the end of the heap, so an
+   * unordered sequential scan returns them ascending. A descending-monotonicity assertion over the
+   * whole result therefore fails on the old behaviour by construction, not by chance.
+   */
+  it('row 85 — the capped cross-table read is ordered, so the breakdown cannot change between openings', async () => {
+    const app = await boot();
+    const repo = app.get(PortfolioAnalysisRepository);
+    const orgContext = app.get(OrgContextService);
+    const line = uniqueLabel('ordering-line');
+
+    /*
+     * `runAs` is REQUIRED, and finding that out is worth recording: calling the repository bare
+     * raised `MissingOrgContextError` — *"Refusing to run Policy.findMany() with no Organization in
+     * context"* — which is `tenantScopeExtension` doing exactly its job. A repository reached through
+     * DI rather than through a request has no office established, and the extension refuses rather
+     * than returning every office's rows. `runAs` is the same code path a request takes after
+     * `JwtStrategy` has established the office, which `last-administrator-lock.e2e-spec.ts` sets as
+     * the precedent.
+     */
+    const office = await prisma.organization.findFirstOrThrow({
+      where: { type: 'BROKERAGE_OFFICE' },
+    });
+    const read = (limit: number) =>
+      orgContext.runAs(office.id, () =>
+        repo.findPoliciesForCrossTableGrouping(limit),
+      );
+
+    // Its own fixtures, like every other test in this file — db-test is cumulative and shared, so a
+    // test that borrowed another one's rows would pass or fail on the order they happened to run in.
+    const insurer = await makeInsurer(uniqueLabel('Ordering E2E Insurer'));
+    const officer = await prisma.user.create({
+      data: {
+        fullName: 'Ordering E2E Officer',
+        email: uniqueEmail('pa-ordering-officer'),
+        passwordHash: 'unused-scored-user',
+      },
+    });
+    const corpCustomer = await prisma.customer.create({
+      data: {
+        customerType: 'CORPORATE',
+        legalName: uniqueLabel('Ordering E2E Corp Co'),
+        ownerUserId: officer.id,
+      },
+    });
+
+    // Premiums ascending AND above anything a sibling spec is likely to hold, so the top-1 case
+    // below is unambiguous about which row it must return.
+    const premiums = ['900001.000', '900002.000', '900003.000'];
+    for (const issuedPremium of premiums) {
+      const opportunity = await prisma.opportunity.create({
+        data: { customerId: corpCustomer.id },
+      });
+      await prisma.policy.create({
+        data: {
+          opportunityId: opportunity.id,
+          customerId: corpCustomer.id,
+          insurerId: insurer.id,
+          insuranceLine: line,
+          requestedPremium: issuedPremium,
+          issuedPremium,
+        },
+      });
+    }
+
+    // THE PROPERTY, asserted over the whole result rather than over a sample: premiums are
+    // non-increasing. This is what `orderBy` guarantees and what nothing guaranteed before.
+    const all = await read(100000);
+    expect(all.length).toBeGreaterThan(premiums.length);
+    for (let i = 1; i < all.length; i += 1) {
+      expect(
+        all[i - 1].issuedPremium.greaterThanOrEqualTo(all[i].issuedPremium),
+        `row ${i - 1} (${all[i - 1].issuedPremium.toString()}) must not be smaller than row ${i} (${all[i].issuedPremium.toString()})`,
+      ).toBe(true);
+    }
+
+    // And the cap keeps the premium-heaviest policies, which is the half that makes a TRUNCATED
+    // breakdown the least distorted one available rather than merely a stable one.
+    const topOne = await read(1);
+    expect(topOne).toHaveLength(1);
+    expect(topOne[0].issuedPremium.toFixed(3)).toBe('900003.000');
   });
 });

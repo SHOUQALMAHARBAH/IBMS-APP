@@ -35,10 +35,40 @@ describe('normalizeQuotationTerms', () => {
     ).toThrow(/deductible cannot be negative/);
   });
 
+  /*
+   * RE-POINTED 2026-11-06 (module 0-c batch 6), AND THE REVERSAL IS THE POINT.
+   *
+   * This test read: *"defaults currency to JOD and upper-cases what it is given"*, and asserted
+   * `currency: 'usd'` normalises to `'USD'` — i.e. it PINNED the acceptance of a foreign currency as
+   * correct behaviour. It was asserting the defect.
+   *
+   * What made that look safe was a comment on `CURRENCY_CODE` claiming a foreign-currency quote is
+   * *"captured as sent and converted downstream"*. Nothing converts anything: measured 2026-11-06,
+   * `schema.prisma` has no `exchangeRate` / `fxRate` / `currencyRate` field and no service computes
+   * a rate, while `PlacePolicyDto` copies the quotation's currency onto the Policy and every premium
+   * total is a plain `_sum` over `Decimal(18,3)` headed 'JOD'.
+   *
+   * So the case-folding half is kept — it is real and still wanted, because `'jod'` must be accepted
+   * — and the acceptance half is inverted.
+   */
   it('defaults currency to JOD and upper-cases what it is given', () => {
     expect(normalizeQuotationTerms(BASE).currency).toBe('JOD');
-    expect(normalizeQuotationTerms({ ...BASE, currency: 'usd' }).currency).toBe(
-      'USD',
+    // Case-folding still applies, demonstrated on the ONE code that is accepted.
+    expect(normalizeQuotationTerms({ ...BASE, currency: 'jod' }).currency).toBe(
+      'JOD',
+    );
+  });
+
+  it('REFUSES a currency this system cannot total — a well-formed code is not enough', () => {
+    for (const currency of ['USD', 'usd', 'EUR', 'GBP']) {
+      expect(() => normalizeQuotationTerms({ ...BASE, currency })).toThrow(
+        UnprocessableEntityException,
+      );
+    }
+    // The message has to say WHY, because the person reading it is being refused something that
+    // looks obviously valid. It names the missing mechanism, not just the rule.
+    expect(() => normalizeQuotationTerms({ ...BASE, currency: 'USD' })).toThrow(
+      /no exchange-rate mechanism/,
     );
   });
 
@@ -46,6 +76,11 @@ describe('normalizeQuotationTerms', () => {
     expect(() =>
       normalizeQuotationTerms({ ...BASE, currency: 'JODX' }),
     ).toThrow(UnprocessableEntityException);
+    // The SHAPE check still fires before the code check, so a malformed value is refused for being
+    // malformed rather than for not being JOD — two different faults, two different messages.
+    expect(() =>
+      normalizeQuotationTerms({ ...BASE, currency: 'JODX' }),
+    ).toThrow(/3-letter code/);
   });
 
   it('leaves optional money / bi-period / commission fields null when absent', () => {
