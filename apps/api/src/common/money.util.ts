@@ -26,6 +26,35 @@ export const MONEY_SCALE = 3;
 /** The one rounding mode this codebase uses for money, fixed here per the lex rule. */
 export const MONEY_ROUNDING = Prisma.Decimal.ROUND_HALF_UP;
 
+/**
+ * THE CURRENCY EVERY FUNCTION IN THIS FILE ASSUMES — declared 2026-11-06 (module 0-c batch 6).
+ *
+ * `MONEY_SCALE = 3` is not a general-purpose precision, it is **the fils**. Quantizing a EUR or USD
+ * amount here gives it a minor unit that currency does not have, and there is **no conversion
+ * mechanism anywhere in this system** — measured 2026-11-06: no `exchangeRate`, `fxRate` or
+ * `currencyRate` field exists in `schema.prisma`, and no service computes one. (A grep for
+ * `conversionRate` DOES hit five dashboard lines; every one is a LEAD conversion rate, a different
+ * meaning of the same word. It is not an FX mechanism.)
+ *
+ * So the single-currency assumption was load-bearing and unenforced: every premium total in this
+ * codebase is a plain `_sum` over `Decimal(18,3)` with no currency split, headed `'JOD'`. A single
+ * non-JOD row would make those totals silently wrong rather than visibly wrong, which is the worst
+ * available outcome for a figure somebody acts on.
+ *
+ * This constant exists so the assumption has ONE name, and `normalizeQuotationTerms` refuses
+ * anything else at the door. **Lifting that guard requires an FX mechanism FIRST** — a stored rate
+ * with an as-of date, a decision about which rate applies to a sum, and a currency split on every
+ * aggregate. Until then the honest behaviour is a refusal with a reason, not acceptance with a
+ * wrong total.
+ *
+ * NOT closed by this, deliberately: `PaymentChannel.currency`, which describes a BANK ACCOUNT the
+ * office receives into rather than an amount that is ever summed into a premium figure. An office
+ * may legitimately hold a non-JOD account, and `Organization.currencyId` beside it is the same kind
+ * of fact (the registration form's bank-account currency, chosen from the three-row `Currency`
+ * reference list). Neither reaches an aggregate.
+ */
+export const MONEY_CURRENCY = 'JOD';
+
 // decimal.js's own default happens to already be ROUND_HALF_UP, but the lex
 // rule asks for the mode to be fixed explicitly, once, rather than relying
 // on a library default that could change — this also covers any Decimal

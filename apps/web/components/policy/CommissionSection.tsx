@@ -9,6 +9,7 @@ import {
   raiseCommissionOverride,
   settleCommission,
   type CommissionEntry,
+  type CommissionEntryStatus,
 } from '../../lib/commission/commission-api';
 import {
   listPoliciesForOpportunity,
@@ -27,11 +28,52 @@ import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
 
-const COMMISSION_STATUS_LABEL_KEY: Record<string, TranslationKey> = {
-  outstanding: 'commissionStatusDraft',
-  calculated: 'commissionStatusCalculated',
-  approved: 'commissionStatusApproved',
+/**
+ * TOTAL over the three statuses that exist, and NO new Arabic was written for it.
+ * Fixed 2026-11-06 (module 0-c batch 6).
+ *
+ * This was `Record<string, TranslationKey>` over four keys with a `?? 'commissionStatusDraft'`
+ * fallback at the call site. Measured against `COMMISSION_ENTRY_STATUSES` in the api, the real set
+ * is `outstanding | paid | reversed` — so `calculated` and `approved` were entries for states that
+ * CANNOT OCCUR, `reversed` was missing, and `outstanding` pointed at «مسوَّدة» / "Draft". Two of
+ * three real statuses therefore rendered as a draft: an entry that is posted but not collected,
+ * and one that has been fully clawed back.
+ *
+ * `Record<CommissionEntryStatus, …>` makes it total, so a fourth status cannot be added to the web
+ * union without deciding its word — and the `??` fallback is DELETED rather than left unreachable,
+ * the treatment `PROVIDER_CAPABILITY_LABEL_KEY` got for the same reason: a fall-through that can no
+ * longer fire is a place for the next drift to hide.
+ *
+ * ## BOTH REPLACEMENT WORDS ALREADY SHIP, AND NEITHER WAS CHOSEN ON TASTE
+ *
+ *  - `reversed` → `commissionReversedLabel` («معكوسة»), which **this very component already renders
+ *    nine lines below**, labelling `entry.reversedAmount` on the same card. Before this fix the card
+ *    contradicted itself in adjacent rows: the amount row said «معكوسة» while the status row said
+ *    «مسوَّدة». One card must not use two words for one fact, and that constraint — not a
+ *    preference — picks the word.
+ *  - `outstanding` → `frOutstanding` («المستحقة»), which is the column heading of the COMMISSION
+ *    roll-up on `/financial-report` (`frEarned` / `frPaid` / `frOutstanding` / `frReversed` over
+ *    `data.commission.byInsurer`). Same subject and same state, so this is a pointer at the word
+ *    the product already uses for outstanding commission — chosen by provenance rather than by
+ *    grammar, which matters because the near-miss candidates (`caColOutstanding`,
+ *    `iaColOutstanding`) are the MASCULINE «المستحق» for a different subject.
+ *
+ * **ONE THING IS THE OWNER'S AND IS NOT DECIDED HERE:** there are now two shipping Arabic words for
+ * a reversed commission — «معكوسة» here and «المستردّة» (`frReversed`) on the financial report —
+ * which is row 76's shape in a second place. Reported, not unified: unifying them means retiring
+ * one of her strings.
+ *
+ * `commissionStatusDraft`, `commissionStatusCalculated` and `commissionStatusApproved` are
+ * WITHDRAWN in both languages with this change — measured, their only consumers were this map and
+ * the deleted fallback, and all three name states a `CommissionLedgerEntry` can never be in.
+ */
+const COMMISSION_STATUS_LABEL_KEY: Record<
+  CommissionEntryStatus,
+  TranslationKey
+> = {
+  outstanding: 'frOutstanding',
   paid: 'financeBillingStatusPaid',
+  reversed: 'commissionReversedLabel',
 };
 
 interface Props {
@@ -139,7 +181,7 @@ export function CommissionSection({
           </div>
           <div style={quoteFieldStyle}>
             <span>{t('commissionStatusLabel')}</span>
-            <span>{t(COMMISSION_STATUS_LABEL_KEY[entry.status] ?? 'commissionStatusDraft')}</span>
+            <span>{t(COMMISSION_STATUS_LABEL_KEY[entry.status])}</span>
           </div>
           {entry.status === 'paid' ? (
             <div style={quoteFieldStyle}>

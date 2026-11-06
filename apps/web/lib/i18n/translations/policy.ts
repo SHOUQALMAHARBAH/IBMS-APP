@@ -265,9 +265,6 @@ export const POLICY = {
     financeInvoiceStatusExceptionRaised: 'أُثيرت حالة استثناء',
     financeInvoiceStatusExceptionResolved: 'عُولجت حالة الاستثناء',
 
-    commissionStatusDraft: 'مسوَّدة',
-    commissionStatusCalculated: 'مُحسوبة',
-    commissionStatusApproved: 'موافق عليها',
     commissionReconciledLabel: 'مُسوّاة',
     commissionReversedLabel: 'معكوسة',
     commissionRaiseOverrideButton: 'رفع تجاوز يدوي',
@@ -587,9 +584,6 @@ export const POLICY = {
     financeInvoiceStatusExceptionRaised: 'Exception raised',
     financeInvoiceStatusExceptionResolved: 'Exception resolved',
 
-    commissionStatusDraft: 'Draft',
-    commissionStatusCalculated: 'Calculated',
-    commissionStatusApproved: 'Approved',
     commissionReconciledLabel: 'Reconciled',
     commissionReversedLabel: 'Reversed',
     commissionRaiseOverrideButton: 'Raise manual override',

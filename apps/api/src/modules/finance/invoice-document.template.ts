@@ -1,3 +1,4 @@
+import { compareMoney, sumMoney } from '../../common/money.util';
 import {
   DOCUMENT_BASE_CSS,
   escapeHtml,
@@ -55,7 +56,21 @@ export interface InvoiceDocumentData {
   feesAmount: { toString(): string };
   totalAmount: { toString(): string };
   currency: string;
-  receipt: InvoiceReceiptData | null;
+  /**
+   * EVERY instalment, not one. Changed 2026-11-06 (module 0-c batch 6).
+   *
+   * This was `receipt: InvoiceReceiptData | null`, filled by
+   * `invoice.receipts[0] ?? null`. `INVOICE_CYCLE_INCLUDE` orders receipts `receivedAt: 'asc'`, so
+   * that was deterministically the FIRST instalment — not an undefined one, which is the only part
+   * of the brief's description that was wrong. The consequences were two, and the first is the
+   * serious one:
+   *
+   *   1. `clientStatus` read *any receipt exists* as "Paid". An invoice of 1,000 with a single 100
+   *      instalment told the CLIENT, on their own invoice, that it was «مدفوعة» / "Paid".
+   *   2. The payment section showed one instalment of however many, so a client who had paid twice
+   *      saw only the first and could not reconcile the document against their own records.
+   */
+  receipts: InvoiceReceiptData[];
   /** From `DocumentTemplate` when an `invoice` row exists; a built-in
    * fallback otherwise (see `invoice-document.service.ts`). */
   bodyEn: string;
@@ -75,7 +90,13 @@ function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
   // `remittance`). A client only needs to know whether THEIR payment is
   // outstanding or received — derived from `data.receipt` (their own
   // collection receipt), never from the raw workflow enum.
-  const clientStatus = data.receipt
+  // PAID means SETTLED, not "something was received". The two words are the ones that already
+  // shipped here — no third state is invented, because a «مدفوعة جزئياً» would be a new Arabic
+  // string and that is the owner's. A part-paid invoice therefore reads «مستحقة» / "Outstanding",
+  // which is true (a balance is outstanding) where "Paid" was false.
+  const amountPaid = sumMoney(data.receipts.map((r) => r.amount.toString()));
+  const settled = compareMoney(amountPaid, data.totalAmount.toString()) >= 0;
+  const clientStatus = settled
     ? lang === 'ar'
       ? 'مدفوعة'
       : 'Paid'
@@ -134,25 +155,38 @@ function renderSection(data: InvoiceDocumentData, lang: 'en' | 'ar'): string {
           ],
         ];
 
+  /*
+   * ONE BLOCK PER INSTALMENT, and the wording is deliberately left alone.
+   *
+   * The heading is kept SINGULAR and repeated, rather than made plural, because every block is one
+   * true statement about one payment — «الدفعة المستلمة» over a single amount, method and date is
+   * exactly what it says. A plural or itemised heading would read better over three blocks and
+   * would be a NEW Arabic string, which this batch may not write. Recorded as owed.
+   *
+   * No new words are introduced: the three row labels are the ones that already shipped, reused
+   * per instalment, and the only change is that all of them now render instead of the first.
+   */
   const receiptHeading = lang === 'ar' ? 'الدفعة المستلمة' : 'Payment Received';
-  const receiptSection = data.receipt
-    ? `
+  const receiptSection = data.receipts
+    .map(
+      (receipt) => `
     <h2>${escapeHtml(receiptHeading)}</h2>
     <table>
       <tr><th>${escapeHtml(lang === 'ar' ? 'المبلغ' : 'Amount')}</th><td>${formatDocumentMoney(
-        data.receipt.amount,
+        receipt.amount,
         lang,
         data.currency,
       )}</td></tr>
       <tr><th>${escapeHtml(lang === 'ar' ? 'طريقة الدفع' : 'Method')}</th><td>${escapeHtml(
-        data.receipt.method ?? '—',
+        receipt.method ?? '—',
       )}</td></tr>
       <tr><th>${escapeHtml(lang === 'ar' ? 'تاريخ الاستلام' : 'Received')}</th><td>${formatDocumentDate(
-        data.receipt.receivedAt,
+        receipt.receivedAt,
         lang,
       )}</td></tr>
-    </table>`
-    : '';
+    </table>`,
+    )
+    .join('');
 
   const body = lang === 'ar' ? data.bodyAr : data.bodyEn;
 

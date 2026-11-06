@@ -268,7 +268,20 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
       {
         href: '/commission',
         labelKey: 'navCommissionRates',
-        permissions: ['commission-rate.manage', 'financial-report.view'],
+        /*
+     * ROW 30 — NARROWED 2026-11-06 (module 0-c batch 6).
+     *
+     * This was an ANY-OF of `commission-rate.manage` and `financial-report.view`, while
+     * `app/(app)/commission/page.tsx:49` requires `commission-rate.manage` alone and renders a
+     * permission refusal otherwise. So anybody holding only `financial-report.view` saw
+     * "Commission rates" in their sidebar and was refused on arrival — a link whose only
+     * function was to tell somebody no.
+     *
+     * Narrowed to the code the SCREEN enforces, never widened to match the link: the directive's
+     * rule is that a control a role cannot use does not exist on their screen, and widening the
+     * screen would have granted the rate table to every reader of the financial report.
+     */
+    permissions: ['commission-rate.manage'],
       },
       {
         href: '/payment-channels',

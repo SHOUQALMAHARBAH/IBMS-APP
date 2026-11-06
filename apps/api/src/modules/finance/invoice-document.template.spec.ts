@@ -17,7 +17,7 @@ const BASE_DATA: InvoiceDocumentData = {
   feesAmount: { toString: () => '150' },
   totalAmount: { toString: () => '115350' },
   currency: 'JOD',
-  receipt: null,
+  receipts: [],
   bodyEn: 'This is your invoice for the insurance premium below.',
   bodyAr: 'هذه فاتورتكم لقسط التأمين المبيّن أدناه.',
 };
@@ -108,19 +108,81 @@ describe('buildInvoiceHtml', () => {
     const html = buildInvoiceHtml(
       {
         ...BASE_DATA,
-        receipt: {
-          amount: { toString: () => '115350' },
-          method: 'bank_transfer',
-          receivedAt: new Date('2026-09-15T00:00:00Z'),
-        },
+        receipts: [
+          {
+            amount: { toString: () => '115350' },
+            method: 'bank_transfer',
+            receivedAt: new Date('2026-09-15T00:00:00Z'),
+          },
+        ],
       },
       'EN',
     );
     expect(html).toContain('Payment Received');
     expect(html).toContain('JOD 115,350.000');
     expect(html).toContain('bank_transfer');
+    // Still "Paid" — this instalment settles the whole 115,350 total, so the sum-based test and
+    // the old existence test agree here. The two tests below are where they disagree.
     expect(html).toContain('Paid');
     expect(html).not.toContain('Outstanding');
+  });
+
+  /*
+   * ROW 22 — added 2026-11-06 (module 0-c batch 6). These two are the behaviour change.
+   *
+   * `clientStatus` was `data.receipt ? 'Paid' : 'Outstanding'` — an EXISTENCE test over the first
+   * instalment. On an invoice of 115,350 settled by a single 100 payment it printed "Paid", on the
+   * client's own bill. It is a SUM against `totalAmount` now.
+   */
+  it('a PART-paid invoice is Outstanding, not Paid — the client is not told a balance is settled', () => {
+    const html = buildInvoiceHtml(
+      {
+        ...BASE_DATA,
+        receipts: [
+          {
+            amount: { toString: () => '100' },
+            method: 'cash',
+            receivedAt: new Date('2026-09-15T00:00:00Z'),
+          },
+        ],
+      },
+      'EN',
+    );
+    expect(html).toContain('Outstanding');
+    expect(html).not.toContain('>Paid<');
+    // The instalment itself is still shown — the client sees what they paid AND that a balance
+    // remains, which is the pair of facts the old document could not express together.
+    expect(html).toContain('JOD 100.000');
+  });
+
+  it('shows EVERY instalment and adds them up, rather than the first of several', () => {
+    const html = buildInvoiceHtml(
+      {
+        ...BASE_DATA,
+        receipts: [
+          {
+            amount: { toString: () => '15350' },
+            method: 'cash',
+            receivedAt: new Date('2026-09-15T00:00:00Z'),
+          },
+          {
+            amount: { toString: () => '100000' },
+            method: 'bank_transfer',
+            receivedAt: new Date('2026-09-20T00:00:00Z'),
+          },
+        ],
+      },
+      'EN',
+    );
+    // Both instalments, both methods — the second was invisible before.
+    expect(html).toContain('JOD 15,350.000');
+    expect(html).toContain('JOD 100,000.000');
+    expect(html).toContain('cash');
+    expect(html).toContain('bank_transfer');
+    // 15,350 + 100,000 = 115,350 = the total, so this one IS settled. The old code would have
+    // called it settled on the strength of the 15,350 alone, which is the same answer reached by
+    // luck rather than by arithmetic.
+    expect(html).toContain('Paid');
   });
 
   it('renders no "Payment Received" section when no receipt exists yet, without crashing', () => {

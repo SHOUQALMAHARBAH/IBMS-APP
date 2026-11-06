@@ -92,7 +92,16 @@ test("renders both breakdowns", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "Property" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "CORPORATE" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "INDIVIDUAL" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "-4000.000" })).toBeVisible();
+  // RE-POINTED 2026-11-06 (module 0-c batch 6), and the reversal is the point: this asserted the
+  // RAW api string "-4000.000", so it was pinning unformatted money as correct on the screen that
+  // says whether a book makes money. All three money columns go through `formatMoney` now — the
+  // same house function `/claims-analytics` already uses for the same kind of table — so the cell
+  // carries its currency and its thousands separator.
+  await expect(
+    page.getByRole("cell", { name: "JOD -4,000.000" }),
+  ).toBeVisible();
+  // And the raw form is GONE, which is the half an updated expectation alone would not prove.
+  await expect(page.getByRole("cell", { name: "-4000.000" })).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({

@@ -6,6 +6,7 @@ import {
   quantizeMoney,
   subtractMoney,
   toMoney,
+  MONEY_CURRENCY,
   MONEY_ROUNDING,
   type MoneyInput,
 } from '../../common/money.util';
@@ -37,9 +38,23 @@ export const MAX_BI_PERIOD_MONTHS = 120;
  * (#31+), not this module's. */
 export const MAX_COMMISSION_RATE_PERCENT = 100;
 
-/** ISO-4217-ish: three uppercase letters. The book is JOD-first but the
- * schema (and money.util.ts) allow a foreign-currency quote to be captured
- * as sent and converted downstream. */
+/**
+ * ISO-4217-ish: three uppercase letters. Shape only — `MONEY_CURRENCY` decides which code is
+ * accepted.
+ *
+ * **CORRECTED 2026-11-06 (module 0-c batch 6). This said: *"The book is JOD-first but the schema
+ * (and money.util.ts) allow a foreign-currency quote to be captured as sent and converted
+ * downstream."*** The first half was true and is now deliberately false; **the second half was
+ * never true at all, and it is the sentence that made the gap feel safe.** Nothing downstream
+ * converts anything: measured 2026-11-06, no `exchangeRate` / `fxRate` / `currencyRate` field
+ * exists in `schema.prisma` and no service computes a rate. A foreign-currency quote was captured
+ * as sent, copied onto its Policy by `PlacePolicyDto`, and then added to JOD premiums by plain
+ * `_sum` under a heading reading 'JOD'.
+ *
+ * Corrected rather than deleted because what it was reaching for is real and still owed: capturing
+ * an insurer's quote in the currency it was sent in IS the right behaviour the day there is a rate
+ * to convert it with. There is not one, so the honest state is a refusal naming the reason.
+ */
 const CURRENCY_CODE = /^[A-Z]{3}$/;
 
 export interface QuotationTermsInput {
@@ -114,10 +129,26 @@ export function normalizeQuotationTerms(
     );
   }
 
-  const currency = (input.currency ?? 'JOD').toUpperCase();
+  const currency = (input.currency ?? MONEY_CURRENCY).toUpperCase();
   if (!CURRENCY_CODE.test(currency)) {
     throw new UnprocessableEntityException(
       'currency must be a 3-letter code, e.g. "JOD"',
+    );
+  }
+  // THE DOOR. Added 2026-11-06 (module 0-c batch 6): this accepted any well-formed 3-letter code
+  // and stored it, and `PlacePolicyDto` takes the Policy's currency FROM the accepted quotation —
+  // so a USD quotation became a USD policy whose `issuedPremium` was then summed, with no currency
+  // split and no conversion, into totals headed 'JOD' on the KPI, portfolio, policy and
+  // employee-performance dashboards. See `MONEY_CURRENCY` in `money.util.ts` for why there is no
+  // conversion to fall back on and what lifting this guard would require first.
+  //
+  // This is the ONE client-supplied currency that reaches a premium aggregate. Measured
+  // 2026-11-06: every Quotation, Policy and Invoice row on the dev database is already 'JOD'
+  // (89 / 74 / 60), so this refuses nothing that exists — it closes a path, it does not change a
+  // stored figure.
+  if (currency !== MONEY_CURRENCY) {
+    throw new UnprocessableEntityException(
+      `currency must be ${MONEY_CURRENCY} — this system holds and totals money in ${MONEY_CURRENCY} fils only, and has no exchange-rate mechanism, so a quotation in ${currency} could not be summed into any premium figure without being silently wrong`,
     );
   }
 

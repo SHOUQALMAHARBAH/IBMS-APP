@@ -334,7 +334,7 @@ def self_test():
 #     and belongs with the money.
 #   * `/dsr` renders an insured person's uuid fragment where a customer would get a
 #     link. Closing it is an api view change on a PDPL screen.
-RENDERED_IDENTIFIER_BUDGET = 12
+RENDERED_IDENTIFIER_BUDGET = 11
 
 # The floor is the smaller of the two guards and the one that has fired for real. Four separate
 # measurements in this repository have reported a clean nothing because their matcher stopped

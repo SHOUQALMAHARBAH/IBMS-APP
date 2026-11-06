@@ -25,3 +25,15 @@ export const profileFieldValueStyle: CSSProperties = {
   fontSize: '1rem',
   marginTop: '0.2rem',
 };
+
+/**
+ * A detail-page section block. Added 2026-11-06 (module 0-c batch 6) because the SCREEN ratchet
+ * refused a new `style={{ marginBottom: '2rem' }}` on `/policies/[id]` at 1084 against 1083 — and
+ * that budget may only FALL, so the honest move is a named style rather than a raised ceiling.
+ *
+ * The value is the one `/policies/[id]` already used inline for exactly this, so nothing about the
+ * rendering changes; this gives the spacing one name instead of repeating the literal.
+ */
+export const detailSectionStyle: CSSProperties = {
+  marginBottom: '2rem',
+};

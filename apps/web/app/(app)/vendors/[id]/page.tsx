@@ -27,6 +27,7 @@ import {
   type Vendor,
 } from "../../../../lib/supporting-operations/vendor-api";
 import { ApiError } from "../../../../lib/auth/api-client";
+import { hasPermission } from "../../../../lib/auth/permissions";
 import { CombinedDutyOnRecord } from "../../../../components/ui/CombinedDutyOnRecord";
 import {
   EmptyState,
@@ -47,6 +48,39 @@ export default function VendorDetailPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
+
+  /*
+   * ROW 28 — THIS SCREEN CHECKED NO PERMISSION AT ALL. Added 2026-11-06 (module 0-c batch 6).
+   *
+   * Measured: zero `hasPermission` / `hasAnyPermission` / `usePermission` anywhere under
+   * `apps/web/app/(app)/vendors`. Eight controls — including "terminate contract" and the DPO's own
+   * approval — rendered for anybody who could open the page, and each one failed with a 403 when
+   * pressed. `docs/frontend-ux-directive.md` is explicit that a control a role cannot use does not
+   * exist on their screen.
+   *
+   * THREE booleans, not one, and that is the whole point of row 12's rule: each is the code the
+   * route it drives actually enforces, read off the controllers rather than inferred —
+   *
+   *   `vendor.update`      risk tier, annual review, create DPA, sign DPA
+   *                        (`vendor.controller.ts` :51 :61 :71;
+   *                         `data-processing-agreement.controller.ts` :52 :67)
+   *   `vendor.deactivate`  terminate, revoke access   (`vendor.controller.ts` :80 :90)
+   *   `dpa.approve`        the DPO approval ONLY      (`data-processing-agreement.controller.ts` :73)
+   *
+   * Collapsing them into one "can manage vendors" boolean would be the defect row 12 names, in a
+   * new place: `dpa.approve` is the DPO's code and nobody else's, and a vendor manager who could
+   * also DPO-approve would defeat the maker/checker pair that agreement exists for.
+   *
+   * `vendor.read` is NOT checked here — it gates the page itself, so anybody rendering this markup
+   * already holds it, and re-checking it would be a second answer to the same question.
+   *
+   * `packages/db/prisma/vendor-screen-permissions.spec.ts` is what keeps these three strings
+   * honest: `hasPermission` takes a plain `string`, so a typo typechecks and silently HIDES a
+   * control from the person who should have it — failing closed, and invisibly.
+   */
+  const canUpdateVendor = hasPermission(user, "vendor.update");
+  const canDeactivateVendor = hasPermission(user, "vendor.deactivate");
+  const canDpoApprove = hasPermission(user, "dpa.approve");
   const params = useParams<{ id: string }>();
   const vendorId = params.id;
 
@@ -123,7 +157,12 @@ export default function VendorDetailPage() {
   async function onTerminate() {
     setActionError(null);
     try {
-      setVendor(await terminateVendor(vendorId));
+      setVendor(await terminateVendor(
+        vendorId,
+        // ROW 29 — still `true`, which is the UNCHANGED behaviour and not a fix. The checkbox this
+        // value should come from needs an Arabic sentence that does not ship; see `terminateVendor`.
+        true,
+      ));
     } catch (err) {
       setActionError(
         err instanceof ApiError ? err.message : t("vendTerminateError"),
@@ -237,6 +276,7 @@ export default function VendorDetailPage() {
             </p>
           </section>
 
+          {canUpdateVendor ? (
           <section style={sectionStyle}>
             <h2>{t("vendRiskTiering")}</h2>
             <label>
@@ -259,6 +299,7 @@ export default function VendorDetailPage() {
               {t("vendRecordAnnualReviewButton")}
             </button>
           </section>
+          ) : null}
 
           <section style={sectionStyle}>
             <h2>{t("vendDataShareReadiness")}</h2>
@@ -280,9 +321,11 @@ export default function VendorDetailPage() {
 
           <section style={sectionStyle}>
             <h2>{t("vendDpaHeading")}</h2>
-            <button type="button" onClick={onCreateDpa}>
-              {t("vendCreateDpaButton")}
-            </button>
+            {canUpdateVendor ? (
+              <button type="button" onClick={onCreateDpa}>
+                {t("vendCreateDpaButton")}
+              </button>
+            ) : null}
             {dpas && dpas.length > 0 ? (
               <table
                 style={{
@@ -361,7 +404,7 @@ export default function VendorDetailPage() {
                         />
                       </Td>
                       <Td>
-                        {!dpa.signedAt ? (
+                        {!dpa.signedAt && canUpdateVendor ? (
                           <button
                             type="button"
                             onClick={() => onSignDpa(dpa.id)}
@@ -369,7 +412,9 @@ export default function VendorDetailPage() {
                             {t("vendSignButton")}
                           </button>
                         ) : null}{" "}
-                        {dpa.signedAt && !dpa.dpoApprovedByUserId
+                        {dpa.signedAt &&
+                        !dpa.dpoApprovedByUserId &&
+                        canDpoApprove
                           ? (() => {
                               // Part 4 — the assessor may DPO-approve their own assessment in an office that
                               // has declared COMBINED, only by saying why.
@@ -422,15 +467,17 @@ export default function VendorDetailPage() {
             )}
           </section>
 
-          <section style={sectionStyle}>
-            <h2>{t("vendTermination")}</h2>
-            <button type="button" onClick={onTerminate}>
-              {t("vendTerminateButton")}
-            </button>{" "}
-            <button type="button" onClick={onRevokeAccess}>
-              {t("vendRevokeAccessButton")}
-            </button>
-          </section>
+          {canDeactivateVendor ? (
+            <section style={sectionStyle}>
+              <h2>{t("vendTermination")}</h2>
+              <button type="button" onClick={onTerminate}>
+                {t("vendTerminateButton")}
+              </button>{" "}
+              <button type="button" onClick={onRevokeAccess}>
+                {t("vendRevokeAccessButton")}
+              </button>
+            </section>
+          ) : null}
         </>
       ) : loadError ? null : (
         <SkeletonList rows={4} label={t("vendLoading")} />

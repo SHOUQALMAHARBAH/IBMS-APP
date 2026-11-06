@@ -345,4 +345,103 @@ describe('Claims Dashboard (e2e) — backlog Part E / Process #64', () => {
     ).body as ClaimsDashboardBody;
     expect(emptyScoped.openClaimsCount).toBe(0);
   });
+  /*
+   * ROW 81 — THE TWO COUNTERS AGREE ABOUT WITHDRAWN CLAIMS. Added 2026-11-06 (module 0-c batch 6).
+   *
+   * `findOpenClaimsForAgeing` has always carried `discardedAt: null` and says why. `countClosed` did
+   * not — and the two are rendered as the two halves of ONE proportion: `/dashboards/claims` draws a
+   * `Ring` whose total is `openClaimsCount + closedClaimsCount`, under the owner's caption
+   * «{open} مطالبة مفتوحة من {total}». Two filters that disagree about which claims exist cannot be
+   * the two halves of one total.
+   *
+   * ## THE STATE UNDER TEST CANNOT BE REACHED THROUGH THE PRODUCT, AND THAT IS THE POINT
+   *
+   * A claim is discardable only while `status === 'NOTIFIED'` (`discard.config.ts`), and
+   * `WorkflowTransitionService` refuses to advance a discarded record — so a discarded claim is
+   * NOTIFIED forever and the API has no path to a discarded CLOSED one. Measured on dev
+   * 2026-11-06: 31 claims, 0 discarded, 0 closed, 0 both. The asymmetry is therefore LATENT, it
+   * changes no figure today, and the fix is a guard against a change somewhere else.
+   *
+   * So this writes the row DIRECTLY, which is the only way to exercise a guard whose trigger the
+   * product declines to produce. The three discard columns are written together because
+   * `Claim_discard_all_or_nothing` refuses any other combination, and the reason must be at least
+   * ten trimmed characters — the database enforcing the rule `assertDiscardable` states.
+   */
+  it('row 81 — a withdrawn claim is excluded from the CLOSED count too, not just the open one', async () => {
+    const app = await boot();
+    const claims = await makeUser(app, 'cd-row81', 'CLAIMS_OFFICER');
+    const insurer = await makeInsurer(uniqueLabel('Row81 Insurer'));
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'CORPORATE',
+        legalName: uniqueLabel('Row81 Co'),
+        ownerUserId: claims.userId,
+      },
+    });
+    const opportunity = await prisma.opportunity.create({
+      data: { customerId: customer.id },
+    });
+    const policy = await prisma.policy.create({
+      data: {
+        opportunityId: opportunity.id,
+        customerId: customer.id,
+        insurerId: insurer.id,
+        insuranceLine: uniqueLabel('row81-line'),
+        requestedPremium: '1000.000',
+        issuedPremium: '1000.000',
+      },
+    });
+
+    // An ordinary closed claim — this one MUST be counted.
+    await prisma.claim.create({
+      data: {
+        policyId: policy.id,
+        customerId: customer.id,
+        status: 'CLOSED',
+        lossDate: daysAgo(40),
+        estimatedLoss: '1000.000',
+        createdAt: daysAgo(30),
+      },
+    });
+
+    const beforeWithdrawal = (
+      await request(app.getHttpServer())
+        .get(`/dashboards/claims?insurerId=${insurer.id}`)
+        .set(bearer(claims.accessToken))
+        .expect(200)
+    ).body as ClaimsDashboardBody;
+    expect(beforeWithdrawal.closedClaimsCount).toBe(1);
+    expect(beforeWithdrawal.openClaimsCount).toBe(0);
+
+    // A WITHDRAWN closed claim. Under the old filter this made the count 2.
+    await prisma.claim.create({
+      data: {
+        policyId: policy.id,
+        customerId: customer.id,
+        status: 'CLOSED',
+        lossDate: daysAgo(40),
+        estimatedLoss: '9000.000',
+        createdAt: daysAgo(30),
+        discardedAt: new Date(),
+        discardedByUserId: claims.userId,
+        discardedReason: 'raised against the wrong policy by mistake',
+      },
+    });
+
+    const afterWithdrawal = (
+      await request(app.getHttpServer())
+        .get(`/dashboards/claims?insurerId=${insurer.id}`)
+        .set(bearer(claims.accessToken))
+        .expect(200)
+    ).body as ClaimsDashboardBody;
+
+    // THE ASSERTION: unchanged. A withdrawn claim is not a closed claim.
+    expect(afterWithdrawal.closedClaimsCount).toBe(1);
+    // And the open half still excludes it, as it always did — so the ring's denominator is now a
+    // consistent set rather than two filters disagreeing.
+    expect(afterWithdrawal.openClaimsCount).toBe(0);
+    expect(
+      afterWithdrawal.openClaimsCount + afterWithdrawal.closedClaimsCount,
+    ).toBe(1);
+  });
 });
