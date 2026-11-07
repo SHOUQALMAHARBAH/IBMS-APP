@@ -27,7 +27,27 @@ export default function RiskProfileSurveyPage() {
 
   if (isLoading || !user) return null;
 
-  const canEdit = hasPermission(user, 'risk-profile.create');
+  /*
+   * ROW 12 — `risk-profile.update`, NOT `.create`. Fixed 2026-11-06 (module 0-c batch 6b).
+   *
+   * This read `risk-profile.create` and is passed to `<RiskSurvey canEdit>`, where it gates the
+   * asset add / edit / delete controls — and all THREE of those routes enforce
+   * `risk-profile.update` (`risk-profile.controller.ts` :66 :78 :90). `.create` guards one route,
+   * `POST /risk-profiles`, which this screen does not call at all.
+   *
+   * BOTH DIRECTIONS WERE WRONG AT ONCE, which is what makes a mismatch worth fixing rather than
+   * tidying: a role holding `.update` and not `.create` could not SEE the controls it is entitled
+   * to use, and a role holding `.create` and not `.update` saw them and was answered 403.
+   *
+   * INVISIBLE UNDER THE SEED, and that is why it survived: measured 2026-11-06, both codes are
+   * granted to exactly `[SALES, PLACEMENT]`, so no seeded role can tell them apart. It goes live
+   * the first time an office defines a role holding one — which is the whole point of
+   * office-scoped RBAC.
+   *
+   * NOT widened to `hasAnyPermission([create, update])`: that would offer the control to a holder
+   * of `.create` who the route still refuses, which is the same defect wearing a fix.
+   */
+  const canEdit = hasPermission(user, 'risk-profile.update');
 
   return (
     <main style={pageStackStyle}>

@@ -95,7 +95,7 @@ async function makeUser(
   app: INestApplication<App>,
   label: string,
   ...roles: RoleName[]
-): Promise<{ accessToken: string; userId: string }> {
+): Promise<{ accessToken: string; userId: string; totpSecret: string }> {
   const email = uniqueEmail(label);
   await request(app.getHttpServer())
     .post('/auth/signup')
@@ -112,12 +112,15 @@ async function makeUser(
     .set(bearer(accessToken))
     .expect(201);
   const enrollBody = enroll.body as MfaEnrollBody;
+  /* Kept so a test can STEP UP: `POST /refunds/:id/approve` carries `@RequireStepUp()`
+   * since module 0-c batch 6b, and a step-up needs a live MFA code as well as the password. */
+  const totpSecret = secretFromOtpAuthUri(enrollBody.otpAuthUri);
   await request(app.getHttpServer())
     .post('/auth/mfa/totp/enroll/verify')
     .set(bearer(accessToken))
     .send({
       credentialId: enrollBody.credentialId,
-      code: authenticator.generate(secretFromOtpAuthUri(enrollBody.otpAuthUri)),
+      code: authenticator.generate(totpSecret),
     })
     .expect(200);
 
@@ -136,7 +139,7 @@ async function makeUser(
       });
     }
   }
-  return { accessToken, userId: user.id };
+  return { accessToken, userId: user.id, totpSecret };
 }
 
 async function buildOpportunity(
@@ -438,11 +441,53 @@ describe('Endorsement Management (e2e) — backlog Part C #22', () => {
       .expect(422);
 
     const refundId = cBody.refund?.id as string;
-    // maker/checker: the officer who raised it cannot approve it
+
+    /*
+     * ROW 68 — STEP-UP ON THE REFUND APPROVAL, AND IT MADE THE ASSERTION BELOW AMBIGUOUS.
+     * Re-pointed 2026-11-06 (module 0-c batch 6b).
+     *
+     * `@RequireStepUp()` refuses with **403**, which is the same status the maker/checker guard
+     * uses. So "the officer who raised it cannot approve it" would have gone on passing even if
+     * duty segregation were deleted — the step-up guard would have refused the raiser anyway,
+     * because they had not stepped up. **A test that cannot distinguish the two controls is no
+     * longer evidence for either**, and that is a defect this decoration introduced rather than
+     * found.
+     *
+     * So the raiser STEPS UP FIRST. Their 403 is then unambiguously the segregation refusal, which
+     * is the thing this test exists to prove.
+     */
+    await request(app.getHttpServer())
+      .post('/auth/step-up')
+      .set(bearer(plc.accessToken))
+      .send({
+        password: PASSWORD,
+        code: authenticator.generate(plc.totpSecret),
+      })
+      .expect(200);
+
+    // maker/checker: the officer who raised it cannot approve it — and now that is the ONLY
+    // control that can be refusing, because the step-up above is satisfied.
     await request(app.getHttpServer())
       .post(`/refunds/${refundId}/approve`)
       .set(bearer(plc.accessToken))
       .expect(403);
+
+    // THE STEP-UP ITSELF, proven on the checker: a manager who may approve, and has not
+    // re-authenticated, is refused. Remove `@RequireStepUp()` from the route and this fails,
+    // because the approval goes through unchallenged.
+    await request(app.getHttpServer())
+      .post(`/refunds/${refundId}/approve`)
+      .set(bearer(mgr.accessToken))
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/auth/step-up')
+      .set(bearer(mgr.accessToken))
+      .send({
+        password: PASSWORD,
+        code: authenticator.generate(mgr.totpSecret),
+      })
+      .expect(200);
 
     const approved = await request(app.getHttpServer())
       .post(`/refunds/${refundId}/approve`)

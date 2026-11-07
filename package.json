@@ -80,6 +80,7 @@
     "check:four-states": "python scripts/measurements/four-states.py --check",
     "check:load-error-way-forward": "python scripts/measurements/load-error-way-forward.py --check",
     "check:dead-helpers": "python scripts/measurements/dead_helpers.py --self-test",
+    "measure:control-permission-fit": "python scripts/measurements/control-permission-fit.py",
     "check:unreachable-routes": "python scripts/measurements/unreachable-routes.py --check",
     "check:unreachable-routes-by-verb": "python scripts/measurements/unreachable-routes-by-verb.py --check",
     "check:screen-pass": "npm run check:labels && npm run check:token-contrast && npm run check:inline-styles && npm run check:opacity-muting && npm run check:literal-colours && npm run check:rendered-identifiers && npm run check:typed-identifiers && npm run check:four-states && npm run check:load-error-way-forward && npm run check:dead-helpers && npm run check:unreachable-routes && npm run check:unreachable-routes-by-verb",

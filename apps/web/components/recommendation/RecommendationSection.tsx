@@ -51,7 +51,33 @@ const FACTOR_LABEL_KEY: Record<keyof RationaleFactors, TranslationKey> = {
 
 interface Props {
   opportunity: OpportunityWithContext;
-  isPlacement: boolean;
+  /**
+   * THREE PROPS, NOT ONE — and `isPlacement` was gated on a FOURTH code that none of the three
+   * controls uses. Split 2026-11-06 (module 0-c batch 6b), row 12.
+   *
+   * `isPlacement` arrived from `/opportunities/[id]` bound to **`quotation.capture`**, and gated
+   * three controls whose routes enforce three different codes:
+   *
+   *   the DRAFT form   `POST /recommendations`           **`recommendation.draft`**
+   *   the SEND button  `POST /recommendations/:id/send`  **`recommendation.send`**
+   *   the CoI notice   the disclosure route              **`conflict-of-interest.disclose`**
+   *
+   * So a Placement Officer holding `quotation.capture` and not `recommendation.send` saw a Send
+   * button and was refused by it, and a role holding `recommendation.draft` without
+   * `quotation.capture` could not see the draft form at all.
+   *
+   * This is the SAME defect the `isManager` comment below records, in the SAME component, left
+   * behind by that fix: the rule it states — *one permission per control, named after what the
+   * endpoint behind that control actually enforces* — had been applied to two of the props and not
+   * to this one. LATENT UNDER THE SEED, like the rest of row 12: all four codes are granted to
+   * `[PLACEMENT]` alone, so no seeded role can tell them apart.
+   *
+   * The third control also needed no new prop: `canDiscloseCoi` IS what `isCompliance` already
+   * carried, so the old `(isPlacement || isCompliance)` was offering the disclosure to a holder of
+   * `quotation.capture` whom the route refuses. The `isPlacement ||` half was pure defect.
+   */
+  canDraft: boolean;
+  canSend: boolean;
   /**
    * TWO PROPS, NOT ONE, BECAUSE TWO DIFFERENT ENDPOINTS GUARD THESE TWO CONTROLS.
    *
@@ -72,7 +98,12 @@ interface Props {
    */
   canSetThreshold: boolean;
   canApprove: boolean;
-  isCompliance: boolean;
+  /**
+   * `conflict-of-interest.disclose`. Renamed from `isCompliance` 2026-11-06: the value was always
+   * this code — `/opportunities/[id]` binds it as `canDiscloseCoi` — and a role-shaped name is
+   * what the `isManager` note below says invites the next person to widen it.
+   */
+  canDiscloseCoi: boolean;
   /** `recommendation.discard` — its own code, not implied by the ability to draft one. */
   canDiscard: boolean;
   onOpportunityChanged: () => void;
@@ -89,11 +120,12 @@ const EMPTY_FACTORS: RationaleFactors = {
 
 export function RecommendationSection({
   opportunity,
-  isPlacement,
+  canDraft,
+  canSend,
   canSetThreshold,
   canApprove,
   canDiscard,
-  isCompliance,
+  canDiscloseCoi,
   onOpportunityChanged,
 }: Props) {
   const { language, t } = useLanguage();
@@ -259,7 +291,7 @@ export function RecommendationSection({
       {rec === undefined ? (
         <p>{t("commonLoading")}</p>
       ) : rec === null ? (
-        isPlacement ? (
+        canDraft ? (
           <div style={{ marginTop: "1rem", maxWidth: "40rem" }}>
             <strong>{t("recDraftHeading")}</strong>
             <div style={quoteFieldStyle}>
@@ -474,7 +506,8 @@ export function RecommendationSection({
                 </button>
               </>
             ) : null}
-            {isPlacement &&
+            {/* SEND — `recommendation.send`, not `quotation.capture`. */}
+            {canSend &&
             !rec.sentToClientAt &&
             rec.blockedFromSend.length === 0 &&
             !rec.discard ? (
@@ -513,7 +546,9 @@ export function RecommendationSection({
           </div>
           <DiscardedNotice discard={rec.discard} />
 
-          {(isPlacement || isCompliance) &&
+          {/* The `isPlacement ||` half is GONE: it offered the disclosure to a holder of
+               `quotation.capture`, which the route does not accept. */}
+          {canDiscloseCoi &&
           rec.conflictOfInterestFlagged &&
           !rec.conflictOfInterestDisclosure &&
           !rec.sentToClientAt &&

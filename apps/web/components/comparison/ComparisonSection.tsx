@@ -24,7 +24,15 @@ import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
 
 interface Props {
   rfqId: string;
-  isPlacement: boolean;
+  /**
+   * `comparison.build`, which is what this component's one writing route enforces.
+   * Renamed from `isPlacement` 2026-11-06 (module 0-c batch 6b), row 12.
+   *
+   * It was bound on `/rfqs/[id]` to `rfq.insurer.update`, a code `POST /comparisons` does not
+   * enforce. Named after the permission rather than the role, which is the rule
+   * `RecommendationSection` states: a role-shaped name invites the next person to widen it.
+   */
+  canBuildComparison: boolean;
 }
 
 interface ScoreDraft {
@@ -32,7 +40,7 @@ interface ScoreDraft {
   serviceScore: string;
 }
 
-export function ComparisonSection({ rfqId, isPlacement }: Props) {
+export function ComparisonSection({ rfqId, canBuildComparison }: Props) {
   const { language, t } = useLanguage();
   const [matrix, setMatrix] = useState<ComparisonMatrix | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -158,7 +166,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
       ) : matrix === null ? (
         <p style={{ color: 'var(--ink-secondary)' }}>
           {t('comparisonNoneYet')}
-          {isPlacement ? t('comparisonNoneYetPlacementHint') : ''}
+          {canBuildComparison ? t('comparisonNoneYetPlacementHint') : ''}
         </p>
       ) : (
         <>
@@ -274,7 +282,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
         </p>
       ) : null}
 
-      {isPlacement ? (
+      {canBuildComparison ? (
         <div style={{ marginTop: '1.25rem' }}>
           {matrix && matrix.rows.length > 0 ? (
             <>

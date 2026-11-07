@@ -158,7 +158,7 @@ async function makeUser(
   app: INestApplication<App>,
   label: string,
   ...roles: RoleName[]
-): Promise<{ accessToken: string; userId: string }> {
+): Promise<{ accessToken: string; userId: string; totpSecret: string }> {
   const email = uniqueEmail(label);
   await request(app.getHttpServer())
     .post('/auth/signup')
@@ -175,12 +175,15 @@ async function makeUser(
     .set(bearer(accessToken))
     .expect(201);
   const enrollBody = enroll.body as MfaEnrollBody;
+  /* Kept so a test can STEP UP — a route carrying `@RequireStepUp()` (module 0-c batch 6b)
+   * needs a live MFA code as well as the password. */
+  const totpSecret = secretFromOtpAuthUri(enrollBody.otpAuthUri);
   await request(app.getHttpServer())
     .post('/auth/mfa/totp/enroll/verify')
     .set(bearer(accessToken))
     .send({
       credentialId: enrollBody.credentialId,
-      code: authenticator.generate(secretFromOtpAuthUri(enrollBody.otpAuthUri)),
+      code: authenticator.generate(totpSecret),
     })
     .expect(200);
 
@@ -199,7 +202,7 @@ async function makeUser(
       });
     }
   }
-  return { accessToken, userId: user.id };
+  return { accessToken, userId: user.id, totpSecret };
 }
 
 /**
@@ -272,6 +275,29 @@ async function sweepFloorCategories(): Promise<void> {
   await prisma.retentionScheduleItem.deleteMany({
     where: { recordCategory: { in: FLOOR_CATEGORIES } },
   });
+}
+
+/**
+ * ROW 68 — `POST /disposal-batches/:id/dpo-approve` carries `@RequireStepUp()` since module 0-c batch 6b: it is the DPO half of
+ * disposal dual control — the authorisation that permits records to be destroyed, which is the
+ * irreversible one. `require-step-up.decorator.ts` has always named "disposal approval" as one of
+ * its three cases.
+ *
+ * A step-up is a PASSWORD re-entry plus a live MFA code — re-proving the first factor, not just the
+ * second — so a bystander at an unlocked machine cannot generate an export.
+ */
+async function stepUp(
+  app: INestApplication<App>,
+  actor: { accessToken: string; totpSecret: string },
+): Promise<void> {
+  await request(app.getHttpServer())
+    .post('/auth/step-up')
+    .set(bearer(actor.accessToken))
+    .send({
+      password: PASSWORD,
+      code: authenticator.generate(actor.totpSecret),
+    })
+    .expect(200);
 }
 
 describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52 / M06', () => {
@@ -452,6 +478,19 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     expect((managerApproved.body as DisposalBatchBody).status).toBe(
       'MANAGER_APPROVED',
     );
+
+    /*
+     * ROW 68 — BOTH ACTORS STEP UP FIRST, AND THE FIRST ONE IS THE REASON WHY.
+     * Added 2026-11-06 (module 0-c batch 6b).
+     *
+     * `POST /disposal-batches/:id/dpo-approve` carries `@RequireStepUp()` now, and `StepUpGuard`
+     * runs BEFORE `PermissionsGuard` (`rbac.module.ts:64`). Both refuse with **403**. So the
+     * manager's refusal below — which this test exists to attribute to "no
+     * `retention.dispose.approve` permission at all" — would have become the step-up's refusal, and
+     * the assertion would have passed with the permission check deleted.
+     */
+    await stepUp(app, manager);
+    await stepUp(app, dpo);
 
     // the SAME manager who nominated CANNOT also give the DPO approval
     await request(app.getHttpServer())
@@ -826,6 +865,14 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       .send({ retentionScheduleItemId: itemId })
       .expect(201);
     const batchId = (batch.body as { id: string }).id;
+
+    /*
+     * ROW 68 — and this test was ALREADY built for a 403 collision, which is why it survives a
+     * third source of one: its own comment below says the MESSAGE is what distinguishes the
+     * refusals, and it asserts the message rather than the status. The step-up is added so the
+     * message is the maker/checker one and not the step-up's.
+     */
+    await stepUp(app, both);
 
     // Holds the permission — so this is NOT a 403. It is the maker/checker
     // rule refusing a second signature from the first signatory.

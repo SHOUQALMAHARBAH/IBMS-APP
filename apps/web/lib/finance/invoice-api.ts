@@ -92,7 +92,35 @@ export function createInvoice(input: CreateInvoiceInput): Promise<Invoice> {
  * instead of booking a second instalment. */
 export function recordReceipt(
   invoiceId: string,
-  input: { amount: string; method?: string; reference: string },
+  /**
+   * ROW 23 — `paymentChannelId` ADDED 2026-11-06 (module 0-c batch 6b).
+   *
+   * It was absent from this shape, so no screen in the product could ever send one, and the four
+   * refusals `assertReceiptChannelUsable` makes — wrong owner, disabled, wrong currency, a `method`
+   * contradicting the channel's type — were **unreachable by clicking**. `/payment-channels` lets
+   * an office add an approved channel and nothing could then collect against it.
+   *
+   * MEASURED, AND ONE HALF OF THE BRIEF'S CLAIM IS WRONG: the four checks are NOT untested. Three
+   * were already asserted in `invoice.e2e-spec.ts` (disabled, wrong owner, method contradiction)
+   * and the fourth — currency — was added alongside this. So they work; they were simply
+   * unreachable from a screen. "The first time they run is a measurement" was true of the product
+   * and not of the suite.
+   *
+   * **THE PICKER IS STILL OWED AND IS NOT BUILT HERE.** `listPaymentChannels({ customerId,
+   * status: 'active' })` already exists and `payment-channel.read` already gates it, so the data
+   * half is ready — but a `<select>` asking *which channel did this money arrive on* needs a field
+   * label, and measured 2026-11-06 no shipping Arabic says that: `pcHeading` is «قنوات الدفع», a
+   * plural page heading, and `pcChannelTypeLabel` is «نوع القناة», the channel's TYPE rather than
+   * the channel. One word is owed. There is also a design question under it that is not an
+   * engineering one: when a channel IS chosen the server DERIVES `method` from it, so the existing
+   * method `<select>` and a channel `<select>` cannot both be live for the same receipt.
+   */
+  input: {
+    amount: string;
+    method?: string;
+    paymentChannelId?: string;
+    reference: string;
+  },
 ): Promise<Invoice> {
   return apiPost(`/invoices/${invoiceId}/receipt`, input);
 }

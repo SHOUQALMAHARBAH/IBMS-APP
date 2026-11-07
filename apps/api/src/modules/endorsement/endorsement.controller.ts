@@ -8,6 +8,7 @@ import {
   CalculateAdjustmentDto,
 } from './dto/endorsement-step.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
+import { RequireStepUp } from '../auth/decorators/require-step-up.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DiscardDto } from '../../common/dto/discard.dto';
 import { ApproveRefundDto } from './dto/approve-refund.dto';
@@ -94,7 +95,20 @@ export class EndorsementController {
 
   /** Maker/checker refund approval (never the raiser). Advances the
    * endorsement REFUND_APPROVAL_PENDING → APPLIED. */
+  /**
+   * ROW 68 — STEP-UP. Added 2026-11-06 (module 0-c batch 6b).
+   *
+   * `require-step-up.decorator.ts` names its own three cases: *"Part 10.1 — refund approval, data
+   * export, disposal approval"*. This is the first of them, and the gate had been wired to exactly
+   * ONE route in the whole api — `rbac.controller.ts:166`, the MFA security attributes — which is
+   * none of the three.
+   *
+   * It belongs here rather than on `recordRefundDisbursement` because this is the maker/checker
+   * decision: the approval is what commits money to leave, and the disbursement carries it out
+   * against an approval that already exists.
+   */
   @RequirePermissions('refund.approve')
+  @RequireStepUp()
   @Post('refunds/:id/approve')
   approveRefund(
     @Param('id') id: string,

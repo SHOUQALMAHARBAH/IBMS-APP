@@ -52,7 +52,7 @@ async function makeUser(
   app: INestApplication<App>,
   label: string,
   ...roles: RoleName[]
-): Promise<{ accessToken: string; userId: string }> {
+): Promise<{ accessToken: string; userId: string; totpSecret: string }> {
   const email = uniqueEmail(label);
   await request(app.getHttpServer())
     .post('/auth/signup')
@@ -69,12 +69,16 @@ async function makeUser(
     .set(bearer(accessToken))
     .expect(201);
   const enrollBody = enroll.body as MfaEnrollBody;
+  // Kept so a test can perform a STEP-UP: `GET /ropa-entries/export` carries
+  // `@RequireStepUp()` since module 0-c batch 6b, and step-up is a password re-entry PLUS a
+  // live MFA code — the secret is the only way to produce the second half.
+  const totpSecret = secretFromOtpAuthUri(enrollBody.otpAuthUri);
   await request(app.getHttpServer())
     .post('/auth/mfa/totp/enroll/verify')
     .set(bearer(accessToken))
     .send({
       credentialId: enrollBody.credentialId,
-      code: authenticator.generate(secretFromOtpAuthUri(enrollBody.otpAuthUri)),
+      code: authenticator.generate(totpSecret),
     })
     .expect(200);
 
@@ -93,7 +97,7 @@ async function makeUser(
       });
     }
   }
-  return { accessToken, userId: user.id };
+  return { accessToken, userId: user.id, totpSecret };
 }
 
 describe('Records of Processing Activities (e2e) — backlog Part D §5.1, Process #52', () => {
@@ -195,6 +199,34 @@ describe('Records of Processing Activities (e2e) — backlog Part D §5.1, Proce
         recipients: ['Insurer'],
       })
       .expect(201);
+
+    /*
+     * ROW 68 — THE EXPORT IS BEHIND A STEP-UP NOW, AND THIS TEST IS THE PROOF.
+     * Re-pointed 2026-11-06 (module 0-c batch 6b), with the reversal stated.
+     *
+     * This read `.expect(200)` on the bare session, which pinned an UNCHALLENGED export as correct
+     * behaviour. `require-step-up.decorator.ts` has always named "data export" as one of its three
+     * cases, and the gate was wired to exactly one route in the api — none of the three.
+     *
+     * The 403 FIRST is what makes the decoration load-bearing rather than decorative: remove
+     * `@RequireStepUp()` from the route and this assertion fails, because the export goes through
+     * unchallenged. An updated 200-after-step-up on its own would pass either way.
+     */
+    await request(app.getHttpServer())
+      .get('/ropa-entries/export')
+      .set(bearer(dpo.accessToken))
+      .expect(403);
+
+    // A password re-entry AND a live code — re-proving the first factor, not just the second, so a
+    // bystander at an unlocked machine cannot export the register.
+    await request(app.getHttpServer())
+      .post('/auth/step-up')
+      .set(bearer(dpo.accessToken))
+      .send({
+        password: PASSWORD,
+        code: authenticator.generate(dpo.totpSecret),
+      })
+      .expect(200);
 
     const exported = (
       await request(app.getHttpServer())
