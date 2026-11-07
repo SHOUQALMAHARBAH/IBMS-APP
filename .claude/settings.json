@@ -1,4 +1,5 @@
 {
+  "_comment": "A CONFIGURED GUARD THAT IS MISSING MUST FAIL THE ACTION, NOT PASS IT. Each registration resolves the SUPERPROJECT root first (`git rev-parse --show-superproject-working-tree`, falling back to `--show-toplevel`) and then its script, and runs it through `bash` — never `exec \"$script\"`, which needs an executable bit a fresh clone may not have (every hook in the brain was recorded in git as 100644 until 2026-11-07). THE SUPERPROJECT STEP IS NOT DECORATION: `--show-toplevel` is cwd-dependent, so while the working directory is inside ibms-brain/ it returns the SUBMODULE root and every path below resolved to a file that does not exist. The old `|| true` shape hid that completely; the loud shape surfaced it by blocking a legitimate edit within a minute of landing, which is how it was found. If the hooks DIRECTORY is absent the submodule is simply not initialised: that warns and exits 0, because exiting 2 there would block the very `git submodule update --init` that fixes it. If the directory exists and the named script does not, that is a deleted or renamed guard and it exits 2. `npm run check:hook-registration` gates all of this; see scripts/measurements/hook-registration.py for which hooks are registered, which are not, and the measured reason for each.",
   "hooks": {
     "PreToolUse": [
       {
@@ -6,11 +7,24 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'script=\"$(git rev-parse --show-toplevel)/ibms-brain/.claude/hooks/enforce-workspace-updates.sh\"; [ -f \"$script\" ] && exec bash \"$script\" || true'"
+            "command": "bash -c 'r=\"$(git rev-parse --show-superproject-working-tree 2>/dev/null)\"; [ -n \"$r\" ] || r=\"$(git rev-parse --show-toplevel)\"; d=\"$r/ibms-brain/.claude/hooks\"; s=\"$d/enforce-workspace-updates.sh\"; if [ -r \"$s\" ]; then exec bash \"$s\"; fi; if [ ! -d \"$d\" ]; then echo \"ibms-brain submodule is not initialised, so its guards are not running. Fix: git submodule update --init --recursive\" >&2; exit 0; fi; echo \"GUARD MISSING: ibms-brain/.claude/hooks/enforce-workspace-updates.sh is registered in .claude/settings.json but is not readable. Restore it or remove its registration — this blocks rather than passes, because a guard that cannot run has checked nothing.\" >&2; exit 2'"
           },
           {
             "type": "command",
-            "command": "bash -c 'script=\"$(git rev-parse --show-toplevel)/ibms-brain/.claude/hooks/enforce-credential-safety.sh\"; [ -f \"$script\" ] && exec bash \"$script\" || true'"
+            "command": "bash -c 'r=\"$(git rev-parse --show-superproject-working-tree 2>/dev/null)\"; [ -n \"$r\" ] || r=\"$(git rev-parse --show-toplevel)\"; d=\"$r/ibms-brain/.claude/hooks\"; s=\"$d/enforce-credential-safety.sh\"; if [ -r \"$s\" ]; then exec bash \"$s\"; fi; if [ ! -d \"$d\" ]; then echo \"ibms-brain submodule is not initialised, so its guards are not running. Fix: git submodule update --init --recursive\" >&2; exit 0; fi; echo \"GUARD MISSING: ibms-brain/.claude/hooks/enforce-credential-safety.sh is registered in .claude/settings.json but is not readable. Restore it or remove its registration — this blocks rather than passes, because a guard that cannot run has checked nothing.\" >&2; exit 2'"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'r=\"$(git rev-parse --show-superproject-working-tree 2>/dev/null)\"; [ -n \"$r\" ] || r=\"$(git rev-parse --show-toplevel)\"; d=\"$r/ibms-brain/.claude/hooks\"; s=\"$d/enforce-money-decimal.sh\"; if [ -r \"$s\" ]; then exec bash \"$s\"; fi; if [ ! -d \"$d\" ]; then echo \"ibms-brain submodule is not initialised, so its guards are not running. Fix: git submodule update --init --recursive\" >&2; exit 0; fi; echo \"GUARD MISSING: ibms-brain/.claude/hooks/enforce-money-decimal.sh is registered in .claude/settings.json but is not readable. Restore it or remove its registration — this blocks rather than passes, because a guard that cannot run has checked nothing.\" >&2; exit 2'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'r=\"$(git rev-parse --show-superproject-working-tree 2>/dev/null)\"; [ -n \"$r\" ] || r=\"$(git rev-parse --show-toplevel)\"; d=\"$r/ibms-brain/.claude/hooks\"; s=\"$d/enforce-sensitive-data.sh\"; if [ -r \"$s\" ]; then exec bash \"$s\"; fi; if [ ! -d \"$d\" ]; then echo \"ibms-brain submodule is not initialised, so its guards are not running. Fix: git submodule update --init --recursive\" >&2; exit 0; fi; echo \"GUARD MISSING: ibms-brain/.claude/hooks/enforce-sensitive-data.sh is registered in .claude/settings.json but is not readable. Restore it or remove its registration — this blocks rather than passes, because a guard that cannot run has checked nothing.\" >&2; exit 2'"
           }
         ]
       }
@@ -21,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'script=\"$(git rev-parse --show-toplevel)/.claude/hooks/mirror-brain-agents.sh\"; [ -f \"$script\" ] && exec bash \"$script\" || true'"
+            "command": "bash -c 'r=\"$(git rev-parse --show-superproject-working-tree 2>/dev/null)\"; [ -n \"$r\" ] || r=\"$(git rev-parse --show-toplevel)\"; s=\"$r/.claude/hooks/mirror-brain-agents.sh\"; if [ -r \"$s\" ]; then exec bash \"$s\"; fi; echo \"GUARD MISSING: .claude/hooks/mirror-brain-agents.sh is registered in .claude/settings.json but is not readable. Restore it or remove its registration.\" >&2; exit 2'"
           }
         ]
       }
