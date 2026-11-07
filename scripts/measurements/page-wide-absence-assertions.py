@@ -71,7 +71,18 @@ SHAPES = [
 # throw — the same shape as `MISSING_DESCRIPTION_BUDGET`, which reached 0 and stayed there.
 #
 # Lower it as sites are converted. Do NOT raise it: a new one is the defect this measures.
-TEXT_LOCATOR_BUDGET = 42
+TEXT_LOCATOR_BUDGET = 38
+# 42 → 38 on 2026-11-07 (module 0-c batch 6b), and NOT because four sites were converted.
+#
+# Blanking comments before matching (see `main()`) removed FOUR pre-existing false positives: the
+# recorded 42 had always counted prose that QUOTED a page-wide absence alongside the real ones. So
+# this ratchet had four units of slack in it from the day it was adopted — a new site could ship and
+# the gate stay green, which is the one thing a ratchet exists to prevent.
+#
+# The fall is therefore a correction of the instrument and not progress on the class, which is the
+# distinction `README.md`'s own note demands be stated: *a falling ratchet is not automatically
+# progress*. Four of the five units came from fixing the matcher; the fifth was this batch's own
+# comment, which is what exposed it.
 
 
 def source_files():
@@ -106,6 +117,24 @@ def main():
 
     for path in sorted(files):
         src = io.open(path, encoding="utf-8").read()
+        # COMMENTS ARE BLANKED FIRST, and a real failure is why — 2026-11-07 (module 0-c batch 6b).
+        #
+        # This gate refused a branch at 43 against 42, and the 43rd site was a COMMENT quoting the
+        # very expression it was explaining the removal of: `expect(page.getByText("Set
+        # status")).toHaveCount(0)`, written beside the `expectAbsentWithin` call that replaced it.
+        # So the gate counted the documentation of a fix as an instance of the defect, and the only
+        # way to satisfy it was to stop explaining the fix — which is the opposite of what this
+        # repository wants from a comment.
+        #
+        # It is the same blindness recorded twice before: a comment quoting `<div>` made a JSX depth
+        # counter miscount, and 13 of 34 `$queryRaw` "call sites" turned out to be prose naming the
+        # method. `literal-colours.py` already strips comments for this reason; this now does too.
+        #
+        # Positions are NOT preserved (lengths are not padded) because nothing here reports a line
+        # number — only counts and an 88-character excerpt. A future line-reporting version must pad
+        # instead of removing.
+        src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
+        src = re.sub(r"(?m)//.*$", " ", src)
         # Flattened, because prettier wraps most of these across lines and a line-based matcher
         # would see none of them.
         flat = re.sub(r"\s+", " ", src)

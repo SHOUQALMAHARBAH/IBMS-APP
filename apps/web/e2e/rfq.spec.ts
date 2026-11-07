@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -1881,8 +1882,22 @@ test("row 12 — a role with quotation.capture but NOT rfq.insurer.update gets t
   await expect(
     page.getByRole("button", { name: "Capture quote" }),
   ).toBeVisible();
-  // And it still does NOT get the RFQ status control, which really is `rfq.insurer.update`.
-  await expect(page.getByText("Set status")).toHaveCount(0);
+  /*
+   * SCOPED, NOT PAGE-WIDE — and a CI gate taught me that, not a review.
+   *
+   * This was `expect(page.getByText("Set status")).toHaveCount(0)`, and CI step 9 of the `frontend`
+   * job (`page-wide-absence-assertions.py --check`) refused it: **43 against a budget of 42**, with
+   * "Do NOT raise the budget" in its own message. A page-wide text absence can match an element the
+   * test is not about — the recorded case is a role-name loop that matched a NAV LABEL and failed on
+   * a correct tree.
+   *
+   * `expectAbsentWithin` takes a `Locator`, so the compiler refuses a page-wide root, and it
+   * asserts the scope VISIBLE first — which fixes the wrong-element failure AND the not-yet-rendered
+   * one, because `toHaveCount(0)` passes on its first poll.
+   */
+  await expectAbsentWithin(page.getByRole("table").first(), (scope) =>
+    scope.getByText("Set status"),
+  );
 });
 
 test("revises a captured quotation into a new version", async ({ page }) => {
