@@ -373,6 +373,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run check:maker-checker-pairs
 
+      - name: Every brain guard is present, registered where the code lives, and executable
+        if: ${{ !cancelled() }}
+        run: npm run check:guards
+        
+      - name: Every document gate runs — no stale absence claim, no uncapped table
+        if: ${{ !cancelled() }}
+        run: npm run check:docs
+
       - name: Database schema (prisma validate)
         if: ${{ !cancelled() }}
         run: npm run db:validate
