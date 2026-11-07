@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   transitionLead,
@@ -112,7 +113,27 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
               const isTransitioning = transitioningId === lead.id;
               return (
                 <article key={lead.id} style={cardStyle} aria-label={t('leadsCardAria', { name: lead.fullName })}>
-                  <strong>{lead.fullName}</strong>
+                  <strong>
+                    {/*
+                     * The card's name is the only way into `/leads/[id]`, which was built,
+                     * works, and had no caller anywhere in the application — measured
+                     * 2026-11-07: every reference to that path was the page's own fetch, two
+                     * e2e specs, or a comment naming the file. A whole screen nobody could
+                     * reach, and nobody reported it missing because nobody knew it was there.
+                     *
+                     * The NAME rather than the card, because the card already contains the
+                     * transition buttons and an anchor may not wrap them. `/leads` and
+                     * `/leads/:id` both enforce `lead.list.read` (measured, lead.controller.ts
+                     * :24 and :33), so a reader who can see this row can open its detail —
+                     * there is no permission to gate the link on and nothing to hide.
+                     *
+                     * No new string: the link's accessible name is the lead's own name, and
+                     * the card keeps its existing `leadsCardAria`.
+                     */}
+                    <Link href={`/leads/${lead.id}`} data-lead-link={lead.id}>
+                      {lead.fullName}
+                    </Link>
+                  </strong>
                   <div style={cardMetaStyle}>{t(SOURCE_LABEL_KEY[lead.source])}</div>
                   {lead.contactPhone ? <div style={cardMetaStyle}>{lead.contactPhone}</div> : null}
                   {lead.contactEmail ? <div style={cardMetaStyle}>{lead.contactEmail}</div> : null}

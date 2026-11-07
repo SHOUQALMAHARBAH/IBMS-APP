@@ -110,6 +110,43 @@ test("shows a friendly message when the user lacks list permission", async ({ pa
   await expect(page.locator('main [role="alert"]')).toContainText("(lead.list.read)");
 });
 
+/*
+ * MODULE 0-c ROW 59 — `/leads/[id]` was built, worked, and nothing in the application linked to it.
+ *
+ * Measured 2026-11-07: every reference to that path in `apps/web` was the detail page's own fetch,
+ * two e2e specs, or a comment naming the file. No `href`, no `router.push`, no nav entry, and not
+ * from the leads list itself — so a whole screen was unreachable, and nobody reported it missing
+ * because nobody knew it was there. `/prospects/[id]` beside it has always been linked, which is
+ * why only this one went unnoticed.
+ *
+ * Asserted by ARRIVING, not by the link's presence: a test that only checks an anchor exists would
+ * pass against an `href` pointing anywhere, and the defect here was a route nobody reached.
+ */
+test("reaches the lead detail screen from its row in the pipeline", async ({ page }) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
+  await page.route("http://localhost:4000/leads", (route) => route.fulfill({ status: 200, json: LEADS }));
+  await page.route("http://localhost:4000/leads/lead-1", (route) =>
+    route.fulfill({ status: 200, json: LEADS[0] }),
+  );
+
+  await page.goto("/leads");
+  await page.getByRole("link", { name: "Ahmad Al-Test" }).click();
+
+  await expect(page).toHaveURL(/\/leads\/lead-1$/);
+  /*
+   * "Marketing Consent" is rendered by the DETAIL page and by nothing on the board, which is what
+   * makes it evidence of arrival. The lead's NAME would not be: it is on the card the click
+   * started from, so an assertion on it passes against a navigation that never happened.
+   *
+   * Deliberately not the `leaddLeadDetails` heading — the owner has decided that string changes
+   * (batch 0-c/6), and a test anchored on it would go red for a reason unrelated to this row.
+   */
+  await expect(page.getByText("Marketing Consent")).toBeVisible();
+});
+
 test("only offers a transition action on the officer's own lead, and moving it updates the board", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.route("http://localhost:4000/privacy-notices/current**", (route) =>

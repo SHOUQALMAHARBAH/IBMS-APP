@@ -135,6 +135,84 @@ test("renames one row without touching another's draft", async ({ page }) => {
   await expect(page.locator(`[data-org-unit="${second.id}"]`)).toContainText("Underwriting");
 });
 
+/*
+ * MODULE 0-c ROW 54 — the Arabic name of a department or branch could not be corrected from
+ * anywhere in this system.
+ *
+ * The rename control edited the ENGLISH name only and its save sent `{ name }`. Creation has
+ * REQUIRED `nameAr` since 2026-10-28, so every office has an Arabic name for every unit and none
+ * of them could fix a typo in it — on a platform whose default language is the one the name is
+ * written in. The server was never the problem: `RenameOrgUnitDto` accepts `nameAr` alone and its
+ * own comment names this control as the remedy.
+ *
+ * Reading the draft back off the SCREEN would pass with `nameAr` dropped from the payload, because
+ * the input holds whatever was typed into it either way. These assert the REQUEST BODY.
+ */
+test("corrects the Arabic name of a department, and sends it", async ({ page }) => {
+  await mockAuth(page, FOUR_ACTIONS);
+  await mockUnits(page);
+  const patched: Record<string, unknown>[] = [];
+  await page.route(`http://localhost:4000/admin/departments/${CLAIMS.id}`, (route) => {
+    patched.push(route.request().postDataJSON() as Record<string, unknown>);
+    return route.fulfill({
+      status: 200,
+      json: { ...CLAIMS, nameAr: "إدارة المطالبات", retiredAt: null },
+    });
+  });
+  await page.goto("/settings/org-units");
+
+  await page.locator(`[data-rename="${CLAIMS.id}"]`).click();
+
+  // The draft opens on the value that is actually stored, so a correction starts from the wrong
+  // word rather than from an empty box — otherwise every fix is a retype.
+  await expect(page.locator(`[data-rename-input-ar="${CLAIMS.id}"]`)).toHaveValue(CLAIMS.nameAr);
+  await expect(page.locator(`[data-rename-input="${CLAIMS.id}"]`)).toHaveValue(CLAIMS.name);
+
+  await page.locator(`[data-rename-input-ar="${CLAIMS.id}"]`).fill("إدارة المطالبات");
+  await page.locator(`[data-save-rename="${CLAIMS.id}"]`).click();
+
+  // Polled on the COUNT rather than on "a body arrived", so two requests fail here instead of the
+  // second one silently overwriting the first.
+  await expect.poll(() => patched.length).toBe(1);
+  // An EXACT key set, not a `toMatchObject`: this control's whole defect was a field missing from
+  // the payload, and a partial match is satisfied by the body that caused it.
+  expect(patched[0]).toEqual({ name: "Claims", nameAr: "إدارة المطالبات" });
+});
+
+test("a unit with no Arabic name opens an empty field and sends a diff", async ({ page }) => {
+  await mockAuth(page, FOUR_ACTIONS);
+  // The shape db-test holds for 11 of its 14 live branches, measured 2026-11-07: a row predating
+  // the 2026-10-28 requirement, with no Arabic name at all. These are the rows the server's own
+  // `nameAr`-alone rename was built for.
+  const legacy = { id: "dept-7", name: "Motor", nameAr: null, retiredAt: null };
+  await page.route("http://localhost:4000/admin/departments", (route) =>
+    route.fulfill({ status: 200, json: [legacy] }),
+  );
+  await page.route("http://localhost:4000/admin/branches", (route) =>
+    route.fulfill({ status: 200, json: [IRBID] }),
+  );
+  const patched: Record<string, unknown>[] = [];
+  await page.route(`http://localhost:4000/admin/departments/${legacy.id}`, (route) => {
+    patched.push(route.request().postDataJSON() as Record<string, unknown>);
+    return route.fulfill({ status: 200, json: { ...legacy, name: "Motor Lines" } });
+  });
+  await page.goto("/settings/org-units");
+
+  await page.locator(`[data-rename="${legacy.id}"]`).click();
+  // EMPTY, never the Latin name: a field pre-filled with "Motor" is one a person saves as though
+  // it were the Arabic name, and the system would then hold a Latin string in an Arabic column.
+  await expect(page.locator(`[data-rename-input-ar="${legacy.id}"]`)).toHaveValue("");
+
+  await page.locator(`[data-rename-input="${legacy.id}"]`).fill("Motor Lines");
+  await page.locator(`[data-save-rename="${legacy.id}"]`).click();
+
+  await expect.poll(() => patched.length).toBe(1);
+  // `nameAr` is ABSENT rather than `""`. The DTO validates every field it receives, so a blank one
+  // is a 400 naming a field this person never touched — the insurer panel's recorded defect, and
+  // these are precisely the rows it would have fired on.
+  expect(patched[0]).toEqual({ name: "Motor Lines" });
+});
+
 test("says so plainly when the account holds neither read code", async ({ page }) => {
   await mockAuth(page, ["claim.read"]);
   await page.goto("/settings/org-units");
