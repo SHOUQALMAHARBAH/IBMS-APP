@@ -46,11 +46,18 @@ import type { TranslationKey } from '../../lib/i18n/translations';
  *
  * ## BOTH REPLACEMENT WORDS ALREADY SHIP, AND NEITHER WAS CHOSEN ON TASTE
  *
- *  - `reversed` → `commissionReversedLabel` («معكوسة»), which **this very component already renders
- *    nine lines below**, labelling `entry.reversedAmount` on the same card. Before this fix the card
- *    contradicted itself in adjacent rows: the amount row said «معكوسة» while the status row said
- *    «مسوَّدة». One card must not use two words for one fact, and that constraint — not a
- *    preference — picks the word.
+ *  - `reversed` → **`frReversed` («المستردّة»), BY OWNER DECISION of 2026-11-07.**
+ *
+ *    Batch 6 pointed this at `commissionReversedLabel` («معكوسة») on the reasoning that one card
+ *    must not use two words for one fact — the amount row said «معكوسة» while the status row said
+ *    «مسوَّدة». That reasoning was right about the constraint and could not settle WHICH word,
+ *    because the system shipped two Arabic words for a reversed commission: «معكوسة» here and
+ *    «المستردّة» on `/financial-report`'s commission roll-up. Batch 6 reported it as the owner's to
+ *    decide, and she has: **«المستردّة» wins everywhere.**
+ *
+ *    So both uses on this card now point at `frReversed`, and `commissionReversedLabel` is
+ *    WITHDRAWN in both languages — one home for one fact, rather than two keys agreeing by
+ *    convention. The English is unchanged: both keys already read `Reversed`.
  *  - `outstanding` → `frOutstanding` («المستحقة»), which is the column heading of the COMMISSION
  *    roll-up on `/financial-report` (`frEarned` / `frPaid` / `frOutstanding` / `frReversed` over
  *    `data.commission.byInsurer`). Same subject and same state, so this is a pointer at the word
@@ -58,10 +65,12 @@ import type { TranslationKey } from '../../lib/i18n/translations';
  *    grammar, which matters because the near-miss candidates (`caColOutstanding`,
  *    `iaColOutstanding`) are the MASCULINE «المستحق» for a different subject.
  *
- * **ONE THING IS THE OWNER'S AND IS NOT DECIDED HERE:** there are now two shipping Arabic words for
- * a reversed commission — «معكوسة» here and «المستردّة» (`frReversed`) on the financial report —
- * which is row 76's shape in a second place. Reported, not unified: unifying them means retiring
- * one of her strings.
+ * **THAT QUESTION IS NOW CLOSED. It read, until 2026-11-07:** *"ONE THING IS THE OWNER'S AND IS NOT
+ * DECIDED HERE: there are now two shipping Arabic words for a reversed commission … Reported, not
+ * unified: unifying them means retiring one of her strings."* She decided, and retiring one of her
+ * strings is exactly what the decision does — «معكوسة» is withdrawn and «المستردّة» is the word
+ * everywhere. Kept as a record rather than deleted, because the reason the batch stopped is the
+ * reason it was right to stop.
  *
  * `commissionStatusDraft`, `commissionStatusCalculated` and `commissionStatusApproved` are
  * WITHDRAWN in both languages with this change — measured, their only consumers were this map and
@@ -73,7 +82,7 @@ const COMMISSION_STATUS_LABEL_KEY: Record<
 > = {
   outstanding: 'frOutstanding',
   paid: 'financeBillingStatusPaid',
-  reversed: 'commissionReversedLabel',
+  reversed: 'frReversed',
 };
 
 interface Props {
@@ -194,7 +203,7 @@ export function CommissionSection({
           ) : null}
           {entry.reversedAmount && Number(entry.reversedAmount) > 0 ? (
             <div style={quoteFieldStyle}>
-              <span>{t('commissionReversedLabel')}</span>
+              <span>{t('frReversed')}</span>
               <span>
                 {formatMoney(entry.reversedAmount, language)}
                 {entry.reversalReason ? ` · ${entry.reversalReason}` : ''}

@@ -37,3 +37,15 @@ export const profileFieldValueStyle: CSSProperties = {
 export const detailSectionStyle: CSSProperties = {
   marginBottom: '2rem',
 };
+
+/**
+ * A block-level attestation row — a checkbox and the sentence it governs on one line of its own.
+ * Added 2026-11-07 (module 0-c batch 6b) because the SCREEN ratchet refused a new inline
+ * `style={{ display: "block", marginBottom: "0.5rem" }}` on `/vendors/[id]` at 1084 against 1083,
+ * and that budget may only FALL — so the honest move is a named style, not a raised ceiling. Second
+ * time this batch family has made that trade; the first was `detailSectionStyle` above.
+ */
+export const attestationRowStyle: CSSProperties = {
+  display: "block",
+  marginBottom: "0.5rem",
+};

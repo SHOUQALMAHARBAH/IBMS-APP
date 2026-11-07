@@ -212,11 +212,33 @@ test("terminates a vendor and then revokes access", async ({ page }) => {
   );
 
   await page.goto("/vendors/vendor-1");
-  await page
-    .getByRole("button", {
-      name: "Terminate (confirm data return/destruction)",
-    })
-    .click();
+
+  /*
+   * ROW 29 — THE ATTESTATION IS TICKED BY A PERSON NOW. Re-pointed 2026-11-07, with the reversal
+   * stated.
+   *
+   * This clicked Terminate straight away, because `terminateVendor` hardcoded
+   * `confirmDataReturnOrDestruction: true` — so the record said an officer had attested that the
+   * vendor returned or destroyed the data, and nobody had been asked. The DTO's own comment calls
+   * that flag *"a deliberate, conscious attestation by the officer… not a system-verified fact"*.
+   *
+   * The checkbox is UNTICKED by default and the button is disabled until it is ticked, so the two
+   * assertions below are the control: the button cannot be pressed first, and the attestation
+   * sentence names the vendor.
+   */
+  const terminate = page.getByRole("button", {
+    name: "Terminate (confirm data return/destruction)",
+  });
+  await expect(terminate).toBeDisabled();
+  const attestation = page.getByRole("checkbox");
+  await expect(attestation).not.toBeChecked();
+  // Her sentence, rendered with the vendor's own name where her placeholder sat.
+  await expect(
+    page.getByText("High Risk Cloud Vendor", { exact: false }).first(),
+  ).toBeVisible();
+  await attestation.check();
+  await expect(terminate).toBeEnabled();
+  await terminate.click();
   await expect(
     page.getByText("Termination confirmed: 2026-09-06", { exact: false }),
   ).toBeVisible();

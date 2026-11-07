@@ -2540,10 +2540,23 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await expect(page.getByText("Outstanding balance")).toBeVisible();
   await expect(page.getByText("JOD 100,000.000")).toBeVisible();
 
-  // 1b. the instalment that settles the rest — a blank amount means "the whole
-  //     outstanding balance", so this closes it out and drives the transition.
-  //     A DIFFERENT reference: the same one would resume the first instalment
-  //     idempotently rather than booking a second.
+  /*
+   * 1b. the instalment that settles the rest.
+   *
+   * RE-POINTED 2026-11-07 (row 21), AND THE REVERSAL IS THE POINT. This step used to leave the
+   * amount BLANK and its comment said why: *"a blank amount means 'the whole outstanding
+   * balance'"*. So the test asserted the defect the owner has now closed — a blank field recording
+   * a receipt for the entire balance, deliberate, commented, and never stated on screen.
+   *
+   * The amount is typed now, and the figure is the balance the assertions above just proved is
+   * outstanding (100,000.000), so the test still settles the invoice and still drives
+   * `Invoiced -> Collected`. The property it was really about — that only the instalment which
+   * COMPLETES an invoice moves it on — is unchanged and is what the status assertion below pins.
+   *
+   * A DIFFERENT reference: the same one would resume the first instalment idempotently rather than
+   * booking a second.
+   */
+  await page.getByLabel("Instalment amount").fill("100000.000");
   await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-2");
   await page.getByRole("button", { name: "Record collection" }).click();
   await expect(page.getByTestId("invoice-status")).toHaveText("Collected");

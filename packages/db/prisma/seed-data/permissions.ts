@@ -1482,7 +1482,24 @@ const supportingOperations: PermissionSeed[] = [
     code: "vendor.read",
     module: "supporting-operations",
     description: "View the vendor register, a vendor's record, and its data-share readiness",
-    roles: [COMPLIANCE, MANAGER, ADMIN, OFFICE_ADMIN],
+        /*
+     * `DPO` ADDED 2026-11-07 — an OWNER-APPROVED EXCEPTION to her own standing rule, recorded here
+     * because the rule is that a role is never handed a permission to make a screen work.
+     *
+     * THE REASON: `dpa.approve` is the DPO's alone, and it gates
+     * `POST /data-processing-agreements/:id/dpo-approve` — the approval of a data-processing
+     * agreement, which lives on `/vendors/[id]`. The DPO held NO `vendor.read`, so the only role
+     * permitted to give that approval could not open the screen it lives on, and no spec had ever
+     * pressed the control. Measured in module 0-c batch 6b while gating that screen (row 28).
+     *
+     * `vendor.read` ONLY, and the narrowness is the condition: NOT `vendor.update`, NOT
+     * `vendor.deactivate`. The DPO approves an agreement; the DPO does not administer vendors.
+     * `vendor-screen-permissions.spec.ts` asserts the screen keeps those three codes distinct, and
+     * `vendor.e2e-spec.ts` asserts both directions of this grant — that the DPO can now open and
+     * approve, and that the DPO still cannot update or deactivate. **The second half is what stops
+     * the exception becoming a precedent.**
+     */
+    roles: [COMPLIANCE, MANAGER, ADMIN, OFFICE_ADMIN, DPO],
   },
   {
     code: "vendor.create",
@@ -1638,7 +1655,7 @@ const pdpl: PermissionSeed[] = [
     code: "retention.archive.retrieve",
     module: "pdpl",
     description:
-      "Read a record that is in the BLOCKED retention phase — past the period its category was given, kept only to satisfy a statutory minimum, and otherwise out of every ongoing report and sweep. Retrieval is permitted on exactly two bases, both external compulsion: a judicial request, or an official audit by the Central Bank of Jordan. Each retrieval is recorded in an append-only register with the basis, who asked and for what, which cannot afterwards be edited or deleted. Holding this does NOT permit retrieval for the office's own purposes — that is the processing the block exists to prevent",
+      "Read a record that is in the BLOCKED retention phase — past the period its category was given, kept only to satisfy a statutory minimum, and otherwise out of every ongoing report and sweep. Retrieval is permitted on these bases and no others: a judicial request; an official audit by the Central Bank of Jordan; a request from the Anti-Money Laundering and Counter-Terrorist Financing Unit; or another legitimate reason that none of those covers, written out in the box. Each retrieval is recorded in an append-only register with the basis, who asked and for what, which cannot afterwards be edited or deleted. Holding this does NOT permit retrieval for the office's own purposes — that is the processing the block exists to prevent",
     roles: [COMPLIANCE, DPO],
   },
   {

@@ -71,18 +71,25 @@ SHAPES = [
 # throw — the same shape as `MISSING_DESCRIPTION_BUDGET`, which reached 0 and stayed there.
 #
 # Lower it as sites are converted. Do NOT raise it: a new one is the defect this measures.
-TEXT_LOCATOR_BUDGET = 38
-# 42 → 38 on 2026-11-07 (module 0-c batch 6b), and NOT because four sites were converted.
+TEXT_LOCATOR_BUDGET = 42
+# 42 ALL ALONG. The figure was never wrong; one of my corrections of it was.
 #
-# Blanking comments before matching (see `main()`) removed FOUR pre-existing false positives: the
-# recorded 42 had always counted prose that QUOTED a page-wide absence alongside the real ones. So
-# this ratchet had four units of slack in it from the day it was adopted — a new site could ship and
-# the gate stay green, which is the one thing a ratchet exists to prevent.
+# ## THE FALSE CORRECTION, RECORDED BECAUSE IT WAS PUBLISHED — 2026-11-07
 #
-# The fall is therefore a correction of the instrument and not progress on the class, which is the
-# distinction `README.md`'s own note demands be stated: *a falling ratchet is not automatically
-# progress*. Four of the five units came from fixing the matcher; the fifth was this batch's own
-# comment, which is what exposed it.
+# This read `38` for part of module 0-c batch 6b, under a comment claiming the ratchet "had four
+# units of slack in it from the day it was adopted". **That claim was wrong, and the cause was my
+# own comment-stripper**, which was two regex substitutions. The line-comment one, `(?m)//.*$`, ate
+# `//` INSIDE STRING LITERALS — and `rfq.spec.ts` is full of `"http://localhost:4000/..."` — so it
+# truncated real code at the `//` of every URL and the "four false positives" it appeared to remove
+# were four real assertions it had destroyed.
+#
+# `blank_comments` below is a tokeniser now, and with it the class reads **42**: the original budget,
+# unchanged. What the stripping legitimately excludes is exactly one thing — a comment that QUOTES a
+# page-wide absence, which is what took this gate to 43 and made CI red in the first place. That
+# much of the diagnosis stands; the arithmetic around it did not.
+#
+# The lesson is this file's own header, which already said it: a figure that only a tool can produce
+# must be produced by a tool that was itself checked. Lower this as sites convert; never raise it.
 
 
 def source_files():
@@ -99,6 +106,64 @@ def classify(subject):
         if re.search(r"\.\s*" + shape + r"\s*\(", subject):
             return shape
     return "(other)"
+
+
+def blank_comments(src: str) -> str:
+    """Replace comment bodies with spaces, leaving string literals alone.
+
+    ## A REGEX CANNOT DO THIS, AND MINE DID NOT — corrected 2026-11-07, same day it shipped.
+
+    The first version of this was two regex substitutions, one for each comment form. The
+    line-comment one
+    eats `//` INSIDE A STRING, and `rfq.spec.ts` is full of `"http://localhost:4000/..."` — so it
+    truncated real code at the `//` of every URL, joined the remains of those lines together, and
+    changed what the flattened matcher could see. The count it produced was an ARTEFACT: adding a
+    block comment elsewhere in the same file moved the figure by four, because it changed where the
+    non-greedy block pattern paired its delimiters.
+
+    **So the "42 → 38, four units of slack" conclusion recorded against this gate on 2026-11-07 was
+    wrong.** It was not slack; it was my own unsound stripper deleting code. The real figure is
+    whatever this function yields, and the budget below is set from it.
+
+    This walks the source once, tracking the only five states that matter, and replaces comment
+    characters with spaces so every offset is preserved — which also makes a future line-reporting
+    version possible, where the regex version made it impossible.
+    """
+    NEWLINE = chr(10)
+    out = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c in "'\"`":
+            quote = c
+            out.append(c)
+            i += 1
+            while i < n:
+                if src[i] == "\\":
+                    out.append(src[i : i + 2])
+                    i += 2
+                    continue
+                out.append(src[i])
+                if src[i] == quote:
+                    i += 1
+                    break
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != NEWLINE:
+                out.append(" ")
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and src[i + 1] == "*":
+            while i < n and not (src[i] == "*" and i + 1 < n and src[i + 1] == "/"):
+                out.append(NEWLINE if src[i] == NEWLINE else " ")
+                i += 1
+            out.append("  ")
+            i += 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def main():
@@ -133,8 +198,7 @@ def main():
         # Positions are NOT preserved (lengths are not padded) because nothing here reports a line
         # number — only counts and an 88-character excerpt. A future line-reporting version must pad
         # instead of removing.
-        src = re.sub(r"/\*.*?\*/", " ", src, flags=re.S)
-        src = re.sub(r"(?m)//.*$", " ", src)
+        src = blank_comments(src)
         # Flattened, because prettier wraps most of these across lines and a line-based matcher
         # would see none of them.
         flat = re.sub(r"\s+", " ", src)

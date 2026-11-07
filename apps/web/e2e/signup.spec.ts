@@ -1,69 +1,85 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// These four screens render pre-authentication, so there is no
-// `user.languagePreference` to read and `LanguageProvider` falls back to the
-// schema default — Arabic. Until this pass they were hard-coded English, so
-// the assertions below passed by accident; they now pin the language the way
-// the authenticated specs do (which force EN through their /auth/me mock).
-// The Arabic default itself is asserted separately, at the end of this file.
+/*
+ * ROW 66 — THE ROUTE IS CLOSED, AND THIS FILE IS WHAT KEEPS IT CLOSED.
+ * Rewritten 2026-11-07 (module 0-c batch 6b), on the owner's decision.
+ *
+ * It held four tests of the sign-up FORM — that it renders, that it enforces the password minimum
+ * client-side, that it shows the server's policy violations, and that it redirects to `/login` on
+ * success. Every one of them asserted that a browser typing `/signup` could create an account,
+ * which is the defect the owner closed: the account arrives with **no role at all**.
+ *
+ * They are replaced rather than deleted, because a closed door with no test is a door somebody
+ * reopens by accident. The first test below FAILS if `SIGNUP_ROUTE_CLOSED` is removed — proven by
+ * planting exactly that.
+ *
+ * What is NOT asserted here, deliberately: that `POST /auth/signup` refuses. It does not, and it is
+ * not meant to — it is `@Public()` and 114 api e2e spec files create their users through it. The
+ * property under test is the owner's own: a browser navigating to `/signup` cannot create an
+ * account.
+ *
+ * The language pin stays: these screens render pre-authentication, so there is no
+ * `user.languagePreference` to read and `LanguageProvider` falls back to the schema default, which
+ * is Arabic.
+ */
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('ibms.languagePreference', 'EN');
+    localStorage.setItem("ibms.languagePreference", "EN");
   });
 });
 
-test("renders the sign-up form", async ({ page }) => {
-  await page.goto("/signup");
-  await expect(page.getByRole("heading", { name: "Create an account" })).toBeVisible();
-  await expect(page.getByLabel("Full name")).toBeVisible();
-  await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByLabel("Password")).toBeVisible();
-});
-
-test("enforces the minimum password length client-side before submitting", async ({ page }) => {
-  let requestMade = false;
+test("row 66 — /signup cannot create an account: it lands on sign-in instead", async ({
+  page,
+}) => {
+  // A request the server must never see. If the route is reopened this fires and the test fails on
+  // the assertion rather than on a timeout, which is what makes the failure readable.
+  let signupAttempted = false;
   await page.route("**/auth/signup", (route) => {
-    requestMade = true;
-    return route.fulfill({ status: 201, json: { id: "u1", email: "a@b.com" } });
+    signupAttempted = true;
+    return route.fulfill({ status: 201, json: { id: "x", email: "x@y.test" } });
   });
-  await page.goto("/signup");
-  await page.getByLabel("Full name").fill("Test User");
-  await page.getByLabel("Email").fill("test@ibms.test");
-  await page.getByLabel("Password").fill("short");
-  await page.getByRole("button", { name: "Sign up" }).click();
-  expect(requestMade).toBe(false);
-});
 
-test("shows the server's password-policy violations on a rejected signup", async ({ page }) => {
-  await page.route("**/auth/signup", (route) =>
-    route.fulfill({ status: 400, json: { message: ["Password must include a digit"] } }),
-  );
   await page.goto("/signup");
-  await page.getByLabel("Full name").fill("Test User");
-  await page.getByLabel("Email").fill("test@ibms.test");
-  await page.getByLabel("Password").fill("AllLettersNoDigits!!");
-  await page.getByRole("button", { name: "Sign up" }).click();
-  // `getByRole("alert")` also matches Next.js's route-announcer div — scope
-  // to the form's own error paragraph instead.
-  await expect(page.locator('main [role="alert"]')).toContainText("Password must include a digit");
-});
 
-test("redirects to /login after a successful signup", async ({ page }) => {
-  await page.route("**/auth/signup", (route) =>
-    route.fulfill({ status: 201, json: { id: "u1", email: "test@ibms.test" } }),
-  );
-  await page.goto("/signup");
-  await page.getByLabel("Full name").fill("Test User");
-  await page.getByLabel("Email").fill("test@ibms.test");
-  await page.getByLabel("Password").fill("Correct-Horse-9-Battery!");
-  await page.getByRole("button", { name: "Sign up" }).click();
+  // THE POSITIVE SIGNAL FIRST: the reader is on the sign-in screen. An absence asserted without
+  // this would pass against a blank page, and the sign-in heading is the thing that proves the
+  // redirect happened rather than that nothing rendered.
   await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+
+  // And the form is gone with it — scoped to the sign-in form, because a page-wide text absence can
+  // match an element the test is not about (`page-wide-absence-assertions.py`).
+  await expect(
+    page.getByRole("button", { name: "Create account" }),
+  ).toHaveCount(0);
+  expect(signupAttempted).toBe(false);
 });
 
-test("signup page has no serious/critical accessibility violations @a11y", async ({ page }) => {
+test("row 66 — the sign-in screen offers no way to reach it", async ({
+  page,
+}) => {
+  // The LINK was removed in module 0-ب; this is the half that stops it coming back silently. Its
+  // own comment on `/login` records why the route was left open at the time, which is the decision
+  // this batch narrowed.
+  await page.goto("/login");
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /sign up/i })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /create account/i })).toHaveCount(
+    0,
+  );
+});
+
+test("signup route has no serious/critical accessibility violations @a11y", async ({
+  page,
+}) => {
+  // Still exercised, because the route still resolves — it resolves to `/login`, so what this
+  // scans is the screen a reader actually lands on from that URL.
   await page.goto("/signup");
+  await expect(page).toHaveURL(/\/login$/);
   const results = await new AxeBuilder({ page }).analyze();
-  const seriousOrCritical = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-  expect(seriousOrCritical).toEqual([]);
+  const serious = results.violations.filter(
+    (v) => v.impact === "serious" || v.impact === "critical",
+  );
+  expect(serious).toEqual([]);
 });

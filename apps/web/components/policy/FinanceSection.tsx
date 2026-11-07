@@ -76,9 +76,27 @@ export function FinanceSection({
   const [receiptMethod, setReceiptMethod] = useState<string>(
     RECEIPT_METHOD_OPTIONS[0],
   );
-  // Process 32 — an invoice may be settled in instalments. Blank means "the
-  // whole outstanding balance", which is the common case and keeps the
-  // one-click full-payment flow intact.
+  /*
+   * ROW 21 — REQUIRED. Owner decision, 2026-11-07.
+   *
+   * This comment used to read: *"Blank means 'the whole outstanding balance', which is the common
+   * case and keeps the one-click full-payment flow intact."* That behaviour is GONE, and a comment
+   * describing behaviour that no longer exists is the exact defect class this module exists for, so
+   * it is replaced rather than left.
+   *
+   * The old behaviour was deliberate and commented and **never stated on screen** — the placeholder
+   * was the only hint. Her reasoning for closing it: recording a payment that was not received is a
+   * money error, and the convenience being given up is one field being typed.
+   *
+   * NO NEW STRING IN EITHER LANGUAGE. The refusal is this component's own existing pattern — the
+   * record button is already `disabled` while `paymentReference` is blank, and the amount simply
+   * joins that condition. `required` + `aria-required` are added for the accessible semantics, and
+   * are NOT the enforcement: measured 2026-11-07, there is no `<form>` anywhere in this component
+   * and every button is `type="button"`, so native validation never fires. That is also true of
+   * `paymentReference`'s own `required`, which has always been decorative here — the server is what
+   * enforces it. Reported rather than fixed, because making these a real form is a change to five
+   * controls and not to one.
+   */
   const [instalmentAmount, setInstalmentAmount] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
 
@@ -388,6 +406,11 @@ export function FinanceSection({
               value={instalmentAmount}
               onChange={(e) => setInstalmentAmount(e.target.value)}
               inputMode="decimal"
+              required
+              aria-required="true"
+              /* The outstanding balance, which is now INFORMATION rather than a default: with the
+                 field required, a blank cannot be submitted, so showing the balance tells the
+                 officer what is owed without offering to assume it. */
               placeholder={invoice.outstandingAmount}
               style={{ width: "100%" }}
             />
@@ -407,8 +430,9 @@ export function FinanceSection({
             onClick={() =>
               void runStep(async () => {
                 const result = await recordReceipt(invoice.id, {
-                  // Blank = settle the whole remaining balance.
-                  amount: instalmentAmount.trim() || invoice.outstandingAmount,
+                  // No fallback. A blank amount cannot reach the server, because the button above
+                  // is disabled until one is typed — see the state declaration for the decision.
+                  amount: instalmentAmount.trim(),
                   method: receiptMethod,
                   // Mandatory: it is the idempotency key. Without it a
                   // double-click books the client's payment twice.
@@ -419,7 +443,11 @@ export function FinanceSection({
                 return result;
               }, t("financeCreateError"))
             }
-            disabled={busy || paymentReference.trim().length === 0}
+            disabled={
+              busy ||
+              paymentReference.trim().length === 0 ||
+              instalmentAmount.trim().length === 0
+            }
             style={buttonStyle}
           >
             {t("financeRecordCollectionButton")}

@@ -484,6 +484,43 @@ describe('Procurement / Vendor Management (e2e) — backlog Part C #67 / #71', (
       .set(bearer(compliance.accessToken))
       .expect(403);
 
+    /*
+     * THE OWNER-APPROVED GRANT, ASSERTED IN BOTH DIRECTIONS. Added 2026-11-07 (module 0-c batch 6b).
+     *
+     * `vendor.read` was granted to the DPO on 2026-11-07 as an explicit, recorded exception to the
+     * owner's standing rule that a role is never handed a permission to make a screen work. The
+     * reason: `dpa.approve` is the DPO's alone and the approval lives on `/vendors/[id]`, which the
+     * DPO could not open — so the only role permitted to approve a data-processing agreement could
+     * not reach the screen the approval is on.
+     *
+     * FIRST DIRECTION — the grant works: the DPO can now READ the vendor.
+     */
+    const dpoCanRead = await request(app.getHttpServer())
+      .get(`/vendors/${vendor.id}`)
+      .set(bearer(dpo.accessToken))
+      .expect(200);
+    expect((dpoCanRead.body as { id: string }).id).toBe(vendor.id);
+
+    /*
+     * SECOND DIRECTION — the grant did NOT widen, and this half is what stops the exception
+     * becoming a precedent. `vendor.read` only: the DPO approves an agreement, the DPO does not
+     * administer vendors. Both of these would be 200/201 if the grant had been written as
+     * "whatever the screen needs".
+     */
+    await request(app.getHttpServer())
+      .patch(`/vendors/${vendor.id}`)
+      .set(bearer(dpo.accessToken))
+      // A payload `UpdateVendorDto` ACCEPTS, so the 403 can only be the permission guard. With an
+      // invalid field the widened case answers 400 and the assertion would still fail, but for the
+      // wrong reason — and a test that fails for the wrong reason is not evidence.
+      .send({ name: 'The DPO must not be able to rename a vendor' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/vendors/${vendor.id}/terminate`)
+      .set(bearer(dpo.accessToken))
+      .send({ confirmDataReturnOrDestruction: true })
+      .expect(403);
+
     const approved = (
       await request(app.getHttpServer())
         .post(`/data-processing-agreements/${dpa.id}/dpo-approve`)
