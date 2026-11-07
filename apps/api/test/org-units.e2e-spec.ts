@@ -268,7 +268,7 @@ describe('departments and branches — the four-action pilot', () => {
     const created = await request(app!.getHttpServer())
       .post('/admin/departments')
       .set(bearer(fullToken))
-      .send({ name: `Underwriting ${tag}`, nameAr: `الاكتتاب ${tag}` })
+      .send({ name: `Underwriting ${tag}`, nameAr: `المطالبات ${tag}` })
       .expect(201);
     const id = (created.body as { id: string }).id;
 
@@ -286,14 +286,14 @@ describe('departments and branches — the four-action pilot', () => {
     const patched = await request(app!.getHttpServer())
       .patch(`/admin/departments/${id}`)
       .set(bearer(fullToken))
-      .send({ nameAr: `الاكتتاب المصحَّح ${tag}` })
+      .send({ nameAr: `المطالبات ${tag} corrected` })
       .expect(200);
     expect((patched.body as { nameAr: string }).nameAr).toBe(
-      `الاكتتاب المصحَّح ${tag}`,
+      `المطالبات ${tag} corrected`,
     );
 
     const row = await rawPrisma.department.findUniqueOrThrow({ where: { id } });
-    expect(row.nameAr).toBe(`الاكتتاب المصحَّح ${tag}`);
+    expect(row.nameAr).toBe(`المطالبات ${tag} corrected`);
     // The other half is the point: a body carrying only `nameAr` must not blank the Latin name,
     // which is NOT NULL and is what the unique live-name index is built on.
     expect(row.name).toBe(`Underwriting ${tag}`);
@@ -308,7 +308,7 @@ describe('departments and branches — the four-action pilot', () => {
     const unchanged = await rawPrisma.department.findUniqueOrThrow({
       where: { id },
     });
-    expect(unchanged.nameAr).toBe(`الاكتتاب المصحَّح ${tag}`);
+    expect(unchanged.nameAr).toBe(`المطالبات ${tag} corrected`);
   }, 300_000);
 
   it('gives VIEW without EDIT, which is the whole reason there are four codes', async () => {

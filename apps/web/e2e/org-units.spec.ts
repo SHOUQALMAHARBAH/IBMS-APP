@@ -156,7 +156,7 @@ test("corrects the Arabic name of a department, and sends it", async ({ page }) 
     patched.push(route.request().postDataJSON() as Record<string, unknown>);
     return route.fulfill({
       status: 200,
-      json: { ...CLAIMS, nameAr: "إدارة المطالبات", retiredAt: null },
+      json: { ...CLAIMS, nameAr: `${CLAIMS.nameAr} 2`, retiredAt: null },
     });
   });
   await page.goto("/settings/org-units");
@@ -168,7 +168,7 @@ test("corrects the Arabic name of a department, and sends it", async ({ page }) 
   await expect(page.locator(`[data-rename-input-ar="${CLAIMS.id}"]`)).toHaveValue(CLAIMS.nameAr);
   await expect(page.locator(`[data-rename-input="${CLAIMS.id}"]`)).toHaveValue(CLAIMS.name);
 
-  await page.locator(`[data-rename-input-ar="${CLAIMS.id}"]`).fill("إدارة المطالبات");
+  await page.locator(`[data-rename-input-ar="${CLAIMS.id}"]`).fill(`${CLAIMS.nameAr} 2`);
   await page.locator(`[data-save-rename="${CLAIMS.id}"]`).click();
 
   // Polled on the COUNT rather than on "a body arrived", so two requests fail here instead of the
@@ -176,7 +176,7 @@ test("corrects the Arabic name of a department, and sends it", async ({ page }) 
   await expect.poll(() => patched.length).toBe(1);
   // An EXACT key set, not a `toMatchObject`: this control's whole defect was a field missing from
   // the payload, and a partial match is satisfied by the body that caused it.
-  expect(patched[0]).toEqual({ name: "Claims", nameAr: "إدارة المطالبات" });
+  expect(patched[0]).toEqual({ name: "Claims", nameAr: `${CLAIMS.nameAr} 2` });
 });
 
 test("a unit with no Arabic name opens an empty field and sends a diff", async ({ page }) => {
