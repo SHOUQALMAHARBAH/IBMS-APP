@@ -252,6 +252,65 @@ describe('departments and branches — the four-action pilot', () => {
     expect(await rawPrisma.department.count({ where: { id } })).toBe(1);
   }, 300_000);
 
+  /*
+   * MODULE 0-c ROW 54 — the Arabic half of a rename, which no test had ever sent.
+   *
+   * The test above proves `nameAr` SURVIVES a name-only rename. Nothing proved it can be
+   * CHANGED, and `/settings/org-units` could not send it at all until 2026-11-07, so an office
+   * that typed its Arabic department name wrongly on the day it registered kept it — on a
+   * platform whose default language is the one that name is written in.
+   *
+   * `RenameOrgUnitDto` has accepted `nameAr` alone all along and its own comment names this
+   * route as the remedy for a row with no Arabic name. This asserts that remedy rather than
+   * assuming it, in both halves: the Arabic lands, and the Latin name is NOT disturbed.
+   */
+  it('changes the Arabic name alone, leaving the Latin name untouched', async () => {
+    const created = await request(app!.getHttpServer())
+      .post('/admin/departments')
+      .set(bearer(fullToken))
+      .send({ name: `Underwriting ${tag}`, nameAr: `المطالبات ${tag}` })
+      .expect(201);
+    const id = (created.body as { id: string }).id;
+
+    /*
+     * The row shape this control exists for: an Arabic name that is ABSENT. Creation has refused
+     * that since 2026-10-28, so it cannot be made through the api — but db-test holds 11 of 14
+     * live branches in exactly this state (measured 2026-11-07) and they are real rows a person
+     * has to be able to fix. Dropped to NULL directly so the fix runs against the real shape.
+     */
+    await rawPrisma.department.update({
+      where: { id },
+      data: { nameAr: null },
+    });
+
+    const patched = await request(app!.getHttpServer())
+      .patch(`/admin/departments/${id}`)
+      .set(bearer(fullToken))
+      .send({ nameAr: `المطالبات ${tag} corrected` })
+      .expect(200);
+    expect((patched.body as { nameAr: string }).nameAr).toBe(
+      `المطالبات ${tag} corrected`,
+    );
+
+    const row = await rawPrisma.department.findUniqueOrThrow({ where: { id } });
+    expect(row.nameAr).toBe(`المطالبات ${tag} corrected`);
+    // The other half is the point: a body carrying only `nameAr` must not blank the Latin name,
+    // which is NOT NULL and is what the unique live-name index is built on.
+    expect(row.name).toBe(`Underwriting ${tag}`);
+
+    // And a blank Arabic name is a 400 from `@Length(1, 100)`, not a silent clear. This is why
+    // the screen sends a DIFF: a full-form PATCH would refuse every row the case above describes.
+    await request(app!.getHttpServer())
+      .patch(`/admin/departments/${id}`)
+      .set(bearer(fullToken))
+      .send({ nameAr: '' })
+      .expect(400);
+    const unchanged = await rawPrisma.department.findUniqueOrThrow({
+      where: { id },
+    });
+    expect(unchanged.nameAr).toBe(`المطالبات ${tag} corrected`);
+  }, 300_000);
+
   it('gives VIEW without EDIT, which is the whole reason there are four codes', async () => {
     const created = await request(app!.getHttpServer())
       .post('/admin/branches')

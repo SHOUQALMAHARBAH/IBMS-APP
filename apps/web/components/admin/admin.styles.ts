@@ -138,3 +138,24 @@ export const orgUnitRowStyle: CSSProperties = {
   padding: '0.45rem 0',
   borderTop: '1px solid var(--border-subtle)',
 };
+
+/*
+ * The two rename inputs — the Latin name and the Arabic one — STACKED, in one cell of
+ * `orgUnitRowStyle`'s flex row.
+ *
+ * A COLUMN deliberately, and measured rather than assumed. `inputStyle` is `width: 100%`, so two of
+ * them in a flex ROW each demand the full cell and wrap anyway — the stacking would have happened
+ * by accident, with a comment claiming otherwise. And side by side is the wrong answer here even
+ * where it fits: `orgUnitGridStyle` is `minmax(19rem, 1fr)`, so each field would get roughly 7rem
+ * minus padding, which is not enough of an Arabic department name to proof-read.
+ *
+ * `minWidth: 0` lets the pair shrink instead of pushing the Rename/Save/Retire buttons off the row.
+ * A named constant because `check:screen-pass` ratchets inline styles downward only.
+ */
+export const orgUnitRenameFieldsStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
+  flex: '1 1 14rem',
+  minWidth: 0,
+};

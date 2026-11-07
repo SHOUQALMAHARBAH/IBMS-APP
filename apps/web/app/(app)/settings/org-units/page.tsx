@@ -36,6 +36,7 @@ import {
 import {
   orgUnitColumnStyle,
   orgUnitGridStyle,
+  orgUnitRenameFieldsStyle,
   orgUnitRowStyle,
 } from '../../../../components/admin/admin.styles';
 import { permissionRefusalAnyOf } from '../../../../lib/i18n/permission-refusal';
@@ -79,9 +80,20 @@ export default function OrgUnitsPage() {
 
   const [newDept, setNewDept] = useState({ name: '', nameAr: '' });
   const [newBranch, setNewBranch] = useState({ name: '', nameAr: '' });
-  /** Per-row edit state, keyed by id. Shared state here would show one row's draft in every row —
-   *  the defect the users screen has with its grant dropdown. */
-  const [editing, setEditing] = useState<Record<string, string>>({});
+  /*
+   * Per-row edit state, keyed by id. Shared state here would show one row's draft in every row —
+   * the defect the users screen has with its grant dropdown.
+   *
+   * BOTH NAMES, 2026-11-07. It was a bare `string` — the English name alone — so the Arabic name
+   * of a department or branch could not be corrected from anywhere in this system. Creation has
+   * REQUIRED `nameAr` since 2026-10-28, which means every office has one and none could fix a
+   * typo in it. The server never needed changing: `RenameOrgUnitDto` has accepted `nameAr` alone
+   * all along, and its own comment names this control as the remedy for exactly this case. Only
+   * the screen was missing the field.
+   */
+  const [editing, setEditing] = useState<
+    Record<string, { name: string; nameAr: string }>
+  >({});
 
   const canReadDept = hasPermission(user, 'department.read');
   const canCreateDept = hasPermission(user, 'department.create');
@@ -252,47 +264,96 @@ export default function OrgUnitsPage() {
         ) : null}
 
         {(units ?? []).map((u) => {
-          const draftName = editing[u.id];
+          const draft = editing[u.id];
           return (
             <div key={u.id} style={orgUnitRowStyle} data-org-unit={u.id}>
-              {draftName === undefined ? (
+              {draft === undefined ? (
                 <span>
                   <bdi>{isArabic ? (u.nameAr ?? u.name) : u.name}</bdi>
                 </span>
               ) : (
-                <input
-                  value={draftName}
-                  onChange={(e) =>
-                    setEditing({ ...editing, [u.id]: e.target.value })
-                  }
-                  style={inputStyle}
-                  data-rename-input={u.id}
-                  aria-label={t('orgUnitNameEn')}
-                />
+                <span style={orgUnitRenameFieldsStyle}>
+                  <input
+                    value={draft.name}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        [u.id]: { ...draft, name: e.target.value },
+                      })
+                    }
+                    style={inputStyle}
+                    data-rename-input={u.id}
+                    aria-label={t('orgUnitNameEn')}
+                  />
+                  <input
+                    value={draft.nameAr}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        [u.id]: { ...draft, nameAr: e.target.value },
+                      })
+                    }
+                    style={inputStyle}
+                    data-rename-input-ar={u.id}
+                    aria-label={t('orgUnitNameAr')}
+                  />
+                </span>
               )}
 
-              {can.update && draftName === undefined ? (
+              {can.update && draft === undefined ? (
                 <button
                   type="button"
-                  onClick={() => setEditing({ ...editing, [u.id]: u.name })}
+                  onClick={() =>
+                    setEditing({
+                      ...editing,
+                      // `?? ''` rather than `?? u.name`: a row with no Arabic name must open an
+                      // EMPTY Arabic field, never one pre-filled with the Latin name, which a
+                      // person would reasonably save as though it were the Arabic one.
+                      [u.id]: { name: u.name, nameAr: u.nameAr ?? '' },
+                    })
+                  }
                   data-rename={u.id}
                 >
                   {t('orgUnitRename')}
                 </button>
               ) : null}
 
-              {can.update && draftName !== undefined ? (
+              {can.update && draft !== undefined ? (
                 <button
                   type="button"
-                  disabled={busy || draftName.trim().length === 0}
+                  disabled={
+                    busy ||
+                    (draft.name.trim().length === 0 &&
+                      draft.nameAr.trim().length === 0)
+                  }
                   data-save-rename={u.id}
                   onClick={() =>
                     void run(async () => {
+                      /*
+                       * A DIFF, not the whole form — each half is sent only when it carries a
+                       * value. `RenameOrgUnitDto` validates every field it RECEIVES
+                       * (`@IsOptional()` + `@Length(1, 100)`), so posting a blank one is a 400
+                       * naming a field the person may never have touched; that is the insurer
+                       * panel's recorded defect, and the 11 of 14 live branches db-test holds
+                       * with no Arabic name at all are exactly the rows that would hit it.
+                       * The service refuses a both-blank body itself, so the two agree.
+                       *
+                       * The cost, stated rather than hidden: a cleared field reads as
+                       * UNCHANGED, so this control can set and change an Arabic name and cannot
+                       * REMOVE one. No value the DTO accepts means "remove this", and inventing
+                       * a sentinel is an api decision rather than a screen's.
+                       */
+                      const payload = {
+                        ...(draft.name.trim()
+                          ? { name: draft.name.trim() }
+                          : {}),
+                        ...(draft.nameAr.trim()
+                          ? { nameAr: draft.nameAr.trim() }
+                          : {}),
+                      };
                       if (kind === 'department')
-                        await renameDepartment(u.id, {
-                          name: draftName.trim(),
-                        });
-                      else await renameBranch(u.id, { name: draftName.trim() });
+                        await renameDepartment(u.id, payload);
+                      else await renameBranch(u.id, payload);
                       const next = { ...editing };
                       delete next[u.id];
                       setEditing(next);
