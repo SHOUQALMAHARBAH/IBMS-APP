@@ -28,6 +28,7 @@ import {
 } from "../../../../lib/supporting-operations/vendor-api";
 import { ApiError } from "../../../../lib/auth/api-client";
 import { hasPermission } from "../../../../lib/auth/permissions";
+import { attestationRowStyle } from "../../../../components/prospect/prospect.styles";
 import { CombinedDutyOnRecord } from "../../../../components/ui/CombinedDutyOnRecord";
 import {
   EmptyState,
@@ -81,6 +82,22 @@ export default function VendorDetailPage() {
   const canUpdateVendor = hasPermission(user, "vendor.update");
   const canDeactivateVendor = hasPermission(user, "vendor.deactivate");
   const canDpoApprove = hasPermission(user, "dpa.approve");
+
+  /*
+   * ROW 29 — THE OFFICER SIGNS THE ATTESTATION NOW, NOT THE WEB. Owner's sentence, 2026-11-07.
+   *
+   * `TerminateVendorDto`'s own comment says what this flag is: *"there is no automated verification
+   * that a vendor actually returned or destroyed the data it held, so this is a deliberate,
+   * conscious attestation by the officer terminating the relationship, not a system-verified
+   * fact."* `terminateVendor` hardcoded it to `true`, so the record said an officer had attested
+   * when nobody had been asked.
+   *
+   * Unticked by DEFAULT and the button disabled until it is ticked — this component's own pattern
+   * for a required input. The sentence is the owner's, with her own placeholder rendered as the
+   * vendor's name; the closing clause is one she approved separately, and its Arabic is built from
+   * runs that already ship rather than translated.
+   */
+  const [dataReturnAttested, setDataReturnAttested] = useState(false);
   const params = useParams<{ id: string }>();
   const vendorId = params.id;
 
@@ -157,12 +174,7 @@ export default function VendorDetailPage() {
   async function onTerminate() {
     setActionError(null);
     try {
-      setVendor(await terminateVendor(
-        vendorId,
-        // ROW 29 — still `true`, which is the UNCHANGED behaviour and not a fix. The checkbox this
-        // value should come from needs an Arabic sentence that does not ship; see `terminateVendor`.
-        true,
-      ));
+      setVendor(await terminateVendor(vendorId, dataReturnAttested));
     } catch (err) {
       setActionError(
         err instanceof ApiError ? err.message : t("vendTerminateError"),
@@ -470,7 +482,19 @@ export default function VendorDetailPage() {
           {canDeactivateVendor ? (
             <section style={sectionStyle}>
               <h2>{t("vendTermination")}</h2>
-              <button type="button" onClick={onTerminate}>
+              <label style={attestationRowStyle}>
+                <input
+                  type="checkbox"
+                  checked={dataReturnAttested}
+                  onChange={(e) => setDataReturnAttested(e.target.checked)}
+                />{" "}
+                {t("vendTerminateAttestation", { vendor: vendor.name })}
+              </label>
+              <button
+                type="button"
+                onClick={onTerminate}
+                disabled={!dataReturnAttested}
+              >
                 {t("vendTerminateButton")}
               </button>{" "}
               <button type="button" onClick={onRevokeAccess}>

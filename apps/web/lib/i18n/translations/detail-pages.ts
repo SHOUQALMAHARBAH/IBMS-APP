@@ -277,6 +277,8 @@ export const DETAIL_PAGES = {
     vendDpaSignError: 'تعذّر توقيع الاتفاقية.',
     vendRevokeAccessButton: 'إلغاء الوصول',
     vendTerminateButton: 'إنهاء التعاقد (تأكيد إعادة البيانات أو إتلافها)',
+    vendTerminateAttestation:
+      'أُقِرُّ أنّني تحقّقتُ بنفسي من إعادةِ المورّد ({vendor}) للبيانات أو إتلافِها، وهذا الإقرار نهائي.',
     vendDpoApproveButton: 'موافقة مسؤول حماية البيانات',
     vendSignButton: 'توقيع',
     vendNo: 'لا',
@@ -786,6 +788,8 @@ export const DETAIL_PAGES = {
     vendDpaSignError: 'Could not sign the agreement.',
     vendRevokeAccessButton: 'Revoke access',
     vendTerminateButton: 'Terminate (confirm data return/destruction)',
+    vendTerminateAttestation:
+      "I confirm that I have myself verified the vendor's ({vendor}) return or destruction of the data, and this attestation cannot be withdrawn.",
     vendDpoApproveButton: 'DPO approve',
     vendSignButton: 'Sign',
     vendNo: 'no',

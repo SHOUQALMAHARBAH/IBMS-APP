@@ -266,7 +266,6 @@ export const POLICY = {
     financeInvoiceStatusExceptionResolved: 'عُولجت حالة الاستثناء',
 
     commissionReconciledLabel: 'مُسوّاة',
-    commissionReversedLabel: 'معكوسة',
     commissionRaiseOverrideButton: 'رفع تجاوز يدوي',
     // policies/page.tsx — the book-wide policy list (Process 20 work surface)
     policiesListHeading: 'الوثائق',
@@ -585,7 +584,6 @@ export const POLICY = {
     financeInvoiceStatusExceptionResolved: 'Exception resolved',
 
     commissionReconciledLabel: 'Reconciled',
-    commissionReversedLabel: 'Reversed',
     commissionRaiseOverrideButton: 'Raise manual override',
     // policies/page.tsx — the book-wide policy list (Process 20 work surface)
     policiesListHeading: 'Policies',

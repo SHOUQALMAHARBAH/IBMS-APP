@@ -2525,25 +2525,67 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   // 1a. Process 32 — a PART payment. The money is booked, but the invoice
   //     stays Invoiced: only the instalment that completes it moves it on,
   //     which is what keeps it on the #33 ageing report for the remainder.
-  await page
-    .getByLabel("Instalment amount")
-    .fill("15,350.000".replace(",", ""));
   // The payment reference is MANDATORY — it is the idempotency key, and the
   // submit button stays disabled without one. While it was optional the cash
   // path had no duplicate protection at all: a double-click booked the
   // client's money twice (two Receipts, two `in` ledger rows).
   await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-1");
-  await page.getByRole("button", { name: "Record collection" }).click();
+
+  /*
+   * ROW 21 — THE ASSERTION THAT MAKES THAT FIX REAL, added 2026-11-07 after noticing the
+   * re-pointed step below proves nothing on its own: it types an EXPLICIT amount, so it
+   * passes whether or not the amount is required. The fix shipped UNGUARDED, and nothing in
+   * the tree would have failed if the substitution came back.
+   *
+   * The owner's decision was that the instalment amount is REQUIRED. What it replaced was
+   * `instalmentAmount.trim() || invoice.outstandingAmount` — a BLANK field silently booking a
+   * receipt for the ENTIRE outstanding balance, deliberate, commented, and never stated on
+   * screen. Asserting the button DISABLED with the reference present and the amount blank is
+   * what makes that substitution unreachable: it cannot be submitted, so it cannot return
+   * without this failing.
+   *
+   * Both directions from the SAME render, because a disabled button on its own proves nothing
+   * — the control could be disabled for some unrelated reason. The ENABLE after one fill is
+   * what isolates the amount as the cause.
+   *
+   * What this deliberately does NOT claim: `required` is DECORATIVE on this component. There
+   * is no `<form>` anywhere in it and every button is `type="button"`, so native validation
+   * never fires — which has always been true of `paymentReference` too. The disabled state is
+   * the whole of the client-side enforcement, which is exactly why it needs an assertion.
+   */
+  const recordCollection = page.getByRole("button", {
+    name: "Record collection",
+  });
+  await expect(recordCollection).toBeDisabled();
+  await page
+    .getByLabel("Instalment amount")
+    .fill("15,350.000".replace(",", ""));
+  await expect(recordCollection).toBeEnabled();
+
+  await recordCollection.click();
   await expect(page.getByTestId("invoice-status")).toHaveText("Invoiced");
   await expect(page.getByText("JOD 15,350.000")).toBeVisible();
   // The remaining balance is shown while the invoice is part-paid.
   await expect(page.getByText("Outstanding balance")).toBeVisible();
   await expect(page.getByText("JOD 100,000.000")).toBeVisible();
 
-  // 1b. the instalment that settles the rest — a blank amount means "the whole
-  //     outstanding balance", so this closes it out and drives the transition.
-  //     A DIFFERENT reference: the same one would resume the first instalment
-  //     idempotently rather than booking a second.
+  /*
+   * 1b. the instalment that settles the rest.
+   *
+   * RE-POINTED 2026-11-07 (row 21), AND THE REVERSAL IS THE POINT. This step used to leave the
+   * amount BLANK and its comment said why: *"a blank amount means 'the whole outstanding
+   * balance'"*. So the test asserted the defect the owner has now closed — a blank field recording
+   * a receipt for the entire balance, deliberate, commented, and never stated on screen.
+   *
+   * The amount is typed now, and the figure is the balance the assertions above just proved is
+   * outstanding (100,000.000), so the test still settles the invoice and still drives
+   * `Invoiced -> Collected`. The property it was really about — that only the instalment which
+   * COMPLETES an invoice moves it on — is unchanged and is what the status assertion below pins.
+   *
+   * A DIFFERENT reference: the same one would resume the first instalment idempotently rather than
+   * booking a second.
+   */
+  await page.getByLabel("Instalment amount").fill("100000.000");
   await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-2");
   await page.getByRole("button", { name: "Record collection" }).click();
   await expect(page.getByTestId("invoice-status")).toHaveText("Collected");

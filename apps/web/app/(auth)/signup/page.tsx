@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
 import { signup } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import {
@@ -15,7 +15,48 @@ import {
 } from '../../../components/auth/auth-form.styles';
 import { AuthFrame } from '../../../components/ui';
 
+/**
+ * ROW 66 — THE ROUTE IS CLOSED AND THE CODE STAYS. Owner decision, 2026-11-07.
+ *
+ * `/login`'s own comment already records that the sign-up LINK was removed in module 0-ب and that
+ * "THE ROUTE AND PAGE STAY" — measured, because `POST /auth/signup` had 120 references across the
+ * api e2e suite. That reasoning was about the SERVER route and it still holds. What it left open is
+ * the PAGE: anybody typing `/signup` by hand reached this form and created an account with **no
+ * role at all** — it could authenticate and reach nothing, and `MfaRequiredGuard` refused every
+ * route until TOTP was paired. A live door onto a dead end.
+ *
+ * The owner's decision, knowingly taken: **the page and its code stay in the repository, and the
+ * route refuses.** Her reason is that she may want self-registration one day and does not want it
+ * rebuilt from nothing.
+ *
+ * ## RE-ENABLING IS ONE LINE, AND THAT IS THE POINT
+ *
+ * Delete `SIGNUP_ROUTE_CLOSED` and the `redirect` below. Nothing else was removed: the form, its
+ * fields, its validation, its submit and `signup()` in `lib/auth/auth-api.ts` are all intact and
+ * are retained DELIBERATELY rather than left behind.
+ *
+ * ## WHY A REDIRECT RATHER THAN A NOTICE OR A 404
+ *
+ * Measured 2026-11-07: no shipping Arabic says "self-registration is closed", and this repository
+ * has no `not-found.tsx`, so `notFound()` would render Next's own untranslated
+ * "This page could not be found" — bare English as the first thing a reader sees, on an
+ * Arabic-first product. A redirect to `/login` needs **no new string in either language**, is
+ * fully localised because `/login` already is, and lands the reader exactly where the removed link
+ * used to point them.
+ *
+ * ## WHAT THIS DOES NOT CLOSE, STATED RATHER THAN IMPLIED
+ *
+ * `POST /auth/signup` is `@Public()` and remains reachable by a direct request. Measured
+ * 2026-11-07: **114 api e2e spec files call it** — it is the suite's user factory — so closing it
+ * is a separate decision with a large blast radius, not a line in this batch. The property this
+ * change delivers is the one the owner named: a browser navigating to `/signup` cannot create an
+ * account.
+ */
+const SIGNUP_ROUTE_CLOSED = true;
+
 export default function SignupPage() {
+  if (SIGNUP_ROUTE_CLOSED) redirect('/login');
+
   const { t } = useLanguage();
   const router = useRouter();
   const [fullName, setFullName] = useState('');
