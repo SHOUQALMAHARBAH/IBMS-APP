@@ -6,6 +6,7 @@ import { CreateDisposalBatchDto } from './dto/create-disposal-batch.dto';
 import { RecordDisposalExecutionDto } from './dto/record-disposal-execution.dto';
 import { ListDisposalBatchesQueryDto } from './dto/list-disposal-batches-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
+import { RequireStepUp } from '../auth/decorators/require-step-up.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -51,7 +52,18 @@ export class DisposalBatchController {
     return this.disposalBatches.managerApprove(id, user.id);
   }
 
+  /**
+   * ROW 68 — STEP-UP. Added 2026-11-06 (module 0-c batch 6b). The decorator's second named case.
+   *
+   * THE DPO HALF AND NOT THE MANAGER HALF, stated because the omission would otherwise read as an
+   * oversight. Disposal is dual control — a Department Manager nominates, the DPO approves — and
+   * these two approvals are not the same act: the manager's advances a nomination, the DPO's is the
+   * authorisation that permits records to be destroyed, which is the irreversible one. Step-up is a
+   * re-authentication in front of an irreversible act, and putting one in front of both halves
+   * would train the pair to answer it twice per batch, which is how a prompt stops being read.
+   */
   @RequirePermissions('retention.dispose.approve')
+  @RequireStepUp()
   @Post(':id/dpo-approve')
   dpoApprove(
     @Param('id') id: string,

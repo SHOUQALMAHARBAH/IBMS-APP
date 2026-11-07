@@ -223,7 +223,23 @@ export default function RfqDetailPage() {
 
   if (isLoading || !user) return null;
 
+  /*
+   * ROW 12 — ONE BOOLEAN WAS CARRYING THREE PERMISSIONS. Split 2026-11-06 (module 0-c batch 6b).
+   *
+   * `isPlacement` is CORRECT for this page's own controls — the per-insurer status column and its
+   * buttons really do drive `rfq.insurer.update` — and was wrong only where it was passed DOWN:
+   * `QuotationsSection` writes through `quotation.capture` and `quotation.negotiate`, and
+   * `ComparisonSection` through `comparison.build`. None of those three routes accepts
+   * `rfq.insurer.update`.
+   *
+   * Measured 2026-11-06: all four codes are granted to `[PLACEMENT]` alone, so no seeded role can
+   * tell them apart and nothing is visibly broken today. It goes live the first time an office
+   * defines a role holding one and not another — which is what office-scoped RBAC is for.
+   */
   const isPlacement = hasPermission(user, 'rfq.insurer.update');
+  const canCaptureQuotation = hasPermission(user, 'quotation.capture');
+  const canNegotiateQuotation = hasPermission(user, 'quotation.negotiate');
+  const canBuildComparison = hasPermission(user, 'comparison.build');
   const shortlistedIds = new Set(
     rfq?.insurerSubmissions.map((s) => s.insurerId) ?? [],
   );
@@ -427,11 +443,15 @@ export default function RfqDetailPage() {
 
           <QuotationsSection
             rfqId={rfq.id}
-            isPlacement={isPlacement}
+            canCaptureQuotation={canCaptureQuotation}
+            canNegotiateQuotation={canNegotiateQuotation}
             submissions={rfq.insurerSubmissions}
           />
 
-          <ComparisonSection rfqId={rfq.id} isPlacement={isPlacement} />
+          <ComparisonSection
+            rfqId={rfq.id}
+            canBuildComparison={canBuildComparison}
+          />
 
           <h2 style={{ marginTop: '2.5rem' }}>{t('rfqCorrespondenceHeading')}</h2>
           <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('rfqCorrespondenceIntro')}</p>

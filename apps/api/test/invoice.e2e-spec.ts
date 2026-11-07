@@ -1353,6 +1353,47 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
         reference: 'E2E-REF-1199',
       })
       .expect(422);
+    /*
+     * ROW 23 — THE FOURTH CHECK, which was the only one of the four with no test.
+     * Added 2026-11-06 (module 0-c batch 6b).
+     *
+     * `assertReceiptChannelUsable` makes four refusals: wrong owner, disabled, **wrong currency**,
+     * and a caller `method` contradicting the channel's type. The other three are asserted above
+     * and below; the currency one had never run.
+     *
+     * AND IT IS REACHABLE ONLY THROUGH THE ONE DOOR ROW 20 DELIBERATELY LEFT OPEN. Batch 6 closed
+     * non-JOD at the quotation, so every Policy and Invoice is JOD — but
+     * `PaymentChannel.currency` was explicitly NOT closed, because a channel describes a BANK
+     * ACCOUNT the office receives into rather than an amount that is ever summed into a premium
+     * total, and an office may legitimately hold a foreign-currency account. That decision is what
+     * makes this check both meaningful and testable: a USD account cannot settle a JOD invoice.
+     */
+    const usdChan = await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'bank_transfer',
+        label: 'Foreign-currency account',
+        currency: 'USD',
+      })
+      .expect(201);
+    const usdChanId = (usdChan.body as PaymentChannelBody).id;
+    const currencyRefusal = await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({
+        amount: '115350.000',
+        paymentChannelId: usdChanId,
+        reference: 'E2E-REF-USD-1',
+      })
+      .expect(422);
+    // The MESSAGE, not just the status: three of these four refusals are 422, so a status alone
+    // cannot say which control refused — the same reasoning `retention-disposal.e2e-spec.ts`
+    // records about its own 403 collision.
+    expect(JSON.stringify(currencyRefusal.body)).toContain('USD channel');
+
     // an explicit method conflicting with the channel type -> 422
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
@@ -1432,8 +1473,16 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .set(bearer(fin.accessToken))
       .expect(200);
     const rows = list.body as PaymentChannelBody[];
+    /*
+     * `usdChanId` ADDED 2026-11-06 (row 23). This is an EXACT SET over the customer's channels and
+     * it caught an INTENDED addition as the shape change the set exists to catch — the same
+     * mechanism this repository recorded when `setByUserId` was projected onto the retention view.
+     * The set stays exact rather than being loosened to a `toContain`: a channel appearing here
+     * that nobody created is precisely what it is for, and the currency-refusal channel above is a
+     * real member of this customer's list.
+     */
     expect(rows.map((r) => r.id).sort()).toEqual(
-      [custChanId, deadChanId].sort(),
+      [custChanId, deadChanId, usdChanId].sort(),
     );
     for (const r of rows) {
       if (r.accountLast4) expect(r.accountLast4.length).toBeLessThanOrEqual(4);

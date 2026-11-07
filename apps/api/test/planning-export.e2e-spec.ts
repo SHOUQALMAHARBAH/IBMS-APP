@@ -70,7 +70,7 @@ async function makeUser(
   app: INestApplication<App>,
   label: string,
   ...roles: RoleName[]
-): Promise<{ accessToken: string; userId: string }> {
+): Promise<{ accessToken: string; userId: string; totpSecret: string }> {
   const email = uniqueEmail(label);
   await request(app.getHttpServer())
     .post('/auth/signup')
@@ -91,12 +91,15 @@ async function makeUser(
     .set(bearer(accessToken))
     .expect(201);
   const enrollBody = enroll.body as MfaEnrollBody;
+  /* Kept so a test can STEP UP — a route carrying `@RequireStepUp()` (module 0-c batch 6b)
+   * needs a live MFA code as well as the password. */
+  const totpSecret = secretFromOtpAuthUri(enrollBody.otpAuthUri);
   await request(app.getHttpServer())
     .post('/auth/mfa/totp/enroll/verify')
     .set(bearer(accessToken))
     .send({
       credentialId: enrollBody.credentialId,
-      code: authenticator.generate(secretFromOtpAuthUri(enrollBody.otpAuthUri)),
+      code: authenticator.generate(totpSecret),
     })
     .expect(200);
 
@@ -115,7 +118,7 @@ async function makeUser(
       });
     }
   }
-  return { accessToken, userId: user.id };
+  return { accessToken, userId: user.id, totpSecret };
 }
 
 function findRow(
@@ -123,6 +126,29 @@ function findRow(
   key: string,
 ): PlanningExportBreakdownRowBody | undefined {
   return rows.find((r) => r.key === key);
+}
+
+/**
+ * ROW 68 — `POST /planning-export` carries `@RequireStepUp()` since module 0-c batch 6b: it is one
+ * of the two routes that write `AuditAction.EXPORT`, which is this product's own definition of an
+ * export, and `require-step-up.decorator.ts` has always named "data export" as one of its three
+ * cases.
+ *
+ * A step-up is a PASSWORD re-entry plus a live MFA code — re-proving the first factor, not just the
+ * second — so a bystander at an unlocked machine cannot generate an export.
+ */
+async function stepUp(
+  app: INestApplication<App>,
+  actor: { accessToken: string; totpSecret: string },
+): Promise<void> {
+  await request(app.getHttpServer())
+    .post('/auth/step-up')
+    .set(bearer(actor.accessToken))
+    .send({
+      password: PASSWORD,
+      code: authenticator.generate(actor.totpSecret),
+    })
+    .expect(200);
 }
 
 describe('Strategic Planning Inputs (e2e) — backlog Part C #65', () => {
@@ -138,6 +164,20 @@ describe('Strategic Planning Inputs (e2e) — backlog Part C #65', () => {
       'pe-outsider',
       'SALES_RELATIONSHIP_OFFICER',
     );
+    /*
+     * ROW 68 — STEP UP FIRST, OR THIS ASSERTION PROVES NOTHING. Added 2026-11-06 (batch 6b).
+     *
+     * `POST /planning-export` carries `@RequireStepUp()` now, and `StepUpGuard` runs BEFORE
+     * `PermissionsGuard` — stated in `rbac.module.ts:64`, where `PermissionsGuard` is registered
+     * after the auth guards. Both refuse with **403**. So a user who lacks the permission AND has
+     * not re-authenticated is refused by the STEP-UP, and this test would pass with the permission
+     * check deleted.
+     *
+     * Stepping up first makes the remaining 403 unambiguously the permission refusal, which is the
+     * only thing this test is for.
+     */
+    await stepUp(app, outsider);
+    await stepUp(app, outsider);
     await request(app.getHttpServer())
       .post('/planning-export')
       .set(bearer(outsider.accessToken))
@@ -157,6 +197,10 @@ describe('Strategic Planning Inputs (e2e) — backlog Part C #65', () => {
       'pe-finance',
       'FINANCE_COLLECTIONS_OFFICER',
     );
+    // Both step up first, for the reason stated on the test above: otherwise the 403 is the
+    // step-up guard's and says nothing about whether these two roles hold the grant.
+    await stepUp(app, manager);
+    await stepUp(app, finance);
     await request(app.getHttpServer())
       .post('/planning-export')
       .set(bearer(manager.accessToken))
@@ -172,6 +216,7 @@ describe('Strategic Planning Inputs (e2e) — backlog Part C #65', () => {
   it('resolves the default period to the previous UTC calendar month when no override is given', async () => {
     const app = await boot();
     const exec = await makeUser(app, 'pe-exec-default', 'EXECUTIVE_MANAGEMENT');
+    await stepUp(app, exec);
     const res = await request(app.getHttpServer())
       .post('/planning-export')
       .set(bearer(exec.accessToken))
@@ -229,6 +274,7 @@ describe('Strategic Planning Inputs (e2e) — backlog Part C #65', () => {
       },
     });
 
+    await stepUp(app, exec);
     const res = await request(app.getHttpServer())
       .post('/planning-export')
       .set(bearer(exec.accessToken))

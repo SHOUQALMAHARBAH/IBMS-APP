@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -1801,6 +1802,102 @@ test("captures a quotation for a shortlisted insurer on the RFQ detail screen", 
   await expect(
     page.getByRole("button", { name: "Revise (new version)" }),
   ).toBeVisible();
+});
+
+/*
+ * ROW 12 — THE NARROWED ROLE, WHICH IS THE ONLY THING THAT PROVES THIS ITEM.
+ * Added 2026-11-06 (module 0-c batch 6b).
+ *
+ * `/rfqs/[id]` bound ONE boolean to `rfq.insurer.update` and passed it to three places needing
+ * three other codes: `quotation.capture`, `quotation.negotiate` and `comparison.build`. Under the
+ * SEEDED grants that is invisible — measured 2026-11-06, all four are granted to `[PLACEMENT]`
+ * alone, so `PLACEMENT_TECHNICAL_OFFICER` holds every one of them and a screen test with a seeded
+ * role passes either way. **A test that mocks a seeded role therefore cannot see this defect at
+ * all**, which is why these two go through `permissions` DIRECTLY rather than through
+ * `permissionsForRoles`: an office that defines its own roles is exactly the case office-scoped
+ * RBAC exists for, and it is the case the mismatch breaks.
+ *
+ * Each test asserts in BOTH directions from the same render — the control that SHOULD be there,
+ * and the one that should not — so neither can pass against a blank page.
+ */
+async function mockAuthWithPermissions(page: Page, permissions: string[]) {
+  await page.route("**/auth/refresh", (route) =>
+    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+  );
+  await page.route("**/auth/me", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        roles: ["PLACEMENT_TECHNICAL_OFFICER"],
+        permissions,
+      },
+    }),
+  );
+}
+
+test("row 12 — a role with rfq.insurer.update but NOT quotation.capture gets no capture form", async ({
+  page,
+}) => {
+  await mockAuthWithPermissions(page, [
+    "rfq.read",
+    "opportunity.read",
+    "quotation.read",
+    "comparison.read",
+    "rfq.insurer.update",
+  ]);
+  await mockRfqApi(page);
+
+  await page.goto("/rfqs/rfq-1");
+
+  // THE ANCHOR: this role's OWN control is present, so the page rendered and the absence below is
+  // a gate rather than an empty screen. `rfq.insurer.update` is what the status control enforces,
+  // and it was the ONE code the old single boolean got right.
+  await expect(page.getByRole("heading", { name: "Quotations" })).toBeVisible();
+  await expect(page.getByText("Set status")).toBeVisible();
+
+  // Before the split, this form was gated on `rfq.insurer.update` and would have rendered.
+  await expect(
+    page.getByRole("button", { name: "Capture quote" }),
+  ).toHaveCount(0);
+});
+
+test("row 12 — a role with quotation.capture but NOT rfq.insurer.update gets the capture form", async ({
+  page,
+}) => {
+  await mockAuthWithPermissions(page, [
+    "rfq.read",
+    "opportunity.read",
+    "quotation.read",
+    "comparison.read",
+    "quotation.capture",
+  ]);
+  await mockRfqApi(page);
+
+  await page.goto("/rfqs/rfq-1");
+
+  // The direction that FAILS CLOSED and is therefore the quiet one: before the split this role
+  // could not see the capture form at all, because the gate asked for a code it does not hold —
+  // and a hidden control looks exactly like a correct screen to everybody who cannot use it.
+  await expect(
+    page.getByRole("button", { name: "Capture quote" }),
+  ).toBeVisible();
+  /*
+   * SCOPED, NOT PAGE-WIDE — and a CI gate taught me that, not a review.
+   *
+   * This was `expect(page.getByText("Set status")).toHaveCount(0)`, and CI step 9 of the `frontend`
+   * job (`page-wide-absence-assertions.py --check`) refused it: **43 against a budget of 42**, with
+   * "Do NOT raise the budget" in its own message. A page-wide text absence can match an element the
+   * test is not about — the recorded case is a role-name loop that matched a NAV LABEL and failed on
+   * a correct tree.
+   *
+   * `expectAbsentWithin` takes a `Locator`, so the compiler refuses a page-wide root, and it
+   * asserts the scope VISIBLE first — which fixes the wrong-element failure AND the not-yet-rendered
+   * one, because `toHaveCount(0)` passes on its first poll.
+   */
+  await expectAbsentWithin(page.getByRole("table").first(), (scope) =>
+    scope.getByText("Set status"),
+  );
 });
 
 test("revises a captured quotation into a new version", async ({ page }) => {

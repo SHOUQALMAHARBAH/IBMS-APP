@@ -96,7 +96,7 @@ async function makeUser(
   app: INestApplication<App>,
   label: string,
   ...roles: RoleName[]
-): Promise<{ accessToken: string; userId: string }> {
+): Promise<{ accessToken: string; userId: string; totpSecret: string }> {
   const email = uniqueEmail(label);
   await request(app.getHttpServer())
     .post('/auth/signup')
@@ -113,12 +113,15 @@ async function makeUser(
     .set(bearer(accessToken))
     .expect(201);
   const eb = enroll.body as MfaEnrollBody;
+  /* Kept so a test can STEP UP: `POST /refunds/:id/approve` carries `@RequireStepUp()` since
+   * module 0-c batch 6b, and a step-up needs a live MFA code as well as the password. */
+  const totpSecret = secretFromOtpAuthUri(eb.otpAuthUri);
   await request(app.getHttpServer())
     .post('/auth/mfa/totp/enroll/verify')
     .set(bearer(accessToken))
     .send({
       credentialId: eb.credentialId,
-      code: authenticator.generate(secretFromOtpAuthUri(eb.otpAuthUri)),
+      code: authenticator.generate(totpSecret),
     })
     .expect(200);
 
@@ -133,7 +136,7 @@ async function makeUser(
       });
     }
   }
-  return { accessToken, userId: user.id };
+  return { accessToken, userId: user.id, totpSecret };
 }
 
 const SCHEDULE = {
@@ -356,6 +359,33 @@ async function assessmentAwaitingReview(
   return id;
 }
 
+/**
+ * ROW 68 — `POST /refunds/:id/approve` carries `@RequireStepUp()` since module 0-c batch 6b, and
+ * **`StepUpGuard` runs BEFORE `PermissionsGuard` and the duty-segregation check** (`rbac.module.ts`
+ * registers `PermissionsGuard` after the auth guards). All three refuse, and two of them refuse with
+ * **403**.
+ *
+ * So without this helper the first test below asserted `'segregation of duties'` against a body
+ * reading `{"code":"STEP_UP_REQUIRED"}` — it was passing a 403 through while proving nothing about
+ * duty segregation — and the COMBINED test got a 403 where it expects the 422 that asks for a
+ * reason. **CI caught both: 1 of 128 files, 2 tests.** I had fixed exactly this collision in five
+ * other specs and never searched for a sixth; `git grep -ln 'refunds/.*approve' -- apps/api/test`
+ * finds it in one line, which is the search I should have run first.
+ */
+async function stepUp(
+  app: INestApplication<App>,
+  actor: { accessToken: string; totpSecret: string },
+): Promise<void> {
+  await request(app.getHttpServer())
+    .post('/auth/step-up')
+    .set(bearer(actor.accessToken))
+    .send({
+      password: PASSWORD,
+      code: authenticator.generate(actor.totpSecret),
+    })
+    .expect(200);
+}
+
 describe('duty segregation — a declared combined act through the API (e2e)', () => {
   beforeAll(async () => {
     // Before anything asserts on it: whatever a killed run left behind.
@@ -388,6 +418,9 @@ describe('duty segregation — a declared combined act through the API (e2e)', (
       one.userId,
       'seg',
     );
+
+    // Stepped up first, so the 403 below can only be the SEGREGATION refusal. See `stepUp`.
+    await stepUp(app, one);
 
     const refused = await request(app.getHttpServer())
       .post(`/refunds/${refundId}/approve`)
@@ -439,6 +472,10 @@ describe('duty segregation — a declared combined act through the API (e2e)', (
 
     const REASON =
       'The owner is the only person in this office and the client is waiting on the refund.';
+
+    // Same reason: the step-up must be satisfied before the 422/400/201 below can be attributed to
+    // the combined-duty path rather than to a missing re-authentication.
+    await stepUp(app, one);
 
     await inCombinedMode(async () => {
       // WITHOUT a reason the mode changes nothing. This is the assertion that separates "declared" from

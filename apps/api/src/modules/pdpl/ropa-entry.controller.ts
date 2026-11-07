@@ -4,6 +4,7 @@ import { RopaEntryService } from './ropa-entry.service';
 import { CreateRopaEntryDto } from './dto/create-ropa-entry.dto';
 import { UpdateRopaEntryDto } from './dto/update-ropa-entry.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
+import { RequireStepUp } from '../auth/decorators/require-step-up.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -30,7 +31,11 @@ export class RopaEntryController {
     return this.ropa.list();
   }
 
+  /** ROW 68 — STEP-UP, the second of the two routes that write `AuditAction.EXPORT`. See
+   *  `planning-export.controller.ts` for why the export set is those two and not the 20 document
+   *  routes. A `GET` is decorated here because what matters is that data LEAVES, not the verb. */
   @RequirePermissions('ropa.manage')
+  @RequireStepUp()
   @Get('export')
   export(@CurrentUser() user: AuthenticatedUser) {
     return this.ropa.export(user.id);

@@ -33,7 +33,32 @@ import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
 
 interface Props {
   rfqId: string;
-  isPlacement: boolean;
+  /**
+   * TWO PROPS, NOT ONE, BECAUSE TWO DIFFERENT ENDPOINTS GUARD THESE TWO CONTROLS.
+   * Split 2026-11-06 (module 0-c batch 6b), row 12.
+   *
+   * This was a single `isPlacement`, bound on `/rfqs/[id]` to **`rfq.insurer.update`** — a code
+   * NEITHER control's route enforces. This component calls exactly two writing routes:
+   * `captureQuotation` → `POST /quotations` → **`quotation.capture`**, and `reviseQuotation` →
+   * `POST /quotations/:id/revise` → **`quotation.negotiate`**.
+   *
+   * It is the defect `RecommendationSection`'s own `isManager` comment records, in the component
+   * next door and left behind by that fix: **one boolean cannot carry two permissions**, and here
+   * it was carrying a third that belongs to neither. `register entry`-wise this is one of the
+   * "17 latent sites of that shape" batch 1 deliberately did not sweep, named at the time as "the
+   * negotiate control on `/rfqs/[id]`, gated there by `rfq.insurer.update`".
+   *
+   * LATENT UNDER THE SEED: measured 2026-11-06, `rfq.insurer.update`, `quotation.capture` and
+   * `quotation.negotiate` are all granted to `[PLACEMENT]` alone, so no seeded role can tell them
+   * apart. An office that defines a role holding `quotation.capture` without `rfq.insurer.update`
+   * gets a capture form it cannot see.
+   *
+   * `isPlacement` STAYS on `/rfqs/[id]` for that page's OWN controls — the per-insurer status
+   * controls really do enforce `rfq.insurer.update`. It was correct there and wrong only where it
+   * was passed down.
+   */
+  canCaptureQuotation: boolean;
+  canNegotiateQuotation: boolean;
   submissions: RfqInsurerSubmission[];
 }
 
@@ -104,7 +129,12 @@ function deltaSign(delta: string): string {
   return /[1-9]/.test(trimmed) ? '+' : '';
 }
 
-export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
+export function QuotationsSection({
+  rfqId,
+  canCaptureQuotation,
+  canNegotiateQuotation,
+  submissions,
+}: Props) {
   const { language, t } = useLanguage();
   const [chains, setChains] = useState<QuotationChain[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -315,7 +345,8 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                     {isOpen ? t('quoteHideHistoryButton') : t('quoteVersionHistoryButton')}
                   </button>
                 ) : null}
-                {isPlacement ? (
+                {/* REVISE — `POST /quotations/:id/revise`, `quotation.negotiate`. */}
+                {canNegotiateQuotation ? (
                   <button
                     type="button"
                     style={{ ...buttonStyle, width: 'auto' }}
@@ -398,7 +429,11 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
         })
       )}
 
-      {isPlacement ? (
+      {/* THE FORM IS BOTH ENDPOINTS, so its gate follows its own mode rather than picking one:
+           `capture` posts a new quotation (`quotation.capture`), `revise` posts a new version
+           (`quotation.negotiate`). Gating it on either code alone would hide one of the two jobs
+           from somebody entitled to do it. */}
+      {(mode === 'capture' ? canCaptureQuotation : canNegotiateQuotation) ? (
         <div style={{ marginTop: '1.5rem', maxWidth: '40rem' }}>
           <strong>
             {mode === 'capture' ? t('quoteCaptureHeading') : t('quoteReviseHeading')}

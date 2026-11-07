@@ -132,6 +132,11 @@ export default function OpportunityDetailPage() {
   // `packages/db/prisma/recommendation-approval-permissions.spec.ts`.
   const canSetThreshold = hasPermission(user, 'opportunity.set-target-threshold');
   const canApproveRecommendation = hasPermission(user, 'recommendation.approve');
+  /* ROW 12 — added 2026-11-06 (module 0-c batch 6b). `RecommendationSection`'s draft form and send
+   * button were both gated on `isPlacement={canCaptureQuotation}`, a code neither route enforces.
+   * Named after what each endpoint actually requires, which is this screen's own stated rule. */
+  const canDraftRecommendation = hasPermission(user, 'recommendation.draft');
+  const canSendRecommendation = hasPermission(user, 'recommendation.send');
   const canDiscloseCoi = hasPermission(user, 'conflict-of-interest.disclose');
   const canCaptureDecision = hasPermission(user, 'client-decision.capture');
   const canPlacePolicy = hasPermission(user, 'policy.create');
@@ -280,10 +285,11 @@ export default function OpportunityDetailPage() {
 
           <RecommendationSection
             opportunity={opportunity}
-            isPlacement={canCaptureQuotation}
+            canDraft={canDraftRecommendation}
+            canSend={canSendRecommendation}
             canSetThreshold={canSetThreshold}
             canApprove={canApproveRecommendation}
-            isCompliance={canDiscloseCoi}
+            canDiscloseCoi={canDiscloseCoi}
             canDiscard={canDiscardRecommendation}
             onOpportunityChanged={() => void load()}
           />
