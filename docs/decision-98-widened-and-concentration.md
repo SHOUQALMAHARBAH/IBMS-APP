@@ -1,5 +1,9 @@
 # Decision 98 widened, and the data-protection concentration — two measurements
 
+## القرار بجملة
+
+كلُّ زرِّ تاريخٍ أو مهلةٍ صلاحيةٌ مستقلةٌ باسمها. **ووُسِّع منطقُه:** الرمزُ الواحدُ ما يحرس فعلَين مختلفَي الأثر — واحدٌ لا يُرجَع أو يغيّر مصيرَ السجلّ، وآخرُ مجرّدُ قراءةٍ أو مسوّدة.
+
 **Nothing in this document was built. No code was split and none was minted; the catalogue is 229
 on both databases, unchanged.** Both measurements are committed as scripts so the numbers are
 re-derivable rather than quoted:

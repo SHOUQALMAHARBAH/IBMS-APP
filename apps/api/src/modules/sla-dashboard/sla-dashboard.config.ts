@@ -57,6 +57,8 @@ export const SLA_DASHBOARD_DUE_SOON_WINDOW: SlaDuration = {
 
 /** `now` + {@link SLA_DASHBOARD_DUE_SOON_WINDOW}. */
 export function computeDueSoonCutoff(now: Date): Date {
+  // `calendarDays`, and a display bucket rather than a deadline (see the
+  // constant above) — `SlaHoliday` deliberately does not apply.
   return applyDuration(now, SLA_DASHBOARD_DUE_SOON_WINDOW);
 }
 

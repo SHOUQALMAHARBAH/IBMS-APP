@@ -4,6 +4,7 @@ import {
   applyDuration,
   isBusinessDay,
   JORDAN_WEEKEND_DAYS,
+  utcDateKey,
 } from './business-days.util';
 
 describe('JORDAN_WEEKEND_DAYS', () => {
@@ -85,5 +86,69 @@ describe('applyDuration', () => {
         unit: 'businessDays',
       }).toISOString(),
     ).toBe('2026-08-31T00:00:00.000Z');
+  });
+});
+
+/**
+ * THE HOLIDAY CALENDAR — untested until 2026-11-08, which is why the gap was
+ * invisible.
+ *
+ * `BusinessDayOptions.holidays` has shipped for as long as `SlaHoliday` has
+ * existed, and NOTHING anywhere asserted it did anything: a `grep -c holidays`
+ * over this file returned 0. So "remove the holidays argument and a test must
+ * fail" was not satisfiable for any caller — the argument could have been a
+ * no-op in the util itself and every suite would still have passed.
+ *
+ * The last test below is the plant in permanent form: it asserts the SAME
+ * computation differs with and without the calendar. Make `holidays` a no-op
+ * and that test fails, which is the property a caller's wiring can then rest
+ * on.
+ */
+describe('BusinessDayOptions.holidays', () => {
+  // 2026-08-30 is a Sunday — a working day in Jordan (weekend is Fri/Sat), so
+  // using it as the holiday proves the holiday set is read rather than the
+  // weekend rule being hit twice.
+  const sundayKey = '2026-08-30';
+  const holidays = new Set([sundayKey]);
+
+  it('keys a date the way the option expects', () => {
+    expect(utcDateKey(new Date('2026-08-30T23:59:59.000Z'))).toBe(sundayKey);
+  });
+
+  it('makes a working day a non-business day', () => {
+    const sunday = new Date(`${sundayKey}T00:00:00.000Z`);
+    expect(isBusinessDay(sunday)).toBe(true);
+    expect(isBusinessDay(sunday, { holidays })).toBe(false);
+  });
+
+  it('does not double-count a holiday that falls on the weekend', () => {
+    // 2026-08-28 is a Friday — already skipped as weekend. Naming it a holiday
+    // must not consume a second day.
+    const wednesday = new Date('2026-08-26T00:00:00.000Z');
+    expect(
+      addBusinessDays(wednesday, 3, {
+        holidays: new Set(['2026-08-28']),
+      }).toISOString(),
+    ).toBe('2026-08-31T00:00:00.000Z');
+  });
+
+  it('is honoured through applyDuration, not only addBusinessDays', () => {
+    const wednesday = new Date('2026-08-26T00:00:00.000Z');
+    expect(
+      applyDuration(wednesday, {
+        value: 3,
+        unit: 'businessDays',
+        businessDayOptions: { holidays },
+      }).toISOString(),
+    ).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('CHANGES THE ANSWER — a dropped calendar is observable', () => {
+    const wednesday = new Date('2026-08-26T00:00:00.000Z');
+    const withoutCalendar = addBusinessDays(wednesday, 3);
+    const withCalendar = addBusinessDays(wednesday, 3, { holidays });
+    expect(withoutCalendar.toISOString()).toBe('2026-08-31T00:00:00.000Z');
+    expect(withCalendar.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+    expect(withCalendar.getTime()).toBeGreaterThan(withoutCalendar.getTime());
   });
 });

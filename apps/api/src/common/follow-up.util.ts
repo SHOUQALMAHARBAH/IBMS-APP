@@ -10,13 +10,31 @@ import { addBusinessDays } from './business-days.util';
  * `thresholdBusinessDays`, is a follow-up now due?
  *
  * The threshold is counted in **Jordan business days** (Fri/Sat weekend) via
- * `addBusinessDays()` — consistent with every other deadline in this codebase
- * (the pdpl-sla-timers registry, the KYC review SLAs). As
- * ibms-brain/meta/context/business-day-calendar.md notes, no gazetted
- * public-holiday calendar exists yet, so a computed due-date is a **lower
- * bound**: the alert may fire a day or two before the "true" business-day
- * deadline that also excludes public holidays, never after it. That is the
- * safe direction for a chase-the-counterparty nudge.
+ * `addBusinessDays()`.
+ *
+ * CORRECTED 2026-11-08, AND IT WAS WRONG TWICE. This block used to say that no
+ * gazetted public-holiday calendar exists yet, citing
+ * ibms-brain/meta/context/business-day-calendar.md — which said the same thing
+ * and has now been corrected too. **It does exist**: `SlaHoliday` holds 48
+ * rows on dev and is HTTP-editable. The claim was true when written and rotted
+ * in place, in three files at once, the brain's copy being the one the other
+ * two cited as their authority.
+ *
+ * It also called this "consistent with every other deadline in this codebase
+ * (the pdpl-sla-timers registry, the KYC review SLAs)". The KYC review cadence
+ * is `unit: 'months'` (`kyc.service.ts`, `REVIEW_CADENCE_MONTHS`), which never
+ * consults a business-day calendar at all — so that comparison named a
+ * deadline of a different kind.
+ *
+ * WHAT IS STILL TRUE is the consequence, which is why this is reported rather
+ * than silently patched: this function takes no `BusinessDayOptions`, so its
+ * due-date skips Friday/Saturday and **ignores all 48 holidays**. The computed
+ * date is a **lower bound** — the alert may fire a day or two before the true
+ * business-day deadline, never after it. That is the safe direction for a
+ * chase-the-counterparty nudge, and it is NOT the safe direction for a
+ * statutory deadline. Threading the calendar in means a signature change plus
+ * a holiday read in each of its three caller modules (`claim.config.ts`,
+ * `retention-case.config.ts`, `rfq.service.ts`); sized, not done.
  *
  * `startedAt + N business days <= now` — i.e. the whole grace window has
  * elapsed. `now` is injected rather than read here so the sweep and its tests

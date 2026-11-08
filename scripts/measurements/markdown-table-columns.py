@@ -60,6 +60,35 @@ UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")
 # `|---|:--:|` and friends. Must contain a pipe, and nothing but pipes, dashes, colons and space.
 SEPARATOR = re.compile(r"^\s*\|?[\s:|-]*\|[\s:|-]*$")
 
+# ---------------------------------------------------------------------------------------
+# DECLARED EXEMPTIONS -- source transcriptions, with a COUNT so the declaration cannot rot.
+#
+# Added 2026-11-08 when `docs/legal/` landed: 22 laws, instructions, forms and verbatim
+# answers transferred byte-for-byte out of the owner's document set. Those papers carry one
+# standing rule, stated in `docs/legal/00-index-sources.md`: they are SOURCE TEXTS, so an
+# error in them is REPORTED and never corrected in place, because editing a source makes it
+# lie to the next reader while still looking original.
+#
+# Two files collide with this gate, and the collision is real rather than cosmetic. Their
+# commentary tables quote OCR output that itself contains pipes -- e.g. a cell reading
+# «0000 | | سسا» for a row the scan left empty -- and three more rows carry an APPENDED
+# cell the header never declared (the `docs/deferred-register.md` shape this script was
+# written for). Both are genuine markdown defects. Neither is safely fixable from here:
+# escaping a pipe inside a verbatim quotation of OCR output changes the rendering of the
+# EVIDENCE, and naming the missing header column is an Arabic word, which is the owner's.
+#
+# So they are declared with their measured counts rather than silenced. The count is checked
+# in BOTH directions: a new malformed row in a declared file fails, a repaired one fails, a
+# declared file that reaches zero fails ("remove the declaration"), and a declared file that
+# disappears fails. A bare path-prefix skip would have done none of that, and would have
+# swallowed every future table anybody writes in `docs/legal/`.
+#
+# Re-measure with:  python scripts/measurements/markdown-table-columns.py <path>
+SOURCE_TRANSCRIPTIONS = {
+    "docs/legal/aml-instructions-2-2016.md": 6,
+    "docs/legal/financial-consumer-protection-advisory.md": 4,
+}
+
 
 def columns(line):
     """Cell count of a markdown table row, counting only unescaped pipes."""
@@ -133,6 +162,8 @@ def main():
     total = 0
     checked = 0
     tables_seen = 0
+    declared_seen = {}
+    errors = []
     for path in targets:
         if not os.path.exists(path):
             continue
@@ -140,13 +171,44 @@ def main():
         tables_seen += len(
             list(tables(io.open(path, encoding="utf-8").read().split("\n")))
         )
+        key = path.replace(os.sep, "/")
+        exempt = key in SOURCE_TRANSCRIPTIONS
+        found_here = 0
         for line_no, found, expected, header_line, text in check(path):
-            total += 1
+            found_here += 1
             print(
-                "%s:%d has %d column(s), its header at line %d has %d"
-                % (path, line_no, found, header_line, expected)
+                "%s%s:%d has %d column(s), its header at line %d has %d"
+                % ("declared  " if exempt else "", path, line_no, found,
+                   header_line, expected)
             )
             print("    %s" % text)
+            if not exempt:
+                total += 1
+        if exempt:
+            declared_seen[key] = found_here
+
+    # The declarations are checked in BOTH directions, so no exemption can go stale.
+    for key, expected in sorted(SOURCE_TRANSCRIPTIONS.items()):
+        if key not in declared_seen:
+            errors.append(
+                "%s is declared in SOURCE_TRANSCRIPTIONS but was not examined -- "
+                "the path is wrong or the file is gone, so that declaration is stale"
+                % key
+            )
+            continue
+        actual = declared_seen[key]
+        if actual == 0:
+            errors.append(
+                "%s is declared in SOURCE_TRANSCRIPTIONS with %d malformed row(s) and now "
+                "has NONE -- delete the declaration, which exists only to record them"
+                % (key, expected)
+            )
+        elif actual != expected:
+            errors.append(
+                "%s is declared with %d malformed row(s) and has %d -- a declared count is "
+                "not a licence to add more; update the number WITH its reason, or fix the row"
+                % (key, expected, actual)
+            )
 
     # NON-VACUITY, BOTH HALVES. A glob matching nothing reports a clean tree; so does a
     # separator-matching bug that finds no tables at all, which is the exact regression the
@@ -161,15 +223,19 @@ def main():
         )
         return 1
 
+    declared_total = sum(declared_seen.get(k, 0) for k in SOURCE_TRANSCRIPTIONS)
     print(
-        "markdown-table-columns: %d file(s), %d table(s), %d malformed row(s)"
-        % (checked, tables_seen, total)
+        "markdown-table-columns: %d file(s), %d table(s), %d malformed row(s), "
+        "%d declared in %d source transcription(s)"
+        % (checked, tables_seen, total, declared_total, len(SOURCE_TRANSCRIPTIONS))
     )
     if total:
         print(
             "Escape a literal pipe inside a cell as backslash-pipe. Do NOT reword the cell to avoid it."
         )
-    return 1 if total else 0
+    for message in errors:
+        print("ERROR  %s" % message)
+    return 1 if (total or errors) else 0
 
 
 if __name__ == "__main__":

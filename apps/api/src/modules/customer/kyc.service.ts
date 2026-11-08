@@ -518,6 +518,8 @@ export class KycService {
     );
     const cadenceMonths =
       REVIEW_CADENCE_MONTHS[riskRating?.level ?? 'STANDARD'];
+    // `months`, so `SlaHoliday` does not apply — the `months` unit never
+    // consults `businessDayOptions`. A re-KYC cadence is a calendar interval.
     const nextReviewDueAt = applyDuration(new Date(), {
       value: cadenceMonths,
       unit: 'months',
@@ -586,6 +588,7 @@ export class KycService {
       const riskRating = await this.kycRecords.findRiskRatingByKycRecordId(id);
       const cadenceMonths =
         REVIEW_CADENCE_MONTHS[riskRating?.level ?? 'STANDARD'];
+      // `months` — no holiday calendar applies. See `finalizeApproval`.
       nextReviewDueAt = applyDuration(new Date(), {
         value: cadenceMonths,
         unit: 'months',
