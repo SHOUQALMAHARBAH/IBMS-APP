@@ -466,6 +466,38 @@ Two things about that gate are worth knowing before you trust a figure it passed
   uncorrected error: do not "fix" it.** The gate does not and must not check grammar — it
   checks that a stated figure equals the measurement — so nothing flags it, deliberately.
 
+### The module papers — what gets built, module by module
+
+**`docs/modules/` holds 22 papers: one index plus one per module** — م١–م١٩ plus two
+cross-cutting ones, م-أ (validation, Arabic refusals, UI) and م-ب (currencies and reference
+lists). Landed 2026-11-08. Each paper is seven sections in the same order: what the module is
+with a worked example, where it sits in the dependency order and why, **its open questions with
+who answers each and whether it blocks the module or one item**, what gets built item by item,
+its screens, what "done" means and what must fail if the fix is removed, and what is forbidden
+in it.
+
+**Filenames are English kebab-case; each paper's title inside is Arabic with an English line
+under it.** `00-index-order-assignment-and-questions.md` carries the filename-to-module map, so
+start there rather than guessing which file is which module.
+
+Three things to know before you use them:
+
+- **They are register content. Report an error; do not correct it.** The papers are the owner's
+  and are byte-identical to the archive they arrived in. A measurement in them that disagrees
+  with the code is reported with the counting method beside it, which is why § 2-ب of the index
+  carries a *measured from the code* table at all.
+- **No gate reads them, and none needs to.** `check:decision-index` cannot see them:
+  its file discovery is a non-recursive `os.listdir(docs)` filtered on `startswith("decision")`,
+  and its citation scan is `git ls-files apps packages`, so `docs/` is never read. Verified
+  2026-11-08 — the gate's figures (49 cited, 49 files, 48 rows) are unchanged by these 22 files.
+  Do not add an exclusion for them; there is nothing to exclude.
+- **Six rows of the index's measured table were re-derived and disagree with it**, recorded in
+  `CLAUDE.md` § What's New for 2026-11-08 with the method for each. The two worth knowing before
+  you plan from the table: **module 15's screening has run** (six succeeded watchlist syncs,
+  61,434 entries, one screened KYC record with an OFAC hit, measured on the dev database
+  2026-11-08), and **`RFQ` is a built entity** at `packages/db/prisma/schema.prisma:2481` with 89
+  rows on dev, not a gap.
+
 ### `.claude/` — agents, commands, hooks
 
 Claude Code only discovers `.claude/agents/`, `.claude/commands/`, and `.claude/settings.json`
