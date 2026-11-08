@@ -141,8 +141,11 @@ test("reaches the lead detail screen from its row in the pipeline", async ({ pag
    * makes it evidence of arrival. The lead's NAME would not be: it is on the card the click
    * started from, so an assertion on it passes against a navigation that never happened.
    *
-   * Deliberately not the `leaddLeadDetails` heading — the owner has decided that string changes
-   * (batch 0-c/6), and a test anchored on it would go red for a reason unrelated to this row.
+   * Deliberately not the `leaddLeadDetails` heading, and the reason has changed rather than gone
+   * away: that string was waiting on the owner when this was written and it LANDED on 2026-11-08
+   * («المرتقب» → «المحتمل»). It is asserted now, in Arabic, by
+   * `part-h-detail-pages-screenshots.spec.ts`. Anchoring here on a heading that another spec
+   * already owns would be a second home for one fact.
    */
   await expect(page.getByText("Marketing Consent")).toBeVisible();
 });

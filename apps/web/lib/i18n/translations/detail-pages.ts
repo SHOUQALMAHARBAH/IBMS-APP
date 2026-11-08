@@ -453,7 +453,7 @@ export const DETAIL_PAGES = {
     poldCommercialTerms: 'الشروط التجارية',
     poldInsurer: 'شركة التأمين',
     poldPremium: 'القسط',
-    poldDeductible: 'الخصم',
+    poldDeductible: 'التحمّل',
     poldCommission: 'العمولة',
     poldBack: 'العودة',
     leaddNotFound: 'غير موجود',
@@ -461,7 +461,7 @@ export const DETAIL_PAGES = {
     leaddLoading: 'جاري التحميل...',
     leaddBackToList: 'العودة إلى القائمة',
     leaddNotFound2: 'غير موجود',
-    leaddLeadDetails: 'تفاصيل العميل المرتقب',
+    leaddLeadDetails: 'تفاصيل العميل المحتمل',
     leaddBasicInformation: 'المعلومات الأساسية',
     leaddFullName: 'الاسم الكامل',
     leaddStatus: 'الحالة',
@@ -507,7 +507,7 @@ export const DETAIL_PAGES = {
     iprogdMonths: '{count} شهرًا',
     nadBackToList: '→ كل تقييمات الاحتياجات',
     upsdBackToList: '→ كل توصيات البيع الإضافي',
-    prospdBackToList: '→ كل العملاء المحتملين',
+    prospdBackToList: '→ كل العملاء المرتقبين',
     crmNoCustomerSelected:
       'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح الجدول الزمني ' +
       'لعلاقته من هناك.',

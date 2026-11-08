@@ -15,12 +15,15 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(page: Page, roles: string[], languagePreference: "AR" | "EN" = "EN") {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, languagePreference, roles, permissions: permissionsForRoles(roles) },
+    }),
   );
 }
 
@@ -199,4 +202,38 @@ test("the qualification form's fields are reachable via keyboard", async ({ page
   await expect(companyNameInput).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Sector (optional)")).toBeFocused();
+});
+
+test("the back link on a prospect profile NAMES the prospects list in Arabic, and goes there", async ({
+  page,
+}) => {
+  /*
+   * MESSAGE 28 ITEM 3. `prospdBackToList` shipped as «→ كل العملاء المحتملين» -- *all LEADS* --
+   * with a correct English half and a correct destination. So only the Arabic reader was misled,
+   * and only about where the button goes.
+   *
+   * ## The name and the destination are asserted TOGETHER, which is the whole property
+   *
+   * Either half alone passes against the defect: the button was always visible with some name, and
+   * it always went to /prospects. What was wrong is that the two DISAGREED. So the test clicks the
+   * button it has just named and asserts where it lands.
+   *
+   * There was no test on this string at all, in either language, which is why a label naming the
+   * wrong list shipped unnoticed.
+   */
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"], "AR");
+  await page.route("http://localhost:4000/prospects", (route) =>
+    route.fulfill({ status: 200, json: [PROSPECT] }),
+  );
+  await page.route("http://localhost:4000/prospects/prospect-1", (route) =>
+    route.fulfill({ status: 200, json: PROSPECT }),
+  );
+
+  await page.goto("/prospects/prospect-1");
+  await expect(page.getByRole("heading", { name: "Ready Trading Co." })).toBeVisible();
+
+  const back = page.getByRole("button", { name: "→ كل العملاء المرتقبين" });
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(page).toHaveURL("/prospects");
 });

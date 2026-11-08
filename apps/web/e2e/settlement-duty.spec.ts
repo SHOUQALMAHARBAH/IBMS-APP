@@ -35,14 +35,14 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(page: Page, roles: string[], languagePreference: "AR" | "EN" = "EN") {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
+      json: { ...ME_BASE, languagePreference, roles, permissions: permissionsForRoles(roles) },
     }),
   );
 }
@@ -194,4 +194,44 @@ test("prints second-approved and declares nothing when the two approvals are two
   await expect(
     page.getByTestId("combined-duty-settlement-clm-1"),
   ).toHaveCount(0);
+});
+
+/**
+ * A claim APPROVED and not yet settled, so the settlement FORM renders rather than the summary
+ * sentence. Derived from `CLAIM` so only the status differs.
+ */
+const AWAITING_SETTLEMENT: Claim = { ...CLAIM, status: "APPROVED", settlement: null };
+
+test("the settlement amount a customer BEARS is labelled «التحمّل», on the input itself", async ({
+  page,
+}) => {
+  /*
+   * MESSAGE 28 ITEM 1. `poldDeductible` shipped as «الخصم» -- *a discount* -- and `ClaimCard`
+   * renders it as the `<label>` of this input. So a claims officer read "discount" over a box and
+   * typed into it an amount that is CHARGED to the customer: the opposite direction of money.
+   *
+   * ## Why the assertion is on the CONTROL and not on the page's text
+   *
+   * The same card renders `claimDeductibleShort` -- the same word, now byte-identical -- 38 lines
+   * above, in the summary sentence of an ALREADY-settled claim. A text assertion would pass on
+   * either one, so it would not distinguish the label from the sentence, and the label is the half
+   * that was wrong. `toHaveAccessibleName` resolves what a screen reader announces FOR THIS INPUT,
+   * which is exactly the claim being made.
+   *
+   * The placeholder is asserted in the same breath because an accessible name proves what the
+   * control is CALLED and not which control it is; `2500.000` is this input's own and pins the
+   * label to the deductible field rather than to the approved-amount field above it.
+   */
+  await mockAuth(page, ["CLAIMS_OFFICER"], "AR");
+  await mockClaim(page, AWAITING_SETTLEMENT);
+  await page.goto("/claims/clm-1");
+
+  const deductibleInput = page.locator("#stl-ded-clm-1");
+  await expect(deductibleInput).toBeVisible();
+  await expect(deductibleInput).toHaveAttribute("placeholder", "2500.000");
+  await expect(deductibleInput).toHaveAccessibleName("التحمّل");
+
+  // The approved-amount input beside it keeps its own distinct name, so this is one label per
+  // control rather than one word landing on both.
+  await expect(page.locator("#stl-appr-clm-1")).toHaveAccessibleName("المبلغ المعتمد");
 });
