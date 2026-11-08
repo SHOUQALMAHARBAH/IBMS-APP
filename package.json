@@ -69,7 +69,7 @@
     "check:undated-absence-claims": "python scripts/measurements/undated-absence-claims.py --check",
     "check:whats-new-cap": "python scripts/measurements/whats-new-cap.py --check",
     "check:markdown-tables": "python scripts/measurements/markdown-table-columns.py",
-    "check:docs": "npm run check:undated-absence-claims && npm run check:whats-new-cap && npm run check:markdown-tables && npm run check:hook-registration",
+    "check:docs": "npm run check:undated-absence-claims && npm run check:whats-new-cap && npm run check:markdown-tables && npm run check:hook-registration && npm run check:decision-index",
     "check:css-properties": "python scripts/measurements/undefined-css-properties.py",
     "check:token-contrast": "python scripts/measurements/token-contrast.py",
     "check:inline-styles": "python scripts/measurements/inline-styles.py",
@@ -86,6 +86,7 @@
     "check:screen-pass": "npm run check:labels && npm run check:token-contrast && npm run check:inline-styles && npm run check:opacity-muting && npm run check:literal-colours && npm run check:rendered-identifiers && npm run check:typed-identifiers && npm run check:four-states && npm run check:load-error-way-forward && npm run check:dead-helpers && npm run check:unreachable-routes && npm run check:unreachable-routes-by-verb",
     "measure:screen-route-fit": "python scripts/measurements/screen-route-permission-fit.py",
     "check:hook-registration": "python scripts/measurements/hook-registration.py --check",
+    "check:decision-index": "python scripts/measurements/decision-index-fit.py --self-test && python scripts/measurements/decision-index-fit.py --check",
     "check:declaration-floor": "python scripts/measurements/declaration-floor-fit.py --check",
     "check:guards": "npm run check:hook-registration && npm run check:declaration-floor"
   },
