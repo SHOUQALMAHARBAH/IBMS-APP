@@ -192,6 +192,8 @@ export class TransactionMonitoringService {
     }
 
     // --- aggregate patterns: frequent_cancellations, frequent_refunds
+    // `calendarDays`, so `SlaHoliday` deliberately does not apply: this is a
+    // LOOKBACK BOUND for a query, not a deadline anyone has to meet.
     const cancellationWindowStart = applyDuration(now, {
       value: -AML_FREQUENT_CANCELLATION_LOOKBACK_DAYS,
       unit: 'calendarDays',
@@ -215,6 +217,7 @@ export class TransactionMonitoringService {
       actorUserId,
     );
 
+    // `calendarDays` — a lookback bound, not a deadline. See above.
     const refundWindowStart = applyDuration(now, {
       value: -AML_FREQUENT_REFUND_LOOKBACK_DAYS,
       unit: 'calendarDays',

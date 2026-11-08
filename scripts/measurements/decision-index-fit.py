@@ -203,22 +203,25 @@ WRAP_TOLERANT = r"decisions[\s*/]+32[\s*/]+and[\s*/]+33"
 # are NOT indexed by number and are deliberately out of scope; `decision-98-...` is the one
 # numbered precedent and IS in scope.
 #
-# AND ONE NUMBERED FILE IS A DIFFERENT KIND OF DOCUMENT, declared rather than quietly
-# skipped. `docs/decision-98-widened-and-concentration.md` is 288 lines of ENGLISH
+# AND THE SET IS EMPTY AS OF 2026-11-08, WHICH IS THE WHOLE POINT OF DECLARING IT.
+# `docs/decision-98-widened-and-concentration.md` was the one entry: 288 lines of ENGLISH
 # measurement record -- two scripted measurements and the owner's verbatim widening of
-# decision 98's logic -- not one of the five-section decision files, and it carries no
-# `## القرار بجملة` section for an index row to repeat. So decision 98's MEANING is
-# documented and its file is required, but it is not an index row.
+# decision 98's logic -- carrying no `## القرار بجملة` section for an index row to repeat.
+# The index therefore had 48 rows against 49 files, and this declaration is what kept that
+# a NAMED exception with a reason rather than a figure nobody reconciled.
 #
-# This is the one place the index's own sentence -- *every decision number cited anywhere
-# in the code has a row here and a file in `docs/`* -- is true of 48 of 49 rather than all
-# 49. Whether 98 gets a five-section file and a row, or the sentence names it as the
-# exception, is the owner's: both answers need Arabic written. (47 of 48 until decision
-# 33's file landed on 2026-11-08; the exception is unchanged and only the pair moved.)
-NOT_AN_INDEX_ROW = {
-    98: "a 288-line English measurement record, not a five-section decision file; it has "
-        "no '## القرار بجملة' section for a row to repeat",
-}
+# The comment here stated the choice as the owner's -- *whether 98 gets a five-section file
+# and a row, or the index sentence names it as the exception; both answers need Arabic
+# written*. She chose the row, and wrote the Arabic for it. So the row landed, this gate
+# FAILED on its own declaration going stale (`decision 98 now HAS an index row`) plus a
+# second error nobody had predicted -- the file still had no sentence section for the row to
+# repeat -- and the fix was to give the file that section with the sentence sliced
+# BYTE-IDENTICALLY from her own row, never retyped. The index is 49 of 49 now.
+#
+# Leaving this dict empty is deliberate. It is the mechanism, and the mechanism is what
+# makes the next exception a declared one; `KNOWN_MISSING` above is empty for the same
+# reason and for the same history.
+NOT_AN_INDEX_ROW: dict[int, str] = {}
 
 SLUG_ONLY = {
     "decision-corporate-customer-identifier.md",

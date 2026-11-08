@@ -5,13 +5,38 @@
  * Friday+Saturday, not the Saturday/Sunday pattern a default date library
  * assumes.
  *
- * No gazetted public-holiday calendar exists in this brain yet (same gap as
- * the retention-period table — see
- * ibms-brain/meta/context/data-retention-and-disposal.md's "not obvious"
- * section): this util accounts for the weekend only. Treat a computed
- * business-day deadline as a lower bound (i.e. never later than the true
- * legal deadline) rather than an exact one until a public-holiday calendar
- * is supplied.
+ * A GAZETTED PUBLIC-HOLIDAY CALENDAR NOW EXISTS, and this docblock said
+ * otherwise until 2026-11-08 — ten lines above `BusinessDayOptions.holidays`,
+ * which said it did. `SlaHoliday` (schema.prisma, `model SlaHoliday`) is
+ * HTTP-editable through `sla-timer.controller.ts` and holds 48 rows on dev.
+ * The sentence that used to sit here — "treat a computed business-day deadline
+ * as a lower bound until a public-holiday calendar is supplied" — was an
+ * absence claim that was true when written and rotted in place, and it was the
+ * first thing a reader of this file met.
+ *
+ * THIS UTIL IS PURE AND DOES NO I/O, SO THE CALLER MUST PASS THE CALENDAR.
+ * A caller that passes none still gets the weekend-only lower bound; that is
+ * not a default, it is an omission, and it is invisible at the call site
+ * because `BusinessDayOptions` is optional.
+ *
+ * Measured 2026-11-08 — 12 non-spec files import this module, 9 of them
+ * evaluate a duration, and the holidays reach exactly ONE evaluation path:
+ * `sla-status.config.ts` builds the set (`holidaySet`, `businessDayOptionsFor`)
+ * and `sla-timer.service.ts:234` fetches it and hands it to
+ * `computePolicyDueAt` — the CONFIGURED-POLICY path.
+ *
+ * SEVEN call sites in SIX files compute in `businessDays` and pass no
+ * holidays: `follow-up.util.ts:37`, `dsr.config.ts:95`,
+ * `access-recertification.controller.ts:75`,
+ * `access-recertification.scheduler.ts:40`, and three in
+ * `sla-timer.service.ts` itself — `:181` the registry fallback, `:227` the
+ * regulatory fast track, `:277` the one non-zero escalation offset. Those
+ * deadlines are weekend-only lower bounds. Re-derive the importer list with
+ * `grep -rl "business-days.util" --include=*.ts apps/api/src | grep -v spec`.
+ *
+ * A caller whose unit is `calendarDays`, `months`, or `minutes`/`hours` with
+ * no `workingWindow` is NOT in that set — those units never consult
+ * `businessDayOptions`, so there is nothing for them to pass.
  */
 
 /** Friday (5) and Saturday (6) — `Date#getUTCDay()` numbering. */

@@ -489,14 +489,60 @@ Three things to know before you use them:
 - **No gate reads them, and none needs to.** `check:decision-index` cannot see them:
   its file discovery is a non-recursive `os.listdir(docs)` filtered on `startswith("decision")`,
   and its citation scan is `git ls-files apps packages`, so `docs/` is never read. Verified
-  2026-11-08 — the gate's figures (49 cited, 49 files, 48 rows) are unchanged by these 22 files.
-  Do not add an exclusion for them; there is nothing to exclude.
-- **Six rows of the index's measured table were re-derived and disagree with it**, recorded in
-  `CLAUDE.md` § What's New for 2026-11-08 with the method for each. The two worth knowing before
-  you plan from the table: **module 15's screening has run** (six succeeded watchlist syncs,
-  61,434 entries, one screened KYC record with an OFAC hit, measured on the dev database
-  2026-11-08), and **`RFQ` is a built entity** at `packages/db/prisma/schema.prisma:2481` with 89
-  rows on dev, not a gap.
+  2026-11-08 — the gate's figures are unchanged by these papers (it reads **49 cited / 49 files /
+  49 rows** as of 2026-11-08, once decision 98 gained its row). Do not add an exclusion for them;
+  there is nothing to exclude.
+- **Six rows of the index's measured table were re-derived, disagreed, and are now CORRECTED IN
+  THE PAPERS** — with what each row said before and what it says now, each beside its command, in
+  the index's own dated block. The two worth knowing before you plan from the table: **module 15's
+  screening has run** (six succeeded watchlist syncs, 61,434 entries, one screened KYC record with
+  an OFAC hit, measured on the dev database 2026-11-08), and **`RFQ` is a built entity** at
+  `packages/db/prisma/schema.prisma:2481` with 89 rows on dev, not a gap. Re-measured 2026-11-08
+  and both reproduce.
+- **Every paper names its holder in an empty table at the top, and an empty one is a signal**
+  rather than an oversight. Until a name is written there, that module has nobody accountable for
+  its decisions — and the module holder is the person who asks the outside questions (a practising
+  broker, a lawyer, the Central Bank) and writes each answer up as a decision file, rather than
+  waiting for management to answer an operational question.
+- **`docs/modules/` holds 24 `.md` files, of which 22 are the module papers.** The other two are
+  `00a-day-one-setup-and-verification.md` (below) and
+  `module-walkthrough-provider-to-first-policy.md`, a 3,001-line field-by-field walkthrough of the
+  built system measured on 2026-11-03. **That walkthrough is the fastest-rotting document here** —
+  it names specific Arabic labels, and one had already changed before it landed — so whoever
+  closes module م-أ re-measures it as part of that delivery.
+
+### Day one — `docs/modules/00a-day-one-setup-and-verification.md`
+
+**Read it before installing anything.** It routes to this README for setup rather than restating
+it, and spells out in full only the two steps where a wrong move is silent: `db:provision-app-role`
+before the first migration, and `migrate deploy` rather than `migrate dev`. Every figure in it
+carries the command that produces it, so a figure that disagrees with your machine is the paper
+being wrong, not you. Re-run its commands rather than quoting it.
+
+### The source documents — `docs/legal/`, `docs/forms/`, `docs/answers/`
+
+**Every law, instruction, form, dictionary and verbatim answer this product was built from.**
+23 files, landed 2026-11-08; until then they lived outside the repository, where nothing in CI
+could see them and nothing could tell you one had gone stale. `docs/legal/00-index-sources.md` is
+the map — what each paper is, which module needs it, and the standing rules.
+
+- **They are SOURCE TEXTS. Report an error; never correct one in place.** Editing a source makes
+  it lie to the next reader while still looking original. OCR garbling, typos and spoken dialect
+  are preserved deliberately — they are the record.
+- **Three gaps bound what can be built, and all three are stated up front in the index.** Eight
+  numbers in Instructions No. 9 of 2026 are unreadable in the extraction — including the
+  instrument's own effective date, on which every Article 23 transition deadline is computed, so
+  **an unreadable number is built configurable and never hard-coded**. Article 15(e)(2) is missing
+  from the extraction entirely, and 15(e) is the mandate rule, so nothing may be built on it until
+  a text copy is obtained. And **14 provisions are referred by the instrument itself to a later
+  decision of the Central Bank** — commission bases and caps, professional-indemnity terms, every
+  application form, the periodic-return dates — which belong in configuration, because
+  hard-coding them builds something that will be rebuilt.
+- **`check:markdown-tables` declares two of them** in `SOURCE_TRANSCRIPTIONS` with their measured
+  malformed-row counts, because their commentary cells quote scanner output containing literal
+  pipes. The declaration is checked in both directions, so it cannot go stale — and a bare
+  path-prefix skip was deliberately not used, since it would have swallowed every future table
+  anybody writes in `docs/legal/`.
 
 ### `.claude/` — agents, commands, hooks
 

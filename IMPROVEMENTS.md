@@ -299,6 +299,54 @@ The same arithmetic is why the colliding dev PAIR was renamed rather than delete
 value was checked against the existing set first: a replacement drawn from the same pool is as likely
 to collide as the original was.
 
+## A verification that confirms itself — two instances, 2026-11-08
+
+> **A check whose subject and whose instrument share the same fault reports success.**
+
+Both of these are stronger examples than anything else in this file of the class the owner's
+"re-run it" rule exists for, because in both the assertion **passed** and the thing it asserted was
+false. Neither was caught by reasoning; both were caught by a number moving when it should not have.
+
+**One — the write succeeded, the read-back succeeded, the file was 0 bytes.** Extracting the module
+papers on Windows, one archive entry was named `00 - الفهرس: الترتيب…md`. A colon after the drive
+letter is an **NTFS alternate-data-stream separator**, so `open(p, 'wb').write(data)` wrote 32,327
+bytes into a *stream* named ` الترتيب والتوزيع والأسئلة.md` hanging off a 0-byte file called
+`00 - الفهرس`. Python raised nothing. The extractor's own assertion — `open(p,'rb').read() == data`
+— **passed**, because the write and the read-back both resolved to the same stream, so the check
+confirmed the stream against itself. `Get-Item -LiteralPath <f> -Stream *` shows it exactly:
+`:$DATA` **0**, the named stream **32,327**.
+
+Three things follow, and the third is the one worth keeping:
+
+- **Verify an extraction by hashing the DIRECTORY and the source into two maps and comparing
+  them.** Never by re-reading the path you just wrote. Any verification that travels the same
+  resolution path as the write can only confirm that path, not the result.
+- **Reject `< > : " / \ | ? *` in a basename explicitly**, before writing. Do not rely on an
+  exception: there is none.
+- **Git would have refused the path anyway** — a tree containing it answers `error: invalid path`,
+  exit 1, on checkout — so it could never have landed in this repository. **It did not bite us
+  because the archive was renamed to English kebab-case the day before, for legibility.** That
+  rename is recorded as the decision it was: a change made for one reason that removed an NTFS
+  metacharacter as a side effect. Luck is not a control, and a reader who finds this entry should
+  not conclude the hazard was handled — it was avoided.
+
+**Two — the correction and its assertion shared one pattern, so the correction was wrong and the
+assertion agreed.** Moving the oldest `## What's New` row to history also updates the sentence
+counting the history's rows. The mover carried its **own** copy of the row pattern,
+`^\| 20\d\d-\d\d-\d\d \|`, which does not match the two two-day rows (`| 2026-09-22/23 |`,
+`| 2026-09-30/10-01 |`). It therefore set the sentence to **133** when the truth was **135** —
+**and its post-condition assertion passed, because the assertion counted rows with the same faulty
+pattern.** A test that shares its subject's bug confirms the bug. Caught only by reconciling the
+live table plus the history against the pre-move total, which is an independent route.
+
+The fix is not a better pattern. **The pattern is imported from the gate that owns it**
+(`scripts/measurements/whats-new-cap.py`'s `ROW` and `CAP`) instead of restated, so the mover and
+the gate cannot disagree — one home for one fact, which is the same remedy this file applies to
+duplicated counts everywhere else. The general rule:
+
+> **Two routes agreeing is evidence only when they are independent in the thing that can be
+> wrong.** Sharing a matcher, a resolution path, or a copied constant is not independence.
+
 ## The standing rule for every number this file publishes
 
 > **A figure that cannot be moved by a plant is published as an ESTIMATE, and says so.**
