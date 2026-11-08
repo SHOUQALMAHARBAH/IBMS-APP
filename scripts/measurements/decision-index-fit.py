@@ -159,22 +159,45 @@ KNOWN_MISSING: dict[int, str] = {}
 # A DECISION THAT IS NEVER CITED ON ITS OWN DECLARES ITS OWN COUNTING METHOD.
 #
 # `measured_count` resolves the narrow `decision <n>` that the files themselves declare.
-# For decision 33 that measures ZERO -- the string never occurs -- so the figure check
-# would have reported a correct file as overstating its count by ten.
-#
-# AND THE PATTERN IS WRAP-TOLERANT ON PURPOSE, which is this gate's own blind spot one
-# level down. `retention-notice.config.ts:62` breaks the citation across a line inside a
-# block comment (`decisions 32 and` then ` *  33.`), so a single-line search finds 9 of
-# the 10. Decision 33 hid inside a multi-number citation; then its own COUNT hid across a
-# line wrap. Same defect, one level down, found by re-measuring instead of recalling.
+# For decision 33 that measures ZERO -- the string never occurs, because the citation is
+# always `decisions 32 and 33` -- so the figure check would have called a correct file
+# wrong by its whole count.
 #
 # ASSERTED: if the narrow form ever appears, this declaration is stale and the gate says
-# so -- because at that point the ordinary method applies and this special case would be
+# so, because at that point the ordinary method applies and this special case would be
 # measuring something nobody declared.
 # ---------------------------------------------------------------------------------------
 CITED_ONLY_JOINTLY: dict[int, str] = {
-    33: r"decisions[\s*/]+32[\s*/]+and[\s*/]+33",
+    33: r"decisions 32 and 33",
 }
+
+# ---------------------------------------------------------------------------------------
+# AND A SITE THAT NO DECLARED METHOD CAN SEE, RECORDED RATHER THAN SILENTLY PICKED OVER.
+#
+# Decision 33 is cited in TEN places. Nine carry `decisions 32 and 33` on one line; the
+# tenth, `retention-notice.config.ts`, breaks it across a line inside a block comment --
+# `decisions 32 and` then ` *  33.` -- so every literal search finds nine.
+#
+# ⟶ THAT IS THIS GATE'S OWN BLIND SPOT ONE LEVEL DOWN. Decision 33 hid inside a
+#   multi-number citation; then its own COUNT hid across a line wrap. Same shape, found
+#   by re-measuring rather than recalling.
+#
+# THE FILE'S FIGURE STAYS AT NINE AND THAT IS DELIBERATE. Nine is the correct answer to
+# the question every other decision file's declared method asks, and decision 33's file
+# states it in THREE places (the measurement, «كلُّ الـ٩ مواضع», and «تسعَ مرّاتٍ»).
+# Declaring the wrap-tolerant method would have forced one digit to ten and left the file
+# contradicting itself twice -- the one-fact-two-homes defect in miniature -- and bringing
+# the other two into line needs «عشرَ مرّاتٍ», which is numeral agreement and therefore
+# morphology, the one operation nobody here may perform on the owner's behalf.
+#
+# So the tenth site is declared HERE, where no Arabic is at stake, and ASSERTED: the day
+# somebody joins that wrapped line the two counts agree, this declaration is stale, and
+# the gate says so. That is the only thing that stops a known gap becoming a forgotten one.
+# ---------------------------------------------------------------------------------------
+WRAPPED_CITATIONS: dict[int, tuple[str, int]] = {
+    33: ("apps/api/src/modules/pdpl/retention-notice.config.ts", 1),
+}
+WRAP_TOLERANT = r"decisions[\s*/]+32[\s*/]+and[\s*/]+33"
 
 # Decision files that predate the numbered convention and are addressed by slug alone. They
 # are NOT indexed by number and are deliberately out of scope; `decision-98-...` is the one
@@ -349,6 +372,27 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
                 errors.append(
                     f"decision {n} is declared in CITED_ONLY_JOINTLY but is now cited on "
                     f"its own at {where[:2]} -- the ordinary method applies, so remove it"
+                )
+
+        # ---- the wrapped site is still wrapped, and still invisible to the literal ---
+        wrap = re.compile(WRAP_TOLERANT, re.IGNORECASE)
+        for n, (rel, extra) in sorted(WRAPPED_CITATIONS.items()):
+            literal = re.compile(CITED_ONLY_JOINTLY[n], re.IGNORECASE)
+            body = bodies.get(rel)
+            if body is None:
+                errors.append(
+                    f"decision {n}'s declared wrapped citation names {rel}, which is no "
+                    f"longer a tracked file -- WRAPPED_CITATIONS is stale"
+                )
+                continue
+            seen = len(wrap.findall(body)) - len(literal.findall(body))
+            if seen != extra:
+                errors.append(
+                    f"decision {n}: {rel} was declared to hold {extra} citation(s) that "
+                    f"only a wrap-tolerant search can see, and now holds {seen}. If the "
+                    f"line was joined, the file's figure and the wrap-tolerant count now "
+                    f"agree and this declaration must go; if a new one wrapped, the "
+                    f"file's figure under-reports by more than was recorded"
                 )
 
     real = {n for n in counts if n not in PHANTOMS}
@@ -585,6 +629,12 @@ def _self_test() -> int:
                     open(os.path.join(t, "apps", "alone.ts"), "wb").write(
                         b"// per decision 33 the floored category ships bare\n")),
          "declared in CITED_ONLY_JOINTLY but is now cited on"),
+        # Proves the wrapped-site declaration cannot become a forgotten gap: joining the
+        # line, or wrapping another, must both be named rather than quietly absorbed.
+        ("a declared wrapped citation whose file is gone",
+         lambda t: os.makedirs(os.path.join(t, "apps", "api", "src", "modules"),
+                               exist_ok=True),
+         "WRAPPED_CITATIONS is stale"),
         # Proves the phantom audit is LIVE rather than switched off by the marker above:
         # a tree that looks like this repository but no longer contains the four producing
         # texts must report them stale, not pass quietly.
