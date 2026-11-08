@@ -83,14 +83,50 @@ NOT_REGISTERED = {
         "(`where.status = filter.status`), and the rest write a `status` column on an entity "
         "the lex does not govern (PaymentChannel, SlaPolicy, ServiceRequest, Role, ...). "
         "Structural: the lex names the governed entities, and a hook seeing one edit cannot "
-        "resolve that list. The question IS gated, correctly and in CI, by the spec below.",
+        "resolve that list. The question IS gated, correctly and in CI, by the spec below. "
+        "DATED REVIEW: 2027-02-08, recorded in the lex too -- re-run the scan then, because "
+        "a 63-of-1,861 measurement with no review date becomes a comfortable ceiling.",
         "npx vitest run apps/api/src/modules/workflow/status-writes.inventory.spec.ts",
     ),
+    # CORRECTED 2026-11-08. The previous reason said the guard was IMPOSSIBLE to satisfy
+    # because "scripts/verify.sh never writes that file and there is no artifacts/
+    # directory". The CONCLUSION (do not wire it here) still holds; the stated CAUSE was
+    # false, and so was the command recorded as proving it.
+    #
+    # THERE ARE TWO FILES CALLED `scripts/verify.sh`, ONE PER REPOSITORY, AND THE OLD
+    # COMMAND READ THE WRONG ONE:
+    #
+    #     scripts/verify.sh              (this repo, 8105 bytes)  gates.json x0
+    #     ibms-brain/scripts/verify.sh   (the brain, 2933 bytes)  gates.json x3
+    #
+    # `enforce-evidence.sh` lives in the brain and implements the brain's verify.sh, which
+    # creates `artifacts/$SHA` at line 13, writes `gates.json` at line 52 and prints
+    # `recorded -> ...` at line 60. Run from this repo's root, `grep -c gates.json
+    # scripts/verify.sh` returns 0 about a DIFFERENT script -- the answer that made the
+    # claim look true. `ibms-brain/meta/lex/definition-of-done.md` has carried the correct
+    # account all along, and it carries the `ibms-brain/`-qualified path that this record
+    # dropped.
+    #
+    # And `test -d artifacts` was the second half of the same error: nothing is TRACKED
+    # under artifacts/ in either repo (measured: 0 and 0) because it is a GENERATED
+    # directory. "Not tracked" is not "not written".
     "enforce-evidence.sh": (
         "Blocks `git push` unless artifacts/<sha>/gates.json exists and every gate in it "
-        "passes. This repo's scripts/verify.sh never writes that file and there is no "
-        "artifacts/ directory, so wiring it would block every push with no way to satisfy it.",
-        "grep -c gates.json scripts/verify.sh   # 0 ... then: test -d artifacts || echo absent",
+        "passes -- and `skip` and `n/a` are non-failing, so a gates.json that the brain's "
+        "verify.sh produces DOES satisfy it. Not wired here for two measured reasons, "
+        "neither of which is impossibility. (1) THE COST: the path is keyed on the commit "
+        "sha, so the evidence must be regenerated after every commit, and this repo's "
+        "gates are a full typecheck/lint/unit/e2e pass rather than the brain's one "
+        "documentation check. (2) THIS REPO'S OWN scripts/verify.sh WRITES NO gates.json "
+        "AT ALL (0 occurrences), so until it does there is nothing here for the guard to "
+        "read -- and the guard resolves its root with `git rev-parse --show-toplevel`, the "
+        "exact call batch 7 replaced in the registrations, which inside the submodule "
+        "returns the brain's root and would look for artifacts/ in the wrong repository. "
+        "DATED REVIEW: 2027-02-08 -- a not-wired record with no review date becomes a "
+        "comfortable ceiling. Re-run the command below; if this repo's verify.sh has "
+        "gained a gates.json writer, the decision changes.",
+        "grep -c gates.json ibms-brain/scripts/verify.sh   # 3, the brain's -- satisfiable"
+        " || grep -c gates.json scripts/verify.sh   # 0, THIS repo's -- nothing to read",
     ),
 }
 
