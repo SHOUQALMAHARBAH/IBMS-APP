@@ -35,7 +35,7 @@
     "db:permission-descriptions": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts",
     "db:permission-descriptions:check": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts --check",
     "db:privileges": "npm run privileges --workspace=@ibms/db",
-    "db:provision-app-role": "node scripts/provision-app-role.mjs",
+    "db:provision-app-role": "dotenv -e .env -- node scripts/provision-app-role.mjs",
     "db:seed": "npm run seed --workspace=@ibms/db",
     "db:studio": "npm run studio --workspace=@ibms/db",
     "db:test:checksums": "npm run checksums:test --workspace=@ibms/db",
