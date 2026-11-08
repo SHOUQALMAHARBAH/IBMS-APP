@@ -52,6 +52,28 @@ import re
 import subprocess
 import sys
 
+# ---------------------------------------------------------------------------------------
+# THIS GATE PRINTS ARABIC, AND IT RUNS INSIDE `npm run check:docs`, SO IT MAY NOT DEPEND
+# ON THE CONSOLE CODEPAGE.
+#
+# Without this it crashes with `UnicodeEncodeError: 'charmap' codec can't encode` the
+# moment it reports decision 98's exception -- whose text contains the section heading
+# `## القرار بجملة` -- on any Windows shell, because Python resolves stdout to cp1252
+# there. CI is Linux and defaults to UTF-8, so the failure appears ONLY on the machine the
+# gate is developed on: it passes in CI and refuses locally, which is the worst direction.
+#
+# The sibling measurement scripts that print Arabic document `PYTHONIOENCODING=utf-8` in
+# their header instead. That is fine for a script a person invokes by hand and wrong for
+# one inside a `check:` chain, where the invocation is `npm run` and nobody passes an
+# environment variable. A gate must not fail for a reason unrelated to what it measures.
+# ---------------------------------------------------------------------------------------
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):  # already UTF-8, or not reconfigurable
+        pass
+import sys
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DOCS = os.path.join(ROOT, "docs")
 INDEX = os.path.join(ROOT, "ibms-brain", "meta", "decision-index.md")
@@ -115,18 +137,43 @@ PHANTOMS: dict[int, tuple[frozenset[str], str]] = {
 # PERMANENTLY RED, AND ASSERTED SO THE DECLARATION CANNOT GO STALE.
 #
 # A permanently-red gate is one everybody learns to ignore; this repository already
-# records that about `markdown-table-columns.py`. So the one known gap is declared with
-# its measurement, and the gate fails the moment it is closed (the declaration is then
-# stale) or the moment an UNDECLARED number appears -- which is the job.
+# records that about `markdown-table-columns.py`. So a known gap is declared with its
+# measurement, and the gate fails the moment it is closed (the declaration is then stale)
+# or the moment an UNDECLARED number appears -- which is the job.
 #
-# Writing decision 33's file means composing its five Arabic sections, which is register
-# content: the owner writes, she ratifies, this repository verifies. It is hers.
+# IT IS EMPTY, AND IT WAS EMPTIED BY THE GATE DOING EXACTLY THAT. Decision 33 was declared
+# here on 2026-11-08: cited 10 times, ALWAYS inside the phrase `decisions 32 and 33` and
+# never once on its own, so every matcher anchored on the word `decision` immediately
+# before a number read the `32` and was blind to the `33` -- which is why it had no file
+# and no row for the whole life of the register. Its file was Arabic register content and
+# was the owner's; she wrote it the same day, and the gate then went red naming this
+# declaration as stale, which is the one proof a declaration list cannot rot.
+#
+# ⟶ KEEP THIS ACCOUNT. The hole was a matcher's shape, not anybody's oversight, and the
+#   only thing stopping it reopening is `CITE_TAIL` plus the two self-test cases that
+#   plant the second and fourth numbers of a chain.
 # ---------------------------------------------------------------------------------------
-KNOWN_MISSING: dict[int, str] = {
-    33: "cited 9 times, ALWAYS inside the phrase `decisions 32 and 33`, never once on its "
-        "own -- which is why no narrow matcher could see it and why it has no file. Found "
-        "2026-11-08 by widening the matcher to walk a multi-number citation. Its file is "
-        "Arabic register content and is the owner's to write.",
+KNOWN_MISSING: dict[int, str] = {}
+
+# ---------------------------------------------------------------------------------------
+# A DECISION THAT IS NEVER CITED ON ITS OWN DECLARES ITS OWN COUNTING METHOD.
+#
+# `measured_count` resolves the narrow `decision <n>` that the files themselves declare.
+# For decision 33 that measures ZERO -- the string never occurs -- so the figure check
+# would have reported a correct file as overstating its count by ten.
+#
+# AND THE PATTERN IS WRAP-TOLERANT ON PURPOSE, which is this gate's own blind spot one
+# level down. `retention-notice.config.ts:62` breaks the citation across a line inside a
+# block comment (`decisions 32 and` then ` *  33.`), so a single-line search finds 9 of
+# the 10. Decision 33 hid inside a multi-number citation; then its own COUNT hid across a
+# line wrap. Same defect, one level down, found by re-measuring instead of recalling.
+#
+# ASSERTED: if the narrow form ever appears, this declaration is stale and the gate says
+# so -- because at that point the ordinary method applies and this special case would be
+# measuring something nobody declared.
+# ---------------------------------------------------------------------------------------
+CITED_ONLY_JOINTLY: dict[int, str] = {
+    33: r"decisions[\s*/]+32[\s*/]+and[\s*/]+33",
 }
 
 # Decision files that predate the numbered convention and are addressed by slug alone. They
@@ -141,9 +188,10 @@ KNOWN_MISSING: dict[int, str] = {
 # documented and its file is required, but it is not an index row.
 #
 # This is the one place the index's own sentence -- *every decision number cited anywhere
-# in the code has a row here and a file in `docs/`* -- is true of 47 of 48 rather than all
-# 48. Whether 98 gets a five-section file and a row, or the sentence names it as the
-# exception, is the owner's: both answers need Arabic written.
+# in the code has a row here and a file in `docs/`* -- is true of 48 of 49 rather than all
+# 49. Whether 98 gets a five-section file and a row, or the sentence names it as the
+# exception, is the owner's: both answers need Arabic written. (47 of 48 until decision
+# 33's file landed on 2026-11-08; the exception is unchanged and only the pair moved.)
 NOT_AN_INDEX_ROW = {
     98: "a 288-line English measurement record, not a five-section decision file; it has "
         "no '## القرار بجملة' section for a row to repeat",
@@ -161,9 +209,24 @@ SLUG_ONLY = {
 
 # A count claim inside a decision file. Both shapes state the same fact; the footer is the one
 # that carries the declared method.
+#
+# BOTH ARABIC NOUN FORMS, AND THE REASON IS THE WHOLE POINT OF THIS GATE'S OWN ERROR MESSAGE.
+# A number from 3 to 10 takes the genitive plural «مواضع»; 11 to 99 takes the singular
+# accusative «موضعاً». This pattern accepted only the SINGULAR, so a figure in the lower band
+# was invisible to the figure check -- and every figure corrected in message 27 happened to be
+# >= 11, so the gap never showed. Decision 33's is the register's first count below 11.
+#
+# ⟶ THE GATE THAT EXISTS TO SAY *correct the digit and never re-word the noun* COULD NOT SEE
+#   THE OTHER NOUN FORM. Both are read now, and `--self-test` plants the plural shape.
+#
+# AND ONE NOUN FORM IS SETTLED AS WRONG-AND-KEPT, BY THE OWNER, 2026-11-08. Decision 52's
+# footer reads «٢ موضعاً» where two takes a DUAL («موضعين»). It was reported in message 27 and
+# her answer was *«ما بيفرق، خليه زي ما هو»* -- leave it. So that is a recorded decision and not
+# an uncorrected error: do not "fix" it. This gate does not and must not check grammar -- it
+# checks that a stated FIGURE equals the measurement -- so nothing here flags it, deliberately.
 CLAIM_FOOTER = re.compile(
     r"مذكورٌ في \*\*([" + AR_DIGITS
-    + r"]+)\*\* موضعاً"
+    + r"]+)\*\* (?:موضعاً|مواضع)"
 )
 CLAIM_HEADER = re.compile(
     r"مستشهد به في ([" + AR_DIGITS
@@ -233,7 +296,8 @@ def measured_count(bodies: dict[str, str], n: int) -> tuple[int, int]:
     where a missed shape means a missing file nobody is told about. Using the broad
     pattern here instead reported five correct figures as wrong.
     """
-    pat = re.compile(rf"decision {n}\b", re.IGNORECASE)
+    joint = CITED_ONLY_JOINTLY.get(n)
+    pat = re.compile(joint or rf"decision {n}\b", re.IGNORECASE)
     cites, files = 0, set()
     for rel, text in bodies.items():
         k = len(pat.findall(text))
@@ -275,6 +339,16 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
                 errors.append(
                     f"declared phantom {n} is now cited somewhere else too: "
                     f"{sorted(hits - where)} -- re-read it before trusting this list ({why})"
+                )
+
+        # ---- a joint-only declaration goes stale the day the narrow form appears ---
+        for n, _pattern in sorted(CITED_ONLY_JOINTLY.items()):
+            narrow = re.compile(rf"decision {n}\b", re.IGNORECASE)
+            where = sorted(rel for rel, text in bodies.items() if narrow.search(text))
+            if where:
+                errors.append(
+                    f"decision {n} is declared in CITED_ONLY_JOINTLY but is now cited on "
+                    f"its own at {where[:2]} -- the ordinary method applies, so remove it"
                 )
 
     real = {n for n in counts if n not in PHANTOMS}
@@ -492,6 +566,25 @@ def _self_test() -> int:
          lambda t: open(os.path.join(t, "apps", "chain.ts"), "wb").write(
              b"// per decisions 7, 61, 62 and 63 this holds\n"),
          "decision 63 is cited"),
+        # THE NOUN FORM THAT THE FIGURE CHECK COULD NOT SEE. A count of 3-10 takes the
+        # genitive plural «مواضع»; the matcher accepted only the 11-99 singular «موضعاً»,
+        # so every low figure was unchecked. Decision 33's was the register's first.
+        ("a stated figure in the 3-10 band, where the noun is a PLURAL",
+         lambda t: _patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                          "**one sentence.**",
+                          "**one sentence.**\n\n**وهو "
+                          "مذكورٌ في **٩** "
+                          "مواضع**"),
+         "the method it declares measures"),
+        # Proves the joint-only declaration cannot rot: the day a number cited only inside
+        # `decisions N and M` starts being cited alone, the ordinary method applies and the
+        # special case must go, or it measures something nobody declared.
+        ("a joint-only decision that has started being cited on its own",
+         lambda t: (os.makedirs(os.path.join(t, "apps", "api", "src", "modules"),
+                                exist_ok=True),
+                    open(os.path.join(t, "apps", "alone.ts"), "wb").write(
+                        b"// per decision 33 the floored category ships bare\n")),
+         "declared in CITED_ONLY_JOINTLY but is now cited on"),
         # Proves the phantom audit is LIVE rather than switched off by the marker above:
         # a tree that looks like this repository but no longer contains the four producing
         # texts must report them stale, not pass quietly.

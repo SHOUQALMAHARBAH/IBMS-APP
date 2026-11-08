@@ -131,8 +131,14 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
     await page.waitForSelector('h1', { timeout: 10000 });
     await page.waitForLoadState('networkidle');
 
-    // Verify page loaded with Arabic text
-    await expect(page.locator('h1')).toContainText('تفاصيل العميل المرتقب', { timeout: 5000 });
+    /*
+     * MESSAGE 28 ITEM 2 -- THIS ASSERTION WAS PINNING THE DEFECT. It read «تفاصيل العميل المرتقب»,
+     * the PROSPECT word, on a LEAD detail heading. `navLeads` is «العملاء المحتملون» and
+     * `navProspects` is «العملاء المرتقبون», settled and consistent, so this heading was the one
+     * place the pair crossed -- and the only test that read it asserted the crossed form, which is
+     * what a test pinning a defect looks like from the inside.
+     */
+    await expect(page.locator('h1')).toContainText('تفاصيل العميل المحتمل', { timeout: 5000 });
 
     // Take screenshot
     await page.screenshot({
