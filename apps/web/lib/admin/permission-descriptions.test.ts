@@ -143,7 +143,9 @@ const AWAITING_OWNER_REVIEW: string[] = [
    * So `OWNER_REVIEWED_COUNT` rises by seven to 230 and the balance holds at 230 = 230 + 0. Each
    * of the seven was written by an agent for the same mechanical reason -- the parity guard
    * requires both languages, so a code cannot ship without a line, and whoever ships it writes it
-   * -- and each was a placeholder in HER register until she read it. Now none is.
+   * -- and each was a placeholder in HER register until she read it. Now none is. The last of them,
+   * `conflict-of-interest.register.read`, is module 0-ب decision 36's disclosure-register READ code,
+   * and all seven were waiting on OWNER DECISION 94's naming pass rather than pre-empting it.
    *
    * ⚠️ AND ONE OF THE SEVEN CAME BACK WITH SOMETHING ELSE, WHICH IS NOT A CHANGE TO ITS LINE.
    * For `retention.archive.retrieve` she supplied a NAME -- «استخراج سجل مؤرشف/محجوب» -- which is
