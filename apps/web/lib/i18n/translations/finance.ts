@@ -40,7 +40,7 @@ export const FINANCE = {
      * retyped. `dclmAgeing31To60` / `frAgeing31To60` are already byte-identical siblings, so
      * one ageing heading per screen family is this dictionary's own shape.
      */
-    caAgeing1To30: 'من ١ إلى ٣٠ يوماً',
+    caAgeing1To30: 'من 1 إلى 30 يوماً',
     caColTotal: 'الإجمالي',
     caNone: 'لا توجد ذمم مدينة قائمة.',
     caLoading: 'جارٍ التحميل…',
@@ -189,7 +189,7 @@ export const FINANCE = {
     frLoading: 'جارٍ التحميل…',
     frLoadError: 'تعذّر تحميل التقرير المالي — حاول مرة أخرى.',
     frRefusalAct: 'عرض التقرير المالي',
-    frAgeing1To30: 'من ١ إلى ٣٠ يوماً',
+    frAgeing1To30: 'من 1 إلى 30 يوماً',
     frAgeing31To60: 'من ٣١ إلى ٦٠ يوماً',
     frAgeing61To90: 'من ٦١ إلى ٩٠ يوماً',
     frAgeing90Plus: 'أكثر من ٩٠ يوماً',

@@ -453,7 +453,7 @@ export const DETAIL_PAGES = {
     poldCommercialTerms: 'الشروط التجارية',
     poldInsurer: 'شركة التأمين',
     poldPremium: 'القسط',
-    poldDeductible: 'التحمّل',
+    poldDeductible: 'مبلغ التحمّل',
     poldCommission: 'العمولة',
     poldBack: 'العودة',
     leaddNotFound: 'غير موجود',

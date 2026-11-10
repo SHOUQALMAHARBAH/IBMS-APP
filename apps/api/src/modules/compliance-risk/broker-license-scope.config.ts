@@ -51,13 +51,6 @@ export interface ScopedBranch {
 }
 
 /**
- * ART. 4/a's BANDS, PER TYPE, BY BRANCH COUNT.
- *
- * Amounts are STRINGS, handed to `toMoney`. A JOD figure must never exist as a JS number in this
- * codebase (`money-decimal-jod.md`), and `5000` written as a numeric literal is exactly the kind
- * that gets added to another one with `+` three commits later.
- */
-/**
  * The insurance TYPES, in catalogue order.
  *
  * Exported because item (g) derives a PERSON's approved types the same way this file derives a
@@ -70,6 +63,27 @@ export const INSURANCE_LINE_CATEGORIES: readonly InsuranceLineCategory[] = [
   'LIFE',
 ];
 
+/**
+ * ART. 4/a's BANDS, PER TYPE, BY BRANCH COUNT. Printed page 5 of the instrument.
+ *
+ * 5,000 JOD up to 6 branches · 7,500 up to 12 · 10,000 above 12. **Five figures, and the
+ * extraction file disagrees with the instrument on one of them** — `cbj-instructions-9-2026-
+ * source-text.md` writes the middle tranche as `7,000`. The instrument says 7,500, read from the
+ * page image on 2026-11-10 and agreed by four independent readings.
+ *
+ * Amounts are STRINGS, handed to `toMoney`. A JOD figure must never exist as a JS number in this
+ * codebase (`money-decimal-jod.md`), and `5000` written as a numeric literal is exactly the kind
+ * that gets added to another one with `+` three commits later.
+ *
+ * ## THIS COMMENT WAS TWO DECLARATIONS AWAY FROM THE FIGURES IT DESCRIBES
+ *
+ * Until 2026-11-10 it sat above `INSURANCE_LINE_CATEGORIES`, stacked as a second doc comment that
+ * happened to render above somebody else's declaration. So `check:legal-numbers`, which reads a
+ * declaration's OWN comment block, found no citation here and said `ok` — and the first thing a
+ * reader consulting the capital bands met was a comment about an unrelated array. Both halves are
+ * closed: the comment is where the figures are, and the gate now reads the shape as well as the
+ * attribution. Keep them together.
+ */
 export const CAPITAL_BANDS: readonly {
   upToBranches: number;
   requiredJod: string;

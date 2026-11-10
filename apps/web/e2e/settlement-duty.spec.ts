@@ -202,7 +202,7 @@ test("prints second-approved and declares nothing when the two approvals are two
  */
 const AWAITING_SETTLEMENT: Claim = { ...CLAIM, status: "APPROVED", settlement: null };
 
-test("the settlement amount a customer BEARS is labelled «التحمّل», on the input itself", async ({
+test("the settlement amount a customer BEARS is labelled «مبلغ التحمّل», on the input itself", async ({
   page,
 }) => {
   /*
@@ -210,13 +210,22 @@ test("the settlement amount a customer BEARS is labelled «التحمّل», on 
    * renders it as the `<label>` of this input. So a claims officer read "discount" over a box and
    * typed into it an amount that is CHARGED to the customer: the opposite direction of money.
    *
+   * ## MESSAGE 34 §3.4 REFINED IT: the INPUT takes «مبلغ التحمّل», the summary line keeps «التحمّل»
+   *
+   * The owner's ruling, confirmed 2026-11-10. The input is a box an amount is typed into, so it is
+   * named for the amount; the summary sentence is naming the concept. **And it settles the
+   * structural question message 28 raised and deliberately left open** -- `poldDeductible` and
+   * `claimDeductibleShort` carried one identical Arabic string between two keys, agreeing only by
+   * convention. They now differ in BOTH languages, so there is nothing left to keep in step.
+   *
    * ## Why the assertion is on the CONTROL and not on the page's text
    *
-   * The same card renders `claimDeductibleShort` -- the same word, now byte-identical -- 38 lines
-   * above, in the summary sentence of an ALREADY-settled claim. A text assertion would pass on
-   * either one, so it would not distinguish the label from the sentence, and the label is the half
-   * that was wrong. `toHaveAccessibleName` resolves what a screen reader announces FOR THIS INPUT,
-   * which is exactly the claim being made.
+   * The same card renders `claimDeductibleShort` 38 lines above, in the summary sentence of an
+   * ALREADY-settled claim. A text assertion would pass on either one, so it would not distinguish
+   * the label from the sentence, and the label is the half that was wrong. `toHaveAccessibleName`
+   * resolves what a screen reader announces FOR THIS INPUT, which is exactly the claim being made.
+   * It is also why the refinement is safe: «التحمّل» is a SUBSTRING of «مبلغ التحمّل», so a text
+   * assertion could not have told the two labels apart at all.
    *
    * The placeholder is asserted in the same breath because an accessible name proves what the
    * control is CALLED and not which control it is; `2500.000` is this input's own and pins the
@@ -229,7 +238,7 @@ test("the settlement amount a customer BEARS is labelled «التحمّل», on 
   const deductibleInput = page.locator("#stl-ded-clm-1");
   await expect(deductibleInput).toBeVisible();
   await expect(deductibleInput).toHaveAttribute("placeholder", "2500.000");
-  await expect(deductibleInput).toHaveAccessibleName("التحمّل");
+  await expect(deductibleInput).toHaveAccessibleName("مبلغ التحمّل");
 
   // The approved-amount input beside it keeps its own distinct name, so this is one label per
   // control rather than one word landing on both.
