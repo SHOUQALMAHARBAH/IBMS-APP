@@ -9,6 +9,13 @@ const RENEWAL_CASE_INCLUDE = {
       customerId: true,
       policyNumber: true,
       insuranceLine: true,
+      // Art. 21/b/5 — the MANAGED line references, beside the name. The licence gate judges a
+      // partial suspension on the id, never on the string: a name is not unique across the
+      // standard catalogue and an office's own additions, and the two columns are what
+      // `RegulatoryActionScopeLine` points at. Selected here rather than read again inside the
+      // gate, because the case already loads its policy.
+      insuranceLineId: true,
+      officeInsuranceLineId: true,
       insurerId: true,
       status: true,
       inceptionDate: true,

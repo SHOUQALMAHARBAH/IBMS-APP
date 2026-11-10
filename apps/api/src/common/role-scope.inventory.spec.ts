@@ -77,6 +77,23 @@ const UNSCOPED_WRITERS: Record<string, string> = {
   'modules/rbac/services/role-admin.service.ts':
     'writes the SCOPE itself; scoping that would make a scope unchangeable once set',
   /*
+   * ART. 21/b/5 — the office recording a CBJ decision that LIMITS ITS LICENCE to some insurance
+   * branches. `RegulatoryActionScopeLine` carries the two line columns, so it lands in this
+   * matcher; it must not be scoped, for two reasons and the first is sufficient:
+   *
+   * (a) THE ACT IS THE REGULATOR'S, NOT THE OFFICE'S BUSINESS. Role scope narrows what an office's
+   *     own staff may PLACE in a line. A compliance officer whose role scope is LIFE must still be
+   *     able to record a letter suspending the office in MOTOR — refusing that would leave the
+   *     office unable to enter a decision it has already received, and the licence gate would then
+   *     permit the very business the CBJ stopped. The scope check would cause the defect it looks
+   *     like it prevents.
+   * (b) It is the INPUT to scope rather than an application of it, the same argument as
+   *     `broker-license-scope.service.ts` directly above: these rows narrow what the whole office
+   *     may do, which is upstream of what any one role may do within it.
+   */
+  'modules/compliance-risk/broker-license.service.ts':
+    "the CBJ's own limitation of the office's licence to some insurance branches (art. 21/b/5) — the regulator's act, upstream of any role's scope",
+  /*
    * MODULE 0-ب ITEM (d). The same argument as `broker-license-scope.service.ts` one step earlier in
    * the office's life, and a second argument that only applies here: the writer is the PROVIDER, and
    * the provider holds no role in the office being created — there is no scope to be within. The

@@ -112,7 +112,23 @@ function makeDeps(initial: BrokerLicense[] = []) {
    */
   const storedActs: Record<string, unknown>[] = [];
   const createAct = vi.fn((data: Record<string, unknown>) => {
-    const row = { id: `act-${storedActs.length + 1}`, ...data };
+    /*
+     * `scopeLines` is FLATTENED out of the nested `create` the service sends, because `findAll`'s
+     * real contract is an act with its art. 21/b/5 scope lines ALREADY ATTACHED — the repository
+     * includes them in the same query, deliberately, so a second read cannot disagree with the
+     * first. A fixture returning an act without them made the gate throw
+     * `a.scopeLines.map is not a function`, which is the fixture being wrong rather than the code:
+     * the alternative — a defensive `?? []` in the gate — would make a genuinely MISSED include
+     * read as "no scope lines", i.e. office-wide, which is the widening direction.
+     */
+    const { scopeLines, ...rest } = data as Record<string, unknown> & {
+      scopeLines?: { create?: unknown[] };
+    };
+    const row = {
+      id: `act-${storedActs.length + 1}`,
+      ...rest,
+      scopeLines: scopeLines?.create ?? [],
+    };
     storedActs.push(row);
     return Promise.resolve(row);
   });

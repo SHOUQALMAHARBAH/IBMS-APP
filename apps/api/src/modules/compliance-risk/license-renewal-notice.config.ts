@@ -1,4 +1,7 @@
-import { renewalApplicationDueBy } from './broker-license.config';
+import {
+  RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY,
+  renewalApplicationDueBy,
+} from './broker-license.config';
 import type { LicenseTermRow } from './license-standing.config';
 
 /**
@@ -54,8 +57,22 @@ import type { LicenseTermRow } from './license-standing.config';
  * An office that renames or splits that role keeps the notice, because the code is what carries it.
  */
 
-/** Art. 11's own figure, reused through `renewalApplicationDueBy` rather than restated here. */
-export const FIRST_NOTICE_DAYS_BEFORE_EXPIRY = 45;
+/**
+ * Art. 11's own figure, now actually REUSED rather than restated.
+ *
+ * ## This comment was false, and that is the point of fixing it
+ *
+ * It said "reused through `renewalApplicationDueBy` rather than restated here" above a literal `45`
+ * — so art. 11's figure had TWO literal homes (`broker-license.config.ts`'s
+ * `RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY` is the other), and the comment a reader consults to
+ * find out whether the number is duplicated DENIED that it was. Change art. 11 in one place and the
+ * first notice fires at a threshold the regulation no longer states, silently.
+ *
+ * Found 2026-11-10 by the legal-number discriminator (`npm run check:legal-numbers`) — this is that
+ * gate's first customer, which is the argument for the gate existing.
+ */
+export const FIRST_NOTICE_DAYS_BEFORE_EXPIRY =
+  RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY;
 
 /**
  * The owner's second threshold. NO ARTICLE — stated plainly, because a figure displayed beside a

@@ -115,6 +115,12 @@ const EXPECTED = {
   'ALTER TABLE "BrokerLicenseScopeLine" DROP CONSTRAINT "BrokerLicenseScopeLine_office_line_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
 
+  // Art. 21/b/5's partial-suspension scope. Same shape and the same reason one step further in:
+  // this row decides whether an office may TRADE in a branch, so a scope line naming another
+  // office's private line would make one office's suspension turn on another office's catalogue.
+  'ALTER TABLE "RegulatoryActionScopeLine" DROP CONSTRAINT "RegulatoryActionScopeLine_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // Module 0 item (g)'s per-person CBJ approval branches. Same shape, same reason — and the record
   // of what a person was approved for is read by the staff-minimum rule, so a branch pointing at
   // another office's private line would make one office's headcount depend on another's catalogue.

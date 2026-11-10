@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   FIRST_NOTICE_DAYS_BEFORE_EXPIRY,
   SECOND_NOTICE_DAYS_BEFORE_EXPIRY,
   deriveRenewalNotice,
 } from './license-renewal-notice.config';
+import { RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY } from './broker-license.config';
 import type { LicenseTermRow } from './license-standing.config';
 
 /** A term expiring 31 December 2026, art. 10/b's shape. */
@@ -20,6 +23,58 @@ function term(over: Partial<LicenseTermRow> = {}): LicenseTermRow {
 function daysBefore(n: number): Date {
   return new Date(Date.UTC(2026, 11, 31 - n));
 }
+
+describe("art. 11's figure has ONE home", () => {
+  it('declares the threshold as the imported constant, not as a numeric literal', () => {
+    /*
+     * Measured 2026-11-10: art. 11's 45 had two literal homes, and the second sat under a comment
+     * claiming it was "reused through `renewalApplicationDueBy` rather than restated here". So a
+     * reader checking whether the number was duplicated was told it was not.
+     *
+     * ## WHY THIS READS THE SOURCE TEXT, WHICH LOOKS LIKE OVERKILL AND IS NOT
+     *
+     * The first version of this test compared the two CONSTANTS — and the plant survived it. Putting
+     * the literal `45` back passed, because `45 === 45`: a value comparison cannot detect a
+     * duplicated figure while the duplicate is still CORRECT, which is exactly the moment somebody
+     * introduces one. It only starts failing after the drift has already shipped, which is the
+     * failure it exists to prevent.
+     *
+     * "This number has one home" is a property of the TEXT, so the assertion is on the text. Rule 12
+     * applies to the read itself: the declaration must be FOUND, or an absent match would pass.
+     */
+    const source = readFileSync(
+      join(__dirname, 'license-renewal-notice.config.ts'),
+      'utf8',
+    );
+    // REFLOW-TOLERANT: `[\s\S]+?` up to the `;`, because PRETTIER OWNS THE LINE BREAKS here and
+    // it wrapped this very declaration onto two lines minutes after the test was written — the
+    // first version anchored `(.+);$` on one line and went red on a CORRECT tree.
+    // `customer-file-anchor.inventory.spec.ts` carries the same warning from its own first version.
+    const declaration =
+      /export const FIRST_NOTICE_DAYS_BEFORE_EXPIRY\s*=\s*([\s\S]+?);/.exec(
+        source,
+      );
+    expect(
+      declaration,
+      'the FIRST_NOTICE_DAYS_BEFORE_EXPIRY declaration was not found — this guard is now BLIND. Re-point it; do not delete it.',
+    ).not.toBeNull();
+    expect(
+      declaration![1].trim().replace(/\s+/g, ' '),
+      "art. 11's figure must be imported from broker-license.config, never restated as a number here",
+    ).toBe('RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY');
+  });
+
+  it('is the figure the filing deadline itself uses, so the notice cannot drift from the due date', () => {
+    // Non-vacuity, rule 12: two constants that were both somehow undefined would also be equal.
+    expect(RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY).toBeGreaterThan(0);
+    expect(
+      deriveRenewalNotice(
+        term(),
+        daysBefore(RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY),
+      ).stage,
+    ).toBe('FIRST');
+  });
+});
 
 describe('the renewal notice series', () => {
   it('says nothing while the expiry is far off', () => {

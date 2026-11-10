@@ -256,7 +256,9 @@ export class RenewalService {
      * be refusing a fact.
      */
     if (toStatus === 'RENEWED') {
-      await this.licenseGate.assertMayPractise('RENEW_POLICY');
+      // Art. 21/b/5 — the expiring policy's own line, already loaded with the case, so this
+      // needs no thunk and no extra query at all.
+      await this.licenseGate.assertMayPractise('RENEW_POLICY', row.policy);
     }
 
     // The engine validates the move against WORKFLOW_TRANSITIONS.RenewalCase

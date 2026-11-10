@@ -94,6 +94,40 @@ export interface RegulatoryActRow {
   /** The final tie-break, so the comparator is TOTAL. Two acts sharing a date AND an instant is
    *  pathological; a comparator that can return 0 is one whose answer depends on input order. */
   id: string;
+  /**
+   * ART. 21/b/5 — THE INSURANCE BRANCHES THIS ACT IS LIMITED TO. **EMPTY MEANS THE WHOLE LICENCE**,
+   * which is what makes every act written before `RegulatoryActionScopeLine` existed keep its
+   * meaning (measured: 0 rows on dev when that table landed, so nothing was reinterpreted).
+   */
+  scopeKeys?: readonly string[];
+}
+
+/**
+ * An insurance branch, as both a scope line and a transaction name it: EITHER a standard catalogue
+ * line OR an office's own addition.
+ */
+export interface InsuranceBranchRef {
+  insuranceLineId?: string | null;
+  officeInsuranceLineId?: string | null;
+}
+
+/**
+ * ONE STRING FOR ONE BRANCH — the single home of the keying rule.
+ *
+ * The alternative is carrying a (standard, office) pair through the fold, the standing, the gate and
+ * every call site, and comparing two nullable columns at each. Two nullable fields compared by hand
+ * in six places is six chances to write `a.insuranceLineId === b.insuranceLineId` and have two rows
+ * whose columns are both NULL read as the same branch — the § 1.25 NULL-distinctness trap arriving
+ * in TypeScript instead of in an index.
+ *
+ * Returns null when neither is named, which the gate treats as "the caller could not resolve the
+ * branch" and REFUSES on. A CHECK constraint already makes a scope-line row impossible in that
+ * state; a transaction, by contrast, really can fail to resolve one, and that is not a permit.
+ */
+export function insuranceBranchKey(ref: InsuranceBranchRef): string | null {
+  if (ref.insuranceLineId) return `std:${ref.insuranceLineId}`;
+  if (ref.officeInsuranceLineId) return `off:${ref.officeInsuranceLineId}`;
+  return null;
 }
 
 /** The term, as the derivation needs it. A subset of `BrokerLicenseRow` on purpose: this function
@@ -117,6 +151,23 @@ export interface DerivedLicenseStanding {
    *  operation of law", because only the second one is something the office can still be surprised
    *  by. */
   deemedCancelledUnderArticle14C: boolean;
+  /**
+   * ART. 21/b/5 — the insurance branches the office may NOT trade in today, while the licence as a
+   * whole still permits practice. `insuranceBranchKey`'s keys, sorted, so the value is stable.
+   *
+   * SEPARATE FROM `status` AND FROM `mayPractise`, and that separation is the whole design:
+   *
+   *  - A partial suspension must NOT report the office SUSPENDED. «في فرع أو أكثر من فروع التأمين»
+   *    is the regulator stopping part of the business, and an office stopped in motor is still
+   *    licensed and still trading in medical. Reporting it SUSPENDED would block everything, which
+   *    is the error the one-bit licence already made.
+   *  - And it must not be derivable from `status` by a reader, for the same reason `mayPractise`
+   *    is not: the caller that blocks an act reads this list, never a label.
+   *
+   * EMPTY on every office that has no scoped act — which is every office today — so the common path
+   * is unchanged and costs one length check.
+   */
+  blockedInsuranceBranchKeys: readonly string[];
 }
 
 /** Two calendar years after `from`, by year arithmetic rather than by adding 730 days — a leap year
@@ -243,6 +294,87 @@ export function deriveLicenseStanding(
   acts: readonly RegulatoryActRow[],
   now: Date,
 ): DerivedLicenseStanding {
+  /*
+   * ART. 21/b/5 — THE TWO FOLDS ARE SEPARATE, AND THE SPLIT IS WHAT KEEPS THE OLD ONE UNCHANGED.
+   *
+   * An act with no scope lines is office-wide and reaches the fold below exactly as it always did.
+   * An act naming branches is folded per branch instead, and CANNOT move `status` or `mayPractise`:
+   * «وقف ... في فرع أو أكثر من فروع التأمين» is a limit on the act, so letting it set the
+   * office-wide status would turn "stopped in motor" into "stopped", which is the one-bit error
+   * this table was added to end.
+   *
+   * The ordering is deliberate: the office-wide answer is computed FIRST and a branch block is only
+   * reported while the licence as a whole permits practice. An office that is wholly suspended is
+   * not "suspended in three branches"; it is suspended, and `mayPractise` is what the gate reads.
+   */
+  const isScoped = (a: RegulatoryActRow): boolean =>
+    (a.scopeKeys?.length ?? 0) > 0;
+  const base = deriveOfficeWideStanding(
+    term,
+    acts.filter((a) => !isScoped(a)),
+    now,
+  );
+  return {
+    ...base,
+    /*
+     * EVERY act is passed, not just the scoped ones, and that is a correction rather than a choice:
+     * filtering to the scoped acts meant an UNSCOPED REINSTATEMENT could never lift a branch block,
+     * because the per-branch fold could not see it. Caught by its own test. Only scoped acts
+     * contribute branch KEYS, so an office with no partial suspension still folds nothing.
+     */
+    blockedInsuranceBranchKeys: base.mayPractise
+      ? foldScopedActs(acts, term?.issuedAt ?? null, now)
+      : [],
+  };
+}
+
+/**
+ * ART. 21/b/5 — WHICH INSURANCE BRANCHES ARE BLOCKED TODAY, folded per branch.
+ *
+ * The same three filters and the same total comparator as `foldActs`, reused by calling it: a
+ * second ordering rule for the same question is the drift this repo keeps paying for, and the
+ * comparator's own comment records what a partial order cost here once.
+ *
+ * ART. 14/c IS DELIBERATELY NOT APPLIED PER BRANCH. Its text is «في حال تجاوزت مدة وقف الترخيص
+ * سنتين» — the suspension of THE LICENCE, not of a branch — and the office-wide fold already
+ * restricts it to an art. 14/a `BROKER_REQUEST`. Deeming a branch cancelled after two years would
+ * be this system inferring a regulatory consequence from a provision that does not mention it.
+ *
+ * A scoped CANCELLATION lands in the same set as a scoped suspension, because the gate's question
+ * is one question: may this office trade in this branch today. Telling a SCREEN which of the two it
+ * is needs a second field and is owed when a screen names it; nothing renders this yet.
+ */
+function foldScopedActs(
+  acts: readonly RegulatoryActRow[],
+  termIssuedAt: Date | null,
+  now: Date,
+): readonly string[] {
+  const keys = new Set<string>();
+  for (const act of acts) for (const key of act.scopeKeys ?? []) keys.add(key);
+
+  const blocked: string[] = [];
+  for (const key of keys) {
+    // Per branch, the acts that name it — plus every act that names NO branch, so an office-wide
+    // reinstatement lifts a branch block. A CBJ decision re-entering the broker with no limitation
+    // is the regulator undoing its own acts, and reading it as "everything except the branches"
+    // would leave a block standing that the decision does not mention.
+    const forBranch = acts.filter(
+      (a) =>
+        (a.scopeKeys?.length ?? 0) === 0 || (a.scopeKeys ?? []).includes(key),
+    );
+    const { suspension, cancellation } = foldActs(forBranch, termIssuedAt, now);
+    if (suspension !== null || cancellation !== null) blocked.push(key);
+  }
+  // Sorted so the value is stable between reads — a caller comparing two standings, or a test
+  // asserting the set, must not depend on `Set` insertion order.
+  return blocked.sort();
+}
+
+function deriveOfficeWideStanding(
+  term: LicenseTermRow | null,
+  acts: readonly RegulatoryActRow[],
+  now: Date,
+): Omit<DerivedLicenseStanding, 'blockedInsuranceBranchKeys'> {
   if (!term) {
     /*
      * NO TERM ON RECORD — and it BLOCKS, which is module 0 item (c)'s decision under art. 21/a/9.

@@ -139,7 +139,7 @@ npm run check:unreachable-routes
 
 ---
 
-# ٤ — **إحدى عشرةَ قاعدةً للتحقّق — وكلُّها وُلِدَت من غلطٍ مقيسٍ لا من حرص**
+# ٤ — **١٢ قاعدةً للتحقّق — وكلُّها وُلِدَت من غلطٍ مقيسٍ لا من حرص**
 
 **١ · ما في رقمٌ يُنقَل، كلُّ رقمٍ يُقاس.** **وإذا ما قدرتَ تعيد إنتاجَ رقمٍ كتبتَه، سمِّ الأمرَ اللي أعطاك إيّاه.**
 
@@ -162,6 +162,9 @@ npm run check:unreachable-routes
 **١٠ · 🆕 عدّانِ مستقلّانِ يصلانِ لنفسِ الجوابِ هو السببُ الوحيدُ للثقةِ بالجواب — بشرطِ أن يكونا مستقلَّينِ في الشيءِ اللي يمكن يكون غلطاً.** **قرارٌ مذكورٌ عشرَ مرّاتٍ بقي بلا ملفٍّ وبلا سطرٍ في أيِّ سجلٍّ طولَ عمرِ المشروع، لأنّه لم يُذكَر لحالِه ولا مرّةً بل دائماً داخلَ جملةِ «القراران ٣٢ و٣٣»** — **فعدّانِ اتّفقا على رقمٍ غلطٍ لأنّهما تشاركا نفسَ العمى.**
 
 **١١ · 🆕 جملةٌ تقول «ما في» تُقاس من جديدٍ قبل أن تُصدَّق — ولو كانت منّا.** **والغيابُ هو الوحيدُ اللي يفسد بالسكوت**، لأنّ الكودَ يُبنى ولا أحدٌ يرجع يشيل الجملة. *(في ٨ تشرين الثاني وحدَه: خمسُ جُمَلِ غيابٍ في ورقاتِنا طلعَت غلطاً — تقويمُ العُطَلِ وطلبُ التسعيرِ والاستيرادُ والقائمةُ والمزامنة، كلُّها مبنيّةٌ وكلُّها كانت مكتوبةً «غائبة».)*
+
+**١٢ · شرطُ الاكتمال يؤكّد وجودَ ما ينتظره، لا غيابَ ما يخافه.**
+**A completeness predicate must assert the PRESENCE of what it waits for, never the absence of what it fears.** *(Four measured cases, which is what makes this a rule rather than an anecdote: a missing `jq` whose failures `|| true` turned into falsy defaults · `|| true` on the line that decides whether a guard runs · a check-run set wholly green under a workflow run still `in_progress` · and `gh pr checks` returning NO ROW for a run not yet registered, so "nothing is pending" was vacuously true over a set that did not contain the job. The common shape: a condition evaluated over an input that could be empty, where EMPTY and SATISFIED are the same answer. Each case, with the command that produced it, is in `IMPROVEMENTS.md`.)*
 
 ## ⛔ وثلاثُ ممنوعاتٍ ما إلها استثناء
 

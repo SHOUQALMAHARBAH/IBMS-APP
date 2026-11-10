@@ -31,6 +31,9 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Anchoring a negative on its container | Anchoring it on something the role actually holds |
 | Treating a single collision as a data problem | Computing its rate first — one in three here |
 | Trusting that a reset seeded | Checking 219 permissions AND 502 grants |
+| Waiting until nothing is pending (rule 12) | Waiting until the thing you named is PRESENT and `completed` |
+| A comment claiming a figure is not restated here | A declaration that imports it, asserted on the source text |
+| A guard reading a generated copy of its subject | A parity spec making the copy unable to diverge |
 
 The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
 THE SAME, and only care separates them. Care is not a control — it is the thing that was
@@ -346,6 +349,42 @@ duplicated counts everywhere else. The general rule:
 
 > **Two routes agreeing is evidence only when they are independent in the thing that can be
 > wrong.** Sharing a matcher, a resolution path, or a copied constant is not independence.
+
+## Rule 12 — a completeness predicate asserts the PRESENCE of what it waits for, four instances
+
+> **١٢ · شرطُ الاكتمال يؤكّد وجودَ ما ينتظره، لا غيابَ ما يخافه.**
+>
+> **A completeness predicate must assert the PRESENCE of what it waits for, never the absence of
+> what it fears.**
+
+Promoted to a numbered rule in `docs/modules/00a-day-one-setup-and-verification.md` § ٤ on
+2026-11-10, by the owner, on the ground that four measured instances is what separates a rule from
+an anecdote. **The common shape, which is what to recognise:** *a condition evaluated over an input
+that could be empty, where EMPTY and SATISFIED are the same answer.*
+
+| # | The predicate | Why empty satisfied it | Measured |
+|---|---|---|---|
+| 1 | a pipeline through `jq`, with failures defaulted away by `\|\| true` | the `jq` BINARY does not exist on this host, so every extraction was empty and every emptiness read as "no failures" | two CI watches reported green while the build was red |
+| 2 | `[ -f "$script" ] && exec bash "$script" \|\| true` | `\|\| true` sat on the line that DECIDES whether a guard runs, so a deleted or renamed hook exited 0 — indistinguishable from a clean pass | 4 of 6 brain hooks were unregistered here and all 7 were recorded `100644`, so on any fresh clone they were inert |
+| 3 | `all(check-runs are success)` | the check-run set was wholly green **under a workflow run still `in_progress`** — the later jobs had not produced rows yet | a green read taken off an object that could not yet disagree |
+| 4 | `all(bucket != "pending")` over `gh pr checks` | a workflow run NOT YET REGISTERED contributes **no row**, so the predicate was vacuously true over a set that did not contain the job it was waiting for | announced ALL CHECKS SETTLED listing only CodeQL's two rows while `CI status=pending` on the same sha |
+
+**The fix in every case is the same move this file opens with:** key on a value that must be
+present. For (4) that is the RUN's own `status == completed` on the exact sha, with *no run
+registered yet* emitting an explicit WAIT line rather than silence; for (2) it is `exit 2` naming
+the missing file; for (1) it is `gh --jq`, which needs no binary, plus a non-vacuity floor.
+
+**And a fifth instance landed minutes after the fourth was written up, which is the argument for
+treating this as a shape rather than a bug list.** A step-level watch tested `.conclusion != null`
+while `gh` returns `""` for a pending step — so one wrong emptiness test produced a false
+"36/36 concluded" AND listed the 10 unrun steps as failures, wrong in opposite directions at once.
+Corrected to `!= null and != ""` → 26/36, 0 not-success.
+
+> **A sharpening of the measurement rule, from the same batch:** *the figure that survived longest
+> wrong is the one whose unit sounded like the thing it was not.* Three of four wrong figures in
+> module 1's opening measurement were a wrong UNIT, not a wrong count — `perm:` keys counted a
+> comment quoting the pattern, roles/grants counted all offices where the subject was one, and
+> "8 call sites across 6 modules" was the FILE count wearing the word *modules*.
 
 ## The standing rule for every number this file publishes
 

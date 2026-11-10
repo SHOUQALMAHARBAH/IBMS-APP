@@ -205,6 +205,29 @@ export class BrokerLicenseService {
           ? null
           : new Date(`${dto.suspendedUntil}T00:00:00.000Z`),
       recordedByUserId: actorUserId,
+      /*
+       * ART. 21/b/5 — the scope lines are created IN THE SAME STATEMENT as the act.
+       *
+       * Nested, not a second write, and that is the invariant rather than a style choice: zero
+       * scope lines MEANS the whole licence, so an act that committed and then failed to write its
+       * lines would be a motor-only suspension recorded as an office-wide one — the widening
+       * direction, blocking lawful business in every other branch. One statement, so the act and
+       * its limit arrive together or neither does.
+       */
+      scopeLines: {
+        create: [
+          ...(dto.scopeInsuranceLineIds ?? []).map((insuranceLineId) => ({
+            organizationId: actor.organizationId,
+            insuranceLineId,
+          })),
+          ...(dto.scopeOfficeInsuranceLineIds ?? []).map(
+            (officeInsuranceLineId) => ({
+              organizationId: actor.organizationId,
+              officeInsuranceLineId,
+            }),
+          ),
+        ],
+      },
     });
 
     /*

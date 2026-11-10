@@ -339,7 +339,20 @@ function makeDeps(opts: Opts = {}) {
      * so a test about "a recorded suspension outranks a timely filing" runs the whole six-state
      * derivation and is asserting the shipped ordering. A double would assert the double.
      */
-    findAll: vi.fn().mockResolvedValue(opts.regulatoryActs ?? []),
+    /*
+     * `scopeLines` is defaulted in HERE rather than in every fixture, because the repository's real
+     * contract is an act with its art. 21/b/5 scope lines already attached (one query, so a second
+     * read cannot disagree). Empty means the WHOLE licence, which is what every act in this file
+     * means — a defensive `?? []` inside the gate instead would make a genuinely missed `include`
+     * read as office-wide, and that is the widening direction.
+     */
+    findAll: vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(
+          (opts.regulatoryActs ?? []).map((a) => ({ scopeLines: [], ...a })),
+        ),
+      ),
   } as unknown as RegulatoryActionRepository);
 
   const record = vi
