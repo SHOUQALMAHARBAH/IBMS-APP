@@ -801,3 +801,38 @@ as a defect and the second must not become a precedent.
 |---|---|---|
 | **1 · `premiumVariance` IS COMPUTED AND RENDERED NOWHERE — and that is a DECISION, not an omission** | `/policies/[id]` renders the requested premium and, since batch 6, the issued premium. It does NOT render `policy.premiumVariance`, and a reader who finds a computed field with no consumer will reasonably assume something is broken. **It is not.** The value exists, is computed by `premiumVariance()` in `policy.config.ts`, is on the wire in `PolicyDetail`, and is already rendered on the OPPORTUNITY screen by `PolicySection` as part of its `Requested X · Issued Y (Δ Z)` line. What is missing is a WORD: measured 2026-11-06, no shipping Arabic names a premium variance, and the nearest candidates name a premium or an amount rather than a difference between two. Batch 6 left it unrendered rather than coining one. | **Module 1, which owns naming.** The owner confirmed on 2026-11-07 that leaving it unrendered was correct and that the field waits for module 1 — so this is a named deferral with one missing input, not a gap. Anybody picking it up needs exactly one Arabic label and nothing else: the value, the computation, the wire and the screen's own layout are all already there. |
 | **2 · THE DPO's `vendor.read` GRANT IS A WRITTEN EXCEPTION TO HER STANDING RULE** | The owner's standing rule is that a role is never handed a new permission to make a screen work. **On 2026-11-07 she made one exception, case by case and recorded here as the rule requires.** `dpa.approve` is the DPO's alone and gates the approval of a data-processing agreement, which lives on `/vendors/[id]` — and the DPO held no `vendor.read`, so the only role permitted to give that approval could not open the screen it is on, and no spec had ever pressed the control. The grant is **`vendor.read` only**, to **one role**: measured, role-grant pairs 519 → 520 and the catalogue unchanged at 230 codes. | **Nothing. This is closed.** It is recorded so that the next person who wants a grant to make a screen work finds the exception and its conditions rather than only the precedent: the narrowness was the condition, and `vendor.e2e-spec.ts` asserts BOTH directions — the DPO can read and approve, and the DPO still cannot update or deactivate a vendor. **A measured side-finding worth carrying: re-running the seed CANNOT un-grant.** A `RolePermission` row removed from `permissions.ts` stays in an existing database — proven by a plant whose widened grant survived `db:test:seed` and had to be deleted by hand. So tightening the catalogue needs a migration or a deliberate revoke, never a re-seed. |
+
+---
+
+## OWNED BY THE OWNER, READY TO PASTE — 2026-11-10, message 34 §7
+
+Two items that are not engineering decisions. The first needs a GitHub-editor paste the token here
+cannot make; the second needs a product answer.
+
+| Item | What is owed | The exact thing to do |
+|---|---|---|
+| **1 · THE CI STEP FOR THE TWO DATABASE-BACKED PERMISSION GATES** | `db:permission-descriptions:check` and `db:fixture:permissions:check` are both GREEN on a clean tree and **neither runs in CI** — so the Arabic-description mirror and the role/grant fixture can both go stale without a build noticing. The step cannot be pushed from a session: `gh auth status` reads scopes `gist, read:org, repo` on a `gho_` OAuth token, and a `.github/workflows` write needs `workflow`. | **In `.github/workflows/ci.yml`, immediately AFTER the step `- name: Seed database (roles + permission grid)` and its `run: npm run db:seed`** (both gates read a seeded database, and the e2e suite that follows adds roles, so it must sit between the two). No `env:` block is needed: the job already sets `DATABASE_URL` to its own postgres service, and `dotenv-cli`'s override is opt-in (`-o`), so the ambient value beats what `.env`/`.env.test` carry.<br><br>`      - name: The Arabic permission-description mirror is not stale`<br>`        if: ${{ !cancelled() }}`<br>`        run: npm run db:permission-descriptions:check`<br><br>`      - name: The role/permission fixture still matches the seeded database`<br>`        if: ${{ !cancelled() }}`<br>`        run: npm run db:fixture:permissions:check` |
+| **2 · WHICH BRANCH A MULTI-LINE RECOMMENDATION BELONGS TO** | `Opportunity.rfqs` is a list and a `Recommendation` carries no insurance line of its own, so *which branch is this recommendation in?* can have several answers. It decides what a recorded art. 21/b/5 partial suspension blocks. Measured on dev 2026-11-10: **89 opportunities, every one spanning exactly ONE line; 0 multi-line recommendations.** So the question has no instances today and will have one the first time an office sends a two-line programme to market. | **Three honest options, and what each makes the gate do.** See § THE MULTI-LINE RECOMMENDATION below. |
+
+### The multi-line recommendation — three options
+
+**Today's behaviour, which is option (a) by default:** the gate resolves the branch from the
+**recommended quotation's** RFQ line, and `recommendation.service.ts` says so at the call site.
+
+- **(a) The recommended quotation's line.** The gate blocks the send only if THAT line is suspended.
+  *Cost:* a programme whose other line is suspended still goes out. The act being gated is
+  «تقديم التوصية» — advising on a product — and the product being advised on is the one quoted, so
+  this is defensible and is why it was built this way.
+- **(b) ANY line in the opportunity.** The gate blocks if any line of the programme is suspended.
+  *Cost:* fail-closed, so a motor suspension stops a medical recommendation that the CBJ never
+  touched — the over-refusal direction, which the licence gate elsewhere treats as the one to avoid
+  when a branch IS resolvable.
+- **(c) Split the act.** The recommendation is sent per line, each line gated on its own branch, and
+  a partially-suspended programme goes out for the lines that are clear.
+  *Cost:* a schema and a product change — `Recommendation` would need a line, and the screen would
+  need to say that half a recommendation was sent. Not a gate decision at all.
+
+**The engineering view:** (a) is correct while a recommendation recommends ONE quotation, which is
+what the model says today. (b) is only right if the owner reads «تقديم التوصية» as covering the whole
+programme. (c) is the real answer if a recommendation is ever allowed to recommend more than one
+quotation — and that is the question to put to her, because it is about the product and not the gate.

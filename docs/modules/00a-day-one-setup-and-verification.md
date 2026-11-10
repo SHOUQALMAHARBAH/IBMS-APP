@@ -163,6 +163,10 @@ npm run check:unreachable-routes
 
 **١١ · 🆕 جملةٌ تقول «ما في» تُقاس من جديدٍ قبل أن تُصدَّق — ولو كانت منّا.** **والغيابُ هو الوحيدُ اللي يفسد بالسكوت**، لأنّ الكودَ يُبنى ولا أحدٌ يرجع يشيل الجملة. *(في ٨ تشرين الثاني وحدَه: خمسُ جُمَلِ غيابٍ في ورقاتِنا طلعَت غلطاً — تقويمُ العُطَلِ وطلبُ التسعيرِ والاستيرادُ والقائمةُ والمزامنة، كلُّها مبنيّةٌ وكلُّها كانت مكتوبةً «غائبة».)*
 
+> **🆕 وحدُّ القاعدةِ ١١، من ١٠ تشرين الثاني ٢٠٢٦ — وهو أمضى منها:** **«غيرُ مقروءٍ في استخراجِنا» ليست «غيرَ مقروءٍ في الصكّ».** ⟶ **جملةُ غيابٍ عن مصدرٍ تُقاس على المصدرِ نفسِه، لا على نسخةٍ مشتقّةٍ منه.**
+>
+> **والغلطُ لم يكن أنّ أحداً لم يُعِد القياس — بل أنّ القياسَ أُعيدَ على المشتقّ.** *(ثمانيةُ أرقامٍ في تعليماتِ ٩ وُسِمَت «غيرَ مقروءة» وهي مقروءةٌ كلُّها للعينِ في الصكّ؛ الذي لم يُقرأ هو مخرجُ التعرّفِ الضوئيّ. وكلّفَت الإدارةَ بحثاً عن أرقامٍ لم تكن ناقصةً يوماً.)* **وأسوأُ منها: المشتقُّ لا يسكت فحسب، بل يحمل رقمَينِ خاطئَينِ وسمَهما بـ«موثوق» — ٧٬٠٠٠ مكانَ ٧٬٥٠٠، و٥ فروعٍ مكانَ ٦ — لأنّ قاعدةَ ثقتِه «اللاتينيُّ سَلِم» تقرأ مخرجاً لاتينياً دليلاً على مدخلٍ لاتينيّ، والتعرّفُ الضوئيُّ يُخرِج لاتينيّاً عن هنديّ.**
+
 **١٢ · شرطُ الاكتمال يؤكّد وجودَ ما ينتظره، لا غيابَ ما يخافه.**
 **A completeness predicate must assert the PRESENCE of what it waits for, never the absence of what it fears.** *(Four measured cases, which is what makes this a rule rather than an anecdote: a missing `jq` whose failures `|| true` turned into falsy defaults · `|| true` on the line that decides whether a guard runs · a check-run set wholly green under a workflow run still `in_progress` · and `gh pr checks` returning NO ROW for a run not yet registered, so "nothing is pending" was vacuously true over a set that did not contain the job. The common shape: a condition evaluated over an input that could be empty, where EMPTY and SATISFIED are the same answer. Each case, with the command that produced it, is in `IMPROVEMENTS.md`.)*
 
