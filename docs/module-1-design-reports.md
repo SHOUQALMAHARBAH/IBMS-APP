@@ -272,3 +272,43 @@ column** — reported, not fixed.
   module 0-c batch 8; `/up-sell/[id]` and `/cross-sell/[id]` are still unreferenced and untested).
   Linking the audit trail to them would make the audit trail their FIRST caller — which is fine, and
   worth knowing before a reader reports a broken screen as an audit-trail defect.
+
+---
+
+## Appendix · decision 125, the measurement only — **nothing changed**
+
+Message 34 §4 asked for two figures before any dash is closed: **how many dash renderings per
+module, and how many of them are an option inside a select** — because the owner's reason names the
+select case first (*«رح توقف مستخدم من تكملة شغله لانه ما رح يعرف يختار لانه شرطة»*).
+
+**The unit matters more than the figure here, and my first run had it wrong.** Counting em dashes
+gave **504 dictionary keys** and the number meant nothing: nearly all of them are an em dash used as
+PUNCTUATION inside a sentence. Decision 125 is about a dash standing **where a value would be**, and
+about a dash offered **as a choice**. Three populations, measured 2026-11-10:
+
+| | count | unit |
+|---|---|---|
+| **A · a dictionary value that IS a dash**, or a `— word —` placeholder | **7 keys** | value is `—`, or matches `^—.*—$` |
+| **B · a JSX fallback** — the screen printing a dash because it has nothing | **99** | `?? '—'`, `\|\| '—'`, `: '—'`, plus a placeholder key rendered outside an option |
+| **C · an OPTION offering a dash as a choice** | **15, of which 14 are real** | inside an `<option>…</option>`; comments stripped first |
+| screens or components carrying at least one | **49** | a directory under `app/(app)/`, or a component file |
+
+**The seven value keys**, which are where decision 60's *«ما عداها يحتفظ بشرطته»* survives:
+`complaintsSlaNone` «—» · `insDetailEmptyField` «—» · `customerPickerNonePlaceholder`
+«— اختر عميلاً —» · `empUnset` «— غير محدَّد —» · `entitySearchActorNone` «— كل الأشخاص —» ·
+`usrSelect` and `usrSelect2` «— اختر —».
+
+**The fourteen option sites, which are the ones that stop a person mid-task:**
+`complaints/page.tsx` · `employees/[id]/page.tsx` ×2 · `employees/page.tsx` ×2 ·
+`needs-assessments/new/page.tsx` · `provider-register-insurer/page.tsx` ·
+`provider-register-office/page.tsx` · `regulatory-compliance/page.tsx` · `rfqs/[id]/page.tsx` ·
+`settings/users/page.tsx` ×2 · `CbjApprovalPanel.tsx` ×2.
+
+⚠️ **The fifteenth is a FALSE POSITIVE and is named rather than quietly dropped:**
+`RecommendationSection.tsx:307` renders `{q.insurer.name} — {premium}` inside an option label, which
+is an em dash as punctuation between two values, not a dash standing for one. **A sweep that treated
+every dash inside an `<option>` as decision 125's subject would rewrite it and break a label that is
+already correct** — which is the same mistake decision 60 was protecting against, one level down.
+
+**Nothing was changed.** Decision 125 is explicitly module by module, each module measuring its own
+screens, and the word for each field is the owner's or a slice from that same screen.
