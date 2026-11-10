@@ -31,6 +31,7 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Anchoring a negative on its container | Anchoring it on something the role actually holds |
 | Treating a single collision as a data problem | Computing its rate first — one in three here |
 | Trusting that a reset seeded | Checking 219 permissions AND 502 grants |
+| Reading "no checks reported" off a zero exit code | Reading the commit's own check-runs and asserting their COUNT |
 | Waiting until nothing is pending (rule 12) | Waiting until the thing you named is PRESENT and `completed` |
 | A comment claiming a figure is not restated here | A declaration that imports it, asserted on the source text |
 | A guard reading a generated copy of its subject | A parity spec making the copy unable to diverge |
@@ -368,6 +369,8 @@ that could be empty, where EMPTY and SATISFIED are the same answer.*
 | 2 | `[ -f "$script" ] && exec bash "$script" \|\| true` | `\|\| true` sat on the line that DECIDES whether a guard runs, so a deleted or renamed hook exited 0 — indistinguishable from a clean pass | 4 of 6 brain hooks were unregistered here and all 7 were recorded `100644`, so on any fresh clone they were inert |
 | 3 | `all(check-runs are success)` | the check-run set was wholly green **under a workflow run still `in_progress`** — the later jobs had not produced rows yet | a green read taken off an object that could not yet disagree |
 | 4 | `all(bucket != "pending")` over `gh pr checks` | a workflow run NOT YET REGISTERED contributes **no row**, so the predicate was vacuously true over a set that did not contain the job it was waiting for | announced ALL CHECKS SETTLED listing only CodeQL's two rows while `CI status=pending` on the same sha |
+| 5 | `gh pr checks <n>` keyed on its EXIT CODE | it printed `no checks reported on the '<branch>' branch` **and exited 0** — so *no checks exist* and *all checks passed* are the same answer from the tool's own exit status | measured 2026-11-10 while 5 check-runs were already `in_progress` on that exact sha |
+| 6 | a watch keyed only on `actions/runs?head_sha=` | **the runs index LAGS the check-runs API** — `commits/<sha>/check-runs` showed 5 jobs `in_progress` at 16:30:01Z while the runs index still returned an empty list for several minutes | the corrected watch emitted `WAIT` three times through that window and concluded nothing, which is why the WAIT branch had to exist rather than being a nicety |
 
 **The fix in every case is the same move this file opens with:** key on a value that must be
 present. For (4) that is the RUN's own `status == completed` on the exact sha, with *no run
@@ -379,6 +382,8 @@ treating this as a shape rather than a bug list.** A step-level watch tested `.c
 while `gh` returns `""` for a pending step — so one wrong emptiness test produced a false
 "36/36 concluded" AND listed the 10 unrun steps as failures, wrong in opposite directions at once.
 Corrected to `!= null and != ""` → 26/36, 0 not-success.
+
+> **And the generalisation rows 5 and 6 add, which is the part worth keeping:** *two GitHub APIs disagree about whether a build exists, and the disagreement has a DIRECTION — the check-runs API knows first.* So "no run has registered" is a statement about one index at one moment, never about the build. It must emit a WAIT line and never a verdict — and a tool that says "no checks reported" while exiting 0 must never be keyed on its exit code.
 
 > **A sharpening of the measurement rule, from the same batch:** *the figure that survived longest
 > wrong is the one whose unit sounded like the thing it was not.* Three of four wrong figures in
