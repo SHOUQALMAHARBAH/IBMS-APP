@@ -504,12 +504,27 @@ Three things to know before you use them:
   its decisions — and the module holder is the person who asks the outside questions (a practising
   broker, a lawyer, the Central Bank) and writes each answer up as a decision file, rather than
   waiting for management to answer an operational question.
-- **`docs/modules/` holds 24 `.md` files, of which 22 are the module papers.** The other two are
-  `00a-day-one-setup-and-verification.md` (below) and
+- **`docs/modules/` holds 26 `.md` files, of which 22 are the module papers** (the index plus one
+  per module). **Corrected 2026-11-10: this said 24, which was stale by one before this batch and
+  by two after it** — `ls docs/modules/*.md | wc -l` is the figure. The other four are
+  `00a-day-one-setup-and-verification.md` and `00b-start-here-from-zero.md` (both below),
   `module-walkthrough-provider-to-first-policy.md`, a 3,001-line field-by-field walkthrough of the
-  built system measured on 2026-11-03. **That walkthrough is the fastest-rotting document here** —
-  it names specific Arabic labels, and one had already changed before it landed — so whoever
-  closes module م-أ re-measures it as part of that delivery.
+  built system measured on 2026-11-03, and `module-01-opening-measurement.md` (next bullet).
+  **That walkthrough is the fastest-rotting document here** — it names specific Arabic labels, and
+  one had already changed before it landed — so whoever closes module م-أ re-measures it as part of
+  that delivery.
+- **A module's FIRST delivery is a measurement paper, not code, and module 1's has landed:
+  `module-01-opening-measurement.md` (2026-11-10).** The module's own rule is
+  «كل مديول يفتح بقياس، والقياس أول تسليم», and the template is `00a` § 5 قالب ١. **Read it beside
+  `module-01-declared-action-and-legal-values.md`, never instead of it** — it re-measured that
+  paper and three of its items came out differently: **§4.5's declared duty-segregation mode is
+  fully built and guarded in CI** (16 CHECK constraints each with one escape disjunct, a trigger on
+  `CombinedDutyAct`, a 713-line design doc), **half the legal-values table already exists as
+  `SlaPolicy`** (value, legal source, effective dating, updater), and **the geographic partial
+  suspension of art. 21/b/6 is not expressible at all** because `branchId` is carried by
+  `Employee`, `SalesTarget` and `User` only and `Branch` has no country. **The papers stay the
+  owner's to correct** — the measurement reports against them and changes none of their text, which
+  is why the corrections live in that file rather than in theirs.
 
 ### Day one — `docs/modules/00a-day-one-setup-and-verification.md`
 
