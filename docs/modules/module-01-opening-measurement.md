@@ -479,7 +479,21 @@ The brief asks for the table nobody has written: two for record type, two for co
 
 **No e2e ran. No database was written to.** Every probe is a `SELECT`; both plants were reverted and verified reverted by an empty `git diff`. **db-test was not touched at all — no reset is owed.**
 
-### Two things that went wrong in my own measuring, recorded because the method matters more than the figures
+### Three things that went wrong in my own measuring, recorded because the method matters more than the figures
+
+**0 · 🔴 AND THE WORST ONE WAS A CI WATCH THAT REPORTED «ALL CHECKS SETTLED» WHILE THE CI RUN HAD NOT STARTED — a fourth member of a family this register has already paid for three times, by a mechanism none of the three had.**
+
+The watch polled `gh pr checks 54` and exited when **`all(bucket != "pending")`**. It fired within a minute, listing **two rows — `CodeQL` and `analyze (javascript-typescript)` — and nothing else.** Verified immediately against the run list: **`CI status=pending` on the same sha.**
+
+**The mechanism: `gh pr checks` returns NO ROW for a workflow run that has not registered yet.** So *nothing is pending* was **vacuously true over a set that did not contain the thing being waited for**, and a watch cannot report a job it cannot see. The three recorded ancestors each had a different cause — a **missing `jq` binary** whose failures `|| true` turned into falsy defaults; **`|| true` on the line that DECIDES** whether a guard runs; and **a check-run set wholly green while its workflow run was still `in_progress`**. This one is the set being *incomplete* rather than the probe failing or the predicate being wrong.
+
+⟶ **The rule the register already states is the fix, and it is the one I did not apply: the RUN's own `status == completed` is the only thing that means finished.** The re-armed watch requires the named `CI` run to be **present AND completed on the exact sha**, treats *no CI run registered yet* as an explicit `WAIT` line rather than as silence, and then reads all three objects — every check-run with its conclusion, the not-success count, and the open code-scanning alerts on `refs/pull/54/merge`.
+
+**And the generalisation is the part worth keeping:** every one of the four is *a condition evaluated over an input that could be empty, where empty and satisfied are the same answer*. **A completeness predicate must assert the presence of what it waits for, not the absence of what it fears.**
+
+---
+
+**The other two:**
 
 **1 · `cd` persisted between Bash calls, twice.** The first time a `cd packages/db/prisma/migrations` made the next `grep` answer *No such file or directory* for `apps/api/src`; the second time a `cd apps/web` sent a `cp` and an `npm run` to the wrong root, which **left a plant in place for one extra call**. This is the recorded finding from 2026-11-08 — *«`cd` PERSISTS BETWEEN BASH CALLS — USE `git -C <abs>`»* — hit twice in one session. Every later call is absolute-pathed, and the plant's removal is proven by an empty `git diff` rather than by having run a `cp`.
 
