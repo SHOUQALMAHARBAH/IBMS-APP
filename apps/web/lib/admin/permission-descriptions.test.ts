@@ -116,7 +116,13 @@ const CARRIED_ENGLISH_BUDGET = 214;
  * That is the honest accounting and it is worth stating: a reviewed count that only ever rises would
  * drift upward every time a code is retired, and the drift would look like progress.
  */
-const OWNER_REVIEWED_COUNT = 223;
+/*
+ * 223 -> 230 ON 2026-11-10: the owner read the seven agent-written lines and approved them as
+ * written (message 34 §3.5). The count rises by exactly seven and the list below is empty, so the
+ * balance holds at 230 = 230 + 0 -- which is what makes this an approval that was RECORDED rather
+ * than a list somebody tidied.
+ */
+const OWNER_REVIEWED_COUNT = 230;
 
 /**
  * The four lines an agent wrote. Each is a placeholder in HER register, not a reviewed line.
@@ -126,60 +132,29 @@ const OWNER_REVIEWED_COUNT = 223;
  */
 const AWAITING_OWNER_REVIEW: string[] = [
   /*
-   * ONE ENTRY, AND THE GUARD PUT IT THERE — item (f)'s new code, whose Arabic an agent wrote because
-   * the parity guard requires both languages and a code therefore cannot ship without it. The list
-   * was EMPTY for exactly one commit after the owner wrote all four of the previous module's codes,
-   * and the balance check then failed on the next code shipped, by name. That is the whole design:
-   * the list refills itself rather than needing somebody to remember.
-   */
-  'provider.office.administrator.invite',
-  /*
-   * Item (f)'s COMPANY half, shipped in the same close. Its Arabic was written by an agent for
-   * the same reason the office one's was: the parity guard requires both languages, so a code
-   * cannot ship without a line, and whoever ships it writes it.
-   */
-  'provider.insurance-company.administrator.invite',
-  /*
-   * Batch 5 group 7b's one new code. Its Arabic was written by an agent for the same reason the two
-   * above were: the parity guard requires both languages, so a code cannot ship without a line.
-   * Decision 94's naming pass is hers; this is a line awaiting it rather than a pre-emption of it.
-   */
-  'retention.extend',
-  /*
-   * Batch 5 group 7c's one new code, the same situation as the line above it: written by an agent
-   * because the parity guard requires both languages, and awaiting decision 94's pass rather than
-   * pre-empting it.
-   */
-  'retention.archive.retrieve',
-  /*
-   * The two halves of the split retention code. Their Arabic was written by an agent — the withdrawn
-   * umbrella's line was HERS, and a split is not a translation, so neither successor inherits it.
-   */
-  'retention-schedule.update',
-  'retention-schedule.confirm',
-  /*
-   * MODULE 0-ب, decision 36 — the disclosure register's READ code. Its Arabic was written by an
-   * agent for the same reason every entry above it was: the parity guard requires both languages, so
-   * a code cannot ship without a line.
+   * EMPTY SINCE 2026-11-10, AND THAT IS AN APPROVAL RATHER THAN A CLEARED LIST.
    *
-   * AND THIS ONE CARRIES AN EXTRA REASON TO BE READ: a code named
-   * `conflict-of-interest.disclose` ALREADY EXISTS, and it is about the OTHER object — the flagged
-   * disclosure on a recommendation, detected by a commission heuristic and acknowledged by a second
-   * person. Both dictionary lines for the new code state that distinction, because two codes sharing
-   * a prefix and meaning different things is exactly where a grant gets made on the wrong one.
-   */
-  'conflict-of-interest.register.read',
-  /*
-   * The owner wrote all four of the previous entries, and that remains the goal state rather than a
-   * disabled guard. The balance check below still holds (224 = 224 + 0) and still fails by name the
-   * moment a code ships without being declared here, which is the only thing this list was for.
+   * The owner read all seven and approved them AS WRITTEN (message 34 §3.5):
    *
-   * Two of the four were CORRECTED before being applied, which is why the count moved by four
-   * rather than by two: `provider.office-state.read` had said the code does not reach the office's
-   * own data, and the view exposes eighteen columns of it; `insurer.company.link` and `.unlink` had
-   * omitted that linking locks the office's own copy of a company's facts to read-only. Corrected in
-   * the ARABIC, never in the code — the owner's instruction, and the right direction, because the
-   * code is what the description is about.
+   *   provider.office.administrator.invite · provider.insurance-company.administrator.invite ·
+   *   retention.extend · retention.archive.retrieve · retention-schedule.update ·
+   *   retention-schedule.confirm · conflict-of-interest.register.read
+   *
+   * So `OWNER_REVIEWED_COUNT` rises by seven to 230 and the balance holds at 230 = 230 + 0. Each
+   * of the seven was written by an agent for the same mechanical reason -- the parity guard
+   * requires both languages, so a code cannot ship without a line, and whoever ships it writes it
+   * -- and each was a placeholder in HER register until she read it. Now none is.
+   *
+   * ⚠️ AND ONE OF THE SEVEN CAME BACK WITH SOMETHING ELSE, WHICH IS NOT A CHANGE TO ITS LINE.
+   * For `retention.archive.retrieve` she supplied a NAME -- «استخراج سجل مؤرشف/محجوب» -- which is
+   * the first owner-supplied row of DECISION 127's naming table, not an edit to the description.
+   * The description here is approved unchanged. Do not apply the name as a description, and do not
+   * read this list as covering names: 127 is a separate, unbuilt pass over all 230 codes, recorded
+   * in `docs/module-1-design-reports.md` §6.3.
+   *
+   * THIS LIST IS NOT A RATCHET AND MUST NOT BECOME ONE. It legitimately GROWS the next time a
+   * module ships a permission, and the balance check below is what refills it -- by name, on the
+   * commit that ships the code. What must only grow is `OWNER_REVIEWED_COUNT`.
    */
 ];
 
