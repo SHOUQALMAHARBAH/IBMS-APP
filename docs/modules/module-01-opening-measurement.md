@@ -417,7 +417,13 @@ The brief asks for the table nobody has written: two for record type, two for co
 3. **No fix for the two red permission checks, and no CI step** — a CI edit is not this batch's, for the recorded OAuth-App/`workflow`-scope reason, and the stale-mirror fix touches the owner's reviewed Arabic.
 4. **The legal-number gate itself** — specified and self-tested here, not committed, because this batch writes no code. The instrument is at `scratchpad/legal-number-discriminator.py` and its full rules are in §1.3 above so it is re-derivable rather than remembered.
 5. **The duplicated art. 11 `45`** — reported, not corrected. It is criterion 1's first customer and belongs in the batch that builds the table, not in a measurement.
-6. **Nothing touching the 32→26 mapping**, per §7 prohibition 4 and decisions 9, 20 and 122. Noted only that `InsuranceLine` holds **32** rows (27 GENERAL / 5 LIFE), which is the 32 side and is already built.
+6. **Nothing touching the 32→26 mapping**, per §7 prohibition 4 and decisions 9, 20 and 122. `broker-license-scope.config.ts:118-170` already carries that deferral in full, with its reopening condition written in advance — **the mapping is built when the NAMES of the 26 arrive from an authoritative source**, never from an estimate or from a mapping inferred from our own line names, because *a wrong mapping changes a capital tier shown to a licensed office*.
+
+   **One measured observation to add to it, because it makes a plausible guess measurably worse rather than merely unauthorised.** That note records the regulator's side as **counts — 26 branches, 18 general and 8 life/medical**. Our side, measured on dev: **32 rows, 27 `GENERAL` and 5 `LIFE`.**
+
+   ⟶ **So the two CATEGORY axes do not line up either, and they fail in opposite directions**: 27 of ours against 18 of theirs on the general side, and **5 of ours against 8 of theirs on the life/medical side.** The obvious guess — *our `GENERAL` collapses into their 18 and our `LIFE` into their 8* — would need **8 regulatory life/medical branches covered by 5 of our lines**, so it cannot be a collapse in that direction at all. `InsuranceLineCategory` has exactly two members, so «medical» is not separable in our data and may sit on either side of our own split.
+
+   **The mapping is therefore not merely unknown in its membership — it is known NOT to be category-preserving**, which removes the one shortcut somebody would otherwise reach for. Reported here and **not** written into that config file, which is the owner's deferral and already says the right thing.
 
 ---
 
