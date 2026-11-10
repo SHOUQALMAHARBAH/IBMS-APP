@@ -455,7 +455,7 @@ model Organization {
   createdByUserId String?
   updatedByUserId String?
 
-  regulatoryActions RegulatoryAction[]
+  regulatoryActions          RegulatoryAction[]
   regulatoryActionScopeLines RegulatoryActionScopeLine[]
 
   dpoAlternateApproverUserId String?
@@ -6090,18 +6090,18 @@ model InsuranceLine {
   displayOrder Int
   createdAt    DateTime              @default(now())
 
-  offeredBy             InsurerOfferedLine[]
-  licenceScopeLines     BrokerLicenseScopeLine[]
+  offeredBy                  InsurerOfferedLine[]
+  licenceScopeLines          BrokerLicenseScopeLine[]
   regulatoryActionScopeLines RegulatoryActionScopeLine[]
-  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
-  roleScopeBranches     RoleScopeBranch[]
-  formTemplates         InsurerFormTemplate[]
-  officeFormTemplates   OfficeInsurerFormTemplate[]
-  insuranceProgramLines InsuranceProgramLine[]
-  rfqs                  RFQ[]
-  policies              Policy[]
-  commissionAgreements  CommissionAgreement[]
-  insurerLicensedLines  InsurerLicensedLine[]
+  cbjApprovalBranches        EmployeeCbjApprovalBranch[]
+  roleScopeBranches          RoleScopeBranch[]
+  formTemplates              InsurerFormTemplate[]
+  officeFormTemplates        OfficeInsurerFormTemplate[]
+  insuranceProgramLines      InsuranceProgramLine[]
+  rfqs                       RFQ[]
+  policies                   Policy[]
+  commissionAgreements       CommissionAgreement[]
+  insurerLicensedLines       InsurerLicensedLine[]
 
   @@index([category, displayOrder])
 }
@@ -6392,16 +6392,16 @@ model OfficeInsuranceLine {
   /// the kind of change that needs an attributable author.
   createdByUserId String
 
-  offeredBy             InsurerOfferedLine[]
-  licenceScopeLines     BrokerLicenseScopeLine[]
+  offeredBy                  InsurerOfferedLine[]
+  licenceScopeLines          BrokerLicenseScopeLine[]
   regulatoryActionScopeLines RegulatoryActionScopeLine[]
-  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
-  roleScopeBranches     RoleScopeBranch[]
-  insuranceProgramLines InsuranceProgramLine[]
-  rfqs                  RFQ[]
-  policies              Policy[]
-  commissionAgreements  CommissionAgreement[]
-  officeFormTemplates   OfficeInsurerFormTemplate[]
+  cbjApprovalBranches        EmployeeCbjApprovalBranch[]
+  roleScopeBranches          RoleScopeBranch[]
+  insuranceProgramLines      InsuranceProgramLine[]
+  rfqs                       RFQ[]
+  policies                   Policy[]
+  commissionAgreements       CommissionAgreement[]
+  officeFormTemplates        OfficeInsurerFormTemplate[]
 
   /// Once per office, per script.
   @@unique([organizationId, canonicalEn])
@@ -7603,7 +7603,7 @@ model RegulatoryAction {
   recordedAt       DateTime              @default(now())
 
   /// Art. 21/b/5 — the insurance branches this act is LIMITED TO. Empty means the whole licence.
-  scopeLines       RegulatoryActionScopeLine[]
+  scopeLines RegulatoryActionScopeLine[]
 
   @@index([organizationId, effectiveFrom])
 }

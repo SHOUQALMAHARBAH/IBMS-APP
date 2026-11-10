@@ -107,8 +107,15 @@ export interface RegulatoryActRow {
  * line OR an office's own addition.
  */
 export interface InsuranceBranchRef {
-  insuranceLineId?: string | null;
-  officeInsuranceLineId?: string | null;
+  /*
+   * BOTH REQUIRED, though either may be null — and the difference is not pedantry. With both
+   * OPTIONAL, any object at all structurally satisfies this type, so a call site could hand the
+   * gate a row that carries no line columns, `insuranceBranchKey` would return null, and the act
+   * would be refused for a reason nobody could see. Fail-closed is the safe direction and a SILENT
+   * one is still a defect. Required means the compiler asks for both columns by name.
+   */
+  insuranceLineId: string | null;
+  officeInsuranceLineId: string | null;
 }
 
 /**
