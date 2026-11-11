@@ -358,6 +358,54 @@ afterAll(async () => {
   app = null;
 });
 
+/*
+ * 🔴 FIRST, BECAUSE EVERY REFUSAL BELOW IT DEPENDS ON IT — added 2026-11-11.
+ *
+ * `asAppRole` exists in this file precisely because the suite's own client is not the role the API
+ * uses. But nothing asserted that the connection it opens IS that role: `APP_DB_URL` falls back to
+ * a literal when `APP_DATABASE_URL` is unset, and a variable pointing at the table OWNER would
+ * leave every assertion here green while proving nothing — Postgres exempts a table's owner from
+ * its own policies.
+ *
+ * MEASURED 2026-11-11: on db-test the suite's own role `ibms` is `rolsuper = t, rolbypassrls = t`,
+ * and on dev the same name is `f, f`. A superuser bypasses RLS entirely, even under FORCE ROW
+ * LEVEL SECURITY. The question is which role this connection actually is, so it is asked of
+ * `current_user`.
+ *
+ * Rule 12: assert the PRESENCE of what the proof needs, never the absence of what it fears.
+ */
+describe('the connection these assertions travel on is not exempt', () => {
+  it('connects as a role that is neither SUPERUSER nor BYPASSRLS, and owns nothing', async () => {
+    const who = await asAppRole<{
+      u: string;
+      s: boolean;
+      b: boolean;
+      owned: bigint;
+    }>(
+      null,
+      `SELECT current_user AS u,
+              (SELECT rolsuper      FROM pg_roles WHERE rolname = current_user) AS s,
+              (SELECT rolbypassrls  FROM pg_roles WHERE rolname = current_user) AS b,
+              (SELECT count(*) FROM pg_tables
+                WHERE schemaname = 'public' AND tableowner = current_user) AS owned`,
+    );
+
+    expect(who).toHaveLength(1);
+    expect(
+      who[0].s,
+      `this spec is connected as ${who[0].u}, which is a SUPERUSER — RLS does not apply to it, so "nothing office-scoped reaches a caller" would pass with every policy dropped`,
+    ).toBe(false);
+    expect(
+      who[0].b,
+      `this spec is connected as ${who[0].u}, which holds BYPASSRLS`,
+    ).toBe(false);
+    expect(
+      Number(who[0].owned),
+      `${who[0].u} owns tables in \`public\`, and a table's owner is exempt from its own policies unless the table is FORCED`,
+    ).toBe(0);
+  }, 120_000);
+});
+
 describe('the view exposes exactly the allow-list', () => {
   it('has these columns and no others', async () => {
     // THE guard. The app role can read this view, so any column on it is readable by

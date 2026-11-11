@@ -122,7 +122,11 @@ describe('Picker search gates (e2e) — any of the using screens permissions', (
      * search returned 200 with an EMPTY ARRAY for the whole period it was broken, because the
      * OWNER FILTER sits below the gate. Measured here before adding this: the employee search
      * is a plain `contains` with NO owner filter (employees have no owner), office-scoped by
-     * RLS — so this test was weak rather than hollow, and nothing was hiding behind it. The
+     * `tenantScopeExtension` with RLS behind it — so this test was weak rather than hollow, and
+     * nothing was hiding behind it. (CORRECTED 2026-11-11: this said "office-scoped by RLS". The
+     * scoping a request actually meets is the extension's; RLS is the backstop underneath and is
+     * not what this assertion travels through. The test is unaffected — it asserts a row COMES
+     * BACK, which is a presence assertion and the opposite of a refusal.) The
      * assertion is added anyway, because *weak* was indistinguishable from *hollow* until
      * somebody read the body.
      *

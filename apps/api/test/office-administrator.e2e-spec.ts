@@ -433,7 +433,12 @@ describe('every office has a route to user administration', () => {
          * the organization OWNS is self-administration, the same family as `user.manage` and the
          * three role codes below. It reads and connects the provider's OWN integration row, which is
          * organization-scoped with an RLS policy on top — asserted in both directions by
-         * `provider-self-administration.e2e-spec.ts`. Nothing was minted BY THAT WIDENING: both codes
+         * `provider-self-administration.e2e-spec.ts`, and CORRECTED 2026-11-11 as to which layer
+         * that spec proves: it asserts over HTTP, so it proves `tenantScopeExtension` and is blind
+         * to the policy. Measured by planting `USING (true)` on that table, which left its 10 tests
+         * passing. The sentence above is still true of the SCHEMA — the row is organization-scoped
+         * and does carry a policy — but the proof named here is a proof of layer 1. RLS itself is
+         * proven in `tenant-isolation.e2e-spec.ts`. Nothing was minted BY THAT WIDENING: both codes
          * already existed in the catalogue. The TOTAL has moved since, by later batches minting
          * codes that reach neither this role nor the provider — it is pinned in
          * `provider-self-administration.e2e-spec.ts` and deliberately not repeated here, because a

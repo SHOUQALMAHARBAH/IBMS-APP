@@ -385,6 +385,62 @@ afterAll(async () => {
   console.log(`[tenant-isolation] removeOfficeB() took ${elapsed}ms`);
 }, 120_000);
 
+/*
+ * 🔴 FIRST, BECAUSE EVERY RLS REFUSAL BELOW IT DEPENDS ON IT — added 2026-11-11.
+ *
+ * This file already proves, thoroughly, that the ROLE NAMED `ibms_app` holds no bypassing
+ * attribute, no bypassing MEMBERSHIP, and owns no tables (Part V, item 4). That is the right check
+ * and it answers a DIFFERENT question from this one.
+ *
+ * `APP_DB_URL` falls back to a literal when `APP_DATABASE_URL` is unset, and nothing anywhere
+ * asserted that the variable, when it IS set, names that role. Point it at the table owner — a
+ * one-character edit in an environment file, or a CI step provisioning the wrong role — and every
+ * `asAppRole` refusal in this file goes hollow while all of item 4's assertions keep passing,
+ * because they are about a row in `pg_roles` and not about this connection.
+ *
+ * MEASURED 2026-11-11: on db-test the suite's own role `ibms` is `rolsuper = t, rolbypassrls = t`,
+ * and on dev the same name is `f, f`. A superuser bypasses RLS entirely, even under FORCE ROW
+ * LEVEL SECURITY. So "which role am I actually connected as" is the question, and it is asked of
+ * `current_user` rather than of a name this file chose.
+ *
+ * Rule 12: assert the PRESENCE of what the proof needs, never the absence of what it fears.
+ */
+describe('Part V — the connection these refusals travel on is not exempt', () => {
+  it('connects as a role that is neither SUPERUSER nor BYPASSRLS, and owns nothing', async () => {
+    const who = await asAppRole<{
+      u: string;
+      s: boolean;
+      b: boolean;
+      owned: bigint;
+    }>(
+      null,
+      `SELECT current_user AS u,
+              (SELECT rolsuper      FROM pg_roles WHERE rolname = current_user) AS s,
+              (SELECT rolbypassrls  FROM pg_roles WHERE rolname = current_user) AS b,
+              (SELECT count(*) FROM pg_tables
+                WHERE schemaname = 'public' AND tableowner = current_user) AS owned`,
+    );
+
+    expect(who).toHaveLength(1);
+    expect(
+      who[0].s,
+      `this spec is connected as ${who[0].u}, which is a SUPERUSER — RLS does not apply to it, so every refusal below would pass with every policy dropped`,
+    ).toBe(false);
+    expect(
+      who[0].b,
+      `this spec is connected as ${who[0].u}, which holds BYPASSRLS`,
+    ).toBe(false);
+    // And OWNERSHIP, which neither attribute covers: Postgres exempts a table's owner from its own
+    // policies, so connecting as the owner defeats RLS with `rolsuper` and `rolbypassrls` both
+    // false. `FORCE ROW LEVEL SECURITY` would close that, and it is set on one table in this
+    // database — so ownership is asserted here rather than assumed to be covered.
+    expect(
+      Number(who[0].owned),
+      `${who[0].u} owns tables in \`public\`, and a table's owner is exempt from its own policies unless the table is FORCED`,
+    ).toBe(0);
+  }, 120_000);
+});
+
 describe('Part V — two Organizations cannot reach each other (item 1)', () => {
   it('both offices hold a customer of the identical legal name', async () => {
     const both = await rawPrisma.customer.findMany({

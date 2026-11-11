@@ -27,6 +27,28 @@ import { rawPrisma } from './tenant-prisma';
  *
  * A 404 and not a 403, deliberately and consistently with the rest of this product: a 403 would
  * confirm that the id names something real in another organization.
+ *
+ * ## 🔴 WHICH OF THOSE TWO LAYERS THIS FILE ACTUALLY PROVES — measured 2026-11-11, and it is one
+ *
+ * The paragraph above says "`tenantScopeExtension` plus RLS", and this file can only see the
+ * first of them. **PLANTED: `OrganizationEmailIntegration`'s `tenant_isolation` policy was
+ * replaced with `USING (true) WITH CHECK (true)`, so Postgres refused nothing at all, and all 10
+ * tests still passed.** A second plant — DROPPING the policy outright — also left 10/10, for the
+ * opposite reason: with RLS enabled and no policy a non-owner sees ZERO rows, so that plant makes
+ * the refusal MORE absolute and cannot fail a refusal test by construction.
+ *
+ * The cause is structural, not a weakness in the assertions. The extension puts `organizationId`
+ * into the query before it leaves the application, so the database is never asked a question it
+ * could refuse. **An HTTP-level assertion proves layer 1 and is blind to layer 2 by design** —
+ * which is fine, because layer 1 is what a clerk's request actually travels through, and layer 2
+ * is the backstop for the case where layer 1 is wrong or bypassed.
+ *
+ * So: this file proves the EXTENSION. RLS is proven where it can be — on a connection the
+ * application layer is not in front of — in `tenant-isolation.e2e-spec.ts` and
+ * `legal-value.e2e-spec.ts`, both through `asAppRole` on `APP_DATABASE_URL`. Do not "strengthen"
+ * the tests below by routing them through a raw client: `rawPrisma` here is the OWNER, which on
+ * db-test is a superuser with BYPASSRLS, and the refusal would then be asserted against a
+ * connection that cannot refuse. `npm run check:rls-proof-shape` holds this file to that split.
  */
 
 let app: INestApplication<App>;
