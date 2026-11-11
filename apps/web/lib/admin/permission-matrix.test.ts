@@ -188,8 +188,20 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * office's, not a platform capability.
      */
     /*
-     * MODULE 1, OWNER DECISION 123 — 230 -> 232. `legal-value.read` and `legal-value.declare`, the
-     * legal-values table's two codes.
+     * MODULE 1, OWNER DECISION 123. The catalogue goes from 230 to 232: `legal-value.read` and
+     * `legal-value.declare`, the legal-values table's two codes.
+     *
+     * ⚠️ THE FIGURES ARE DELIBERATELY NOT WRITTEN IN THE `DECISION <n> <em-dash> <count>` SHAPE
+     * the row above uses. `check:decision-index` walks a MULTI-NUMBER citation — its own header
+     * records which decision hid inside one for the whole life of the register, and that file is
+     * the one home for the story — and an em dash is one of its separators, so that shape reads as
+     * a citation of the COUNT and the gate refuses it as a decision with no file. It did, on this very comment. The row above survives only because its
+     * count is a DECLARED PHANTOM carrying that exact text.
+     *
+     * AND THE FIRST VERSION OF THIS WARNING QUOTED THE SHAPE LITERALLY, so the comment explaining
+     * the trap reproduced it and the gate went from 1 citation to 3. That is the
+     * comment-quotes-the-pattern blindness this repository has paid for five times, committed
+     * inside the sentence warning about it — which is why the shape is written with placeholders.
      *
      * BOTH LAND IN THE TOGGLE LIST, and the reason is the rule rather than the count: `familyOf`
      * gives them both the family `legal-value`, which therefore has TWO members — but only ONE of

@@ -480,7 +480,22 @@ if _positional:
 # comparable with every run recorded above. The new bucket is counted beside it rather than folded
 # in, because "nobody wrote a client" and "the client exists and no screen calls it" have different
 # fixes and can move in opposite directions.
-UNREACHED_BY_PATH_BUDGET = 13
+#
+# 🔴 13 -> 16 ON 2026-11-11, AND IT IS AN UP MOVE THAT IS OWED BACK. Module 1's legal-values table
+# (OWNER DECISION 123) adds three routes with no web caller: `GET /legal-values`,
+# `GET /legal-values/:code/history` and `POST /legal-values`. That is the UP direction this gate
+# exists to catch — "a capability nobody can exercise" — and it is DELIBERATE rather than an
+# oversight: message 35 §6 and message 36 §6 both say that no screen ships until the owner has
+# ratified every Arabic string it would need, and eleven of those cells are still hers. The routes
+# exist because decision 123's criteria 1, 2, 6 and 7 are about what an office ACCOUNT may and may
+# not do, and a criterion with no path cannot be planted against — `legal-value.e2e-spec.ts` is
+# what they are for.
+#
+# SO THIS IS A DEBT WITH A NAMED CREDITOR, not a reclassification. The screens are message 37, and
+# when they land this number comes back to 13 — and the DOWN direction failing is what makes that
+# true rather than hoped for. Raising it without that sentence would have been the exact thing the
+# paragraph above forbids.
+UNREACHED_BY_PATH_BUDGET = 16
 
 # The second figure. 9 here against 19 in the verb-aware pass, and the gap is the point: this pass is
 # verb-agnostic, so a route reads as addressed whenever ANY verb on its path is called live —
@@ -496,7 +511,12 @@ DEAD_ONLY_BY_PATH_BUDGET = 9
 # is why this count is gated separately — two routes and two controllers moving together is a
 # different fact from two routes leaving one controller, and a single total cannot tell them apart.
 # 8 -> 7: `legacy-import.controller.ts` carried exactly those two and nothing else.
-UNREACHED_CONTROLLER_BUDGET = 7
+# 7 -> 8 on 2026-11-11, and it is ONE controller rather than three: `legal-value.controller.ts`
+# carries all three of module 1's unreached routes. That is why this count is gated separately from
+# the route count — three routes arriving in one new controller is a different fact from three
+# arriving across three, and a single total cannot tell them apart. It comes back to 7 with the same
+# commit that takes the routes back to 13.
+UNREACHED_CONTROLLER_BUDGET = 8
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both

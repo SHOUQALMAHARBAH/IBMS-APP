@@ -7310,7 +7310,7 @@ model LegalValue {
   /// has not supplied its value has a row with a shape, a citation and no figure. Nothing may rest
   /// on it: no exemption, no automatic refusal, no alert. A zero would be a figure; NULL is the
   /// absence of one, and the difference is the whole point.
-  numericValue Decimal? @db.Decimal(18, 3)
+  numericValue Decimal?  @db.Decimal(18, 3)
   /// For `kind = DATE` only — the instrument's commencement is the one today.
   dateValue    DateTime? @db.Date
 

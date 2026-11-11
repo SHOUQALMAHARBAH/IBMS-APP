@@ -27,12 +27,28 @@
  * constant is the floor every one of them will share, which is why a third literal `10` must not
  * appear when it is built. See `docs/decision-126-declare-and-record-refuse-only-the-irreversible.md`.
  *
- * ⚠️ AND ONE FIGURE IS OPEN AND IS THE OWNER'S: the legal adviser's drafted window for art. 15/d
- * asks for a minimum of **15**, against the ten here. Reported and deliberately NOT changed — one
- * concept with one minimum is this file's whole purpose, and which number it holds is a decision
- * rather than a measurement. (`check:legal-numbers` declares this constant in `NOT_A_LEGAL_NUMBER`
- * for exactly this reason: the citation above is a REPORT about a different figure, and no
- * instrument states ten.)
+ * ## ✅ THE OPEN FIGURE IS CLOSED AT TEN — the owner, 11 November 2026
+ *
+ * This paragraph read: *one figure is open and is the owner's — the legal adviser's drafted window
+ * for art. 15/d asks for a minimum of 15, against the ten here.* It was reported and deliberately
+ * not changed, because which number one concept holds is a decision rather than a measurement.
+ *
+ * **It was put to her twice, and the second asking is the one that counts.** The first framed 15 as
+ * the adviser's suggestion and she kept 10. That framing was incomplete: **fifteen was already a
+ * recorded decision — decision 87, «وحقلُ المبرِّر خمسةَ عشرَ حرفاً حدّاً أدنى»** — and her standing
+ * rule is that an older decision stands until she strikes it KNOWING it is one. So it was asked
+ * again, with that said plainly. Her words: **«خليها 10 عادي ما بتضر»**.
+ *
+ * ⟶ **TEN IS THE FLOOR EVERYWHERE, and decision 87 is STRUCK on this point only** — the rest of
+ * decision 87 stands. `docs/decision-129-exemption-tagged-by-the-system-chosen-only-when-unknown.md`
+ * §5 carries her answer verbatim and is its one home. **No code changed: it was already ten.**
+ *
+ * The adviser's own drafted windows still SAY «حد أدنى 15 حرفاً» in `docs/answers/`, and they are
+ * source transcriptions — reported, never corrected in place. A window built from them ships his
+ * sentence and this file's floor, and the two now disagree by his number rather than by ours.
+ *
+ * (`check:legal-numbers` declares this constant in `NOT_A_LEGAL_NUMBER` for exactly this reason:
+ * the citation above is a REPORT about a different figure, and no instrument states ten.)
  *
  * ## Why it is in `common/` and not imported from the duty-segregation service
  *

@@ -153,7 +153,28 @@ PHANTOMS: dict[int, tuple[frozenset[str], str]] = {
 #   only thing stopping it reopening is `CITE_TAIL` plus the two self-test cases that
 #   plant the second and fourth numbers of a chain.
 # ---------------------------------------------------------------------------------------
-KNOWN_MISSING: dict[int, str] = {}
+# AND IT REFILLED ON 2026-11-11 WITH DECISION 87, which is the second real decision this
+# repository cites and cannot explain. See the entry's own text.
+KNOWN_MISSING: dict[int, str] = {
+    87: (
+        "Cited 3x in `apps/api/src/common/declaration-reason.ts`, where the owner STRUCK it on "
+        "2026-11-11. Decision 87 set the written-reason floor at FIFTEEN characters; the product "
+        "has always held TEN. Asked whether to strike it -- knowing it was a recorded decision "
+        "and not merely the legal adviser's suggestion, which is how the question had been put "
+        "the first time -- she kept ten. So ten is the floor everywhere and decision 87 is struck "
+        "ON THAT POINT ONLY; the rest of it stands. Her answer is verbatim in "
+        "`docs/decision-129-exemption-tagged-by-the-system-chosen-only-when-unknown.md`, section "
+        "5, which is its one home. "
+        "THE NUMBER IS NAMED RATHER THAN DROPPED, deliberately: a strike whose decision number "
+        "was removed to satisfy a gate is a strike nobody can attribute, and the next reader "
+        "re-derives the fifteen from the adviser's own drafted window -- which still asks for it "
+        "in `docs/answers/`, because those are source transcriptions and are reported rather "
+        "than corrected in place. "
+        "ITS FILE IS THE OWNER'S TO WRITE, like decision 82's. Both are real decisions this "
+        "repository cites and neither has a file: 82 is cited only inside decision 128's own "
+        "section 8, and 87 only here. Reported, not invented."
+    ),
+}
 
 # ---------------------------------------------------------------------------------------
 # A DECISION THAT IS NEVER CITED ON ITS OWN DECLARES ITS OWN COUNTING METHOD.

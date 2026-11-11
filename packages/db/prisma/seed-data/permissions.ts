@@ -1192,6 +1192,21 @@ const complianceRisk: PermissionSeed[] = [
    *
    * **EXECUTIVE_MANAGEMENT is deliberately NOT included**, on the recorded rule that widening a
    * grant the owner has not named is not a tidy-up.
+   *
+   * ## ✅ RATIFIED — OWNER DECISION 130, ruling 5 (11 November 2026)
+   *
+   * `docs/decision-130-three-insurers-per-request-and-four-rulings.md`. Both grants above are the
+   * owner's now: `legal-value.declare` to BRANCH_DEPARTMENT_MANAGER, and `legal-value.read` to
+   * that role and COMPLIANCE_OFFICER. They stopped being a reported default the moment she read
+   * them.
+   *
+   * ⚠️ AND THE ARABIC DESCRIPTIONS ARE **NOT** RATIFIED BY THAT. Both codes stay on
+   * `AWAITING_OWNER_REVIEW` in `apps/web/lib/admin/permission-descriptions.test.ts`, because the
+   * two things are separate questions: *who holds this code* is answered, and *is this sentence
+   * hers* is not. Both lines are COMPOSED from runs shipping elsewhere rather than sliced whole,
+   * and they go to her in message 36's §6 table. Taking them off that list on the strength of the
+   * grant ratification would claim she wrote a sentence she has never seen — which is exactly what
+   * that list exists to prevent.
    */
   {
     code: "legal-value.read",

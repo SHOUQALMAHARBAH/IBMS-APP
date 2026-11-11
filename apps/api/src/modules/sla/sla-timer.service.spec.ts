@@ -638,10 +638,7 @@ describe('startTimer uses the CONFIGURED policy, not the registry constant', () 
     const calls = create.mock.calls as [
       { data: { slaPolicyId: string; escalatedTo: string | null } },
     ][];
-    expect(calls.map((c) => c[0].data.slaPolicyId)).toEqual([
-      'p-old',
-      'p-old',
-    ]);
+    expect(calls.map((c) => c[0].data.slaPolicyId)).toEqual(['p-old', 'p-old']);
     expect(calls.map((c) => c[0].data.escalatedTo)).toEqual([
       'COMPLIANCE_OFFICER',
       null,
