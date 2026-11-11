@@ -536,7 +536,19 @@ export class RfqService {
      * licence is the thing the caller cannot change by editing the request — art. 3/a's own
      * ordering argument, reused.
      */
-    await this.licenseGate.assertMayPractise('REQUEST_QUOTES');
+    await this.licenseGate.assertMayPractise('REQUEST_QUOTES', async () => {
+      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+      // reads and costs no extra query unless the office actually has a partial suspension.
+      const scoped = await this.assertOpportunityVisible(
+        dto.opportunityId,
+        actor,
+        'Opportunity not found',
+      );
+      return this.assertLineInProgramme(
+        scoped.insuranceProgramId,
+        dto.insuranceLine,
+      );
+    });
     const opportunity = await this.assertOpportunityVisible(
       dto.opportunityId,
       actor,
@@ -627,8 +639,20 @@ export class RfqService {
      *
      * Two call sites, ONE gate — which is what the gate is for. It is not two answers.
      */
-    await this.licenseGate.assertMayPractise('REQUEST_QUOTES');
-    const { opportunityStatus } = await this.findVisibleRfq(rfqId, actor);
+    /*
+     * ART. 21/b/5 — the RFQ is read ONCE, here, and its branch handed to the gate.
+     *
+     * Unlike `createRfq`, this site made no "before the reads" argument — its own comment is about
+     * the ACT (soliciting the market is the same act as creating the request), not about ordering.
+     * So the read is hoisted rather than duplicated in a thunk: one query instead of two, and
+     * `customer-file-anchor.inventory.spec.ts` counts `findVisibleRfq(` occurrences to prove each
+     * write path keeps the owner-only policy. A second textual call inside ONE write path does not
+     * weaken that, and a bare count cannot tell the two apart — so the count is kept honest by not
+     * adding one.
+     */
+    const visible = await this.findVisibleRfq(rfqId, actor);
+    await this.licenseGate.assertMayPractise('REQUEST_QUOTES', visible.rfq);
+    const { opportunityStatus } = visible;
     this.assertOpportunityInMarketPhase(opportunityStatus);
 
     const insurerIds = [...new Set(dto.insurerIds)];

@@ -443,3 +443,188 @@ describe('the fold is a TOTAL order, because two acts can bear one date', () => 
     expect(first).toEqual(second);
   });
 });
+
+/**
+ * ART. 21/b/5 — A SUSPENSION LIMITED TO SOME INSURANCE BRANCHES.
+ *
+ * «وقف أو إلغاء ترخيص وسيط التأمين في فرع أو أكثر من فروع التأمين» — so the office can be stopped
+ * in motor and still trading in medical. Before `RegulatoryActionScopeLine` the licence was one bit
+ * for the whole office, and recording that act would have blocked everything or nothing.
+ *
+ * The compound case the module paper asks for is the FIRST test here: one office, one branch
+ * stopped, the rest working. Asserted in BOTH directions from the same standing, because either
+ * half alone passes against the defect — a gate that blocked everything would satisfy "motor is
+ * blocked", and one that blocked nothing would satisfy "medical is not".
+ */
+describe('art. 21/b/5 — a partial suspension', () => {
+  const MOTOR = 'std:line-motor';
+  const MEDICAL = 'std:line-medical';
+
+  it('stops the office in the named branch AND leaves the rest of the licence in force', () => {
+    const result = standing(
+      term(),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-03-01'),
+          scopeKeys: [MOTOR],
+        }),
+      ],
+      d('2026-07-01'),
+    );
+    // The office is NOT suspended: it is suspended in one branch. Reporting SUSPENDED here is the
+    // one-bit error this table exists to end, and `mayPractise` is what every gate reads.
+    expect(result.status).toBe('ACTIVE');
+    expect(result.mayPractise).toBe(true);
+    expect(result.blockedInsuranceBranchKeys).toEqual([MOTOR]);
+    expect(result.blockedInsuranceBranchKeys).not.toContain(MEDICAL);
+  });
+
+  it('blocks nothing when the act names no branch — zero scope lines means the WHOLE licence', () => {
+    // The compatibility hinge. Every act recorded before scope lines existed has none, so it must
+    // keep behaving office-wide; a scoped-by-default reading would neuter every suspension on
+    // record. Measured: `RegulatoryAction` held 0 rows when the table landed.
+    const result = standing(
+      term(),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-03-01'),
+        }),
+      ],
+      d('2026-07-01'),
+    );
+    expect(result.status).toBe('SUSPENDED');
+    expect(result.mayPractise).toBe(false);
+    expect(result.blockedInsuranceBranchKeys).toEqual([]);
+  });
+
+  it('reports NO branch list once the licence as a whole stops permitting practice', () => {
+    // An office that is wholly suspended is not "suspended in three branches"; it is suspended.
+    // Reporting both would let a caller read the branch list, miss `mayPractise`, and permit.
+    const result = standing(
+      term(),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-03-01'),
+          scopeKeys: [MOTOR],
+        }),
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-04-01'),
+        }),
+      ],
+      d('2026-07-01'),
+    );
+    expect(result.mayPractise).toBe(false);
+    expect(result.blockedInsuranceBranchKeys).toEqual([]);
+  });
+
+  it('lifts one branch with a scoped reinstatement and leaves the other stopped', () => {
+    const result = standing(
+      term(),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-03-01'),
+          scopeKeys: [MOTOR, MEDICAL],
+        }),
+        act({
+          kind: 'REINSTATEMENT',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-05-01'),
+          scopeKeys: [MOTOR],
+        }),
+      ],
+      d('2026-07-01'),
+    );
+    expect(result.blockedInsuranceBranchKeys).toEqual([MEDICAL]);
+  });
+
+  it('lifts EVERY branch with an unscoped reinstatement', () => {
+    // A CBJ decision re-entering the broker with no limitation is the regulator undoing its own
+    // acts. Reading it as "everything except the branches" would leave a block standing that the
+    // decision does not mention.
+    const result = standing(
+      term(),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-03-01'),
+          scopeKeys: [MOTOR, MEDICAL],
+        }),
+        act({
+          kind: 'REINSTATEMENT',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-05-01'),
+        }),
+      ],
+      d('2026-07-01'),
+    );
+    expect(result.blockedInsuranceBranchKeys).toEqual([]);
+  });
+
+  it('releases a scoped branch the day its own period runs out, with no sweep', () => {
+    // Art. 21/b's «وللمدة التي يراها مناسبة», per branch. Derived, so nothing has to expire it.
+    const scoped = act({
+      kind: 'SUSPENSION',
+      basis: 'SANCTION',
+      effectiveFrom: d('2026-03-01'),
+      suspendedUntil: d('2026-06-01'),
+      scopeKeys: [MOTOR],
+    });
+    expect(
+      standing(term(), [scoped], d('2026-05-01')).blockedInsuranceBranchKeys,
+    ).toEqual([MOTOR]);
+    expect(
+      standing(term(), [scoped], d('2026-07-01')).blockedInsuranceBranchKeys,
+    ).toEqual([]);
+  });
+
+  it('does NOT apply art. 14/c per branch, however long a branch has been stopped', () => {
+    // Art. 14/c is «في حال تجاوزت مدة وقف الترخيص سنتين» — the suspension of THE LICENCE, not of a
+    // branch. Deeming a branch cancelled after two years would be this system inferring a
+    // regulatory consequence from a provision that does not mention one.
+    const result = standing(
+      term({ issuedAt: d('2020-01-01'), expiresAt: d('2030-12-31') }),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'BROKER_REQUEST',
+          effectiveFrom: d('2022-01-01'),
+          scopeKeys: [MOTOR],
+        }),
+      ],
+      d('2026-07-01'),
+    );
+    expect(result.status).toBe('ACTIVE');
+    expect(result.deemedCancelledUnderArticle14C).toBe(false);
+    expect(result.blockedInsuranceBranchKeys).toEqual([MOTOR]);
+  });
+
+  it('returns the branch list SORTED, so two reads of one standing are equal', () => {
+    const result = standing(
+      term(),
+      [
+        act({
+          kind: 'SUSPENSION',
+          basis: 'SANCTION',
+          effectiveFrom: d('2026-03-01'),
+          scopeKeys: [MEDICAL, MOTOR],
+        }),
+      ],
+      d('2026-07-01'),
+    );
+    expect(result.blockedInsuranceBranchKeys).toEqual(
+      [...result.blockedInsuranceBranchKeys].sort(),
+    );
+    expect(result.blockedInsuranceBranchKeys).toEqual([MEDICAL, MOTOR].sort());
+  });
+});

@@ -133,6 +133,63 @@ export function writtenLinesIn(existing: string): string[] {
   return out;
 }
 
+/** A mirror line that does not match the dictionary's line for the same code. */
+export type MirrorLine = { readonly code: string; readonly mirror: string; readonly dictionary: string };
+
+/**
+ * The two ways a mirror line can disagree with the dictionary, which have OPPOSITE remedies.
+ *
+ * `orphaned` — the mirror holds a line and the dictionary holds NOTHING for that code. Regenerating
+ * would delete the only copy that exists anywhere, so it must be refused in both modes. This is the
+ * case the refusal was built for.
+ *
+ * `superseded` — both homes hold a line for the code and they differ. The dictionary is the single
+ * source by the owner's 2026-09-30 ruling, so the mirror is simply BEHIND it, and regenerating
+ * replaces a copy rather than destroying an original.
+ */
+export type MirrorDisagreements = {
+  readonly orphaned: readonly MirrorLine[];
+  readonly superseded: readonly MirrorLine[];
+};
+
+/**
+ * Splits a mirror/dictionary disagreement into the two cases above.
+ *
+ * ## Why this exists — one sentence was printed for both cases, and it deadlocked the gate
+ *
+ * The check used to be a single `line !== dictionary[code]` test, and the message it printed told the
+ * reader to move the line into the dictionary and regenerate. For an orphaned line that is right. For
+ * a superseded one it is an instruction that cannot be followed — the line IS in the dictionary, in a
+ * corrected form — and because the refusal ran before the write, the regenerate it named was refused
+ * by the same check. **Measured 2026-11-10: the gate had been red since 2026-10-28 and the repair it
+ * printed could not be run**, so the mirror an owner with no repository access reads went on showing
+ * one line the dictionary had corrected to say the opposite (`retention.archive.retrieve`: two bases
+ * where there are four) and one the owner's own strike had made false (`customer.update`).
+ *
+ * The distinction that decides it is not which text is nicer. It is **whether regenerating destroys
+ * the only copy**: for an orphan it does, and for a superseded line it cannot, because the dictionary
+ * holds one and the mirror is a tracked file whose previous bytes are in git. So the orphan refuses
+ * and the superseded line is reported as staleness — named in full, so a replacement is never silent.
+ */
+export function classifyMirrorDisagreements(
+  existing: string,
+  fromDictionary: Readonly<Record<string, string>>,
+): MirrorDisagreements {
+  const orphaned: MirrorLine[] = [];
+  const superseded: MirrorLine[] = [];
+  for (const [code, raw] of Object.entries(harvestExistingArabic(existing))) {
+    const mirror = raw.trim();
+    if (mirror === '') continue;
+    const dictionary = fromDictionary[code];
+    if (dictionary === undefined || dictionary.trim() === '') {
+      orphaned.push({ code, mirror, dictionary: '' });
+      continue;
+    }
+    if (dictionary.trim() !== mirror) superseded.push({ code, mirror, dictionary: dictionary.trim() });
+  }
+  return { orphaned, superseded };
+}
+
 /** The three lines one code contributes: its name, the stored English hint, and her Arabic slot. */
 function entry(
   code: string,

@@ -219,7 +219,19 @@ check "the one-provider partial unique still carries its WHERE" 1 \
 # because I ran the six database gates and NOT this script. `db:divergence` sees the FK as a
 # DECLARED expected statement and says nothing about the count; only this pin notices that the
 # shape a database reaches from NOTHING has moved.
-check "composite tenant FKs" 15 \
+#
+# 15 -> 16, art. 21/b/5: `RegulatoryActionScopeLine_office_line_same_org_fkey`, so a scope line
+# limiting an office's licence to some insurance branches cannot name ANOTHER office's private line
+# — which would make one office's suspension turn on another office's catalogue, on the record a
+# regulator reads. Same shape and same reason as the two entries above, and Prisma cannot express it
+# either, so it is a named entry in the divergence gate's expected set too.
+#
+# AND IT FIRED IN CI AGAIN, FOR THE IDENTICAL REASON THE PARAGRAPH ABOVE GIVES: I ran
+# `db:validate`, `db:divergence`, the three unit suites and six targeted e2e specs, and NOT this
+# script. The paragraph was written by somebody who had just made the mistake and it did not stop
+# the next person making it. **Run `bash scripts/from-empty.sh` before pushing any migration** —
+# `db:divergence` cannot answer this question, by construction.
+check "composite tenant FKs" 16 \
   "$(psql_scratch $'SELECT count(*) FROM pg_constraint WHERE contype = \'f\' AND conname LIKE \'%\\_same\\_org\\_fkey\'')"
 check "the eight reference tables are seeded" 8 \
   "$(psql_scratch 'SELECT count(*) FROM (SELECT 1 FROM "LegalForm" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "LicensingAuthority" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Country" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "City" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Bank" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "Currency" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "BusinessModel" HAVING count(*) > 0 UNION ALL SELECT 1 FROM "RatingAgency" HAVING count(*) > 0) t')"

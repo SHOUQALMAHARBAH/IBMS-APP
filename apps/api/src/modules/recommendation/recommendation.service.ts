@@ -763,7 +763,22 @@ export class RecommendationService {
      * customer. An office whose renewal is with the regulator may prepare its advice and may not
      * issue it — which is the narrowest reading that still blocks the act the owner named.
      */
-    await this.licenseGate.assertMayPractise('ISSUE_RECOMMENDATION');
+    await this.licenseGate.assertMayPractise(
+      'ISSUE_RECOMMENDATION',
+      async () => {
+        // Art. 21/b/5 — a recommendation carries no line of its own; the branch is the one behind
+        // the quotation it recommends. LAZY, so no extra query unless a partial suspension exists.
+        //
+        // MEASURED 2026-11-10: all 89 opportunities on dev span exactly ONE insurance line across
+        // their RFQs, so the recommended quotation's line is the recommendation's line. A
+        // multi-line opportunity is structurally possible (`Opportunity.rfqs` is a list) and has
+        // zero instances; if one appears, this names ONE of its branches and the gate would permit
+        // an act touching a suspended one. That is a product question -- which branch a multi-line
+        // recommendation belongs to -- and it is reported rather than guessed at here.
+        const sending = await this.loadVisible(id, actor);
+        return sending.recommendedQuotation.rfq ?? null;
+      },
+    );
     const rec = await this.loadVisible(id, actor);
     this.assertNotDiscarded(id, rec);
 

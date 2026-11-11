@@ -455,7 +455,8 @@ model Organization {
   createdByUserId String?
   updatedByUserId String?
 
-  regulatoryActions RegulatoryAction[]
+  regulatoryActions          RegulatoryAction[]
+  regulatoryActionScopeLines RegulatoryActionScopeLine[]
 
   dpoAlternateApproverUserId String?
   createdAt                  DateTime @default(now())
@@ -6089,17 +6090,18 @@ model InsuranceLine {
   displayOrder Int
   createdAt    DateTime              @default(now())
 
-  offeredBy             InsurerOfferedLine[]
-  licenceScopeLines     BrokerLicenseScopeLine[]
-  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
-  roleScopeBranches     RoleScopeBranch[]
-  formTemplates         InsurerFormTemplate[]
-  officeFormTemplates   OfficeInsurerFormTemplate[]
-  insuranceProgramLines InsuranceProgramLine[]
-  rfqs                  RFQ[]
-  policies              Policy[]
-  commissionAgreements  CommissionAgreement[]
-  insurerLicensedLines  InsurerLicensedLine[]
+  offeredBy                  InsurerOfferedLine[]
+  licenceScopeLines          BrokerLicenseScopeLine[]
+  regulatoryActionScopeLines RegulatoryActionScopeLine[]
+  cbjApprovalBranches        EmployeeCbjApprovalBranch[]
+  roleScopeBranches          RoleScopeBranch[]
+  formTemplates              InsurerFormTemplate[]
+  officeFormTemplates        OfficeInsurerFormTemplate[]
+  insuranceProgramLines      InsuranceProgramLine[]
+  rfqs                       RFQ[]
+  policies                   Policy[]
+  commissionAgreements       CommissionAgreement[]
+  insurerLicensedLines       InsurerLicensedLine[]
 
   @@index([category, displayOrder])
 }
@@ -6390,15 +6392,16 @@ model OfficeInsuranceLine {
   /// the kind of change that needs an attributable author.
   createdByUserId String
 
-  offeredBy             InsurerOfferedLine[]
-  licenceScopeLines     BrokerLicenseScopeLine[]
-  cbjApprovalBranches   EmployeeCbjApprovalBranch[]
-  roleScopeBranches     RoleScopeBranch[]
-  insuranceProgramLines InsuranceProgramLine[]
-  rfqs                  RFQ[]
-  policies              Policy[]
-  commissionAgreements  CommissionAgreement[]
-  officeFormTemplates   OfficeInsurerFormTemplate[]
+  offeredBy                  InsurerOfferedLine[]
+  licenceScopeLines          BrokerLicenseScopeLine[]
+  regulatoryActionScopeLines RegulatoryActionScopeLine[]
+  cbjApprovalBranches        EmployeeCbjApprovalBranch[]
+  roleScopeBranches          RoleScopeBranch[]
+  insuranceProgramLines      InsuranceProgramLine[]
+  rfqs                       RFQ[]
+  policies                   Policy[]
+  commissionAgreements       CommissionAgreement[]
+  officeFormTemplates        OfficeInsurerFormTemplate[]
 
   /// Once per office, per script.
   @@unique([organizationId, canonicalEn])
@@ -7092,6 +7095,21 @@ model SlaPolicy {
   workingHoursEnd   String?
   timezone          String          @default("Asia/Amman")
 
+  /// THIS IS THE LEGAL-VALUES SHAPE MODULE 1 EXTENDS, and it already carries all four columns that
+  /// module's §4.2 asks for: the value with its unit, its legal citation, its effective dating, and
+  /// who updated it. A second table beside this one would be a second answer to "what does the law
+  /// require here, and on whose authority".
+  ///
+  /// OWNER DECISION 123 widens WHOSE row it can be: a legal value this system cannot read but the
+  /// office can — eight figures in CBJ Instructions No. 9 of 2026 are unreadable in our scanned
+  /// copy — is entered BY THE OFFICE, with its citation, declared once, and every transaction it
+  /// applies to is attributed to that declaration. So `sourceReference` stops meaning only "the
+  /// provider's citation" and starts meaning "the citation whoever owns this row gave", and
+  /// `updatedByUserId` below is what makes that attributable. The system never says *this is the
+  /// legal ceiling*; it says *this is the ceiling your office declared, and here is its source*.
+  ///
+  /// `INTERNAL_POLICY` is already the honest home for a drafted figure with no authority behind it,
+  /// which is what the unnumbered configurable values need until an office supplies one.
   sourceType      SlaSourceType
   /// e.g. "PDPL Art. 23(b)" or "INTERNAL-POLICY-AML-002". MANDATORY when
   /// `sourceType` is REGULATORY.
@@ -7584,7 +7602,70 @@ model RegulatoryAction {
   recordedByUserId String
   recordedAt       DateTime              @default(now())
 
+  /// Art. 21/b/5 — the insurance branches this act is LIMITED TO. Empty means the whole licence.
+  scopeLines RegulatoryActionScopeLine[]
+
   @@index([organizationId, effectiveFrom])
+}
+
+/// ART. 21/b/5 — A SUSPENSION LIMITED TO SOME INSURANCE BRANCHES RATHER THAN THE WHOLE LICENCE.
+///
+/// «وقف أو إلغاء ترخيص وسيط التأمين في فرع أو أكثر من فروع التأمين» — so the regulator may stop an
+/// office in motor and leave it working in medical. Before this table the licence was one bit for
+/// the whole office, and recording that act would have blocked everything or nothing.
+///
+/// ## ZERO ROWS ON THIS TABLE MEANS THE WHOLE LICENCE, and that is the compatibility hinge
+///
+/// Every act recorded before this table existed has no scope lines, so it keeps meaning exactly what
+/// it meant: office-wide. `RegulatoryAction` held 0 rows on dev when this landed, so there is no
+/// back-fill and no interpretation of old data — measured, not assumed.
+///
+/// ## WHY THE SAME SHAPE AS `BrokerLicenseScopeLine` AND NOT A NEW ONE
+///
+/// An insurance branch is EITHER a standard catalogue line OR an office's own addition, and three
+/// models already carry that exact nullable pair with `onDelete: Restrict`
+/// (`BrokerLicenseScopeLine`, `EmployeeCbjApprovalBranch`, `RoleScopeBranch`). A fourth shape for
+/// the same fact would be a fourth thing to keep in step.
+///
+/// ## AND WHY THE GEOGRAPHIC HALF (ART. 21/b/6) IS NOT A COLUMN HERE YET
+///
+/// It is the same article and the owner's design judgement is that the two scopes SHARE this table
+/// when the geographic one arrives — a nullable `branchId` beside the pair, with its own partial
+/// unique. It is not added now because it would be unenforceable: measured 2026-11-10, no
+/// transaction carries a branch at all (`branchId` is on `Employee`, `SalesTarget` and `User` only;
+/// 0 of 60 employees have one), and `Branch` has no country, so «خارج المملكة» is inexpressible.
+/// OWNER DECISION 124 settles the shape — a transaction's branch is stamped at creation and frozen —
+/// and this table takes that column once the stamp exists, never before. A scope dimension the gate
+/// cannot resolve must refuse rather than permit, and a column nobody can populate would be a
+/// recorded suspension that blocks nothing.
+model RegulatoryActionScopeLine {
+  id                 String           @id @default(uuid())
+  organizationId     String           @default(dbgenerated())
+  organization       Organization     @relation(fields: [organizationId], references: [id])
+  regulatoryActionId String
+  regulatoryAction   RegulatoryAction @relation(fields: [regulatoryActionId], references: [id], onDelete: Cascade)
+
+  /// A standard catalogue line, or null when this branch is an office addition.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  /// An office's own line, or null when this branch is a standard one.
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  /// NOTE — "an act cannot list the same branch twice" is NOT expressible here, for the same reason
+  /// `BrokerLicenseScopeLine` records: a compound unique over a nullable column admits unlimited
+  /// rows whose column is NULL, because Postgres treats NULLs as distinct — the § 1.25 trap. It is
+  /// TWO PARTIAL uniques in raw SQL instead
+  /// (`RegulatoryActionScopeLine_one_standard_line_per_act` / `..._one_office_line_per_act`), and
+  /// `db:divergence` cannot see a partial index, so the migration asserts both in its own DO block.
+  ///
+  /// The "exactly one of the two is set" rule IS expressible and is a CHECK, also in the migration:
+  /// a row naming neither line scopes the act to nothing, and a row naming both is two branches
+  /// wearing one row.
+
+  @@index([regulatoryActionId])
+  @@index([organizationId])
 }
 
 /// Suspension or cancellation — the two acts a regulator takes against a licence. A LIFTING is not

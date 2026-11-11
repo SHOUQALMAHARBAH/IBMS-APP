@@ -62,7 +62,15 @@ export class CertificateOfInsuranceDocumentService {
      * what it placed, which ز.٢ protects as work on existing business. The certificate is an
      * assertion to a third party; the summary is a statement to the customer about their own file.
      */
-    await this.licenseGate.assertMayPractise('ISSUE_CERTIFICATE');
+    await this.licenseGate.assertMayPractise('ISSUE_CERTIFICATE', async () => {
+      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+      // reads and costs no extra query unless the office actually has a partial suspension.
+      const { policy } = await this.policies.getByIdWithCustomer(
+        policyId,
+        actor,
+      );
+      return policy;
+    });
 
     // The SAME visibility read + data-availability gate the
     // policy-schedule-summary slice already established — see that

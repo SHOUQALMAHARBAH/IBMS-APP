@@ -205,6 +205,28 @@ export class PolicyRepository {
     });
   }
 
+  /**
+   * ART. 21/b/5 — which insurance branch a policy belongs to, and nothing else.
+   *
+   * Two columns rather than `findById`'s whole context, because this is read inside the licence
+   * gate: an act is refused or permitted on this answer, so it must not depend on the rest of a
+   * policy being loadable. The endorsement and renewal gates both call it through a thunk, so the
+   * query only runs when the office actually has a partial suspension on record.
+   *
+   * Returns null for a policy that does not exist, which the gate treats as an unresolved branch
+   * and REFUSES on — the same direction as every other unresolved case, and the right one: an act
+   * on a policy the gate cannot find is not an act it should wave through.
+   */
+  findInsuranceBranch(id: string): Promise<{
+    insuranceLineId: string | null;
+    officeInsuranceLineId: string | null;
+  } | null> {
+    return this.prisma.client.policy.findUnique({
+      where: { id },
+      select: { insuranceLineId: true, officeInsuranceLineId: true },
+    });
+  }
+
   /** Just the id + status — for a bounded status-walk loop
    * (`PolicyCheckingService.driveCheckingOutcome`) that re-reads the live
    * status before every hop and does not need the full include. */

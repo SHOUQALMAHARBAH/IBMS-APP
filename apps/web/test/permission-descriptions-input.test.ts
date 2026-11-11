@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifyMirrorDisagreements,
   harvestExistingArabic,
   render,
   writtenLinesIn,
@@ -39,6 +40,51 @@ const CATALOGUE = [
 ];
 
 const ARABIC = 'الاطّلاع على سجل المورّدين دون تعديله.';
+
+describe('classifyMirrorDisagreements — the two cases that used to print one sentence', () => {
+  /*
+   * The distinction is not editorial. It is whether regenerating destroys the ONLY copy of a line.
+   *
+   * Measured 2026-11-10: the single `line !== dictionary[code]` test made this gate red from
+   * 2026-10-28 and the repair it printed — `npm run db:permission-descriptions` — was refused by the
+   * same check, because the refusal ran before the write. Two owner-corrected lines sat unmirrored
+   * for 13 days, one of them asserting the opposite of what the dictionary says.
+   */
+  const file = (code: string, line: string): string =>
+    ['      ' + code, '          en: whatever', `          ar: ${line}`].join('\n');
+
+  it('refuses a line the dictionary has NOTHING for — regenerating would delete the only copy', () => {
+    const got = classifyMirrorDisagreements(file('vendor.read', ARABIC), {});
+    expect(got.orphaned).toEqual([{ code: 'vendor.read', mirror: ARABIC, dictionary: '' }]);
+    expect(got.superseded).toEqual([]);
+  });
+
+  it('calls a line the dictionary has MOVED superseded, not orphaned — the mirror is merely behind', () => {
+    const moved = 'الاطّلاع على سجل المورّدين، ولا يعدّله.';
+    const got = classifyMirrorDisagreements(file('vendor.read', ARABIC), { 'vendor.read': moved });
+    expect(got.orphaned).toEqual([]);
+    expect(got.superseded).toEqual([{ code: 'vendor.read', mirror: ARABIC, dictionary: moved }]);
+  });
+
+  it('reports nothing when the two homes agree', () => {
+    const got = classifyMirrorDisagreements(file('vendor.read', ARABIC), { 'vendor.read': ARABIC });
+    expect(got.orphaned).toEqual([]);
+    expect(got.superseded).toEqual([]);
+  });
+
+  it('treats a dictionary entry that is blank as no entry at all, so a blank cannot silence the refusal', () => {
+    // A key present with an empty string is the shape a parity guard produces before anyone writes
+    // the text. If that counted as a home, the only copy would be deletable.
+    const got = classifyMirrorDisagreements(file('vendor.read', ARABIC), { 'vendor.read': '   ' });
+    expect(got.orphaned).toEqual([{ code: 'vendor.read', mirror: ARABIC, dictionary: '' }]);
+  });
+
+  it('ignores the dotted placeholder, so an unanswered slot is never reported as a line', () => {
+    const got = classifyMirrorDisagreements(file('vendor.read', '.'.repeat(64)), {});
+    expect(got.orphaned).toEqual([]);
+    expect(got.superseded).toEqual([]);
+  });
+});
 
 describe('harvestExistingArabic', () => {
   it('reads a written line and keys it by its code', () => {
