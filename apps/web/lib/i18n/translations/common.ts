@@ -8,7 +8,19 @@
 export const COMMON = {
   AR: {
     /*
-     * OWNER DECISION 60's THREE WORDS, AND THERE ARE ONLY THREE.
+     * ⚠️ OWNER DECISION 60 IS STRUCK (2026-11-03, confirmed 2026-11-10). **DECISION 125 GOVERNS**
+     * — `docs/decision-125-no-dash-a-word-per-field-by-its-screen.md` — and these three words are
+     * the first three of what it asks for rather than the whole of it. THE DASH DOES NOT APPEAR
+     * IN THE SYSTEM AT ALL: every empty value AND every option inside a select carries a word
+     * fitted to its own screen, measured module by module. ⛔ The guard survives the strike and
+     * is why nothing changes here today: the word is never invented — it is sliced from text
+     * already shipping on that same screen, or it is the owner's, and the table (site · word ·
+     * where it was sliced from) is shown to her before it ships. Measured on the day of the
+     * strike: 163 sites across 67 files, and no shared helper.
+     *
+     * ---- what decision 60 said, kept because the three words below are still hers ----
+     *
+     * HER THREE WORDS, AND THERE WERE ONLY THREE.
      *
      * A bare em dash leaves a reader asking *was this forgotten, or does it not apply?* —
      * which is the confusion this pass exists to remove. Her ruling gives a word to exactly
@@ -333,7 +345,19 @@ export const COMMON = {
   },
   EN: {
     /*
-     * OWNER DECISION 60's THREE WORDS, AND THERE ARE ONLY THREE.
+     * ⚠️ OWNER DECISION 60 IS STRUCK (2026-11-03, confirmed 2026-11-10). **DECISION 125 GOVERNS**
+     * — `docs/decision-125-no-dash-a-word-per-field-by-its-screen.md` — and these three words are
+     * the first three of what it asks for rather than the whole of it. THE DASH DOES NOT APPEAR
+     * IN THE SYSTEM AT ALL: every empty value AND every option inside a select carries a word
+     * fitted to its own screen, measured module by module. ⛔ The guard survives the strike and
+     * is why nothing changes here today: the word is never invented — it is sliced from text
+     * already shipping on that same screen, or it is the owner's, and the table (site · word ·
+     * where it was sliced from) is shown to her before it ships. Measured on the day of the
+     * strike: 163 sites across 67 files, and no shared helper.
+     *
+     * ---- what decision 60 said, kept because the three words below are still hers ----
+     *
+     * HER THREE WORDS, AND THERE WERE ONLY THREE.
      *
      * A bare em dash leaves a reader asking *was this forgotten, or does it not apply?* —
      * which is the confusion this pass exists to remove. Her ruling gives a word to exactly

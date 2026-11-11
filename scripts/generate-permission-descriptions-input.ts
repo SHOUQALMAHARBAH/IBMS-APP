@@ -26,7 +26,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
 import {
-  harvestExistingArabic,
+  classifyMirrorDisagreements,
   OUT,
   render,
   writtenLinesIn,
@@ -48,20 +48,38 @@ function arabicFromDictionary(codes: readonly string[]): Record<string, string> 
 }
 
 /**
- * Codes whose `ar:` line in the mirror is not the dictionary's line for that code.
+ * Codes whose `ar:` line in the mirror exists in NO other home — the dictionary has nothing for
+ * them at all. Regenerating would delete the only copy, so both modes refuse.
  *
  * READS THE FILE, NOT THE DICTIONARY'S OPINION OF IT — the same reason `writtenLinesIn` exists
  * beside `harvestExistingArabic`: a safety check built out of the component whose failure it exists
  * to catch reports the mildest message in the worst case, which this generator has already been
  * bitten by once.
+ *
+ * ## It used to refuse one case too many, and that deadlocked this gate for 13 days
+ *
+ * This was `line !== fromDictionary[code]`, which is true both when a line exists only here AND when
+ * the dictionary has since been corrected. The second is ordinary staleness, and refusing it made
+ * `npm run db:permission-descriptions` — the repair this script's own message names — exit 1 without
+ * writing. See `classifyMirrorDisagreements` for the measurement and the rule that separates them.
  */
-function linesWrittenInTheWrongHome(
+function linesWithNoOtherHome(
   existing: string,
   fromDictionary: Readonly<Record<string, string>>,
 ): string[] {
-  return Object.entries(harvestExistingArabic(existing))
-    .filter(([code, line]) => line.trim().length > 0 && line.trim() !== fromDictionary[code])
-    .map(([code, line]) => `${code}: ${line.trim()}`);
+  return classifyMirrorDisagreements(existing, fromDictionary).orphaned.map(
+    (line) => `${line.code}: ${line.mirror}`,
+  );
+}
+
+/** Codes where both homes hold a line and they differ — the mirror is behind the dictionary. */
+function linesTheDictionaryHasMoved(
+  existing: string,
+  fromDictionary: Readonly<Record<string, string>>,
+): string[] {
+  return classifyMirrorDisagreements(existing, fromDictionary).superseded.map(
+    (line) => `${line.code}\n      mirror now:  ${line.mirror}\n      dictionary:  ${line.dictionary}`,
+  );
 }
 
 const CHECK_ONLY = process.argv.includes('--check');
@@ -89,29 +107,49 @@ async function main(): Promise<void> {
     const content = render(catalogue, written);
     const mirrored = catalogue.filter((p) => written[p.code] !== undefined).length;
 
-    // A LINE IN THE WRONG HOME, in BOTH modes and before any write. "Stale" is routine; "somebody
-    // wrote a description in the mirror" is not, and the two must not print the same sentence —
-    // regenerating over it would destroy reviewed work and report success.
-    const misplaced = linesWrittenInTheWrongHome(existing, written);
-    if (misplaced.length > 0) {
+    // A LINE WITH NO OTHER HOME, in BOTH modes and before any write. "Stale" is routine; "somebody
+    // wrote a description in the mirror and it exists nowhere else" is not, and the two must not
+    // print the same sentence — regenerating over THAT would destroy the only copy and report
+    // success. A line the dictionary has merely MOVED is handled as staleness below, because
+    // refusing it left the mirror unrepairable by the very command this message names.
+    const orphaned = linesWithNoOtherHome(existing, written);
+    if (orphaned.length > 0) {
       console.error(
-        `permission-descriptions: ${misplaced.length} Arabic line(s) are written in ${OUT}, which is a MIRROR and is not read by anything.`,
+        `permission-descriptions: ${orphaned.length} Arabic line(s) in ${OUT} exist in NO other home — ${DICTIONARY} has nothing for those codes, so regenerating would delete the only copy.`,
       );
       console.error(`  Move each one into ${DICTIONARY} under its \`perm:<code>\` key, then regenerate.`);
-      console.error(`  First: ${misplaced[0]}`);
+      console.error(`  First: ${orphaned[0]}`);
       process.exitCode = 1;
       return;
     }
+
+    // Both homes hold a line and they differ. Named in full in both modes, so a replacement is never
+    // silent — but it does not block the write, because the dictionary is the single source and the
+    // mirror is a tracked file whose previous bytes are in git.
+    const moved = linesTheDictionaryHasMoved(existing, written);
 
     if (CHECK_ONLY) {
       if (existing !== content) {
         // Kept as a second, independent reading of the file — `writtenLinesIn` does not ask the
         // harvest, so a broken harvest cannot make this silent. That defect was real here once: the
         // worst failure printed the mildest message, proven by planting it.
-        const dropped = writtenLinesIn(existing).filter((line) => !content.includes(line));
+        // Lines that vanish with NO explanation. A superseded line also vanishes, but `moved` has
+        // just named it with both texts, so counting it twice would bury the unexplained case.
+        const explained = new Set(
+          classifyMirrorDisagreements(existing, written).superseded.map((line) => line.mirror),
+        );
+        const dropped = writtenLinesIn(existing).filter(
+          (line) => !content.includes(line) && !explained.has(line.trim()),
+        );
         console.error(
           `permission-descriptions mirror: STALE — ${OUT} does not match the seeded catalogue (${catalogue.length} codes) plus ${DICTIONARY}.`,
         );
+        if (moved.length > 0) {
+          console.error(
+            `  ${moved.length} code(s) have a DIFFERENT line in the dictionary; regenerating replaces the mirror's copy:`,
+          );
+          for (const line of moved) console.error(`    - ${line}`);
+        }
         if (dropped.length > 0) {
           console.error(
             `  AND regenerating would DROP ${dropped.length} Arabic line(s) present in the file. First: ${dropped[0]}`,
@@ -127,6 +165,14 @@ async function main(): Promise<void> {
       return;
     }
 
+    // Before the write, not after: the replaced text is in the log whether or not anyone reads the
+    // diff, which is the property the old blanket refusal was reaching for.
+    if (moved.length > 0) {
+      console.log(
+        `permission-descriptions mirror: replacing ${moved.length} line(s) the dictionary has moved:`,
+      );
+      for (const line of moved) console.log(`  - ${line}`);
+    }
     writeFileSync(OUT, content, 'utf8');
     console.log(
       `permission-descriptions mirror: wrote ${OUT} (${catalogue.length} codes, ${mirrored} Arabic line(s) from the dictionary).`,

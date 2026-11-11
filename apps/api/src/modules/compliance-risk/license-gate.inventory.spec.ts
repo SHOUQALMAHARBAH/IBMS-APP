@@ -124,6 +124,7 @@ function standing(
     mayPractise: false,
     standingActDecisionRef: null,
     deemedCancelledUnderArticle14C: false,
+    blockedInsuranceBranchKeys: [],
     ...over,
   };
 }

@@ -32,6 +32,15 @@ export function licensedOffice(): LicenseGateService {
     mayPractise: true,
     standingActDecisionRef: null,
     deemedCancelledUnderArticle14C: false,
+    // Art. 21/b/5 — no branch is blocked, which is what "licensed office" means, and this must stay
+    // the unrestricted case: a double that blocked a branch would refuse every call site that has
+    // not yet learned to name one, and the specs would be asserting the double.
+    //
+    // There is deliberately no partially-suspended double. The branch logic is tested against the
+    // REAL service with fake repositories (`license-gate.service.spec.ts`), because a double that
+    // reimplemented "is this branch blocked" would be the second answer to the question the gate
+    // exists to answer once.
+    blockedInsuranceBranchKeys: [],
   };
   return {
     // Resolved promises, not bare values: the real engine is async, and a synchronous double would
@@ -57,6 +66,10 @@ export function unlicensedOffice(
     mayPractise: false,
     standingActDecisionRef: null,
     deemedCancelledUnderArticle14C: false,
+    // Empty, and NOT overridable into something meaningful: a branch block is only reported while
+    // the licence as a whole permits practice, so an office that may not practise at all has no
+    // branch list. `deriveLicenseStanding` enforces the same thing.
+    blockedInsuranceBranchKeys: [],
     ...over,
   };
   return {

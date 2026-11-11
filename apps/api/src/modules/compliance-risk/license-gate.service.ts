@@ -4,7 +4,9 @@ import { RegulatoryActionRepository } from '../../repositories/regulatory-action
 import { pickCurrentTerm } from './broker-license.config';
 import {
   deriveLicenseStanding,
+  insuranceBranchKey,
   type DerivedLicenseStanding,
+  type InsuranceBranchRef,
 } from './license-standing.config';
 
 /**
@@ -123,7 +125,22 @@ export class LicenseGateService {
       this.licenses.findTerms(),
       this.acts.findAll(),
     ]);
-    return deriveLicenseStanding(pickCurrentTerm(terms), acts, now);
+    return deriveLicenseStanding(
+      pickCurrentTerm(terms),
+      /*
+       * Art. 21/b/5 — the scope lines become `insuranceBranchKey`s HERE, at the one boundary
+       * between the database's two nullable columns and the derivation's single key. The derivation
+       * stays pure and never sees a nullable pair, so it cannot compare two NULLs and read them as
+       * the same branch.
+       */
+      acts.map((a) => ({
+        ...a,
+        scopeKeys: a.scopeLines
+          .map((line) => insuranceBranchKey(line))
+          .filter((key): key is string => key !== null),
+      })),
+      now,
+    );
   }
 
   /**
@@ -133,15 +150,80 @@ export class LicenseGateService {
    * guess which of six states they are in — and the six are not interchangeable: an office with no
    * term on record has a different thing to do from one whose licence the CBJ suspended.
    */
+  /*
+   * `branch` IS REQUIRED, with no default, and that is deliberate.
+   *
+   * A default of `null` would compile at every existing call site and then refuse them all the day
+   * a partial suspension is recorded — correct in direction and invisible until it bites. Required,
+   * the COMPILER asks each of the eight call sites which insurance branch its act belongs to, and a
+   * site that genuinely cannot answer passes `null` on purpose with its reason beside it. That is
+   * the form that cannot express the mistake rather than the form that requires noticing it.
+   */
   async assertMayPractise(
     act: LicenceGatedAct,
+    branch: InsuranceBranchSource,
     now: Date = new Date(),
   ): Promise<void> {
     const standing = await this.standing(now);
-    if (standing.mayPractise) return;
-    throw new UnprocessableEntityException(refusal(act, standing));
+    if (!standing.mayPractise) {
+      throw new UnprocessableEntityException(refusal(act, standing));
+    }
+    if (standing.blockedInsuranceBranchKeys.length === 0) return;
+
+    /*
+     * ART. 21/b/5 — THE OFFICE IS STOPPED IN SOME BRANCHES AND TRADING IN THE REST.
+     *
+     * THE UNRESOLVED CASE REFUSES, and that is the load-bearing decision in this method.
+     *
+     * A caller that cannot name the branch its act belongs to leaves the gate unable to tell a
+     * permitted act from a forbidden one. Permitting would make a recorded CBJ suspension block
+     * nothing while the screen shows it as in force — a suspension that exists in the register and
+     * not in the product, which is worse than refusing, because nobody finds out. Refusing is
+     * visible on the first attempt and names what is missing.
+     *
+     * It costs nothing until a scoped act exists: `blockedInsuranceBranchKeys` is empty for every
+     * office with no partial suspension, and the method has already returned above.
+     */
+    const resolved = typeof branch === 'function' ? await branch() : branch;
+    const key = resolved === null ? null : insuranceBranchKey(resolved);
+    if (key === null) {
+      throw new UnprocessableEntityException(
+        `${LICENCE_GATED_ACTS[act]} is blocked — the CBJ has limited this office's licence to some ` +
+          `insurance branches (art. 21/b/5), and this request does not say which branch it belongs ` +
+          `to, so the limit cannot be applied to it. This is a gap in the request rather than a ` +
+          `decision about the office: the act is refused rather than allowed through an unchecked ` +
+          `licence limit.`,
+      );
+    }
+    if (standing.blockedInsuranceBranchKeys.includes(key)) {
+      throw new UnprocessableEntityException(
+        `${capitalise(LICENCE_GATED_ACTS[act])} is blocked — the CBJ has suspended or cancelled ` +
+          `this office's licence in the insurance branch this request belongs to, while leaving the ` +
+          `rest of the licence in force (CBJ Instructions No. 9 of 2026, art. 21/b/5). Practising in ` +
+          `a branch the office is stopped in is a ground for administrative sanction (art. 21/a/9). ` +
+          `Business in the office's other branches is not affected, and neither is work on existing ` +
+          `business in this one — collection, claims, cancellations, reporting and compliance.`,
+      );
+    }
   }
 }
+
+/**
+ * WHERE A CALL SITE'S INSURANCE BRANCH COMES FROM — a value, `null`, or a THUNK.
+ *
+ * The thunk is not a convenience. `rfq.service.ts` gates BEFORE it reads the opportunity, on a
+ * documented ordering argument — *"the licence is the thing the caller cannot change by editing the
+ * request"* — and the branch is only knowable AFTER that read, from the programme line the RFQ
+ * inherits. A value-only parameter would have forced one of two bad choices: move the gate after
+ * the reads and lose the ordering, or pass `null` and refuse every RFQ in an office with any
+ * partial suspension.
+ *
+ * Lazy, so the extra read happens ONLY when a partial suspension actually exists — the gate checks
+ * `blockedInsuranceBranchKeys` first and returns before ever calling the thunk. On every office
+ * today that is every call: zero added queries.
+ */
+export type InsuranceBranchSource =
+  InsuranceBranchRef | null | (() => Promise<InsuranceBranchRef | null>);
 
 /**
  * The refusal sentence — exported and PURE, so its wording is unit-testable without a database and

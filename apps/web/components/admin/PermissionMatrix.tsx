@@ -108,6 +108,18 @@ export function PermissionMatrix({
             onChange={(e) => apply([row.code], e.target.checked)}
           />
           <span>
+            {/* 🔴 OWNER DECISION 127 (2026-11-03) — NO PERMISSION CODE IS EVER SHOWN TO A USER.
+                Every permission is to carry a short plain Arabic NAME, sliced from its own shipped
+                Arabic description, and the code stays inside the system as a reference: on
+                `data-code` for the tests, matched by search, never rendered. An office manager
+                handing out `rfq.read` is being asked to grant something they cannot read.
+
+                NOT BUILT. Three render sites carry the code today — this one, the family header
+                below, and `settings/roles/page.tsx` — plus five Arabic refusal messages ending in
+                `({code})`. The name table is a derivation from the descriptions and the owner
+                ratifies it before any name ships; the first name is hers already
+                (`retention.archive.retrieve` → «استخراج سجل مؤرشف/محجوب»). See
+                `docs/decision-127-no-permission-code-shown-an-arabic-name.md`. */}
             <code>{row.code}</code>
             {/* One short line BENEATH the name, not appended to it: the owner's finding is that a
                 code is not an explanation, and a description crammed onto the same line after an

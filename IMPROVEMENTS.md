@@ -18,6 +18,11 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Remembering not to select a relationship column | A `SECURITY DEFINER` view where it is unreachable |
 | Remembering that a migration changed a stored key | A `DO` block that refuses to deploy if it did not recompute |
 | Reading `setting \|\| unit` and spotting `"5242888kB"` (§ 1.32) | `SHOW`, or separate columns, which cannot concatenate |
+| Believing an extraction's «unreadable» about the source it came from | Reading the SOURCE — an absence claim is measured on the object it is about |
+| An extraction marking a figure «trusted» because it came out in Latin digits | Nothing: OCR emits Latin digits for Arabic-Indic input, so the signal carries no information |
+| A gate counting a population that cannot contain its subject | Measuring the class from the discriminator's own direction before trusting `ok` |
+| Declaring a structured legal literal by NAME | Pinning its figure SET, so a figure added to the array cannot change no key |
+| A citation comment that happens to render above a declaration | A comment block ending at its own `*/`, attributed to the declaration below it |
 | Reading a character class to check its ranges (§ 1.34) | Decoding it and diffing against the intended set |
 | Remembering that a guard covers only one directory (§ 1.34) | A sanity test that fails when a root moves |
 | Believing a published count because it was carefully derived | A `--self-test` that plants each column's condition and fails unless the number moves (§ 1.79) |
@@ -31,6 +36,10 @@ numbered entries covers — which is the only kind of documentation that scales.
 | Anchoring a negative on its container | Anchoring it on something the role actually holds |
 | Treating a single collision as a data problem | Computing its rate first — one in three here |
 | Trusting that a reset seeded | Checking 219 permissions AND 502 grants |
+| Reading "no checks reported" off a zero exit code | Reading the commit's own check-runs and asserting their COUNT |
+| Waiting until nothing is pending (rule 12) | Waiting until the thing you named is PRESENT and `completed` |
+| A comment claiming a figure is not restated here | A declaration that imports it, asserted on the source text |
+| A guard reading a generated copy of its subject | A parity spec making the copy unable to diverge |
 
 The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
 THE SAME, and only care separates them. Care is not a control — it is the thing that was
@@ -346,6 +355,141 @@ duplicated counts everywhere else. The general rule:
 
 > **Two routes agreeing is evidence only when they are independent in the thing that can be
 > wrong.** Sharing a matcher, a resolution path, or a copied constant is not independence.
+
+## The absence claim measured on a derivative — 2026-11-10
+
+> **"Unreadable in OUR EXTRACTION" is not "unreadable in the SOURCE."** An absence claim about a
+> source is measured on the source itself, never on a derivative of it.
+
+This is rule 11's sharpest instance and it cost the owner a search for numbers that were never
+missing. It is recorded separately because **the failure was not that nobody re-measured — it was
+that the re-measurement was performed on the wrong object.**
+
+**What happened.** `docs/legal/cbj-instructions-9-2026-source-text.md` is OCR output from a scanned
+PDF. It marks eight figures «رقمٌ غير مقروء». That claim travelled — into
+`docs/legal/00-index-sources.md`'s list of gaps, into `docs/modules/00-index-...md`'s deadline
+section, into the module-1 paper as *"a first item in this module that code does not write"*, and
+into a comment inside `scripts/measurements/legal-numbers.py`. **Every one of those said the
+instrument was unreadable. The instrument is plainly legible; the OCR was not.** All eight read
+first time off the page images: effective date **24/6/2026** (p3) · **5,000 / 6 branches**,
+**7,500 / 12**, **10,000 above 12** (p5) · **2,000 JOD** (p17) · art. 15/e/2's full text (p17) ·
+**50%** (p26) · **30 days** (p29).
+
+**And the repository already held the refutation.** `docs/legal/cbj-instructions-9-2026-reading.md`,
+dated 9 October, carries the amounts checked against the page images, and `CAPITAL_BANDS` in
+`broker-license-scope.config.ts` has held 5000 / 7500 / 10000 with 6 and 12 the whole time. A
+four-way agreement sat beside the claim and nobody put them next to each other.
+
+**The second half, which is worse than the silence.** The extraction does not merely decline to
+read those figures — **it publishes two WRONG ones and marks them «موثوق» (trusted)**:
+
+| | the extraction | the instrument |
+|---|---|---|
+| art. 4/a/2 amount | **7,000** — "Latin digits, therefore trusted" (its raw line 129) | **٧٬٥٠٠** |
+| art. 4/a/1 branch cap | **5 branches** — "Latin digits, trusted" (raw line 127) | **٦** |
+
+**One mechanism, and it is the generalisable part:** the file's stated reliability rule — *Arabic-Indic
+digits are corrupted by this OCR, Latin ones survived* — **treats a Latin-digit OUTPUT as evidence of a
+Latin-digit INPUT.** It is not. Both figures are drawn in Arabic-Indic digits in the instrument, and
+the OCR emitted Latin digits with different values. So:
+
+> **An instrument's confidence signal is only as good as the inference behind it.** "It came out in
+> Latin digits" says nothing about whether it was read correctly, and every figure that file marks
+> trusted on that ground inherits the doubt — including art. 13/b/2's **50,000**, which has not been
+> read from the image and is neither confirmed nor refuted.
+
+**What was done.** The source text is NOT edited — it is source, and correcting it in place would make
+it lie to the next reader. One dated marker sits at its head naming both wrong figures, the mechanism,
+and the 15/e item-number slip (`م(15/هـ/3)` where the paragraph has two items and the rule is the
+second). The four derived places carry dated markers with the old text left visible. `CAPITAL_BANDS`
+now carries art. 4/a's citation on its own declaration, with the 7,000-vs-7,500 disagreement named.
+
+## A gate that was green over a population that did not contain its subject — 2026-11-10
+
+`npm run check:legal-numbers` read **149 declarations scanned, 2 cited, 2 declared, ok** — while the
+largest block of legal figures in the codebase sat outside everything it counted. `CAPITAL_BANDS`
+carries five of art. 4/a's figures and was invisible **twice over**, by two independent mechanisms:
+
+1. **Shape.** The gate's unit was *a bare numeric constant declaration*. These are object properties,
+   and the three amounts are **strings** — because `money-decimal-jod.md` forbids a JOD figure existing
+   as a JS number, and that rule is correct. **So the right rule for money hid the figures from the
+   right rule for legal numbers.**
+2. **Attribution.** The `ART. 4/a's BANDS` doc comment was not above `CAPITAL_BANDS` at all. Two doc
+   comments were stacked and the citation rendered above `INSURANCE_LINE_CATEGORIES`, two declarations
+   up. A reader consulting the capital bands met a comment about an unrelated array, and a
+   shape-aware gate reading the declaration's own comment block would still have found no citation.
+
+**The class was measured before it was fixed, and from the direction that cannot be biased by the
+shapes one happens to think of**: start at every comment block that CITES a legal source and ask what
+it governs. 191 cited blocks across the three scanned roots → 2 bare numeric constants (the two the
+gate saw) · 13 declarations in other shapes carrying digits, **of which 0 are legal figures** once the
+digits are read properly (citation text like `'art. 10/a/2'`, call expressions, and one explicitly
+drafted non-legal heuristic) · 12 cited blocks governing another comment, **of which exactly 1 is a
+real detached citation** — `CAPITAL_BANDS`. And 101 citations live in `.prisma`/`.sql` and 18 in
+`apps/web/app`+`components`, which the gate does not read at all: all of them are prose or
+provenance notes, **none a figure a program reads.**
+
+**The instrument reproduced the defect it was hunting, which is why this entry exists.** Its first
+version accumulated comment lines until a non-comment line — merging two stacked blocks — and so
+attributed art. 4/a's citation to the next declaration down and reported it as carrying no digits.
+That is the same misattribution the gate's own `own_comment_block` was written to prevent, committed
+by the thing measuring it. A block now ends at its own `*/`, and a cited block followed by another
+comment is reported as ORPHANED rather than silently assigned to someone else's declaration.
+
+**And the fix had to be the discriminator, not a declaration**, because of the plant the owner asked
+for: *add a seventh figure to `CAPITAL_BANDS` and show the gate goes red*. A declared list keyed by
+`path:NAME` would NOT have gone red — the key does not change when a band is added to an array that
+is already declared. So `DECLARED_FIGURES` pins the figure SET, and the gate fails on an added, a
+removed or a changed figure, naming it. Three plants: a fourth band → red naming `15000` and `20`;
+`7500` → `7000` (the extraction's own wrong figure) → red naming both directions; re-detaching the
+comment → red as *declared but no longer found*.
+
+**The accepted cost, stated rather than hidden:** `DECLARED_FIGURES` is a second written home for
+those five numbers. It is accepted because the gate FAILS when the two disagree, so they cannot
+silently diverge — the standard `permission-catalogue-parity.spec.ts` already sets.
+
+## Rule 12 — a completeness predicate asserts the PRESENCE of what it waits for, eight instances
+
+> **١٢ · شرطُ الاكتمال يؤكّد وجودَ ما ينتظره، لا غيابَ ما يخافه.**
+>
+> **A completeness predicate must assert the PRESENCE of what it waits for, never the absence of
+> what it fears.**
+
+Promoted to a numbered rule in `docs/modules/00a-day-one-setup-and-verification.md` § ٤ on
+2026-11-10, by the owner, on the ground that four measured instances is what separates a rule from
+an anecdote. **There are EIGHT as at 2026-11-11 — the seven below plus the step-level watch
+described after the table — and the eighth is the sharpest, because it is the WRAPPER around a
+watch that had already been fixed for this exact rule.** **The common shape, which is what to recognise:** *a condition evaluated over an input
+that could be empty, where EMPTY and SATISFIED are the same answer.*
+
+| # | The predicate | Why empty satisfied it | Measured |
+|---|---|---|---|
+| 1 | a pipeline through `jq`, with failures defaulted away by `\|\| true` | the `jq` BINARY does not exist on this host, so every extraction was empty and every emptiness read as "no failures" | two CI watches reported green while the build was red |
+| 2 | `[ -f "$script" ] && exec bash "$script" \|\| true` | `\|\| true` sat on the line that DECIDES whether a guard runs, so a deleted or renamed hook exited 0 — indistinguishable from a clean pass | 4 of 6 brain hooks were unregistered here and all 7 were recorded `100644`, so on any fresh clone they were inert |
+| 3 | `all(check-runs are success)` | the check-run set was wholly green **under a workflow run still `in_progress`** — the later jobs had not produced rows yet | a green read taken off an object that could not yet disagree |
+| 4 | `all(bucket != "pending")` over `gh pr checks` | a workflow run NOT YET REGISTERED contributes **no row**, so the predicate was vacuously true over a set that did not contain the job it was waiting for | announced ALL CHECKS SETTLED listing only CodeQL's two rows while `CI status=pending` on the same sha |
+| 5 | `gh pr checks <n>` keyed on its EXIT CODE | it printed `no checks reported on the '<branch>' branch` **and exited 0** — so *no checks exist* and *all checks passed* are the same answer from the tool's own exit status | measured 2026-11-10 while 5 check-runs were already `in_progress` on that exact sha |
+| 6 | a watch keyed only on `actions/runs?head_sha=` | **the runs index LAGS the check-runs API** — `commits/<sha>/check-runs` showed 5 jobs `in_progress` at 16:30:01Z while the runs index still returned an empty list for several minutes | the corrected watch emitted `WAIT` three times through that window and concluded nothing, which is why the WAIT branch had to exist rather than being a nicety |
+| 7 | **the WRAPPER around a watch already fixed for this rule** | `for i in $(seq 1 40); do …; done` ran out of attempts with its last reading `WAIT` and **exited 0** — a `for` loop's status is its last command's, and that was a successful `sleep`. So *the run finished* and *I gave up waiting* were the same answer from the wrapper's exit status | measured 2026-11-11 on THREE background watches at once, every one reported by the harness as *completed (exit code 0)* while none had concluded. **The loop lives inside the script now and EXHAUSTION is an explicit `exit 4` with a loud line**, self-tested against a sha that has no runs. A second defect fell out with it: the script re-read `git rev-parse HEAD` every attempt, so a push mid-watch silently moved the subject — the sha is pinned once now |
+
+**The fix in every case is the same move this file opens with:** key on a value that must be
+present. For (4) that is the RUN's own `status == completed` on the exact sha, with *no run
+registered yet* emitting an explicit WAIT line rather than silence; for (2) it is `exit 2` naming
+the missing file; for (1) it is `gh --jq`, which needs no binary, plus a non-vacuity floor.
+
+**And a fifth instance landed minutes after the fourth was written up, which is the argument for
+treating this as a shape rather than a bug list.** A step-level watch tested `.conclusion != null`
+while `gh` returns `""` for a pending step — so one wrong emptiness test produced a false
+"36/36 concluded" AND listed the 10 unrun steps as failures, wrong in opposite directions at once.
+Corrected to `!= null and != ""` → 26/36, 0 not-success.
+
+> **And the generalisation rows 5 and 6 add, which is the part worth keeping:** *two GitHub APIs disagree about whether a build exists, and the disagreement has a DIRECTION — the check-runs API knows first.* So "no run has registered" is a statement about one index at one moment, never about the build. It must emit a WAIT line and never a verdict — and a tool that says "no checks reported" while exiting 0 must never be keyed on its exit code.
+
+> **A sharpening of the measurement rule, from the same batch:** *the figure that survived longest
+> wrong is the one whose unit sounded like the thing it was not.* Three of four wrong figures in
+> module 1's opening measurement were a wrong UNIT, not a wrong count — `perm:` keys counted a
+> comment quoting the pattern, roles/grants counted all offices where the subject was one, and
+> "8 call sites across 6 modules" was the FILE count wearing the word *modules*.
 
 ## The standing rule for every number this file publishes
 

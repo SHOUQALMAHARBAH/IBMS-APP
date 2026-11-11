@@ -193,9 +193,9 @@ export const COMPLIANCE_RISK = {
     rcScopeNoBranches:
       'لم تُسجّل أي فروع بعد. لا يُحدّد نوع التأمين إلا من فروعه.',
     rcScopeAddBranch: 'إضافة فرع',
-    rcScopeBranchLabel: 'الفرع',
+    rcScopeBranchLabel: 'فرع التأمين',
     rcScopeRemove: 'إزالة',
-    rcScopeColBranch: 'الفرع',
+    rcScopeColBranch: 'فرع التأمين',
     rcScopeColType: 'النوع',
     rcScopeSoleEstablishmentNote:
       'هذا المكتب مسجّل كمؤسسة فردية (شخص طبيعي)، ويجوز ترخيصه لنوع تأمين واحد فقط (المادة 3/أ). إضافة فرع من النوع الآخر سيُرفض.',

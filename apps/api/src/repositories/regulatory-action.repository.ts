@@ -3,6 +3,17 @@ import type { Prisma, RegulatoryAction } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
+ * An act with art. 21/b/5's scope lines attached. EMPTY `scopeLines` means the whole licence — the
+ * compatibility hinge, and the reason every act written before that table keeps its meaning.
+ */
+export type RegulatoryActionWithScope = RegulatoryAction & {
+  scopeLines: {
+    insuranceLineId: string | null;
+    officeInsuranceLineId: string | null;
+  }[];
+};
+
+/**
  * THE OFFICE'S OWN RECORD OF A REGULATOR'S DECISION — and this table's FIRST writer.
  *
  * ## THERE IS NO REGULATOR IN THIS SYSTEM
@@ -40,8 +51,22 @@ export class RegulatoryActionRepository {
    * the caller cannot narrow it wrongly."* A `where` that dropped an expired suspension would make
    * the derivation's art. 14/c branch unreachable without anything failing.
    */
-  findAll(): Promise<RegulatoryAction[]> {
+  findAll(): Promise<RegulatoryActionWithScope[]> {
     return this.prisma.client.regulatoryAction.findMany({
+      /*
+       * ART. 21/b/5's scope lines travel WITH the act, because the derivation cannot ask for them.
+       *
+       * `deriveLicenseStanding` is pure and takes the whole set at once — its own header says the
+       * filtering belongs there so a caller cannot narrow it wrongly — so a scope line fetched
+       * separately would be a second read that could disagree with the first. An act whose scope
+       * lines were missed reads as OFFICE-WIDE by the zero-rows rule, which is the widening
+       * direction: a motor-only suspension would block the whole office.
+       */
+      include: {
+        scopeLines: {
+          select: { insuranceLineId: true, officeInsuranceLineId: true },
+        },
+      },
       /*
        * A TOTAL ORDER, even though the consumer re-sorts.
        *

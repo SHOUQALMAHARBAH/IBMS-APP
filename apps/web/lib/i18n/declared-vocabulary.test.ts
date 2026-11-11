@@ -249,6 +249,19 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
  * `docs/design-pass-register.md` and `scripts/measurements/em-dash-sites.py` re-derives them.
  */
 describe('owner decision 60: three words for the em dash, and only three', () => {
+  /*
+   * ⚠️ 2026-11-10 — DECISION 60 IS STRUCK AND DECISION 125 REPLACES IT. The dash does not appear
+   * anywhere: every empty value and every list option carries a word fitted to its own screen,
+   * measured module by module.
+   *
+   * THESE ASSERTIONS STILL HOLD AND ARE DELIBERATELY NOT CHANGED, because no string moved in the
+   * batch that recorded the strike: three words ship, and a fourth key carrying one of them is
+   * still the drift this guard exists to stop. What changes is what a FAILURE here means. When
+   * module 1 writes the fourth word, this `describe` must be RE-POINTED at decision 125 — one word
+   * per field by its own screen, so the "only three" property goes and the "no word is invented"
+   * property stays. It must not be deleted: decision 125 carries decision 60's guard forward
+   * verbatim («الكلمةُ لا تُخترَع») and this is the only place it is mechanically checked.
+   */
   /** Hers, verbatim. Written once here so the assertions below cannot drift apart. */
   const DECISION_60: Record<string, string> = {
     commonNotAssessedYet: 'لم يُقيَّم بعد',
@@ -321,5 +334,75 @@ describe('owner decision 60: three words for the em dash, and only three', () =>
     walk(join(WEB, 'app'));
     walk(join(WEB, 'components'));
     expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+});
+
+describe('owner decision 2026-11-04: the branch word says WHICH branch', () => {
+  /*
+   * «الفرع» MEANT TWO DIFFERENT THINGS ON ONE PRODUCT, and the two are not related facts.
+   *
+   * An INSURANCE branch is a line within a type (art. 3/a derives the type from it, art. 4/a's
+   * capital bands COUNT them). An OFFICE branch is a place with staff in it, `Branch` in the
+   * schema, carried by `Employee`, `User` and `SalesTarget`. A reader meeting the bare word on a
+   * column header has no way to tell which one a row is about — and decision 124's whole subject is
+   * a transaction being attributed to the wrong branch, so this is that confusion's visible half.
+   *
+   * The owner's ruling: «فرع التأمين» in full for the insurance one, never bare; «فرع المكتب» for
+   * the office one. Measured 2026-11-10: six keys carried the bare word, and «فرع المكتب» shipped
+   * ZERO times before this batch.
+   *
+   * ## WHY THIS GUARD EXISTS AT ALL, which is a finding rather than a precaution
+   *
+   * Of the twelve strings message 34 §3 corrected, exactly ONE had a test that pinned it (the
+   * settlement input's accessible name). The other eleven could have been reverted to their old
+   * values with nothing in this repository going red — proven by planting it. A standing owner
+   * decision with no mechanical reader is a decision that gets undone by the next person who needs
+   * a short column header, so the RULE is guarded here rather than the eleven individual strings:
+   * the budget is zero in both languages, and it is the rule that scales, not the list.
+   *
+   * It does NOT say which kind of branch a given key is about — that is a reading of the screen,
+   * and §3.1's own measurement found the owner's classification of `rcScopeBranchLabel` and
+   * `rcScopeColBranch` needed correcting (they are the LICENCE SCOPE, so insurance branches). It
+   * says only that no key ships the undetermined word.
+   */
+  const BARE = 'الفرع';
+
+  const arabicValues = (): { file: string; line: number; key: string; value: string }[] => {
+    const dir = join(__dirname, 'translations');
+    const out: { file: string; line: number; key: string; value: string }[] = [];
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.ts'))) {
+      const lines = readFileSync(join(dir, file), 'utf8').split('\n');
+      lines.forEach((line, i) => {
+        const m = /^\s*([a-zA-Z][a-zA-Z0-9_]*)\s*:\s*'([^']*)'\s*,?\s*$/.exec(line);
+        if (m) out.push({ file, line: i + 1, key: m[1], value: m[2] });
+      });
+    }
+    return out;
+  };
+
+  it('reads a real set of dictionary entries — an empty parse would pass on nothing', () => {
+    // The non-vacuity floor. Rule 12: this assertion is about the PRESENCE of the population, and
+    // without it a regex that stopped matching would report a clean screen set.
+    expect(arabicValues().length).toBeGreaterThan(500);
+  });
+
+  it('no key ships the bare word «الفرع» as its whole value', () => {
+    const offenders = arabicValues()
+      .filter((e) => e.value === BARE)
+      .map((e) => `translations/${e.file}:${e.line}  ${e.key}`);
+    expect(
+      offenders,
+      'A key ships «الفرع» alone, which does not say whether the row is about an INSURANCE branch ' +
+        'or an OFFICE branch:\n' +
+        offenders.join('\n') +
+        '\n\nOwner decision 2026-11-04. Read the screen, then use «فرع التأمين» (sliced from ' +
+        '`dashInsuranceLineLabel`) or «فرع المكتب». Do not shorten it back to fit a column.',
+    ).toEqual([]);
+  });
+
+  it('both determined forms actually ship, so the rule is satisfiable', () => {
+    const values = arabicValues().map((e) => e.value);
+    expect(values).toContain('فرع التأمين');
+    expect(values).toContain('فرع المكتب');
   });
 });

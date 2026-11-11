@@ -325,7 +325,12 @@ export class EndorsementService {
      * must not increase cover after the licence ends.
      */
     if (dto.type === 'POSITIVE') {
-      await this.licenseGate.assertMayPractise('INCREASE_COVER');
+      await this.licenseGate.assertMayPractise('INCREASE_COVER', () =>
+        // Art. 21/b/5 — LAZY, so it costs no extra query unless the office has a partial
+        // suspension. `loadVisiblePolicy` returns a narrow projection that does not carry
+        // the line, so this reads the branch directly rather than widening it.
+        this.policies.findInsuranceBranch(policyId),
+      );
     }
     const policy = await this.loadVisiblePolicy(policyId, actor);
     if (policy.status !== 'ACTIVE') {
@@ -803,7 +808,11 @@ export class EndorsementService {
      * on existing business.
      */
     if (e.type === 'POSITIVE') {
-      await this.licenseGate.assertMayPractise('INCREASE_COVER');
+      await this.licenseGate.assertMayPractise('INCREASE_COVER', () =>
+        // Art. 21/b/5 — the policy this endorsement sits on carries the line. LAZY, so it costs
+        // no extra query unless the office has a partial suspension.
+        this.policies.findInsuranceBranch(e.policyId),
+      );
     }
     if (e.status === 'REFUND_APPROVAL_PENDING') {
       throw new UnprocessableEntityException(

@@ -518,7 +518,14 @@ export class PolicyService {
     dto: PlacePolicyDto,
     actor: AuthenticatedUser,
   ): Promise<PolicyView> {
-    await this.licenseGate.assertMayPractise('PLACE_POLICY');
+    await this.licenseGate.assertMayPractise('PLACE_POLICY', async () => {
+      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+      // reads and costs no extra query unless the office actually has a partial suspension.
+      const sent = await this.recommendations.findByOpportunityId(
+        dto.opportunityId,
+      );
+      return sent?.recommendedQuotation.rfq ?? null;
+    });
 
     const opportunity = await this.loadVisibleOpportunity(
       dto.opportunityId,
