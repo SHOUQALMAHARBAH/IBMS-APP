@@ -230,8 +230,16 @@ describe('AccessRecertificationService', () => {
         entityId: 'cycle-1',
         workflowName: 'quarterly_access_review',
         dueAt,
+        // The cycle's own START instant, not `dueAt` — `startTimer` reads the `SlaPolicy` row in
+        // force on this date, so a cycle started under last quarter's policy keeps that policy's
+        // escalation stages. Asserted as a Date rather than a value, because the value is `now`.
+        baseDate: expect.any(Date),
         actorUserId: 'admin-1',
       });
+      // And it is NOT `dueAt`: the two are different facts, and passing the deadline would read
+      // the policy in force on the day the review is DUE rather than the day it was ordered.
+      const call = mocks.startTimer.mock.calls[0][0] as { baseDate: Date };
+      expect(call.baseDate.getTime()).not.toBe(dueAt.getTime());
     });
 
     it('still returns the created cycle when starting its SLA timer fails', async () => {

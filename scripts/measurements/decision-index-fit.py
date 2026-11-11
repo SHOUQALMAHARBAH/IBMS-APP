@@ -258,8 +258,24 @@ CLAIM_HEADER = re.compile(
     r"مستشهد به في ([" + AR_DIGITS
     + r"]+) (?:موضع|مواضع)"
 )
+# THE HEADING, NOT THE CHECK, IS WHAT WIDENED HERE -- 2026-11-11.
+#
+# The pinned property is unchanged: the index row must repeat its file's own one-sentence section,
+# byte-for-byte after whitespace normalisation. What changed is which HEADINGS count as that
+# section. Decisions 128 and 129 arrived numbering their sections, so the heading reads
+# `## ١ — القرار بجملة واحدة` and `## ١ — القرار ١٢٩ بجملة واحدة`; the old pattern anchored
+# `## ` immediately before `القرار بجملة` and matched neither.
+#
+# The failure mode that makes this worth widening rather than renaming the owner's headings: a file
+# whose section the matcher cannot find is reported as *having no section*, and the row it should
+# be pinned to then goes UNCHECKED in the only direction that matters. A decision file is copied in
+# verbatim and is not ours to re-head, so the reader has to accept the shapes the author writes.
+#
+# Both new shapes are permanent self-test cases below, so a later narrowing cannot quietly put the
+# hole back -- the same reasoning as `CITE_TAIL`'s multi-number walk.
 ONE_SENTENCE = re.compile(
-    r"## القرار بجملة\s*\n+(.+?)(?=\n##|\Z)",
+    r"## (?:[" + AR_DIGITS + r"]+ — )?القرار (?:[" + AR_DIGITS + r"]+ )?بجملة"
+    r"(?: واحدة)?\s*\n+(.+?)(?=\n##|\Z)",
     re.S,
 )
 
@@ -669,6 +685,24 @@ def _self_test() -> int:
          lambda t: os.makedirs(os.path.join(t, "apps", "api", "src", "modules"),
                                exist_ok=True),
          "WRAPPED_CITATIONS is stale"),
+        # THE TWO HEADING SHAPES DECISIONS 128 AND 129 ARRIVED WITH. Both are asserted by
+        # MUTATING the row away from the sentence: if the matcher cannot find the section at all
+        # the gate says "has no section" instead, so these cases fail on the wrong message and the
+        # widening is genuinely tested rather than merely exercised.
+        ("a numbered one-sentence heading (`## ١ — القرار بجملة واحدة`)",
+         lambda t: (_patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "## القرار بجملة",
+                           "## ١ — القرار بجملة واحدة"),
+                    _patch(os.path.join(t, "ibms-brain", "meta", "decision-index.md"),
+                           "| **one sentence.** |", "| **drifted.** |")),
+         "does not repeat its file's first sentence"),
+        ("a heading carrying the decision's own number (`## ١ — القرار ١٢٩ بجملة واحدة`)",
+         lambda t: (_patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "## القرار بجملة",
+                           "## ١ — القرار ١٢٩ بجملة واحدة"),
+                    _patch(os.path.join(t, "ibms-brain", "meta", "decision-index.md"),
+                           "| **one sentence.** |", "| **drifted.** |")),
+         "does not repeat its file's first sentence"),
         # Proves the phantom audit is LIVE rather than switched off by the marker above:
         # a tree that looks like this repository but no longer contains the four producing
         # texts must report them stale, not pass quietly.

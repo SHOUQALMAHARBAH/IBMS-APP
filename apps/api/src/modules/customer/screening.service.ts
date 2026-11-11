@@ -374,14 +374,16 @@ export class ScreeningService {
         // successful screening run into a failure.
         if (recorded.created) {
           try {
+            const baseDate = new Date();
             await this.sla.startTimer({
               entityType: 'ScreeningMatch',
               entityId: recorded.id,
               workflowName: SANCTIONS_MATCH_REVIEW_WORKFLOW,
               dueAt: await this.sla.computeDueAt(
                 SANCTIONS_MATCH_REVIEW_WORKFLOW,
-                new Date(),
+                baseDate,
               ),
+              baseDate,
               actorUserId,
             });
           } catch (err) {

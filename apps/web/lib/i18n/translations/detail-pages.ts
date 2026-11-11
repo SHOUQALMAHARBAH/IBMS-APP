@@ -453,6 +453,23 @@ export const DETAIL_PAGES = {
     poldCommercialTerms: 'الشروط التجارية',
     poldInsurer: 'شركة التأمين',
     poldPremium: 'القسط',
+    /*
+     * «مبلغ التحمّل» — AND THIS ONE KEY LABELS TWO SCREENS, WHICH THE OWNER HAS SEEN AND KEPT.
+     *
+     * `ClaimCard.tsx:687` — the settlement input a claims officer types money into — and
+     * `policies/[id]/page.tsx:327`, the policy page's commercial terms. Measured and reported
+     * 2026-11-11; her ruling is decision 129 §5-ب: **it stays as it is** — one key for both
+     * screens, because in BOTH of them the thing being named is an AMOUNT.
+     *
+     * The short summary line stays «التحمّل» (`claimDeductibleShort`), and that is not a second
+     * word for one fact: it is the same word without the «مبلغ», used mid-sentence where the
+     * amount is already on the line. ⚠️ Note for anybody writing a test here: «التحمّل» is a
+     * SUBSTRING of «مبلغ التحمّل», so a text assertion cannot tell the two apart — pin the
+     * input's accessible name, as `settlement-duty.spec.ts:232` does.
+     *
+     * What is still owed and is NOT this key's problem: a `pold*` (policy-detail) key is rendered
+     * by a CLAIM component. That is a key restructure.
+     */
     poldDeductible: 'مبلغ التحمّل',
     poldCommission: 'العمولة',
     poldBack: 'العودة',

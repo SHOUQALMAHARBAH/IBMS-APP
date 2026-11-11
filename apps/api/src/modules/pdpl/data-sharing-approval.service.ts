@@ -112,6 +112,7 @@ export class DataSharingApprovalService {
       entityId: row.id,
       workflowName: DATA_SHARING_SLA_WORKFLOW,
       dueAt: slaDueAt,
+      baseDate: now,
       actorUserId,
     });
 

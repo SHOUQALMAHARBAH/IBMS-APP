@@ -189,6 +189,10 @@ export class RenewalService {
         entityId: renewalCaseId,
         workflowName: 'renewal_workflow_start',
         dueAt,
+        // `dueAt` here is derived from the POLICY's expiry date, which can be a year away. The
+        // policy row that governs this timer is the one in force when the renewal case was
+        // triggered, which is now.
+        baseDate: new Date(),
         actorUserId,
       });
     } catch (err) {

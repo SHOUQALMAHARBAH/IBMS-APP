@@ -279,6 +279,9 @@ export class AccessRecertificationService {
         entityId: cycle.id,
         workflowName: 'quarterly_access_review',
         dueAt,
+        // The cycle's own start instant, not `dueAt` — the question is which policy governed the
+        // act of starting it. See `StartSlaTimerParams.baseDate`.
+        baseDate: new Date(),
         actorUserId: startedByUserId,
       });
     } catch (err) {

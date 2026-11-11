@@ -118,15 +118,18 @@ export class ServiceRequestService {
     actorUserId: string,
   ): Promise<void> {
     try {
+      // ONE instant for the deadline and the policy lookup — see ComplaintService's own note.
+      const baseDate = new Date();
       const dueAt = await this.slaTimer.computeDueAt(
         SERVICE_REQUEST_SLA_WORKFLOW,
-        new Date(),
+        baseDate,
       );
       const [timer] = await this.slaTimer.startTimer({
         entityType: 'ServiceRequest',
         entityId: serviceRequestId,
         workflowName: SERVICE_REQUEST_SLA_WORKFLOW,
         dueAt,
+        baseDate,
         actorUserId,
       });
       if (timer) {

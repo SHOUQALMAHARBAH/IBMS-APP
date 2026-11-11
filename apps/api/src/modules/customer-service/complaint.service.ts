@@ -148,15 +148,19 @@ export class ComplaintService {
     actorUserId: string,
   ): Promise<void> {
     try {
+      // ONE instant, used for both the deadline and the policy lookup. Two `new Date()` calls
+      // would be two answers on a midnight boundary.
+      const baseDate = new Date();
       const dueAt = await this.slaTimer.computeDueAt(
         COMPLAINT_SLA_WORKFLOW,
-        new Date(),
+        baseDate,
       );
       const [timer] = await this.slaTimer.startTimer({
         entityType: 'Complaint',
         entityId: complaintId,
         workflowName: COMPLAINT_SLA_WORKFLOW,
         dueAt,
+        baseDate,
         actorUserId,
       });
       if (timer) {

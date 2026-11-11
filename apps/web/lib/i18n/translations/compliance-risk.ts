@@ -193,6 +193,20 @@ export const COMPLIANCE_RISK = {
     rcScopeNoBranches:
       'لم تُسجّل أي فروع بعد. لا يُحدّد نوع التأمين إلا من فروعه.',
     rcScopeAddBranch: 'إضافة فرع',
+    /*
+     * «فرع التأمين» AND NOT «فرع المكتب» — RATIFIED BY THE OWNER 2026-11-11 (message 35 §1.1).
+     *
+     * Her first instruction put these two keys in the OFFICE-branch half of the split. The
+     * measurement disagreed: both sit on the LICENCE-SCOPE screen, their neighbours are
+     * `rcScopeTypes` («أنواع التأمين») and `rcScopeBranches` («الفروع المرخّصة»), and art. 3/a
+     * derives the insurance TYPE from the branch — so «فرع المكتب» here would have been worse than
+     * the bare word, because it would have named a place with staff in it where the row means a
+     * line of business. She read it and agreed.
+     *
+     * Recorded AT the keys, not only in the report, so the next reader does not "restore" the
+     * first instruction. The rule itself — no key ships the bare «الفرع» — is guarded at budget
+     * zero in `declared-vocabulary.test.ts`.
+     */
     rcScopeBranchLabel: 'فرع التأمين',
     rcScopeRemove: 'إزالة',
     rcScopeColBranch: 'فرع التأمين',
@@ -238,6 +252,22 @@ export const COMPLIANCE_RISK = {
     rcCalendarLoadError: 'تعذّر تحميل تقويم الالتزامات — حاول مرة أخرى.',
     rcStandingHeading:
       'حالةُ الترخيص',
+    /*
+     * THE SIX DERIVED STANDINGS. ⛔ OWNER DECISION 128 — «ساري» AND «حكماً» NEVER DESCRIBE AN
+     * OFFICE PAST ITS PRINTED EXPIRY, however good its renewal filing is.
+     *
+     * `docs/decision-128-renewal-under-study-proof-opens-not-date.md` (10 November 2026): an office
+     * whose licence term has ended, whose renewal was filed on time and whose proof of filing is
+     * attached goes on issuing — and the word for that state is the one already here,
+     * `rcStandingRenewalPending` («قيدَ التجديد»). Its licence has EXPIRED; what continues is
+     * permission to work while the regulator decides.
+     *
+     * So `rcStandingActive` («ساري») belongs to a term INSIDE its printed dates and to nothing
+     * else. A screen that reached for it to describe the under-study state would be telling an
+     * office — and an inspector — that a licence is current when the instrument says it ran out.
+     * The decision says so in terms, and the map in `regulatory-compliance/page.tsx` is what keeps
+     * the two apart: `ACTIVE` → this key, `RENEWAL_PENDING` → the other.
+     */
     rcStandingNoTerm:
       'لا توجدُ مدّةُ ترخيصٍ مسجّلة',
     rcStandingActive:

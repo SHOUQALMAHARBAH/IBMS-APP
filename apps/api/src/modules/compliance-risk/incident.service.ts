@@ -145,6 +145,9 @@ export class IncidentService {
           INCIDENT_CONTAINMENT_WORKFLOW,
           row.reportedAt,
         ),
+        // `reportedAt`, the same date the deadline is computed from — an incident reported
+        // under last year's containment policy is governed by last year's policy.
+        row.reportedAt,
         actorUserId,
       );
     }
@@ -314,13 +317,15 @@ export class IncidentService {
         // policy rather than a compile-time constant.
         sideEffect: async () => {
           if (dto.classification !== 'MATERIAL') return;
+          const classifiedAt = new Date();
           await this.startSlaTimerBestEffort(
             id,
             INCIDENT_SENIOR_MANAGEMENT_WORKFLOW,
             await this.slaTimer.computeDueAt(
               INCIDENT_SENIOR_MANAGEMENT_WORKFLOW,
-              new Date(),
+              classifiedAt,
             ),
+            classifiedAt,
             actor.id,
           );
         },
@@ -678,6 +683,9 @@ export class IncidentService {
     id: string,
     workflowName: string,
     dueAt: Date,
+    /** The transaction's own date — which `SlaPolicy` row governed this act. See
+     *  `StartSlaTimerParams.baseDate`. */
+    baseDate: Date,
     actorUserId: string,
   ): Promise<void> {
     try {
@@ -686,6 +694,7 @@ export class IncidentService {
         entityId: id,
         workflowName,
         dueAt,
+        baseDate,
         actorUserId,
       });
     } catch (err) {

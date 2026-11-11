@@ -562,6 +562,9 @@ export class EmployeeService {
       entityId: checklist.id,
       workflowName: TERMINATION_SLA_WORKFLOW,
       dueAt: terminationDate,
+      // The termination date is the DEADLINE and may be back- or forward-dated by the person
+      // recording it; the governing policy is the one in force when the record was made.
+      baseDate: new Date(),
       actorUserId,
     });
 

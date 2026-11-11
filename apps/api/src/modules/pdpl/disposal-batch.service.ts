@@ -195,7 +195,12 @@ export class DisposalBatchService {
           combinedDutyActId,
         },
         sideEffect: () =>
-          this.startSlaTimerBestEffort(id, slaDueAt, actorUserId),
+          this.startSlaTimerBestEffort(
+            id,
+            slaDueAt,
+            dpoApprovedAt,
+            actorUserId,
+          ),
       });
     } catch (err) {
       if (err instanceof ConflictException) {
@@ -369,6 +374,8 @@ export class DisposalBatchService {
   private async startSlaTimerBestEffort(
     id: string,
     dueAt: Date,
+    /** The transaction's own date — see `StartSlaTimerParams.baseDate`. */
+    baseDate: Date,
     actorUserId: string,
   ): Promise<void> {
     try {
@@ -377,6 +384,7 @@ export class DisposalBatchService {
         entityId: id,
         workflowName: DISPOSAL_BATCH_SLA_WORKFLOW,
         dueAt,
+        baseDate,
         actorUserId,
       });
     } catch (err) {

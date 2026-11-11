@@ -68,6 +68,7 @@ export class DpiaScreeningService {
         entityId: row.id,
         workflowName: DPIA_REVIEW_SLA_WORKFLOW,
         dueAt: dpoReviewDueAt,
+        baseDate: now,
         actorUserId,
       });
     }

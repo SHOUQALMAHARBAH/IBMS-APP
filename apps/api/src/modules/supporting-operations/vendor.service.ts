@@ -113,9 +113,10 @@ export class VendorService {
     let updated = await this.vendors.setRiskTier(id, dto.riskTier);
 
     if (dpaRequiredForTier(dto.riskTier) && !existing.annualReviewDueAt) {
+      const baseDate = new Date();
       const dueAt = await this.slaTimers.computeDueAt(
         VENDOR_ANNUAL_REVIEW_SLA_WORKFLOW,
-        new Date(),
+        baseDate,
       );
       updated = await this.vendors.scheduleAnnualReview(id, dueAt);
       await this.slaTimers.startTimer({
@@ -123,6 +124,7 @@ export class VendorService {
         entityId: id,
         workflowName: VENDOR_ANNUAL_REVIEW_SLA_WORKFLOW,
         dueAt,
+        baseDate,
         actorUserId,
       });
     }
@@ -173,6 +175,7 @@ export class VendorService {
       entityId: id,
       workflowName: VENDOR_ANNUAL_REVIEW_SLA_WORKFLOW,
       dueAt,
+      baseDate: now,
       actorUserId,
     });
 
@@ -227,6 +230,7 @@ export class VendorService {
       entityId: id,
       workflowName: VENDOR_TERMINATION_ACCESS_REVOCATION_SLA_WORKFLOW,
       dueAt,
+      baseDate: now,
       actorUserId,
     });
 
