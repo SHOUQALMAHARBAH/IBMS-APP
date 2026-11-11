@@ -814,6 +814,39 @@ cannot make; the second needs a product answer.
 | **1 · THE CI STEP FOR THE TWO DATABASE-BACKED PERMISSION GATES** | `db:permission-descriptions:check` and `db:fixture:permissions:check` are both GREEN on a clean tree and **neither runs in CI** — so the Arabic-description mirror and the role/grant fixture can both go stale without a build noticing. The step cannot be pushed from a session: `gh auth status` reads scopes `gist, read:org, repo` on a `gho_` OAuth token, and a `.github/workflows` write needs `workflow`. | **In `.github/workflows/ci.yml`, immediately AFTER the step `- name: Seed database (roles + permission grid)` and its `run: npm run db:seed`** (both gates read a seeded database, and the e2e suite that follows adds roles, so it must sit between the two). No `env:` block is needed: the job already sets `DATABASE_URL` to its own postgres service, and `dotenv-cli`'s override is opt-in (`-o`), so the ambient value beats what `.env`/`.env.test` carry.<br><br>`      - name: The Arabic permission-description mirror is not stale`<br>`        if: ${{ !cancelled() }}`<br>`        run: npm run db:permission-descriptions:check`<br><br>`      - name: The role/permission fixture still matches the seeded database`<br>`        if: ${{ !cancelled() }}`<br>`        run: npm run db:fixture:permissions:check` |
 | **2 · ~~WHICH BRANCH A MULTI-LINE RECOMMENDATION BELONGS TO~~ — CLOSED AS DECIDED 2026-11-11** | **The owner chose option (a): the recommended quotation's own line, which is what is already built.** Nothing to change. The measurement it rested on stands: `Opportunity.rfqs` is a list and a `Recommendation` carries no insurance line of its own; on dev 2026-11-10, **89 opportunities, every one spanning exactly ONE line; 0 multi-line recommendations.** | **REOPENING CONDITION, and it is the only thing that reopens it: the day a recommendation may recommend MORE THAN ONE quotation.** At that moment option (a) stops being a reading of the model and becomes a choice against it, and option (c) — a line on `Recommendation`, the act split per line — is the answer. Until then the three options below are kept as the record of what was weighed, not as an open question. |
 
+## OWNED BY THE OWNER, READY TO PASTE — 2026-11-11, message 36 §0 (CI went red on nobody's code)
+
+**`main` went RED at `68847585` on a step with no retry, and the tree was not the cause.** The
+identical tree was green by check name on the branch tip `82fab425` minutes earlier.
+
+| Item | What is owed | The exact thing to do |
+|---|---|---|
+| **3 · THE TWO BROWSER-INSTALL STEPS HAVE NO RETRY, AND BOTH FAILED ON A RUNNER's DNS** | Measured 2026-11-11 on `68847585`: `frontend` step 24 *Install Playwright browsers* and `backend` step 26 *Install Chromium for PdfRendererService* both failed with `Temporary failure resolving 'archive.ubuntu.com'` (and the `azure.` and `security.` mirrors) on **every** apt retry, and `backend` step 27 *Integration tests* fell with them — so the full api e2e suite did not run on `main`. Both steps are a bare `npx playwright install --with-deps chromium`, and `--with-deps` is the half that shells out to `apt-get`. **A re-run of the failed jobs hit the SAME step again**, so this is not reliably self-clearing. The step cannot be pushed from a session: `gh auth status` reads scopes `gist, read:org, repo` on a `gho_` OAuth token, and a `.github/workflows` write needs `workflow`. | **Wrap each of the two steps in a retry rather than raising a timeout, because the failure is name resolution and not slowness.** The replacement body is in the fenced block directly below this table — **it is NOT in a table cell on purpose**, because a YAML block scalar opens with a pipe and a markdown table needs that escaped, which would have put a backslash into the thing the owner is meant to paste. Escaping a pipe inside a quotation changes the artefact, which is the reason `check:markdown-tables` carries `SOURCE_TRANSCRIPTIONS` at all. |
+
+**Item 3's replacement body.** Swap it in for the `run:` line of `- name: Install Playwright
+browsers` (`ci.yml:216-217`) and of `- name: Install Chromium for PdfRendererService (Part F
+item #7)` (`ci.yml:478`). Leave every surrounding line exactly as it is — including the
+`if: ${{ !cancelled() }}` on the api one, which is there for a measured reason of its own.
+
+```yaml
+        run: |
+          for i in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "attempt $i failed; apt or the CDN may be unreachable - retrying"
+            sleep $((i * 20))
+          done
+          echo "::error::playwright install failed three times - check whether the runner can resolve archive.ubuntu.com"
+          exit 1
+```
+
+> **The `exit 0` on success and the explicit `exit 1` after the loop are both load-bearing, and
+> the reason is rule 12's eighth instance, recorded in `IMPROVEMENTS.md`:** a `for` loop's exit
+> status is its LAST command's, so a loop that runs out of attempts ending in a successful
+> `sleep` **exits 0** — and *the install worked* and *I gave up retrying* become the same
+> answer from the wrapper. That is exactly the defect the CI watch script was rewritten to
+> remove, and it must not be reintroduced here. Do not write this as `for … done` with the
+> install command last.
+
 ### The multi-line recommendation — three options  ·  **DECIDED: (a), 2026-11-11**
 
 > **The owner's ruling (message 35 §2): option (a) stays.** This section is kept because a
