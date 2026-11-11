@@ -546,15 +546,46 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
 def _self_test() -> int:
     import shutil
     import tempfile
+    import time
 
     cases: list[tuple[str, str]] = []
+
+    def _git(args: list[str], cwd: str) -> None:
+        """Run a git command in the throwaway tree, and SAY WHY if it fails.
+
+        `subprocess.run(..., check=True)` raised a bare
+        `CalledProcessError: 'git add -A' returned non-zero exit status 128` with no stderr --
+        a guard whose failure path tells the reader nothing, which is rule 9 inside the self-test
+        of a gate.
+
+        Measured 2026-11-11 on Windows: `npm run check:docs` failed 1 run in 3 this way. The
+        self-test builds THIRTEEN throwaway repositories and makes ~26 git calls in the system temp
+        directory, creating and `rmtree`-ing a `.git` each time; in isolation the same sequence
+        failed 0 times in 15, so the per-call rate is low and the failure is the environment holding
+        a handle open (indexer or AV), not the gate.
+
+        ONE retry, and the stderr is printed on the first failure so a persistent fault is still
+        visible rather than smoothed away. If the second attempt fails too it raises WITH git's own
+        message -- the fixture failing to build must fail the self-test loudly, never pass it.
+        """
+        for attempt in (1, 2):
+            r = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+            if r.returncode == 0:
+                return
+            msg = (r.stderr or r.stdout or "").strip()
+            print(f"  note  `{' '.join(args)}` exited {r.returncode} (attempt {attempt}): {msg}")
+            if attempt == 2:
+                raise RuntimeError(
+                    f"{' '.join(args)} failed twice in {cwd} (exit {r.returncode}): {msg}"
+                )
+            time.sleep(0.4)
 
     def build(tmp: str) -> None:
         """A minimal tree the real audit() can run over: one cited decision, one file,
         one index row."""
         for d in ("apps", "packages", "docs", os.path.join("ibms-brain", "meta")):
             os.makedirs(os.path.join(tmp, d), exist_ok=True)
-        subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+        _git(["git", "init", "-q"], tmp)
         src = os.path.join(tmp, "apps", "thing.ts")
         with open(src, "wb") as fh:
             fh.write(b"// owner decision 7 governs this\n")
@@ -565,7 +596,7 @@ def _self_test() -> int:
             fh.write(("| # | x | y | z |\n|---|---|---|---|\n"
                       "| **7** | **one sentence.** | "
                       "[`d`](../../docs/decision-7-a-slug.md) |  |\n").encode())
-        subprocess.run(["git", "add", "-A"], cwd=tmp, check=True)
+        _git(["git", "add", "-A"], tmp)
 
     def run(tmp: str) -> list[str]:
         return audit(tmp)[0]
@@ -652,7 +683,7 @@ def _self_test() -> int:
             build(tmp)
             if mutate:
                 mutate(tmp)
-                subprocess.run(["git", "add", "-A"], cwd=tmp, check=True)
+                _git(["git", "add", "-A"], tmp)
             errs = run(tmp)
             if needle is None:
                 ok = not errs

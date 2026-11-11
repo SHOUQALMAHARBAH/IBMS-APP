@@ -448,7 +448,7 @@ comment → red as *declared but no longer found*.
 those five numbers. It is accepted because the gate FAILS when the two disagree, so they cannot
 silently diverge — the standard `permission-catalogue-parity.spec.ts` already sets.
 
-## Rule 12 — a completeness predicate asserts the PRESENCE of what it waits for, four instances
+## Rule 12 — a completeness predicate asserts the PRESENCE of what it waits for, eight instances
 
 > **١٢ · شرطُ الاكتمال يؤكّد وجودَ ما ينتظره، لا غيابَ ما يخافه.**
 >
@@ -457,7 +457,9 @@ silently diverge — the standard `permission-catalogue-parity.spec.ts` already 
 
 Promoted to a numbered rule in `docs/modules/00a-day-one-setup-and-verification.md` § ٤ on
 2026-11-10, by the owner, on the ground that four measured instances is what separates a rule from
-an anecdote. **The common shape, which is what to recognise:** *a condition evaluated over an input
+an anecdote. **There are EIGHT as at 2026-11-11 — the seven below plus the step-level watch
+described after the table — and the eighth is the sharpest, because it is the WRAPPER around a
+watch that had already been fixed for this exact rule.** **The common shape, which is what to recognise:** *a condition evaluated over an input
 that could be empty, where EMPTY and SATISFIED are the same answer.*
 
 | # | The predicate | Why empty satisfied it | Measured |
@@ -468,6 +470,7 @@ that could be empty, where EMPTY and SATISFIED are the same answer.*
 | 4 | `all(bucket != "pending")` over `gh pr checks` | a workflow run NOT YET REGISTERED contributes **no row**, so the predicate was vacuously true over a set that did not contain the job it was waiting for | announced ALL CHECKS SETTLED listing only CodeQL's two rows while `CI status=pending` on the same sha |
 | 5 | `gh pr checks <n>` keyed on its EXIT CODE | it printed `no checks reported on the '<branch>' branch` **and exited 0** — so *no checks exist* and *all checks passed* are the same answer from the tool's own exit status | measured 2026-11-10 while 5 check-runs were already `in_progress` on that exact sha |
 | 6 | a watch keyed only on `actions/runs?head_sha=` | **the runs index LAGS the check-runs API** — `commits/<sha>/check-runs` showed 5 jobs `in_progress` at 16:30:01Z while the runs index still returned an empty list for several minutes | the corrected watch emitted `WAIT` three times through that window and concluded nothing, which is why the WAIT branch had to exist rather than being a nicety |
+| 7 | **the WRAPPER around a watch already fixed for this rule** | `for i in $(seq 1 40); do …; done` ran out of attempts with its last reading `WAIT` and **exited 0** — a `for` loop's status is its last command's, and that was a successful `sleep`. So *the run finished* and *I gave up waiting* were the same answer from the wrapper's exit status | measured 2026-11-11 on THREE background watches at once, every one reported by the harness as *completed (exit code 0)* while none had concluded. **The loop lives inside the script now and EXHAUSTION is an explicit `exit 4` with a loud line**, self-tested against a sha that has no runs. A second defect fell out with it: the script re-read `git rev-parse HEAD` every attempt, so a push mid-watch silently moved the subject — the sha is pinned once now |
 
 **The fix in every case is the same move this file opens with:** key on a value that must be
 present. For (4) that is the RUN's own `status == completed` on the exact sha, with *no run
