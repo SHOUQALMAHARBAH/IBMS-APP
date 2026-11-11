@@ -8,6 +8,7 @@ import type { AuditService } from '../audit/audit.service';
 import type { CreateBrokerLicenseDto } from './dto/create-broker-license.dto';
 import type { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
 import { LicenseGateService } from './license-gate.service';
+import { instrumentLegalValues } from './legal-figures.double';
 
 /**
  * Module 0 item (c) rewrote this spec rather than patching it, because the repository it mocks
@@ -138,10 +139,20 @@ function makeDeps(initial: BrokerLicense[] = []) {
   } as unknown as RegulatoryActionRepository;
 
   // The REAL gate over this file's own two mocks — same reasoning as `policy.service.spec.ts`.
-  const licenseGate = new LicenseGateService(repo, acts);
+  const licenseGate = new LicenseGateService(
+    repo,
+    acts,
+    instrumentLegalValues(),
+  );
 
   return {
-    service: new BrokerLicenseService(repo, audit, acts, licenseGate),
+    service: new BrokerLicenseService(
+      repo,
+      audit,
+      acts,
+      licenseGate,
+      instrumentLegalValues(),
+    ),
     mocks: {
       findTerms,
       createTerm,

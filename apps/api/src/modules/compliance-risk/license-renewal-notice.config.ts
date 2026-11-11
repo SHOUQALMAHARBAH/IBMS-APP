@@ -1,7 +1,5 @@
-import {
-  RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY,
-  renewalApplicationDueBy,
-} from './broker-license.config';
+import { renewalApplicationDueBy } from './broker-license.config';
+import type { LicenceLegalFigures } from './legal-figures.config';
 import type { LicenseTermRow } from './license-standing.config';
 
 /**
@@ -58,21 +56,26 @@ import type { LicenseTermRow } from './license-standing.config';
  */
 
 /**
- * Art. 11's own figure, now actually REUSED rather than restated.
+ * Art. 11's own figure — and it has NO literal home at all now.
  *
- * ## This comment was false, and that is the point of fixing it
+ * ## THE HISTORY, BECAUSE IT IS THE WHOLE ARGUMENT FOR THE LEGAL-VALUES TABLE
  *
- * It said "reused through `renewalApplicationDueBy` rather than restated here" above a literal `45`
- * — so art. 11's figure had TWO literal homes (`broker-license.config.ts`'s
- * `RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY` is the other), and the comment a reader consults to
- * find out whether the number is duplicated DENIED that it was. Change art. 11 in one place and the
- * first notice fires at a threshold the regulation no longer states, silently.
+ * A literal `45` stood here under a comment saying "reused through `renewalApplicationDueBy`
+ * rather than restated here" — so art. 11's figure had TWO literal homes and the comment a reader
+ * consults to find out whether the number is duplicated DENIED that it was. Found 2026-11-10 by
+ * `npm run check:legal-numbers`, the legal-number discriminator's first customer. It was then
+ * imported from `RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY`, which gave it ONE home in source.
  *
- * Found 2026-11-10 by the legal-number discriminator (`npm run check:legal-numbers`) — this is that
- * gate's first customer, which is the argument for the gate existing.
+ * Module 1 removes the source home too: the figure is a `LegalValue` row, and the first notice
+ * threshold is whatever art. 11's row says today. **So the function below takes the figures, and
+ * `FIRST_NOTICE_DAYS_BEFORE_EXPIRY` is a function of them rather than a constant.** A regulation
+ * that moves the filing span moves the first notice with it, with no deploy.
  */
-export const FIRST_NOTICE_DAYS_BEFORE_EXPIRY =
-  RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY;
+export function firstNoticeDaysBeforeExpiry(
+  figures: LicenceLegalFigures,
+): number {
+  return figures.renewalApplicationDueDaysBeforeExpiry;
+}
 
 /**
  * The owner's second threshold. NO ARTICLE — stated plainly, because a figure displayed beside a
@@ -136,6 +139,8 @@ function wholeDaysBetween(from: Date, to: Date): number {
 export function deriveRenewalNotice(
   term: LicenseTermRow | null,
   now: Date,
+  /** Art. 11's filing span, from `LegalValue` — the first notice fires at it. */
+  figures: LicenceLegalFigures,
 ): RenewalNotice {
   if (term === null) {
     // NO TERM ON RECORD is a block, not a warning about a date — there is no date. The licence
@@ -155,7 +160,10 @@ export function deriveRenewalNotice(
   const base = {
     daysToExpiry,
     expiresAt: term.expiresAt.toISOString(),
-    applicationDueBy: renewalApplicationDueBy(term.expiresAt).toISOString(),
+    applicationDueBy: renewalApplicationDueBy(
+      term.expiresAt,
+      figures.renewalApplicationDueDaysBeforeExpiry,
+    ).toISOString(),
     renewalFiled,
   };
 
@@ -176,7 +184,7 @@ export function deriveRenewalNotice(
           : 'CONTINUING',
     };
   }
-  if (daysToExpiry <= FIRST_NOTICE_DAYS_BEFORE_EXPIRY) {
+  if (daysToExpiry <= firstNoticeDaysBeforeExpiry(figures)) {
     return { ...base, stage: 'FIRST' };
   }
   return { ...base, stage: 'NONE' };

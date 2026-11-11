@@ -23,6 +23,7 @@ import type { BrokerLicenseTermDto } from './dto/broker-license-term.dto';
 import { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
 import { RecordRegulatoryActionDto } from './dto/record-regulatory-action.dto';
 import { LicenseGateService } from './license-gate.service';
+import { LegalValueService } from './legal-value.service';
 import type { DerivedLicenseStanding } from './license-standing.config';
 import {
   deriveRenewalNotice,
@@ -87,6 +88,8 @@ export class BrokerLicenseService {
     private readonly audit: AuditService,
     private readonly acts: RegulatoryActionRepository,
     private readonly licenseGate: LicenseGateService,
+    /** OWNER DECISION 123 — art. 11's filing span is a `LegalValue` row. */
+    private readonly legalValues: LegalValueService,
   ) {}
 
   /** This office's FIRST term. 409 if it already holds one — per office now, where the old 409 was
@@ -149,7 +152,12 @@ export class BrokerLicenseService {
         renewalRequestedAtWasSupplied: supplied,
       },
     });
-    return deriveBrokerLicenseView(after, new Date());
+    const now = new Date();
+    return deriveBrokerLicenseView(
+      after,
+      now,
+      await this.legalValues.licenceFigures(now),
+    );
   }
 
   /**
@@ -267,9 +275,13 @@ export class BrokerLicenseService {
     const now = new Date();
     const terms = await this.repo.findTerms();
     const current = pickCurrentTerm(terms);
+    // ONE read of art. 11's figure for the whole series, at the same instant the views are
+    // derived at — two terms on one screen must not be judged against two figures any more than
+    // against two clocks.
+    const figures = await this.legalValues.licenceFigures(now);
     return {
-      current: current ? deriveBrokerLicenseView(current, now) : null,
-      terms: terms.map((t) => deriveBrokerLicenseView(t, now)),
+      current: current ? deriveBrokerLicenseView(current, now, figures) : null,
+      terms: terms.map((t) => deriveBrokerLicenseView(t, now, figures)),
       /*
        * THE STANDING — the ONE answer, and the screen's replacement for the stored `status` it used
        * to render beside `isCurrentlyLapsed`.
@@ -288,7 +300,7 @@ export class BrokerLicenseService {
        * stage, because a filing is not a decision and what lifts the block is the new term being
        * recorded with its certificate.
        */
-      renewalNotice: deriveRenewalNotice(current, now),
+      renewalNotice: deriveRenewalNotice(current, now, figures),
     };
   }
 
@@ -332,7 +344,12 @@ export class BrokerLicenseService {
       entityId: row.id,
       afterValue: brokerLicenseAuditSnapshot(row),
     });
-    return deriveBrokerLicenseView(row, new Date());
+    const asAt = new Date();
+    return deriveBrokerLicenseView(
+      row,
+      asAt,
+      await this.legalValues.licenceFigures(asAt),
+    );
   }
 
   private async mustFindCurrentTerm(): Promise<BrokerLicense> {

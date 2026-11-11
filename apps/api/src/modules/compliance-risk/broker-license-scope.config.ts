@@ -1,5 +1,6 @@
 import { Prisma } from '@ibms/db';
 import type { InsuranceLineCategory } from '@ibms/db';
+import type { CapitalBand } from './legal-figures.config';
 import {
   compareMoney,
   subtractMoney,
@@ -63,35 +64,36 @@ export const INSURANCE_LINE_CATEGORIES: readonly InsuranceLineCategory[] = [
   'LIFE',
 ];
 
-/**
- * ART. 4/a's BANDS, PER TYPE, BY BRANCH COUNT. Printed page 5 of the instrument.
+/*
+ * ART. 4/a's FIVE FIGURES ARE ROWS NOW — OWNER DECISION 123, module 1.
  *
- * 5,000 JOD up to 6 branches · 7,500 up to 12 · 10,000 above 12. **Five figures, and the
- * extraction file disagrees with the instrument on one of them** — `cbj-instructions-9-2026-
- * source-text.md` writes the middle tranche as `7,000`. The instrument says 7,500, read from the
- * page image on 2026-11-10 and agreed by four independent readings.
+ * `CAPITAL_BANDS` stood here, three entries carrying five figures: 5,000 JOD up to 6 branches ·
+ * 7,500 up to 12 · 10,000 above 12. They are `LegalValue` codes `CAPITAL_MIN_JOD_BAND_1`,
+ * `CAPITAL_MAX_BRANCHES_BAND_1`, `CAPITAL_MIN_JOD_BAND_2`, `CAPITAL_MAX_BRANCHES_BAND_2` and
+ * `CAPITAL_MIN_JOD_BAND_3`, all art. 4/a, all printed page 5, each row carrying the page it was
+ * READ on.
  *
- * Amounts are STRINGS, handed to `toMoney`. A JOD figure must never exist as a JS number in this
- * codebase (`money-decimal-jod.md`), and `5000` written as a numeric literal is exactly the kind
- * that gets added to another one with `+` three commits later.
+ * ## TWO THINGS THAT MUST NOT BE LOST WITH THE CONSTANT, BECAUSE NEITHER IS A FIGURE
  *
- * ## THIS COMMENT WAS TWO DECLARATIONS AWAY FROM THE FIGURES IT DESCRIBES
+ * **(1) The OCR extraction disagrees with the instrument on two of these five.**
+ * `cbj-instructions-9-2026-source-text.md` writes the middle amount as `7,000` and the first
+ * boundary as `5 branches`, both marked «رقمٌ لاتينيٌّ ومن ثمّ موثوق». The instrument draws ٧٬٥٠٠
+ * and ٦. Its reliability rule reads a Latin-digit OUTPUT as evidence of a Latin-digit INPUT, which
+ * it is not. Each row's `note` carries this, so a reader meeting the figure meets the warning.
  *
- * Until 2026-11-10 it sat above `INSURANCE_LINE_CATEGORIES`, stacked as a second doc comment that
- * happened to render above somebody else's declaration. So `check:legal-numbers`, which reads a
- * declaration's OWN comment block, found no citation here and said `ok` — and the first thing a
- * reader consulting the capital bands met was a comment about an unrelated array. Both halves are
- * closed: the comment is where the figures are, and the gate now reads the shape as well as the
- * attribution. Keep them together.
+ * **(2) A JOD amount is never a JS number.** The rows hold `Decimal(18,3)` and
+ * `LicenceLegalFigures.capitalBands` carries `Prisma.Decimal`, not a string and not a `number`.
+ * `5000` as a numeric literal is exactly the kind that gets `+`-ed to another one three commits
+ * later (`money-decimal-jod.md`).
+ *
+ * ## AND THE ATTRIBUTION DEFECT THIS CONSTANT TAUGHT IS WORTH KEEPING
+ *
+ * Until 2026-11-10 the comment describing these figures sat above `INSURANCE_LINE_CATEGORIES`,
+ * two declarations up, stacked as a second doc comment. So `check:legal-numbers`, which reads a
+ * declaration's OWN comment block, found no citation on the bands and said `ok` over a population
+ * that could not contain its subject. The gate reads structured literals now — which is what keeps
+ * it honest about whatever legal figure is written next.
  */
-export const CAPITAL_BANDS: readonly {
-  upToBranches: number;
-  requiredJod: string;
-}[] = [
-  { upToBranches: 6, requiredJod: '5000' },
-  { upToBranches: 12, requiredJod: '7500' },
-  { upToBranches: Number.POSITIVE_INFINITY, requiredJod: '10000' },
-];
 
 /**
  * The capital art. 4/a requires FOR ONE TYPE, given how many branches are held in it.
@@ -99,12 +101,16 @@ export const CAPITAL_BANDS: readonly {
  * Zero branches requires zero: a type with no branches is a type the office is not licensed for, so
  * charging it 5,000 JOD would invent a requirement for something nobody applied for.
  */
-export function requiredCapitalForType(branchCount: number): Prisma.Decimal {
+export function requiredCapitalForType(
+  branchCount: number,
+  /** Art. 4/a's bands, from `LegalValue`. REQUIRED — see `LicenceLegalFigures`. */
+  bands: readonly CapitalBand[],
+): Prisma.Decimal {
   if (branchCount <= 0) return toMoney('0');
-  const band = CAPITAL_BANDS.find((b) => branchCount <= b.upToBranches);
+  const band = bands.find((b) => branchCount <= b.upToBranches);
   // Unreachable while the last band is Infinity; `?? last` rather than a non-null assertion so a
   // future edit that bounds the top band degrades to the highest requirement rather than crashing.
-  return toMoney((band ?? CAPITAL_BANDS[CAPITAL_BANDS.length - 1]).requiredJod);
+  return toMoney((band ?? bands[bands.length - 1]).requiredJod);
 }
 
 /** How many branches the licence holds in each type. Types with none are absent, not zero. */
@@ -221,9 +227,10 @@ export function typesInScope(
  */
 export function requiredCapitalForScope(
   branches: readonly ScopedBranch[],
+  bands: readonly CapitalBand[],
 ): Prisma.Decimal {
   const perType = [...branchCountByType(branches).values()].map((count) =>
-    requiredCapitalForType(count),
+    requiredCapitalForType(count, bands),
   );
   // `sumMoney([])` of an empty scope is zero, which is correct: nothing licensed, nothing required.
   return sumMoney(perType);
@@ -292,8 +299,9 @@ export interface CapitalAssessment {
 export function assessCapital(
   paidUpCapital: Prisma.Decimal | null,
   branches: readonly ScopedBranch[],
+  bands: readonly CapitalBand[],
 ): CapitalAssessment {
-  const requiredCapital = requiredCapitalForScope(branches);
+  const requiredCapital = requiredCapitalForScope(branches, bands);
   if (paidUpCapital === null) {
     return {
       requiredCapital,

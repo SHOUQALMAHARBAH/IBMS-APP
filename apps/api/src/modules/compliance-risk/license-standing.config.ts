@@ -2,6 +2,7 @@ import {
   isBrokerLicenseCurrentlyLapsed,
   isValidPendingRenewalDecision,
 } from './broker-license.config';
+import type { LicenceLegalFigures } from './legal-figures.config';
 
 /**
  * MODULE 0-ب ITEM (d) — THE LICENCE STATUS IS DERIVED. WHAT IS STORED IS THE REGULATOR'S ACT.
@@ -67,9 +68,18 @@ export const DERIVED_LICENSE_STATUSES = [
 ] as const;
 export type DerivedLicenseStatus = (typeof DERIVED_LICENSE_STATUSES)[number];
 
-/** Art. 14/c — «في حال تجاوزت مدة وقف الترخيص سنتين يعتبر الترخيص ملغى حكماً». Verified against the
- *  scan, printed page 16, not taken from the field dictionary's citation alone. */
-export const ARTICLE_14C_SUSPENSION_LIMIT_YEARS = 2;
+/*
+ * ART. 14/c's TWO YEARS IS A ROW NOW — OWNER DECISION 123, module 1.
+ *
+ * `export const ARTICLE_14C_SUSPENSION_LIMIT_YEARS = 2` stood here, declared in
+ * `check:legal-numbers` with its reason. It is `LegalValue` code
+ * `ARTICLE_14C_SUSPENSION_LIMIT_YEARS`, art. 14/c, printed page 16 —
+ * «في حال تجاوزت مدة وقف الترخيص سنتين يعتبر الترخيص ملغى حكماً».
+ *
+ * THE READING SURVIVES THE MOVE: art. 14/c is applied to the LICENCE and never per insurance
+ * branch, because its text is the suspension of the licence. `foldScopedActs` below says so at
+ * the place that would otherwise be tempted.
+ */
 
 /** One row of `RegulatoryAction`, as the derivation needs it. */
 export interface RegulatoryActRow {
@@ -179,9 +189,9 @@ export interface DerivedLicenseStanding {
 
 /** Two calendar years after `from`, by year arithmetic rather than by adding 730 days — a leap year
  *  makes the day count wrong by one, in the direction that cancels an office a day early. */
-function twoYearsAfter(from: Date): Date {
+function yearsAfter(from: Date, years: number): Date {
   const d = new Date(from.getTime());
-  d.setUTCFullYear(d.getUTCFullYear() + ARTICLE_14C_SUSPENSION_LIMIT_YEARS);
+  d.setUTCFullYear(d.getUTCFullYear() + years);
   return d;
 }
 
@@ -300,6 +310,10 @@ export function deriveLicenseStanding(
   term: LicenseTermRow | null,
   acts: readonly RegulatoryActRow[],
   now: Date,
+  /** Art. 11's filing span and art. 14/c's limit, read from `LegalValue` at `now`. REQUIRED, with
+   *  no default: a default would put the figures back into source, which is what decision 123
+   *  moved out, and it would compile at every call site while doing it. */
+  figures: LicenceLegalFigures,
 ): DerivedLicenseStanding {
   /*
    * ART. 21/b/5 — THE TWO FOLDS ARE SEPARATE, AND THE SPLIT IS WHAT KEEPS THE OLD ONE UNCHANGED.
@@ -320,6 +334,7 @@ export function deriveLicenseStanding(
     term,
     acts.filter((a) => !isScoped(a)),
     now,
+    figures,
   );
   return {
     ...base,
@@ -381,6 +396,7 @@ function deriveOfficeWideStanding(
   term: LicenseTermRow | null,
   acts: readonly RegulatoryActRow[],
   now: Date,
+  figures: LicenceLegalFigures,
 ): Omit<DerivedLicenseStanding, 'blockedInsuranceBranchKeys'> {
   if (!term) {
     /*
@@ -411,7 +427,11 @@ function deriveOfficeWideStanding(
   if (suspension) {
     const deemedCancelled =
       suspension.basis === 'BROKER_REQUEST' &&
-      now.getTime() > twoYearsAfter(suspension.effectiveFrom).getTime();
+      now.getTime() >
+        yearsAfter(
+          suspension.effectiveFrom,
+          figures.article14cSuspensionLimitYears,
+        ).getTime();
     return {
       status: deemedCancelled ? 'CANCELLED' : 'SUSPENDED',
       mayPractise: false,
@@ -449,7 +469,7 @@ function deriveOfficeWideStanding(
    */
   if (
     term.renewalRequestedAt !== null &&
-    !isBrokerLicenseCurrentlyLapsed(term, now)
+    !isBrokerLicenseCurrentlyLapsed(term, now, figures)
   ) {
     return {
       status: 'RENEWAL_PENDING',
@@ -459,7 +479,7 @@ function deriveOfficeWideStanding(
     };
   }
 
-  if (isValidPendingRenewalDecision(term, now)) {
+  if (isValidPendingRenewalDecision(term, now, figures)) {
     // Past the printed expiry, a timely application pending a decision. Kept as its own branch
     // rather than folded above, because this one is reachable only through the owner's
     // renewal-pending rule and a reader has to be able to find it from that rule's name.
@@ -471,7 +491,7 @@ function deriveOfficeWideStanding(
     };
   }
 
-  if (isBrokerLicenseCurrentlyLapsed(term, now)) {
+  if (isBrokerLicenseCurrentlyLapsed(term, now, figures)) {
     return {
       status: 'EXPIRED',
       mayPractise: false,

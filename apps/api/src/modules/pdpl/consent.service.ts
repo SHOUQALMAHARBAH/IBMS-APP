@@ -153,6 +153,7 @@ export class ConsentService {
         entityId: id,
         workflowName: CONSENT_SLA_WORKFLOW,
         dueAt: dueAtComputed,
+        baseDate: requestedAt,
         actorUserId,
       });
       dueAt = timer?.dueAt ?? null;

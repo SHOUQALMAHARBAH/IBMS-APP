@@ -185,7 +185,7 @@ say "asserting the structure"
 # grid there is no role named OFFICE_MANAGER. It is a TEMPLATE DEFAULT and not a lock (decision 80).
 # Nothing was minted for DECLARING a conflict: the discloser is the subject, so no permission exists
 # for it or can, which is why this moves by one rather than two.
-check "permission codes seeded" 230 \
+check "permission codes seeded" 232 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
 check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"

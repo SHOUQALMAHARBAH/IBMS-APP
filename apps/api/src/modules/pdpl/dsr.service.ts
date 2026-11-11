@@ -157,6 +157,9 @@ export class DsrService {
       row.id,
       workflowName,
       slaDueAt,
+      // The intake instant the statutory clock is based on — the same `receivedAt` the
+      // deadline above is computed from.
+      receivedAt,
       actorUserId,
     );
 
@@ -179,6 +182,8 @@ export class DsrService {
     id: string,
     workflowName: string,
     dueAt: Date,
+    /** The transaction's own date — see `StartSlaTimerParams.baseDate`. */
+    baseDate: Date,
     actorUserId: string,
   ): Promise<boolean> {
     try {
@@ -187,6 +192,7 @@ export class DsrService {
         entityId: id,
         workflowName,
         dueAt,
+        baseDate,
         actorUserId,
       });
       return true;
@@ -372,6 +378,9 @@ export class DsrService {
       id,
       workflowName,
       newSlaDueAt,
+      // The extension is being applied NOW; `rebaseCutoff` is that instant and is already
+      // captured for the resolve below, so one value serves both.
+      rebaseCutoff,
       actorUserId,
     );
     if (started) {

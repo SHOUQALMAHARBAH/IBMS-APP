@@ -33,6 +33,27 @@ export interface StartSlaTimerParams {
    * should pass that value; callers that don't can derive one with
    * `computeDueAt()` first. */
   dueAt: Date;
+  /**
+   * THE TRANSACTION'S OWN DATE — which `SlaPolicy` row was in force when this thing happened.
+   *
+   * REQUIRED, with no default, and that is the whole correction. `startTimer` read the policy with
+   * `findActiveFor(workflowName, null)` — no `at` — so it took the repository's `at = new Date()`
+   * default and resolved the row in force TODAY. Every escalation stage of a timer started for a
+   * transaction dated under a superseded policy therefore came from the REPLACEMENT row, while
+   * `resolveDueAt` four methods up had already honoured the effective dating for the deadline
+   * itself. One record, two dates, and only the deadline was right.
+   *
+   * A default of `new Date()` would compile at all 17 call sites and keep the defect; required, the
+   * COMPILER asks each one which date its transaction bears. Reported as a defect in
+   * `docs/module-1-design-reports.md` § 6.1 and fixed here because a defect does not wait for its
+   * module.
+   *
+   * Pass the SAME value handed to `computeDueAt`/`resolveDueAt`. Where a caller took a domain field
+   * as its due date (`DataSubjectRequest.slaDueAt`, a policy's expiry), pass the date the
+   * transaction was recorded on, not the due date — the question is *which rule governed this act*,
+   * and the act happened when it happened.
+   */
+  baseDate: Date;
   actorUserId: string;
 }
 
@@ -238,13 +259,22 @@ export class SlaTimerService {
    * `workflowName` in `SLA_REGISTRY`, each due at `dueAt` offset by that
    * stage's (signed) `offset`. Returns the created rows in stage order. */
   async startTimer(params: StartSlaTimerParams): Promise<SlaTimer[]> {
-    const { entityType, entityId, workflowName, dueAt, actorUserId } = params;
+    const { entityType, entityId, workflowName, dueAt, baseDate, actorUserId } =
+      params;
 
     // Escalation stages come from the CONFIGURED policy when one exists,
     // falling back to the registry otherwise. Without this the stages stayed a
     // compile-time constant even though the table modelled them — the feature
     // would have looked configurable and quietly not been.
-    const policy = await this.policies.findActiveFor(workflowName, null);
+    //
+    // `baseDate` is passed, not omitted: the third argument is `at`, and leaving it off took the
+    // repository's `new Date()` default — so a timer for a transaction dated under a superseded
+    // policy got the REPLACEMENT row's stages. See `StartSlaTimerParams.baseDate`.
+    const policy = await this.policies.findActiveFor(
+      workflowName,
+      null,
+      baseDate,
+    );
     const stages: readonly {
       offset: { value: number; unit: SlaDurationUnitName };
       escalateTo: string | null;

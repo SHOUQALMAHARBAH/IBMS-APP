@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { OrgContextService } from '../common/org-context/org-context.service';
+import { Prisma } from '@ibms/db';
 import {
   applyTenantScope,
   MissingOrgContextError,
+  PROVIDER_OWNED_NULL_ORG_MODELS,
   TENANT_SCOPED_MODELS,
   UnhandledOperationError,
 } from './tenant-scope.extension';
@@ -330,5 +332,183 @@ describe('tenantScopeExtension — the auth bootstrap bypass', () => {
     await Promise.all([request('org-1'), request('org-2')]);
 
     expect(observed.sort()).toEqual(['org-1:org-1', 'org-2:org-2']);
+  });
+});
+
+describe('tenantScopeExtension — a NULL organizationId that means PROVIDER-OWNED', () => {
+  /*
+   * MODULE 1's LEGAL-VALUES TABLE. `LegalValue.organizationId` is NULLABLE and NULL means the row
+   * is the provider's — a figure CBJ Instructions No. 9 of 2026 itself states — which every office
+   * must be able to READ and none may write.
+   *
+   * The DMMF-derived scoped set answers a two-value question, and this is a three-value table.
+   * Without the exception, `withOrg` adds `{ organizationId }` to every read and the instrument's
+   * own figures become invisible to the application. With it widened too far, an office can update
+   * or delete the provider's rows through Prisma. Both directions are asserted here.
+   */
+
+  const nullableOrgModels = (): string[] =>
+    Prisma.dmmf.datamodel.models
+      .filter((m) =>
+        m.fields.some((f) => f.name === 'organizationId' && !f.isRequired),
+      )
+      .map((m) => m.name);
+
+  it('every declared provider-owned-NULL model really has a NULLABLE organizationId', () => {
+    // A model whose column is NOT NULL has no NULL rows at all, so listing it widens reads for
+    // nothing and is pure risk.
+    for (const model of PROVIDER_OWNED_NULL_ORG_MODELS) {
+      expect(nullableOrgModels()).toContain(model);
+    }
+  });
+
+  it('every NULLABLE organizationId in the schema is declared here', () => {
+    // The second direction, and the one that cannot be noticed by reading code: a new model with a
+    // nullable tenant column is either this pattern or a mistake, and both need naming. Left
+    // undeclared, its NULL rows would be invisible to every office — including the office that
+    // wrote them.
+    expect([...nullableOrgModels()].sort()).toEqual(
+      [...PROVIDER_OWNED_NULL_ORG_MODELS].sort(),
+    );
+  });
+
+  it('is in the tenant-scoped set, because that is what sets app.current_org_id', () => {
+    // The lex's own rule: an RLS policy is only enforceable on a model the extension recognises as
+    // tenant-scoped, because that is how the session variable gets set at all. A nullable column
+    // still satisfies the DMMF filter, which is why naming the column `organizationId` — rather
+    // than something like `ownerOrganizationId` — was the load-bearing choice.
+    expect(TENANT_SCOPED_MODELS.has('LegalValue')).toBe(true);
+  });
+
+  it('a READ sees this office rows OR the provider rows', () => {
+    const ctx = new OrgContextService();
+    ctx.runAs('org-1', () => {
+      expect(scoped(ctx, 'LegalValue', 'findMany', {})).toEqual({
+        where: {
+          AND: [
+            { OR: [{ organizationId: 'org-1' }, { organizationId: null }] },
+          ],
+        },
+      });
+    });
+  });
+
+  it("keeps the caller's own OR, by appending to AND rather than merging a second OR", () => {
+    // A caller's `where` may already carry an `OR`. Merging a second top-level `OR` key would
+    // OVERWRITE it and silently widen the caller's filter — the failure direction that does not
+    // look like a bug.
+    const ctx = new OrgContextService();
+    ctx.runAs('org-1', () => {
+      expect(
+        scoped(ctx, 'LegalValue', 'findFirst', {
+          where: { OR: [{ code: 'A' }, { code: 'B' }] },
+        }),
+      ).toEqual({
+        where: {
+          OR: [{ code: 'A' }, { code: 'B' }],
+          AND: [
+            { OR: [{ organizationId: 'org-1' }, { organizationId: null }] },
+          ],
+        },
+      });
+    });
+  });
+
+  it("keeps the caller's own AND too, rather than replacing it", () => {
+    const ctx = new OrgContextService();
+    ctx.runAs('org-1', () => {
+      expect(
+        scoped(ctx, 'LegalValue', 'findMany', {
+          where: { AND: [{ code: 'A' }] },
+        }),
+      ).toEqual({
+        where: {
+          AND: [
+            { code: 'A' },
+            { OR: [{ organizationId: 'org-1' }, { organizationId: null }] },
+          ],
+        },
+      });
+    });
+  });
+
+  it('🔴 a findUnique keeps its UNIQUE FIELD at the top level', () => {
+    /*
+     * THE DEFECT THIS WAS WRITTEN FOR, and it was a real one in the first version of the widening.
+     *
+     * `findUnique`/`findUniqueOrThrow` take a `WhereUniqueInput`, and Prisma needs the unique field
+     * AT THE TOP LEVEL to identify the row. The first version returned `{ AND: [where, ownership] }`,
+     * which moved `id` off the top level and produced
+     * `PrismaClientValidationError: Invalid prisma.legalValue.findUniqueOrThrow() invocation`.
+     * `withOrg` never hit it because it spreads — so the bug was introduced by the ONE function that
+     * did not.
+     *
+     * Caught by `legal-value.e2e-spec.ts` on its first run, which is the argument for that spec
+     * existing: no unit test of the extension's output SHAPE would have noticed, because the shape
+     * was internally consistent and simply not the one Prisma accepts.
+     */
+    const ctx = new OrgContextService();
+    ctx.runAs('org-1', () => {
+      const args = scoped(ctx, 'LegalValue', 'findUniqueOrThrow', {
+        where: { id: 'lv-1' },
+      }) as { where: Record<string, unknown> };
+      expect(args.where.id).toBe('lv-1');
+      expect(args.where.AND).toEqual([
+        { OR: [{ organizationId: 'org-1' }, { organizationId: null }] },
+      ]);
+    });
+  });
+
+  for (const op of ['update', 'updateMany', 'delete', 'deleteMany'] as const) {
+    it(`a ${op} is NOT widened — an office must not reach the provider's rows`, () => {
+      const ctx = new OrgContextService();
+      ctx.runAs('org-1', () => {
+        const args = scoped(ctx, 'LegalValue', op, {
+          where: { code: 'X' },
+          ...(op.startsWith('update') ? { data: { name: 'y' } } : {}),
+        }) as { where: Record<string, unknown> };
+        expect(args.where).toEqual({ code: 'X', organizationId: 'org-1' });
+      });
+    });
+  }
+
+  it('an upsert is not widened on its where, and its create is still stamped', () => {
+    const ctx = new OrgContextService();
+    ctx.runAs('org-1', () => {
+      expect(
+        scoped(ctx, 'LegalValue', 'upsert', {
+          where: { code: 'X' },
+          create: { code: 'X', name: 'n' },
+          update: { name: 'n' },
+        }),
+      ).toEqual({
+        where: { code: 'X', organizationId: 'org-1' },
+        create: { code: 'X', name: 'n', organizationId: 'org-1' },
+        update: { name: 'n' },
+      });
+    });
+  });
+
+  it('a create is STAMPED, so the application cannot author a provider row', () => {
+    // The only thing that can write `organizationId: null` here is the seed, running as the
+    // database owner under a policy granted TO that role alone. An office account attempting it is
+    // refused by RLS — `new row violates row-level security policy`, measured.
+    const ctx = new OrgContextService();
+    ctx.runAs('org-1', () => {
+      expect(
+        scoped(ctx, 'LegalValue', 'create', { data: { code: 'X', name: 'n' } }),
+      ).toEqual({ data: { code: 'X', name: 'n', organizationId: 'org-1' } });
+    });
+  });
+
+  it('an ordinary tenant-scoped model is untouched by the exception', () => {
+    const ctx = new OrgContextService();
+    ctx.runAs('org-1', () => {
+      expect(
+        scoped(ctx, 'Customer', 'findMany', { where: { status: 'ACTIVE' } }),
+      ).toEqual({
+        where: { status: 'ACTIVE', organizationId: 'org-1' },
+      });
+    });
   });
 });

@@ -95,7 +95,12 @@ export class LegalHoldService {
       insuredPersonId: dto.insuredPersonId ?? null,
     });
 
-    await this.startSlaTimerBestEffort(row.id, nextReviewDueAt, actorUserId);
+    await this.startSlaTimerBestEffort(
+      row.id,
+      nextReviewDueAt,
+      new Date(),
+      actorUserId,
+    );
 
     await this.safeAudit({
       userId: actorUserId,
@@ -155,6 +160,8 @@ export class LegalHoldService {
     const started = await this.startSlaTimerBestEffort(
       id,
       newDueAt,
+      // The review is being re-based NOW; `rebaseCutoff` is that instant.
+      rebaseCutoff,
       actorUserId,
     );
     if (started) {
@@ -200,6 +207,8 @@ export class LegalHoldService {
   private async startSlaTimerBestEffort(
     id: string,
     dueAt: Date,
+    /** The transaction's own date — see `StartSlaTimerParams.baseDate`. */
+    baseDate: Date,
     actorUserId: string,
   ): Promise<boolean> {
     try {
@@ -208,6 +217,7 @@ export class LegalHoldService {
         entityId: id,
         workflowName: LEGAL_HOLD_REVIEW_SLA_WORKFLOW,
         dueAt,
+        baseDate,
         actorUserId,
       });
       return true;

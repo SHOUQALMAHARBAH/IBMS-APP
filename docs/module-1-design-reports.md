@@ -95,7 +95,15 @@ onto the new shape later; do not migrate the new shape onto `SlaPolicy`.*
 | **30 days** ex-agent bar | م(٢٢/م) | 29 |
 | **45 days** renewal filing | م(١١) | — (already a literal, declared) |
 | **2 years** deemed cancellation | م(١٤/ج) | — (already a literal, declared) |
-| ⚠️ **50,000 JOD** for >5 physical branches | م(١٣/ب/٢) | **NOT yet read from the image** — the extraction marks it trusted on a rule that has failed twice |
+| **50,000 JOD** for >5 physical branches | م(١٣/ب/٢) | 16 |
+
+> **CORRECTED 2026-11-11 (message 35 §1.4).** That last row read **"NOT yet read from the
+> image — the extraction marks it trusted on a rule that has failed twice"**. The owner read it
+> on 10–11 November: the instrument says **«أن لا يقل رأسماله عن (٥٠) الف دينار»**, printed page
+> 16. So the figure is confirmed and the doubt is closed. **The mechanism it warned about is
+> still real** — a Latin-digit OCR output is not evidence of a Latin-digit input — and that is
+> why this row needed a reading rather than an inference. **And art. 11 has a title**, which this
+> report and our own reference both denied: **«المادة (١١): تجديد الترخيص»**, printed page 15.
 
 **From the owner's decision of 9 October — provider-owned:** 7 business days · 3 days · 45 days ·
 one month · 60 days · a fortnight · 2,000 JOD · 3 companies · 15 hours · 50% · the capital bands.

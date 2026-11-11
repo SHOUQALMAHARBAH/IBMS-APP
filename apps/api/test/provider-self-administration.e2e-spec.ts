@@ -300,7 +300,23 @@ describe('the authorised mailbox widening — the sets, by name', () => {
      */
     const total = await rawPrisma.permission.count();
     console.log(`permission catalogue total: ${total}`);
-    expect(total).toBe(230);
+    /*
+     * 230 -> 232, MODULE 1's legal-values table (OWNER DECISION 123): `legal-value.read` and
+     * `legal-value.declare`. The test's own name is the rule — *the catalogue total moves only
+     * when a batch deliberately mints* — and this batch deliberately minted two.
+     *
+     * 🔴 AND CI FOUND IT AGAIN, FOR THE SECOND TIME, IN EXACTLY THE WAY THE PARAGRAPH ABOVE
+     * DESCRIBES. That paragraph was written by somebody who had just run "one e2e FILE plus the
+     * full unit suite" and been caught by this pin. I ran `legal-value.e2e-spec.ts` plus the full
+     * unit suites and was caught by the same pin. **A warning written in the voice of the person
+     * who just made the mistake did not stop the next person making it**, which is an argument for
+     * the gate and not for the comment: `npm run test:e2e` takes ~22 minutes and that is the price
+     * of knowing. The question "which specs assert the catalogue TOTAL" is answerable in one line
+     * and is now in `CLAUDE.md`'s action column:
+     *
+     *     git grep -ln 'PERMISSION\|Permission' -- apps/api/test | xargs git grep -ln 'toBe(2[0-9][0-9])'
+     */
+    expect(total).toBe(232);
   });
 
   it("adds no role — PLATFORM_OPERATOR is still the provider organization's only seeded role", async () => {

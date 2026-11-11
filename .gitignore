@@ -57,3 +57,11 @@ server-message-identifiers.txt
 # The design-pass screenshots. NOT under `test-results/`, which Playwright clears at the
 # start of every run - these have to survive one. Evidence to look at, not an artefact.
 design-pass-captures/
+
+# A staging area for files pulled OUT of the working tree on the way to being deleted — stale
+# `.git` lock files, mostly. Ignored because of how five of them got committed on 2026-11-11:
+# `git add -A` staged the directory, I undid it with `git rm -r --cached` and amended, and then a
+# LATER `git add -A` in the same session put them straight back. `git rm --cached` is undone by the
+# next `git add -A` unless the path is also ignored — untracking without ignoring is not a fix, it
+# is a fix that expires.
+_to_delete/

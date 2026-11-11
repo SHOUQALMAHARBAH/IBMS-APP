@@ -89,7 +89,8 @@
     "check:decision-index": "python scripts/measurements/decision-index-fit.py --self-test && python scripts/measurements/decision-index-fit.py --check",
     "check:declaration-floor": "python scripts/measurements/declaration-floor-fit.py --check",
     "check:legal-numbers": "python scripts/measurements/legal-numbers.py",
-    "check:guards": "npm run check:hook-registration && npm run check:declaration-floor && npm run check:legal-numbers"
+    "check:unguarded-routes": "python scripts/measurements/unguarded-routes.py",
+    "check:guards": "npm run check:hook-registration && npm run check:declaration-floor && npm run check:legal-numbers && npm run check:unguarded-routes"
   },
   "devDependencies": {
     "turbo": "2.10.11"

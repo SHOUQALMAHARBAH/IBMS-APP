@@ -29,6 +29,7 @@ import {
 } from './broker-license-scope.config';
 import { formatMoney } from '../../common/money.util';
 import type { AddScopeBranchDto } from './dto/add-scope-branch.dto';
+import { LegalValueService } from './legal-value.service';
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -89,6 +90,8 @@ export class BrokerLicenseScopeService {
     // cross-module shape — the approval SERVICE stays inside the employee module.
     private readonly approvals: EmployeeCbjApprovalRepository,
     private readonly audit: AuditService,
+    /** OWNER DECISION 123 — art. 4/a's capital bands are `LegalValue` rows. */
+    private readonly legalValues: LegalValueService,
   ) {}
 
   async get(): Promise<LicenseScopeView> {
@@ -268,9 +271,16 @@ export class BrokerLicenseScopeService {
   ): Promise<LicenseScopeView> {
     const branches = await this.scope.findForTerm(brokerLicenseId);
     const organization = await this.organizations.findById(organizationId);
+    // OWNER DECISION 123 — art. 4/a's five figures are `LegalValue` rows now, read at the instant
+    // the assessment is made. The assessment is a WARNING and never a refusal, so a figure that
+    // moved last month must not retroactively change what an office was told then; `asAt` is this
+    // read's own instant and the row in force on it is what answers.
+    const asAt = new Date();
+    const figures = await this.legalValues.licenceFigures(asAt);
     const capital = assessCapital(
       organization?.paidUpCapital ?? null,
       branches,
+      figures.capitalBands,
     );
 
     return {

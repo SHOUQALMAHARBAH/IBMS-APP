@@ -1,4 +1,5 @@
 import type { Prisma } from '@ibms/db';
+import type { LicenceLegalFigures } from './legal-figures.config';
 
 /**
  * Process 51/Part 7.1 — the broker's own CBJ regulatory license (backlog
@@ -67,6 +68,12 @@ import type { Prisma } from '@ibms/db';
  * Against the analogy stands art. 5/a of the same law: no person may practise insurance business
  * without the required licence. That is why the rule is conditioned on a TIMELY filing and is not
  * a general grace period.
+ *
+ * ## AND IT IS REPLACED — see `BrokerLicense`'s own model comment in `schema.prisma`
+ *
+ * The owner's ruling of 10 November tightens the rule this sentence explains and replaces the basis
+ * behind it. The account lives on the MODEL rather than here, because it is a statement about what a
+ * licence term MEANS, and this file answers questions about one term by arithmetic.
  */
 export const RENEWAL_PENDING_RULE_BASIS =
   "Owner's decision. No provision in Instructions No. 9 of 2026. Supported by analogy only with " +
@@ -74,22 +81,34 @@ export const RENEWAL_PENDING_RULE_BASIS =
   'extend to brokers by its terms. Pending arts. 82 and 109 of that law and the CBJ renewal ' +
   'application form.';
 
-/** Art. 11 — and this one IS art. 11: the filing deadline is the article's whole content.
- *  CALENDAR days, not business days, and the reading is deliberate: the deadline is
- *  stated as a span before a fixed calendar date, and counting it in business days would move it
- *  EARLIER — making the office late for a filing the regulation would call timely. This project has
- *  already been bitten by a date rule whose error ran against the brokerage (the empty holiday
- *  calendar), so where a reading is ambiguous the literal one wins. */
-export const RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY = 45;
+/*
+ * ART. 11's 45 DAYS IS A ROW NOW, NOT A CONSTANT — OWNER DECISION 123, module 1.
+ *
+ * `export const RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY = 45` stood here, declared in
+ * `check:legal-numbers` with its reason, and that gate's own message said to DELETE the
+ * declaration when the figure moved into the legal-values table. It has:
+ * `LegalValue` code `RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY`, art. 11, printed page 15.
+ *
+ * THE READING IT CARRIED IS NOT LOST, because it is a reading and not a figure: the span is in
+ * CALENDAR days, not business days, deliberately. The deadline is stated as a span before a fixed
+ * calendar date, and counting it in business days would move it EARLIER — making the office late
+ * for a filing the regulation would call timely. This project has already been bitten by a date
+ * rule whose error ran against the brokerage (the empty holiday calendar), so where a reading is
+ * ambiguous the literal one wins. The row's own `note` says so too.
+ *
+ * Art. 11's title, read off the page image on 2026-11-11, is «تجديد الترخيص». Our reference had
+ * recorded the article as untitled.
+ */
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Art. 11's deadline for THIS term's renewal application: 45 calendar days before it expires. */
-export function renewalApplicationDueBy(expiresAt: Date): Date {
-  return new Date(
-    expiresAt.getTime() -
-      RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY * MS_PER_DAY,
-  );
+/** Art. 11's deadline for THIS term's renewal application: `dueDaysBeforeExpiry` calendar days
+ *  before it expires. The figure comes from `LicenceLegalFigures`, never from here. */
+export function renewalApplicationDueBy(
+  expiresAt: Date,
+  dueDaysBeforeExpiry: number,
+): Date {
+  return new Date(expiresAt.getTime() - dueDaysBeforeExpiry * MS_PER_DAY);
 }
 
 /**
@@ -98,14 +117,20 @@ export function renewalApplicationDueBy(expiresAt: Date): Date {
  * `false` when nothing was filed at all — which is the case that matters, because an office that
  * filed nothing expires on 31 December while one that filed on time does not.
  */
-export function renewalFiledOnTime(term: {
-  expiresAt: Date;
-  renewalRequestedAt: Date | null;
-}): boolean {
+export function renewalFiledOnTime(
+  term: {
+    expiresAt: Date;
+    renewalRequestedAt: Date | null;
+  },
+  figures: LicenceLegalFigures,
+): boolean {
   if (!term.renewalRequestedAt) return false;
   return (
     term.renewalRequestedAt.getTime() <=
-    renewalApplicationDueBy(term.expiresAt).getTime()
+    renewalApplicationDueBy(
+      term.expiresAt,
+      figures.renewalApplicationDueDaysBeforeExpiry,
+    ).getTime()
   );
 }
 
@@ -195,6 +220,10 @@ export function isBrokerLicenseCurrentlyLapsed(
     renewalRequestedAt: Date | null;
   },
   now: Date,
+  /** Art. 11's filing span, read from `LegalValue` at the date the caller is asking about.
+   *  REQUIRED with no default: a default would compile at every call site and put the figure
+   *  back into source, which is what decision 123 moved out. */
+  figures: LicenceLegalFigures,
 ): boolean {
   /*
    * THE MANUAL-LAPSE BRANCH IS GONE, AND ITS RULE MOVED RATHER THAN BEING LOST.
@@ -228,7 +257,7 @@ export function isBrokerLicenseCurrentlyLapsed(
    * yet. A `renewalDecidedAt` column would be a second place for that fact to live and to drift
    * from the series it is derived from.
    */
-  return !renewalFiledOnTime(license);
+  return !renewalFiledOnTime(license, figures);
 }
 
 /**
@@ -248,12 +277,14 @@ export function isValidPendingRenewalDecision(
     renewalRequestedAt: Date | null;
   },
   now: Date,
+  /** Art. 11's filing span, from `LegalValue`. REQUIRED — see `isBrokerLicenseCurrentlyLapsed`. */
+  figures: LicenceLegalFigures,
 ): boolean {
   // The manual-lapse guard moved with the column — see `isBrokerLicenseCurrentlyLapsed` above. A
   // standing act is now what stops this branch, in `deriveLicenseStanding`, which checks the acts
   // before it ever asks about a pending renewal.
   if (license.expiresAt.getTime() > now.getTime()) return false;
-  return renewalFiledOnTime(license);
+  return renewalFiledOnTime(license, figures);
 }
 
 /** ONE TERM as stored. */
@@ -325,6 +356,10 @@ export interface BrokerLicenseView {
 export function deriveBrokerLicenseView(
   row: BrokerLicenseRow,
   now: Date,
+  /** Art. 11's filing span, from `LegalValue` — OWNER DECISION 123. Threaded rather than read
+   *  here because this function is pure and is rendered by a provider dashboard whose whole point
+   *  is that it is cheap; see `legal-figures.config.ts`. */
+  figures: LicenceLegalFigures,
 ): BrokerLicenseView {
   return {
     id: row.id,
@@ -332,14 +367,21 @@ export function deriveBrokerLicenseView(
     scopeOfAuthorization: row.scopeOfAuthorization,
     issuedAt: row.issuedAt ? row.issuedAt.toISOString() : null,
     expiresAt: row.expiresAt.toISOString(),
-    isCurrentlyLapsed: isBrokerLicenseCurrentlyLapsed(row, now),
+    isCurrentlyLapsed: isBrokerLicenseCurrentlyLapsed(row, now, figures),
     certificateDocumentId: row.certificateDocumentId,
     renewalRequestedAt: row.renewalRequestedAt
       ? row.renewalRequestedAt.toISOString()
       : null,
-    renewalDueBy: renewalApplicationDueBy(row.expiresAt).toISOString(),
-    renewalFiledOnTime: renewalFiledOnTime(row),
-    validPendingRenewalDecision: isValidPendingRenewalDecision(row, now),
+    renewalDueBy: renewalApplicationDueBy(
+      row.expiresAt,
+      figures.renewalApplicationDueDaysBeforeExpiry,
+    ).toISOString(),
+    renewalFiledOnTime: renewalFiledOnTime(row, figures),
+    validPendingRenewalDecision: isValidPendingRenewalDecision(
+      row,
+      now,
+      figures,
+    ),
     expiryIsEndOfCalendarYear: expiryIsEndOfCalendarYear(row.expiresAt),
     expectedExpiryForThreeYearTerm:
       expectedExpiryForThreeYearTerm(row.issuedAt)?.toISOString() ?? null,

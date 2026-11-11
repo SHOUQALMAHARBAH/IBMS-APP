@@ -230,8 +230,22 @@ describe('AccessRecertificationService', () => {
         entityId: 'cycle-1',
         workflowName: 'quarterly_access_review',
         dueAt,
+        // The cycle's own START instant, not `dueAt` — `startTimer` reads the `SlaPolicy` row in
+        // force on this date, so a cycle started under last quarter's policy keeps that policy's
+        // escalation stages. Asserted as a Date rather than a value, because the value is `now`.
+        //
+        // `as Date` because `expect.any()` returns `any`, and `any` as an object-literal PROPERTY
+        // is an unsafe assignment (it is fine as a bare argument, which is why the sibling sites in
+        // `session.service.spec.ts` need no cast).
+        baseDate: expect.any(Date) as Date,
         actorUserId: 'admin-1',
       });
+      // And it is NOT `dueAt`: the two are different facts, and passing the deadline would read
+      // the policy in force on the day the review is DUE rather than the day it was ordered.
+      // The whole call array is cast, not an element of it: indexing a `vi.fn()`'s untyped
+      // `calls` first and casting after is an unsafe-any assignment.
+      const calls = mocks.startTimer.mock.calls as [{ baseDate: Date }][];
+      expect(calls[0][0].baseDate.getTime()).not.toBe(dueAt.getTime());
     });
 
     it('still returns the created cycle when starting its SLA timer fails', async () => {

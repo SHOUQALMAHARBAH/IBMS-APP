@@ -187,7 +187,34 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * OFFICE-scoped, so it reaches this matrix: a register of this office's own people is the
      * office's, not a platform capability.
      */
-    expect(PERMISSION_CATALOGUE.length).toBe(230);
+    /*
+     * MODULE 1, OWNER DECISION 123. The catalogue goes from 230 to 232: `legal-value.read` and
+     * `legal-value.declare`, the legal-values table's two codes.
+     *
+     * ⚠️ THE FIGURES ARE DELIBERATELY NOT WRITTEN IN THE `DECISION <n> <em-dash> <count>` SHAPE
+     * the row above uses. `check:decision-index` walks a MULTI-NUMBER citation — its own header
+     * records which decision hid inside one for the whole life of the register, and that file is
+     * the one home for the story — and an em dash is one of its separators, so that shape reads as
+     * a citation of the COUNT and the gate refuses it as a decision with no file. It did, on this very comment. The row above survives only because its
+     * count is a DECLARED PHANTOM carrying that exact text.
+     *
+     * AND THE FIRST VERSION OF THIS WARNING QUOTED THE SHAPE LITERALLY, so the comment explaining
+     * the trap reproduced it and the gate went from 1 citation to 3. That is the
+     * comment-quotes-the-pattern blindness this repository has paid for five times, committed
+     * inside the sentence warning about it — which is why the shape is written with placeholders.
+     *
+     * BOTH LAND IN THE TOGGLE LIST, and the reason is the rule rather than the count: `familyOf`
+     * gives them both the family `legal-value`, which therefore has TWO members — but only ONE of
+     * them carries a CRUD verb. `read` is in the verb list; `declare` is not, and deliberately so,
+     * because declaring a legal value is not a CRUD operation on one. A family with one CRUD verb
+     * is not a five-state row, exactly as `conflict-of-interest.register` above is not.
+     *
+     * So families stay 21, family codes stay 59, and the toggle count moves by TWO.
+     *
+     * OFFICE-scoped, both: a value this office declared is the office's, and the figures the
+     * instrument states are read by every office rather than being a platform capability.
+     */
+    expect(PERMISSION_CATALOGUE.length).toBe(232);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
@@ -199,7 +226,7 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
      * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
      */
-    expect(toggles.length).toBe(166);
+    expect(toggles.length).toBe(168);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

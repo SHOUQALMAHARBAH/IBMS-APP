@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
 import { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
 import { LicenseGateService } from './license-gate.service';
+import { LegalValueService } from './legal-value.service';
+import { LegalValueRepository } from '../../repositories/legal-value.repository';
 
 /**
  * `@Global()`, for the reason `WorkflowModule` and `DutySegregationModule` are — and the reason is
@@ -20,7 +22,12 @@ import { LicenseGateService } from './license-gate.service';
     LicenseGateService,
     BrokerLicenseRepository,
     RegulatoryActionRepository,
+    // OWNER DECISION 123's legal-values reader. Exported for the SAME reason the gate is: the
+    // capital assessment is called from `provider/office-registration.service.ts`, in a different
+    // module, and a figure read in two places by two routes is two answers.
+    LegalValueService,
+    LegalValueRepository,
   ],
-  exports: [LicenseGateService],
+  exports: [LicenseGateService, LegalValueService],
 })
 export class LicenseGateModule {}

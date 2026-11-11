@@ -6,6 +6,12 @@ import type { AuditService } from '../audit/audit.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { UserRepository } from '../../repositories/user.repository';
 
+/** The transaction's own date for the fixtures below. `startTimer` takes it as a REQUIRED
+ *  parameter so the policy lookup honours the effective dating — see
+ *  `StartSlaTimerParams.baseDate`. Its value is irrelevant to every test that configures no
+ *  policy; the test that DOES care declares its own dates. */
+const SPEC_BASE_DATE = new Date('2026-08-26T00:00:00.000Z');
+
 function makeDeps(overrides?: {
   createImpl?: (data: unknown) => { id: string } & Record<string, unknown>;
   findManyResult?: unknown[];
@@ -209,6 +215,7 @@ describe('SlaTimerService.startTimer', () => {
       entityId: 'consent-1',
       workflowName: 'consent_withdrawal',
       dueAt,
+      baseDate: SPEC_BASE_DATE,
       actorUserId: 'user-1',
     });
 
@@ -246,6 +253,7 @@ describe('SlaTimerService.startTimer', () => {
       entityId: 'dsr-1',
       workflowName: 'dsr_access_deletion',
       dueAt,
+      baseDate: SPEC_BASE_DATE,
       actorUserId: 'dpo-1',
     });
 
@@ -280,6 +288,7 @@ describe('SlaTimerService.startTimer', () => {
         entityId: 'x-1',
         workflowName: 'not_a_workflow',
         dueAt: new Date(),
+        baseDate: SPEC_BASE_DATE,
         actorUserId: 'user-1',
       }),
     ).rejects.toThrow(/Unknown SLA workflow/);
@@ -472,6 +481,7 @@ describe('startTimer uses the CONFIGURED policy, not the registry constant', () 
       entityId: 'consent-1',
       workflowName: 'consent_withdrawal',
       dueAt: new Date('2026-09-01T00:00:00.000Z'),
+      baseDate: SPEC_BASE_DATE,
       actorUserId: 'user-1',
     });
     for (const call of create.mock.calls as [
@@ -495,6 +505,7 @@ describe('startTimer uses the CONFIGURED policy, not the registry constant', () 
       entityId: 'consent-1',
       workflowName: 'consent_withdrawal',
       dueAt: new Date('2026-09-01T00:00:00.000Z'),
+      baseDate: SPEC_BASE_DATE,
       actorUserId: 'user-1',
     });
     expect(created).toHaveLength(2);
@@ -521,6 +532,7 @@ describe('startTimer uses the CONFIGURED policy, not the registry constant', () 
       entityId: 'consent-1',
       workflowName: 'consent_withdrawal',
       dueAt,
+      baseDate: SPEC_BASE_DATE,
       actorUserId: 'user-1',
     });
     expect(created).toHaveLength(1);
@@ -538,9 +550,99 @@ describe('startTimer uses the CONFIGURED policy, not the registry constant', () 
       entityId: 'consent-1',
       workflowName: 'consent_withdrawal',
       dueAt: new Date('2026-09-01T00:00:00.000Z'),
+      baseDate: SPEC_BASE_DATE,
       actorUserId: 'user-1',
     });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  /*
+   * MESSAGE 35 §1.6 — THE POLICY IS READ AT THE TRANSACTION'S DATE, NOT AT TODAY'S.
+   *
+   * `startTimer` called `findActiveFor(workflowName, null)` with no `at`, so it took the
+   * repository's `new Date()` default. A timer started for a transaction dated under a SUPERSEDED
+   * policy therefore drew its escalation stages from the REPLACEMENT row — while `resolveDueAt`
+   * four methods up had already honoured the effective dating for the deadline itself. One record,
+   * two dates, and only the deadline was right.
+   *
+   * The fixture is the only honest shape for this: `findActiveFor` answers as the real repository
+   * does, BY DATE. A mock that ignores its third argument would pass with the defect restored.
+   */
+  it('reads the policy in force on the TRANSACTION date, not today', async () => {
+    const CUTOVER = new Date('2026-07-01T00:00:00.000Z');
+    const SUPERSEDED = configuredPolicy({
+      id: 'p-old',
+      escalations: [
+        {
+          stageOrder: 0,
+          offsetValue: -2,
+          offsetUnit: 'BUSINESS_DAYS',
+          escalateTo: 'COMPLIANCE_OFFICER',
+        },
+        {
+          stageOrder: 1,
+          offsetValue: 0,
+          offsetUnit: 'BUSINESS_DAYS',
+          escalateTo: null,
+        },
+      ],
+    });
+    const REPLACEMENT = configuredPolicy({
+      id: 'p-new',
+      escalations: [
+        {
+          stageOrder: 0,
+          offsetValue: 0,
+          offsetUnit: 'BUSINESS_DAYS',
+          escalateTo: 'GENERAL_MANAGER',
+        },
+      ],
+    });
+    const findActiveFor = vi
+      .fn()
+      .mockImplementation(
+        (_process: string, _state: string | null, at: Date = new Date()) =>
+          Promise.resolve(
+            at.getTime() < CUTOVER.getTime() ? SUPERSEDED : REPLACEMENT,
+          ),
+      );
+    const { service, create } = makeDeps({
+      policies: {
+        findActiveFor,
+        findHolidays: vi.fn().mockResolvedValue([]),
+      },
+    });
+
+    // A transaction from BEFORE the cutover. Today is after it, by construction — this spec runs
+    // in 2026-11 or later, and the assertion does not depend on the clock beyond that.
+    const transactionDate = new Date('2026-05-10T00:00:00.000Z');
+    const created = await service.startTimer({
+      entityType: 'ConsentRecord',
+      entityId: 'consent-1',
+      workflowName: 'consent_withdrawal',
+      dueAt: new Date('2026-05-20T00:00:00.000Z'),
+      baseDate: transactionDate,
+      actorUserId: 'user-1',
+    });
+
+    // 1. The lookup was asked about the transaction's own date.
+    expect(findActiveFor).toHaveBeenCalledWith(
+      'consent_withdrawal',
+      null,
+      transactionDate,
+    );
+    // 2. And the SUPERSEDED row's stages are what the timer carries — two of them, the first
+    //    escalating to Compliance. The replacement has one stage and escalates to the General
+    //    Manager, so the count AND the target each distinguish the two on their own.
+    expect(created).toHaveLength(2);
+    const calls = create.mock.calls as [
+      { data: { slaPolicyId: string; escalatedTo: string | null } },
+    ][];
+    expect(calls.map((c) => c[0].data.slaPolicyId)).toEqual(['p-old', 'p-old']);
+    expect(calls.map((c) => c[0].data.escalatedTo)).toEqual([
+      'COMPLIANCE_OFFICER',
+      null,
+    ]);
   });
 });
 

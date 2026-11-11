@@ -140,20 +140,54 @@ BARE_NUMBER = re.compile(r"(?<![\w.'\"/\-])(-?[0-9][0-9_]*(?:\.[0-9]+)?)(?![\w.'
 # Keyed by `path:NAME` rather than by line number, so ordinary edits above a declaration do not
 # make this list stale.
 # ---------------------------------------------------------------------------
-DECLARED = {
-    "apps/api/src/modules/compliance-risk/broker-license.config.ts:RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY":
-        "Art. 11's filing deadline, 45 CALENDAR days. The ONE home for it since 2026-11-10 -- "
-        "`license-renewal-notice.config.ts` imports it rather than restating it, which it used to do "
-        "under a comment denying it did.",
-    "apps/api/src/modules/compliance-risk/license-standing.config.ts:ARTICLE_14C_SUSPENSION_LIMIT_YEARS":
-        "Art. 14/c -- a voluntary suspension that reaches two years is a deemed cancellation. It "
-        "belongs in the legal-values table once that table takes non-duration values; it is a "
-        "literal until then.",
-    "apps/api/src/modules/compliance-risk/broker-license-scope.config.ts:CAPITAL_BANDS":
-        "Art. 4/a's paid-up capital bands, printed page 5: 5,000 JOD up to 6 branches, 7,500 up to "
-        "12, 10,000 above 12. The three amounts are STRINGS because `money-decimal-jod.md` forbids a "
-        "JOD figure as a JS number, and that is why this gate could not see them until shape 2 "
-        "existed. Decision 123's first half puts all five in the legal-values table, provider-owned.",
+DECLARED: dict[str, str] = {
+    # EMPTY SINCE 2026-11-11, AND THAT IS THE POINT OF THE LIST.
+    #
+    # It held three entries, each saying "this figure belongs in the legal-values table and is a
+    # literal until that table exists":
+    #
+    #   broker-license.config.ts:RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY  (art. 11, 45 days)
+    #   license-standing.config.ts:ARTICLE_14C_SUSPENSION_LIMIT_YEARS        (art. 14/c, 2 years)
+    #   broker-license-scope.config.ts:CAPITAL_BANDS                         (art. 4/a, five figures)
+    #
+    # The table exists (migration `20261216100000_legal_values`, OWNER DECISION 123), all three are
+    # rows, and this gate REFUSED when they were deleted from source and left here — "DECLARED but
+    # no longer found (the list has become a ceiling)" — which is the half of the ratchet that makes
+    # the progress stick. The entries are gone rather than kept as history because the gate's own
+    # message says to delete them.
+    #
+    # An entry added here is a statement that a figure a legal instrument states is STILL a literal
+    # in source. After module 1 that should need an argument, not a line.
+}
+
+# ---------------------------------------------------------------------------
+# DECLARATIONS WHOSE FIGURES *ARE* THE LEGAL-VALUES TABLE'S OWN SOURCE.
+#
+# A DIFFERENT CATEGORY FROM `DECLARED`, and the distinction is the whole reason it exists rather
+# than being folded in. `DECLARED` means *a program reads this figure from source instead of from
+# the table* — the thing module 1 removed. These two declarations are what PUT the figures in the
+# table and what pins a test's expectation to them; neither is a path around it.
+#
+# The figures have to exist as literals SOMEWHERE: a seed that read its own rows would seed nothing.
+#
+# NOT A PATH-PREFIX SKIP, deliberately. Excluding `seed-data/` or `*.double.ts` by path would
+# swallow every future legal figure anybody writes there, which is the recorded objection to
+# `SOURCE_TRANSCRIPTIONS`-style blanket skips. Each entry is named, carries its reason, and is
+# checked in BOTH directions below.
+# ---------------------------------------------------------------------------
+SEEDS_THE_TABLE = {
+    "packages/db/prisma/seed-data/legal-values.ts:LEGAL_VALUES":
+        "THE CATALOGUE ITSELF -- the rows the seed writes into `LegalValue`, each with its article "
+        "and the printed page it was read on. This is the one place the instrument's figures are "
+        "allowed to be literals, because it is what gives them to the table. Its own invariants "
+        "(every provider entry states a figure and cites instrument/article/page; every office "
+        "entry ships with none) are pinned by `legal-values-parity.spec.ts`.",
+    "apps/api/src/modules/compliance-risk/legal-figures.double.ts:INSTRUMENT_LICENCE_FIGURES":
+        "THE TEST DOUBLE'S EXPECTATION. Six specs assert licence behaviour against the instrument's "
+        "own figures and must not each restate them -- that would be six copies of art. 4/a which "
+        "cannot be wrong in the same way at the same time. It is pinned to the catalogue by "
+        "`legal-values-parity.spec.ts`, which reads this file's text, so a figure that moves in the "
+        "table and not here fails rather than leaving specs green against the old law.",
 }
 
 # ---------------------------------------------------------------------------
@@ -184,8 +218,24 @@ NOT_A_LEGAL_NUMBER = {
 # The FIGURE SET of each declared STRUCTURED literal. See the header: the name alone has no teeth,
 # because adding a figure to an already-declared array changes no key.
 DECLARED_FIGURES = {
-    "apps/api/src/modules/compliance-risk/broker-license-scope.config.ts:CAPITAL_BANDS":
-        ("10000", "12", "5000", "6", "7500"),
+    # THE TEST DOUBLE'S EXPECTATION — art. 4/a's five figures, art. 11's 45 days and art. 14/c's
+    # two years, as the specs assert them. Pinned here AND pinned to the catalogue by
+    # `legal-values-parity.spec.ts`, so a figure that moves in the table and not here fails rather
+    # than leaving six specs green against the old law.
+    "apps/api/src/modules/compliance-risk/legal-figures.double.ts:INSTRUMENT_LICENCE_FIGURES":
+        ("10000", "12", "2", "45", "5000", "6", "7500"),
+    # THE CATALOGUE. Every figure the seed writes into `LegalValue` AND every printed page it was
+    # read on -- the pin cannot tell them apart and should not: a page number that changes is a
+    # citation that changed, and a reader must be told. 2026-06-24 contributes nothing here because
+    # the gate reads bare numbers in value position and a quoted ISO date is one string.
+    #
+    #   figures : 5000 · 6 · 7500 · 12 · 10000 (art. 4/a) · 45 (art. 11) · 50000 (art. 13/b/2)
+    #             2 (art. 14/c) · 3 (art. 15/d) · 2000 (art. 15/d/4) · 50 (art. 21/a/12)
+    #             30 (art. 22/m)
+    #   pages   : 3 · 5 · 15 · 16 · 17 · 26 · 29
+    "packages/db/prisma/seed-data/legal-values.ts:LEGAL_VALUES":
+        ("10000", "12", "15", "16", "17", "2", "2000", "26", "29", "3", "30",
+         "45", "5", "50", "5000", "50000", "6", "7500"),
 }
 
 # NOT IN THE LIST, and worth saying why, because it is the case this gate CANNOT see:
@@ -534,13 +584,27 @@ def self_test():
     print(("  ok   " if ok else "  FAIL ")
           + "no key is both DECLARED and NOT_A_LEGAL_NUMBER"
           + ("" if ok else "  (both: %s)" % both))
-    stray = sorted(set(DECLARED_FIGURES) - set(DECLARED))
+    stray = sorted(set(DECLARED_FIGURES) - set(DECLARED) - set(SEEDS_THE_TABLE))
     ok = not stray
     passed += ok
     failed += not ok
     print(("  ok   " if ok else "  FAIL ")
-          + "every DECLARED_FIGURES key is a DECLARED key"
+          + "every DECLARED_FIGURES key is a DECLARED or SEEDS_THE_TABLE key"
           + ("" if ok else "  (stray: %s)" % stray))
+    # THE THREE LISTS ARE DISJOINT. A key in two of them means two different claims about the same
+    # declaration -- "it is still a literal", "no instrument states it", "it is the table's own
+    # source" -- and whichever the code happens to read first would silence the other two.
+    for a, b, an, bn in (
+        (DECLARED, SEEDS_THE_TABLE, "DECLARED", "SEEDS_THE_TABLE"),
+        (NOT_A_LEGAL_NUMBER, SEEDS_THE_TABLE, "NOT_A_LEGAL_NUMBER", "SEEDS_THE_TABLE"),
+    ):
+        overlap = sorted(set(a) & set(b))
+        ok = not overlap
+        passed += ok
+        failed += not ok
+        print(("  ok   " if ok else "  FAIL ")
+              + ("no key is both %s and %s" % (an, bn))
+              + ("" if ok else "  (both: %s)" % overlap))
     print("self-test %d/%d" % (passed, passed + failed))
     return failed == 0
 
@@ -559,16 +623,21 @@ def main():
     found = {key for key, *_ in cited}
     declared = set(DECLARED)
     exempt = set(NOT_A_LEGAL_NUMBER)
+    seeds = set(SEEDS_THE_TABLE)
 
     print("numeric constant declarations scanned : %d" % scanned)
     print("  cited bare numeric constants        : %d" % len(bare))
     print("  cited STRUCTURED literals           : %d" % len(structured))
-    print("  declared                            : %d" % len(declared))
+    # The headline figure after module 1. It is the count of places a PROGRAM still reads a legal
+    # figure out of source instead of out of the table, and it should stay zero.
+    print("  declared, awaiting the table        : %d" % len(declared))
+    print("  the table's own source              : %d" % len(seeds))
     print("  cited but NOT a legal number         : %d" % len(exempt))
 
-    new = sorted(found - declared - exempt)
+    new = sorted(found - declared - exempt - seeds)
     gone = sorted(declared - found)
     gone_exempt = sorted(exempt - found)
+    gone_seeds = sorted(seeds - found)
     errors = []
 
     if new:
@@ -600,10 +669,18 @@ def main():
             "  is the half of the ratchet that makes progress stick -- or it was renamed, and the key\n"
             "  needs updating."
         )
+    if gone_seeds:
+        errors.append(
+            "DECLARED AS THE TABLE'S OWN SOURCE but no longer found:\n"
+            + "\n".join("    %s" % key for key in gone_seeds)
+            + "\n\n  The catalogue or the test double was renamed, moved, or stopped citing its article.\n"
+            "  DELETE its line from SEEDS_THE_TABLE, or update the key -- an entry nothing matches is\n"
+            "  an exemption waiting for whatever lands next under that name."
+        )
 
     for key, path, line, name, figures in sorted(structured):
         if key not in DECLARED_FIGURES:
-            if key in declared:
+            if key in declared or key in seeds:
                 errors.append(
                     "%s:%d  %s is DECLARED but its figures are not pinned.\n\n"
                     "  A structured literal's name has no teeth: a figure added to the array changes no\n"
@@ -641,10 +718,17 @@ def main():
         return 1
 
     print(
-        "\nlegal-numbers: ok -- %d cited declaration(s) (%d bare, %d structured): %d declared as legal\n"
-        "literals awaiting the legal-values table, %d declared as NOT legal numbers. Every one carries a reason."
-        % (len(cited), len(bare), len(structured), len(declared), len(exempt))
+        "\nlegal-numbers: ok -- %d cited declaration(s) (%d bare, %d structured): %d still a literal\n"
+        "awaiting the legal-values table, %d the table's OWN SOURCE, %d declared as NOT legal numbers.\n"
+        "Every one carries a reason."
+        % (len(cited), len(bare), len(structured), len(declared), len(seeds), len(exempt))
     )
+    if not declared:
+        print(
+            "\n  ZERO literals awaiting the table. OWNER DECISION 123 moved art. 4/a's five figures,\n"
+            "  art. 11's 45 days and art. 14/c's two years into `LegalValue` rows; what remains are the\n"
+            "  catalogue that SEEDS those rows and the test double pinned to it."
+        )
     return 0
 
 

@@ -578,7 +578,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 230 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 232 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -676,6 +676,8 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'internal-audit.close', module: 'compliance-risk', description: "Close an internal audit finding after remediation", scope: 'OFFICE' },
   { code: 'internal-audit.record', module: 'compliance-risk', description: "Record an internal audit finding", scope: 'OFFICE' },
   { code: 'internal-controls.view', module: 'compliance-risk', description: "View the periodic self-approval (maker/checker) audit report", scope: 'OFFICE' },
+  { code: 'legal-value.declare', module: 'compliance-risk', description: "Declare, for this office, a legal value the instrument defers to a Central Bank decision that has not been issued — entering it with the reference it rests on and the date it takes effect, both mandatory. It does NOT permit entering or changing a figure the instrument itself states: those belong to the provider and the database refuses an office account that tries. A value already declared is never edited in place; a change is a new entry from its own date, so every transaction keeps computing at the value in force on the day it happened", scope: 'OFFICE' },
+  { code: 'legal-value.read', module: 'compliance-risk', description: "Read the legal values the system computes with: the figures Instructions No. 9 of 2026 states, each with its article and the printed page it was read on, and any value this office has itself declared for a figure the Central Bank has deferred to a decision it has not issued. Reading shows the whole dated history, not only the figure in force today, because an old transaction was computed at the value in force on its own day and the record has to be able to show which one that was", scope: 'OFFICE' },
   { code: 'license.manage', module: 'compliance-risk', description: "Manage the broker's regulatory license record", scope: 'OFFICE' },
   { code: 'pi-policy.manage', module: 'compliance-risk', description: "Manage the broker's own Professional Indemnity policy record", scope: 'OFFICE' },
   { code: 'risk-register.manage', module: 'compliance-risk', description: "Manage the operational/cyber/financial/compliance/reputational risk register", scope: 'OFFICE' },
