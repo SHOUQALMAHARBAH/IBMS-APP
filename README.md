@@ -519,8 +519,17 @@ Three things to know before you use them:
   `module-01-declared-action-and-legal-values.md`, never instead of it** — it re-measured that
   paper and three of its items came out differently: **§4.5's declared duty-segregation mode is
   fully built and guarded in CI** (16 CHECK constraints each with one escape disjunct, a trigger on
-  `CombinedDutyAct`, a 713-line design doc), **half the legal-values table already exists as
-  `SlaPolicy`** (value, legal source, effective dating, updater), and **the geographic partial
+  `CombinedDutyAct`, a 713-line design doc), **~~half the legal-values table already exists as
+  `SlaPolicy`~~ — CORRECTED 2026-11-11, and the correction is the whole of module 1's first build:
+  `SlaPolicy` has all four of the columns §4.2 asks for and still CANNOT hold a legal value.** It is
+  tenant-scoped NOT NULL, so a PROVIDER row cannot exist in it, and decision 123's subject is whose
+  row this is; its `@@unique([organizationId, policyCode])` stops a superseded value sitting beside
+  its replacement, which is precisely what criterion 3 needs. So the table is `LegalValue`
+  (migration `20261216100000`), with `organizationId` NULLABLE and NULL meaning provider-owned —
+  **13 provider rows seeded, each carrying its article AND the printed page it was read on**, and
+  three office-owned codes with their shape, their guards and NO VALUE. The departure from the
+  12-October intention («التاسع من عائلة الجداول المرجعية، لا نمطاً ثانياً») is recorded in the
+  module-1 paper with its three measured reasons. And **the geographic partial
   suspension of art. 21/b/6 is not expressible at all** because `branchId` is carried by
   `Employee`, `SalesTarget` and `User` only and `Branch` has no country. **The papers stay the
   owner's to correct** — the measurement reports against them and changes none of their text, which

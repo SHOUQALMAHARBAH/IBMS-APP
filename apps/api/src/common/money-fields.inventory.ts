@@ -72,6 +72,29 @@ export const MONEY_DECIMAL_FIELDS: readonly string[] = [
   'ProfessionalIndemnityPolicy.coverageLimit',
   'EmployeePerformanceRecord.premiumWritten',
   'EmployeePerformanceRecord.commissionEarned',
+  /*
+   * MODULE 1's LEGAL-VALUES TABLE (OWNER DECISION 123), and it is the one entry in this list that
+   * is money SOMETIMES — so the classification deserves its reason rather than a line.
+   *
+   * `LegalValue.numericValue` is the single value column for every numeric KIND: `MONEY_JOD`
+   * (art. 4/a's three capital amounts, art. 13/b/2's 50,000, art. 15/d/4's 2,000 ceiling) and also
+   * `COUNT`, `CALENDAR_DAYS`, `YEARS` and `PERCENT`. One column rather than one per kind, because a
+   * reader asking *which column holds this figure* must not have to know the kind first, and a
+   * CHECK constraint ties the column to the kind.
+   *
+   * CLASSIFIED AS MONEY, deliberately and in the safe direction:
+   *
+   *   * `NON_MONEY_DECIMAL_FIELDS` would FAIL this file's own guard — that list may hold no
+   *     `Decimal(18, 3)` field, precisely because (18, 3) IS the money shape, and this column is
+   *     (18, 3) so that a JOD figure fits to the fils;
+   *   * and a reader who treats every row as money handles the counts correctly too (a count read
+   *     through `Decimal` is exact), whereas a reader who treats the money rows as plain numbers
+   *     would introduce the float arithmetic `money-decimal-jod.md` exists to forbid.
+   *
+   * `legal-figures.config.ts` is where the non-money kinds come back out, through
+   * `requireWholeNumber`, which REFUSES a fractional count rather than truncating it.
+   */
+  'LegalValue.numericValue',
 ];
 
 /**

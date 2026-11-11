@@ -10,9 +10,9 @@ import {
   pickCurrentTerm,
   renewalApplicationDueBy,
   renewalFiledOnTime,
-  RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY,
   type BrokerLicenseRow,
 } from './broker-license.config';
+import { INSTRUMENT_LICENCE_FIGURES } from './legal-figures.double';
 
 const NOW = new Date('2026-09-05T00:00:00.000Z');
 
@@ -33,7 +33,9 @@ function row(overrides: Partial<BrokerLicenseRow> = {}): BrokerLicenseRow {
 
 describe('isBrokerLicenseCurrentlyLapsed (Process 51)', () => {
   it('is not lapsed while active and before expiry', () => {
-    expect(isBrokerLicenseCurrentlyLapsed(row(), NOW)).toBe(false);
+    expect(
+      isBrokerLicenseCurrentlyLapsed(row(), NOW, INSTRUMENT_LICENCE_FIGURES),
+    ).toBe(false);
   });
 
   it('is lapsed once expiresAt has passed, even if status still reads active', () => {
@@ -41,14 +43,19 @@ describe('isBrokerLicenseCurrentlyLapsed (Process 51)', () => {
       isBrokerLicenseCurrentlyLapsed(
         row({ expiresAt: new Date('2026-01-01T00:00:00.000Z') }),
         NOW,
+        INSTRUMENT_LICENCE_FIGURES,
       ),
     ).toBe(true);
   });
 
   it('is lapsed exactly at the expiry instant (inclusive boundary)', () => {
-    expect(isBrokerLicenseCurrentlyLapsed(row({ expiresAt: NOW }), NOW)).toBe(
-      true,
-    );
+    expect(
+      isBrokerLicenseCurrentlyLapsed(
+        row({ expiresAt: NOW }),
+        NOW,
+        INSTRUMENT_LICENCE_FIGURES,
+      ),
+    ).toBe(true);
   });
 
   /*
@@ -63,7 +70,9 @@ describe('isBrokerLicenseCurrentlyLapsed (Process 51)', () => {
    * expiry means not lapsed — so the function has stopped consulting anything but the dates.
    */
   it('consults only the DATES now — a future expiry is not lapsed, and there is no marker to override it', () => {
-    expect(isBrokerLicenseCurrentlyLapsed(row(), NOW)).toBe(false);
+    expect(
+      isBrokerLicenseCurrentlyLapsed(row(), NOW, INSTRUMENT_LICENCE_FIGURES),
+    ).toBe(false);
   });
 });
 
@@ -74,6 +83,7 @@ describe('deriveBrokerLicenseView (Process 51)', () => {
         expiresAt: new Date('2026-01-01T00:00:00.000Z'),
       }),
       NOW,
+      INSTRUMENT_LICENCE_FIGURES,
     );
     expect(view.isCurrentlyLapsed).toBe(true);
   });
@@ -82,6 +92,7 @@ describe('deriveBrokerLicenseView (Process 51)', () => {
     const view = deriveBrokerLicenseView(
       row({ issuedAt: null, scopeOfAuthorization: null }),
       NOW,
+      INSTRUMENT_LICENCE_FIGURES,
     );
     expect(view.issuedAt).toBeNull();
     expect(view.scopeOfAuthorization).toBeNull();
@@ -122,9 +133,13 @@ describe('pickCurrentTerm (Module 0 item c)', () => {
     const duringTheOverlap = new Date('2026-12-01T00:00:00.000Z');
     const current = pickCurrentTerm([outgoing, incoming]);
     expect(current?.id).toBe('incoming');
-    expect(isBrokerLicenseCurrentlyLapsed(current!, duringTheOverlap)).toBe(
-      false,
-    );
+    expect(
+      isBrokerLicenseCurrentlyLapsed(
+        current!,
+        duringTheOverlap,
+        INSTRUMENT_LICENCE_FIGURES,
+      ),
+    ).toBe(false);
   });
 });
 
@@ -139,10 +154,18 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
 
   describe('renewalApplicationDueBy (art. 11)', () => {
     it('is 45 CALENDAR days before expiry', () => {
-      expect(RENEWAL_APPLICATION_DUE_DAYS_BEFORE_EXPIRY).toBe(45);
-      expect(renewalApplicationDueBy(EXPIRES).toISOString()).toBe(
-        DEADLINE.toISOString(),
-      );
+      // RE-POINTED, NOT DELETED — OWNER DECISION 123. The figure was a `const` here; it is a
+      // `LegalValue` row now, art. 11, printed page 15. What this still asserts is that the
+      // instrument's own figure is 45 and that the arithmetic below uses it.
+      expect(
+        INSTRUMENT_LICENCE_FIGURES.renewalApplicationDueDaysBeforeExpiry,
+      ).toBe(45);
+      expect(
+        renewalApplicationDueBy(
+          EXPIRES,
+          INSTRUMENT_LICENCE_FIGURES.renewalApplicationDueDaysBeforeExpiry,
+        ).toISOString(),
+      ).toBe(DEADLINE.toISOString());
     });
 
     it('crosses a month and a leap-year February without drifting', () => {
@@ -150,7 +173,10 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       // month-arithmetic implementation would land on 2028-01-31 and be wrong by a day in exactly
       // the direction that reports an on-time filing as late.
       expect(
-        renewalApplicationDueBy(new Date('2028-03-15T00:00:00.000Z'))
+        renewalApplicationDueBy(
+          new Date('2028-03-15T00:00:00.000Z'),
+          INSTRUMENT_LICENCE_FIGURES.renewalApplicationDueDaysBeforeExpiry,
+        )
           .toISOString()
           .slice(0, 10),
       ).toBe('2028-01-30');
@@ -160,7 +186,10 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
   describe('renewalFiledOnTime (art. 11)', () => {
     it('is false when nothing was filed — the case that decides whether an office expires', () => {
       expect(
-        renewalFiledOnTime({ expiresAt: EXPIRES, renewalRequestedAt: null }),
+        renewalFiledOnTime(
+          { expiresAt: EXPIRES, renewalRequestedAt: null },
+          INSTRUMENT_LICENCE_FIGURES,
+        ),
       ).toBe(false);
     });
 
@@ -168,19 +197,25 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       // A boundary that matters: "due 45 days before" includes the 45th day, and an
       // implementation using `<` would make an office filing exactly on time late.
       expect(
-        renewalFiledOnTime({
-          expiresAt: EXPIRES,
-          renewalRequestedAt: DEADLINE,
-        }),
+        renewalFiledOnTime(
+          {
+            expiresAt: EXPIRES,
+            renewalRequestedAt: DEADLINE,
+          },
+          INSTRUMENT_LICENCE_FIGURES,
+        ),
       ).toBe(true);
     });
 
     it('is false one day after the deadline', () => {
       expect(
-        renewalFiledOnTime({
-          expiresAt: EXPIRES,
-          renewalRequestedAt: new Date('2028-11-17T00:00:00.000Z'),
-        }),
+        renewalFiledOnTime(
+          {
+            expiresAt: EXPIRES,
+            renewalRequestedAt: new Date('2028-11-17T00:00:00.000Z'),
+          },
+          INSTRUMENT_LICENCE_FIGURES,
+        ),
       ).toBe(false);
     });
   });
@@ -290,6 +325,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
         isBrokerLicenseCurrentlyLapsed(
           { expiresAt: EXPIRES, renewalRequestedAt: null },
           past,
+          INSTRUMENT_LICENCE_FIGURES,
         ),
       ).toBe(true);
     });
@@ -302,6 +338,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
             renewalRequestedAt: new Date('2028-12-20T00:00:00.000Z'),
           },
           past,
+          INSTRUMENT_LICENCE_FIGURES,
         ),
       ).toBe(true);
     });
@@ -317,6 +354,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
             renewalRequestedAt: DEADLINE,
           },
           past,
+          INSTRUMENT_LICENCE_FIGURES,
         ),
       ).toBe(false);
     });
@@ -345,6 +383,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
             renewalRequestedAt: DEADLINE,
           },
           past,
+          INSTRUMENT_LICENCE_FIGURES,
         ),
       ).toBe(false);
     });
@@ -362,6 +401,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
             renewalRequestedAt: DEADLINE,
           },
           past,
+          INSTRUMENT_LICENCE_FIGURES,
         ),
       ).toBe(true);
     });
@@ -374,6 +414,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
             renewalRequestedAt: DEADLINE,
           },
           inside,
+          INSTRUMENT_LICENCE_FIGURES,
         ),
       ).toBe(false);
     });
@@ -390,6 +431,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
         isValidPendingRenewalDecision(
           { expiresAt: EXPIRES, renewalRequestedAt: null },
           past,
+          INSTRUMENT_LICENCE_FIGURES,
         ),
       ).toBe(false);
     });
@@ -404,6 +446,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
           renewalRequestedAt: DEADLINE,
         }),
         new Date('2029-02-01T00:00:00.000Z'),
+        INSTRUMENT_LICENCE_FIGURES,
       );
       expect(view.renewalDueBy).toBe(DEADLINE.toISOString());
       expect(view.renewalFiledOnTime).toBe(true);
@@ -418,6 +461,7 @@ describe('the term and renewal rules — Module 0 item (d)', () => {
       const view = deriveBrokerLicenseView(
         row({ expiresAt: new Date('2028-06-30T00:00:00.000Z') }),
         new Date('2027-01-01T00:00:00.000Z'),
+        INSTRUMENT_LICENCE_FIGURES,
       );
       expect(view.expiryIsEndOfCalendarYear).toBe(false);
       // Not blocked, not lapsed: the certificate is the authority and the date is entered as

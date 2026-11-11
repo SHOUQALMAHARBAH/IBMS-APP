@@ -30,6 +30,7 @@ import {
 } from './office-administrator-grants';
 import { deriveRegistrationPackState } from './registration-pack.config';
 import type { RegisterBrokerageOfficeDto } from './dto/register-brokerage-office.dto';
+import { LegalValueService } from '../compliance-risk/legal-value.service';
 
 /**
  * MODULE 0-ب ITEM (d) — REGISTERING A BROKERAGE OFFICE.
@@ -92,6 +93,9 @@ export class OfficeRegistrationService {
     private readonly orgContext: OrgContextService,
     private readonly audit: AuditService,
     private readonly encryption: EncryptionService,
+    /** OWNER DECISION 123 — art. 4/a's capital bands are `LegalValue` rows. Reachable without a
+     *  module import because `LicenseGateModule` is `@Global()` and exports it. */
+    private readonly legalValues: LegalValueService,
   ) {}
 
   async registerBrokerageOffice(
@@ -217,9 +221,14 @@ export class OfficeRegistrationService {
          * A reading that can only make a warning appear is a safe place to be approximately right
          * and say so. The same reading inside a refusal would not be.
          */
+        // OWNER DECISION 123 — art. 4/a's bands are `LegalValue` rows, read at this instant. The
+        // read is inside the transaction so the figures the warning rests on are the ones in force
+        // when the office was recorded, and `LegalValueService` is reachable here because
+        // `LicenseGateModule` is `@Global()` and exports it.
         const capital = assessCapital(
           dto.paidUpCapital === undefined ? null : toMoney(dto.paidUpCapital),
           branches,
+          (await this.legalValues.licenceFigures(new Date())).capitalBands,
         );
 
         // --------------------------------------------------------------------------- writes

@@ -8,6 +8,7 @@ import {
   type DerivedLicenseStanding,
   type InsuranceBranchRef,
 } from './license-standing.config';
+import { LegalValueService } from './legal-value.service';
 
 /**
  * MAY THIS OFFICE PRACTISE — ONE ANSWER, AND THE GATE USES IT.
@@ -111,6 +112,8 @@ export class LicenseGateService {
   constructor(
     private readonly licenses: BrokerLicenseRepository,
     private readonly acts: RegulatoryActionRepository,
+    /** OWNER DECISION 123 — art. 11's 45 days and art. 14/c's two years are `LegalValue` rows. */
+    private readonly legalValues: LegalValueService,
   ) {}
 
   /**
@@ -121,9 +124,14 @@ export class LicenseGateService {
    * correctness.
    */
   async standing(now: Date = new Date()): Promise<DerivedLicenseStanding> {
-    const [terms, acts] = await Promise.all([
+    // THREE READS, ONE ROUND TRIP, ONE INSTANT. The legal figures join the terms and the acts
+    // rather than being fetched inside the derivation: OWNER DECISION 123 made art. 11's span and
+    // art. 14/c's limit rows, and `deriveLicenseStanding` must stay PURE — its whole value is that
+    // a provider dashboard and the gate share one implementation and one test suite.
+    const [terms, acts, figures] = await Promise.all([
       this.licenses.findTerms(),
       this.acts.findAll(),
+      this.legalValues.licenceFigures(now),
     ]);
     return deriveLicenseStanding(
       pickCurrentTerm(terms),
@@ -140,6 +148,7 @@ export class LicenseGateService {
           .filter((key): key is string => key !== null),
       })),
       now,
+      figures,
     );
   }
 

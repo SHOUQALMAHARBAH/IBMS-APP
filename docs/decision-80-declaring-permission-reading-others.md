@@ -33,7 +33,7 @@
 
 **بيتُه الأوّلُ في الكود:** `apps/api/src/modules/compliance-risk/conflict-of-interest-register.service.ts` — السطر **٤١**.
 
-**وهو مذكورٌ في **١٦** موضعاً** في `apps/` و`packages/`.
+**وهو مذكورٌ في **١٧** موضعاً** في `apps/` و`packages/`.
 
 **وطريقةُ العدِّ، عشان تُعاد لا تُؤخَذ:** بحثٌ غيرُ حسّاسٍ لحالةِ الأحرفِ عن `decision 80` في `apps/` و`packages/` على `main`. **ورقمُ من يُعيدُه يغلب رقمي.**
 

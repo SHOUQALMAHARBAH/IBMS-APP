@@ -30,6 +30,57 @@ export const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set(
     .map((model) => model.name),
 );
 
+/**
+ * MODELS WHERE A NULL `organizationId` MEANS **PROVIDER-OWNED**, AND EVERY OFFICE MAY READ IT.
+ *
+ * ## WHY THIS EXISTS AT ALL
+ *
+ * `TENANT_SCOPED_MODELS` is derived from the DMMF — *a model is tenant-scoped iff it has an
+ * `organizationId` field* — and that derivation is the right one and must not be weakened. But it
+ * is a two-value answer, and `LegalValue` is a three-value table: a row belongs to the provider
+ * (NULL), or to this office, or to another office. Unchanged, `withOrg` would have added
+ * `{ organizationId }` to every read and made **every provider row invisible to the application**
+ * — the figures CBJ Instructions No. 9 of 2026 itself states, hidden by the tenancy rule.
+ *
+ * ## IT WIDENS READS AND NOTHING ELSE, AND THAT IS THE LOAD-BEARING PART
+ *
+ * `WHERE_OPERATIONS` contains `update`, `updateMany`, `delete`, `deleteMany` and `upsert` as well
+ * as the reads. Widening those would let an office UPDATE or DELETE a provider row through
+ * Prisma — the RLS policy would still refuse it (measured: 0 rows affected), but a rule that
+ * depends on the database catching what the application just permitted is one defence, not two.
+ * So the widening applies ONLY to `READ_OPERATIONS` below, and a write keeps the exact, unwidened
+ * `{ organizationId }` filter it has always had.
+ *
+ * CREATES are untouched for the same reason: `stampCreate` still stamps the caller's org, so the
+ * application cannot author a provider row at all. The only thing that can is the seed, running
+ * as the database owner under a policy granted `TO` that role alone.
+ *
+ * ## ADDING A MODEL HERE IS A DECISION, NOT A CONVENIENCE
+ *
+ * It means *NULL in this table means every office may read this row*. A model whose
+ * `organizationId` is NOT NULL has no NULL rows and gains nothing but risk from being listed, so
+ * `tenant-scope.extension.spec.ts` refuses an entry whose column is not actually nullable, and
+ * refuses a nullable `organizationId` that is NOT listed here — in both directions, because a new
+ * nullable tenant column is either this pattern or a mistake, and both need naming.
+ */
+export const PROVIDER_OWNED_NULL_ORG_MODELS: ReadonlySet<string> = new Set([
+  // OWNER DECISION 123 — a figure the instrument states is the provider's; a figure it defers to
+  // an unissued ruling is the office's. Both are rows in one table.
+  'LegalValue',
+]);
+
+/** The subset of `WHERE_OPERATIONS` that only READS. See `PROVIDER_OWNED_NULL_ORG_MODELS`. */
+const READ_OPERATIONS = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'count',
+  'aggregate',
+  'groupBy',
+]);
+
 /** Operations whose `where` selects the rows to act on. */
 const WHERE_OPERATIONS = new Set([
   'findUnique',
@@ -82,6 +133,46 @@ function withOrg(
   organizationId: string,
 ): Record<string, unknown> {
   return { ...(where ?? {}), organizationId };
+}
+
+/**
+ * The same thing for a READ on a `PROVIDER_OWNED_NULL_ORG_MODELS` table: this office's rows OR the
+ * provider's.
+ *
+ * ## IT APPENDS TO `AND` AND SPREADS EVERYTHING ELSE, AND BOTH HALVES ARE LOAD-BEARING
+ *
+ * **Why not a top-level `OR`:** a caller's `where` may already carry one, and a second `OR` key
+ * would overwrite it — silently WIDENING the caller's filter instead of narrowing it, which is the
+ * failure direction that does not look like a bug.
+ *
+ * **Why not `{ AND: [where, ownership] }`, which is what the first version did:** that moves the
+ * caller's keys off the top level, and `findUnique`/`findUniqueOrThrow` take a `WhereUniqueInput`
+ * — Prisma needs the unique field (`id`) AT THE TOP LEVEL to identify the row. Nesting it produced
+ * `PrismaClientValidationError: Invalid prisma.legalValue.findUniqueOrThrow() invocation`, caught
+ * by `legal-value.e2e-spec.ts` on its first run. `withOrg` above never hit this because it spreads.
+ *
+ * So the caller's own keys are spread (the unique field stays where Prisma looks for it) and the
+ * ownership clause is APPENDED to `AND`, preserving an `AND` the caller supplied — which Prisma
+ * 5+'s extended-where-unique accepts alongside the unique field.
+ */
+function withOrgOrProvider(
+  where: Record<string, unknown> | undefined,
+  organizationId: string,
+): Record<string, unknown> {
+  const ownership = {
+    OR: [{ organizationId }, { organizationId: null }],
+  };
+  const existing = where ?? {};
+  // `AND` may be absent, one object, or an array — Prisma accepts all three. Typed as `unknown[]`
+  // rather than inferred, because `existing.AND` is `unknown` and spreading it would be an
+  // unsafe-any spread.
+  const prior: unknown = existing.AND;
+  const priorAnd: unknown[] = Array.isArray(prior)
+    ? (prior as unknown[])
+    : prior === undefined
+      ? []
+      : [prior];
+  return { ...existing, AND: [...priorAnd, ownership] };
 }
 
 /**
@@ -409,7 +500,13 @@ export function applyTenantScope(
   const next = { ...((args ?? {}) as Record<string, unknown>) };
 
   if (WHERE_OPERATIONS.has(operation)) {
-    next.where = withOrg(
+    // A READ on a provider-owned-NULL table sees this office's rows AND the provider's. Every
+    // other case — and every WRITE on that same table — keeps the exact `{ organizationId }`
+    // filter. See `PROVIDER_OWNED_NULL_ORG_MODELS`.
+    const widen =
+      PROVIDER_OWNED_NULL_ORG_MODELS.has(model) &&
+      READ_OPERATIONS.has(operation);
+    next.where = (widen ? withOrgOrProvider : withOrg)(
       next.where as Record<string, unknown> | undefined,
       organizationId,
     );

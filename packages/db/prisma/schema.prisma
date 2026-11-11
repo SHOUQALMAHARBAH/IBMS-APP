@@ -580,6 +580,7 @@ model Organization {
   upSellRecommendations               UpSellRecommendation[]
   slaHolidays                         SlaHoliday[]
   slaPolicies                         SlaPolicy[]
+  legalValues                         LegalValue[]
   slaPolicyEscalations                SlaPolicyEscalation[]
   users                               User[]
   userRoleAssignments                 UserRoleAssignment[]
@@ -4220,6 +4221,31 @@ model RenewalRecommendation {
 /// could never hold a licence at all, while its `findCurrent` returned null and the new-business
 /// gate then passed silently. Renewal was an `updateMany` over that same row, so the previous term
 /// was erased. Both are gone: a term is a row, and renewal appends.
+///
+/// ## OWNER DECISION 128 — PAST THE PRINTED EXPIRY, PROOF OPENS ISSUANCE, NOT A DATE
+///
+/// `docs/decision-128-renewal-under-study-proof-opens-not-date.md`, the owner's ruling of 10
+/// November 2026. It replaces the BASIS recorded in `RENEWAL_PENDING_RULE_BASIS` and it tightens
+/// the rule that basis explains. Two changes, and the second is the one that bites:
+///
+///   1. **The basis.** The old one rested on an analogy with art. 8/d of Law No. 12 of 2021 that an
+///      earlier owner decision had already ordered removed — decision 128's own §8 records which,
+///      and that file is its one home — and on "pending arts. 82 and 109" of that law, both of
+///      which were FOUND in October. The basis is now the legal adviser's written opinion of 13
+///      October 2026 and the administrative principle it states, with art. 19/c as the customer's
+///      protection on a premium already paid to the broker. **No provision of Instructions No. 9 of
+///      2026 grants continuation**, and art. 21/a/9 names expiry on its own as a ground for
+///      sanction (printed page 25).
+///   2. **The condition.** `renewalFiledOnTime` compares `renewalRequestedAt` against art. 11's
+///      deadline AND NOTHING ELSE — so a date typed into a field, with no document behind it, opens
+///      all six issuance acts. Under decision 128 the office must ALSO have uploaded proof of
+///      filing, and a holder of a separate permission must have DECLARED that no refusal and no
+///      deficiency notice has arrived. **Not built yet** — message 35 §5 is where it lands, and this
+///      comment is here so the next reader of this model is not told the old rule.
+///
+/// ⛔ AND THE WORDS «ساري» AND «حكماً» NEVER DESCRIBE THAT STATE, on any screen or in any paper.
+/// The shipped status word is «قيد التجديد» (`rcStandingRenewalPending`); «ساري» is
+/// `rcStandingActive` and belongs to a term inside its printed dates.
 model BrokerLicense {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
@@ -7164,6 +7190,171 @@ model SlaPolicyEscalation {
   escalateTo     String?
 
   @@unique([slaPolicyId, stageOrder])
+  @@index([organizationId])
+}
+
+/// What a legal value IS, which decides which value column it occupies.
+///
+/// `MONEY_JOD` and every numeric kind live in `numericValue` as `Decimal(18,3)`;
+/// `DATE` lives in `dateValue`. `TEXT_LIST` carries NEITHER and is how the three
+/// office-supplied codes exist with a shape and no value — see `LegalValue.numericValue`.
+enum LegalValueKind {
+  MONEY_JOD
+  COUNT
+  CALENDAR_DAYS
+  YEARS
+  PERCENT
+  DATE
+  TEXT_LIST
+}
+
+/// WHOSE AUTHORITY the row rests on — OWNER DECISION 123, third form.
+///
+/// `INSTRUMENT` means the instrument STATES the figure and we seeded it with its article and the
+/// printed page it was read on. `OFFICE_DECLARATION` means the instrument DEFERS it to a ruling the
+/// Central Bank has not issued, so the office supplies it with its own reference and date.
+///
+/// It is NOT a second home for `organizationId IS NULL`: a CHECK constraint ties the two together
+/// in both directions, so an office account cannot write a row claiming the instrument's authority
+/// and we cannot write one claiming the office's.
+enum LegalValueSourceType {
+  INSTRUMENT
+  OFFICE_DECLARATION
+}
+
+/// MODULE 1 — THE LEGAL-VALUES TABLE. **A figure a program reads because a legal instrument says
+/// so, with the article it comes from and the day it started applying.**
+///
+/// OWNER DECISION 123, third form: *a figure the instrument STATES is ours to seed with its
+/// article; only a figure the instrument DEFERS to a ruling not yet issued is the office's to
+/// supply.* `packages/db/prisma/seed-data/legal-values.ts` is the catalogue and carries the three
+/// measured reasons this is a new table rather than an extension of `SlaPolicy` or the ninth
+/// reference table — a departure from the intention recorded on 12 October, recorded rather than
+/// made quietly.
+///
+/// ## `organizationId` IS NULLABLE AND NULL MEANS PROVIDER-OWNED
+///
+/// That one column is what lets the provider's rows and an office's rows be the same KIND of thing
+/// — a value with a citation and an effective date — without being two tables. The four
+/// nullable-pair precedents (`BrokerLicenseScopeLine`, `EmployeeCbjApprovalBranch`,
+/// `RoleScopeBranch`, `RegulatoryActionScopeLine`) are why this is not a second pattern.
+///
+/// **It carries the `dbgenerated()` default like every tenant-scoped model, and the nullability is
+/// what makes that default do the right thing in both directions:** `current_setting(
+/// 'app.current_org_id', true)` yields the caller's office inside a request and NULL in the
+/// migration and the seed, which have no office. So an office's row is stamped and a provider row
+/// is not, by the same default.
+///
+/// **AND IT NEEDED A DECLARED EXCEPTION IN `tenantScopeExtension`, which is the one thing about
+/// this table a reader must know.** That extension derives its scoped-model set from the DMMF —
+/// *a model is tenant-scoped iff it has an `organizationId` field* — and then adds
+/// `{ organizationId }` to every `where`. Unchanged, it would have made every PROVIDER row
+/// invisible to the application: the instrument's own figures, hidden by the tenancy rule. The
+/// exception is declared by name in `PROVIDER_OWNED_NULL_ORG_MODELS` there, it widens READS only,
+/// and writes are still stamped — so the only thing that can write a provider row is the seed,
+/// running as the database owner.
+///
+/// ## WHAT REFUSES WHAT, AND NONE OF IT IS APPLICATION LOGIC
+///
+/// Decision 123's criterion 7 is *an office account trying to enter an instrument value is
+/// refused, by a CHECK and an RLS policy*. Both halves exist, and they refuse different things:
+///
+///   * the **RLS policy** refuses an office account writing a row with NULL `organizationId` —
+///     measured against a live database, the error is `new row violates row-level security policy`;
+///   * the **CHECK** refuses any row whose `sourceType` disagrees with its ownership, so an office
+///     row cannot claim `INSTRUMENT` even though it is allowed to exist.
+///
+/// RLS is ENABLED **and FORCED**, so the table owner is subject to its own policies too — and the
+/// provider's write is permitted by a policy granted `TO` that owner alone, not by the owner's
+/// exemption. `ibms` is not a superuser and has no `BYPASSRLS` here (measured), so without that
+/// policy the seed itself could not write a provider row.
+///
+/// ## ONE CURRENT ROW PER CODE, ANY NUMBER OF HISTORICAL ONES
+///
+/// Two PARTIAL unique indexes on `effectiveTo IS NULL`. A change is APPENDED — never overwritten —
+/// so criterion 3 (*read an old transaction and it computes at the value in force on its own day*)
+/// is a property of the table rather than of a caller remembering to pass a date. This is exactly
+/// where `SlaPolicy` cannot help: its `@@unique([organizationId, policyCode])` stops a superseded
+/// value sitting beside its replacement.
+model LegalValue {
+  id String @id @default(uuid())
+
+  /// **NULL = PROVIDER-OWNED.** See the model comment: the default fills it inside a request and
+  /// leaves it NULL in the seed, and `tenantScopeExtension` has a declared exception so a NULL row
+  /// is still READABLE by every office.
+  ///
+  /// `onDelete: Restrict` IS DECLARED AND IS NOT COSMETIC. Prisma's default for an OPTIONAL
+  /// relation is `SET NULL`, and `db:divergence` named it on the first run: deleting an
+  /// Organization would turn every value that office DECLARED into a row with NULL
+  /// `organizationId` — a provider row, carrying the instrument's authority, with the office's
+  /// own reference still on it. An office's declaration silently becoming an instrument figure is
+  /// the worst thing this table could do.
+  organizationId String?       @default(dbgenerated())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  /// Stable, quotable identifier — named after the FACT, never after the article, because a later
+  /// instrument can renumber an article while the fact survives. Quoted in governance documents,
+  /// so it must not change when the value does.
+  code String
+  /// English only. No screen ships in this batch and no Arabic is invented: every string a person
+  /// will read goes to the owner as a table first.
+  name String
+
+  kind LegalValueKind
+
+  /// The figure, for every kind except `DATE`. `Decimal` and not `Int`/`Float` because
+  /// `money-decimal-jod.md` forbids a JOD amount as a binary float, and one column for every
+  /// numeric kind beats a column per kind that each reader has to know about.
+  ///
+  /// **BOTH VALUE COLUMNS MAY BE NULL, and that state is DORMANT — criterion 6.** An office that
+  /// has not supplied its value has a row with a shape, a citation and no figure. Nothing may rest
+  /// on it: no exemption, no automatic refusal, no alert. A zero would be a figure; NULL is the
+  /// absence of one, and the difference is the whole point.
+  numericValue Decimal? @db.Decimal(18, 3)
+  /// For `kind = DATE` only — the instrument's commencement is the one today.
+  dateValue    DateTime? @db.Date
+
+  /// WHOSE AUTHORITY. Tied to `organizationId`'s nullability by a CHECK in both directions.
+  sourceType LegalValueSourceType
+
+  /// MANDATORY on a provider row (CHECK): the instrument, its article, and the printed page the
+  /// figure was READ on. The page is not decoration — our OCR extraction of this instrument
+  /// publishes two wrong figures marked «موثوق», so a citation without a page cannot be checked.
+  sourceInstrument  String?
+  sourceArticle     String?
+  sourcePrintedPage Int?
+  /// MANDATORY on an office row (CHECK): the office's own reference for the value it declared — a
+  /// Central Bank decision number, a letter, a board minute. Decision 123's second of three
+  /// conditions, and all three fall on the manager ONCE, never on the employee.
+  sourceReference   String?
+
+  /// Decision 123's third condition, and criterion 2's other half: a row with no date is refused.
+  /// `@db.Date` because a value starts applying on a day, not at an instant.
+  effectiveFrom DateTime  @db.Date
+  /// NULL = this is the row in force. A replacement sets it on the row it supersedes rather than
+  /// editing the value.
+  effectiveTo   DateTime? @db.Date
+
+  /// Free text — why this row says what it says. Carries the reading provenance for a provider row
+  /// (which page image, and whether the OCR disagreed) and the office's reasoning for its own.
+  note String?
+
+  /// MANDATORY on an office row (CHECK). This is what makes a declaration ATTRIBUTABLE, which is
+  /// decision 123's whole point: the system never says *this is the legal ceiling*, it says *this
+  /// is the ceiling your office declared, and here is who declared it and from what*.
+  /// Bare scalars with no `User` relation, exactly as `SlaPolicy.createdByUserId` is: the
+  /// `AuditLogEntry` row is the authoritative trail, and a relation here would make a user
+  /// undeletable for having typed a figure.
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  /// The two PARTIAL uniques Prisma cannot express — `WHERE "effectiveTo" IS NULL`, split by
+  /// whether the row is the provider's — live in the migration. A compound unique here would
+  /// refuse a superseded row sitting beside its replacement, which is the thing this table exists
+  /// to allow.
+  @@index([code, effectiveFrom])
   @@index([organizationId])
 }
 

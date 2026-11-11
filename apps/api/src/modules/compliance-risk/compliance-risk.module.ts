@@ -44,6 +44,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ProviderOfficeStateRepository } from '../../repositories/provider-office-state.repository';
 import { ProviderOfficeStateService } from './provider-office-state.service';
 import { ProviderOfficeStateController } from './provider-office-state.controller';
+import { LegalValueController } from './legal-value.controller';
 
 /**
  * Domain F — Compliance & Risk (backlog Part C #47–57). Opens with Process
@@ -144,6 +145,9 @@ import { ProviderOfficeStateController } from './provider-office-state.controlle
     IncidentController,
     InternalAuditFindingController,
     ConflictOfInterestController,
+    // MODULE 1, OWNER DECISION 123. No screen ships for it in this batch; the routes exist because
+    // the decision's criteria are about what an office account may and may not do.
+    LegalValueController,
   ],
   providers: [
     // MODULE 0-ب, decision 36 — the conflict-of-interest disclosure register. The repository is

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { LicenseGateService } from './license-gate.service';
 import type { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
 import type { RegulatoryActionRepository } from '../../repositories/regulatory-action.repository';
+import { instrumentLegalValues } from './legal-figures.double';
 
 /**
  * ART. 21/b/5 AT THE GATE — AND THE ONE DECISION WORTH A SPEC OF ITS OWN IS THE UNRESOLVED CASE.
@@ -65,7 +66,7 @@ function gate(
     ),
   } as unknown as RegulatoryActionRepository;
 
-  return new LicenseGateService(licenses, acts);
+  return new LicenseGateService(licenses, acts, instrumentLegalValues());
 }
 
 /** The office is stopped in motor only. Every case below reads the same standing. */
@@ -94,7 +95,7 @@ function cleanLicence() {
   const acts = {
     findAll: vi.fn(() => Promise.resolve([])),
   } as unknown as RegulatoryActionRepository;
-  return new LicenseGateService(licenses, acts);
+  return new LicenseGateService(licenses, acts, instrumentLegalValues());
 }
 
 describe('art. 21/b/5 at the licence gate', () => {

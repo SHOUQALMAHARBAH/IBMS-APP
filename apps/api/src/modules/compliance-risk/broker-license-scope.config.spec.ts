@@ -5,13 +5,13 @@ import {
   assessStaffing,
   breachesNaturalPersonOneTypeRule,
   requiredApprovedStaff,
-  CAPITAL_BANDS,
   requiredCapitalForScope,
   requiredCapitalForType,
   typesInScope,
   type ScopedBranch,
 } from './broker-license-scope.config';
 import { toMoney } from '../../common/money.util';
+import { INSTRUMENT_LICENCE_FIGURES } from './legal-figures.double';
 
 /**
  * MODULE 0 ITEM (e) — the licence-scope rules.
@@ -32,8 +32,18 @@ describe('requiredCapitalForType (art. 4/a)', () => {
   it('requires nothing for a type with no branches', () => {
     // A type with no branches is a type the office is not licensed for. Charging it 5,000 JOD
     // would invent a requirement for something nobody applied for.
-    expect(requiredCapitalForType(0).toFixed(3)).toBe('0.000');
-    expect(requiredCapitalForType(-1).toFixed(3)).toBe('0.000');
+    expect(
+      requiredCapitalForType(
+        0,
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
+    ).toBe('0.000');
+    expect(
+      requiredCapitalForType(
+        -1,
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
+    ).toBe('0.000');
   });
 
   /*
@@ -51,21 +61,33 @@ describe('requiredCapitalForType (art. 4/a)', () => {
     [13, '10000.000'],
     [40, '10000.000'],
   ])('%i branch(es) requires %s JOD', (branches, expected) => {
-    expect(requiredCapitalForType(branches).toFixed(3)).toBe(expected);
+    expect(
+      requiredCapitalForType(
+        branches,
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
+    ).toBe(expected);
   });
 
   it('states the three bands the regulation names, and only three', () => {
-    // A fourth band appearing here is a capital rule nobody decided.
-    expect(CAPITAL_BANDS.map((b) => b.requiredJod)).toEqual([
-      '5000',
-      '7500',
-      '10000',
-    ]);
-    expect(CAPITAL_BANDS.map((b) => b.upToBranches)).toEqual([
-      6,
-      12,
-      Number.POSITIVE_INFINITY,
-    ]);
+    /*
+     * A fourth band appearing here is a capital rule nobody decided.
+     *
+     * RE-POINTED, NOT DELETED — OWNER DECISION 123. `CAPITAL_BANDS` was a `const` in
+     * `broker-license-scope.config.ts`; art. 4/a's five figures are `LegalValue` rows now, and the
+     * bands are built from them by `licenceFiguresFrom`. The subject of this assertion is
+     * unchanged: the SHAPE art. 4/a names. What moved is where the figures live, and
+     * `legal-values-parity.spec.ts` in `packages/db` is what pins the rows themselves against the
+     * catalogue.
+     */
+    expect(
+      INSTRUMENT_LICENCE_FIGURES.capitalBands.map((b) =>
+        b.requiredJod.toFixed(3),
+      ),
+    ).toEqual(['5000.000', '7500.000', '10000.000']);
+    expect(
+      INSTRUMENT_LICENCE_FIGURES.capitalBands.map((b) => b.upToBranches),
+    ).toEqual([6, 12, Number.POSITIVE_INFINITY]);
   });
 });
 
@@ -98,11 +120,21 @@ describe('the TYPES a licence covers are derived from its branches', () => {
 
 describe('requiredCapitalForScope — "per type" is read as SUMMED', () => {
   it('is zero for an empty scope', () => {
-    expect(requiredCapitalForScope([]).toFixed(3)).toBe('0.000');
+    expect(
+      requiredCapitalForScope(
+        [],
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
+    ).toBe('0.000');
   });
 
   it('charges one type once', () => {
-    expect(requiredCapitalForScope(general(4)).toFixed(3)).toBe('5000.000');
+    expect(
+      requiredCapitalForScope(
+        general(4),
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
+    ).toBe('5000.000');
   });
 
   it('charges BOTH types when both are held — 8 general + 3 life = 7,500 + 5,000', () => {
@@ -110,7 +142,10 @@ describe('requiredCapitalForScope — "per type" is read as SUMMED', () => {
     // type", so an office licensed for both pays both. Flagged in the config as a reading because
     // the comparison only ever produces a warning.
     expect(
-      requiredCapitalForScope([...general(8), ...life(3)]).toFixed(3),
+      requiredCapitalForScope(
+        [...general(8), ...life(3)],
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
     ).toBe('12500.000');
   });
 
@@ -118,9 +153,17 @@ describe('requiredCapitalForScope — "per type" is read as SUMMED', () => {
     // 4 general + 4 life is 8 branches in total but 5,000 + 5,000, NOT the 7,500 a single
     // eight-branch type would need. The distinction is the whole point of "per type".
     expect(
-      requiredCapitalForScope([...general(4), ...life(4)]).toFixed(3),
+      requiredCapitalForScope(
+        [...general(4), ...life(4)],
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
     ).toBe('10000.000');
-    expect(requiredCapitalForScope(general(8)).toFixed(3)).toBe('7500.000');
+    expect(
+      requiredCapitalForScope(
+        general(8),
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
+    ).toBe('7500.000');
   });
 });
 
@@ -128,25 +171,41 @@ describe('assessCapital — a WARNING input, never a refusal', () => {
   it('distinguishes NO capital recorded from capital that is too low', () => {
     // Conflating them would tell an office it is undercapitalised when nobody has typed the
     // number — a finding about its capital versus a missing fact about the office.
-    const unrecorded = assessCapital(null, general(4));
+    const unrecorded = assessCapital(
+      null,
+      general(4),
+      INSTRUMENT_LICENCE_FIGURES.capitalBands,
+    );
     expect(unrecorded.capitalIsUnrecorded).toBe(true);
     expect(unrecorded.shortfall).toBeNull();
     expect(unrecorded.meetsRequirement).toBe(false);
 
-    const tooLow = assessCapital(toMoney('3000'), general(4));
+    const tooLow = assessCapital(
+      toMoney('3000'),
+      general(4),
+      INSTRUMENT_LICENCE_FIGURES.capitalBands,
+    );
     expect(tooLow.capitalIsUnrecorded).toBe(false);
     expect(tooLow.shortfall?.toFixed(3)).toBe('2000.000');
     expect(tooLow.meetsRequirement).toBe(false);
   });
 
   it('meets the requirement exactly on the figure, not only above it', () => {
-    const exact = assessCapital(toMoney('5000'), general(4));
+    const exact = assessCapital(
+      toMoney('5000'),
+      general(4),
+      INSTRUMENT_LICENCE_FIGURES.capitalBands,
+    );
     expect(exact.meetsRequirement).toBe(true);
     expect(exact.shortfall?.toFixed(3)).toBe('0.000');
   });
 
   it('reports a shortfall against the SUMMED requirement for both types', () => {
-    const a = assessCapital(toMoney('10000'), [...general(8), ...life(3)]);
+    const a = assessCapital(
+      toMoney('10000'),
+      [...general(8), ...life(3)],
+      INSTRUMENT_LICENCE_FIGURES.capitalBands,
+    );
     expect(a.requiredCapital.toFixed(3)).toBe('12500.000');
     expect(a.shortfall?.toFixed(3)).toBe('2500.000');
   });
@@ -154,7 +213,7 @@ describe('assessCapital — a WARNING input, never a refusal', () => {
   it('is content with an empty scope and no capital figure at all', () => {
     // Nothing licensed, nothing required — but still "unrecorded", because the office genuinely
     // has not stated a capital and a screen should not imply it has.
-    const a = assessCapital(null, []);
+    const a = assessCapital(null, [], INSTRUMENT_LICENCE_FIGURES.capitalBands);
     expect(a.requiredCapital.toFixed(3)).toBe('0.000');
     expect(a.capitalIsUnrecorded).toBe(true);
   });

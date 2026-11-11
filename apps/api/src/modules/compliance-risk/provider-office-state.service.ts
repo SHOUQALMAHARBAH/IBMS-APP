@@ -10,6 +10,8 @@ import {
   renewalFiledOnTime,
 } from './broker-license.config';
 import { OrganizationRepository } from '../../repositories/organization.repository';
+import type { LicenceLegalFigures } from './legal-figures.config';
+import { LegalValueService } from './legal-value.service';
 
 /**
  * MODULE 0 ITEM (j) — THE PROVIDER DASHBOARD.
@@ -117,6 +119,9 @@ function iso(value: Date | null): string | null {
 export function toProviderOfficeStateView(
   row: ProviderOfficeStateRow,
   now: Date,
+  /** Art. 11's filing span, from `LegalValue` — read ONCE for the whole list by the caller, so two
+   *  offices cannot be judged against two different figures any more than against two instants. */
+  figures: LicenceLegalFigures,
 ): ProviderOfficeStateView {
   const term =
     row.licenseExpiresAt === null
@@ -168,16 +173,19 @@ export function toProviderOfficeStateView(
     // gap is in `docs/deferred-register.md`; the dashboard gates nothing, so nothing is decided on
     // this value.
     isCurrentlyLapsed:
-      term === null ? null : isBrokerLicenseCurrentlyLapsed(term, now),
+      term === null ? null : isBrokerLicenseCurrentlyLapsed(term, now, figures),
     renewalDueBy:
       term === null
         ? null
         : // Takes the EXPIRY, not the term — copied from the signature rather than guessed.
-          renewalApplicationDueBy(term.expiresAt).toISOString(),
+          renewalApplicationDueBy(
+            term.expiresAt,
+            figures.renewalApplicationDueDaysBeforeExpiry,
+          ).toISOString(),
     renewalFiledOnTime:
       term === null || term.renewalRequestedAt === null
         ? null
-        : renewalFiledOnTime(term),
+        : renewalFiledOnTime(term, figures),
     licensedBranches: row.licensedBranches,
     dormantLicensedBranches: row.dormantLicensedBranches,
     users: row.users,
@@ -196,6 +204,8 @@ export class ProviderOfficeStateService {
     // adds a dependency rather than a provider — verified rather than assumed, because item (e)'s
     // first wiring claimed a provider it did not have.
     private readonly organizations: OrganizationRepository,
+    /** OWNER DECISION 123 — art. 11's figure is a row, not a constant. */
+    private readonly legalValues: LegalValueService,
   ) {}
 
   async list(
@@ -243,8 +253,10 @@ export class ProviderOfficeStateService {
       },
     });
 
-    // ONE `now` for the whole list, so two offices cannot be judged against different instants.
+    // ONE `now` for the whole list, so two offices cannot be judged against different instants —
+    // and ONE read of the legal figures at that instant, for the same reason.
     const now = new Date();
-    return rows.map((row) => toProviderOfficeStateView(row, now));
+    const figures = await this.legalValues.licenceFigures(now);
+    return rows.map((row) => toProviderOfficeStateView(row, now, figures));
   }
 }

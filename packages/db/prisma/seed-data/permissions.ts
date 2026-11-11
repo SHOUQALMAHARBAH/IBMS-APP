@@ -1162,6 +1162,51 @@ const complianceRisk: PermissionSeed[] = [
     description: "Manage the broker's regulatory license record",
     roles: [COMPLIANCE],
   },
+  /*
+   * MODULE 1, OWNER DECISION 123 — THE LEGAL-VALUES TABLE.
+   *
+   * ## 🔴 THE GRANTS BELOW ARE THE SEED'S OWN RULE AND AWAIT THE OWNER'S RATIFICATION
+   *
+   * Both codes were written `roles: []` first, on the standing rule that no role is granted a new
+   * code so that a screen works. **`permissions.spec.ts` refused it**, and its reason is sound:
+   * *"a code granted to nobody is a checkbox that removes nothing"* — an OFFICE-scoped code must
+   * reach at least one role, and only a PLATFORM-scoped code may carry an empty list.
+   *
+   * So the seed's rule is FOLLOWED and the grant is REPORTED rather than decided. These are
+   * TEMPLATE DEFAULTS in decision 80's sense — what ships, not a lock — and an office re-grants
+   * them on its own role screen. Message 35 §4.3's instruction is exactly this: if following that
+   * rule hands any role a new code, list role and code for the owner's ratification.
+   *
+   * **WHY THESE ROLES, so the choice can be argued with rather than guessed at:**
+   *
+   *   * `legal-value.declare` → **BRANCH_DEPARTMENT_MANAGER**, because decision 123 says the three
+   *     conditions on an office-supplied value fall «على المدير مرّةً واحدة» — on the manager, once,
+   *     and never on the employee. It is SEPARATE from every permission to DO the act the value
+   *     governs (module paper §٤.١: whoever may act is not thereby able to declare what the law
+   *     requires), which is why a placement officer working under art. 15/d's ceiling every day
+   *     cannot move it.
+   *   * `legal-value.read` → **BRANCH_DEPARTMENT_MANAGER and COMPLIANCE_OFFICER**. The manager,
+   *     because declaring a value one cannot read back is not a capability; the compliance officer,
+   *     because `license.manage` is already theirs and these figures are what the licence rules
+   *     read.
+   *
+   * **EXECUTIVE_MANAGEMENT is deliberately NOT included**, on the recorded rule that widening a
+   * grant the owner has not named is not a tidy-up.
+   */
+  {
+    code: "legal-value.read",
+    module: "compliance-risk",
+    description:
+      "Read the legal values the system computes with: the figures Instructions No. 9 of 2026 states, each with its article and the printed page it was read on, and any value this office has itself declared for a figure the Central Bank has deferred to a decision it has not issued. Reading shows the whole dated history, not only the figure in force today, because an old transaction was computed at the value in force on its own day and the record has to be able to show which one that was",
+    roles: [MANAGER, COMPLIANCE],
+  },
+  {
+    code: "legal-value.declare",
+    module: "compliance-risk",
+    description:
+      "Declare, for this office, a legal value the instrument defers to a Central Bank decision that has not been issued — entering it with the reference it rests on and the date it takes effect, both mandatory. It does NOT permit entering or changing a figure the instrument itself states: those belong to the provider and the database refuses an office account that tries. A value already declared is never edited in place; a change is a new entry from its own date, so every transaction keeps computing at the value in force on the day it happened",
+    roles: [MANAGER],
+  },
   {
     code: "compliance-calendar.manage",
     module: "compliance-risk",

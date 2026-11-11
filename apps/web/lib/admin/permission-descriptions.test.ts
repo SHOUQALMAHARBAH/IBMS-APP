@@ -157,7 +157,16 @@ const AWAITING_OWNER_REVIEW: string[] = [
    * THIS LIST IS NOT A RATCHET AND MUST NOT BECOME ONE. It legitimately GROWS the next time a
    * module ships a permission, and the balance check below is what refills it -- by name, on the
    * commit that ships the code. What must only grow is `OWNER_REVIEWED_COUNT`.
+   *
+   * AND IT REFILLED ON 2026-11-11, EXACTLY AS THAT PARAGRAPH SAID IT WOULD, with module 1's two
+   * legal-values codes. Both lines below are AGENT-WRITTEN and are placeholders in her register
+   * until she reads them; both are composed from runs already shipping elsewhere in the product
+   * («تعليمات البنك المركزي الأردني رقم 9 لسنة 2026» from `rcStandingNoTermNote`, «المادة» and
+   * «المرجع» from the same dictionary, «يقرأ» from 28 sibling descriptions here), and the
+   * composition is reported to her in message 35's §6 table beside its slice sources.
    */
+  'legal-value.declare',
+  'legal-value.read',
 ];
 
 describe('whose Arabic is it — provenance, because the text cannot say', () => {

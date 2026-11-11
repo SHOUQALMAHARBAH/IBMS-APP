@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { toProviderOfficeStateView } from './provider-office-state.service';
 import type { ProviderOfficeStateRow } from '../../repositories/provider-office-state.repository';
+import { INSTRUMENT_LICENCE_FIGURES } from './legal-figures.double';
 
 /**
  * MODULE 0 ITEM (j) — the three licence states, and why these tests exist at all.
@@ -59,6 +60,7 @@ describe('item (j): the three licence states', () => {
         licenseExpiresAt: null,
       },
       NOW,
+      INSTRUMENT_LICENCE_FIGURES,
     );
     expect(view.isCurrentlyLapsed).toBeNull();
     expect(view.renewalDueBy).toBeNull();
@@ -66,13 +68,17 @@ describe('item (j): the three licence states', () => {
   });
 
   it('a term inside its period is NOT lapsed', () => {
-    expect(toProviderOfficeStateView(BASE, NOW).isCurrentlyLapsed).toBe(false);
+    expect(
+      toProviderOfficeStateView(BASE, NOW, INSTRUMENT_LICENCE_FIGURES)
+        .isCurrentlyLapsed,
+    ).toBe(false);
   });
 
   it('a term past its expiry with NO renewal filed IS lapsed', () => {
     const view = toProviderOfficeStateView(
       BASE,
       new Date('2027-02-01T00:00:00.000Z'),
+      INSTRUMENT_LICENCE_FIGURES,
     );
     expect(view.isCurrentlyLapsed).toBe(true);
   });
@@ -93,6 +99,7 @@ describe('item (j): the three licence states', () => {
         renewalRequestedAt: new Date('2026-10-01T00:00:00.000Z'),
       },
       new Date('2027-02-01T00:00:00.000Z'),
+      INSTRUMENT_LICENCE_FIGURES,
     );
     expect(view.isCurrentlyLapsed).toBe(false);
     expect(view.renewalFiledOnTime).toBe(true);
@@ -108,6 +115,7 @@ describe('item (j): the three licence states', () => {
         renewalRequestedAt: new Date('2026-12-20T00:00:00.000Z'),
       },
       new Date('2027-02-01T00:00:00.000Z'),
+      INSTRUMENT_LICENCE_FIGURES,
     );
     expect(view.isCurrentlyLapsed).toBe(true);
     expect(view.renewalFiledOnTime).toBe(false);
@@ -130,9 +138,10 @@ describe('item (j): the three licence states', () => {
    */
 
   it("art. 11's deadline is 45 days before expiry, derived not stored", () => {
-    expect(toProviderOfficeStateView(BASE, NOW).renewalDueBy).toBe(
-      '2026-11-16T00:00:00.000Z',
-    );
+    expect(
+      toProviderOfficeStateView(BASE, NOW, INSTRUMENT_LICENCE_FIGURES)
+        .renewalDueBy,
+    ).toBe('2026-11-16T00:00:00.000Z');
   });
 });
 
@@ -140,7 +149,11 @@ describe('item (j): the view carries office state and nothing else', () => {
   it('every field is office state — no key names a person, a customer or money', () => {
     // The same boundary the migration and the e2e assert, at the shape level: a field added to
     // `ProviderOfficeStateView` is caught here even before a migration exposes it.
-    const view = toProviderOfficeStateView(BASE, NOW);
+    const view = toProviderOfficeStateView(
+      BASE,
+      NOW,
+      INSTRUMENT_LICENCE_FIGURES,
+    );
     for (const key of Object.keys(view)) {
       expect(
         /userId|email|phone|nationalId|customer|polic|premium|commission|capital|fullName/i.test(

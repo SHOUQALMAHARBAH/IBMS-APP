@@ -6,6 +6,7 @@ import {
   type LicenseTermRow,
   type RegulatoryActRow,
 } from './license-standing.config';
+import { INSTRUMENT_LICENCE_FIGURES } from './legal-figures.double';
 
 /**
  * MODULE 0-ب ITEM (d) — the derived licence standing.
@@ -56,7 +57,12 @@ function standing(
   acts: RegulatoryActRow[],
   now: Date,
 ) {
-  const result = deriveLicenseStanding(t, acts, now);
+  const result = deriveLicenseStanding(
+    t,
+    acts,
+    now,
+    INSTRUMENT_LICENCE_FIGURES,
+  );
   reached.add(result.status);
   return result;
 }

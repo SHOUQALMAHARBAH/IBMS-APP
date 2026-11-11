@@ -27,6 +27,7 @@ import {
   typesInScope,
   type ScopedBranch,
 } from './broker-license-scope.config';
+import { INSTRUMENT_LICENCE_FIGURES } from './legal-figures.double';
 
 /**
  * THE ASSUMPTION MODULE 0 ITEM (e) RESTS ON, MADE EXPLICIT.
@@ -90,7 +91,12 @@ describe('item (e)’s assumption: a licensed type always has at least one branc
     // Defence in depth on the arithmetic rather than the shape: should a zero-branch type ever
     // become representable, art. 4/a has nothing to charge it, so the capital figure stays honest
     // instead of silently inventing a 5,000 JOD requirement.
-    expect(requiredCapitalForType(0).toFixed(3)).toBe('0.000');
+    expect(
+      requiredCapitalForType(
+        0,
+        INSTRUMENT_LICENCE_FIGURES.capitalBands,
+      ).toFixed(3),
+    ).toBe('0.000');
   });
 
   it('NO COLUMN STORES A LICENCE TYPE — the derivation cannot be bypassed', () => {

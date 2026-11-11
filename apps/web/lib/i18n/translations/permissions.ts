@@ -224,6 +224,10 @@ export const PERMISSIONS = {
     'perm:lead.list.read': 'يرى قائمة العملاء المحتملين ويصنّفها',
     'perm:lead.transition': 'ينقل العميل المحتمل من حالة إلى حالة في مسار المبيعات',
     'perm:legal-hold.manage': 'يضع حفظاً قانونياً على سجلات فلا تُتلَف، ويراجعه. يتقدّم على كل قاعدة إتلاف',
+    'perm:legal-value.declare':
+      'يعلن لهذا المكتب قيمةً أحالتها تعليمات البنك المركزي الأردني رقم 9 لسنة 2026 إلى قرار لم يصدر، ومعها المرجع وتاريخ العمل بها. ولا يملك إدخال رقم نصّت عليه التعليمات نفسها ولا تغييره',
+    'perm:legal-value.read':
+      'يقرأ القيم التي يحسب بها النظام: ما نصّت عليه تعليمات البنك المركزي الأردني رقم 9 لسنة 2026 ومعه المادة التي ورد فيها، وما أعلنه هذا المكتب. ويرى السجل كاملاً لا القيمة السارية اليوم وحدها، لأن كل معاملة حُسبت بالقيمة السارية يومها',
     'perm:license.manage': 'يدير سجل رخصة الوسيط التنظيمية وتواريخها',
     'perm:needs-assessment.approve': 'يعتمد تقييم حاجات العميل قبل ربطه بفرصة أو طلب تسعير. رقابة على جودة التقييم، وليست تعبئته',
     'perm:needs-assessment.create': 'يعبّئ استبيان تقييم حاجات العميل — أساس كل ما يُبنى بعده',
@@ -468,6 +472,10 @@ export const PERMISSIONS = {
     'perm:lead.list.read': 'List/filter leads',
     'perm:lead.transition': 'Transition LeadStatus',
     'perm:legal-hold.manage': 'Place/review a Legal Hold',
+    'perm:legal-value.declare':
+      'Declare, for this office, a legal value the instrument defers to a Central Bank decision that has not been issued — with its reference and the date it takes effect, both mandatory. It does not permit entering or changing a figure the instrument itself states',
+    'perm:legal-value.read':
+      'Read the legal values the system computes with — each with its article and the page it was read on — and the whole dated history, not only the figure in force today',
     'perm:license.manage': "Manage the broker's regulatory license record",
     'perm:needs-assessment.approve': 'Review and approve a Needs Assessment before linking to an Opportunity/RFQ',
     'perm:needs-assessment.create': 'Capture a Needs Assessment questionnaire',

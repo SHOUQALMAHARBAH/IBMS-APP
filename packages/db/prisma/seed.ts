@@ -58,6 +58,7 @@ import { validatePasswordPolicy } from "../src/password-policy";
 import { SAMPLE_INSURERS } from "./seed-data/insurers";
 import { DOCUMENT_TEMPLATES } from "./seed-data/document-templates";
 import { SLA_POLICY_SEEDS } from "./seed-data/sla-policies";
+import { PROVIDER_LEGAL_VALUES } from "./seed-data/legal-values";
 
 const prisma = new PrismaClient();
 
@@ -1035,6 +1036,74 @@ async function ensureSlaPolicies(): Promise<void> {
   );
 }
 
+/**
+ * THE LEGAL-VALUES TABLE's PROVIDER ROWS — OWNER DECISION 123, third form.
+ *
+ * `organizationId` is left UNSET, so the column default
+ * `current_setting('app.current_org_id', true)` yields NULL here: the seed has no office, and NULL
+ * is what makes the row the PROVIDER's. The RLS policy granted to the migration/seed role is what
+ * permits the write — `FORCE ROW LEVEL SECURITY` makes the table owner subject to its own
+ * policies, and `ibms` is neither a superuser nor `BYPASSRLS` (measured), so without that policy
+ * this function could not insert a single row.
+ *
+ * ## IT CREATES AND NEVER UPDATES, WHICH IS THE WHOLE POINT OF THE TABLE
+ *
+ * A value that MOVED is a NEW row with a new `effectiveFrom`, and the row it supersedes gets an
+ * `effectiveTo` — never an edit in place, because criterion 3 is that an old transaction computes
+ * at the value in force on ITS day. So a code already present is left exactly as it is, and the
+ * figures below changing is a MIGRATION's job, not a re-seed's. Re-running the seed is therefore
+ * safe and is a no-op on an existing database, which is what `from-empty.sh` relies on.
+ */
+async function ensureLegalValues(): Promise<void> {
+  const existing = new Set(
+    (
+      await prisma.legalValue.findMany({
+        where: { organizationId: null },
+        select: { code: true },
+      })
+    ).map((v) => v.code),
+  );
+
+  let created = 0;
+  for (const entry of PROVIDER_LEGAL_VALUES) {
+    if (existing.has(entry.code)) continue;
+    if (entry.value === null) {
+      // Unreachable: `PROVIDER_LEGAL_VALUES` filters on `owner === "PROVIDER"` and a CHECK
+      // constraint refuses a provider row with no figure. Thrown rather than skipped so a
+      // catalogue edit that broke the invariant says so instead of seeding fewer rows quietly.
+      throw new Error(
+        `Legal value "${entry.code}" is PROVIDER-owned with no value. A provider row states a ` +
+          `figure the instrument states; a row with no figure belongs to the office.`,
+      );
+    }
+    await prisma.legalValue.create({
+      data: {
+        code: entry.code,
+        name: entry.name,
+        kind: entry.kind,
+        // One column per shape, and the CHECK refuses the wrong one. The DATE kind is the
+        // instrument's own commencement.
+        numericValue: entry.kind === "DATE" ? null : entry.value,
+        dateValue: entry.kind === "DATE" ? new Date(entry.value) : null,
+        sourceType: "INSTRUMENT",
+        sourceInstrument: entry.instrument,
+        sourceArticle: entry.article,
+        sourcePrintedPage: entry.printedPage,
+        // Every figure below was in force from the day the instrument came into force. The
+        // instrument's own commencement row says which day that is, and it is the same date.
+        effectiveFrom: new Date("2026-06-24"),
+        note: entry.note,
+      },
+    });
+    created += 1;
+  }
+
+  console.log(
+    `Seeded ${created} new legal value(s) (${PROVIDER_LEGAL_VALUES.length} provider-owned figures defined, ` +
+      `${existing.size} already present and left untouched -- a value that MOVES is a new row, never an edit).`,
+  );
+}
+
 async function main() {
   // MUST be first: every seeded row below carries an organizationId foreign
   // key pointing at this row.
@@ -1043,6 +1112,7 @@ async function main() {
   await ensureRetentionSchedule();
   await ensureDocumentTemplates();
   await ensureSlaPolicies();
+  await ensureLegalValues();
 
   // Roles are OFFICE-SCOPED now, so every one of these belongs to the default
   // organization and is keyed on `(organizationId, name)` rather than a name
