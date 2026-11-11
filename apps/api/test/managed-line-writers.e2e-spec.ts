@@ -218,7 +218,26 @@ afterAll(async () => {
 
 describe('an RFQ INHERITS its line identity from the programme line', () => {
   it('copies the programme line FK onto the stored RFQ row', async () => {
-    const insurer = await makeInsurer(`${FIXTURE_PREFIX} RFQ Ins ${tag}`);
+    /*
+     * THREE INSURERS, not one — message 36 §2, and the reason is forward-looking rather than
+     * about this test's own subject.
+     *
+     * This spec is about the programme line's FK reaching the stored RFQ row; the shortlist is
+     * incidental to that. But art. 15/d (OWNER DECISION 130) requires a quote request to reach
+     * three insurers or more, and when it is wired a one-insurer RFQ will need either a tagged
+     * exemption or a declared act. This RFQ SUCCEEDS (201), so it would be evaluated — unlike
+     * `license-gate.e2e-spec.ts`'s, which the licence gate refuses with a 422 before a shortlist
+     * means anything, and unlike `insurer-deactivation.e2e-spec.ts`'s, whose subject IS the one
+     * insurer's own state.
+     *
+     * Changed now rather than when art. 15/d lands, so that build does not have to tell this
+     * test's subject apart from its scaffolding under time pressure.
+     */
+    const shortlist = [
+      await makeInsurer(`${FIXTURE_PREFIX} RFQ Ins A ${tag}`),
+      await makeInsurer(`${FIXTURE_PREFIX} RFQ Ins B ${tag}`),
+      await makeInsurer(`${FIXTURE_PREFIX} RFQ Ins C ${tag}`),
+    ];
     const { opportunityId } = await marketReadyOpportunity(placement.userId, {
       insuranceLine: 'Property All Risks',
       insuranceLineId: propertyLineId,
@@ -230,7 +249,7 @@ describe('an RFQ INHERITS its line identity from the programme line', () => {
       .send({
         opportunityId,
         insuranceLine: 'Property All Risks',
-        insurerIds: [insurer.id],
+        insurerIds: shortlist.map((i) => i.id),
       })
       .expect(201);
     const rfqId = (created.body as { id: string }).id;
@@ -249,7 +268,12 @@ describe('an RFQ INHERITS its line identity from the programme line', () => {
     // carries no FK, so the RFQ taken from it cannot carry one either. Resolving the string here
     // would be a SECOND resolution path — two lookups that have to agree forever, which is the
     // defect the FK removes.
-    const insurer = await makeInsurer(`${FIXTURE_PREFIX} RFQ Unmapped ${tag}`);
+    // Three, for the reason given on the test above.
+    const shortlist = [
+      await makeInsurer(`${FIXTURE_PREFIX} RFQ Unmapped A ${tag}`),
+      await makeInsurer(`${FIXTURE_PREFIX} RFQ Unmapped B ${tag}`),
+      await makeInsurer(`${FIXTURE_PREFIX} RFQ Unmapped C ${tag}`),
+    ];
     const { opportunityId } = await marketReadyOpportunity(placement.userId, {
       insuranceLine: 'Kidnap & Ransom',
       insuranceLineId: null,
@@ -261,7 +285,7 @@ describe('an RFQ INHERITS its line identity from the programme line', () => {
       .send({
         opportunityId,
         insuranceLine: 'Kidnap & Ransom',
-        insurerIds: [insurer.id],
+        insurerIds: shortlist.map((i) => i.id),
       })
       .expect(201);
     const row = await rawPrisma.rFQ.findUniqueOrThrow({
