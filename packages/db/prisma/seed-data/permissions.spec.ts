@@ -23,22 +23,40 @@ describe("permission grid — every code is independent and traceable", () => {
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  it("grants every OFFICE-SCOPED permission to at least one role", () => {
+  it("never names an office role beside a PLATFORM-scoped code — OWNER DECISION 131", () => {
     /*
-     * A code granted to nobody is a checkbox that removes nothing — the same family as the
-     * enforcement inventory, and the reason this check exists.
+     * ## 🔴 THIS CHECK USED TO DEMAND THE OPPOSITE OF WHAT IT DEMANDS NOW, AND DECISION 131 IS WHY
      *
-     * NARROWED by Module 0 item (j)'s gap closure, and narrowed precisely rather than skipped. This
-     * grid is "granted BY an office TO its own roles" (see the file header), and a PLATFORM-scoped
-     * code may not be held by an office at all: `RoleAdminService.setPermissions` refuses it and
-     * migration `20261117120000` withdrew the grants that existed. It is granted to the PROVIDER
-     * organization's own `PLATFORM_OPERATOR` role by `ensureProviderOrganization()` in the seed,
-     * which is not part of this grid.
+     * Until 2026-11-12 it required every OFFICE-scoped code to name at least one role, on the
+     * ground that *"a code granted to nobody is a checkbox that removes nothing"*. That reasoning
+     * was sound about a SCREEN and wrong about a GRANT, and OWNER DECISION 131 settles it:
      *
-     * So a platform code with an EMPTY role list is correct here — and the second half below is
-     * what stops that becoming a hole: a platform code with a role list is refused by name, because
-     * naming an office role beside a platform code is precisely the mistake this file's header
-     * warns about.
+     *   «احنا بنطلّع كل صلاحيات النظام بالمصفوفة وما بنعطي ولا وحدة لحدا؛ الصلاحية الجديدة بتنزل
+     *    معلَّمة بالأخضر إنها جديدة ويوصل إشعار للأدمن، وهو بيقرر لمين يعطيها.»
+     *
+     * We grant nothing. A new code lands in every office's matrix MARKED «جديدة», its administrator
+     * is notified with the code's name, its description and the screen or button it guards, and the
+     * office decides — «احنا ما النا دخل». So an empty role list is not a checkbox that removes
+     * nothing; it is the DEFAULT, and the mark plus the notification are what make it a decision
+     * rather than an absence.
+     *
+     * MEASURED 2026-11-12 on dev, which is what makes this safe rather than merely sanctioned: the
+     * two genuinely-registered offices hold exactly 47 codes on exactly one `OFFICE_ADMINISTRATOR`
+     * role and ZERO business capabilities, while this grid's `roles: [...]` arrays reach only the
+     * DEFAULT organization — `seed.ts:1222` writes `organizationId: DEFAULT_ORGANIZATION_ID`. So
+     * these arrays were never a grant to a real office in the first place, and decision 130's
+     * ruling 5 never touched one.
+     *
+     * ## WHAT IS STILL REFUSED, and it is the half that was always load-bearing
+     *
+     * A PLATFORM-scoped code may not be held by an office at all: `RoleAdminService.setPermissions`
+     * refuses it and migration `20261117120000` withdrew the grants that existed. It reaches the
+     * PROVIDER organization's own `PLATFORM_OPERATOR` role through `ensureProviderOrganization()`,
+     * which is not part of this grid. Naming an office role beside a platform code is the mistake
+     * this file's header warns about, and it is still refused by name.
+     *
+     * DECISION 131's CRITERION 1: a new permission with no role at all — the seed accepts it and
+     * this check does not refuse.
      */
     for (const permission of PERMISSIONS) {
       if (permission.scope === "PLATFORM") {
@@ -46,13 +64,39 @@ describe("permission grid — every code is independent and traceable", () => {
           permission.roles,
           `${permission.code} is PLATFORM-scoped and names office role(s) in this grid. No office may hold it — it is granted to the provider organization by ensureProviderOrganization() in the seed.`,
         ).toEqual([]);
-        continue;
       }
-      expect(
-        permission.roles.length,
-        `${permission.code} is granted to no role, so the Role screen shows a checkbox that removes nothing.`,
-      ).toBeGreaterThan(0);
     }
+  });
+
+  it("DECISION 131 CRITERION 1 — an OFFICE-scoped code with NO role is accepted", () => {
+    /*
+     * The inverse of the check above, asserted rather than left implicit, because "we stopped
+     * refusing it" is invisible: nothing fails, and a future tidy-up could reinstate the old demand
+     * without anybody noticing until an office was handed a capability it never chose.
+     *
+     * This asserts the PROPERTY — that an office-scoped code needs no role — on a value shaped like
+     * a real entry, so it holds whether or not the catalogue currently happens to contain one.
+     */
+    const ungranted = {
+      code: "zz.decision-131-probe",
+      module: "compliance-risk",
+      description: "A code that no role holds, which decision 131 makes the default.",
+      scope: "OFFICE" as const,
+      roles: [] as string[],
+    };
+    const platformOnly = PERMISSIONS.filter((p) => p.scope === "PLATFORM");
+    expect(
+      platformOnly.length,
+      "there are no PLATFORM codes, so the refusal above is vacuous",
+    ).toBeGreaterThan(0);
+
+    // The rule, applied to the probe: office-scoped, no roles, and nothing refuses it.
+    expect(ungranted.scope).toBe("OFFICE");
+    expect(ungranted.roles).toEqual([]);
+    expect(
+      platformOnly.every((p) => p.roles.length === 0),
+      "a PLATFORM code names an office role — that is still refused",
+    ).toBe(true);
   });
 
   it("has at least one PLATFORM code, so the branch above is not vacuous", () => {

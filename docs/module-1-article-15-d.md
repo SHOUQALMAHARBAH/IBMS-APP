@@ -109,7 +109,7 @@ can, use it.* **It can, and nothing new was built.** Measured 2026-11-12, it alr
 | what was said | `subject`, `body` |
 | when, and who recorded it | `sentAt`, `loggedByUserId` |
 
-**⚠️ ONE QUESTION GOES UP, AND IT IS NOT AN ENGINEERING ONE.** Art. 15/e/5 says «وفق وسائل التبليغ
+**⚠️ ONE QUESTION GOES UP, AND IT IS NOT AN ENGINEERING ONE.** Art. 15/d/5 says «وفق وسائل التبليغ
 المعتمدة» — through the **approved** means of notification. `InteractionChannel`'s twelve members are
 not all plausibly means of notification: `MEETING`, `CALL`, `EMAIL`, `WHATSAPP`, `VISIT`, `PORTAL`
 and `SMS` are channels; `PROPOSAL`, `RENEWAL`, `CLAIM` and `COMPLAINT` are document or case types;

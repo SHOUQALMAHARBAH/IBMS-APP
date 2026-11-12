@@ -46,6 +46,45 @@
 
 ---
 
+## ٢أ — 🔴 **`Opportunity.isRenewal`: ثلاثة قرّاء ولا كاتب واحد**
+
+> **Recorded here by message 37 §5, measured 2026-11-11 and re-measured 2026-11-12.** It is
+> this module's because the flag is a renewal fact.
+
+**القُرّاء ثلاثة، وكلُّهم أحياء:**
+
+| الموضع | ما يقرأه |
+|---|---|
+| `sales-dashboard.repository.ts:64,82` | filters policies by `opportunity: { isRenewal }` — **that IS the dashboard's *Premium written (new vs. renewal)* split** |
+| `apps/web/app/(app)/opportunities/page.tsx:102` | renders the renewal or new-business word per row |
+| `apps/web/lib/opportunity/opportunity-api.ts:25` | carries it on the wire |
+
+**And the writer does not exist — not one, repo-wide.** `CreateOpportunityInput` is exactly
+`{ customerId, insuranceProgramId, createdByUserId }`, `CreateOpportunityDto` accepts only
+`insuranceProgramId`, and no service, route or scheduler sets `isRenewal` or
+`Opportunity.renewalCaseId`.
+
+**⟶ So that split can only ever report 100% new business, and every row of the opportunities
+screen reads *new business* — not because the data says so, but because nothing in the system
+can set the flag.** That is the inverse of an absence claim: a screen reporting a fact that is
+structurally unobtainable.
+
+**And the renewal chain exists in the schema and is broken at ONE link.**
+`RenewalCase.policyId` is `@unique` and names the EXPIRING policy, and `RenewalCase` carries an
+`Opportunity?` back-relation; the break is `Opportunity.renewalCaseId`, which nothing writes. So
+it is the **smallest** of the three prerequisites for tagging art. 15/d's exemptions 1–3
+(`docs/module-1-article-15-d.md`) — and still a **product decision rather than a field to wire**:
+nothing today creates an opportunity *from* a renewal case, and walking the chain needs a rule
+for what BREAKS it (a lapse, a gap in cover, a change of insurer). «ثلاث سنوات متتالية» means
+consecutive, and consecutive is the part the schema cannot answer by itself.
+
+⛔ **Nothing was built.** Message 37 §5 says so in terms: a product decision for module 18.
+And the seeded demo data is not evidence either — 21 renewals of 90 opportunities were written
+straight through Prisma because no endpoint can, so they prove the READERS render and prove
+nothing about a writer that does not exist.
+
+---
+
 ## ٣ — 🔴 **أسئلته المعلَّقة**
 
 ### 📖 قبل ما تسأل — **كيف تُسأل أسئلة هذا المديول**
