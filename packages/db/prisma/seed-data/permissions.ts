@@ -1224,18 +1224,28 @@ const complianceRisk: PermissionSeed[] = [
    * ⛔ SO DO NOT PUT A ROLE BACK IN EITHER ARRAY. `permissions.spec.ts` no longer requires one —
    * that assertion was rewritten in the same commit, and its own comment carries the reasoning.
    *
-   * ## ⚠️ ONE DEFERRED CONSEQUENCE, NAMED SO IT IS NOT A SURPRISE
+   * ## 🔴 CORRECTED 2026-11-12, SAME DAY: THERE IS NO DEFERRED DROP, AND MY FIRST NOTE HERE
+   * ## HAD THE DIRECTION BACKWARDS
    *
-   * These three grants (read → two roles, declare → one) are still IN the dev and db-test
-   * databases, because emptying the arrays changes what the seed WOULD write and re-seeding is a
-   * separate act. Measured 2026-11-12: `db:fixture:permissions:check` reads *12 roles, 519 grants*
-   * and is GREEN, because the fixture matches the live database.
+   * This paragraph first said *these three grants are still IN the dev and db-test databases, so
+   * the next seed from nothing drops the default office 519 → 516 and the web fixture must be
+   * regenerated in that commit*. **Both halves are false, and the measurement that refutes them is
+   * the one in §1 above.**
    *
-   * ⟶ **The next `npm run db:seed` on a database built from nothing drops the default office to
-   * 516, and `apps/web/e2e/fixtures/role-permissions.ts` must be regenerated in that same commit**
-   * — its header declares the figure, and `scripts/from-empty.sh` prints the new one labelled for
-   * `docs/first-run.md`. Nothing is wrong today; what would be wrong is meeting the drop as a
-   * mysterious red.
+   * MEASURED on dev, per code: `legal-value.declare` and `legal-value.read` hold **0** grants —
+   * zero, in every organization, which is the same measurement that showed decision 130's ruling 5
+   * never reached a real office. The grants were never written, because these two codes were minted
+   * on 2026-11-11 and `db:seed` has not run on dev since. And `apps/web/e2e/fixtures/
+   * role-permissions.ts` lists both codes in its CATALOGUE section and carries **no grant for
+   * either** in its grid.
+   *
+   * ⟶ So the fixture's *12 roles, 519 grants* NEVER INCLUDED THEM. A seed from nothing BEFORE
+   * this change would have written 522; after it, 519 — which is what the fixture already declares.
+   * **Nothing needs regenerating, and there is no drop to meet.**
+   *
+   * ⚠️ The error is kept visible rather than quietly replaced, because it is the shape this
+   * repository keeps paying for: 519 was read off a database seeded BEFORE the codes existed, and
+   * subtracting from it assumed it contained them. A figure's UNIT includes the date it was taken.
    *
    * ⚠️ AND THE ARABIC DESCRIPTIONS ARE **NOT** RATIFIED BY THAT. Both codes stay on
    * `AWAITING_OWNER_REVIEW` in `apps/web/lib/admin/permission-descriptions.test.ts`, because the
