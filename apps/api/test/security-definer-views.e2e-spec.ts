@@ -113,6 +113,63 @@ async function asAppRole(sql: string): Promise<void> {
   }
 }
 
+/** Like `asAppRole`, but for a statement WITH a result set. Added 2026-11-11 for the test below:
+ *  the void-returning helper cannot ask the connection who it is. */
+async function asAppRoleQuery<T>(sql: string): Promise<T[]> {
+  const { PrismaClient } = await import('@prisma/client');
+  const client = new PrismaClient({ datasources: { db: { url: APP_DB_URL } } });
+  try {
+    return await client.$queryRawUnsafe<T[]>(sql);
+  } finally {
+    await client.$disconnect();
+  }
+}
+
+/*
+ * 🔴 FIRST, BECAUSE THE `refuses the write it declares` ASSERTIONS DEPEND ON IT — added 2026-11-11.
+ *
+ * Those tests assert `rejects.toThrow()` on a write executed as the app role. A throw is not
+ * self-describing: it proves a refusal happened, never WHICH mechanism refused, and a connection
+ * exempt from RLS would still throw on some of these writes for unrelated reasons — so the
+ * assertion can survive the privilege it exists to rest on.
+ *
+ * MEASURED 2026-11-11: on db-test the suite's own role `ibms` is `rolsuper = t, rolbypassrls = t`,
+ * and on dev the same name is `f, f`. `APP_DB_URL` falls back to a literal when
+ * `APP_DATABASE_URL` is unset, and nothing here asserted the variable names the non-owner role.
+ *
+ * Rule 12: assert the PRESENCE of what the proof needs, never the absence of what it fears.
+ */
+describe('the connection these refusals travel on is not exempt', () => {
+  it('connects as a role that is neither SUPERUSER nor BYPASSRLS, and owns nothing', async () => {
+    const who = await asAppRoleQuery<{
+      u: string;
+      s: boolean;
+      b: boolean;
+      owned: bigint;
+    }>(
+      `SELECT current_user AS u,
+              (SELECT rolsuper      FROM pg_roles WHERE rolname = current_user) AS s,
+              (SELECT rolbypassrls  FROM pg_roles WHERE rolname = current_user) AS b,
+              (SELECT count(*) FROM pg_tables
+                WHERE schemaname = 'public' AND tableowner = current_user) AS owned`,
+    );
+
+    expect(who).toHaveLength(1);
+    expect(
+      who[0].s,
+      `this spec is connected as ${who[0].u}, which is a SUPERUSER — a SECURITY DEFINER view's write refusal proves nothing through it`,
+    ).toBe(false);
+    expect(
+      who[0].b,
+      `this spec is connected as ${who[0].u}, which holds BYPASSRLS`,
+    ).toBe(false);
+    expect(
+      Number(who[0].owned),
+      `${who[0].u} owns tables in \`public\`, and a table's owner is exempt from its own policies unless the table is FORCED`,
+    ).toBe(0);
+  }, 120_000);
+});
+
 describe('every SECURITY DEFINER view is declared', () => {
   it('has no undeclared members', async () => {
     const found = await securityDefinerViews();

@@ -2021,17 +2021,78 @@ async function runFullPipeline(
   );
   if (!opportunity) return undefined;
 
-  // Pick from the INTERSECTION of what this programme designed and what each
-  // insurer actually writes. Picking an insurer first and then one of its own
-  // lines (the obvious order) 422s whenever that line is not on the
-  // programme — which was ~1 pipeline in 3 before this.
-  const eligible = insurers
-    .map((i) => ({
-      insurer: i,
-      lines: i.lines.filter((l) => designedLines.has(l)),
-    }))
-    .filter((e) => e.lines.length > 0);
-  if (eligible.length === 0) {
+  /*
+   * 🔴 SOME OPPORTUNITIES ARE RENEWALS — AND THIS IS THE ONLY WAY TO SAY SO, BECAUSE
+   * `Opportunity.isRenewal` HAS THREE LIVE READERS AND NO WRITER AT ALL.
+   *
+   * Measured repo-wide 2026-11-11, for message 36 §2:
+   *
+   *   READERS  `sales-dashboard.repository.ts:64,82` filters policies by
+   *            `opportunity: { isRenewal }` — that IS the dashboard's "Premium written
+   *            (new vs. renewal)" split; `opportunities/page.tsx:102` renders «تجديد» or
+   *            «أعمال جديدة» per row; `opportunity-api.ts:25` carries it on the wire.
+   *   WRITERS  none. `CreateOpportunityInput` is exactly
+   *            `{ customerId, insuranceProgramId, createdByUserId }`, `CreateOpportunityDto`
+   *            accepts only `insuranceProgramId`, and no service, route or scheduler
+   *            anywhere sets `isRenewal` or `Opportunity.renewalCaseId`.
+   *
+   * So the sales dashboard's new-vs-renewal split can only ever report 100% new business,
+   * and every row of `/opportunities` reads «أعمال جديدة» — **not because the data says
+   * so, but because nothing in the system can set the flag.** That is the inverse of an
+   * absence claim: a screen reporting a fact that is structurally unobtainable.
+   *
+   * This write is consistent with this script's own documented rule — HTTP where an
+   * endpoint exists, Prisma where none does, with the reason named, as it already does for
+   * the first account in an Organization and for every `Insurer` row. ⛔ But it must NOT be
+   * read as evidence the feature works: **seeded renewals prove the READERS render, and
+   * prove nothing about a writer that does not exist.** Building one is a product decision
+   * (what makes an opportunity a renewal — a link to the expiring policy, presumably
+   * `RenewalCase`) and it belongs to the renewal module, not to a seed script.
+   *
+   * One in four, so both branches of every reader have data and neither is the whole set.
+   */
+  if (Math.random() < 0.25) {
+    await rawPrisma.opportunity.update({
+      where: { id: opportunity.id },
+      data: { isRenewal: true },
+    });
+    bump(tally, 'created', 'opportunityMarkedRenewal');
+  }
+
+  /*
+   * Pick from the INTERSECTION of what this programme designed and what each
+   * insurer actually writes. Picking an insurer first and then one of its own
+   * lines (the obvious order) 422s whenever that line is not on the
+   * programme — which was ~1 pipeline in 3 before this.
+   *
+   * 🔴 THE LINE IS PICKED FIRST, AND THAT INVERSION IS THE WHOLE POINT — message 36 §2.
+   *
+   * Until 2026-11-11 this picked an insurer, then one of ITS lines, and sent to
+   * `insurerIds: [insurer.id]` — so **every one of the 89 seeded RFQs reached exactly
+   * ONE insurer**, measured on dev. Art. 15/d requires a quote request to reach three
+   * insurers or more, and OWNER DECISION 130 rules that the office does so "because that
+   * is what the law says". Seeded that way, art. 15/d's window would appear on 100% of
+   * quote requests — which is precisely the failure decision 129's second form was
+   * corrected for, and the owner's own test is *count the clicks added to the most
+   * frequent transaction*.
+   *
+   * A shortlist of three needs three insurers writing ONE line, so the line has to be
+   * chosen before the insurer. Measured on dev the same day: **9 (line, office) pairs
+   * have three or more writers and 5 have fewer** — so the minority below three arises
+   * from the real line/insurer structure rather than from a contrived ratio, which is a
+   * better seed than forcing one. A thin line genuinely has few writers, and that is the
+   * case the exemptions exist for.
+   */
+  const writersByLine = new Map<string, typeof insurers>();
+  for (const candidate of insurers) {
+    for (const line of candidate.lines) {
+      if (!designedLines.has(line)) continue;
+      const writers = writersByLine.get(line) ?? [];
+      writers.push(candidate);
+      writersByLine.set(line, writers);
+    }
+  }
+  if (writersByLine.size === 0) {
     // Possible in principle (a questionnaire designing only lines no demo
     // insurer writes) and worth counting rather than silently dropping.
     bump(tally, 'failed', 'rfqNoEligibleInsurer');
@@ -2040,36 +2101,74 @@ async function runFullPipeline(
     );
     return undefined;
   }
-  const chosen = pick(eligible);
-  const insurer = chosen.insurer;
-  const insuranceLine = pick(chosen.lines);
+  const insuranceLine = pick([...writersByLine.keys()]);
+  const lineWriters = writersByLine.get(insuranceLine) ?? [];
+  // Up to FOUR, so a well-served line reaches the statutory three with one to spare and
+  // the comparison has something to compare. `pickN` caps at what exists, so a line with
+  // one or two writers yields one or two — the minority, unforced.
+  const shortlist = pickN(lineWriters, Math.min(4, lineWriters.length));
   const rfq = await attempt(tally, 'rfq', () =>
     postAs<{ id: string }>(app, actors.placement.token, '/rfqs', {
       opportunityId: opportunity.id,
       insuranceLine,
-      insurerIds: [insurer.id],
+      insurerIds: shortlist.map((i) => i.id),
     }),
   );
   if (!rfq) return undefined;
 
-  const premium = randomInt(500, 45_000);
-  const quotation = await attempt(tally, 'quotation', () =>
-    postAs<{ current?: { id: string }; id?: string }>(
-      app,
-      actors.placement.token,
-      '/quotations',
-      {
-        rfqId: rfq.id,
-        insurerId: insurer.id,
-        premium: money(premium),
-        currency: 'JOD',
-        deductible: money(Math.max(50, Math.round(premium * 0.05))),
-        commissionRatePercent: '12.50',
-      },
-    ),
-  );
-  if (!quotation) return undefined;
-  const quotationId = quotation.current?.id ?? quotation.id;
+  /*
+   * ONE QUOTATION PER SHORTLISTED INSURER, and the cheapest is what gets recommended.
+   *
+   * Before 2026-11-11 there was one insurer and therefore one quote, so every seeded
+   * comparison matrix compared a field of ONE and every recommendation's *"most
+   * competitive premium among the insurers approached"* rationale was true of a set with
+   * no alternative in it. A shortlist with one quote on it would have been worse than
+   * the old data, not better: the RFQ would say three insurers were approached while the
+   * comparison showed one, which is the shape an inspector asks about.
+   *
+   * A quote is NOT forced from every insurer — `attempt` already tolerates one failing,
+   * and a real market has insurers that decline to quote. What matters is that the set
+   * is bigger than one and that the recommended quotation is the cheapest in it, so the
+   * rationale the seed writes is true of the data it writes.
+   */
+  const quotes: {
+    insurerId: string;
+    quotationId: string;
+    premium: number;
+  }[] = [];
+  for (const target of shortlist) {
+    const premium = randomInt(500, 45_000);
+    const quoted = await attempt(tally, 'quotation', () =>
+      postAs<{ current?: { id: string }; id?: string }>(
+        app,
+        actors.placement.token,
+        '/quotations',
+        {
+          rfqId: rfq.id,
+          insurerId: target.id,
+          premium: money(premium),
+          currency: 'JOD',
+          deductible: money(Math.max(50, Math.round(premium * 0.05))),
+          commissionRatePercent: '12.50',
+        },
+      ),
+    );
+    const id = quoted?.current?.id ?? quoted?.id;
+    if (id) quotes.push({ insurerId: target.id, quotationId: id, premium });
+  }
+  if (quotes.length === 0) return undefined;
+  // Cheapest, so the recommendation's own stated reason matches the seeded figures.
+  quotes.sort((a, b) => a.premium - b.premium);
+  const quotationId = quotes[0].quotationId;
+  /*
+   * The policy downstream is issued at the RECOMMENDED quotation's premium, which used to
+   * be true only because there was exactly one quote. With a shortlist it has to be said:
+   * `premium` is the figure on the quote the recommendation names, and the compiler is
+   * what asked — removing the single `premium` broke `issuedPremium` and the return value,
+   * which is the right kind of break, because a policy issued at some OTHER insurer's
+   * premium would have been a quiet inconsistency in money.
+   */
+  const premium = quotes[0].premium;
   if (!quotationId) {
     bump(tally, 'failed', 'quotationId');
     return undefined;

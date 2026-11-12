@@ -74,7 +74,7 @@ function requireRow(rows: readonly LegalValue[], code: string): LegalValue {
   return row;
 }
 
-function requireNumeric(
+export function requireNumeric(
   rows: readonly LegalValue[],
   code: string,
 ): Prisma.Decimal {
@@ -97,7 +97,10 @@ function requireNumeric(
  * fractional part is a data fault and is refused rather than truncated: 44.5 days silently
  * becoming 44 moves a statutory deadline by a day.
  */
-function requireWholeNumber(rows: readonly LegalValue[], code: string): number {
+export function requireWholeNumber(
+  rows: readonly LegalValue[],
+  code: string,
+): number {
   const value = requireNumeric(rows, code);
   if (!value.isInteger()) {
     throw new UnprocessableEntityException(

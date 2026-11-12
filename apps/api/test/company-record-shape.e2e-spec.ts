@@ -31,7 +31,14 @@ import { CompanyRecordService } from '../src/modules/company/company-record.serv
  *
  * So the service is called inside `orgContext.runAs`, which `last-administrator-lock.e2e-spec.ts`
  * already establishes as "the same code path a request takes after `JwtStrategy` has established the
- * office". Real service, real Prisma, real database, real RLS context, no login.
+ * office". Real service, real Prisma, real database, real TENANCY context, no login.
+ *
+ * CORRECTED 2026-11-11: that last clause read "real RLS context", and it was not one. `orgContext`
+ * drives `tenantScopeExtension`, which is the application layer; the connection underneath it here
+ * is the suite's own, and on db-test that role is a SUPERUSER with BYPASSRLS, so row-level security
+ * is inert on it. Nothing in this file depends on the difference — it asserts a SHAPE and no
+ * refusal — but a reader looking for where RLS is proven would have stopped here, and the answer is
+ * `tenant-isolation.e2e-spec.ts`, which opens a connection on `APP_DATABASE_URL`.
  *
  * ## WHAT THIS PROVES AND WHAT IT DOES NOT — stated, because the gap is the reason entry 38 exists
  *

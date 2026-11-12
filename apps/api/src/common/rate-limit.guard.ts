@@ -2,6 +2,8 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { CanActivate, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 
+import { clientIpOf } from './client-ip';
+
 interface ClientStore {
   count: number;
   resetTime: number;
@@ -121,48 +123,14 @@ export class RateLimitGuard implements CanActivate {
   }
 
   /**
-   * `x-forwarded-for` is CLIENT-SUPPLIED and trivially spoofable, so it is
-   * honoured ONLY when the deployment declares a trusted reverse proxy sets it
-   * — `TRUST_PROXY_HEADERS=true`, the same "the deployment target decides"
-   * gate `securityHeaders()` and the secure-cookie flag already use.
-   *
-   * THE HOP MUST BE COUNTED FROM THE RIGHT. Taking `split(',')[0]` — the
-   * LEFTMOST value — was the original bug and it left the vulnerability fully
-   * open on the exact deployments the flag exists for. Every standard reverse
-   * proxy APPENDS the peer it sees to whatever the client already sent (nginx
-   * `$proxy_add_x_forwarded_for`, ALB, Cloudflare), so a request arriving with
-   * a forged `x-forwarded-for: 1.2.3.4` reaches the app as
-   * `1.2.3.4, <real client ip>` and the leftmost read returns the attacker's
-   * own value. Rotating it per request then yields a fresh bucket every time:
-   * a complete bypass of the brute-force control on login and password reset.
-   *
-   * The RIGHTMOST entry is the one contributed by the nearest trusted proxy
-   * and cannot be forged by the client. `TRUST_PROXY_HOP_COUNT` handles a
-   * chain of more than one trusted proxy: with N trusted hops the client's own
-   * address is N from the right.
+   * The client's address. The resolution itself lives in `common/client-ip.ts` since
+   * 2026-11-12, because the declared-act record needs the SAME answer and the only correct
+   * implementation was private to this file. The reasoning — why `x-forwarded-for` is only
+   * honoured behind a declared trusted proxy, and why the hop is counted from the RIGHT —
+   * moved with it, unaltered.
    */
   private getClientIp(request: Request): string {
-    if (process.env.TRUST_PROXY_HEADERS === 'true') {
-      const header = request.headers['x-forwarded-for'];
-      const raw = Array.isArray(header) ? header.join(',') : header;
-      if (typeof raw === 'string') {
-        const hops = raw
-          .split(',')
-          .map((part) => part.trim())
-          .filter(Boolean);
-        const trusted = trustedProxyHopCount();
-        const index = hops.length - trusted;
-        if (index >= 0 && index < hops.length) return hops[index];
-        // Fewer entries than declared hops: the header is not what this
-        // deployment says it should be. Fall through to the socket address
-        // rather than trust an attacker-controlled position in the list.
-      }
-    }
-    // `request.ip` can be undefined behind some adapters. Everything in that
-    // state shares ONE bucket, which is deliberately restrictive rather than
-    // permissive: an unidentifiable client gets the smallest possible budget
-    // instead of an unlimited one.
-    return request.ip ?? 'unknown';
+    return clientIpOf(request);
   }
 
   /**
@@ -207,14 +175,4 @@ export class RateLimitGuard implements CanActivate {
       RateLimitGuard.store.delete(ip);
     }
   }
-}
-
-/** How many trusted proxies sit between the client and this process. Only
- * consulted when `TRUST_PROXY_HEADERS=true`. Defaults to 1 (the common single
- * reverse proxy / load balancer). A value below 1 is meaningless and is
- * clamped — reading the 0th-from-right entry would mean trusting whatever the
- * client sent last. */
-function trustedProxyHopCount(): number {
-  const parsed = Number.parseInt(process.env.TRUST_PROXY_HOP_COUNT ?? '1', 10);
-  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
 }
