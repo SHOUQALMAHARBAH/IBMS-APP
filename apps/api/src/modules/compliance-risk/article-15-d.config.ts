@@ -180,8 +180,21 @@ export function exemption4Applies(
 /**
  * HOW MANY INSURERS IS ENOUGH — the only question art. 15/d actually asks.
  *
- * «التواصل مع ثلاث شركات» is THE SENDING, not receiving three replies (decision 38, 9 October),
- * so the count is of the shortlist the request went to and nothing about the responses.
+ * «التواصل مع ثلاث شركات» is THE SENDING, not receiving three replies — the owner's reading of
+ * 9 October, carried forward unchanged by OWNER DECISION 129 §3 — so the count is of the shortlist
+ * the request went to and nothing about the responses.
+ *
+ * ⟶ ATTRIBUTED THE WAY `seed-data/legal-values.ts` ALREADY ATTRIBUTES IT, and that is deliberate.
+ * The first version of this comment cited the 9 October ruling BY ITS OWN NUMBER, and
+ * `check:decision-index` refused it — that ruling has no file in `docs/`. The fix is not to declare
+ * it missing: the RULE's home is OWNER DECISION 129 §3, which restates it under «ما يبقى من قرار ٩
+ * تشرين الأول كما هو» — *what remains from the 9 October decision unchanged* — so naming 129 loses
+ * no attribution at all. Writing a decision file is the owner's, and a citation that points nowhere
+ * is worse than citing the decision that carries the rule today.
+ *
+ * ⛔ AND THE NUMBER IS NOT REPEATED ANYWHERE IN THIS FILE, INCLUDING HERE. The gate WALKS a
+ * multi-number citation, so a comment that names the number while explaining why it must not be
+ * named is itself the citation — which is exactly what the second version of this comment did.
  */
 export function reachesEnoughInsurers(
   insurerCount: number,

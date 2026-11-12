@@ -306,6 +306,28 @@ def _ar_to_int(s: str) -> int:
 
 
 def _tracked_bodies(root: str) -> dict[str, str]:
+    """Every TRACKED file under apps/ and packages/, by path.
+
+    ## 🔴 THIS GATE IS BLIND TO AN UNTRACKED FILE, AND THAT PRODUCED A FALSE GREEN ON 2026-11-12
+
+    `git ls-files` lists tracked files only, so a BRAND-NEW file's decision citations are invisible
+    until it is staged. Measured, with a plant: a new `apps/api/src/__plant.ts` citing a decision
+    number that has no file left this gate GREEN while untracked, went RED the moment it was
+    `git add`ed, and went green again when removed.
+
+    That is exactly how `article-15-d.config.ts` shipped a citation of the 9 October ruling, which
+    has no file: `check:docs` was run before `git add`, reported clean, and CI — which reads a
+    committed tree — refused the push.
+
+    ⟶ **SO RUN `git add` BEFORE `check:docs`, OR RUN IT AGAIN AFTER STAGING.** "I ran the gate after
+    my last edit" is not sufficient here; the gate's unit is the INDEX, not the working tree, and
+    those are different things for precisely the files most likely to carry a new citation.
+
+    Deliberately NOT changed to read the working tree. Scanning untracked files would make the gate
+    fail on scratch files, throwaway plants and anything else a working tree legitimately holds —
+    and this repository's own `_to_delete/` history is what that looks like. The tracked set is the
+    right unit; what was missing was saying so where a reader meets it.
+    """
     out = subprocess.run(
         ["git", "ls-files", "apps", "packages"],
         cwd=root, capture_output=True, text=True, check=True,
