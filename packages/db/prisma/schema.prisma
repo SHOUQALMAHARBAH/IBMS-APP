@@ -614,6 +614,7 @@ model Organization {
   retentionArchiveRetrievals          RetentionArchiveRetrieval[]
   /// Batch 5 group 7d — this company's own licence terms, when it is an INSURANCE_COMPANY.
   insuranceCompanyLicenseTerms        InsuranceCompanyLicenseTerm[]     @relation("OrganizationInsuranceCompanyLicenseTerms")
+  declaredActs                        DeclaredAct[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -960,6 +961,7 @@ model User {
   /// `reported_by` on PRIV-SRS-02's IncidentReport — Optional, «may be anonymous»,
   /// which is why the FK is nullable rather than defaulted to the caller.
   reportedIncidents                 IncidentReport[]                  @relation("IncidentReportedBy")
+  declaredActs                      DeclaredAct[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -7629,6 +7631,145 @@ model CombinedDutyAct {
   needsAssessmentReviews        NeedsAssessment[]           @relation("NeedsAssessmentReviewerCombinedDuty")
 
   @@index([organizationId, actedAt(sort: Desc)])
+  @@index([entity, entityId])
+  @@index([actorUserId])
+}
+
+/// THE SEVEN PLACES A DECLARED ACT CAN BE MADE — OWNER DECISION 126, and the module-1 paper §٨.٢.
+///
+/// An ENUM rather than a free string, by this repository's own test: code BRANCHES on the value.
+/// Each site has its own permission (module paper §٨.١ item 3 — *a separate permission for EACH
+/// site, never one permission for all*), its own article text, and its own row in the compliance
+/// report's breakdown. A free string would let a typo create a silent EIGHTH category that the
+/// report would then under-count in a direction nobody notices.
+///
+/// Seven members and no eighth without a decision: decision 126 fixed the list, and its own test
+/// for a new one is *is the harm irreversible, and on whom does it fall?*
+enum DeclaredActSite {
+  /// م(١٥/د) — a quote request reaching fewer than three insurance companies. WIRED in message 36.
+  ARTICLE_15_D_FEWER_THAN_THREE_INSURERS
+  /// م(١٩/أ/٣) — booking an unpaid premium as a debt on the broker, or setting it off.
+  ARTICLE_19_A_3_UNPAID_PREMIUM_AS_DEBT
+  /// م(١٦/ي/٨) — the broker collecting a premium in the prohibited cases (group medical).
+  ARTICLE_16_Y_8_PROHIBITED_PREMIUM_COLLECTION
+  /// Practising after the authorisation has been withdrawn.
+  PRACTISING_AFTER_AUTHORISATION_WITHDRAWN
+  /// Issuing with approved staff below the minimum for the type.
+  STAFF_BELOW_MINIMUM_AT_ISSUANCE
+  /// The office manager also holding data protection. Caller 6 — built BESPOKE today as
+  /// `Organization`'s four `dpoManagerCombined*` columns, and it moves here with module 16
+  /// (decision 130, ruling 4). The member exists so the report's category list is the decided
+  /// seven rather than the six that happen to be general.
+  OFFICE_MANAGER_HOLDS_DATA_PROTECTION
+  /// One natural person approved for both life and general. Caller 7 — a REFUSAL today
+  /// (`breachesNaturalPersonOneTypeRule`); its turn from refusal to declaration is module 16's.
+  ONE_PERSON_FOR_LIFE_AND_GENERAL
+}
+
+/// 🔴 THE DECLARED-ACT RECORD — the office was warned, declared, and proceeded. Module-1 paper §٨.
+///
+/// OWNER DECISION 126: the system warns and records and does not refuse, except for four acts whose
+/// harm is irreversible AND falls on someone other than the office. This table is the *records*
+/// half, and it is general from the first line because decision 126 names SEVEN sites (§٨.٢), not
+/// one.
+///
+/// ## WHY THIS IS A NEW TABLE AND NOT `CombinedDutyAct` EXTENDED — message 35 §4.1 asked for the
+/// choice to be stated, so here it is, with the four measured reasons.
+///
+///   1. `CombinedDutyAct.constraintName` names WHICH maker/checker CHECK constraint the act
+///      excuses, and `maker-checker-pairs.e2e-spec.ts` asserts that set against `pg_constraint`.
+///      A declared act excuses no CHECK; there is nothing for that column to hold, and widening it
+///      to mean "a constraint name OR an article" is one column with two meanings.
+///   2. `CombinedDutyAct` is guarded by a TRIGGER that refuses an act for an office whose mode is
+///      not `COMBINED`. A declared act has nothing to do with the office's duty-segregation mode,
+///      so sharing the table would make every declaration require `COMBINED` — refusing the
+///      routine case, which is the opposite of decision 126.
+///   3. It carries the maker/checker HAT analysis (`grantingRoleIds`, `multipleGrantingRoles` —
+///      which of the actor's roles granted the *checker* permission). There is no checker here.
+///   4. It carries ~19 TYPED back-relations, one per model that can bear such an act. This record
+///      is addressed generally by `site` + `entity`/`entityId`, because seven callers across five
+///      modules will write it and a typed relation per caller is the matrix §٨.٢ warns against.
+///
+/// It FOLLOWS that table's shape deliberately, and the shape is the part worth copying: the tenant
+/// column with a `dbgenerated()` default, `entity`/`entityId` so the act can be shown ON the
+/// record, the actor, a NOT NULL reason with the one shared floor, `actedAt`, and NAMES stored
+/// beside ids because a name recoverable only from an id is not recoverable years later.
+///
+/// ## THE NINE ELEMENTS (module paper §٨.١) — BUILT WHOLE OR NOT AT ALL
+///
+/// Eight are OWNER DECISION of 12 October; the ninth is the legal adviser's.
+///
+///   1 the article TEXT verbatim as displayed, never its number  -> `articleTextShown`
+///   2 a written reason with a minimum length                    -> `reason` + CHECK
+///   3 a separate permission for EACH site, never one for all    -> `permissionCode` + `site`
+///   4 an explicit hand-ticked acknowledgement, STORED AS SHOWN  -> `acknowledgementTextShown`
+///   5 the event, article and its shown text, the reason, the
+///     declarer's name, date and time, the permission used, and
+///     the related record                                        -> every column below
+///   6 responsibility written as a SENTENCE, not inferred        -> `responsibilitySentence`
+///   7 append-only: no permission deletes or edits it            -> trigger, with a plant
+///   8 detailed in the office's compliance report, and at the
+///     provider an AGGREGATE NUMBER ONLY                         -> the report surface is NOT in
+///     this batch (server and database only); the columns support both readings
+///   9 the developing company's release, AND ITS LIMIT BESIDE IT,
+///     never separated                                           -> `acknowledgementTextShown`,
+///     enforced by a CHECK that the stored text contains both
+///
+/// And the adviser's own hardening of the record: the approved NAME, the TRANSACTION NUMBER, the
+/// VERBATIM text of the acknowledgement and the reason — *not the word «yes»* — the timestamp, and
+/// THE NETWORK ADDRESS.
+model DeclaredAct {
+  id                       String          @id @default(uuid())
+  /// The office that declared. `tenantScopeExtension` supplies it; never passed by hand.
+  organizationId           String          @default(dbgenerated())
+  organization             Organization    @relation(fields: [organizationId], references: [id])
+  /// Which of decision 126's seven. Element 3 and element 8's breakdown.
+  site                     DeclaredActSite
+  /// The article as CITED, for the report's grouping — e.g. `15/d`. Element 1 says the number is
+  /// NOT what is shown to the person; it is kept because a report has to group by something
+  /// stable, and the shown text is prose that may change.
+  articleRef               String
+  /// 🔴 ELEMENT 1 and 4: the article text and the acknowledgement text **as they were displayed**,
+  /// stored verbatim on the act. The reason is the owner's: *the text may change later, and the
+  /// record testifies to what the employee SAW.* A foreign key to a text that can be edited would
+  /// destroy exactly that.
+  articleTextShown         String
+  acknowledgementTextShown String
+  /// ELEMENT 6: the regulatory responsibility, written out. A sentence, never inferred from the
+  /// row's existence.
+  responsibilitySentence   String
+  /// ELEMENT 2: why. The floor is the ONE shared floor — `DECLARATION_REASON_MIN_LENGTH`, ten
+  /// characters, enforced here by CHECK as well, because two SQL CHECKs already enforce that same
+  /// number where no importer can reach. OWNER DECISION 87 set fifteen and the owner STRUCK it on
+  /// that point on 2026-11-11 (decision 129 §5): ten is the floor everywhere.
+  reason                   String
+  /// ELEMENT 3: the permission actually used. A CODE and not a role name — decision 127, and the
+  /// standing rule that authorisation resolves from permissions rather than role names.
+  permissionCode           String
+  /// ELEMENT 5: the related record, so the act shows ON the record and not only in the report.
+  entity                   String
+  entityId                 String
+  /// The adviser's hardening: the transaction number, so an inspector can tie the declaration to
+  /// the business event rather than to a timestamp.
+  transactionRef           String
+  /// ELEMENT 5: who. The id for joining, the NAME as it stood — the adviser asked for «الاسم
+  /// المعتمد», and a user renamed or deactivated years later is unrecoverable from an id alone.
+  /// Same reasoning as `CombinedDutyAct.grantingRoleNames`.
+  actorUserId              String
+  actor                    User            @relation(fields: [actorUserId], references: [id])
+  actorNameShown           String
+  actedAt                  DateTime        @default(now())
+  /// 🔴 THE NETWORK ADDRESS — ONE NULLABLE COLUMN, ON THIS TABLE, threaded from the request.
+  ///
+  /// Message 35 §4.1 is explicit that it does NOT go on `AuditLogEntry`: that table is written on
+  /// every authenticated action, and an address column there would be a new piece of personal data
+  /// on millions of rows for the sake of seven. NULLABLE because a request can genuinely arrive
+  /// without a resolvable address (a scheduler, a console script), and a column that lies about
+  /// having one is worse than one that admits it does not.
+  networkAddress           String?
+
+  @@index([organizationId, actedAt(sort: Desc)])
+  @@index([organizationId, site])
   @@index([entity, entityId])
   @@index([actorUserId])
 }

@@ -81,6 +81,43 @@ API_SRC = os.path.join(ROOT, "apps", "api", "src")
 DB_FLOORS = {
     ("CombinedDutyAct", "reason"),
     ("IncidentContainmentAction", "description"),
+    # Module 1's declared-act record, 2026-11-12. The THIRD SQL home of the shared ten, and
+    # this gate is what demanded it be declared rather than letting it become a quiet copy.
+    ("DeclaredAct", "reason"),
+}
+
+#: Length floors in SQL that are deliberately NOT the declaration floor, because they govern a
+#: DIFFERENT concept. Each entry is (table, column) -> (expected floor, the TypeScript constant
+#: that is its one home, reason).
+#:
+#: This list exists because of this gate's own error message — *"if not, it is a second number
+#: for a different concept and needs its own home"*. Before it, the only way to add a non-ten
+#: floor was to make the gate red forever or to point the new concept at the reason constant,
+#: and the second of those is exactly the conflation the gate exists to stop.
+#:
+#: Checked in BOTH directions, and the number is checked against the NAMED CONSTANT's own value
+#: in the TypeScript source — so a declared floor whose constant has moved fails, rather than
+#: this file silently becoming the third place the number lives.
+SHOWN_TEXT_CONST = "DECLARED_ACT_SHOWN_TEXT_MIN_LENGTH"
+OTHER_LENGTH_FLOORS = {
+    ("DeclaredAct", "articleTextShown"): (
+        SHOWN_TEXT_CONST,
+        "The article text the system DISPLAYED, stored verbatim (module-1 paper element 1). The "
+        "adviser's requirement is the verbatim text and NOT the word yes, so the floor says prose "
+        "rather than token. Ten characters of statutory text is a different defect from a "
+        "ten-character written reason, which is why it is not the declaration floor.",
+    ),
+    ("DeclaredAct", "acknowledgementTextShown"): (
+        SHOWN_TEXT_CONST,
+        "The acknowledgement as displayed, including the developing company's release and its "
+        "limit (elements 4 and 9). The same concept as the article text above.",
+    ),
+    ("DeclaredAct", "responsibilitySentence"): (
+        SHOWN_TEXT_CONST,
+        "The responsibility written as a SENTENCE rather than inferred (element 6). The owner's "
+        "own sentence is 32 characters, which is why this concept's floor is 20 and not 40 -- a "
+        "forty-character floor applied to all three by symmetry would refuse her own sentence.",
+    ),
 }
 
 #: Literal `@MinLength(10)` sites that do NOT import the constant and are deliberately left
@@ -189,6 +226,27 @@ def constant_value() -> int:
     return int(m.group(1))
 
 
+def named_constant_value(name: str):
+    """The value of `export const <name> = <int>` anywhere under `apps/api/src`, or None.
+
+    A SEARCH rather than a fixed path, deliberately: `OTHER_LENGTH_FLOORS` names the constant and
+    not the file, so moving a constant to a better home does not silently turn this check off. It
+    reads the first literal assignment it finds; a constant assigned from another constant has no
+    literal here and reads as absent, which fails loudly rather than passing.
+    """
+    pattern = re.compile(
+        r"export\s+const\s+" + re.escape(name) + r"\s*(?::[^=]+)?=\s*(\d+)\s*;"
+    )
+    for dirpath, _dirs, files in os.walk(API_SRC):
+        for fn in files:
+            if not fn.endswith(".ts") or fn.endswith(".spec.ts"):
+                continue
+            m = pattern.search(open(os.path.join(dirpath, fn), encoding="utf-8").read())
+            if m:
+                return int(m.group(1))
+    return None
+
+
 def db_floors(migrations_dir: str = MIGRATIONS) -> list:
     """(table, column, floor, file) for every length CHECK with a floor above 1."""
     found = []
@@ -246,7 +304,30 @@ def audit() -> tuple:
     found = db_floors()
     lines.append(f"  database CHECK floors above 1: {len(found)}")
     seen = set()
+    other_seen = set()
     for table, col, n, path in sorted(found):
+        declared_other = OTHER_LENGTH_FLOORS.get((table, col))
+        if declared_other is not None:
+            # A DIFFERENT concept, declared with its own home. The number is checked against that
+            # home's value in the TypeScript source, so this list cannot become a second copy.
+            other_seen.add((table, col))
+            const_name = declared_other[0]
+            expected = named_constant_value(const_name)
+            mark = "own" if expected == n else "BAD"
+            lines.append(f"    {mark} {table}.{col} >= {n}   {const_name}   {path}")
+            if expected is None:
+                errors.append(
+                    f"{table}.{col} is declared in OTHER_LENGTH_FLOORS against `{const_name}`, "
+                    f"and no such exported constant was found in apps/api/src. Its own home is "
+                    f"what makes it a different concept rather than a loose number"
+                )
+            elif expected != n:
+                errors.append(
+                    f"{table}.{col} enforces {n} in SQL while `{const_name}` is {expected}. The "
+                    f"CHECK and its one home have drifted — a value the constant accepts would be "
+                    f"refused by the database, which is a 500 where a 400 belongs"
+                )
+            continue
         seen.add((table, col))
         mark = "ok " if n == floor else "BAD"
         lines.append(f"    {mark} {table}.{col} >= {n}   {path}")
@@ -256,6 +337,12 @@ def audit() -> tuple:
                 f"DECLARATION_REASON_MIN_LENGTH is {floor} — a DTO that accepts {floor} "
                 f"characters would produce a 500 from the CHECK where a 400 belongs"
             )
+    for gone in sorted(set(OTHER_LENGTH_FLOORS) - other_seen):
+        errors.append(
+            f"{gone[0]}.{gone[1]} is DECLARED in OTHER_LENGTH_FLOORS and no CHECK was found — "
+            "was the constraint dropped or renamed? A declaration kept past its subject is an "
+            "amnesty the next loose number hides behind"
+        )
     for missing in sorted(DB_FLOORS - seen):
         errors.append(
             f"{missing[0]}.{missing[1]} is DECLARED as a declaration floor but no CHECK was "
