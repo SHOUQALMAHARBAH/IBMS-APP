@@ -108,11 +108,17 @@ derived route needs no such channel, which is the strongest argument for it.
 
 | # | criterion | where it stands |
 |---|---|---|
-| 1 | a new code with no role — the seed accepts it, the check does not refuse | **BUILT** (message 37 §1.1), with both plants |
-| 2 | a new office gets ONE role and no business capability | **ALREADY TRUE** — measured on dev: the two registered offices hold 47 codes on one `OFFICE_ADMINISTRATOR` role, zero business capabilities |
-| 3 | «جديدة» in every office's matrix + a notification to the `role.update` holders | needs the shape above (not built) + the screen; the recipient query exists |
-| 4 | the admin grants it ⟶ the mark clears **in their office only** | falls out of condition 2 above: the `RolePermission` row IS the clearing, and it is tenant-scoped |
-| 5 | another office does not see one office's decision | falls out of RLS on the dismissal table — invisible, not filtered |
+| 1 | a new code with no role — the seed accepts it, the check does not refuse | **BUILT** (message 37 §1.1), with both plants. Its test lives with the catalogue: `permissions.spec.ts`, "DECISION 131 CRITERION 1" |
+| 2 | a new office gets ONE role and no business capability | **ALREADY TRUE** — measured on dev: the two registered offices hold 47 codes on one `OFFICE_ADMINISTRATOR` role, zero business capabilities. **Now also GUARDED**: criterion 2's test refuses a business-entity code in `OFFICE_ADMINISTRATOR_GRANTS` by name |
+| 3 | «جديدة» in every office's matrix + a notification to the `role.update` holders | needs the shape above (not built) + the screen; the recipient query exists. **The recipient CODE is pinned**: criterion 3's test reads the matrix route's own decorator, so moving that route to another permission fails rather than redirecting the notification silently |
+| 4 | the admin grants it ⟶ the mark clears **in their office only** | falls out of condition 2 above: the `RolePermission` row IS the clearing, and it is tenant-scoped. Criterion 4's test **pins the pointer** rather than restating — those three assertions have one home, `tenant-scope.extension.spec.ts`, and deleting one there fails here by name |
+| 5 | another office does not see one office's decision | falls out of RLS on the dismissal table — invisible, not filtered. Criterion 5's test reads the DMMF: while `OfficePermissionDismissal` is absent — measured 2026-11-12 — it records that, and **the day the model lands it demands the tenant column** — there is no window in which the table exists and nothing checks its isolation |
+
+**The four tests are `apps/api/src/modules/provider/decision-131-criteria.spec.ts`, each named by
+its criterion number, each planted separately and each killing exactly one.** ⚠️ Criteria 4 and 5
+assert the property their criterion RESTS on rather than the behaviour, because the mark is not
+built as at 2026-11-12 and a test driving a mark that does not exist would pass vacuously — which reads as coverage
+and is worse than no test.
 
 ## ⚠️ And one thing the notification must say, because of what §1.6 measured
 

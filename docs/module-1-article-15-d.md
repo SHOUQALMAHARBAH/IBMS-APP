@@ -145,3 +145,34 @@ though both of its measurable halves (the line and the premium) are known. The s
 exemption only when the line and the premium qualify, and the employee's choice is their
 declaration of the remaining condition. ⟶ **So "the system knows the line and the premium" must not
 be mistaken for "the system can tag exemption 4."**
+
+---
+
+## **2026-11-12 — BOTH TABLES ARE ON `main` AND BOTH ARE INERT**
+
+Message 37 §0. `RfqArticle15DExemption` and `Article15DPremiumAlert` merged to `main` in PR #58
+(migration `20261218100000_article_15_d_exemption`), so the schema holds them, the migration's own
+DO block asserts their eleven properties, and `from-empty.sh` builds them from nothing — **and
+nothing in the application reads or writes a row in either one.**
+
+**Measured on the merge commit, every tracked reference outside the migration and the generated
+client:**
+
+| where | what it is |
+|---|---|
+| `schema.prisma` (10 sites) | the models and their relation fields |
+| `money-fields.inventory.ts:45-48` | the four `Decimal` columns classified as MONEY — a declaration, which is what that gate demands of a new money column |
+| `article-15-d.config.ts:210,214` | two comments, explaining where the comparison's answer gets recorded and why a quote exactly AT the ceiling is within it |
+| `insurer-deactivation.e2e-spec.ts:442` | the §4 pin — a `.count()` asserting a one-insurer RFQ writes **no** exemption row |
+
+⟶ **That single `.count()` is the only Prisma client call against either table in the repository.**
+There is no `create`, no `update`, no read on any request path.
+
+⟶ **This is deliberate and is the state §4 required**, not an oversight: art. 15/d is not enforced
+until its strings are ratified (`docs/module-1-strings-for-ratification.md`) and its screen ships
+with the server in one batch. A table that exists before its writer is the safe order here — the
+reverse would mean a window with nowhere to record what it says.
+
+⛔ **So do not read their presence as the feature being live**, and do not wire a writer to either
+one without the screen: a recorded exemption nobody can see is worse than none, because it reads
+as a declared act that was never declared.
