@@ -36,6 +36,16 @@ export const MONEY_DECIMAL_FIELDS: readonly string[] = [
   'InsuranceProgramLine.sumInsuredBasis',
   'Opportunity.targetPremiumThreshold',
   'Quotation.premium',
+  // Art. 15/d/4, module 1 (2026-11-12). All four are JOD amounts and are MONEY, which is the
+  // safe classification: the premium the employee DECLARED under the exemption, the ceiling
+  // that was in force on the request's own date, and the same pair again on an alert raised
+  // when a quotation came back above it. The ceiling appears twice ON PURPOSE -- copied onto
+  // the exemption and onto the alert -- so each row reads correctly after the `LegalValue`
+  // row moves, which is decision 129's criterion 4.
+  'RfqArticle15DExemption.declaredAnnualPremiumJod',
+  'RfqArticle15DExemption.ceilingValueJod',
+  'Article15DPremiumAlert.quotedPremiumJod',
+  'Article15DPremiumAlert.ceilingValueJod',
   'Quotation.deductible',
   'Quotation.liabilityLimit',
   'Policy.requestedPremium',

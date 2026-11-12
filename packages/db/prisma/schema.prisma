@@ -615,6 +615,8 @@ model Organization {
   /// Batch 5 group 7d — this company's own licence terms, when it is an INSURANCE_COMPANY.
   insuranceCompanyLicenseTerms        InsuranceCompanyLicenseTerm[]     @relation("OrganizationInsuranceCompanyLicenseTerms")
   declaredActs                        DeclaredAct[]
+  rfqArticle15DExemptions             RfqArticle15DExemption[]
+  article15DPremiumAlerts             Article15DPremiumAlert[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -962,6 +964,7 @@ model User {
   /// which is why the FK is nullable rather than defaulted to the caller.
   reportedIncidents                 IncidentReport[]                  @relation("IncidentReportedBy")
   declaredActs                      DeclaredAct[]
+  rfqArticle15DExemptions           RfqArticle15DExemption[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -2513,10 +2516,11 @@ model RFQ {
   // issued this RFQ. Bare scalar; the AuditLogEntry CREATE row is authoritative.
   issuedByUserId        String?
 
-  insurerSubmissions RFQInsurer[]
-  quotations         Quotation[]
-  comparisonMatrix   ComparisonMatrix?
-  communications     CommunicationLog[]
+  insurerSubmissions     RFQInsurer[]
+  quotations             Quotation[]
+  comparisonMatrix       ComparisonMatrix?
+  communications         CommunicationLog[]
+  rfqArticle15DExemption RfqArticle15DExemption?
 
   // One RFQ per insurance line per Opportunity (backlog Part C #11 — "Create
   // an RFQ per insurance line"). Re-marketing a line is a deliberate future
@@ -2626,10 +2630,11 @@ model Quotation {
   /// same "metadata not body" shape as exclusions / conditions).
   negotiationNotes      String?
 
-  comparisonRows  ComparisonMatrixRow[]
+  comparisonRows          ComparisonMatrixRow[]
   /// One-to-MANY for the same reason: a quotation may have been recommended by a recommendation that was
   /// then discarded, and by the live one that replaced it.
-  recommendations Recommendation[]      @relation("RecommendedQuotation")
+  recommendations         Recommendation[]         @relation("RecommendedQuotation")
+  article15DPremiumAlerts Article15DPremiumAlert[]
 
   @@index([rfqId])
   @@index([insurerId])
@@ -4059,12 +4064,12 @@ enum CommunicationDirection {
 /// WorkflowTransitionService entity, no maker/checker (a factual log, like
 /// `Interaction` #10).
 model CommunicationLog {
-  id               String                 @id @default(uuid())
+  id                      String                   @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId   String                 @default(dbgenerated())
-  organization     Organization           @relation(fields: [organizationId], references: [id])
-  customerId       String?
+  organizationId          String                   @default(dbgenerated())
+  organization            Organization             @relation(fields: [organizationId], references: [id])
+  customerId              String?
   /// Batch six item 4 — register entry 125. This relation did NOT exist: the column
   /// was a bare `String?`, so a row could name a customer that does not exist and
   /// the database had nothing to refuse it with. It became urgent when batch five
@@ -4073,29 +4078,30 @@ model CommunicationLog {
   /// ON DELETE SET NULL, matching `consentRecordId` below and for its stated reason
   /// — the log row outlives what it referenced. CASCADE would destroy PDPL send
   /// evidence; RESTRICT would block a DSR erasure. See the migration header.
-  customer         Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  channel          InteractionChannel
-  templateId       String?
-  languageUsed     LanguagePreference?
-  direction        CommunicationDirection @default(OUTBOUND)
-  rfqId            String?
-  rfq              RFQ?                   @relation(fields: [rfqId], references: [id])
-  rfqInsurerId     String?
-  rfqInsurer       RFQInsurer?            @relation(fields: [rfqInsurerId], references: [id])
-  subject          String?
-  body             String?
-  loggedByUserId   String?
-  sentAt           DateTime               @default(now())
-  createdAt        DateTime               @default(now())
-  respectedConsent Boolean                @default(true) // must respect customer's consent preference
+  customer                Customer?                @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  channel                 InteractionChannel
+  templateId              String?
+  languageUsed            LanguagePreference?
+  direction               CommunicationDirection   @default(OUTBOUND)
+  rfqId                   String?
+  rfq                     RFQ?                     @relation(fields: [rfqId], references: [id])
+  rfqInsurerId            String?
+  rfqInsurer              RFQInsurer?              @relation(fields: [rfqInsurerId], references: [id])
+  subject                 String?
+  body                    String?
+  loggedByUserId          String?
+  sentAt                  DateTime                 @default(now())
+  createdAt               DateTime                 @default(now())
+  respectedConsent        Boolean                  @default(true) // must respect customer's consent preference
   // Process 44 — a marketing send (the ConsentRecord gate applies). false = a
   // service / transactional message (contractual necessity, no consent gate).
-  isMarketing      Boolean                @default(false)
+  isMarketing             Boolean                  @default(false)
   // Process 44 — the marketing ConsentRecord relied on at send time. Null for
   // a non-marketing send. ON DELETE SET NULL — the log row outlives the
   // consent record it referenced.
-  consentRecordId  String?
-  consentRecord    ConsentRecord?         @relation(fields: [consentRecordId], references: [id], onDelete: SetNull)
+  consentRecordId         String?
+  consentRecord           ConsentRecord?           @relation(fields: [consentRecordId], references: [id], onDelete: SetNull)
+  rfqArticle15DExemptions RfqArticle15DExemption[]
 
   @@index([customerId, sentAt])
   @@index([rfqId])
@@ -7633,6 +7639,137 @@ model CombinedDutyAct {
   @@index([organizationId, actedAt(sort: Desc)])
   @@index([entity, entityId])
   @@index([actorUserId])
+}
+
+/// ART. 15/d's FIVE EXEMPTIONS, in the instrument's own order.
+///
+/// A quote request must reach three insurance companies or more. These are the five cases in which
+/// it need not — and OWNER DECISION 130's first ruling is that the office sends to three or more
+/// *because that is what the law says*, so these are the exception and not the routine.
+enum Article15DExemption {
+  /// 1 — an individual medical renewal.
+  INDIVIDUAL_MEDICAL_RENEWAL
+  /// 2 — a group medical renewal, to a maximum of three consecutive years.
+  GROUP_MEDICAL_RENEWAL_UP_TO_THREE_YEARS
+  /// 3 — defined-benefit and defined-coverage contracts.
+  DEFINED_BENEFIT_CONTRACT
+  /// 4 — motor, medical or goods in transit with an annual premium at or below the ceiling,
+  /// conditional on relying on the underwriting policies of three companies.
+  LOW_PREMIUM_MOTOR_MEDICAL_OR_TRANSIT
+  /// 5 — at the customer's own request, through the approved means of notification.
+  AT_CUSTOMER_REQUEST
+}
+
+/// WHO ESTABLISHED THE EXEMPTION — OWNER DECISION 129's whole subject.
+///
+/// «النظام يسم وحده حين تكون كلُّ واقعةٍ يتوقّف عليها الإعفاء مسجَّلةً عنده أصلاً. فإن نقصت واقعة
+/// واحدة، يُعرَض الإعفاء اختياراً، واختيار الموظف هو إعلانه لتلك الواقعة.»
+///
+/// 🔴 `TAGGED_BY_SYSTEM` IS UNUSED TODAY AND MUST NOT BE DELETED. Message 36 §4 is explicit: on
+/// the measurement of 2026-11-11, NONE of the five can be tagged by the system, so every exemption
+/// on a request today is `CHOSEN_BY_PERSON`. The value exists because the distinction is the
+/// record's, not the code's — decision 129's criterion 7 is that the record tells «وسمه النظام»
+/// from «اختاره فلان», and a column that cannot express the first could never record it later.
+///
+/// What each of exemptions 1-3 would need to become taggable is sized in
+/// `docs/module-1-article-15-d.md` § What the system would need to tag by itself. None is built.
+enum Article15DExemptionBasis {
+  TAGGED_BY_SYSTEM
+  CHOSEN_BY_PERSON
+}
+
+/// 🔴 THE EXEMPTION STORED WITH THE REQUEST — art. 15/d's own «ما يثبت ذلك», OWNER DECISION 129.
+///
+/// One row per RFQ: an RFQ either rests on exactly one exemption or it does not rest on one at all,
+/// in which case a `DeclaredAct` carries the declaration instead. `@unique` on `rfqId` is what
+/// makes "exactly one" true rather than conventional.
+///
+/// ## WHY THE CEILING IS COPIED ONTO THE ROW, which looks like duplication and is not
+///
+/// Decision 129's criterion 4: **«غيِّر سطر الـ٢٠٠٠ في الجدول بتاريخ نفاذ جديد ⟶ الطلب القديم يبقى
+/// على قيمته يوم أُرسل.»** Change the ceiling with a new effective date and an old request keeps the
+/// value it was sent under. A foreign key to `LegalValue` would satisfy that too — the dated read
+/// is what `findInForce(code, at)` is for — but only while somebody remembers to pass the
+/// request's own date, and `sla-timer.service.ts:247` is this repository's own recorded example of
+/// a dated read that quietly uses TODAY. The figure that was applied is copied onto the row, so
+/// the request carries its own answer and no later reader can get it wrong.
+///
+/// `ceilingValueJod` is therefore a MONEY column by `money-decimal-jod.md` — Decimal, never a
+/// float — and so is the premium the employee declared.
+///
+/// ## APPEND-ONLY, for criterion 7's second half
+///
+/// «ولا يُعدَّل بعد الإرسال» — not edited after sending. Two triggers, the same pair `DeclaredAct`
+/// carries, because an exemption that can be swapped after the fact is not evidence of anything.
+///
+/// ⟶ AND THAT IS PRECISELY WHY THE ART. 15/d/4 ALERT IS A SEPARATE TABLE. The alert is raised
+/// LATER, when a quotation comes back above the ceiling, so it could not be a column on this row:
+/// these triggers would refuse the UPDATE. Append-only is the right property for the exemption and
+/// the wrong one for something that arrives after it — see `Article15DPremiumAlert`.
+model RfqArticle15DExemption {
+  id                         String                   @id @default(uuid())
+  /// The office. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId             String                   @default(dbgenerated())
+  organization               Organization             @relation(fields: [organizationId], references: [id])
+  /// ONE exemption per request, and `@unique` is what enforces it.
+  rfqId                      String                   @unique
+  rfq                        RFQ                      @relation(fields: [rfqId], references: [id], onDelete: Restrict)
+  exemption                  Article15DExemption
+  basis                      Article15DExemptionBasis
+  /// How many insurers the request had reached when the exemption was recorded. Decision 130's
+  /// second ruling counts PER REQUEST, so the count that mattered is the request's own.
+  insurerCount               Int
+  /// Exemption 4 only: the premium the employee DECLARED, and the ceiling that was in force on the
+  /// request's own date. Both NULL for the other four.
+  declaredAnnualPremiumJod   Decimal?                 @db.Decimal(18, 3)
+  ceilingValueJod            Decimal?                 @db.Decimal(18, 3)
+  /// Exemption 5 only: the evidence of the customer's request. An INBOUND `CommunicationLog` on
+  /// this RFQ — measured 2026-11-12 as sufficient as it stands, so nothing new was built for it.
+  evidenceCommunicationLogId String?
+  evidenceCommunicationLog   CommunicationLog?        @relation(fields: [evidenceCommunicationLogId], references: [id], onDelete: Restrict)
+  /// WHO chose it, for criterion 7. NULL only when `basis` is `TAGGED_BY_SYSTEM`, which nothing
+  /// produces today — the CHECK ties the two together so the pair cannot drift.
+  chosenByUserId             String?
+  chosenBy                   User?                    @relation(fields: [chosenByUserId], references: [id], onDelete: Restrict)
+  /// The name as it stood, for the same reason `DeclaredAct.actorNameShown` keeps one.
+  chosenByNameShown          String?
+  recordedAt                 DateTime                 @default(now())
+
+  premiumAlerts Article15DPremiumAlert[]
+
+  @@index([organizationId])
+  @@index([organizationId, exemption])
+}
+
+/// 🔴 THE ART. 15/d/4 ALERT — a quotation came back above the ceiling the employee declared under.
+///
+/// Message 36 §4.5: **«ولمّا ترجع العروض يقارن النظام، وإن زاد القسط عن الحدّ ينبّه ولا يرفض»** —
+/// when the quotes come back the system compares, and if the premium exceeds the ceiling it WARNS
+/// and does not refuse. OWNER DECISION 126's whole shape, applied here: the quotation is not
+/// refused and **the exemption is not erased**, because both of those would be the system
+/// rewriting what happened.
+///
+/// A ROW RATHER THAN A FLAG ON THE EXEMPTION, for two reasons. A flag could be set once and would
+/// lose the second quotation that also exceeded; and the exemption row is append-only, so a flag
+/// on it could not be written at all after the fact — which is the correct property for the
+/// exemption and the wrong one for an alert that arrives later.
+model Article15DPremiumAlert {
+  id               String                 @id @default(uuid())
+  organizationId   String                 @default(dbgenerated())
+  organization     Organization           @relation(fields: [organizationId], references: [id])
+  exemptionId      String
+  exemption        RfqArticle15DExemption @relation(fields: [exemptionId], references: [id], onDelete: Restrict)
+  /// The quotation whose premium exceeded it, so the alert points at the evidence.
+  quotationId      String
+  quotation        Quotation              @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  /// Both figures ON the alert: what came back, and what it was measured against. The ceiling is
+  /// copied again rather than joined, so the alert reads correctly even after the row moves.
+  quotedPremiumJod Decimal                @db.Decimal(18, 3)
+  ceilingValueJod  Decimal                @db.Decimal(18, 3)
+  raisedAt         DateTime               @default(now())
+
+  @@unique([exemptionId, quotationId])
+  @@index([organizationId])
 }
 
 /// THE SEVEN PLACES A DECLARED ACT CAN BE MADE — OWNER DECISION 126, and the module-1 paper §٨.٢.

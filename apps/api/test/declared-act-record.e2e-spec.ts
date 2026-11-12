@@ -89,7 +89,10 @@ let actorUserId = '';
 /** A complete, valid row — every CHECK cleared — so a refusal is never the wrong refusal. The
  *  `provider-office-state` lesson: a fixture that fails a NOT NULL instead of the constraint under
  *  test passes forever while proving nothing. */
-function insertSql(orgId: string, overrides: Record<string, string> = {}): string {
+function insertSql(
+  orgId: string,
+  overrides: Record<string, string> = {},
+): string {
   const values: Record<string, string> = {
     id: `gen_random_uuid()::text`,
     organizationId: `'${orgId}'`,
@@ -169,10 +172,7 @@ describe('the connection these refusals travel on is not exempt', () => {
     // Ownership too: Postgres exempts a table's owner from its own policies, and `rolsuper`/
     // `rolbypassrls` both false does not cover that. `DeclaredAct` is FORCED, which closes it —
     // asserted anyway, because the next tenant table probably will not be.
-    expect(
-      Number(who[0].owned),
-      `${who[0].u} owns tables in public`,
-    ).toBe(0);
+    expect(Number(who[0].owned), `${who[0].u} owns tables in public`).toBe(0);
   }, 120_000);
 
   it('and the table it is about is ENABLED **and FORCED**, which only two tables in this database are', async () => {
@@ -265,8 +265,8 @@ describe('one office never reads another’s admitted breaches', () => {
   }, 120_000);
 
   it('RLS refuses one office writing a row that belongs to another', async () => {
-    await expect(
-      asAppRole(otherOrgId, [insertSql(officeId)]),
-    ).rejects.toThrow(/row-level security/i);
+    await expect(asAppRole(otherOrgId, [insertSql(officeId)])).rejects.toThrow(
+      /row-level security/i,
+    );
   }, 120_000);
 });
