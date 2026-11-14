@@ -368,11 +368,35 @@ describe('OWNER DECISION 131 § 6 — criteria 3 and 4, end to end', () => {
     expect(probe!.screen).toBeNull();
     expect(probe!.routes).toEqual([]);
 
-    // And a code that DOES declare its controls carries them, so the slot is not dead.
-    const declared = item!.newPermissions!.find(
-      (p) => p.code === 'legal-value.declare',
-    );
-    expect(declared?.routes).toEqual(['POST /legal-values']);
+    /*
+     * 🔴 AND THE NON-EMPTY CASE IS NOT ASSERTED HERE, WHICH IS A CORRECTION CI MADE.
+     *
+     * The first version looked for `legal-value.declare` in this payload and expected
+     * `['POST /legal-values']`. It passed locally and FAILED IN CI, and the reason is the mark's
+     * own condition 1 working exactly as designed:
+     *
+     *   a code is marked only if it arrived AFTER that office's `createdAt`. CI builds the
+     *   database FROM EMPTY, so the office is created during the run and EVERY catalogue code
+     *   predates it. ⟶ On a fresh database NO existing code is ever marked, and the only marked
+     *   code is this spec's own probe — which is stamped `new Date()` after the office exists.
+     *
+     * That is not a gap in the mark; it is the half that stops a newly-registered office meeting
+     * its whole catalogue as new. ⛔ And it means the non-empty controls case is UNOBSERVABLE
+     * over HTTP on a fresh database, so asserting it here would be asserting a property of the
+     * seed state rather than of the wiring.
+     *
+     * ⟶ It belongs to `new-permission-mark.config.spec.ts`, which proves the map is total over
+     *   the dated codes AND that every declared route really is decorated with that code. This
+     *   test keeps what only an e2e can show: that the payload carries the fields at all, and
+     *   that a code with no declared controls still reaches the bell rather than vanishing.
+     *
+     * This is the SECOND assertion in this file to be rewritten for the same reason — the first
+     * named the marked set as a list of codes. A test that names codes is a statement about one
+     * database's seed; a test that names the rule is a statement about the product.
+     */
+    for (const notice of item!.newPermissions!) {
+      expect(Object.keys(notice).sort()).toEqual(['code', 'routes', 'screen']);
+    }
   });
 
   it('CRITERION 4 — granting it to a role clears the mark', async () => {

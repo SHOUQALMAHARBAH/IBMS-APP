@@ -85,9 +85,9 @@ export const commBodyStyle: CSSProperties = {
 export const a15dSectionStyle: CSSProperties = {
   marginTop: '1.5rem',
   padding: 'var(--space-3)',
-  border: '1px solid var(--warning-border, var(--line))',
+  border: '1px solid var(--warning-border)',
   borderRadius: 'var(--radius-md)',
-  background: 'var(--warning-bg, var(--surface-raised))',
+  background: 'var(--warning-bg)',
 };
 
 export const a15dQuestionStyle: CSSProperties = {
@@ -106,15 +106,15 @@ export const a15dOptionStyle: CSSProperties = {
 export const a15dWindowStyle: CSSProperties = {
   marginTop: '1rem',
   padding: 'var(--space-3)',
-  border: '1px solid var(--danger-border, var(--line))',
+  border: '1px solid var(--danger-border)',
   borderRadius: 'var(--radius-md)',
-  background: 'var(--danger-bg, var(--surface-raised))',
+  background: 'var(--danger-bg)',
 };
 
 export const a15dWindowTitleStyle: CSSProperties = {
   margin: 0,
   fontWeight: 700,
-  color: 'var(--danger-ink, var(--ink-primary))',
+  color: 'var(--danger-ink)',
 };
 
 export const a15dProseStyle: CSSProperties = {
