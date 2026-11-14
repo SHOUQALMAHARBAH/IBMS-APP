@@ -94,3 +94,31 @@ export const DECLARED_ACT_REASON_MIN_LENGTH = DECLARATION_REASON_MIN_LENGTH;
  * than two numbers that each fit some of them.
  */
 export const DECLARED_ACT_SHOWN_TEXT_MIN_LENGTH = 20;
+
+/**
+ * 🔴 THE RELEASE LINE — OWNER DECISION 132, RULING 1.
+ *
+ * MEASURED 2026-11-12: of the adviser's three drafted acknowledgements, only art. 15/d's
+ * carries «إبراء ذمة الشركة المطورة». His art. 19/أ/3 and art. 16/ي/8 texts place full
+ * liability on the office and say nothing about releasing the developing company — so
+ * element 9 is not satisfiable for those two from his text as it stands.
+ *
+ * ⛔ HIS TEXTS ARE NEVER EDITED. The owner's ruling is that beneath each acknowledgement that
+ * LACKS the release, a separate line carries the release itself — **sliced byte-exact from his
+ * own art. 15/d sentence** — together with her limit, and the two are never separated.
+ *
+ * So this constant is one string for the same reason `ARTICLE_15_D.acknowledgementText` is:
+ * two fields can be rendered apart and a template can drop the second.
+ *
+ * ⟶ AND ART. 15/d DOES NOT USE IT. Its own acknowledgement already contains the release, so
+ * adding the line beneath would print the clause twice on the one window where it is already
+ * there. The ruling says «حيث لا يحمل» — WHERE it does not carry it — and that is the other
+ * six sites. `declared-act.config.spec.ts` asserts both halves of that.
+ */
+export const DEVELOPER_RELEASE_LINE =
+  'مع إبراء ذمة الشركة المطورة للنظام إبراءً مطلقاً. الإقرارُ لا يُسقِط المسؤوليةَ الجزائية.';
+
+/** The adviser's release clause alone, sliced from his art. 15/d acknowledgement. Exported so
+ *  the spec can prove the line above was SLICED and not composed by hand. */
+export const DEVELOPER_RELEASE_CLAUSE =
+  'مع إبراء ذمة الشركة المطورة للنظام إبراءً مطلقاً.';

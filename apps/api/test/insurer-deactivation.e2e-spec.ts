@@ -419,6 +419,41 @@ describe('a new RFQ cannot shortlist a deactivated insurer', () => {
     expect((refused.body as { message: string }).message).toContain(
       'deactivated insurer',
     );
+
+    /*
+     * 🔴 AND ART. 15/d IS NOT ENFORCED — MESSAGE 37 §4's CONSTRAINT, PINNED HERE.
+     *
+     * This RFQ reached ONE insurer and was accepted at 201 above. That is deliberate and it is
+     * asserted rather than merely true, because the opposite is a live temptation: message 36 §4
+     * listed the wiring for `CreateRfqDto` and the `createRfq` hook, and message 37 §4 STOPPED it
+     * with a reason worth repeating here —
+     *
+     *   if the server requires an exemption or a declaration below three insurers while no screen
+     *   can yet ask for one, EVERY such request fails. On the seeded data that is 34.4% of quote
+     *   requests (31 of 90, measured on a throwaway database). An employee sending to two insurers
+     *   would be STOPPED, not warned — the opposite of OWNER DECISION 126.
+     *
+     * So the server wiring and its screen ship in ONE batch, after the strings are ratified.
+     *
+     * ⟶ WHEN THAT BATCH LANDS, THIS BLOCK IS EXPECTED TO FAIL, AND THAT IS ITS PURPOSE. Change it
+     * deliberately then; do not delete it to make a build pass. Until then it is what stops art.
+     * 15/d being half-wired by somebody working from message 36's list.
+     */
+    const exemptions = await rawPrisma.rfqArticle15DExemption.count({
+      where: { rfqId },
+    });
+    expect(
+      exemptions,
+      'an art. 15/d exemption row was written for a one-insurer RFQ. Nothing should write one yet — the tables are inert until message 38.',
+    ).toBe(0);
+
+    const declaredActs = await rawPrisma.declaredAct.count({
+      where: { entity: 'RFQ', entityId: rfqId },
+    });
+    expect(
+      declaredActs,
+      'a declared act was recorded for a one-insurer RFQ. Art. 15/d is not wired yet, so nothing should declare anything.',
+    ).toBe(0);
   }, 300_000);
 
   it('lets an insurer be shortlisted again once it is reactivated', async () => {

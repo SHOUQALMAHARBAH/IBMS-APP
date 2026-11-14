@@ -294,9 +294,19 @@ CLAIM_HEADER = re.compile(
 #
 # Both new shapes are permanent self-test cases below, so a later narrowing cannot quietly put the
 # hole back -- the same reasoning as `CITE_TAIL`'s multi-number walk.
+# The heading that carries a decision's own sentence, in every form the owner has written it:
+#
+#   ## القرار بجملة                    ## ١ — القرار بجملة واحدة
+#   ## ١ — القرار ١٢٩ بجملة واحدة      ## ١ — القرار بجملتين
+#
+# `بجملتين` — the DUAL, "in two sentences" — was added 2026-11-12 for decision 132, which the owner
+# wrote as two rulings and headed accordingly. ⛔ The alternative was to edit her heading to the
+# singular so the gate would match, and that is the one thing this repository never does: the
+# gate reads her text, her text is not rewritten to suit the gate. Her Arabic is the authority and
+# a matcher is a tool.
 ONE_SENTENCE = re.compile(
-    r"## (?:[" + AR_DIGITS + r"]+ — )?القرار (?:[" + AR_DIGITS + r"]+ )?بجملة"
-    r"(?: واحدة)?\s*\n+(.+?)(?=\n##|\Z)",
+    r"## (?:[" + AR_DIGITS + r"]+ — )?القرار (?:[" + AR_DIGITS + r"]+ )?"
+    r"(?:بجملة(?: واحدة)?|بجملتين)\s*\n+(.+?)(?=\n##|\Z)",
     re.S,
 )
 
@@ -393,7 +403,23 @@ def measured_count(bodies: dict[str, str], n: int) -> tuple[int, int]:
 
 
 def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"[*`]", "", s)).strip()
+    """Compare SENTENCES, not markdown. Emphasis, code ticks and the blockquote marker come off,
+    and runs of whitespace collapse — so a sentence wrapped over three lines in a file matches the
+    same sentence in a one-line table cell.
+
+    `>` was added 2026-11-12 for decision 132, which the owner wrote as TWO sentences in one
+    blockquote:
+
+        > **sentence one**
+        >
+        > **sentence two**
+
+    Without stripping `>` that normalises to `> one > > two`, and a table cell carrying `one two`
+    is a substring of neither direction — so the gate would have refused a correct row and the
+    only ways out would have been to put half her decision in the index or to reformat her file.
+    `>` is markdown wrapper exactly as `*` and `` ` `` are, and it belongs in the same class.
+    """
+    return re.sub(r"\s+", " ", re.sub(r"[*`>]", "", s)).strip()
 
 
 def audit(root: str = ROOT) -> tuple[list[str], list[str]]:

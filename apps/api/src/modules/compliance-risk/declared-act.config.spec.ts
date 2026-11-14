@@ -8,6 +8,8 @@ import {
   ARTICLE_15_D_LIMIT,
   ARTICLE_15_D_RELEASE_ANCHOR,
   DECLARED_ACT_REASON_MIN_LENGTH,
+  DEVELOPER_RELEASE_CLAUSE,
+  DEVELOPER_RELEASE_LINE,
   DECLARED_ACT_SHOWN_TEXT_MIN_LENGTH,
 } from './declared-act.config';
 
@@ -174,5 +176,43 @@ describe('the declared-act texts are the adviser’s and the owner’s, byte for
       source.includes('15 حرف'),
       'the adviser’s “minimum 15 characters” hint has been copied into the config. The enforced floor is TEN (decision 129 §5 struck decision 87 on that point), so that hint would be a false statement on the screen.',
     ).toBe(false);
+  });
+});
+
+describe('the release line — OWNER DECISION 132, ruling 1', () => {
+  it('is SLICED from the adviser’s own art. 15/d acknowledgement, byte for byte', () => {
+    // The whole point of the ruling: his texts are never edited, so where one lacks the release the
+    // release is taken FROM HIM rather than written by us. Proven by re-slicing here.
+    const ack = adviserAcknowledgement(lines(SIX), AT.six.ack);
+    expect(
+      ack,
+      'the release clause is no longer a substring of the adviser’s acknowledgement — it was not sliced from him',
+    ).toContain(DEVELOPER_RELEASE_CLAUSE);
+    expect(DEVELOPER_RELEASE_LINE.startsWith(DEVELOPER_RELEASE_CLAUSE)).toBe(
+      true,
+    );
+  });
+
+  it('carries the owner’s limit, and the two are ONE string', () => {
+    // «ولا يُفصَل عنه». Two fields can be rendered apart and a template can drop the second; one
+    // string cannot be separated at all.
+    expect(DEVELOPER_RELEASE_LINE).toContain(ARTICLE_15_D_LIMIT);
+    expect(DEVELOPER_RELEASE_LINE).toContain(ARTICLE_15_D_RELEASE_ANCHOR);
+  });
+
+  it('⟶ and art. 15/d does NOT use it, because its own acknowledgement already carries the release', () => {
+    // The ruling says «حيث لا يحمل» — WHERE it does not carry it. Appending the line to art. 15/d's
+    // window would print the clause twice on the one window that already has it, which is a worse
+    // failure than omitting it: a reader meeting the same release twice reads it as boilerplate.
+    expect(ARTICLE_15_D.acknowledgementText).toContain(
+      DEVELOPER_RELEASE_CLAUSE,
+    );
+    const occurrences =
+      ARTICLE_15_D.acknowledgementText.split(ARTICLE_15_D_RELEASE_ANCHOR)
+        .length - 1;
+    expect(
+      occurrences,
+      'the release appears more than once in the art. 15/d acknowledgement — the release line has been appended to a window that already carried it',
+    ).toBe(1);
   });
 });

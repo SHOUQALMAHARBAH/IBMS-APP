@@ -1195,10 +1195,57 @@ const complianceRisk: PermissionSeed[] = [
    *
    * ## ✅ RATIFIED — OWNER DECISION 130, ruling 5 (11 November 2026)
    *
-   * `docs/decision-130-three-insurers-per-request-and-four-rulings.md`. Both grants above are the
-   * owner's now: `legal-value.declare` to BRANCH_DEPARTMENT_MANAGER, and `legal-value.read` to
-   * that role and COMPLIANCE_OFFICER. They stopped being a reported default the moment she read
-   * them.
+   * `docs/decision-130-three-insurers-per-request-and-four-rulings.md`. Both grants above were the
+   * owner's: `legal-value.declare` to BRANCH_DEPARTMENT_MANAGER, and `legal-value.read` to that
+   * role and COMPLIANCE_OFFICER.
+   *
+   * ## 🔴 AND STRUCK THE NEXT DAY BY OWNER DECISION 131 — BOTH ROLE LISTS ARE EMPTY NOW
+   *
+   * `docs/decision-131-new-permission-shown-green-office-decides.md`. Not a reversal of her mind:
+   * **the question she ratified had been put to her wrongly, and the error was mine.** It was
+   * framed as the template every NEW OFFICE starts with, and that is not what these arrays are.
+   *
+   * MEASURED 2026-11-12, which is what settled it:
+   *
+   *   * `seed.ts:1222` writes these grants with `organizationId: DEFAULT_ORGANIZATION_ID` — the
+   *     DEMO office, and nowhere else. The twelve seeded roles exist only there.
+   *   * `office-registration.service.ts` `createAdministratorRole` gives a genuinely-registered
+   *     office exactly ONE role, «مدير المكتب», from `OFFICE_ADMINISTRATOR_GRANTS`.
+   *   * On dev the two registered offices (`069d420a`, `c1cd73e5`) hold exactly **47 codes on one
+   *     `OFFICE_ADMINISTRATOR` role and ZERO business capabilities**; and `legal-value.*` is held
+   *     by **no organization at all**, not even the demo office.
+   *
+   * ⟶ So ruling 5 never touched a real office, and these arrays were never the thing I described.
+   * Her model is «احنا بنطلّع كل صلاحيات النظام بالمصفوفة وما بنعطي ولا وحدة لحدا» — we expose every
+   * permission in the matrix and grant none of them. A new code lands marked «جديدة», the
+   * administrator is notified with its name, its description and the screen or button it guards,
+   * and the office decides: «احنا ما النا دخل».
+   *
+   * ⛔ SO DO NOT PUT A ROLE BACK IN EITHER ARRAY. `permissions.spec.ts` no longer requires one —
+   * that assertion was rewritten in the same commit, and its own comment carries the reasoning.
+   *
+   * ## 🔴 CORRECTED 2026-11-12, SAME DAY: THERE IS NO DEFERRED DROP, AND MY FIRST NOTE HERE
+   * ## HAD THE DIRECTION BACKWARDS
+   *
+   * This paragraph first said *these three grants are still IN the dev and db-test databases, so
+   * the next seed from nothing drops the default office 519 → 516 and the web fixture must be
+   * regenerated in that commit*. **Both halves are false, and the measurement that refutes them is
+   * the one in §1 above.**
+   *
+   * MEASURED on dev, per code: `legal-value.declare` and `legal-value.read` hold **0** grants —
+   * zero, in every organization, which is the same measurement that showed decision 130's ruling 5
+   * never reached a real office. The grants were never written, because these two codes were minted
+   * on 2026-11-11 and `db:seed` has not run on dev since. And `apps/web/e2e/fixtures/
+   * role-permissions.ts` lists both codes in its CATALOGUE section and carries **no grant for
+   * either** in its grid.
+   *
+   * ⟶ So the fixture's *12 roles, 519 grants* NEVER INCLUDED THEM. A seed from nothing BEFORE
+   * this change would have written 522; after it, 519 — which is what the fixture already declares.
+   * **Nothing needs regenerating, and there is no drop to meet.**
+   *
+   * ⚠️ The error is kept visible rather than quietly replaced, because it is the shape this
+   * repository keeps paying for: 519 was read off a database seeded BEFORE the codes existed, and
+   * subtracting from it assumed it contained them. A figure's UNIT includes the date it was taken.
    *
    * ⚠️ AND THE ARABIC DESCRIPTIONS ARE **NOT** RATIFIED BY THAT. Both codes stay on
    * `AWAITING_OWNER_REVIEW` in `apps/web/lib/admin/permission-descriptions.test.ts`, because the
@@ -1213,14 +1260,17 @@ const complianceRisk: PermissionSeed[] = [
     module: "compliance-risk",
     description:
       "Read the legal values the system computes with: the figures Instructions No. 9 of 2026 states, each with its article and the printed page it was read on, and any value this office has itself declared for a figure the Central Bank has deferred to a decision it has not issued. Reading shows the whole dated history, not only the figure in force today, because an old transaction was computed at the value in force on its own day and the record has to be able to show which one that was",
-    roles: [MANAGER, COMPLIANCE],
+    // OWNER DECISION 131: no role. The code lands in every office's matrix marked «جديدة» and the
+    // office decides. See the note above this pair.
+    roles: [],
   },
   {
     code: "legal-value.declare",
     module: "compliance-risk",
     description:
       "Declare, for this office, a legal value the instrument defers to a Central Bank decision that has not been issued — entering it with the reference it rests on and the date it takes effect, both mandatory. It does NOT permit entering or changing a figure the instrument itself states: those belong to the provider and the database refuses an office account that tries. A value already declared is never edited in place; a change is a new entry from its own date, so every transaction keeps computing at the value in force on the day it happened",
-    roles: [MANAGER],
+    // OWNER DECISION 131: no role. See the note above this pair.
+    roles: [],
   },
   {
     code: "compliance-calendar.manage",
