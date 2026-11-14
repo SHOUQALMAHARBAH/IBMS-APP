@@ -444,6 +444,7 @@ export const ENUM_LABEL = {
     COMPLAINT: 'crmChannelComplaint',
     SMS: 'crmChannelSms',
     PORTAL: 'crmChannelPortal',
+    WRITTEN_NOTICE: 'crmChannelWrittenNotice',
     OTHER: 'crmChannelOther',
   } satisfies Labels<string>,
   PaymentChannelType: {

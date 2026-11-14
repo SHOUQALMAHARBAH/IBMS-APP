@@ -1301,6 +1301,46 @@ const complianceRisk: PermissionSeed[] = [
     /** Same arrival as its sibling — one migration, one commit. See the note on `legal-value.read`. */
     introducedAt: "2026-11-11",
   },
+  /*
+   * 🔴 ART. 15/d's DECLARATION — ITS OWN PERMISSION, SEPARATE FROM THE PERMISSION TO SEND.
+   *
+   * Module paper §٤.١, element 3: whoever can ACT is not thereby able to DECLARE. A placement
+   * officer who sends quote requests all day cannot admit a regulatory breach on the office's
+   * behalf — that is a different act with a different consequence, and `rfq.create` must not
+   * carry it.
+   *
+   * ## IT IS GRANTED TO NOBODY, AND THAT IS WHAT MAKES IT THE FIRST REAL TEST OF DECISION 131
+   *
+   * `declared-act.config.ts` has named this string since message 36 and deliberately did NOT
+   * mint it, because at the time minting an OFFICE-scoped code meant granting it to at least one
+   * role — `permissions.spec.ts` refused `roles: []` — and that grant was the owner's to ratify.
+   *
+   * OWNER DECISION 131 removed that requirement and inverted the default: we expose every
+   * permission and grant none. ⟶ So this code lands held by no role anywhere, marked «جديدة» in
+   * every office's matrix, with the administrator notified.
+   *
+   * 🔴 AND THE CONSEQUENCE IS REAL RATHER THAN THEORETICAL, which is why it is written here.
+   * MEASURED 2026-11-12: every permission-adding migration before this one — 8 of 8 — backfilled
+   * its grant, so no code in this product's history has ever closed a button that was open. This
+   * one does: from the moment it ships, a quote request to fewer than three insurers with NO
+   * exemption cannot be declared until an administrator grants it. **That is decision 131 working
+   * as intended, not a regression** — and it is safe only because the notification is live and
+   * names what the code guards. ⛔ Do NOT pre-grant it to keep the path open.
+   *
+   * An EXEMPTED request is unaffected, and so is every request reaching three or more — which is
+   * 84.3% of them on the seeded distribution. The refusal reaches the minority of the minority.
+   */
+  {
+    code: "declared-act.article-15-d.declare",
+    module: "compliance-risk",
+    description:
+      "Declare that a quote request is going to fewer than three insurance companies with none of art. 15/d's five exemptions applying — writing the reason, ticking the acknowledgement, and recording the act against the request. SEPARATE from the permission to send a quote request, deliberately: whoever may act is not thereby able to admit a breach on the office's behalf. It does not permit editing or deleting a declaration once made, which no permission does",
+    // OWNER DECISION 131: no role. See the note above.
+    roles: [],
+    /** The day it ships. It is the first code ever to arrive ungranted AND close a path, so the
+     *  mark and the notification are the whole of how an office learns it exists. */
+    introducedAt: "2026-11-14",
+  },
   {
     code: "compliance-calendar.manage",
     module: "compliance-risk",

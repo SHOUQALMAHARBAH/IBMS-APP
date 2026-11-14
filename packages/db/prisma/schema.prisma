@@ -2170,6 +2170,14 @@ model RiskRating {
   @@index([organizationId])
 }
 
+/// The medium of an interaction or a communication.
+///
+/// 🔴 AND FIVE OF THE THIRTEEN CARRY ART. 22/s's FOUR APPROVED MEANS OF NOTIFICATION, which is a
+/// legal question rather than a display one: exemption 5 of art. 15/d rests on the customer's
+/// request having ARRIVED by an approved means. The mapping is OWNER DECISION 132 ruling 2 and
+/// OWNER DECISION 133 §3, and it lives in `approved-means.config.ts` — never inferred from a
+/// member's name, because `WHATSAPP` is an electronic channel and is refused BY NAME (decision
+/// 44), while `CALL` is the nearest thing to `SMS` and is not a means at all.
 enum InteractionChannel {
   MEETING
   CALL
@@ -2183,6 +2191,13 @@ enum InteractionChannel {
   PORTAL
   SMS
   OTHER
+  /// «تبليغ خطي» — art. 22/s's FIRST means, added by OWNER DECISION 133 §3 ruling 2.
+  ///
+  /// Measured 2026-11-12: the most traditional means the article names had NO member, so a
+  /// paper notice could only be filed as `OTHER` — which means 4 makes conditional on a written
+  /// agreement. The strongest means treated as the weakest. ⛔ No existing `OTHER` row was
+  /// re-read as this: a row recorded as `OTHER` was recorded that way by a person.
+  WRITTEN_NOTICE
 }
 
 /// Process 10 — Relationship Management (CRM). Every interaction logged,
@@ -7796,8 +7811,18 @@ model RfqArticle15DExemption {
   /// request's own date. Both NULL for the other four.
   declaredAnnualPremiumJod   Decimal?                 @db.Decimal(18, 3)
   ceilingValueJod            Decimal?                 @db.Decimal(18, 3)
-  /// Exemption 5 only: the evidence of the customer's request. An INBOUND `CommunicationLog` on
-  /// this RFQ — measured 2026-11-12 as sufficient as it stands, so nothing new was built for it.
+  /// Exemption 5 only: the evidence of the customer's request. An INBOUND `CommunicationLog`.
+  ///
+  /// 🔴 CORRECTED 2026-11-14 WHILE WIRING IT. This said «on this RFQ», which measured as
+  /// unreachable: the customer asks BEFORE the request exists, so at creation there is no RFQ
+  /// for the log to be on, and the strict reading made exemption 5 impossible on the only path
+  /// that needs it.
+  ///
+  /// ⟶ The rule enforced is: INBOUND, on the OPPORTUNITY'S OWN CUSTOMER, and arriving by one of
+  ///   art. 22/s's approved means (`approved-means.config.ts`). ⛔ Not any log in the office —
+  ///   that would let an unrelated message stand as proof that THIS customer asked for THIS
+  ///   request. And the CUSTOMER check fires before the CHANNEL check: whose message it is comes
+  ///   before how it arrived.
   evidenceCommunicationLogId String?
   evidenceCommunicationLog   CommunicationLog?        @relation(fields: [evidenceCommunicationLogId], references: [id], onDelete: Restrict)
   /// WHO chose it, for criterion 7. NULL only when `basis` is `TAGGED_BY_SYSTEM`, which nothing

@@ -175,6 +175,30 @@ export class InsuranceLineRepository {
     return null;
   }
 
+  /**
+   * THE STANDARD LINE'S OWN `code` — what art. 15/d's exemptions are decided against.
+   *
+   * ⚠️ NULL FOR AN OFFICE-DEFINED LINE, and that is the answer rather than a gap.
+   * `OfficeInsuranceLine` is a line the office invented; it has no place in the 32-row standard
+   * catalogue, so no `code` of that vocabulary names it. Art. 15/d's exemptions 1, 2 and 4 are
+   * gated on specific standard codes (`MEDICAL_HEALTH`, the four motor/medical/transit ones), and
+   * `availableExemptions(null)` correctly offers only the two that are ungated.
+   *
+   * ⛔ Falling back to the office line's own name would be worse than returning null: a line an
+   * office happened to call "Motor" would start qualifying for a statutory premium exemption on
+   * a string match, which is the same widening-by-substring trap `MONEY` is excluded from.
+   */
+  async findStandardCode(
+    insuranceLineId: string | null,
+  ): Promise<string | null> {
+    if (!insuranceLineId) return null;
+    const line = await this.prisma.client.insuranceLine.findUnique({
+      where: { id: insuranceLineId },
+      select: { code: true },
+    });
+    return line?.code ?? null;
+  }
+
   countInsurersOffering(officeInsuranceLineId: string): Promise<number> {
     return this.prisma.client.insurerOfferedLine.count({
       where: { officeInsuranceLineId },

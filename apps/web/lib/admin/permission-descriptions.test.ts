@@ -181,7 +181,19 @@ const AWAITING_OWNER_REVIEW: string[] = [
    *   Both are SLICED byte-exact from `docs/decision-133-strings-ratified.md` and never retyped,
    *   and the test below re-slices from that file and compares, so a hand-edit to the dictionary
    *   fails by name.
+   *
+   * AND IT REFILLED AGAIN THE SAME DAY, with module 1's art. 15/d declaration code — exactly as
+   * the paragraph above says it legitimately does. That line is AGENT-COMPOSED: every run in it
+   * already ships («طلب عرض سعر» from `rfqNewRefusalAct`, «أقل من ثلاث شركات تأمين» from the
+   * adviser's own window text, «المسؤولية التنظيمية على المكتب» the owner's own sentence, and the
+   * verbs from 28 siblings here) but COMPOSED is not SLICED. The parity guard requires a line
+   * before a code can exist at all, so the choice was to compose one and declare it, or not to
+   * ship the permission.
+   *
+   * ⟶ `OWNER_REVIEWED_COUNT` stays 232 and the balance is 233 = 232 + 1. The sentence goes to her
+   *   in this batch's report.
    */
+  'declared-act.article-15-d.declare',
 ];
 
 describe('whose Arabic is it — provenance, because the text cannot say', () => {

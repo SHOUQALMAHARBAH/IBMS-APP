@@ -121,10 +121,18 @@ describe("permission grid — every code is independent and traceable", () => {
     const undated = PERMISSIONS.filter((p) => p.introducedAt === undefined);
 
     /*
-     * THE TWO CODES THAT ARE ACTUALLY NEW, BY NAME. Measured 2026-11-14: they arrived in
-     * migration `20261216100000_legal_values` (commit `27e651b0`, 2026-11-11), every brokerage
-     * office on dev was created before that day, and no role holds either — so these are the
-     * first two codes in this product's life to be marked «جديدة» in a real office.
+     * THE THREE CODES THAT ARE ACTUALLY NEW, BY NAME.
+     *
+     * The two `legal-value.*` arrived in migration `20261216100000_legal_values` (commit
+     * `27e651b0`, 2026-11-11); measured 2026-11-14, every brokerage office on dev was created
+     * before that day and no role holds either, so those two are the first codes in this
+     * product's life to be marked «جديدة» in a real office.
+     *
+     * 🔴 `declared-act.article-15-d.declare` is the third and it is the sharper one: it is the
+     * first code that actually CLOSES a path. Until an administrator grants it, a quote request
+     * to fewer than three insurers with NO exemption cannot be declared — which is OWNER
+     * DECISION 131 working as intended, and is safe only because the notification names what the
+     * code guards. ⛔ Do not pre-grant it.
      */
     expect(
       dated.map((p) => p.code).sort(),
@@ -132,7 +140,11 @@ describe("permission grid — every code is independent and traceable", () => {
         "and wrong for an old one — an old code with a date would appear as «جديدة» in every " +
         "office whose createdAt precedes it, which is noise, and the mark only works while it " +
         "is rare.",
-    ).toEqual(["legal-value.declare", "legal-value.read"]);
+    ).toEqual([
+      "declared-act.article-15-d.declare",
+      "legal-value.declare",
+      "legal-value.read",
+    ]);
 
     /*
      * AND THE OTHER DIRECTION, which is the half that catches the real mistake. 230 codes

@@ -65,6 +65,12 @@ export const RFQ = {
       'العملية 11 — إنشاء طلب عرض أسعار واحد لخط تأميني واحد وإرساله إلى قائمة مختصرة ' +
       'من شركات التأمين. يبدأ كل مؤمِّن بحالة "أُرسل".',
     rfqNewRefusalAct: 'إنشاء طلب عرض سعر',
+    // ART. 15/d's declaration, as an ACT in the language of the work -- which is what the
+    // standing refusal vocabulary requires: «the act is described in the language of the work,
+    // not of the permission». AGENT-WRITTEN like the other 102 act keys; «أقل من ثلاث شركات
+    // تأمين» is the adviser's own shipping phrase and «طلب عرض سعر» is `rfqNewRefusalAct` above.
+    a15dDeclareRefusalAct:
+      'الإعلان بأن طلب عرض السعر ذاهب إلى أقل من ثلاث شركات تأمين بلا إعفاء',
     rfqNewInsurerListLoadError: 'تعذر تحميل قائمة شركات التأمين — حاول مرة أخرى.',
     rfqNewLineLabel: 'الخط التأميني',
     rfqNewLineHint:
@@ -169,7 +175,44 @@ export const RFQ = {
     rfqCommDirectionOutboundBadge: 'صادر',
     rfqCommChannelEmail: 'بريد إلكتروني',
     rfqCommChannelCall: 'مكالمة',
+    // ─────────────────────────────────────────────────────────────────────────────────
+    // ART. 15/d — «التواصل مع ثلاث شركات تأمين». EVERY STRING BELOW IS HERS, RATIFIED IN
+    // OWNER DECISION 133 and SLICED from its own table by script. Never retyped.
+    //
+    // ⛔ THE ADVISER'S WINDOW IS NOT HERE. Its title, text, reason hint and acknowledgement
+    // come from the SERVER (`Article15DOptions.window`), because the record stores what the
+    // employee was shown and that is true by construction only while the screen renders the
+    // same constant. His text is also the one Arabic in this product that is NOT translated.
+    //
+    // ⚠️ `a15dExemption4` AND `a15dPremiumAlert` CARRY `{ceiling}`. Her ratified sentences
+    // hold the figure; the figure is never typed in, and renders from
+    // SINGLE_INSURER_EXEMPTION_PREMIUM_CEILING_JOD read at the request's own date.
+    // ─────────────────────────────────────────────────────────────────────────────────
+    a15dQuestion:
+      'أُرسِل الطلب لأقل من ثلاث شركات تأمين. ما سبب الإعفاء؟',
+    a15dExemption1:
+      'عند تجديد عقود التأمين الطبي الفردي.',
+    a15dExemption2:
+      'عند تجديد عقود التأمين الطبي الجماعي بحد اقصى ثلاث سنوات متتالية.',
+    a15dExemption3:
+      'في عقود التأمين محددة المنافع والتغطيات.',
+    a15dExemption4:
+      'في عقود تأمين المركبات وعقود التأمين الطبي وعقود التأمين على البضائع أثناء النقل التي لا يزيد القسط السنوي فيها عن {ceiling} دينار شريطة الاعتماد على سياسات اكتتابية لثلاث شركات تأمين على الأقل.',
+    a15dExemption5:
+      'بناءً على طلب العميل وفق وسائل التبليغ المعتمدة.',
+    a15dPremiumLabel:
+      'القسط السنوي المتوقَّع (دينار)',
+    a15dEvidenceLabel:
+      'طلب العميل، واصلاً بوسيلة تبليغ معتمدة',
+    a15dPremiumAlert:
+      'تنبيه: قسط العرض الوارد أعلى من {ceiling} دينار، وهو حدّ الإعفاء المختار لهذا الطلب. الطلب لم يُرفَض.',
+    a15dChosenBy:
+      'اختاره: ',
+    a15dTaggedBySystem:
+      'حدّده النظام',
     rfqCommChannelPortal: 'بوابة إلكترونية',
+    // OWNER DECISION 133 section 3 ruling 2 -- HERS, sliced from her own sentence.
+    rfqCommChannelWrittenNotice: 'تبليغ خطي',
     rfqCommChannelMeeting: 'اجتماع',
     rfqCommChannelOther: 'أخرى',
 
@@ -405,6 +448,8 @@ export const RFQ = {
       'Process 11 — create one RFQ for one insurance line and send it to a ' +
       'shortlist of insurers. Each insurer starts at SENT.',
     rfqNewRefusalAct: 'raise a request for quotation',
+    a15dDeclareRefusalAct:
+      'declare that this quote request is going to fewer than three insurance companies with no exemption',
     rfqNewInsurerListLoadError: 'Could not load the insurer list — try again.',
     rfqNewLineLabel: 'Insurance line',
     rfqNewLineHint:
@@ -500,7 +545,32 @@ export const RFQ = {
     rfqCommDirectionOutboundBadge: 'Outbound',
     rfqCommChannelEmail: 'Email',
     rfqCommChannelCall: 'Call',
+    // ART. 15/d. The Arabic is hers (OWNER DECISION 133); this mirrors it. `{ceiling}`
+    // renders from the legal-values row at the request's own date, never typed in.
+    a15dQuestion:
+      'This request is going to fewer than three insurance companies. What is the ground for exemption?',
+    a15dExemption1:
+      'On the renewal of individual medical insurance contracts.',
+    a15dExemption2:
+      'On the renewal of group medical insurance contracts, to a maximum of three consecutive years.',
+    a15dExemption3:
+      'In defined-benefit and defined-coverage contracts.',
+    a15dExemption4:
+      'In motor insurance contracts, medical insurance contracts and goods-in-transit contracts whose annual premium does not exceed {ceiling} dinars, conditional on relying on the underwriting policies of at least three insurance companies.',
+    a15dExemption5:
+      "At the customer's request, through the approved means of notification.",
+    a15dPremiumLabel:
+      'Expected annual premium (JOD)',
+    a15dEvidenceLabel:
+      "The customer's request, arriving by an approved means of notification",
+    a15dPremiumAlert:
+      'Notice: the premium on the quotation received is above {ceiling} dinars, which is the ceiling of the exemption chosen for this request. The request has NOT been refused.',
+    a15dChosenBy:
+      'Chosen by: ',
+    a15dTaggedBySystem:
+      'Determined by the system',
     rfqCommChannelPortal: 'Portal',
+    rfqCommChannelWrittenNotice: 'Written notice',
     rfqCommChannelMeeting: 'Meeting',
     rfqCommChannelOther: 'Other',
 

@@ -61,6 +61,13 @@ function datedCodesFromCatalogue(): string[] {
   return codes;
 }
 
+/**
+ * Codes that guard a BRANCH of a route rather than a route, so the decorator comparison cannot
+ * read them. Declared here with the test that asserts what the declaration claims instead —
+ * never a path skip, which would swallow every future entry too.
+ */
+const BRANCH_GUARDED = new Set(['declared-act.article-15-d.declare']);
+
 const OFFICE_CREATED = new Date('2026-11-09T11:03:01.399Z');
 const AFTER = new Date('2026-11-11T00:00:00.000Z');
 const BEFORE = new Date('2026-10-01T00:00:00.000Z');
@@ -179,12 +186,52 @@ describe('decision 131 — what the notification says a code controls', () => {
     ).toBeGreaterThan(0);
 
     for (const [code, controls] of Object.entries(PERMISSION_CONTROLS)) {
+      if (BRANCH_GUARDED.has(code)) continue;
       const real = pairs.filter((p) => p.code === code).map((p) => p.route);
       if (real.length === 0) continue; // guarded somewhere this spec does not read
       expect(
         [...controls.routes].sort(),
         `${code}'s declared routes disagree with the decorators on legal-value.controller.ts`,
       ).toEqual(real.sort());
+    }
+  });
+
+  it('a BRANCH-guarded code names its branch, and is exempted from the decorator check BY NAME', () => {
+    /*
+     * 🔴 THE ONE SHAPE THE DECORATOR COMPARISON CANNOT READ, declared rather than tolerated.
+     *
+     * `declared-act.article-15-d.declare` does not gate a route. It gates a BRANCH of
+     * `POST /rfqs` — the declaration an employee makes when a request goes to fewer than three
+     * insurers with no exemption — and that route's own decorator says `rfq.create`.
+     *
+     * Two wrong answers were available. Naming `POST /rfqs` flat would tell an administrator
+     * this code guards the whole of quote requesting, which is false for 84.3% of requests.
+     * Letting the comparison run would fail, and the only way to make it pass would be to
+     * weaken the comparison for everybody.
+     *
+     * ⟶ So the entry is EXEMPT BY NAME and this test asserts what the exemption claims instead:
+     *   the declared text names the route AND marks it as a branch, and the route it names is
+     *   real. A declaration that stopped doing either fails here.
+     */
+    for (const code of BRANCH_GUARDED) {
+      const controls = PERMISSION_CONTROLS[code];
+      expect(
+        controls,
+        `${code} is declared branch-guarded but has no entry`,
+      ).toBeDefined();
+      expect(controls.routes).toHaveLength(1);
+      expect(
+        controls.routes[0],
+        `${code} is branch-guarded, so its declared control must say so — otherwise an ` +
+          'administrator reads it as gating the whole route',
+      ).toMatch(/^POST \/rfqs \(.*branch\)$/);
+    }
+
+    // Non-vacuity, and the second direction: the exemption list must not name a code that is
+    // not in the map, which is how a stale exemption hides a missing entry.
+    expect(BRANCH_GUARDED.size).toBeGreaterThan(0);
+    for (const code of BRANCH_GUARDED) {
+      expect(Object.keys(PERMISSION_CONTROLS)).toContain(code);
     }
   });
 

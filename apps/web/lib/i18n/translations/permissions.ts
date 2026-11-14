@@ -128,6 +128,11 @@ export const PERMISSIONS = {
     'perm:complaint.close': 'يُغلق شكوى. يستلزم توقيع مشرف، ولا يجوز أن يكون من عالجها',
     'perm:complaint.escalate': 'يحوّل الشكوى إلى لجنة تسوية النزاعات التأمينية — خارج المكتب',
     'perm:complaint.log': 'يسجّل شكوى عميل. تُمنح لمن يلتقي العميل، حتى لا تضيع شكوى لأن مستلمها لا يملك تسجيلها',
+    // 🔴 AGENT-COMPOSED, on AWAITING_OWNER_REVIEW. Every run ships elsewhere (see the
+    // script header in this batch) but composed is not sliced, and the parity guard needs a
+    // line before the code can exist. Hers to replace.
+    'perm:declared-act.article-15-d.declare':
+      'يُعلن أن طلب عرض سعر ذاهب إلى أقل من ثلاث شركات تأمين ولا ينطبق عليه إعفاء، ويكتب سببه ويُقرّ بأن المسؤولية التنظيمية على المكتب. وهي غير صلاحية إرسال الطلب: من يرسل لا يُعلن بحكم إرساله',
     'perm:compliance-calendar.manage': 'يدير تقويم الالتزام التنظيمي ومواعيد ما يجب تقديمه للجهات',
     'perm:conflict-of-interest.disclose': 'يسجّل إفصاح تضارب المصالح الإلزامي على توصية مُعلَّمة، قبل أن تُرسَل للعميل. ولا يجوز أن يكون المُفصِح هو كاتب التوصية — والنظام يمنعه',
     'perm:conflict-of-interest.register.read':
@@ -378,6 +383,8 @@ export const PERMISSIONS = {
     'perm:complaint.close': 'Close a complaint (mandatory supervisor sign-off)',
     'perm:complaint.escalate': 'Escalate a complaint to the Insurance Dispute Resolution Committee',
     'perm:complaint.log': 'Log a complaint',
+    'perm:declared-act.article-15-d.declare':
+      'Declare that a quote request is going to fewer than three insurance companies with none of art. 15/d\'s five exemptions applying — writing the reason, ticking the acknowledgement, and recording the act against the request. SEPARATE from the permission to send a quote request: whoever may act is not thereby able to admit a breach on the office\'s behalf',
     'perm:compliance-calendar.manage': 'Manage the regulatory compliance calendar',
     'perm:conflict-of-interest.disclose': 'Record the mandatory conflict-of-interest disclosure for a flagged recommendation before it can be sent (Process 16). The acknowledger must differ from the drafter (assertDifferentActors).',
     'perm:conflict-of-interest.register.read':

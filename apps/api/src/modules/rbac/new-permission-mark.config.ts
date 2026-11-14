@@ -99,6 +99,25 @@ export const PERMISSION_CONTROLS: Readonly<Record<string, PermissionControls>> =
       screen: null,
       routes: ['POST /legal-values'],
     },
+    /*
+     * 🔴 THE FIRST CODE IN THIS PRODUCT'S LIFE THAT CLOSES A PATH, so this entry is the one the
+     * notification was built for.
+     *
+     * It has no screen of its own, and it is not simply route-only either: what it guards is a
+     * BRANCH of `POST /rfqs` — the declaration an employee makes when a request goes to fewer
+     * than three insurers with no exemption. The ROUTE is gated on `rfq.create`, a different
+     * code, so naming `POST /rfqs` flat would tell an administrator this code guards the whole
+     * of quote requesting. It does not: 84.3% of requests never meet it.
+     *
+     * ⟶ So the route is named WITH its branch, and the spec exempts this entry from the
+     *   decorator comparison BY NAME while asserting the branch text instead — a branch is not a
+     *   decorator, and comparing it to one would be a category error that the spec would then
+     *   have to be weakened to tolerate.
+     */
+    'declared-act.article-15-d.declare': {
+      screen: null,
+      routes: ['POST /rfqs (the art. 15/d declaration branch)'],
+    },
   };
 
 /** The item the bell carries for one marked code. The api returns KEYS and never a sentence —
