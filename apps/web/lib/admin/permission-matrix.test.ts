@@ -214,7 +214,7 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * OFFICE-scoped, both: a value this office declared is the office's, and the figures the
      * instrument states are read by every office rather than being a platform capability.
      */
-    expect(PERMISSION_CATALOGUE.length).toBe(232);
+    expect(PERMISSION_CATALOGUE.length).toBe(233);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
@@ -226,7 +226,20 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * So a new PLATFORM code moves `PERMISSION_CATALOGUE.length` and moves nothing here. Raising this
      * to 164 is what I tried first; the guard refused with `expected 163 to be 164`.
      */
-    expect(toggles.length).toBe(168);
+    /*
+     * 168 -> 169: MODULE 1's art. 15/d declaration code, `declared-act.article-15-d.declare`.
+     *
+     * A TOGGLE, by the rule rather than by preference. `familyOf` gives it the family
+     * `declared-act.article-15-d`, which has exactly ONE member, and `declare` is not in the
+     * verb list — so there is no CRUD shape to make five states out of, exactly as
+     * `legal-value.declare` above. Families stay 21 and family codes stay 59; only the toggle
+     * count moves, and by one.
+     *
+     * OFFICE-scoped: admitting a breach is the office's own act, not a platform capability — so
+     * unlike a PLATFORM code it DOES reach this matrix, which is the whole point of decision 131
+     * marking it «جديدة» there.
+     */
+    expect(toggles.length).toBe(169);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

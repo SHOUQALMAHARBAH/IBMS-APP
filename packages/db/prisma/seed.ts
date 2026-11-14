@@ -1196,12 +1196,22 @@ async function main() {
         // or narrowed in the catalogue must take effect on a re-seed, and a field only written on
         // CREATE is a field that silently keeps its first value forever.
         scope: permission.scope ?? "OFFICE",
+        // OWNER DECISION 131. On the UPDATE branch for the same reason, and written as NULL when
+        // the catalogue omits it rather than left alone: the catalogue is the authority in BOTH
+        // directions, so removing a date here must clear it in the database too. Otherwise a code
+        // could carry a mark nobody can find the source of.
+        introducedAt: permission.introducedAt
+          ? new Date(permission.introducedAt)
+          : null,
       },
       create: {
         code: permission.code,
         module: permission.module,
         description: permission.description,
         scope: permission.scope ?? "OFFICE",
+        introducedAt: permission.introducedAt
+          ? new Date(permission.introducedAt)
+          : null,
       },
     });
 

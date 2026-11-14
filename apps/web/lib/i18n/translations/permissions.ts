@@ -128,6 +128,11 @@ export const PERMISSIONS = {
     'perm:complaint.close': 'يُغلق شكوى. يستلزم توقيع مشرف، ولا يجوز أن يكون من عالجها',
     'perm:complaint.escalate': 'يحوّل الشكوى إلى لجنة تسوية النزاعات التأمينية — خارج المكتب',
     'perm:complaint.log': 'يسجّل شكوى عميل. تُمنح لمن يلتقي العميل، حتى لا تضيع شكوى لأن مستلمها لا يملك تسجيلها',
+    // 🔴 AGENT-COMPOSED, on AWAITING_OWNER_REVIEW. Every run ships elsewhere (see the
+    // script header in this batch) but composed is not sliced, and the parity guard needs a
+    // line before the code can exist. Hers to replace.
+    'perm:declared-act.article-15-d.declare':
+      'يُعلن أن طلب عرض سعر ذاهب إلى أقل من ثلاث شركات تأمين ولا ينطبق عليه إعفاء، ويكتب سببه ويُقرّ بأن المسؤولية التنظيمية على المكتب. وهي غير صلاحية إرسال الطلب: من يرسل لا يُعلن بحكم إرساله',
     'perm:compliance-calendar.manage': 'يدير تقويم الالتزام التنظيمي ومواعيد ما يجب تقديمه للجهات',
     'perm:conflict-of-interest.disclose': 'يسجّل إفصاح تضارب المصالح الإلزامي على توصية مُعلَّمة، قبل أن تُرسَل للعميل. ولا يجوز أن يكون المُفصِح هو كاتب التوصية — والنظام يمنعه',
     'perm:conflict-of-interest.register.read':
@@ -224,10 +229,12 @@ export const PERMISSIONS = {
     'perm:lead.list.read': 'يرى قائمة العملاء المحتملين ويصنّفها',
     'perm:lead.transition': 'ينقل العميل المحتمل من حالة إلى حالة في مسار المبيعات',
     'perm:legal-hold.manage': 'يضع حفظاً قانونياً على سجلات فلا تُتلَف، ويراجعه. يتقدّم على كل قاعدة إتلاف',
+    // OWNER DECISION 133 — hers, ratified 2026-11-13, replacing the agent-composed line.
     'perm:legal-value.declare':
-      'يعلن لهذا المكتب قيمةً أحالتها تعليمات البنك المركزي الأردني رقم 9 لسنة 2026 إلى قرار لم يصدر، ومعها المرجع وتاريخ العمل بها. ولا يملك إدخال رقم نصّت عليه التعليمات نفسها ولا تغييره',
+      'يُدخل للمكتب رقماً أحالته التعليمات إلى قرار لم يصدر بعد، ومعه مرجعه وتاريخ العمل به.',
+    // OWNER DECISION 133 — hers, ratified 2026-11-13, replacing the agent-composed line.
     'perm:legal-value.read':
-      'يقرأ القيم التي يحسب بها النظام: ما نصّت عليه تعليمات البنك المركزي الأردني رقم 9 لسنة 2026 ومعه المادة التي ورد فيها، وما أعلنه هذا المكتب. ويرى السجل كاملاً لا القيمة السارية اليوم وحدها، لأن كل معاملة حُسبت بالقيمة السارية يومها',
+      'يقرأ الأرقام القانونية التي يحسب بها النظام، ومع كل رقم مادته وتاريخ العمل به.',
     'perm:license.manage': 'يدير سجل رخصة الوسيط التنظيمية وتواريخها',
     'perm:needs-assessment.approve': 'يعتمد تقييم حاجات العميل قبل ربطه بفرصة أو طلب تسعير. رقابة على جودة التقييم، وليست تعبئته',
     'perm:needs-assessment.create': 'يعبّئ استبيان تقييم حاجات العميل — أساس كل ما يُبنى بعده',
@@ -376,6 +383,8 @@ export const PERMISSIONS = {
     'perm:complaint.close': 'Close a complaint (mandatory supervisor sign-off)',
     'perm:complaint.escalate': 'Escalate a complaint to the Insurance Dispute Resolution Committee',
     'perm:complaint.log': 'Log a complaint',
+    'perm:declared-act.article-15-d.declare':
+      'Declare that a quote request is going to fewer than three insurance companies with none of art. 15/d\'s five exemptions applying — writing the reason, ticking the acknowledgement, and recording the act against the request. SEPARATE from the permission to send a quote request: whoever may act is not thereby able to admit a breach on the office\'s behalf',
     'perm:compliance-calendar.manage': 'Manage the regulatory compliance calendar',
     'perm:conflict-of-interest.disclose': 'Record the mandatory conflict-of-interest disclosure for a flagged recommendation before it can be sent (Process 16). The acknowledger must differ from the drafter (assertDifferentActors).',
     'perm:conflict-of-interest.register.read':

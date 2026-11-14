@@ -99,6 +99,79 @@ describe("permission grid — every code is independent and traceable", () => {
     ).toBe(true);
   });
 
+  /*
+   * 🔴 DECISION 131's MARK: WHICH CODES CARRY AN ARRIVAL DATE, PINNED IN BOTH DIRECTIONS.
+   *
+   * `Permission.introducedAt` is what makes a code land marked «جديدة». OMITTED means the code
+   * PREDATES the mark and is never marked — the right answer for the catalogue as it stood when
+   * the column landed, and the WRONG answer for anything added afterwards, because a new code
+   * with no date is a code that closes a button and tells nobody.
+   *
+   * ## WHY A COUNT HERE AND A SET BELOW, which is a real distinction and not inconsistency
+   *
+   * The PLATFORM list below is a SET because which codes cross an office boundary IS the boundary
+   * — a count would be satisfied by any two. This is a COUNT because the undated set is "every
+   * code that happened to exist on 2026-11-13", which is history rather than a decision: naming
+   * 230 codes would be a list nobody could review, and the only property that matters is that it
+   * never GROWS. The dated set is tiny and IS named, so the half that carries meaning is pinned
+   * by name and the half that is merely historical is pinned by size.
+   */
+  it("DECISION 131 — a code added from now on carries its arrival date, and an old one does not", () => {
+    const dated = PERMISSIONS.filter((p) => p.introducedAt !== undefined);
+    const undated = PERMISSIONS.filter((p) => p.introducedAt === undefined);
+
+    /*
+     * THE THREE CODES THAT ARE ACTUALLY NEW, BY NAME.
+     *
+     * The two `legal-value.*` arrived in migration `20261216100000_legal_values` (commit
+     * `27e651b0`, 2026-11-11); measured 2026-11-14, every brokerage office on dev was created
+     * before that day and no role holds either, so those two are the first codes in this
+     * product's life to be marked «جديدة» in a real office.
+     *
+     * 🔴 `declared-act.article-15-d.declare` is the third and it is the sharper one: it is the
+     * first code that actually CLOSES a path. Until an administrator grants it, a quote request
+     * to fewer than three insurers with NO exemption cannot be declared — which is OWNER
+     * DECISION 131 working as intended, and is safe only because the notification names what the
+     * code guards. ⛔ Do not pre-grant it.
+     */
+    expect(
+      dated.map((p) => p.code).sort(),
+      "the set of codes carrying an arrival date changed. Adding one is correct for a NEW code " +
+        "and wrong for an old one — an old code with a date would appear as «جديدة» in every " +
+        "office whose createdAt precedes it, which is noise, and the mark only works while it " +
+        "is rare.",
+    ).toEqual([
+      "declared-act.article-15-d.declare",
+      "legal-value.declare",
+      "legal-value.read",
+    ]);
+
+    /*
+     * AND THE OTHER DIRECTION, which is the half that catches the real mistake. 230 codes
+     * predate the mark. A new code shipped WITHOUT a date lands here and pushes this to 231.
+     */
+    expect(
+      undated.length,
+      `${undated.length} codes carry no arrival date, expected 230. If you have just added a ` +
+        "permission, give it `introducedAt: \"YYYY-MM-DD\"` — the day it ships — so every " +
+        "office's administrator is told it exists. OWNER DECISION 131: we grant it to nobody, " +
+        "so the mark and the notification are the whole of how anyone learns it is there.",
+    ).toBe(230);
+
+    // Every date is a real one, and in the ISO form the seed parses. `new Date("soon")` is
+    // `Invalid Date`, which Prisma writes as NULL — a typo would silently un-mark the code.
+    for (const p of dated) {
+      expect(
+        p.introducedAt,
+        `${p.code}'s introducedAt is not a YYYY-MM-DD date`,
+      ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(
+        Number.isNaN(new Date(p.introducedAt as string).getTime()),
+        `${p.code}'s introducedAt does not parse as a date`,
+      ).toBe(false);
+    }
+  });
+
   it("has at least one PLATFORM code, so the branch above is not vacuous", () => {
     // Without this, deleting the scope field from every entry would make the narrowing above
     // unreachable and the test would still pass.

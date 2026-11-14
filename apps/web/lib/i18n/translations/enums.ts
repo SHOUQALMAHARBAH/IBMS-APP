@@ -297,6 +297,8 @@ export const ENUMS = {
     crmChannelComplaint: 'شكوى',
     crmChannelSms: 'رسالة نصية',
     crmChannelPortal: 'بوابة',
+    // OWNER DECISION 133 section 3 ruling 2 — HERS, sliced from her own sentence.
+    crmChannelWrittenNotice: 'تبليغ خطي',
     crmChannelOther: 'أخرى',
     // PaymentChannelType
     pcTypeBankTransfer: 'حوالة بنكية',
@@ -609,6 +611,8 @@ export const ENUMS = {
     crmChannelComplaint: 'Complaint',
     crmChannelSms: 'SMS',
     crmChannelPortal: 'Portal',
+    // Mirrors her Arabic. Art. 22/s's first approved means: a written/paper notice.
+    crmChannelWrittenNotice: 'Written notice',
     crmChannelOther: 'Other',
     // PaymentChannelType
     pcTypeBankTransfer: 'Bank transfer',

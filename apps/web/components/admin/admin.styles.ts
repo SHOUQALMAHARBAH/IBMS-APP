@@ -103,6 +103,31 @@ export const matrixDescriptionStyle: CSSProperties = {
   color: 'var(--ink-secondary)',
 };
 
+/**
+ * 🔴 OWNER DECISION 131's «جديدة» BADGE — «معلم عليها بالاخضر ع انها جديدة».
+ *
+ * GREEN is hers and it is the only colour she named for it. The `--success-*` trio is the
+ * product's declared green and already carries a dark-theme definition, so the badge reads in
+ * both themes without a new token — `check:screen-pass` counts undeclared colours and a literal
+ * here would be one.
+ *
+ * ⚠️ COLOUR IS NOT THE ONLY SIGNAL. The badge carries the WORD «جديدة» as its text and as its
+ * accessible name, so a reader who cannot distinguish the green is told the same thing. A badge
+ * that was only a colour would be a mark half the readers cannot see.
+ */
+export const matrixNewBadgeStyle: CSSProperties = {
+  display: 'inline-block',
+  marginInlineStart: '0.4rem',
+  padding: '0.05rem 0.35rem',
+  borderRadius: 'var(--radius-sm)',
+  background: 'var(--success-bg)',
+  color: 'var(--success-ink)',
+  border: '1px solid var(--success-border)',
+  fontSize: '0.7rem',
+  lineHeight: 1.6,
+  verticalAlign: 'middle',
+};
+
 /** The section-level select-all, in the module's summary line. */
 export const matrixSectionAllStyle: CSSProperties = {
   display: 'inline-flex',

@@ -6,7 +6,12 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { CommunicationLog, OpportunityStatus } from '@ibms/db';
+import type {
+  Article15DPremiumAlert,
+  CommunicationLog,
+  OpportunityStatus,
+  RfqArticle15DExemption,
+} from '@ibms/db';
 import {
   RfqRepository,
   type RfqCommunicationRow,
@@ -35,6 +40,10 @@ import {
   type CustomerFileAnchor,
 } from './customer-file-anchor.service';
 import { LicenseGateService } from '../compliance-risk/license-gate.service';
+import { Article15DService } from '../compliance-risk/article-15-d.service';
+import { PermissionsService } from '../rbac/services/permissions.service';
+import type { Article15DOptions } from '../compliance-risk/article-15-d.service';
+import type { Article15DOptionsQueryDto } from './dto/article-15-d-options-query.dto';
 
 /** Result of one follow-up sweep run — logged by the scheduler. Only
  * `candidates` and `due` are row counts; the tallies below are per-step and
@@ -137,6 +146,17 @@ export class RfqService {
      * this design refused would arrive one import at a time. */
     private readonly anchors: CustomerFileAnchorService,
     private readonly licenseGate: LicenseGateService,
+    /* ART. 15/d. A SERVICE across the module boundary rather than a repository, which is the
+     * same shape `licenseGate` above already takes — and for the same reason: what is needed
+     * here is not rows but a RULE, and reimplementing "how many insurers is enough, and what
+     * exempts a request from it" inside this module would be the second answer to a legal
+     * question. One gate, two callers, exactly as the licence gate is. */
+    private readonly article15D: Article15DService,
+    /* The caller's granted codes, for the declaration's own permission. ⛔ Checked in the
+     * BRANCH rather than by a route decorator: the route is `POST /rfqs` and its code is
+     * `rfq.create`, so a decorator would demand the declaration permission of every quote
+     * request — including the 84.3% that never meet art. 15/d. */
+    private readonly permissions: PermissionsService,
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
@@ -530,6 +550,9 @@ export class RfqService {
   async createRfq(
     dto: CreateRfqDto,
     actor: AuthenticatedUser,
+    /** The caller's network address, threaded from the controller by `clientIpForRecord`. An
+     *  art. 15/d declaration records it; NULL when there genuinely is none. */
+    networkAddress: string | null = null,
   ): Promise<RfqWithSubmissions> {
     /*
      * ز.١ — A NEW QUOTE REQUEST TO INSURERS. Blocked FIRST, before the visibility read, because the
@@ -590,7 +613,53 @@ export class RfqService {
       );
     }
 
+    /*
+     * ART. 15/d — «التواصل مع ثلاث شركات تأمين». OWNER DECISIONS 126, 129, 130 and 133.
+     *
+     * ## 🔴 EVALUATED BEFORE THE ROW, APPLIED AFTER IT — AND THE SPLIT IS A DEFECT THE e2e FOUND
+     *
+     * Both records point AT the request, so the WRITES cannot come before it exists. The
+     * REFUSALS can, and the first version did not separate them. The consequence was real: a
+     * refused request left the RFQ row behind, and the employee's corrected second attempt got
+     * **409 Conflict** from `@@unique([opportunityId, insuranceLine])` — told that a request
+     * they could not see already existed, with no way to proceed on that line.
+     *
+     * ⟶ So `evaluate` refuses, then the row is inserted, then `apply` writes a plan that cannot
+     *   fail for anything the caller could have fixed.
+     *
+     * ## AND IT IS ALL BEFORE THE SHORTLIST INSERT
+     *
+     * The count art. 15/d cares about is the shortlist the request is GOING to — the owner's
+     * reading of 9 October, carried forward by decision 129 §3: it is the SENDING, not the
+     * replies — so the count is known from `insurerIds` and needs no rows. A refused request has
+     * therefore gone nowhere at all, which is the honest state.
+     *
+     * ⚠️ THE LICENCE CHECK STAYS AHEAD OF EVERYTHING HERE. `license-gate.e2e-spec.ts` asserts
+     * the refusal message names `21/a/9`, so a licence failure must not be pre-empted by an art.
+     * 15/d one — a suspended office being told about insurer counts would be the wrong answer to
+     * the more serious question.
+     */
+    const article15DPlan = await this.article15D.evaluate({
+      // The STANDARD line's code, which is what the exemptions are decided against. NULL for an
+      // office-defined line, and that is the answer: such a line is not in the 32-row catalogue
+      // art. 15/d's exemptions name, so only the two ungated ones are offered.
+      lineCode: await this.lines.findStandardCode(
+        inheritedLine.insuranceLineId,
+      ),
+      insurerCount: insurerIds.length,
+      customerId: opportunity.customerId ?? null,
+      choice: dto.article15D ?? {},
+      grantedCodes: await this.permissions.getCodesForRoles(actor.roleIds),
+      actorUserId: actor.id,
+      networkAddress,
+      // The REQUEST's own moment, so decision 129's criterion 4 holds: change the ceiling row
+      // with a new effective date and this request keeps the value it was sent under.
+      at: new Date(),
+    });
+
     const rfq = await this.insertRfqRow(dto, actor.id, inheritedLine);
+
+    await this.article15D.apply(article15DPlan, rfq.id);
 
     // Audit CREATE BEFORE the shortlist insert: a crash in between still
     // leaves a CREATE trail, and the resulting zero-insurer RFQ is
@@ -623,6 +692,40 @@ export class RfqService {
     }
 
     return this.mustFindRfq(rfq.id);
+  }
+
+  /**
+   * ART. 15/d's QUESTION, answered for a request that does not exist yet.
+   *
+   * Resolves the line through the opportunity's own designed programme — the SAME call
+   * `createRfq` makes — so the answer the screen is given and the rule the server will apply
+   * cannot disagree. A screen told one set of exemptions and then refused a different one is
+   * worse than no screen.
+   *
+   * ⚠️ VISIBILITY FIRST. A caller who cannot see the opportunity gets the same 404 every other
+   * RFQ route gives them, before any figure is read: otherwise this route would answer questions
+   * about another owner's opportunity, which is what `assertOpportunityVisible` exists to stop.
+   */
+  async article15DOptions(
+    query: Article15DOptionsQueryDto,
+    actor: AuthenticatedUser,
+  ): Promise<Article15DOptions> {
+    const opportunity = await this.assertOpportunityVisible(
+      query.opportunityId,
+      actor,
+      'Opportunity not found',
+    );
+    const inherited = await this.assertLineInProgramme(
+      opportunity.insuranceProgramId,
+      query.insuranceLine,
+    );
+    return this.article15D.optionsFor({
+      lineCode: await this.lines.findStandardCode(inherited.insuranceLineId),
+      insurerCount: query.insurerCount,
+      customerId: opportunity.customerId ?? null,
+      grantedCodes: await this.permissions.getCodesForRoles(actor.roleIds),
+      at: new Date(),
+    });
   }
 
   async addInsurers(
@@ -814,7 +917,13 @@ export class RfqService {
   async get(
     id: string,
     actor: AuthenticatedUser,
-  ): Promise<RfqWithSubmissions & { opportunity: { customerId: string } }> {
+  ): Promise<
+    RfqWithSubmissions & {
+      opportunity: { customerId: string };
+      article15DExemption: RfqArticle15DExemption | null;
+      article15DAlerts: Article15DPremiumAlert[];
+    }
+  > {
     const { rfq, opportunityCustomerId, anchor } = await this.findReadableRfq(
       id,
       actor,
@@ -828,7 +937,31 @@ export class RfqService {
         anchor,
       );
     }
-    return { ...rfq, opportunity: { customerId: opportunityCustomerId } };
+    /*
+     * ART. 15/d ON THE RECORD — decision 129's criterion 7 and the owner's own flow.
+     *
+     * «الإعفاء يُخزَّن مع الطلب، و«اختاره:» واسم الموظف» — the exemption is stored WITH the
+     * request, and the record names who chose it. A row nobody can see is not a record: the
+     * whole value of the exemption is that an inspector, and the office itself, can read what
+     * the request was sent under.
+     *
+     * The ALERTS come with it. An art. 15/d/4 warning that lives only in a table is a warning
+     * nobody receives, which reads exactly like no breach — and OWNER DECISION 126's shape is
+     * that the system WARNS, which is a thing somebody has to be able to see.
+     *
+     * ⚠️ Both reads are tenant-scoped and both return NULL/empty for the overwhelming majority
+     * of requests, which is the point: 84.3% of them rest on nothing because they reached three.
+     */
+    const [article15DExemption, article15DAlerts] = await Promise.all([
+      this.article15D.findExemptionForRfq(rfq.id),
+      this.article15D.findAlertsForRfq(rfq.id),
+    ]);
+    return {
+      ...rfq,
+      opportunity: { customerId: opportunityCustomerId },
+      article15DExemption,
+      article15DAlerts,
+    };
   }
 
   listSelectableInsurers(): Promise<SelectableInsurer[]> {

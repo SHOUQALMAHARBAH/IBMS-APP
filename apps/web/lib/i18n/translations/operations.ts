@@ -597,6 +597,8 @@ export const OPERATIONS = {
     orgUnitLoadError: 'تعذّر تحميل الأقسام والفروع — حاول مرة أخرى.',
     orgUnitRefusalAct: 'عرض أقسام المكتب وفروعه',
     roleMatrixSummary: 'هذا الدور يملك {granted} من {total} صلاحية.',
+    // OWNER DECISION 131, listed again in 133. Sliced from her own table; green is hers too.
+    roleMatrixNewBadge: 'جديدة',
     roleMatrixNeedsCatalogue:
       'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية permission.read. يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
     roleMatrixSearchLabel: 'ابحث في الصلاحيات',
@@ -1276,6 +1278,8 @@ export const OPERATIONS = {
     orgUnitLoadError: 'Could not load departments and branches — try again.',
     orgUnitRefusalAct: "view the office's departments and branches",
     roleMatrixSummary: 'This role has {granted} of {total} permissions.',
+    // Hers in Arabic; this mirrors it. Shown in green -- see matrixNewBadgeStyle.
+    roleMatrixNewBadge: 'New',
     roleMatrixNeedsCatalogue:
       'The permission matrix cannot be shown — your account does not hold permission.read. You can still create the role, and someone who holds it can set its permissions.',
     roleMatrixSearchLabel: 'Search permissions',

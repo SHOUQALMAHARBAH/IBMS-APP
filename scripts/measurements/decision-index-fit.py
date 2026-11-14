@@ -153,28 +153,27 @@ PHANTOMS: dict[int, tuple[frozenset[str], str]] = {
 #   only thing stopping it reopening is `CITE_TAIL` plus the two self-test cases that
 #   plant the second and fourth numbers of a chain.
 # ---------------------------------------------------------------------------------------
-# AND IT REFILLED ON 2026-11-11 WITH DECISION 87, which is the second real decision this
-# repository cites and cannot explain. See the entry's own text.
-KNOWN_MISSING: dict[int, str] = {
-    87: (
-        "Cited 3x in `apps/api/src/common/declaration-reason.ts`, where the owner STRUCK it on "
-        "2026-11-11. Decision 87 set the written-reason floor at FIFTEEN characters; the product "
-        "has always held TEN. Asked whether to strike it -- knowing it was a recorded decision "
-        "and not merely the legal adviser's suggestion, which is how the question had been put "
-        "the first time -- she kept ten. So ten is the floor everywhere and decision 87 is struck "
-        "ON THAT POINT ONLY; the rest of it stands. Her answer is verbatim in "
-        "`docs/decision-129-exemption-tagged-by-the-system-chosen-only-when-unknown.md`, section "
-        "5, which is its one home. "
-        "THE NUMBER IS NAMED RATHER THAN DROPPED, deliberately: a strike whose decision number "
-        "was removed to satisfy a gate is a strike nobody can attribute, and the next reader "
-        "re-derives the fifteen from the adviser's own drafted window -- which still asks for it "
-        "in `docs/answers/`, because those are source transcriptions and are reported rather "
-        "than corrected in place. "
-        "ITS FILE IS THE OWNER'S TO WRITE, like decision 82's. Both are real decisions this "
-        "repository cites and neither has a file: 82 is cited only inside decision 128's own "
-        "section 8, and 87 only here. Reported, not invented."
-    ),
-}
+# AND IT REFILLED ON 2026-11-11 WITH DECISION 87, which was the second real decision this
+# repository cited and could not explain.
+#
+# ⟶ CLOSED 2026-11-13. The owner wrote BOTH owed files, from her project paper of 13 October:
+#   `docs/decision-87-three-prohibited-acts-history-and-status.md` and
+#   `docs/decision-82-grace-period-history-and-status.md`. The declaration went stale the moment
+#   87 gained a file and this gate said so by name, which is the second time that has happened
+#   and the whole reason the list exists.
+#
+# AND THE SHAPE OF THOSE TWO FILES IS WORTH THE NOTE, because it is new here: each records what
+# was decided on a date and then says, PART BY PART, what a later decision of hers reversed.
+# Most of both is reversed -- 87's two hard refusals became "warn and record and do not refuse"
+# (decision 126) and its fifteen-character floor is struck (decision 129); 82's permitted
+# issuance window is gone (decision 35, then 128). ⛔ So neither index row may carry only the
+# file's own sentence: that sentence is what was true in October, and a reader who takes it as
+# current builds the refusal the owner removed. Both rows lead with the strike, exactly as
+# decision 60's does.
+#
+# THE FLOOR ITSELF DID NOT MOVE and nothing in that account changed: ten characters everywhere,
+# her answer verbatim in decision 129 section 5, which is still its one home.
+KNOWN_MISSING: dict[int, str] = {}
 
 # ---------------------------------------------------------------------------------------
 # A DECISION THAT IS NEVER CITED ON ITS OWN DECLARES ITS OWN COUNTING METHOD.
@@ -304,9 +303,23 @@ CLAIM_HEADER = re.compile(
 # singular so the gate would match, and that is the one thing this repository never does: the
 # gate reads her text, her text is not rewritten to suit the gate. Her Arabic is the authority and
 # a matcher is a tool.
+#
+# AND THE THIRD WIDENING, 2026-11-14, FOR A NEW SHAPE OF FILE RATHER THAN A NEW SHAPE OF HEADING:
+#
+#   ## القرار بجملة (كما كان في ١٣ ت١)
+#
+# Decisions 82 and 87 are HISTORY-AND-STATUS files -- they record what was decided on a date and
+# then say, part by part, what a later decision of hers reversed. So the heading qualifies its own
+# sentence with the date it was true on, because the sentence is NOT what governs today. The
+# qualifier is parenthetical and the sentence below it is still the one the index row repeats, so
+# the matcher takes an optional trailing `(...)` and nothing else changes.
+#
+# ⚠️ The parenthetical is deliberately NOT captured. It is a note ABOUT the sentence, not part of
+# it, and folding it into the pinned text would make the index row repeat a date qualifier instead
+# of the decision -- which is the opposite of what this pin is for.
 ONE_SENTENCE = re.compile(
     r"## (?:[" + AR_DIGITS + r"]+ — )?القرار (?:[" + AR_DIGITS + r"]+ )?"
-    r"(?:بجملة(?: واحدة)?|بجملتين)\s*\n+(.+?)(?=\n##|\Z)",
+    r"(?:بجملة(?: واحدة)?|بجملتين)(?: \([^)\n]*\))?\s*\n+(.+?)(?=\n##|\Z)",
     re.S,
 )
 
@@ -769,6 +782,27 @@ def _self_test() -> int:
          lambda t: (_patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
                            "## القرار بجملة",
                            "## ١ — القرار ١٢٩ بجملة واحدة"),
+                    _patch(os.path.join(t, "ibms-brain", "meta", "decision-index.md"),
+                           "| **one sentence.** |", "| **drifted.** |")),
+         "does not repeat its file's first sentence"),
+        # THE DUAL (decision 132) AND THE DATE-QUALIFIED HEADING (decisions 82 and 87).
+        #
+        # 🔴 The dual was widened for on 2026-11-12 under a comment saying both new shapes are
+        # permanent self-test cases -- and it had NONE. The two cases above are the shapes from
+        # the batch BEFORE it, so the sentence was true when written and the next widening
+        # inherited it without earning it. Found 2026-11-14 while adding the parenthetical, by
+        # grepping the plants for `بجملتين` rather than by trusting the comment above them.
+        ("the dual heading (`## ١ — القرار بجملتين`)",
+         lambda t: (_patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "## القرار بجملة",
+                           "## ١ — القرار بجملتين"),
+                    _patch(os.path.join(t, "ibms-brain", "meta", "decision-index.md"),
+                           "| **one sentence.** |", "| **drifted.** |")),
+         "does not repeat its file's first sentence"),
+        ("a date-qualified heading (`## القرار بجملة (كما كان في ١٣ ت١)`)",
+         lambda t: (_patch(os.path.join(t, "docs", "decision-7-a-slug.md"),
+                           "## القرار بجملة",
+                           "## القرار بجملة (كما كان في ١٣ ت١)"),
                     _patch(os.path.join(t, "ibms-brain", "meta", "decision-index.md"),
                            "| **one sentence.** |", "| **drifted.** |")),
          "does not repeat its file's first sentence"),

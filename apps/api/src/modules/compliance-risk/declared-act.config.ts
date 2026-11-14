@@ -38,6 +38,31 @@ export const ARTICLE_15_D = {
   site: 'ARTICLE_15_D_FEWER_THAN_THREE_INSURERS',
   /** Grouping only. Element 1 is explicit that the NUMBER is not what the person is shown. */
   articleRef: '15/d',
+  /**
+   * The adviser's own TITLE for the window, after «عنوان التنبيه: ».
+   *
+   * ⚠️ «تنظيمى» IS HIS SPELLING (alef maqsura where alef yaa is expected) AND IS NOT CORRECTED.
+   * Decision 132 ruling 1: his texts are used verbatim and never edited. A silent correction
+   * here would make every record written afterwards testify to a sentence he did not write.
+   */
+  windowTitle: 'تحذير تنظيمى: خرق حد التعامل الأدنى مع شركات التأمين.',
+  /**
+   * The hint inside the reason field, from his own bracket at `:200`.
+   *
+   * ⛔ AND WITHOUT THE PARENTHETICAL ON THE LINE ABOVE IT, which names a minimum of FIFTEEN
+   * characters. The enforced floor is TEN — OWNER DECISION 129 §5 struck decision 87 on exactly
+   * that point — so shipping it would put a false promise on the screen, which is worse than
+   * losing a hint.
+   *
+   * ⚠️ THAT PARENTHETICAL IS DESCRIBED HERE AND NOT QUOTED, deliberately.
+   * `declared-act.config.spec.ts` asserts it is absent by scanning this file's SOURCE, and a
+   * source scan cannot tell a comment from a value — so a comment reproducing the phrase fails
+   * the test that exists to keep the phrase out. The first version of this note did exactly
+   * that: the comment-quotes-the-pattern blindness, committed inside the sentence warning about
+   * it, for the sixth time in this repository. `permission-matrix.test.ts` already writes its
+   * own trap with placeholders for the same reason.
+   */
+  reasonHint: 'الرجاء كتابة السند القانوني أو مبرر الإعفاء للمتابعة...',
   /** The adviser's text, shown verbatim. Element 1. */
   articleText:
     'إن قيام المكتب بالتعامل مع أقل من ثلاث شركات تأمين يُعد مخالفة صريحة لأحكام المادة (15/د) من تعليمات ترخيص وسيط التأمين وتنظيم أعماله ومسؤولياته رقم (9) لسنة 2026 الصادرة عن البنك المركزي الأردني، ما لم تكن الحركة مشمولة بأحد الاستثناءات القانونية (مثل كون قيمة القسط 2000 دينار أو أقل).',

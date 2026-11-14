@@ -407,6 +407,20 @@ describe('a new RFQ cannot shortlist a deactivated insurer', () => {
         opportunityId,
         insuranceLine: 'Property All Risks',
         insurerIds: [active.id],
+        /*
+         * ART. 15/d IS ENFORCED NOW, so a one-insurer request has to say what it rests on.
+         *
+         * EXEMPTION 3 — «في عقود التأمين محددة المنافع والتغطيات» — is chosen because
+         * `availableExemptions` offers it on EVERY line, including one the standard catalogue
+         * does not name. Its own reason is measured: the Central Bank has issued no
+         * defined-benefit list, so nothing can say a product is NOT one, and withholding the
+         * exemption would be the system asserting a fact it does not have.
+         *
+         * ⟶ Which keeps this spec about ITS OWN subject. The deactivation refusal below is
+         *   about one insurer's state, and it must not start depending on how many insurers a
+         *   request reached.
+         */
+        article15D: { exemption: 'DEFINED_BENEFIT_CONTRACT' },
       })
       .expect(201);
     const rfqId = (created.body as { id: string }).id;
@@ -421,38 +435,53 @@ describe('a new RFQ cannot shortlist a deactivated insurer', () => {
     );
 
     /*
-     * 🔴 AND ART. 15/d IS NOT ENFORCED — MESSAGE 37 §4's CONSTRAINT, PINNED HERE.
+     * ✅ ART. 15/d IS ENFORCED NOW — AND THIS BLOCK IS THE REPLACEMENT ITS OWN PREDECESSOR ASKED
+     * FOR.
      *
-     * This RFQ reached ONE insurer and was accepted at 201 above. That is deliberate and it is
-     * asserted rather than merely true, because the opposite is a live temptation: message 36 §4
-     * listed the wiring for `CreateRfqDto` and the `createRfq` hook, and message 37 §4 STOPPED it
-     * with a reason worth repeating here —
+     * What stood here until 2026-11-14 asserted the OPPOSITE: that a one-insurer RFQ was
+     * accepted with no exemption row and no declared act, because message 37 §4 had stopped the
+     * wiring until the strings were ratified and a screen could ask the question. Its last
+     * paragraph said «WHEN THAT BATCH LANDS, THIS BLOCK IS EXPECTED TO FAIL, AND THAT IS ITS
+     * PURPOSE. Change it deliberately then; do not delete it to make a build pass.»
      *
-     *   if the server requires an exemption or a declaration below three insurers while no screen
-     *   can yet ask for one, EVERY such request fails. On the seeded data that is 34.4% of quote
-     *   requests (31 of 90, measured on a throwaway database). An employee sending to two insurers
-     *   would be STOPPED, not warned — the opposite of OWNER DECISION 126.
+     * The batch landed. So this is the deliberate change, and it pins what OWNER DECISION 130
+     * makes true instead:
      *
-     * So the server wiring and its screen ship in ONE batch, after the strings are ratified.
+     *   - a request below the minimum REST on something, and the something is recorded;
+     *   - an EXEMPTED request goes through — it is not refused, not warned, not slowed. Decision
+     *     130 ruling 1: three or more is the law being complied with, and fewer than three WITH
+     *     an exemption is the instrument's own provision, not a breach;
+     *   - and it carries NO declared act, because there is nothing to declare.
      *
-     * ⟶ WHEN THAT BATCH LANDS, THIS BLOCK IS EXPECTED TO FAIL, AND THAT IS ITS PURPOSE. Change it
-     * deliberately then; do not delete it to make a build pass. Until then it is what stops art.
-     * 15/d being half-wired by somebody working from message 36's list.
+     * ⚠️ The count that mattered is the REQUEST's own — decision 130 ruling 2 counts per request —
+     * so `insurerCount` is 1 here and would be 1 even if the opportunity's other RFQ reached ten.
      */
-    const exemptions = await rawPrisma.rfqArticle15DExemption.count({
+    const exemption = await rawPrisma.rfqArticle15DExemption.findUnique({
       where: { rfqId },
     });
     expect(
-      exemptions,
-      'an art. 15/d exemption row was written for a one-insurer RFQ. Nothing should write one yet — the tables are inert until message 38.',
-    ).toBe(0);
+      exemption,
+      'a one-insurer RFQ was accepted with no art. 15/d exemption row. Art. 15/d is wired now: a request below the minimum rests on an exemption or on a declaration, and either way it is recorded.',
+    ).not.toBeNull();
+    expect(exemption!.exemption).toBe('DEFINED_BENEFIT_CONTRACT');
+    expect(exemption!.insurerCount).toBe(1);
+    // OWNER DECISION 129's criterion 7: the record tells «اختاره فلان» from «وسمه النظام».
+    // CHOSEN_BY_PERSON for every row written today — measured 2026-11-12, none of the five can
+    // be tagged by the system — and it names WHO rather than only their id.
+    expect(exemption!.basis).toBe('CHOSEN_BY_PERSON');
+    expect(exemption!.chosenByUserId).toBe(officer.userId);
+    expect(exemption!.chosenByNameShown?.trim()).not.toBe('');
+    // Exemption 3 carries neither figure and no evidence — the CHECKs say so too.
+    expect(exemption!.declaredAnnualPremiumJod).toBeNull();
+    expect(exemption!.ceilingValueJod).toBeNull();
+    expect(exemption!.evidenceCommunicationLogId).toBeNull();
 
     const declaredActs = await rawPrisma.declaredAct.count({
       where: { entity: 'RFQ', entityId: rfqId },
     });
     expect(
       declaredActs,
-      'a declared act was recorded for a one-insurer RFQ. Art. 15/d is not wired yet, so nothing should declare anything.',
+      "a declared act was recorded for a request that rests on an exemption. An exemption is the instrument's own provision — there is nothing to declare, and a declaration here would record a breach that did not happen.",
     ).toBe(0);
   }, 300_000);
 
@@ -493,6 +522,11 @@ describe('a new RFQ cannot shortlist a deactivated insurer', () => {
         opportunityId,
         insuranceLine: 'Property All Risks',
         insurerIds: [insurer.id],
+        /* ART. 15/d IS ENFORCED NOW. Exemption 3 is chosen because `availableExemptions`
+         * offers it on EVERY line, including one the standard catalogue does not name -- which
+         * keeps this spec about ITS OWN subject, an insurer's state, rather than about how many
+         * insurers a request reached. See the fuller note on the first such call above. */
+        article15D: { exemption: 'DEFINED_BENEFIT_CONTRACT' },
       })
       .expect(201);
   }, 300_000);
@@ -527,6 +561,11 @@ describe('capturing a quotation is NOT blocked — and that is deliberate', () =
         opportunityId,
         insuranceLine: 'Property All Risks',
         insurerIds: [insurer.id],
+        /* ART. 15/d IS ENFORCED NOW. Exemption 3 is chosen because `availableExemptions`
+         * offers it on EVERY line, including one the standard catalogue does not name -- which
+         * keeps this spec about ITS OWN subject, an insurer's state, rather than about how many
+         * insurers a request reached. See the fuller note on the first such call above. */
+        article15D: { exemption: 'DEFINED_BENEFIT_CONTRACT' },
       })
       .expect(201);
     const rfqId = (created.body as { id: string }).id;
@@ -572,6 +611,11 @@ describe('deactivating is an ACT, with a reason and a record of what was outstan
         opportunityId,
         insuranceLine: 'Property All Risks',
         insurerIds: [insurer.id],
+        /* ART. 15/d IS ENFORCED NOW. Exemption 3 is chosen because `availableExemptions`
+         * offers it on EVERY line, including one the standard catalogue does not name -- which
+         * keeps this spec about ITS OWN subject, an insurer's state, rather than about how many
+         * insurers a request reached. See the fuller note on the first such call above. */
+        article15D: { exemption: 'DEFINED_BENEFIT_CONTRACT' },
       })
       .expect(201);
 
