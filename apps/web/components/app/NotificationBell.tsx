@@ -10,6 +10,7 @@ import {
   type NotificationKind,
 } from '../../lib/notification/notification-api';
 import type { TranslationKey } from '../../lib/i18n/translations';
+import { newPermissionSentence } from '../../lib/notification/new-permission-sentence';
 
 /*
  * The bell. Replaces the `<span aria-hidden>` placeholder that held this slot,
@@ -35,6 +36,7 @@ const LABEL_KEY: Record<NotificationKind, TranslationKey> = {
   service_request_assigned: 'notifServiceRequestAssigned',
   customer_pending_kyc: 'notifCustomerPendingKyc',
   kyc_awaiting_decision: 'notifKycAwaitingDecision',
+  new_permission: 'notifNewPermission',
 };
 
 const triggerStyle: CSSProperties = {
@@ -99,6 +101,16 @@ const rowStyle: CSSProperties = {
 const countStyle: CSSProperties = {
   fontVariantNumeric: 'tabular-nums',
   color: 'var(--ink-secondary)',
+};
+
+/** OWNER DECISION 131's sentence, beneath its row. Secondary ink and a smaller size: it is the
+ *  detail under a heading, not a second heading. */
+const noticeStyle: CSSProperties = {
+  margin: 0,
+  padding: '0 var(--space-2) var(--space-2)',
+  color: 'var(--ink-secondary)',
+  fontSize: 'var(--text-sm)',
+  lineHeight: 1.5,
 };
 
 export function NotificationBell() {
@@ -175,18 +187,36 @@ export function NotificationBell() {
         <div style={panelStyle} role="group" aria-label={t('notifPanelAria')}>
           {items.length > 0 ? (
             items.map((item) => (
-              <button
-                key={item.kind}
-                type="button"
-                style={rowStyle}
-                onClick={() => {
-                  setOpen(false);
-                  router.push(item.href);
-                }}
-              >
-                <span>{t(LABEL_KEY[item.kind])}</span>
-                <span style={countStyle}>{formatNumber(item.count, language)}</span>
-              </button>
+              <div key={item.kind}>
+                <button
+                  type="button"
+                  style={rowStyle}
+                  onClick={() => {
+                    setOpen(false);
+                    router.push(item.href);
+                  }}
+                >
+                  <span>{t(LABEL_KEY[item.kind])}</span>
+                  <span style={countStyle}>{formatNumber(item.count, language)}</span>
+                </button>
+                {/*
+                 * OWNER DECISION 131 — the one item that says more than a number.
+                 *
+                 * Her ratified sentence (decision 133) names the permission, explains it, and
+                 * says what it controls. A count alone would tell an administrator that
+                 * SOMETHING arrived and not what, which is the whole point of the notification:
+                 * nothing is granted, so this is the only way anyone learns the code exists.
+                 */}
+                {item.newPermissions?.map((notice) => (
+                  <p
+                    key={notice.code}
+                    style={noticeStyle}
+                    data-testid={`notif-new-permission-${notice.code}`}
+                  >
+                    {newPermissionSentence(notice, t, language)}
+                  </p>
+                ))}
+              </div>
             ))
           ) : (
             <p style={{ margin: 0, padding: 'var(--space-2)', color: 'var(--ink-secondary)' }}>

@@ -9,6 +9,43 @@ turned out to already exist, and its unbuildable half is explained below rather 
 
 ---
 
+## ✅ BUILT — 2026-11-14, message 38 §2. The design below is unchanged; this records what landed.
+
+Migration `20261219100000_new_permission_mark`: `Permission.introducedAt` (nullable, global) and
+`OfficePermissionDismissal` (tenant-scoped, RLS **ENABLED and FORCED**, one policy, unique on
+`(organizationId, permissionId)`), with seven assertions in its own DO block — including that it
+stamps **no** existing code and writes **no** grant.
+
+| piece | where |
+|---|---|
+| the rule, pure | `apps/api/src/modules/rbac/new-permission-mark.config.ts` — `isMarkedNew`, three conditions, each tested in both directions |
+| the three facts, per office | `PermissionRepository.findMarkStateForOffice` |
+| the grid, marked | `GET /rbac/permissions` now returns `isNew` per code, computed against the caller's own office |
+| the ruling | `POST /rbac/permissions/:code/dismiss`, gated on `role.update` |
+| the bell | `notification.service.ts`, kind `new_permission`, gated on `role.update` |
+| the mark | `PermissionMatrix.tsx` — «جديدة», green (`matrixNewBadgeStyle`, the declared `--success-*` trio) |
+| the sentence | `apps/web/lib/notification/new-permission-sentence.ts`, from decision 133 |
+| criteria 3 and 4 | `apps/api/test/new-permission-mark.e2e-spec.ts`, 7/7, each named by its number |
+
+**And `introducedAt` is NOT back-filled.** The 230 codes that existed keep NULL — «predates the
+mark» — so no office meets its catalogue as new. The two `legal-value.*` codes carry **2026-11-11**,
+measured from migration `20261216100000`'s own commit, and every brokerage office on dev was created
+before that day: **so those two are the first codes in this product's life to be marked in a real
+office.**
+
+⛔ **AND THE BACKFILL IS NOW A GATE.** `npm run check:permission-migrations` refuses a migration
+that adds a permission and writes `RolePermission` for it. The eight that did are declared as
+history and asserted, so a stale declaration fails too. Self-test 6/6, in `check:guards`, so in CI.
+
+🔴 **ONE THING IS NOT FINISHED AND IT IS THE OWNER'S.** Decision 133's sentence opens with the
+permission's NAME, and decision 127 forbids ever showing a user the CODE. The names are a
+derivation table over all 232 codes that is **not built** (message 38 §4 defers it), and exactly
+**one** name exists — hers, for `retention.archive.retrieve`, which cannot be marked. So where no
+name exists the sentence renders **without that clause**: showing the code breaks 127, and
+inventing a name breaks the standing rule. Reported rather than quietly shipped.
+
+---
+
 ## Why `Permission.introducedAt` alone cannot carry it — the question §1.4 asks
 
 The mark clears **when that office's administrator has decided**, not by elapsed time, and **per
@@ -146,3 +183,31 @@ gates a control INSIDE a screen (`diagnostics.view` hiding raw error detail on `
 the shipped example) they do not, and the route-derived answer would name the screen while the
 thing that disappeared is a panel on it. **That gap is named here rather than papered over**, and
 it is a question for the screen's own batch.
+
+### ✅ HOW IT WAS BUILT, AND WHICH CODES FALL IN THE GAP — 2026-11-14
+
+Neither source is readable at RUNTIME: the api image does not contain `apps/web`, and a Nest
+decorator is not a route table without booting the app. So `PERMISSION_CONTROLS` is **declared** in
+`new-permission-mark.config.ts` and **proven** against both sources by its spec, which re-derives
+the controller's decorators and reads the nav map — the arrangement
+`permission-catalogue-parity.spec.ts` already uses to stop the web fixture drifting from the seed.
+Move a decorator and it fails by name; the plant that proved it named the code and the file.
+
+It covers **exactly** the codes that carry an `introducedAt`, asserted in both directions — a code
+with no date is never shown in the sentence, so an entry for it would be an unread line somebody
+still has to maintain.
+
+🔴 **AND BOTH CODES THAT CAN BE MARKED TODAY FALL IN THE GAP — neither has a screen at all.**
+Measured 2026-11-14: `legal-value.read` and `legal-value.declare` appear **nowhere** in
+`destinations.ts`, because module 1 built the legal-values API and `/legal-values` is not built. So
+the first two marks this product shows both say a ROUTE:
+
+| code | what the notification says |
+|---|---|
+| `legal-value.read` | `GET /legal-values` · `GET /legal-values/:code/history` |
+| `legal-value.declare` | `POST /legal-values` |
+
+A route is weaker than a screen name and it is the honest answer: naming a screen that is not
+built would be a guess, in the one sentence an administrator reads before deciding who may do
+something. **The spec fails the day either code enters the nav map**, demanding the entry gain its
+screen — so this cannot silently stay the weaker answer after the screen ships.

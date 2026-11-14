@@ -27,6 +27,27 @@ export interface NotificationItem {
   severity: 'action' | 'warning';
   /** Where the reader goes to act on it. A real screen that exists today. */
   href: string;
+  /**
+   * OWNER DECISION 131 — the only source whose item needs more than a number.
+   *
+   * Every other kind says "7 things need attention" and the web supplies the sentence. This one
+   * has to name WHICH permissions arrived and what each controls, because the ratified sentence
+   * (decision 133) has slots: «صلاحية جديدة في النظام: [اسمها]. [شرحها]. تتحكّم في: [الشاشة أو
+   * الزر].» A count alone would tell an administrator that something arrived and not what.
+   *
+   * ⚠️ STILL KEYS AND NEVER A SENTENCE. This carries permission CODES and hrefs; the name and
+   * the description come from the web's own dictionaries, which already hold both languages, and
+   * the sentence itself is a translation key. The rule in this file's header is intact — the one
+   * thing that changed is that a key is not always a single word.
+   *
+   * A permission code is catalogue metadata, not customer data, so returning them here does not
+   * reach the concern that keeps every other source to counts.
+   */
+  newPermissions?: readonly {
+    code: string;
+    screen: string | null;
+    routes: readonly string[];
+  }[];
 }
 
 export const NOTIFICATION_KINDS = [
@@ -37,6 +58,8 @@ export const NOTIFICATION_KINDS = [
   'service_request_assigned',
   'customer_pending_kyc',
   'kyc_awaiting_decision',
+  /** OWNER DECISION 131: a permission arrived and this office has not decided on it. */
+  'new_permission',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];

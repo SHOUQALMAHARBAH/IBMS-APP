@@ -77,6 +77,18 @@ export interface PermissionCatalogueEntry {
    * non-widening reading: a caller that does not know must not treat a code as platform-wide.
    */
   scope?: 'OFFICE' | 'PLATFORM';
+  /**
+   * 🔴 OWNER DECISION 131 — «جديدة»: this office has not decided on this code yet.
+   *
+   * PER OFFICE and computed by the api, never stored on the catalogue row: it arrived after this
+   * office was created, no role here holds it, and nobody here has ruled on it. The same row is
+   * marked for one office and not for another, which is the decision — «احنا ما النا دخل».
+   *
+   * Optional for the same reason `scope` is: ~80 spec files build a catalogue entry and a
+   * required field would fail every one of them over a value none of them are about. Absent
+   * reads as NOT new, which is the non-noisy direction.
+   */
+  isNew?: boolean;
 }
 
 export function listRolesForAdmin(): Promise<RoleAdminEntry[]> {

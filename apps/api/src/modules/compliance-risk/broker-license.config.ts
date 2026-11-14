@@ -74,6 +74,32 @@ import type { LicenceLegalFigures } from './legal-figures.config';
  * The owner's ruling of 10 November tightens the rule this sentence explains and replaces the basis
  * behind it. The account lives on the MODEL rather than here, because it is a statement about what a
  * licence term MEANS, and this file answers questions about one term by arithmetic.
+ *
+ * ## 🔴 AND THE ANALOGY ABOVE IS VOID BY OWNER DECISION 82, WHICH IS WHY THIS STRING STILL SAYS SO
+ *
+ * ⚠️ READ THE TWO 82s APART. `arts. 82 and 109 of that law` in the sentence below are ARTICLES of
+ * Law No. 12 of 2021. OWNER DECISION 82 is a decision of hers, and this paragraph is its citation:
+ * `docs/decision-82-grace-period-history-and-status.md`.
+ *
+ * Decision 82 ruling (ب), 13 October 2026: resting on art. 8/d BY ANALOGY is **void**, and the
+ * citation is to be removed from the code and from every document. It has not been, and that is
+ * deliberate rather than overlooked — the file records it as still outstanding, measured 10
+ * November. ⟶ It goes when decision 128 is built, because 128 replaces the whole rule this basis
+ * explains, and deleting the basis BEFORE its replacement lands would leave the rule standing with
+ * no account of where it came from at all. That is strictly worse than an account the file itself
+ * marks as void.
+ *
+ * ⛔ AND MOST OF DECISION 82 IS NOT LAW ANY MORE. Its ruling (و) — issuance during the period is
+ * PERMITTED behind a warning window — was dropped in October and then replaced outright by OWNER
+ * DECISION 128; the name «فترة سماح» went with it, because 128 calls it a STATE and not a period.
+ * Do not build on either. Decision 82's own file says which of its six rulings still stand, and
+ * names the intervening ruling that dropped (و).
+ *
+ * ⚠️ THAT INTERVENING NUMBER IS DELIBERATELY NOT WRITTEN HERE. It has no file in `docs/`, and
+ * `check:decision-index` refuses a citation of a decision it cannot explain — rightly, because a
+ * number a reader cannot look up is worse than no number. The same call `article-15-d.config.ts`
+ * makes about the 9 October ruling: cite the decision that GOVERNS today, which loses no
+ * attribution, and leave writing the missing file to the owner.
  */
 export const RENEWAL_PENDING_RULE_BASIS =
   "Owner's decision. No provision in Instructions No. 9 of 2026. Supported by analogy only with " +

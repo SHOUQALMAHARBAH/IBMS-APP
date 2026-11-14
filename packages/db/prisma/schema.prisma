@@ -617,6 +617,7 @@ model Organization {
   declaredActs                        DeclaredAct[]
   rfqArticle15DExemptions             RfqArticle15DExemption[]
   article15DPremiumAlerts             Article15DPremiumAlert[]
+  permissionDismissals                OfficePermissionDismissal[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -965,6 +966,7 @@ model User {
   reportedIncidents                 IncidentReport[]                  @relation("IncidentReportedBy")
   declaredActs                      DeclaredAct[]
   rfqArticle15DExemptions           RfqArticle15DExemption[]
+  permissionDismissals              OfficePermissionDismissal[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -1282,7 +1284,78 @@ model Permission {
   /// it and the SERVER refuses it, because a hidden control the API still honours is not a boundary.
   scope       PermissionScope @default(OFFICE)
 
-  roles RolePermission[]
+  /// 🔴 WHEN THIS CODE ARRIVED IN THE SYSTEM — OWNER DECISION 131's «جديدة» mark, half of it.
+  ///
+  /// «إحنا بنطلّع كل صلاحيات النظام بالمصفوفة وما بنعطي ولا وحدة لحدا؛ الصلاحية الجديدة بتنزل
+  /// معلَّمة بالأخضر إنها جديدة» — every permission appears in every office's matrix, granted to
+  /// nobody, and a new one lands marked.
+  ///
+  /// GLOBAL AND PROVIDER-OWNED, like every other column on this model. A code arrives in the
+  /// product once, not once per office, so the DATE is one fact. What is per-office is whether
+  /// that office has DEALT with it, and that cannot live here — see `OfficePermissionDismissal`,
+  /// and `docs/module-1-new-permission-mark.md` for why a single date can never answer it.
+  ///
+  /// ## NULL MEANS «PREDATES THE MARK», AND IT IS THE NON-NOISY DIRECTION
+  ///
+  /// The 232 codes that existed when this column landed carry NULL and are never marked. The
+  /// alternative — stamping them all with the migration's own date — would have shown every
+  /// office its entire catalogue as new on day one, which teaches the first administrator to
+  /// dismiss the mark and makes it worthless for the code that genuinely closes a button.
+  ///
+  /// ⟶ So a code is marked only when this is SET **and** later than the office's own `createdAt`.
+  /// A newly-registered office therefore meets no mark at all, which is the same argument.
+  ///
+  /// ⛔ AND A NEW CODE MUST CARRY ONE. `permissions.spec.ts` pins the number of codes WITHOUT a
+  /// date at exactly the pre-decision-131 catalogue and fails in BOTH directions: add a code with
+  /// no date and it says so; backdate an existing one and it says that instead.
+  introducedAt DateTime?
+
+  roles      RolePermission[]
+  dismissals OfficePermissionDismissal[]
+}
+
+/// 🔴 THE OTHER HALF OF THE «جديدة» MARK — this office looked at this code and chose not to grant it.
+///
+/// OWNER DECISION 131 names two ways an office decides: «يعطيها لدور، أو يقرّر فيها» — grant it to
+/// a role, or rule on it. The FIRST is already recorded, as a `RolePermission` row. This table
+/// holds only the SECOND, which is the one state nothing else in the schema can express.
+///
+/// ## WHY A DISMISSAL TABLE AND NOT A DECISION TABLE
+///
+/// The obvious shape is one row per (office, code) carrying the decision either way. It is bigger
+/// and weaker: bigger because it duplicates what `RolePermission` already says, 232 codes times
+/// every office to record what one join answers; weaker because TWO sources would then say whether
+/// a code is granted and they could disagree. The grant is the authority. This holds the remainder.
+///
+/// Measured shape on dev: a handful of rows rather than ~930.
+///
+/// ## CRITERION 5 FALLS OUT OF RLS RATHER THAN A FILTER
+///
+/// «مكتب ثاني ما بيشوف قرار مكتب» — one office must not see another's decision. The row is
+/// tenant-scoped with the usual `dbgenerated()` default and an ENABLED **and FORCED** policy, so
+/// another office cannot read, write or clear this state because the row is INVISIBLE to it —
+/// not because a query remembered to filter. Message 36 §1 measured that distinction the hard
+/// way: an application filter proves layer 1 and only a policy proves layer 2.
+model OfficePermissionDismissal {
+  id                   String       @id @default(uuid())
+  /// The office. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String       @default(dbgenerated())
+  organization         Organization @relation(fields: [organizationId], references: [id])
+  permissionId         String
+  permission           Permission   @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+  /// WHO ruled. The holder of `role.update` — the same permission that gates the matrix itself,
+  /// so the person who could have granted it is the person who declined to.
+  dismissedByUserId    String
+  dismissedBy          User         @relation(fields: [dismissedByUserId], references: [id], onDelete: Restrict)
+  /// The name as it stood, for the same reason `DeclaredAct.actorNameShown` keeps one: a record of
+  /// a decision that can only name a uuid is a record nobody can read.
+  dismissedByNameShown String
+  dismissedAt          DateTime     @default(now())
+
+  /// ONE ruling per code per office. A second would not mean anything the first does not, and
+  /// without this a double-click writes two.
+  @@unique([organizationId, permissionId])
+  @@index([organizationId])
 }
 
 model RolePermission {

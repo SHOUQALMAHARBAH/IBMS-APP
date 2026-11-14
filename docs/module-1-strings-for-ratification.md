@@ -11,11 +11,11 @@ or the owner's own decision file.
 no source is **EMPTY and hers** — message 37 §3 is explicit that a guessed cell is the one thing
 this table must not hold, and an empty cell is a question rather than a gap.
 
-**Counts: 16 cells filled from a source, 14 empty and hers.**
+**RATIFIED 2026-11-13 — OWNER DECISION 133.** The table went up with **16 cells filled from a source and 14 empty and hers**; she ratified all thirty, corrected two of the sliced cells, and ruled on two open readings. **Every row below is marked مصادَق عليه — القرار ١٣٣**, and the fourteen that were empty now carry her words.
 
-⚠️ **NOTHING HERE SHIPS UNTIL SHE RATIFIES IT.** As at **2026-11-12** no screen is built, and art. 15/d
-is not enforced — the server wiring and its screen ship together in message 38, for the reason in
-message 37 §4.
+🔴 **AND THE TWO CORRECTIONS SHARE ONE CAUSE, WHICH IS THE LESSON WORTH KEEPING.** Exemption 5 carried a NOTE from our own reference paper instead of the clause, and exemption 2 carried markdown bold the instrument does not have — because both were sliced from `docs/legal/cbj-instructions-9-2026-source-text.md`, **our transcription**, which carries our commentary and our formatting. ⟶ **The source for the five exemption labels is decision 133’s own table from here on**, whose text she read off the page image and cited to printed page 17. `article-15-d.strings.spec.ts` re-slices all five from it and compares byte for byte, so this cannot recur silently.
+
+✅ **SHE HAS RATIFIED IT — 2026-11-13, decision 133.** Art. 15/d’s server wiring and its screen ship together in message 38, which is this batch. Decision 128’s strings (§4) are ratified too and are built in message 39, on the record this batch lays down.
 
 ---
 
@@ -35,29 +35,30 @@ ruling 1). The order below is the order an employee meets it.
 
 ## 2 · Art. 15/d — the five exemption labels
 
-Each is a clause of art. 15/d's own text, printed page 17. **Four of the five slice whole.**
+Each is a clause of art. 15/d’s own text, **printed page 17, read off the page image by the owner and ratified in decision 133 §2**. All five slice whole from her table.
+
+⛔ **AND THEY ARE NOT SLICED FROM `docs/legal/cbj-instructions-9-2026-source-text.md` ANY MORE.** That file is our transcription: it carries our own notes and our own bolding, and both of this table’s defects came from taking a label out of it. Decision 133’s table is the source, and the spec re-slices from there.
 
 | site | the string | its source |
 |---|---|---|
-| exemption 1 label | «عند تجديد عقود التأمين الطبي الفردي.» | **instrument**, art. 15/d/1, printed page 17 — source line 431. Sliceable whole. |
-| exemption 2 label | «عند تجديد عقود التأمين الطبي الجماعي بحد اقصى **ثلاث سنوات متتالية**.» | **instrument**, art. 15/d/2, printed page 17 — source line 432. Sliceable whole, and it carries its own three-year limit. |
-| exemption 3 label | «في عقود التأمين محددة المنافع والتغطيات.» | **instrument**, art. 15/d/3, printed page 17 — source line 433. Sliceable whole. |
-| exemption 4 label | «في عقود تأمين المركبات وعقود التأمين الطبي وعقود التأمين على البضائع أثناء النقل» | **instrument**, art. 15/d/4, printed page 17 — source line 434, span **[0:81]** of the clause, i.e. up to «التي لا يزيد». ⛔ **THE REST IS NOT SLICEABLE**: the clause's own figure is UNREADABLE in our extraction (the raw line shows «٠٠١»), and the standing rule is never to take a figure from that file. The ceiling comes from `SINGLE_INSURER_EXEMPTION_PREMIUM_CEILING_JOD`, read at the request's date. ⟶ **So the label stops before the figure and the figure is rendered from the row.** Whether the label should name the ceiling at all is hers. |
-| exemption 5 label | «> **سقف القسط السنوي: رقمٌ غير مقروء.** السطر الخامّ (519): `التي لا يزيد القسط السنوي فيها عن ‎٠٠١‏ دينار شريطة الاعتماد على سياسات اكتتابية`» | **instrument**, art. 15/d/5, printed page 17 — source line 436. Sliceable whole. (Cited as 15/d/5; an earlier note of mine said 15/e/5 and was wrong — decision 132 §4.) |
+| exemption 1 label | «عند تجديد عقود التأمين الطبي الفردي.» | **OWNER DECISION 133**, `docs/decision-133-strings-ratified.md` — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. Unchanged by the ratification. |
+| exemption 2 label | «عند تجديد عقود التأمين الطبي الجماعي بحد اقصى ثلاث سنوات متتالية.» | **OWNER DECISION 133**, `docs/decision-133-strings-ratified.md` — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. **CORRECTED:** it carried `**ثلاث سنوات متتالية**` — markdown bold out of our transcription. The instrument has no formatting. Decision 133 §4 names this as one of its two corrections. |
+| exemption 3 label | «في عقود التأمين محددة المنافع والتغطيات.» | **OWNER DECISION 133**, `docs/decision-133-strings-ratified.md` — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. Unchanged by the ratification. |
+| exemption 4 label | «في عقود تأمين المركبات وعقود التأمين الطبي وعقود التأمين على البضائع أثناء النقل التي لا يزيد القسط السنوي فيها عن ٢٠٠٠ دينار شريطة الاعتماد على سياسات اكتتابية لثلاث شركات تأمين على الأقل.» | **OWNER DECISION 133**, `docs/decision-133-strings-ratified.md` — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. **NOW RATIFIED WHOLE, figure included** — the earlier cell stopped at span `[0:81]` because our extraction renders the clause’s own figure as «٠٠١». She read it off the page image. ⛔ **THE FIGURE IS STILL NEVER TYPED INTO THE STRING:** the label is a template split either side of it, and the figure renders from `SINGLE_INSURER_EXEMPTION_PREMIUM_CEILING_JOD` read at the request’s own date. The spec asserts that rendering it with the seeded row reproduces this sentence byte for byte — so if the row moves and the label does not, the build fails. |
+| exemption 5 label | «بناءً على طلب العميل وفق وسائل التبليغ المعتمدة.» | **OWNER DECISION 133**, `docs/decision-133-strings-ratified.md` — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. 🔴 **CORRECTED:** it carried a NOTE from our reference paper — «سقف القسط السنوي: رقمٌ غير مقروء» and a raw-line quotation — instead of the clause. Decision 133 §4’s first correction. |
 
 ## 3 · Art. 15/d — the record and the two conditional exemptions
 
-**Every cell here is hers.** None of these has a source to slice from: they are labels on a record
-and on two fields, not sentences anybody has written yet.
+**Every cell here was hers and she has written all six** (decision 133 §2). They are labels on a record and on two fields, so none had a source to slice from until her own table became one.
 
 | site | the string | its source |
 |---|---|---|
-| the question asked when fewer than three are reached | **(empty — hers)** | Hers. The adviser's TITLE above is a warning, not a question, and a question that invites a choice reads differently from one that announces a breach. ⟶ Or she may rule that the title serves and no separate question is needed. |
-| the «chosen by» wording on the record | **(empty — hers)** | Hers. Decision 129 criterion 7 requires the record to tell «وسمه النظام» from «اختاره فلان», and those two phrases are HER words in the decision — but a record LABEL is not the decision's prose, so the cell is empty rather than sliced from a sentence about the rule. |
-| the «tagged by the system» wording | **(empty — hers)** | Hers. **Unused today** — on the 2026-11-12 measurement none of the five can be tagged — and the value must not be deleted (decision 129's criterion 7 could not be recorded later without it). |
-| exemption 4 — the expected-premium field label | **(empty — hers)** | Hers. ⚠️ And it must not borrow a premium label from elsewhere: this is the premium the employee EXPECTS and declares, not one a quotation returned, and `quoteTermPremium`-style wording would say the wrong thing. |
-| exemption 4 — the alert when a quotation exceeds the ceiling | **(empty — hers)** | Hers. ⛔ It must read as a WARNING and not a refusal: decision 126, and message 36 §4.5 — «ينبّه ولا يرفض». The quotation is not rejected and the exemption is not erased. |
-| exemption 5 — the evidence label | **(empty — hers)** | Hers. The evidence is an INBOUND `CommunicationLog` on the request; see the approved-means table below for which channels may count. |
+| the question asked when fewer than three are reached | «أُرسِل الطلب لأقل من ثلاث شركات تأمين. ما سبب الإعفاء؟» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. She wrote a separate question rather than ruling the adviser’s title serves: his title announces a breach, and this asks which exemption applies. **Both are shown** — his title heads the window that appears only when no exemption is chosen, and this question heads the step before it. |
+| the «chosen by» wording on the record | «اختاره: » + the employee’s name from the system | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. Decision 129 criterion 7 — the record must tell «وسمه النظام» from «اختاره فلان». The label carries the colon and the name is appended from `chosenByNameShown`, which the row already stores. |
+| the «tagged by the system» wording | «حدّده النظام» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. **Still unused today** — on the 2026-11-12 measurement none of the five can be tagged, and decision 133 says so in the row’s own site cell «غير مستعمل اليوم». ⛔ The value must not be deleted: criterion 7 could not be recorded later without it. |
+| exemption 4 — the expected-premium field label | «القسط السنوي المتوقَّع (دينار)» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. ⚠️ Note she wrote «المتوقَّع» — EXPECTED — which is the distinction the empty cell warned about: this is what the employee expects and declares, never what a quotation returned. |
+| exemption 4 — the alert when a quotation exceeds the ceiling | «تنبيه: قسط العرض الوارد أعلى من ٢٠٠٠ دينار، وهو حدّ الإعفاء المختار لهذا الطلب. الطلب لم يُرفَض.» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. ⛔ **THE FIGURE IS READ FROM THE LEGAL-VALUES TABLE AT THE REQUEST’S DATE AND IS NEVER WRITTEN INTO THE TEXT** — decision 133 says so on the row itself. Her last sentence «الطلب لم يُرفَض» is the warning-not-refusal property in her own words (decision 126). |
+| exemption 5 — the evidence label | «طلب العميل، واصلاً بوسيلة تبليغ معتمدة» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. The evidence is an INBOUND `CommunicationLog` on the request, through an approved means only — and her label says exactly that: the customer’s request, **arriving by an approved means of notification**. See §6. |
 
 ## 4 · Decision 128 — what the office sees
 
@@ -67,19 +68,19 @@ and on two fields, not sentences anybody has written yet.
 | ⛔ what the stamp must NEVER be | «ساري» | `rcStandingActive`, shown only for a term INSIDE its printed dates. Decision 128 is explicit: a screen reaching for this word to describe the under-study state would tell an office and an inspector that a licence is current when the instrument says it ran out. **Never «ساري», and never «حكماً».** |
 | «إشعار نقص» | «إشعار نقص» | **HERS ALREADY** — decision 128 §5 and §8. Listed so she sees it beside the rest before it ships. |
 | «رفض تجديد» | «رفض تجديد» | **HERS ALREADY** — decision 128. Same reason. |
-| the stamp on a record issued while the renewal is under study | **(empty — hers)** | Hers. ⛔ Never «ساري» and never «حكماً» (decision 128). This is the one string on this list that a reader could be actively misled by, because it appears ON an issued document. |
-| filing proof — the file field label | **(empty — hers)** | Hers. |
-| filing proof — the filing date field label | **(empty — hers)** | Hers. |
-| filing proof — the inbound/reference number field label | **(empty — hers)** | Hers. |
-| the standing declaration (made once per term) | **(empty — hers)** | Hers. It is a row in the declared-act record (§3 of message 36), not a second mechanism — so its wording is a declaration's wording and carries the same weight as the art. 15/d acknowledgement. |
+| the stamp on a record issued while the renewal is under study | «صدرت والتجديد قيد الدراسة» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. ⛔ Her own cell repeats the prohibition: **not «ساري» and not «حكماً»**. This is the one string a reader could be actively misled by, because it appears ON an issued document. **Built in message 39.** |
+| filing proof — the file field label | «إثبات تقديم طلب التجديد» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. **Built in message 39.** |
+| filing proof — the filing date field label | «تاريخ تقديم الطلب» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. **Built in message 39.** |
+| filing proof — the inbound/reference number field label | «رقم الوارد أو الرقم المرجعي» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. **Built in message 39.** |
+| the standing declaration (made once per term) | «أُقرّ بأنه لم يصل المكتبَ من البنك المركزي رفضٌ لطلب التجديد ولا إشعارُ نقص.» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. It is a row in the declared-act record (message 36 §3), not a second mechanism — so it carries the same weight as the art. 15/d acknowledgement. Decision 133 heads it «إقرار المدير (مرة لكل فترة ترخيص)» — once per licence term. **Built in message 39.** |
 
 ## 5 · Also owed
 
 | site | the string | its source |
 |---|---|---|
-| `legal-value.read` — Arabic description | **(empty — hers)** | **AGENT-COMPOSED, on `AWAITING_OWNER_REVIEW`.** Its English is in `permissions.ts`; the Arabic line is composed from runs already shipping («تعليمات البنك المركزي الأردني رقم 9 لسنة 2026» from `rcStandingNoTermNote`, «المادة» and «المرجع» from the same dictionary, «يقرأ» from 28 sibling descriptions). Composed, not sliced whole — which is why it is here. |
-| `legal-value.declare` — Arabic description | **(empty — hers)** | Same: agent-composed, on `AWAITING_OWNER_REVIEW`. ⟶ And note decision 131 took both codes off every role; the DESCRIPTION question is unaffected by that. |
-| decision 131's notification sentence | **(empty — hers)** | Hers. It must carry the code's name, its description, **and the screen or button the code guards** (decision 131 §5). ⚠️ Measured 2026-11-12: no code guards a formerly-open button TODAY, because all 8 permission-adding migrations backfilled their grants — decision 131 ends that, so the next such code is the first that will actually close one. |
+| `legal-value.read` — Arabic description | «يقرأ الأرقام القانونية التي يحسب بها النظام، ومع كل رقم مادته وتاريخ العمل به.» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. 🔴 **HER SENTENCE REPLACES THE AGENT-COMPOSED ONE**, and the code comes OFF `AWAITING_OWNER_REVIEW` — so `OWNER_REVIEWED_COUNT` rises by two and the balance holds. The composed line was built out of shipping runs; hers was written whole. |
+| `legal-value.declare` — Arabic description | «يُدخل للمكتب رقماً أحالته التعليمات إلى قرار لم يصدر بعد، ومعه مرجعه وتاريخ العمل به.» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. Same: her sentence replaces the composed one and the code comes off `AWAITING_OWNER_REVIEW`. ⟶ Decision 131 took both codes off every role; the DESCRIPTION question was always separate from that, and still is. |
+| decision 131's notification sentence | «صلاحية جديدة في النظام: [اسمها]. [شرحها]. تتحكّم في: [الشاشة أو الزر]. لم تُعطَ لأحد بعد — قرّر لمن تعطيها من مصفوفة الصلاحيات.» | **OWNER DECISION 133** — sliced from its own table by script. مصادَق عليه — القرار ١٣٣. Four slots, and the third — «تتحكّم في: [الشاشة أو الزر]» — is the one that needed building: it is DERIVED from the controllers, never authored. ⚠️ Measured 2026-11-12: no code guards a formerly-open button TODAY, because all 8 permission-adding migrations backfilled their grants. Decision 131 ends that, and `declared-act.article-15-d.declare` — minted in this batch — is the first code that will actually close one. |
 | decision 131's «جديدة» mark | «جديدة» | **HERS ALREADY** — decision 131 §1, «معلم عليها بالاخضر ع انها جديدة». Shown in green. |
 
 ---
@@ -99,9 +100,10 @@ sliced from the instrument (source lines 665-668):
 And `InteractionChannel`'s twelve members mapped onto them. **Exemption 5's evidence is an INBOUND
 `CommunicationLog` on the request; this table decides which channels may carry it.**
 
-⚠️ **CODE READS THIS ONLY AFTER SHE RATIFIES IT, NOT BEFORE.** Today the system requires the
-evidence to be INBOUND and attached to the request, and records the channel — so her answer can be
-applied afterwards to rows already written.
+✅ **SHE HAS RULED — decision 133 §3, and it changes two rows of the table below.**
+
+1. **`PORTAL` counts as means 2 and is no longer a reading.** Her reason: «لأنها قناة المكتب مع عميله وباسمه» — it is the office’s own channel with its own customer, in the office’s name. The question the earlier cell raised — whether a portal whose software is the provider’s is «الخاصة بوسيط التأمين» — is answered, and answered on whose channel it is rather than whose code runs it.
+2. 🔴 **A THIRTEENTH `InteractionChannel` MEMBER IS ADDED FOR MEANS 1**, labelled «تبليغ خطي». Her reason is the one §6 reported: without it «رسالة العميل الورقية كانت ستُسجَّل «أخرى»، وهي أضعف خانة» — a paper notice would have been filed as `OTHER`, the conditional case, which is the strongest means treated as the weakest.
 
 | `InteractionChannel` | which means | why |
 |---|---|---|
@@ -114,20 +116,19 @@ applied afterwards to rows already written.
 | `RENEWAL` | **not a means** | A case type, not a channel. |
 | `CLAIM` | **not a means** | A case type, not a channel. |
 | `COMPLAINT` | **not a means** | A case type, not a channel. |
-| `PORTAL` | means **2** — *a reading* | ⚠️ **THIS ONE IS A READING AND IS FLAGGED AS ONE.** «القنوات الالكترونية الخاصة بوسيط التأمين» — the broker's own electronic channels — is the natural home for a customer portal the office runs. But whether OUR portal is «الخاصة بوسيط التأمين» when the software is the provider's is a question about the arrangement, not about the code. **Hers.** |
+| `PORTAL` | means **2** | ✅ **RATIFIED — decision 133 §3 ruling 1, and it is no longer a reading.** «القنوات الالكترونية الخاصة بوسيط التأمين» — the broker’s own electronic channels. Her reason settles the open question on WHOSE CHANNEL it is rather than whose software: «قناة المكتب مع عميله وباسمه». |
 | `SMS` | means **3** | «الرسائل النصية عن طريق الهاتف الخلوي» — named explicitly. |
+| `WRITTEN_NOTICE` | means **1** | 🔴 **NEW — decision 133 §3 ruling 2**, added in this batch. «التبليغ الخطي» — named first of the four and the only one with no member until now. |
 | `OTHER` | means **4**, CONDITIONALLY | «اي وسيلة يتم الاتفاق عليها خطياً بين الاطراف ذات العلاقة» — so it counts **only with evidence of a written agreement**, which is message 37 §2's own condition. ⟶ A bare `OTHER` with no such evidence is not a means. |
 
-**Measured: 2 members map cleanly (`EMAIL`, `SMS`), 1 is a reading (`PORTAL`), 1 is conditional
-(`OTHER`), 1 is excluded by her own earlier decision (`WHATSAPP`), and 7 are not means at all.**
+**Measured before the ratification: 2 members mapped cleanly (`EMAIL`, `SMS`), 1 was a reading (`PORTAL`), 1 conditional (`OTHER`), 1 excluded by her own earlier decision (`WHATSAPP`), and 7 were not means at all.**
 
-### 🔴 And means 1 has NO channel member at all
+**After decision 133: THIRTEEN members — `WRITTEN_NOTICE` is means 1, `EMAIL` and `PORTAL` are means 2, `SMS` is means 3, `OTHER` is means 4 conditionally, `WHATSAPP` is refused by name, and 7 are not means at all.** All four of art. 22/s now have a member, which is the state §6 reported as missing.
 
-«التبليغ الخطي» — written notice — is the first of the four, and **measured 2026-11-12, no
-member of `InteractionChannel` represents it.** A letter or a signed paper notice is the most
-traditional means the article names, and the least representable in a model built around channels.
+### ✅ And means 1 HAS a channel member now — it had none, and that is what she fixed
 
-⟶ Today such evidence could only be recorded as `OTHER`, which the table above makes conditional
-on a written agreement — so **a written notice would be treated as the weakest case rather than
-the strongest.** That is backwards, and it is reported rather than fixed: adding a member to a
-12-member enum that 20 call sites read is a decision, not a tidy-up.
+«التبليغ الخطي» — written notice — is the first of the four, and **measured 2026-11-12, no member of `InteractionChannel` represented it.** A letter or a signed paper notice is the most traditional means the article names, and the least representable in a model built around channels.
+
+So such evidence could only have been recorded as `OTHER`, which the table above makes conditional on a written agreement — **the strongest means treated as the weakest.** It was reported rather than fixed, on the ground that adding a member to a 12-member enum read at 20 call sites is a decision and not a tidy-up.
+
+✅ **SHE TOOK THAT DECISION — decision 133 §3 ruling 2.** `WRITTEN_NOTICE` is the thirteenth member, labelled «تبليغ خطي», and it is means 1. The 20 call sites were measured before it was added and the ones a thirteenth member touches are named in this batch’s report.
