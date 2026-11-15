@@ -43,11 +43,22 @@ import { formatDate, formatDateTime } from '../../../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../../../lib/i18n/translations';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
+import { Article15DRecord } from '../../../../components/rfq/Article15DRecord';
 
 
 // The medium of a broker<->insurer exchange. The API accepts the full
 // InteractionChannel enum; this is the practical subset for placement work.
-const COMM_CHANNELS = ['EMAIL', 'CALL', 'PORTAL', 'MEETING', 'OTHER'] as const;
+// WRITTEN_NOTICE added 2026-11-14: art. 15/d's exemption 5 rests on the customer's request
+// having arrived by an approved means (OWNER DECISION 133 section 3), the evidence is an
+// INBOUND CommunicationLog on this RFQ, and a paper notice could not be recorded here at all.
+const COMM_CHANNELS = [
+  'EMAIL',
+  'CALL',
+  'PORTAL',
+  'MEETING',
+  'WRITTEN_NOTICE',
+  'OTHER',
+] as const;
 const COMM_DIRECTIONS: CommunicationDirection[] = ['INBOUND', 'OUTBOUND'];
 
 const RFQ_INSURER_STATUS_LABEL_KEY: Record<RfqInsurerStatus, TranslationKey> = {
@@ -68,6 +79,10 @@ const COMM_CHANNEL_LABEL_KEY: Record<(typeof COMM_CHANNELS)[number], Translation
   CALL: 'rfqCommChannelCall',
   PORTAL: 'rfqCommChannelPortal',
   MEETING: 'rfqCommChannelMeeting',
+  // Art. 22/s's FIRST approved means, added by OWNER DECISION 133 section 3 ruling 2. The
+  // COMPILER demanded this the moment the channel was added to COMM_CHANNELS, which is the
+  // right kind of break: a Record over a closed set cannot silently miss a member.
+  WRITTEN_NOTICE: 'rfqCommChannelWrittenNotice',
   OTHER: 'rfqCommChannelOther',
 };
 
@@ -271,6 +286,17 @@ export default function RfqDetailPage() {
               { date: formatDate(rfq.issuedAt, language), count: rfq.followUpThresholdDays },
             )}
           </div>
+
+          {/*
+            ART. 15/d — what this request rests on, ABOVE the insurer list rather than below it.
+            A reader asking "why did this go to one company?" is asking before they read the
+            list, not after; and the component renders nothing at all when the request reached
+            three or more, which is 84.3% of them.
+          */}
+          <Article15DRecord
+            exemption={rfq.article15DExemption}
+            alerts={rfq.article15DAlerts}
+          />
 
           <ConsentCaptureWidget
             customerId={rfq.opportunity.customerId}

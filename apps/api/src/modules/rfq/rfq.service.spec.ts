@@ -17,6 +17,8 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 import { licensedOffice } from '../compliance-risk/license-gate.double';
+import type { Article15DService } from '../compliance-risk/article-15-d.service';
+import type { PermissionsService } from '../rbac/services/permissions.service';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return withDerivedPermissions({
@@ -196,6 +198,10 @@ function makeDeps() {
       // actors carry no role scope, which reads as unrestricted whatever the category.
       {
         findCategory: vi.fn().mockResolvedValue('GENERAL'),
+        // Art. 15/d decides its exemptions against the STANDARD line's own code. NULL here, so
+        // `availableExemptions` offers only the two that are ungated by line -- which keeps
+        // every test in this file about the RFQ rather than about the article.
+        findStandardCode: vi.fn().mockResolvedValue(null),
       } as unknown as InsuranceLineRepository,
       // DOOR FOUR. Resolves NO anchor, which is the NON-WIDENING value: every test in this file
       // keeps the behaviour it had, and a test that wants an anchored read says so by overriding
@@ -206,6 +212,26 @@ function makeDeps() {
         resolve: resolveAnchor,
       } as unknown as CustomerFileAnchorService,
       licensedOffice(),
+      /*
+       * ART. 15/d. Records NOTHING and refuses nothing, which is the NON-WIDENING value for a
+       * file whose tests are about the RFQ: every request here reaches the shortlist it asked
+       * for, exactly as before this service existed. The article's own behaviour is proven over
+       * HTTP in `article-15-d.e2e-spec.ts`, because a mock cannot refuse you -- the recorded
+       * lesson from the five screening routes whose precondition only an api e2e could see.
+       */
+      {
+        evaluate: vi.fn().mockResolvedValue({ kind: 'nothing' }),
+        apply: vi.fn().mockResolvedValue(null),
+        // `get` reads these onto the record. NULL / empty is the state of 84.3% of requests --
+        // the ones that reached three insurers and rest on nothing.
+        findExemptionForRfq: vi.fn().mockResolvedValue(null),
+        findAlertsForRfq: vi.fn().mockResolvedValue([]),
+      } as unknown as Article15DService,
+      /* No codes granted. These actors are not making declarations, and a stub that granted
+       * everything would hide the one refusal that matters. */
+      {
+        getCodesForRoles: vi.fn().mockResolvedValue(new Set<string>()),
+      } as unknown as PermissionsService,
     ),
     mocks: {
       createRfq,

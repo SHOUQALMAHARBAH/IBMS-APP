@@ -176,3 +176,97 @@ reverse would mean a window with nowhere to record what it says.
 ⛔ **So do not read their presence as the feature being live**, and do not wire a writer to either
 one without the screen: a recorded exemption nobody can see is worse than none, because it reads
 as a declared act that was never declared.
+
+---
+
+## ✅ WIRED — 2026-11-14, message 38 §3. Server and screen in one batch, as §4 required.
+
+The paragraph above is the state until 2026-11-14 and is kept as the history. What shipped:
+
+| piece | where |
+|---|---|
+| the rule, pure | `article-15-d.config.ts` (unchanged) |
+| the evaluation | `article-15-d.service.ts` — `evaluate` refuses, `apply` writes |
+| the question the screen asks | `GET /rfqs/article-15-d/options`, gated on `rfq.create` |
+| the record | `POST /rfqs` — `RfqArticle15DExemption` or a `DeclaredAct`, never both |
+| the alert | `quotation.service.ts` `capture` → `checkQuotationAgainstCeiling` |
+| the window | `components/rfq/Article15DWindow.tsx`, on `/rfqs/new` |
+| the approved means | `approved-means.config.ts`, total over the 13-member channel enum |
+| the tests | `article-15-d.e2e-spec.ts` — **15/15**, each named by its criterion |
+
+### 🔴 THE DEFECT THE e2e FOUND, WHICH IS THE THING WORTH READING HERE
+
+The first version evaluated art. 15/d **after** `insertRfqRow`, because the exemption and the
+declared act both point AT the request and neither can be written before one exists. That is true
+of the **writes** and false of the **refusals** — and the consequence was real:
+
+> a refused request left the RFQ row behind. The employee corrected their mistake, submitted
+> again, and got **409 Conflict** from `@@unique([opportunityId, insuranceLine])` — told that a
+> request they could not see already existed, with **no way to proceed on that line at all**.
+
+Found on the spec's second run, where a refused WhatsApp evidence was followed by a valid attempt
+on the same opportunity and line. ⟶ Split into `evaluate` (refuses, before the row) and `apply`
+(writes, after it), and pinned by a test that drives the exact human sequence — refused, then
+corrected — because that is the only form in which the bug was visible.
+
+### 🔴 AND THE ALERT WAS WIRED ON `capture` AND NOT ON `revise` — HALF A WARNING
+
+The second defect, and it was found by reading the sibling path rather than by a failure.
+`QuotationService.capture` compared the quote against the ceiling; `revise` did not.
+
+⟶ So an insurer's opening quote of 1,800 would have raised nothing (correctly) **and its revised
+quote of 2,400 would have raised nothing either.** The system would have warned on the cheapest
+path and gone silent on the expensive one — which is worse than no alert, because an office that
+has seen the mechanism work once will read its silence as "within the ceiling".
+
+Message 36 §4.5 is «ولمّا ترجع العروض يقارن النظام» — when the quotes come back the system
+compares — and **a revision IS a quote coming back.** Both paths call it now, and the revision
+raises its OWN alert rather than editing the first: a revision is a new `Quotation` row, the index
+is `(exemptionId, quotationId)`, and the alert is a TABLE rather than a flag precisely so a second
+high quote cannot be swallowed by the first.
+
+⚠️ **And the route carries `quotation.negotiate`, not `quotation.capture`** — measured when the
+test answered 403. The compiler cannot see that, and neither can a reader who assumes the two
+quote-writing routes share a code.
+
+### AND THE CUSTOMER CHECK FIRES BEFORE THE CHANNEL CHECK
+
+Also found by getting it wrong: evidence from the wrong customer is refused as *the wrong
+customer*, not as *the wrong channel*. Whose message it is comes before how it arrived, and a
+message from the wrong customer is not improved by having come by email.
+
+### ⛔ AND EXEMPTION 5's EVIDENCE CANNOT BE «ON THIS RFQ», WHICH CORRECTS THE SCHEMA COMMENT
+
+`RfqArticle15DExemption`'s own comment says the evidence is «an INBOUND `CommunicationLog` on this
+RFQ». Measured while wiring it: **the customer asks BEFORE the request exists**, so at creation
+there is no RFQ for the log to be on — the strict reading makes exemption 5 unreachable on the
+only path that needs it. ⟶ The evidence is an INBOUND log **on the opportunity's own customer**,
+by an approved means, and nothing wider: any log in the office would let an unrelated message
+stand as proof that THIS customer asked for THIS request.
+
+### 🔴 AND THE ENFORCEMENT IS IN THE ROUTE, SO A DIRECTLY-WRITTEN ROW ESCAPES IT
+
+Stated plainly because it is the honest limit of what shipped, and because it was already
+measured last batch: **`comparison` and `recommendation` create their RFQs through Prisma and
+never pass through `POST /rfqs` at all.** Measured 2026-11-14: **15 api e2e specs** write an
+`RFQ` row directly.
+
+⟶ Such a row has no exemption and no declared act, and **nothing refuses it.** The database
+CHECKs constrain an exemption row that EXISTS; none of them requires one to exist.
+
+**It is not expressible as a constraint today, and that is structural rather than an omission.**
+The count art. 15/d turns on is the SHORTLIST, which lives in `RFQInsurer` rows inserted *after*
+the parent — so a trigger on `RFQ` fires before the fact it would need, and a trigger on
+`RFQInsurer` would have to decide what the *final* shortlist is while rows are still arriving.
+
+⛔ So do not read the CHECKs as the guarantee. The guarantee is the route, and a path that writes
+an RFQ some other way is a path art. 15/d does not reach — which is a reason not to build one,
+and the reason seeding scripts that do it carry a comment saying so.
+
+### WHAT STILL CANNOT BE TAGGED — unchanged, and the measurement above still holds
+
+Every exemption recorded today is `CHOSEN_BY_PERSON`. ⛔ Decision 129's **criterion 1** asks for
+exemption 1 tagged BY THE SYSTEM on an individual medical renewal, and the system holds no fact it
+could tag on. The e2e proves what decision 129 actually governs — the exemptions are offered on
+the line that can carry them and the record says who chose — and says so in its own header rather
+than driving a tag that would mean inventing the fact beneath it.

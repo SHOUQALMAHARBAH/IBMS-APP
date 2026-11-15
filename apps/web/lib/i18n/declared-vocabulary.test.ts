@@ -65,6 +65,19 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
       ['CustomerStatus', 4],
       ['SlaDurationUnit', 5],
       ['SlaSourceType', 5],
+      /*
+       * 🔴 ADDED 2026-11-14, AND IT WAS A REAL HOLE RATHER THAN AN OVERSIGHT WORTH A SHRUG.
+       *
+       * `ENUM_LABEL.InteractionChannel` was not under test, and `satisfies Labels<string>` keys
+       * it on `string` — so it enforces nothing about COVERAGE. OWNER DECISION 133 §3 ruling 2
+       * adds a thirteenth member, `WRITTEN_NOTICE`, and without this the member would have
+       * shipped with NO label: `/crm`'s channel select would have rendered a blank option, and
+       * `t()` on a missing key returns the key itself.
+       *
+       * Measured before adding it: the map had 12 keys for 12 members, so the parity held today
+       * and this is not a ratchet on a broken state.
+       */
+      ['InteractionChannel', 13],
     ] as const) {
       const members = schemaEnumMembers(name);
       expect(members.length, `${name} parsed ${members.length} member(s)`).toBe(
@@ -78,6 +91,7 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
     ['CustomerStatus', 'CustomerStatus'],
     ['SlaDurationUnit', 'SlaDurationUnit'],
     ['SlaSourceType', 'SlaSourceType'],
+    ['InteractionChannel', 'InteractionChannel'],
   ])(
     'ENUM_LABEL.%s is total over the database enum, and every key resolves in both languages',
     (mapName, enumName) => {

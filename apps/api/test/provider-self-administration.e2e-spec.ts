@@ -338,7 +338,7 @@ describe('the authorised mailbox widening — the sets, by name', () => {
      *
      *     git grep -ln 'PERMISSION\|Permission' -- apps/api/test | xargs git grep -ln 'toBe(2[0-9][0-9])'
      */
-    expect(total).toBe(232);
+    expect(total).toBe(233);
   });
 
   it("adds no role — PLATFORM_OPERATOR is still the provider organization's only seeded role", async () => {

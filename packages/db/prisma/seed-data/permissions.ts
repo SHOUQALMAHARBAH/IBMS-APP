@@ -70,6 +70,20 @@ export interface PermissionSeed {
   description: string;
   /** Module 0 item (j). Omitted = OFFICE, which is the non-widening default — see the header. */
   scope?: "OFFICE" | "PLATFORM";
+  /**
+   * 🔴 WHEN THIS CODE ARRIVED — OWNER DECISION 131's «جديدة» mark. An ISO date, `YYYY-MM-DD`.
+   *
+   * OMITTED means the code PREDATES the mark and is never marked. That is the right answer for
+   * the catalogue as it stood when the column landed and the wrong answer for anything added
+   * afterwards, so `permissions.spec.ts` pins the number of undated codes in BOTH directions:
+   * ship a new code with no date and it says so by name; backdate an old one and it says that.
+   *
+   * ⛔ IT IS NOT «when this row was first inserted». A database stamping its own insert time
+   * would make the date differ per environment, so an office on one database would see a mark
+   * that an identical office on another would not. The catalogue is the authority and the seed
+   * writes this on the UPDATE branch too, for the same reason `scope` is written there.
+   */
+  introducedAt?: string;
   /** Role machine names. Typed as `string`, not `RoleName`, because
    *  `OFFICE_ADMINISTRATOR` is a seeded role deliberately outside the legacy
    *  enum — see `roles.ts`. `permissions.spec.ts` still checks every entry
@@ -1263,6 +1277,19 @@ const complianceRisk: PermissionSeed[] = [
     // OWNER DECISION 131: no role. The code lands in every office's matrix marked «جديدة» and the
     // office decides. See the note above this pair.
     roles: [],
+    /*
+     * AND IT IS THE DATE THAT MAKES THE MARK APPEAR — decision 131, built in message 38.
+     *
+     * 2026-11-11 is when this code actually arrived: migration `20261216100000_legal_values`,
+     * commit `27e651b0`, measured rather than chosen. ⛔ Not the date the `introducedAt` column
+     * landed, which would be a lie about when the office's catalogue changed.
+     *
+     * MEASURED 2026-11-14 on dev: all four brokerage offices were created before that day — the
+     * latest, `069d420a`, on 2026-11-09 — so both codes are marked «جديدة» in every one of them,
+     * and they are the first two codes ever to be. Neither is held by any role anywhere, which is
+     * the other condition.
+     */
+    introducedAt: "2026-11-11",
   },
   {
     code: "legal-value.declare",
@@ -1271,6 +1298,48 @@ const complianceRisk: PermissionSeed[] = [
       "Declare, for this office, a legal value the instrument defers to a Central Bank decision that has not been issued — entering it with the reference it rests on and the date it takes effect, both mandatory. It does NOT permit entering or changing a figure the instrument itself states: those belong to the provider and the database refuses an office account that tries. A value already declared is never edited in place; a change is a new entry from its own date, so every transaction keeps computing at the value in force on the day it happened",
     // OWNER DECISION 131: no role. See the note above this pair.
     roles: [],
+    /** Same arrival as its sibling — one migration, one commit. See the note on `legal-value.read`. */
+    introducedAt: "2026-11-11",
+  },
+  /*
+   * 🔴 ART. 15/d's DECLARATION — ITS OWN PERMISSION, SEPARATE FROM THE PERMISSION TO SEND.
+   *
+   * Module paper §٤.١, element 3: whoever can ACT is not thereby able to DECLARE. A placement
+   * officer who sends quote requests all day cannot admit a regulatory breach on the office's
+   * behalf — that is a different act with a different consequence, and `rfq.create` must not
+   * carry it.
+   *
+   * ## IT IS GRANTED TO NOBODY, AND THAT IS WHAT MAKES IT THE FIRST REAL TEST OF DECISION 131
+   *
+   * `declared-act.config.ts` has named this string since message 36 and deliberately did NOT
+   * mint it, because at the time minting an OFFICE-scoped code meant granting it to at least one
+   * role — `permissions.spec.ts` refused `roles: []` — and that grant was the owner's to ratify.
+   *
+   * OWNER DECISION 131 removed that requirement and inverted the default: we expose every
+   * permission and grant none. ⟶ So this code lands held by no role anywhere, marked «جديدة» in
+   * every office's matrix, with the administrator notified.
+   *
+   * 🔴 AND THE CONSEQUENCE IS REAL RATHER THAN THEORETICAL, which is why it is written here.
+   * MEASURED 2026-11-12: every permission-adding migration before this one — 8 of 8 — backfilled
+   * its grant, so no code in this product's history has ever closed a button that was open. This
+   * one does: from the moment it ships, a quote request to fewer than three insurers with NO
+   * exemption cannot be declared until an administrator grants it. **That is decision 131 working
+   * as intended, not a regression** — and it is safe only because the notification is live and
+   * names what the code guards. ⛔ Do NOT pre-grant it to keep the path open.
+   *
+   * An EXEMPTED request is unaffected, and so is every request reaching three or more — which is
+   * 84.3% of them on the seeded distribution. The refusal reaches the minority of the minority.
+   */
+  {
+    code: "declared-act.article-15-d.declare",
+    module: "compliance-risk",
+    description:
+      "Declare that a quote request is going to fewer than three insurance companies with none of art. 15/d's five exemptions applying — writing the reason, ticking the acknowledgement, and recording the act against the request. SEPARATE from the permission to send a quote request, deliberately: whoever may act is not thereby able to admit a breach on the office's behalf. It does not permit editing or deleting a declaration once made, which no permission does",
+    // OWNER DECISION 131: no role. See the note above.
+    roles: [],
+    /** The day it ships. It is the first code ever to arrive ungranted AND close a path, so the
+     *  mark and the notification are the whole of how an office learns it exists. */
+    introducedAt: "2026-11-14",
   },
   {
     code: "compliance-calendar.manage",

@@ -127,6 +127,15 @@ export const NAV = {
     notifServiceRequestAssigned: 'طلبات خدمة مُسنَدة إليك',
     notifCustomerPendingKyc: 'عملاؤك بانتظار اعتماد اعرف عميلك',
     notifKycAwaitingDecision: 'ملفات اعرف عميلك بانتظار قرار',
+    // OWNER DECISION 131, wording ratified in OWNER DECISION 133. Sliced from her own table
+    // in docs/decision-133-strings-ratified.md; only her three bracketed SLOTS became
+    // placeholders. `article-15-d.strings.spec.ts` re-slices and compares byte for byte.
+    notifNewPermission: 'صلاحية جديدة في النظام',
+    notifNewPermissionSentence:
+      'صلاحية جديدة في النظام: {name}. {description}. تتحكّم في: {controls}. لم تُعطَ لأحد بعد — قرّر لمن تعطيها من مصفوفة الصلاحيات.',
+    // The same sentence with her NAME slot removed -- see the key's note in the EN block.
+    notifNewPermissionSentenceNoName:
+      'صلاحية جديدة في النظام: {description}. تتحكّم في: {controls}. لم تُعطَ لأحد بعد — قرّر لمن تعطيها من مصفوفة الصلاحيات.',
   },
   EN: {
     language: 'Language',
@@ -251,5 +260,24 @@ export const NAV = {
     notifServiceRequestAssigned: 'Service requests assigned to you',
     notifCustomerPendingKyc: 'Your customers awaiting KYC approval',
     notifKycAwaitingDecision: 'KYC files awaiting a decision',
+    /*
+     * OWNER DECISION 131's notification. The Arabic is hers (decision 133); this mirrors it.
+     *
+     * 🔴 AND THE `NoName` VARIANT IS A REPORTED GAP, NOT A STYLE CHOICE. Her sentence opens
+     * with the permission's NAME -- «صلاحية جديدة في النظام: [اسمها]» -- and OWNER DECISION
+     * 127 forbids ever showing a permission CODE to a user. The Arabic names come from a
+     * derivation table over all 232 codes that is NOT built (message 38 §4 defers it), and
+     * exactly ONE name exists today, hers, for a code that cannot be marked.
+     *
+     * ⟶ So where no name exists the sentence renders WITHOUT that clause. The alternatives
+     *   were to show the code (127 forbids it) or to invent a name (the standing rule
+     *   forbids it, and a name is hers). Dropping the clause is the only one that neither
+     *   lies nor invents, and it is reported rather than quietly shipped.
+     */
+    notifNewPermission: 'A new permission in the system',
+    notifNewPermissionSentence:
+      'A new permission in the system: {name}. {description}. It controls: {controls}. It has not been granted to anyone yet — decide who gets it from the permission matrix.',
+    notifNewPermissionSentenceNoName:
+      'A new permission in the system: {description}. It controls: {controls}. It has not been granted to anyone yet — decide who gets it from the permission matrix.',
   },
 } as const;

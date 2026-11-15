@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 import { PERMISSIONS } from '../i18n/translations/permissions';
@@ -122,7 +125,7 @@ const CARRIED_ENGLISH_BUDGET = 214;
  * balance holds at 230 = 230 + 0 -- which is what makes this an approval that was RECORDED rather
  * than a list somebody tidied.
  */
-const OWNER_REVIEWED_COUNT = 230;
+const OWNER_REVIEWED_COUNT = 232;
 
 /**
  * The four lines an agent wrote. Each is a placeholder in HER register, not a reviewed line.
@@ -159,14 +162,38 @@ const AWAITING_OWNER_REVIEW: string[] = [
    * commit that ships the code. What must only grow is `OWNER_REVIEWED_COUNT`.
    *
    * AND IT REFILLED ON 2026-11-11, EXACTLY AS THAT PARAGRAPH SAID IT WOULD, with module 1's two
-   * legal-values codes. Both lines below are AGENT-WRITTEN and are placeholders in her register
-   * until she reads them; both are composed from runs already shipping elsewhere in the product
+   * legal-values codes. Both lines were AGENT-WRITTEN and were placeholders in her register until
+   * she read them; both were composed from runs already shipping elsewhere in the product
    * («تعليمات البنك المركزي الأردني رقم 9 لسنة 2026» from `rcStandingNoTermNote`, «المادة» and
    * «المرجع» from the same dictionary, «يقرأ» from 28 sibling descriptions here), and the
-   * composition is reported to her in message 35's §6 table beside its slice sources.
+   * composition was reported to her in message 35's §6 table beside its slice sources.
+   *
+   * ⟶ AND IT EMPTIED AGAIN ON 2026-11-13: OWNER DECISION 133 ratified the strings table, and she
+   *   did NOT approve those two lines as written — she REPLACED both with her own sentences. So
+   *   `OWNER_REVIEWED_COUNT` rises by two to 232 and the balance holds at 232 = 232 + 0.
+   *
+   *   ⚠️ THAT IS A DIFFERENT OUTCOME FROM THE SEVEN ABOVE AND THE DIFFERENCE IS WORTH KEEPING.
+   *   The seven were approved UNCHANGED, so the agent's words survived her reading. These two
+   *   were not: hers are shorter, say «الأرقام القانونية» where the composed line said «القيم»,
+   *   and drop the instrument's full name. ⟶ So a line sitting on this list is not a line that
+   *   is probably fine — two of nine were rewritten — and the list is what makes that visible.
+   *
+   *   Both are SLICED byte-exact from `docs/decision-133-strings-ratified.md` and never retyped,
+   *   and the test below re-slices from that file and compares, so a hand-edit to the dictionary
+   *   fails by name.
+   *
+   * AND IT REFILLED AGAIN THE SAME DAY, with module 1's art. 15/d declaration code — exactly as
+   * the paragraph above says it legitimately does. That line is AGENT-COMPOSED: every run in it
+   * already ships («طلب عرض سعر» from `rfqNewRefusalAct`, «أقل من ثلاث شركات تأمين» from the
+   * adviser's own window text, «المسؤولية التنظيمية على المكتب» the owner's own sentence, and the
+   * verbs from 28 siblings here) but COMPOSED is not SLICED. The parity guard requires a line
+   * before a code can exist at all, so the choice was to compose one and declare it, or not to
+   * ship the permission.
+   *
+   * ⟶ `OWNER_REVIEWED_COUNT` stays 232 and the balance is 233 = 232 + 1. The sentence goes to her
+   *   in this batch's report.
    */
-  'legal-value.declare',
-  'legal-value.read',
+  'declared-act.article-15-d.declare',
 ];
 
 describe('whose Arabic is it — provenance, because the text cannot say', () => {
@@ -304,5 +331,63 @@ describe('the stored English fallback', () => {
     // like an explanation.
     expect(describePermission('never.was.a.code', 'AR', '   ')).toBeNull();
     expect(describePermission('never.was.a.code', 'AR')).toBeNull();
+  });
+});
+
+/*
+ * THE OWNER'S OWN SENTENCES, RE-SLICED FROM HER DECISION FILE AND COMPARED BYTE FOR BYTE.
+ *
+ * OWNER DECISION 133 ratified the strings table on 2026-11-13 and replaced both agent-composed
+ * `legal-value.*` lines with her own. The dictionary is not trusted to have been copied correctly:
+ * it is proven against the file it was copied FROM, the shape `declared-act.config.spec.ts` uses
+ * for the adviser's text and `legal-values-parity.spec.ts` uses for the instrument's figures.
+ *
+ * ⟶ AND THE REASON IT MATTERS HERE IS THE SAME REASON THE AWAITING LIST EXISTS. These lines are
+ *   what an office administrator reads before granting a permission, and a silent edit would put
+ *   an agent's words back under her name — which is precisely the state this batch just left.
+ */
+describe('OWNER DECISION 133 — the two legal-value descriptions are hers, byte for byte', () => {
+  const REPO = join(__dirname, '..', '..', '..', '..');
+  const D133 = join(REPO, 'docs', 'decision-133-strings-ratified.md');
+
+  /** The first «…» span of the decision-133 table row whose site cell is `site`. */
+  function ratified(site: string): string {
+    const row = readFileSync(D133, 'utf8')
+      .split('\n')
+      .filter((line) => line.startsWith('|'))
+      .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()))
+      .find((cells) => cells.length >= 2 && cells[0] === site);
+    expect(row, `decision 133 has no row for «${site}» — the slice source moved`).toBeDefined();
+    const match = /«(.+?)»/.exec(row![1]);
+    expect(match, `decision 133's row for «${site}» carries no quoted sentence`).not.toBeNull();
+    return match![1];
+  }
+
+  it.each([
+    ['legal-value.read', 'شرح `legal-value.read`'],
+    ['legal-value.declare', 'شرح `legal-value.declare`'],
+  ])('%s says exactly what she wrote', (code, site) => {
+    expect(
+      PERMISSIONS.AR[permissionDescriptionKey(code) as keyof typeof PERMISSIONS.AR],
+      `the Arabic for ${code} is not byte-identical to OWNER DECISION 133's own table. It is HER ` +
+        'sentence: re-slice it from docs/decision-133-strings-ratified.md rather than editing it ' +
+        'here, and if the sentence itself needs to change that is hers, not ours.',
+    ).toBe(ratified(site));
+  });
+
+  it('and neither is still declared as awaiting her review', () => {
+    /*
+     * The pair that makes the rewrite real rather than cosmetic. She did not approve the composed
+     * lines — she replaced them — so leaving the codes on the awaiting list would claim her words
+     * are still a placeholder, and removing them without taking her text would claim she approved
+     * something she did not.
+     */
+    for (const code of ['legal-value.read', 'legal-value.declare']) {
+      expect(
+        AWAITING_OWNER_REVIEW,
+        `${code} carries the owner's own ratified sentence now (decision 133), so it must not be ` +
+          'declared as awaiting her review.',
+      ).not.toContain(code);
+    }
   });
 });

@@ -19,6 +19,7 @@ import { OpportunityRepository } from '../../repositories/opportunity.repository
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
+import { Article15DService } from '../compliance-risk/article-15-d.service';
 import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import {
   buildNegotiationHistory,
@@ -122,6 +123,11 @@ export class QuotationService {
     private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    /* ART. 15/d/4's alert. The SECOND caller of this gate -- `RfqService` is the first -- which
+     * is why it is exported from the @Global() LicenseGateModule rather than built here: two
+     * modules asking one legal question is how three different answers to "is this office
+     * licensed" came to exist before the licence gate. */
+    private readonly article15D: Article15DService,
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
@@ -355,6 +361,35 @@ export class QuotationService {
       actor.id,
     );
 
+    /*
+     * ART. 15/d/4 — THE QUOTE CAME BACK ABOVE THE CEILING THE REQUEST WAS SENT UNDER.
+     *
+     * Message 36 section 4.5: «ولمّا ترجع العروض يقارن النظام، وإن زاد القسط عن الحدّ ينبّه ولا
+     * يرفض» — when the quotes come back the system compares, and if the premium exceeds the
+     * ceiling it WARNS and does not refuse. OWNER DECISION 126's whole shape.
+     *
+     * ⛔ THE THREE THINGS THIS MUST NOT DO, each of which was available and each of which would
+     * be the system rewriting what happened:
+     *
+     *   - it does not REFUSE the quotation. The insurer quoted what it quoted; a capture that
+     *     threw would lose a factual event and leave the office unable to record its own market.
+     *   - it does not ERASE the exemption. The employee declared an expectation in good faith
+     *     and the record of that declaration is the point.
+     *   - it does not EDIT the exemption row either — which it could not anyway: that table is
+     *     append-only by trigger, which is exactly why the alert is its own table.
+     *
+     * ⚠️ AND IT IS NOT SWALLOWED. Every other best-effort step in this method is wrapped,
+     * because a failed audit row or a lost status transition must not undo a captured quote. An
+     * alert that silently did not fire is different in kind: it is the ONLY thing that tells an
+     * office its exemption no longer matches reality, and a warning nobody receives reads
+     * exactly like no breach. So a failure here fails the capture, loudly.
+     */
+    await this.article15D.checkQuotationAgainstCeiling({
+      rfqId: dto.rfqId,
+      quotationId: created.id,
+      quotedPremiumJod: created.premium,
+    });
+
     return this.chainView(dto.rfqId, dto.insurerId);
   }
 
@@ -436,6 +471,26 @@ export class QuotationService {
       opportunityStatus,
       actor.id,
     );
+
+    /*
+     * ART. 15/d/4 ON A REVISION TOO — and this was MISSING from the first version of the wiring.
+     *
+     * `capture` had the check and `revise` did not, which would have meant an insurer's opening
+     * quote of 1,800 raising nothing (correctly) and its revised quote of 2,100 raising nothing
+     * EITHER. Message 36 section 4.5 is «ولمّا ترجع العروض يقارن النظام» — when the quotes come
+     * back the system compares — and a revision IS a quote coming back. The half-wired version
+     * would have warned on the cheapest path and gone silent on the expensive one.
+     *
+     * ⚠️ `next.id` is a NEW `Quotation` row, so this is its OWN alert rather than an edit to the
+     * predecessor's. That is what the `(exemptionId, quotationId)` unique index is for, and the
+     * reason the alert is a table rather than a flag: a flag set once would lose the second
+     * quote that also exceeded.
+     */
+    await this.article15D.checkQuotationAgainstCeiling({
+      rfqId: current.rfqId,
+      quotationId: next.id,
+      quotedPremiumJod: promoted.premium,
+    });
 
     return this.chainView(current.rfqId, current.insurerId);
   }

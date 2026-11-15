@@ -495,7 +495,32 @@ if _positional:
 # when they land this number comes back to 13 — and the DOWN direction failing is what makes that
 # true rather than hoped for. Raising it without that sentence would have been the exact thing the
 # paragraph above forbids.
-UNREACHED_BY_PATH_BUDGET = 16
+#
+# 🔴 16 -> 17 ON 2026-11-14, AND THE CREDITOR IS ONE ARABIC WORD. `POST /rbac/permissions/:code/
+# dismiss` is the second half of OWNER DECISION 131: «يعطيها لدور، أو يقرّر فيها» — the office
+# decides by granting a code to a role, OR by ruling on it without granting. The FIRST half needs
+# no control at all, because the grant is the existing matrix checkbox. The second needs a button,
+# and the button needs a label.
+#
+# THE ROUTE IS BUILT, ENFORCED AND TESTED: gated on `role.update`, refused at 403 without it, and
+# `new-permission-mark.e2e-spec.ts` drives it end to end — revoke the grant, the mark returns;
+# dismiss, the mark clears. What it has no way in from is the SCREEN.
+#
+# ⛔ AND THE LABEL IS NOT OURS TO WRITE. OWNER DECISION 133 ratified every string this batch
+# needed and does not contain one for this control; OWNER DECISION 125's rule is that a word is
+# sliced from text already shipping ON THAT SAME SCREEN or it is hers, and the permission matrix
+# ships nothing that means «the office looked at this and chose not to grant it». Searched: the
+# nearest shipping candidates are «إخفاء الملاحظات» and «تجاهل دون», both from the screening
+# screens, and borrowing either would put a word about screening notes on a permission decision.
+#
+# ⟶ So this is a DEBT WITH A NAMED CREDITOR exactly as the legal-values one was: one ratified word,
+#   reported to the owner as an empty cell. The day it arrives the button lands and this comes back
+#   to 16 — and the DOWN direction failing is what makes that true rather than hoped for.
+#
+# ⚠️ The alternative was to delete the route and let the mark clear only by granting. That would
+# drop half of decision 131 to satisfy a gate, and leave an administrator who has decided NOT to
+# grant a code with no way to say so — the mark would stay on it for ever.
+UNREACHED_BY_PATH_BUDGET = 17
 
 # The second figure. 9 here against 19 in the verb-aware pass, and the gap is the point: this pass is
 # verb-agnostic, so a route reads as addressed whenever ANY verb on its path is called live —
@@ -516,7 +541,12 @@ DEAD_ONLY_BY_PATH_BUDGET = 9
 # the route count — three routes arriving in one new controller is a different fact from three
 # arriving across three, and a single total cannot tell them apart. It comes back to 7 with the same
 # commit that takes the routes back to 13.
-UNREACHED_CONTROLLER_BUDGET = 8
+# 8 -> 9 on 2026-11-14: `rbac/controllers/rbac.controller.ts` joins the list with exactly ONE
+# unreached route, decision 131's dismissal. ⚠️ Note what this pair of figures says that neither
+# alone could: module 1's legal-values move added THREE routes in ONE new controller, and this adds
+# ONE route to an OLD controller that was fully reached before. Same +1 on the route count, a
+# different fact about the codebase. It comes back to 8 with the button.
+UNREACHED_CONTROLLER_BUDGET = 9
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both

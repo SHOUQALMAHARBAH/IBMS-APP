@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PermissionRepository } from '../../../repositories/permission.repository';
 import type { RoleScope } from '../../../common/role-scope';
+import { isMarkedNew } from '../new-permission-mark.config';
 
 const CACHE_TTL_MS = 60_000;
 
@@ -96,6 +97,41 @@ export class PermissionsService {
     );
     this.scopeCache.set(key, { scopes, expiresAt: Date.now() + CACHE_TTL_MS });
     return scopes;
+  }
+
+  /**
+   * OWNER DECISION 131 — the catalogue as THIS office sees it, each code carrying its mark.
+   *
+   * ⛔ NOT CACHED, deliberately, and the reason is the opposite of the one above. The code cache
+   * exists because resolving a caller's grants happens on every guarded request; this runs when
+   * somebody opens the permission matrix or loads the bell, which is rare — and its inputs
+   * include a grant that an administrator has JUST made. Serving a minute-old answer here would
+   * show the mark still on a code they had already decided, which is the one thing criterion 4
+   * is about.
+   */
+  async findAllForOffice(
+    officeId: string,
+    officeCreatedAt: Date,
+  ): Promise<{ code: string; isNew: boolean }[]> {
+    const rows = await this.permissions.findMarkStateForOffice(officeId);
+    return rows.map((row) => ({
+      code: row.code,
+      isNew: isMarkedNew({
+        introducedAt: row.introducedAt,
+        officeCreatedAt,
+        grantedHere: row.grantedHere,
+        dismissedHere: row.dismissedHere,
+      }),
+    }));
+  }
+
+  /** The codes this office has not yet dealt with — what the bell derives its item from. */
+  async markedCodesForOffice(
+    officeId: string,
+    officeCreatedAt: Date,
+  ): Promise<string[]> {
+    const rows = await this.findAllForOffice(officeId, officeCreatedAt);
+    return rows.filter((r) => r.isNew).map((r) => r.code);
   }
 
   /** Called after any admin write to the grid so callers don't wait out

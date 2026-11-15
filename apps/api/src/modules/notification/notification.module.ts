@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { NotificationRepository } from '../../repositories/notification.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 import { PermissionsModule } from '../rbac/permissions.module';
 
 /**
@@ -14,6 +15,12 @@ import { PermissionsModule } from '../rbac/permissions.module';
 @Module({
   imports: [PermissionsModule],
   controllers: [NotificationController],
-  providers: [NotificationService, NotificationRepository],
+  /** `OrganizationRepository` for decision 131's mark: a code is only «جديدة» for an office if it
+   *  arrived AFTER that office's own `createdAt`, so the bell needs the office's row. */
+  providers: [
+    NotificationService,
+    NotificationRepository,
+    OrganizationRepository,
+  ],
 })
 export class NotificationModule {}

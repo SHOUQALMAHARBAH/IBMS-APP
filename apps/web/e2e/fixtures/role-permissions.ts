@@ -578,7 +578,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 232 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 233 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -665,6 +665,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'audit-log.read', module: 'compliance-risk', description: "Read the immutable audit log", scope: 'OFFICE' },
   { code: 'compliance-calendar.manage', module: 'compliance-risk', description: "Manage the regulatory compliance calendar", scope: 'OFFICE' },
   { code: 'conflict-of-interest.register.read', module: 'compliance-risk', description: "Read the conflict-of-interest disclosure register — the conflicts this office's people have declared about themselves", scope: 'OFFICE' },
+  { code: 'declared-act.article-15-d.declare', module: 'compliance-risk', description: "Declare that a quote request is going to fewer than three insurance companies with none of art. 15/d's five exemptions applying — writing the reason, ticking the acknowledgement, and recording the act against the request. SEPARATE from the permission to send a quote request, deliberately: whoever may act is not thereby able to admit a breach on the office's behalf. It does not permit editing or deleting a declaration once made, which no permission does", scope: 'OFFICE' },
   { code: 'document-history.read', module: 'compliance-risk', description: "Read document version/workflow history", scope: 'OFFICE' },
   { code: 'duty-segregation.mode.declare', module: 'compliance-risk', description: "Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason", scope: 'OFFICE' },
   { code: 'incident.classification.co-sign', module: 'compliance-risk', description: "Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it", scope: 'OFFICE' },

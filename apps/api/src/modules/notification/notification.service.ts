@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { NotificationRepository } from '../../repositories/notification.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 import { PermissionsService } from '../rbac/services/permissions.service';
+import { noticeFor } from '../rbac/new-permission-mark.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   BOOK_WIDE_SOURCES,
@@ -37,6 +39,7 @@ export class NotificationService {
   constructor(
     private readonly repo: NotificationRepository,
     private readonly permissions: PermissionsService,
+    private readonly organizations: OrganizationRepository,
   ) {}
 
   async list(user: AuthenticatedUser): Promise<{
@@ -79,6 +82,40 @@ export class NotificationService {
             count: overdue,
             severity: 'warning',
             href: '/sla-dashboard',
+          });
+        }
+      }
+    }
+
+    /*
+     * --- OWNER DECISION 131: a permission arrived and this office has not decided on it.
+     *
+     * GATED ON `role.update`, which is the permission that gates `PUT /roles/:id/permissions` —
+     * the matrix itself. So the recipients are exactly the people who can act on it, which is
+     * this file's own rule («you are only notified about work you could already open») and also
+     * decision 131's requirement that the recipient set be a PERMISSION and never a role name.
+     *
+     * ⚠️ `findActiveHoldersOfPermission` is NOT called, and that is the shape rather than an
+     * omission. The bell is DERIVED: each reader's own request asks whether THEY hold the code,
+     * so the set of people who see this item IS the set of active holders, computed one reader
+     * at a time. A fan-out would have to enumerate holders across every office from a context
+     * with no caller — leaving the tenancy model to deliver a notification. See
+     * `docs/module-1-new-permission-mark.md`.
+     */
+    if (granted.has('role.update')) {
+      const office = await this.organizations.findById(user.organizationId);
+      if (office) {
+        const marked = await this.permissions.markedCodesForOffice(
+          user.organizationId,
+          office.createdAt,
+        );
+        if (marked.length > 0) {
+          items.push({
+            kind: 'new_permission',
+            count: marked.length,
+            severity: 'action',
+            href: '/settings/roles',
+            newPermissions: marked.map((code) => noticeFor(code)),
           });
         }
       }

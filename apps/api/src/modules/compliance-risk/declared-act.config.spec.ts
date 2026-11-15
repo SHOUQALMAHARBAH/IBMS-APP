@@ -164,6 +164,27 @@ describe('the declared-act texts are the adviser’s and the owner’s, byte for
     ).toBe(false);
   });
 
+  it('the window TITLE and the reason HINT are re-sliced from the adviser’s own file', () => {
+    /*
+     * Added 2026-11-14 with the screen. Both now reach a user, so both have to be proven against
+     * his file rather than trusted — the same argument the article text and the acknowledgement
+     * have carried since message 36.
+     *
+     * ⚠️ «تنظيمى» IS HIS SPELLING and it is NOT corrected: decision 132 ruling 1. A silent
+     * correction would make every record written afterwards testify to a sentence he did not
+     * write, and this assertion is what would catch one.
+     */
+    const src = lines(SIX);
+    const title = src[195].trim().replace(/^عنوان التنبيه:\s*/, '');
+    expect(ARTICLE_15_D.windowTitle).toBe(title);
+
+    const hint = src[199]
+      .trim()
+      .replace(/^•\s*\[\s*/, '')
+      .replace(/\s*\]$/, '');
+    expect(ARTICLE_15_D.reasonHint).toBe(hint);
+  });
+
   it('⛔ the adviser’s “15 characters” hint is NOT shipped as the floor', () => {
     // His drafted window prints «حد أدنى 15 حرفاً» as the field hint. The owner STRUCK fifteen on
     // 2026-11-11 (decision 129 §5) and ten is the floor everywhere — so shipping that hint would

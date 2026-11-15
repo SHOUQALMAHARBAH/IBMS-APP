@@ -13,6 +13,7 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
 import { DsrRepository } from '../../repositories/dsr.repository';
 import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import { CustomerFileAnchorService } from './customer-file-anchor.service';
+import { PermissionsModule } from '../rbac/permissions.module';
 
 /** Process 11 — RFQ / Market Submission (backlog Part C #11, Domain B).
  *
@@ -37,6 +38,12 @@ import { CustomerFileAnchorService } from './customer-file-anchor.service';
     OpportunityModule,
     InsuranceProgramModule,
     CustomerModule,
+    /* ART. 15/d's declaration has its OWN permission, checked in the BRANCH rather than by a
+     * route decorator -- the route is `POST /rfqs` and its code is `rfq.create`, so a decorator
+     * would demand the declaration permission of every quote request. `PermissionsModule` rather
+     * than `RbacModule`: that module imports `AuthModule` and the dependency would be circular,
+     * which is the reason `PermissionsModule` was extracted in the first place. */
+    PermissionsModule,
   ],
   controllers: [RfqController, RfqInsurerController],
   providers: [

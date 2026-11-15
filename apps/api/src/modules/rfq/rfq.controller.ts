@@ -1,10 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { clientIpForRecord } from '../../common/client-ip';
 import { RfqService } from './rfq.service';
 import { CreateRfqDto } from './dto/create-rfq.dto';
 import { AddRfqInsurersDto } from './dto/add-rfq-insurers.dto';
 import { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
 import { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
+import { Article15DOptionsQueryDto } from './dto/article-15-d-options-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -21,8 +24,52 @@ export class RfqController {
 
   @RequirePermissions('rfq.create')
   @Post()
-  create(@Body() dto: CreateRfqDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.rfqs.createRfq(dto, user);
+  create(
+    @Body() dto: CreateRfqDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    /*
+     * THE NETWORK ADDRESS IS THREADED FROM THE REQUEST, never resolved deeper.
+     *
+     * An art. 15/d declaration records it (the adviser's «العنوان الشبكي»), and only a
+     * controller holds the `Request` to read it from. `clientIpForRecord` is the ONE
+     * implementation -- extracted from the rate-limit guard, which had earned the only correct
+     * answer by surviving a real brute-force bypass -- and it returns NULL rather than the
+     * string 'unknown', because a RECORD must not claim an address it does not have.
+     */
+    return this.rfqs.createRfq(dto, user, clientIpForRecord(request));
+  }
+
+  /**
+   * ART. 15/d — WHAT THE SCREEN ASKS BEFORE THE REQUEST IS SENT.
+   *
+   * «أُرسِل الطلب لأقل من ثلاث شركات تأمين. ما سبب الإعفاء؟» (OWNER DECISION 133). The window
+   * belongs on the EXCEPTION, not the routine — decision 123's own test is to count the clicks
+   * added to the most frequent transaction — so the screen asks this only once the shortlist is
+   * below the minimum, and this route tells it which exemptions can apply to THIS request's line.
+   *
+   * ## WHY A ROUTE RATHER THAN A CLIENT-SIDE RULE
+   *
+   * Three of the figures involved are the office's data, not the screen's: the minimum and the
+   * ceiling are `LegalValue` rows read at the request's own date, the eligible lines are a
+   * property of the 32-row standard catalogue, and whether the caller may DECLARE is a
+   * permission. A screen that decided any of them would be a second answer to a legal question.
+   *
+   * GATED ON `rfq.create`, the same code as the request itself: asking what a request would need
+   * is part of making one, and a separate code would be a checkbox that hides the question from
+   * somebody who can still send the request.
+   *
+   * Declared BEFORE `:id` so "article-15-d" is never parsed as an RFQ id — the same reason
+   * `selectable-insurers` is.
+   */
+  @RequirePermissions('rfq.create')
+  @Get('article-15-d/options')
+  article15DOptions(
+    @Query() query: Article15DOptionsQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rfqs.article15DOptions(query, user);
   }
 
   /**

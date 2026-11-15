@@ -6,9 +6,13 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import {
   createRfq,
+  getArticle15DOptions,
   listSelectableInsurers,
+  type Article15DChoice,
+  type Article15DOptions,
   type SelectableInsurer,
 } from '../../../../lib/rfq/rfq-api';
+import { Article15DWindow } from '../../../../components/rfq/Article15DWindow';
 import { ApiError } from '../../../../lib/auth/api-client';
 import {
   buttonStyle,
@@ -39,6 +43,68 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   const [threshold, setThreshold] = useState('9');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  /*
+   * ART. 15/d. The question belongs on the EXCEPTION, not the routine -- OWNER DECISION 130
+   * ruling 1 and decision 123's own test, which is to count the clicks added to the most
+   * frequent transaction. So the options are fetched only once the line is named and the
+   * shortlist is picked, and the server answers whether the question applies at all.
+   *
+   * ⛔ THE SCREEN DOES NOT DECIDE THE THRESHOLD. `required` comes back from the server, which
+   * reads the minimum out of `LegalValue` at the request's own date. Hard-coding three here
+   * would be `check:legal-numbers`'s whole subject, and it would be wrong the day the row moves.
+   */
+  /*
+   * ⚠️ THE FETCHED OPTIONS ARE STORED WITH THE KEY THEY WERE FETCHED FOR, and the render
+   * compares — rather than the effect clearing state when the line is too short.
+   *
+   * `setA15d(null)` in the effect body is a SYNCHRONOUS setState inside an effect, which eslint
+   * refuses with «Calling setState synchronously within an effect can trigger cascading
+   * renders». It was right, and the fix is not to silence it: a key comparison makes staleness
+   * UNREPRESENTABLE instead of merely cleared. ⟶ Without it, options fetched for a motor line
+   * could be rendered for a medical one during the moment between the line changing and the next
+   * response arriving — and those two lines offer DIFFERENT exemptions, so the employee would be
+   * shown a choice the server is about to refuse.
+   */
+  const [a15dFetch, setA15dFetch] = useState<{
+    key: string;
+    options: Article15DOptions;
+  } | null>(null);
+  const [choice, setChoice] = useState<Article15DChoice>({});
+  const line = insuranceLine.trim();
+  const a15dKey = `${line}|${selected.size}`;
+
+  useEffect(() => {
+    if (line.length < 2) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const options = await getArticle15DOptions({
+          opportunityId,
+          insuranceLine: line,
+          insurerCount: selected.size,
+        });
+        if (!cancelled) setA15dFetch({ key: `${line}|${selected.size}`, options });
+      } catch {
+        /*
+         * SILENT, and deliberately so: this is a PRE-CHECK, not the enforcement. The server
+         * evaluates art. 15/d again on `POST /rfqs` and refuses there with a message naming
+         * what is missing, so a failed options read loses a helpful window and never loses the
+         * rule. Surfacing an error here would put a scary message on a form the employee has
+         * not submitted yet, for a request that may well reach three insurers anyway.
+         *
+         * ⟶ And nothing is cleared: the stale entry simply stops matching the key, so the
+         *   window closes on its own.
+         */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [opportunityId, line, selected.size]);
+
+  /** The options, only while they belong to the line and count on screen RIGHT NOW. */
+  const a15d = a15dFetch?.key === a15dKey ? a15dFetch.options : null;
 
   useEffect(() => {
     void (async () => {
@@ -79,6 +145,10 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         followUpThresholdDays: Number.isFinite(parsedThreshold)
           ? parsedThreshold
           : undefined,
+        /* Sent ONLY when the server said the question applies. An `article15D` on a request
+         * that reaches the minimum is refused by name -- an exemption from a rule that was
+         * already satisfied is nothing to be exempt from. */
+        article15D: a15d?.required ? choice : undefined,
       });
       router.push(`/rfqs/${rfq.id}`);
     } catch (err) {
@@ -166,6 +236,15 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         onChange={(e) => setThreshold(e.target.value)}
         style={{ width: '6rem', marginTop: '0.35rem' }}
       />
+
+      {a15d ? (
+        <Article15DWindow
+          options={a15d}
+          choice={choice}
+          onChange={setChoice}
+          disabled={submitting}
+        />
+      ) : null}
 
       <div style={{ marginTop: '1.5rem' }}>
         <button type="submit" disabled={!canSubmit} style={buttonStyle}>

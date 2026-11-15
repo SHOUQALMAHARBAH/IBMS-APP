@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -23,6 +24,9 @@ import {
   UpdateRoleDto,
 } from '../dto/role-crud.dto';
 import { PermissionRepository } from '../../../repositories/permission.repository';
+import { OrganizationRepository } from '../../../repositories/organization.repository';
+import { UserRepository } from '../../../repositories/user.repository';
+import { PermissionsService } from '../services/permissions.service';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
 import { SetRoleScopeDto } from '../dto/role-scope.dto';
 
@@ -48,8 +52,12 @@ const permissionListSchema = {
       code: { type: 'string' as const },
       module: { type: 'string' as const },
       description: { type: 'string' as const, nullable: true },
+      /** OWNER DECISION 131 — «جديدة»: this code arrived after this office was created, no role
+       *  here holds it, and this office has not ruled on it. Per-office, so the same catalogue
+       *  row reads differently for two offices, which is the whole point. */
+      isNew: { type: 'boolean' as const },
     },
-    required: ['id', 'code', 'module'],
+    required: ['id', 'code', 'module', 'isNew'],
   },
 };
 
@@ -63,6 +71,11 @@ export class RbacController {
     private readonly roles: RoleRepository,
     private readonly permissions: PermissionRepository,
     private readonly roleAdmin: RoleAdminService,
+    /** OWNER DECISION 131 — the mark is per-office, so the grid read needs the office's row and
+     *  the rule that reads it. */
+    private readonly organizations: OrganizationRepository,
+    private readonly permissionsService: PermissionsService,
+    private readonly users: UserRepository,
   ) {}
 
   // `role.read`, not a write code: this reads the catalogue. The write codes now
@@ -215,7 +228,74 @@ export class RbacController {
     description: 'The full permission grid.',
     schema: permissionListSchema,
   })
-  listPermissions() {
-    return this.permissions.findAll();
+  async listPermissions(@CurrentUser() user: AuthenticatedUser) {
+    /*
+     * OWNER DECISION 131: the grid is the same for every office — `Permission` is global and
+     * stays global — but the MARK is not. A code is «جديدة» for an office that has not decided
+     * on it and not for one that has, so the mark is computed against the caller's own office
+     * and merged here rather than stored on the row.
+     */
+    const [rows, marks] = await Promise.all([
+      this.permissions.findAll(),
+      this.markFor(user),
+    ]);
+    return rows.map((row) => ({ ...row, isNew: marks.has(row.code) }));
+  }
+
+  /**
+   * OWNER DECISION 131's second way of deciding — «أو يقرّر فيها».
+   *
+   * The administrator looked at the code and chose not to grant it. That clears the mark in THIS
+   * office and nowhere else (criterion 5), because the row is tenant-scoped with a FORCED policy.
+   *
+   * GATED ON `role.update`, the same code that gates `PUT roles/:id/permissions`: the person who
+   * could have granted it is the person who may decline it. ⛔ Not a new permission of its own —
+   * minting one would mean an office could be configured so that somebody may grant a code but
+   * not dismiss it, which makes the mark unclearable for them and is a worse state than either.
+   */
+  @RequirePermissions('role.update')
+  @Post('permissions/:code/dismiss')
+  async dismissPermission(
+    @Param('code') code: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const [permission] = await this.permissions.findByCodes([code]);
+    if (!permission) {
+      throw new NotFoundException(`Unknown permission code "${code}".`);
+    }
+    /*
+     * THE NAME THROUGH `displayNameForUserId`, NEVER `findById().fullName` — OWNER DECISION 48.
+     *
+     * `Employee.fullName` is composed from the four Jordanian name parts and is the real
+     * identity; `User.fullName` is free text and is only the fallback for an account with no HR
+     * record. In the demo data ALL SIXTEEN linked accounts disagree, the user row holding an
+     * English ROLE LABEL. This is a register of who decided an office would not grant a
+     * permission, so «Compliance Officer» here would be a record naming nobody.
+     */
+    const shown =
+      (await this.users.displayNameForUserId(user.id)) ?? user.email;
+    await this.permissions.dismissForOffice({
+      organizationId: user.organizationId,
+      permissionId: permission.id,
+      dismissedByUserId: user.id,
+      // The name AS IT STOOD, for the same reason `DeclaredAct` keeps one: a record of a
+      // decision that can only name a uuid is a record nobody can read.
+      dismissedByNameShown: shown,
+    });
+    return { code, dismissed: true };
+  }
+
+  /** The set of codes marked «جديدة» for this caller's office. */
+  private async markFor(user: AuthenticatedUser): Promise<Set<string>> {
+    const office = await this.organizations.findById(user.organizationId);
+    // No office row means no `createdAt` to compare against, and condition 1 cannot be evaluated.
+    // An EMPTY set is the right answer: showing no mark is a missing nudge, while showing every
+    // code as new would be the noise the mark is designed to avoid.
+    if (!office) return new Set();
+    const marked = await this.permissionsService.markedCodesForOffice(
+      user.organizationId,
+      office.createdAt,
+    );
+    return new Set(marked);
   }
 }

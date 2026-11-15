@@ -20,7 +20,10 @@ export type InteractionChannel =
   | 'COMPLAINT'
   | 'PORTAL'
   | 'SMS'
-  | 'OTHER';
+  | 'OTHER'
+  // OWNER DECISION 133 section 3, ruling 2 — art. 22/s's FIRST approved means, which had no
+  // member until 2026-11-14. See approved-means.config.ts in the api.
+  | 'WRITTEN_NOTICE';
 
 export const INTERACTION_CHANNELS: InteractionChannel[] = [
   'MEETING',
@@ -34,6 +37,7 @@ export const INTERACTION_CHANNELS: InteractionChannel[] = [
   'COMPLAINT',
   'PORTAL',
   'SMS',
+  'WRITTEN_NOTICE',
   'OTHER',
 ];
 

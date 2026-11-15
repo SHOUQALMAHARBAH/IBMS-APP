@@ -185,7 +185,23 @@ say "asserting the structure"
 # grid there is no role named OFFICE_MANAGER. It is a TEMPLATE DEFAULT and not a lock (decision 80).
 # Nothing was minted for DECLARING a conflict: the discloser is the subject, so no permission exists
 # for it or can, which is why this moves by one rather than two.
-check "permission codes seeded" 232 \
+# 232 -> 233 on 2026-11-14, module 1 message 38 section 3: ONE code minted,
+# `declared-act.article-15-d.declare`, held by NO ROLE anywhere -- OWNER DECISION 131, which
+# inverted the default: we expose every permission and grant none.
+#
+# 🔴 AND IT IS THE FIRST CODE IN THIS PRODUCT'S LIFE THAT CLOSES A PATH. Measured 2026-11-12,
+# every permission-adding migration before it -- 8 of 8 -- backfilled its grant, so no code has
+# ever shut a door that was open. From the moment this one ships, a quote request to fewer than
+# three insurers with NO exemption cannot be declared until an office administrator grants it.
+# That is the decision working as intended, and it is safe only because the notification is live
+# and names what the code guards. `npm run check:permission-migrations` now refuses a migration
+# that backfills.
+#
+# ⛔ THIS PIN IS THE FIFTH PLACE THE TOTAL IS FIXED AND THE ONLY ONE THE OTHERS CANNOT SEE: it
+# counts what a database reaches FROM NOTHING. `db:divergence` cannot answer that question by
+# construction, and the four in-repo pins all read the catalogue source rather than a seeded
+# database. It is also the one that caught this change.
+check "permission codes seeded" 233 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
 check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"

@@ -20,6 +20,85 @@ export class PermissionRepository {
     });
   }
 
+  /**
+   * OWNER DECISION 131 — the three facts the «جديدة» mark needs, for THIS office.
+   *
+   * Returns, for every catalogue code: its arrival date (global), whether any role in the
+   * caller's office holds it, and whether this office has dismissed it.
+   *
+   * ## WHY THE GRANT CHECK IS A `RolePermission` READ AND NOT A JOIN ON `Role`
+   *
+   * `RolePermission` carries `organizationId` itself — denormalised from `Role`, deliberately,
+   * and the schema comment on that column says why — so `tenantScopeExtension` scopes this read
+   * to the caller's own office without any join at all. A join through `Role` would work and
+   * would be one more place for the office filter to be forgotten.
+   *
+   * ⚠️ A RETIRED role still counts as holding the code. That is deliberate and it is the
+   * NON-NOISY direction: the grant row exists, the office has plainly dealt with the code, and
+   * re-marking it «جديدة» because the role it was given to was later retired would tell an
+   * administrator a decision they made has been forgotten. `Role.status` governs whether the
+   * grant lets anybody ACT — `findCodesForRoles` is where that question belongs, and it already
+   * excludes RETIRED.
+   */
+  async findMarkStateForOffice(officeId: string): Promise<
+    {
+      id: string;
+      code: string;
+      introducedAt: Date | null;
+      grantedHere: boolean;
+      dismissedHere: boolean;
+    }[]
+  > {
+    const [permissions, grants, dismissals] = await Promise.all([
+      this.prisma.client.permission.findMany({
+        select: { id: true, code: true, introducedAt: true },
+        orderBy: { code: 'asc' },
+      }),
+      // Tenant-scoped by the extension. `distinct` because a code granted to three roles in one
+      // office is still one fact here.
+      this.prisma.client.rolePermission.findMany({
+        where: { organizationId: officeId },
+        select: { permissionId: true },
+        distinct: ['permissionId'],
+      }),
+      this.prisma.client.officePermissionDismissal.findMany({
+        where: { organizationId: officeId },
+        select: { permissionId: true },
+      }),
+    ]);
+
+    const granted = new Set(grants.map((g) => g.permissionId));
+    const dismissed = new Set(dismissals.map((d) => d.permissionId));
+    return permissions.map((p) => ({
+      id: p.id,
+      code: p.code,
+      introducedAt: p.introducedAt,
+      grantedHere: granted.has(p.id),
+      dismissedHere: dismissed.has(p.id),
+    }));
+  }
+
+  /** Record that this office looked at a code and chose not to grant it — decision 131's second
+   *  way of deciding. Idempotent on `(organizationId, permissionId)`: a second click is the same
+   *  ruling, not a new one. */
+  async dismissForOffice(input: {
+    organizationId: string;
+    permissionId: string;
+    dismissedByUserId: string;
+    dismissedByNameShown: string;
+  }): Promise<void> {
+    await this.prisma.client.officePermissionDismissal.upsert({
+      where: {
+        organizationId_permissionId: {
+          organizationId: input.organizationId,
+          permissionId: input.permissionId,
+        },
+      },
+      update: {},
+      create: input,
+    });
+  }
+
   /** The catalogue rows for a set of codes. Returns FEWER than asked for when a
    *  code is unknown, which is how `RoleAdminService` detects one without ever
    *  guessing at what the caller meant. */

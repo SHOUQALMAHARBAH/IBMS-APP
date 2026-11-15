@@ -18,6 +18,7 @@ import {
   matrixSummaryStyle,
   matrixVerbStyle,
   matrixDescriptionStyle,
+  matrixNewBadgeStyle,
   matrixSectionAllStyle,
 } from './admin.styles';
 
@@ -86,6 +87,18 @@ export function PermissionMatrix({
   /** The line under a checkbox. `null` when there is nothing honest to show yet. */
   const explain = (code: string) => describePermission(code, language, stored.get(code));
 
+  /**
+   * OWNER DECISION 131 — the codes this office has not decided on yet, marked «جديدة» in green.
+   *
+   * PER OFFICE, computed by the api against this office's own `createdAt`, its own grants and
+   * its own dismissals. The same catalogue row is marked for one office and not for another,
+   * which is the whole point: «احنا ما النا دخل» — the decision is the office's.
+   */
+  const newCodes = useMemo(
+    () => new Set(catalogue.filter((e) => e.isNew).map((e) => e.code)),
+    [catalogue],
+  );
+
   function apply(codes: string[], on: boolean) {
     const next = new Set(selected);
     for (const code of codes) {
@@ -121,6 +134,23 @@ export function PermissionMatrix({
                 (`retention.archive.retrieve` → «استخراج سجل مؤرشف/محجوب»). See
                 `docs/decision-127-no-permission-code-shown-an-arabic-name.md`. */}
             <code>{row.code}</code>
+            {/* 🔴 OWNER DECISION 131 — «معلم عليها بالاخضر ع انها جديدة».
+                A permission this office has not decided on: it arrived after the office was
+                created, no role here holds it, and nobody here has ruled on it. Granting it to
+                any role, or dismissing it, clears this — in THIS office only.
+
+                The word is «جديدة», hers (decision 131 §1, listed again in decision 133), and
+                green is hers too. `aria-label` carries the same word rather than a different
+                one, so a screen-reader user is told what the colour tells everyone else. */}
+            {newCodes.has(row.code) ? (
+              <span
+                style={matrixNewBadgeStyle}
+                data-new-permission={row.code}
+                aria-label={t('roleMatrixNewBadge')}
+              >
+                {t('roleMatrixNewBadge')}
+              </span>
+            ) : null}
             {/* One short line BENEATH the name, not appended to it: the owner's finding is that a
                 code is not an explanation, and a description crammed onto the same line after an
                 em-dash reads as part of the identifier. */}

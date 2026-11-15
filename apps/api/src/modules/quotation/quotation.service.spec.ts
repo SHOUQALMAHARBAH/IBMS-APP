@@ -12,6 +12,7 @@ import type { OpportunityRepository } from '../../repositories/opportunity.repos
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
+import type { Article15DService } from '../compliance-risk/article-15-d.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
@@ -166,6 +167,17 @@ function makeDeps() {
       customers,
       audit,
       workflow,
+      /*
+       * ART. 15/d/4's alert. Raises NOTHING, which is the NON-WIDENING value for a file whose
+       * tests are about the quotation chain: every capture here behaves exactly as it did
+       * before the article was wired. The alert's own behaviour -- raised when a quote comes
+       * back above the ceiling, and the quotation NOT refused and the exemption NOT erased --
+       * is proven over HTTP in `article-15-d.e2e-spec.ts`, where the exemption row really
+       * exists. A mock returning `false` cannot prove the warning fired.
+       */
+      {
+        checkQuotationAgainstCeiling: vi.fn().mockResolvedValue(false),
+      } as unknown as Article15DService,
     ),
     mocks: {
       createInitial,

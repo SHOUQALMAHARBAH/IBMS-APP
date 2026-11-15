@@ -91,7 +91,8 @@
     "check:legal-numbers": "python scripts/measurements/legal-numbers.py",
     "check:unguarded-routes": "python scripts/measurements/unguarded-routes.py",
     "check:rls-proof-shape": "python scripts/measurements/rls-proof-shape.py --self-test && python scripts/measurements/rls-proof-shape.py --check",
-    "check:guards": "npm run check:hook-registration && npm run check:declaration-floor && npm run check:legal-numbers && npm run check:unguarded-routes && npm run check:rls-proof-shape"
+    "check:permission-migrations": "python scripts/measurements/permission-migration-shape.py --self-test && python scripts/measurements/permission-migration-shape.py",
+    "check:guards": "npm run check:hook-registration && npm run check:declaration-floor && npm run check:legal-numbers && npm run check:unguarded-routes && npm run check:rls-proof-shape && npm run check:permission-migrations"
   },
   "devDependencies": {
     "turbo": "2.10.11"
