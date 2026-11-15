@@ -1213,3 +1213,132 @@ test('warns when a ticked permission opens no screen, and does not block saving'
     page.getByRole('button', { name: 'Save permissions' }),
   ).toBeEnabled();
 });
+
+/*
+ * OWNER DECISION 134 — the «إزالة علامة جديدة» button, which is the OTHER half of decision 131.
+ *
+ * «يعطيها لدور، أو يقرّر فيها». The grant half has always had a control — the checkbox. The
+ * ruling half had a route, enforced and e2e-tested, and NO WAY IN FROM THE SCREEN, which is why
+ * `unreachable-routes.py` carried it as a declared debt with one Arabic word as the creditor.
+ *
+ * Asserted here and not only in the api e2e because what was missing was the SCREEN. The api
+ * spec proves the mark clears, that a reader without `role.update` is refused, and that another
+ * office's row is invisible at the database. None of that is evidence that an administrator can
+ * reach it.
+ */
+test('OWNER DECISION 134 — the dismiss button clears the mark without granting the code', async ({
+  page,
+}) => {
+  await mockAuth(page, ['OFFICE_ADMINISTRATOR']);
+  await mockRoles(page);
+
+  // The catalogue answers MARKED first and UNMARKED after the dismissal, which is what the real
+  // api does: `isNew` is DERIVED per office from the dismissal row, never stored on the catalogue.
+  let dismissed: string | null = null;
+  await page.route('http://localhost:4000/rbac/permissions', (route) =>
+    route.fulfill({
+      status: 200,
+      json: CATALOGUE.map((entry) =>
+        entry.code === 'incident.classify'
+          ? { ...entry, isNew: dismissed !== 'incident.classify' }
+          : entry,
+      ),
+    }),
+  );
+  await page.route(
+    'http://localhost:4000/rbac/permissions/incident.classify/dismiss',
+    async (route) => {
+      dismissed = 'incident.classify';
+      return route.fulfill({
+        status: 201,
+        json: { code: 'incident.classify', dismissed: true },
+      });
+    },
+  );
+
+  await page.goto('/settings/roles');
+  await page
+    .locator('[data-role="CLAIMS_TRIAGE_DESK"]')
+    .getByRole('button', { name: 'Permissions' })
+    .click();
+
+  const matrix = page.locator('[data-matrix-for] [data-permission-matrix]');
+  await matrix
+    .locator('details[data-module="compliance-risk"] summary')
+    .click();
+
+  // The badge and the button are ONE statement — «this is new» and «I have looked at it» — so the
+  // test reads them together. A button beside no badge would be a control for a decision nobody
+  // is being asked to make.
+  await expect(
+    matrix.locator('[data-new-permission="incident.classify"]'),
+  ).toBeVisible();
+  const button = matrix.locator('[data-dismiss-new="incident.classify"]');
+  await expect(button).toBeVisible();
+
+  await button.click();
+
+  // THE MARK IS GONE, and it is gone because the catalogue was RE-READ. The screen does not flip
+  // the flag itself: `isNew` is derived from three facts it does not hold.
+  await expect(
+    matrix.locator('[data-new-permission="incident.classify"]'),
+  ).toHaveCount(0);
+  await expect(button).toHaveCount(0);
+  expect(dismissed).toBe('incident.classify');
+
+  /*
+   * AND THE CODE IS STILL UNGRANTED AND STILL GRANTABLE — the half that makes this a DECISION
+   * rather than a grant. Decision 131's whole point is that the office may say "I have seen this
+   * and I am not handing it out"; a dismissal that quietly granted, or that locked the code out
+   * of the matrix, would be a different decision from the one she took.
+   */
+  const checkbox = matrix.locator('[data-code="incident.classify"]');
+  await expect(checkbox).not.toBeChecked();
+  await expect(checkbox).toBeEnabled();
+  await checkbox.check();
+  await expect(checkbox).toBeChecked();
+});
+
+/*
+ * THE SAME CONTROL, ABSENT — and the case is `role.create` WITHOUT `role.update`, not read-only.
+ *
+ * A read-only caller never reaches the matrix at all (no «Permissions» button), so asserting the
+ * dismiss button is absent for them would pass for the wrong reason. The real case is the CREATE
+ * form: it renders the same matrix, with the same marks, and is reached on `role.create` — while
+ * the dismiss route is gated on `role.update`. `frontend-ux-directive.md` says a control a role
+ * cannot use does not exist on their screen, so the page passes the handler to the EDITOR matrix
+ * only, and this proves the create matrix renders the mark without the button.
+ */
+test('OWNER DECISION 134 — the create form shows the mark and no dismiss button', async ({
+  page,
+}) => {
+  await mockAuthWithPermissions(page, [
+    'role.read',
+    'role.create',
+    'permission.read',
+  ]);
+  await page.route('http://localhost:4000/rbac/roles', (route) =>
+    route.fulfill({ status: 200, json: [CUSTOM_ROLE, SYSTEM_ROLE] }),
+  );
+  await page.route('http://localhost:4000/rbac/permissions', (route) =>
+    route.fulfill({
+      status: 200,
+      json: CATALOGUE.map((entry) =>
+        entry.code === 'incident.classify' ? { ...entry, isNew: true } : entry,
+      ),
+    }),
+  );
+
+  await page.goto('/settings/roles');
+  const create = page.locator('[data-permission-matrix]').first();
+  await create.locator('details[data-module="compliance-risk"] summary').click();
+
+  // The mark IS shown: knowing a code is new is reading, and the create form is where a new role
+  // most needs it. Non-vacuity for the assertion below — without this the absence proves nothing.
+  await expect(
+    create.locator('[data-new-permission="incident.classify"]'),
+  ).toBeVisible();
+  await expect(
+    create.locator('[data-dismiss-new="incident.classify"]'),
+  ).toHaveCount(0);
+});

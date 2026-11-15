@@ -463,6 +463,40 @@ describe('OWNER DECISION 131 § 6 — criteria 3 and 4, end to end', () => {
       (r) => r.code === PROBE_CODE,
     );
     expect(afterDismissal!.isNew).toBe(false);
+
+    /*
+     * OWNER DECISION 134 — AND THE CODE IS STILL UNGRANTED AND STILL GRANTABLE.
+     *
+     * The half that makes a dismissal a DECISION rather than a grant, and it is asserted here
+     * because "the mark went away" is also what a silent grant would look like from outside.
+     * «احنا ما النا دخل»: the office has looked and is not handing this out — and it must be able
+     * to change its mind tomorrow without anybody re-minting anything.
+     */
+    const roleAfter = await request(app!.getHttpServer())
+      .get(`/rbac/roles/${grantableRoleId}`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+    expect(
+      (roleAfter.body as { permissionCodes: string[] }).permissionCodes,
+      'dismissing a code must not grant it — the mark cleared AND the capability moved is the ' +
+        'one outcome decision 131 rules out',
+    ).not.toContain(PROBE_CODE);
+
+    // STILL GRANTABLE: still in the matrix, and the grant the office declined today still works
+    // tomorrow. A dismissal that locked the code out would be a different decision from hers.
+    expect((await catalogue(admin.accessToken)).map((r) => r.code)).toContain(
+      PROBE_CODE,
+    );
+    await request(app!.getHttpServer())
+      .put(`/rbac/roles/${grantableRoleId}/permissions`)
+      .set(bearer(admin.accessToken))
+      .send({ permissionCodes: [PROBE_CODE] })
+      .expect(200);
+    await request(app!.getHttpServer())
+      .put(`/rbac/roles/${grantableRoleId}/permissions`)
+      .set(bearer(admin.accessToken))
+      .send({ permissionCodes: [] })
+      .expect(200);
   });
 
   it('CRITERION 4 — a reader who cannot edit the matrix cannot dismiss either', async () => {

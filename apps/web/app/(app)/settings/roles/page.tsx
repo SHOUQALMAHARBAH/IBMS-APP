@@ -38,6 +38,7 @@ import {
   deleteRole,
   getRoleWithGrants,
   listPermissionCatalogue,
+  dismissNewPermissionMark,
   listRolesForAdmin,
   setRolePermissions,
   setRoleScope,
@@ -313,6 +314,42 @@ export default function RoleAdminPage() {
       }
     })();
   }, [user, canRead, canReadCatalogue, load]);
+
+
+  /**
+   * OWNER DECISION 134 — clear the «جديدة» mark on a code this office will not grant.
+   *
+   * ONLY passed to the editor matrix, and only when `canUpdate` holds: the route is gated on
+   * `role.update`, and the create form is reached on `role.create`. A reader with create and not
+   * update would otherwise see a button that always answers 403.
+   *
+   * THE CATALOGUE IS RE-READ RATHER THAN PATCHED IN PLACE. `isNew` is DERIVED by the api from
+   * three facts this screen does not hold (when the office was created, whether any role here
+   * holds the code, whether a dismissal row exists), so flipping the flag locally would be this
+   * screen computing a second answer to a question the server already answers. Re-reading also
+   * means a mark cleared in another tab disappears here too.
+   */
+  const onDismissNew = useCallback(
+    async (code: string) => {
+      setActionError(null);
+      try {
+        await dismissNewPermissionMark(code);
+        setCatalogue(await listPermissionCatalogue());
+      } catch (err) {
+        /*
+         * `roleCouldNotLoad`, NOT A NEW STRING. A dismissal that fails needs a sentence and
+         * OWNER DECISIONS 133 and 134 do not contain one, so writing one here would be
+         * inventing Arabic — reported as an empty cell instead. This is the same fallback
+         * `onDelete` already uses for the same reason, and it is only reached for a NON-api
+         * error: a refusal from the server shows the server's own message.
+         */
+        setActionError(
+          err instanceof ApiError ? err.message : t('roleCouldNotLoad'),
+        );
+      }
+    },
+    [t],
+  );
 
   const segregationWarning = violatesSegregationPair(selected);
   /**
@@ -773,6 +810,7 @@ export default function RoleAdminPage() {
             selected={selected}
             onChange={setSelected}
             disabled={editing.isSystem}
+            onDismissNew={canUpdate ? onDismissNew : undefined}
           />
 
           {editing.isSystem ? null : (

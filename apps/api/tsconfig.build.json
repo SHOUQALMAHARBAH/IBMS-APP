@@ -1,4 +1,17 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // THE BUILD'S ROOT, AND THE REASON `dist/` LOOKS THE WAY IT DOES.
+    //
+    // `tsconfig.json` states `rootDir: "../.."` because its program includes one spec that
+    // imports a seed file out of `packages/db`. This program excludes every spec, so it holds
+    // no file outside `apps/api` at all and TypeScript infers `apps/api` -- measured, not
+    // assumed. Stating `./` pins that, so `dist/` keeps `src/`, `test/`, `scripts/` at its top
+    // and `dist/src/main.js` keeps resolving.
+    //
+    // It is also a guard: if a non-spec file ever imports outside `apps/api`, tsc refuses with
+    // TS6059 here rather than silently re-rooting `dist/` and breaking the Dockerfile's CMD.
+    "rootDir": "./"
+  },
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }

@@ -128,6 +128,29 @@ export const matrixNewBadgeStyle: CSSProperties = {
   verticalAlign: 'middle',
 };
 
+/**
+ * OWNER DECISION 134 — the control that clears the «جديدة» mark without granting the code.
+ *
+ * It sits beside the badge, not under the row: the two are one statement — «this is new» and
+ * «I have looked at it» — and separating them would make the button read as an action on the
+ * permission itself rather than on the mark. Deliberately quiet (a text button, no fill): the
+ * loud thing on this line is the green badge, and a second loud control beside it would compete
+ * with the decision the administrator is actually here to make, which is the checkbox.
+ */
+export const matrixDismissNewStyle: CSSProperties = {
+  display: 'inline-block',
+  marginInlineStart: '0.3rem',
+  padding: '0.05rem 0.35rem',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--radius-sm)',
+  background: 'transparent',
+  color: 'var(--ink-muted)',
+  fontSize: '0.7rem',
+  lineHeight: 1.6,
+  verticalAlign: 'middle',
+  cursor: 'pointer',
+};
+
 /** The section-level select-all, in the module's summary line. */
 export const matrixSectionAllStyle: CSSProperties = {
   display: 'inline-flex',
