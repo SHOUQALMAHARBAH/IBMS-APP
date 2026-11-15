@@ -931,6 +931,21 @@ traces, debug output, error stacks. Config is one pure, unit-tested function,
 
 Read it before assuming anything is or is not built, and read its opening box first: **every absence claim there carries the date it was measured, and one older than the current module is re-measured rather than believed.** This file once said the Policy module was not built while it shipped twelve routes.
 
+🔴 **A GENERATED DOCUMENT IS STREAMED AND NEVER STORED — measured 2026-11-15.** All three of
+`policy_schedule_summary`, `recommendation_report` and `certificate_of_insurance` render a PDF and
+return a buffer; the routes return a `StreamableFile`, and **none of them writes a `Document` row,
+an audit entry, or any other record.** On dev the `Document` table has never held a
+certificate-of-insurance row, because the act has never created one. ⟶ So *"the row the
+`ISSUE_CERTIFICATE` act creates"* does not exist, which is what stopped OWNER DECISION 128's
+renewal stamp from shipping (message 40 §1.2): its sixth issuance act has nothing to stamp.
+⛔ **Do not add a `Document` write to make a feature fit** — persisting certificates is a product
+decision with a retention consequence, and it is the owner's.
+
+**And decision 128's server half is built and UNMERGED on `module-1/decision-128-wip`**, stopped at
+exactly that point. Resume there rather than starting again, and read
+[`docs/module-1-decision-128-sizing.md`](docs/module-1-decision-128-sizing.md) first. Neither
+database holds its migration.
+
 ## Deployment
 
 **Not decided.** Docker images build correctly and can run anywhere that accepts a

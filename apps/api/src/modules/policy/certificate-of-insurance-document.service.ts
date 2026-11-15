@@ -11,6 +11,36 @@ import { LicenseGateService } from '../compliance-risk/license-gate.service';
 
 const CERTIFICATE_OF_INSURANCE_TEMPLATE_TYPE = 'certificate_of_insurance';
 
+/*
+ * 🔴 OWNER DECISION 136(أ) — THE RENEWAL STAMP IS NEVER PRINTED ON THIS DOCUMENT, AND THAT IS A
+ * RULING RATHER THAN A DEFERRAL.
+ *
+ * «صدرت والتجديد قيد الدراسة» shows on every SCREEN that displays a record issued while the
+ * office's renewal was under study, and in that record's own log. It is not printed on paper the
+ * customer receives — this certificate, the policy schedule summary, or the recommendation report.
+ * Her reason is in the decision: no provision of Instructions No. 9 of 2026 and nothing in the
+ * adviser's written opinion requires the customer to be told on the page, and art. 19/c already
+ * protects them on the premium — so printing it would be an assertion on a customer's document
+ * with no source behind it.
+ *
+ * ⟶ Reopened only by a Central Bank text, the signed legal opinion, or a ruling of hers.
+ *
+ * ## 🔴 AND A MEASUREMENT THAT CONTRADICTS THE PREMISE OF THE STAMP ITSELF — 2026-11-15
+ *
+ * Decision 136 §6 and message 40 §1.2 both say the certificate is stamped on «the `Document` row
+ * that the `ISSUE_CERTIFICATE` act creates». **There is no such row.** Measured: this service
+ * renders a PDF and returns a buffer, the route returns a `StreamableFile`, and nothing here
+ * writes a `Document`, an audit entry, or any other record — and the same is true of the policy
+ * schedule summary and the recommendation report. On dev the `Document` table holds only
+ * `APPLICATION_PROPOSAL`, `BROKER_LICENSE_CERTIFICATE`, `INSURER_LICENSE_CERTIFICATE` and
+ * `OTHER`; there is not one certificate-of-insurance row, because the act has never created one.
+ *
+ * ⛔ So the sixth issuance act has NOTHING TO STAMP, and that is an owner decision rather than an
+ * engineering one: persisting certificates is a new capability (object storage, a category, a
+ * classification, a retention consequence), not a column. Reported in message 40's report;
+ * `docs/module-1-decision-128-sizing.md` carries the shape of the other five.
+ */
+
 /** Built-in fallback boilerplate — used whenever no
  * `certificate_of_insurance` `DocumentTemplate` row exists yet.
  * Byte-identical to the real seed row
