@@ -112,6 +112,16 @@ export const PERMISSIONS = {
     'perm:claim.register': 'يسجّل المطالبة عند شركة التأمين ويُسند المُقدِّر',
     'perm:claim.settle.approve': 'المعتمِد الأول لتسوية مطالبة. والتسوية الكبيرة تحتاج معتمِداً ثانياً غيره — صلاحية منفصلة',
     'perm:claim.settle.second-approve': 'المعتمِد الثاني لتسوية كبيرة أو لأي دفعة مطالبة تمرّ بالمكتب. لا يجوز أن يكون هو المعتمِد الأول — والنظام يمنع ذلك، لا الشاشة',
+    // 🔴 OWNER DECISION 141 ruling 1 — «نسبة الخسارة» BECOMES «معدّل الخسارة» HERE AND IN
+    // TWO SIBLINGS (`perm:dashboard.claims.view`, `perm:renewal.read`). NOT DONE IN THIS BATCH.
+    //
+    // She authorised that one word in exactly these three descriptions and nothing else in
+    // them. «معدّل الخسارة» already ships — `dashboards.ts`, `operations.ts`, `policy.ts` —
+    // so it is a SLICE, never a composition, and message 34 already settled that one screen
+    // must not use two words for one fact.
+    //
+    // ⛔ Deferred only because message 41 orders §4 after §3, and §3 (decision 128 with the
+    // persisted certificate) did not ship. It is three strings and a slice when it does.
     'perm:claims-analytics.view': 'يرى نسبة الخسارة وتحليلات المطالبات. يكشف أداء كل عميل وكل شركة تأمين — أي من يكلّف المكتب أكثر مما يدفع. لا يكشف عمولة',
     'perm:client-accounting.read': 'يرى ما لم يُقبَض من العملاء وأعماره (مستحق، ٣٠ يوماً، ٦٠، ٩٠، أكثر). يكشف من يتأخّر في الدفع',
     'perm:client-decision.capture': 'يسجّل قرار العميل على التوصية المرسلة — قرار واحد يوجّه الفرصة إلى التنفيذ أو الإغلاق أو إعادة التفاوض',

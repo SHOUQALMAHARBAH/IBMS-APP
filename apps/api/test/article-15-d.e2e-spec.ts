@@ -5,6 +5,7 @@ import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
+import { exemptionLacksEvidence } from '../src/modules/compliance-risk/article-15-d.config';
 
 /**
  * ART. 15/d — «التواصل مع ثلاث شركات تأمين», OVER REAL HTTP.
@@ -239,6 +240,11 @@ beforeAll(async () => {
     // the COMPILER cannot see that and the route answered 403 until it was measured.
     'quotation.negotiate',
     'quotation.read',
+    // OWNER DECISION 139 ruling 4 — attaching the evidence afterwards carries
+    // `rfq.communication.log`, not a code of its own: the act is «I logged the customer's
+    // message and pointed the exemption at it». Measured the way the line above was — the
+    // route answered 403 until this was added.
+    'rfq.communication.log',
   ]);
   /*
    * ⚠️ THE DECLARATION CODE IS GRANTED HERE SO A TEST CAN RUN, AND NOWHERE ELSE.
@@ -628,12 +634,21 @@ describe('OWNER DECISION 129 § 4 — the seven criteria', () => {
     );
   }, 300_000);
 
-  it('CRITERION 5 — exemption 5 with no evidence is NOT saved, and WhatsApp is refused', async () => {
+  it('DECISION 139 CRITERION 1 — exemption 5 with no evidence is ACCEPTED and marked, and WhatsApp is still refused', async () => {
     /*
-     * «الإعفاء الخامس بلا ما يثبت طلب العميل ⟶ لا يُحفَظ.» And the evidence has to have ARRIVED
-     * by one of art. 22/s's approved means — OWNER DECISION 132 ruling 2 and 133 §3. WhatsApp is
-     * an electronic channel by any reading and is refused BY NAME (OWNER DECISION 44), which is
-     * the case no name-based rule could get right.
+     * 🔴 THIS TEST CHANGED DIRECTION, AND THE CHANGE IS AN OWNER DECISION.
+     *
+     * It used to be decision 129's CRITERION 5 — «الإعفاء الخامس بلا ما يثبت طلب العميل ⟶ لا
+     * يُحفَظ» — and asserted a 400. **OWNER DECISION 139 reverses that half**, knowingly: an act
+     * is blocked only when the harm is irreversible AND falls on somebody other than the office,
+     * and here it falls on the office and is repaired by attaching the message. Refusing at the
+     * last step punished an employee for forgetting to log a phone call.
+     *
+     * ⛔ THE TEST IS NOT DELETED AND THE OTHER HALF IS UNTOUCHED. The evidence RULES are exactly
+     * as decision 129 and 132 left them: an exemption resting on the WRONG evidence is worse than
+     * one resting on none, because the first looks proven to an inspector and the second is
+     * marked. WhatsApp is still refused BY NAME (decision 44), which is the case no name-based
+     * rule could get right.
      */
     const { opportunityId } = await opportunityOn(MOTOR, 'Motor Comprehensive');
     const insurer = await makeInsurer('O');
@@ -647,8 +662,24 @@ describe('OWNER DECISION 129 § 4 — the seven criteria', () => {
         insurerIds: [insurer],
         article15D: { exemption: 'AT_CUSTOMER_REQUEST' },
       })
-      .expect(400);
-    expect((bare.body as { message: string }).message).toContain('evidence');
+      .expect(201);
+
+    /*
+     * AND IT IS MARKED. The 201 alone would be satisfied by a system that simply stopped
+     * recording the exemption, which is the opposite of the decision: «لا إعفاء على الورق بلا
+     * دليل إلا ظاهراً، ويراه المفتّش». The row exists, names the exemption, and carries NO
+     * evidence — which is what `exemptionLacksEvidence` reads.
+     */
+    const marked = await prisma.rfqArticle15DExemption.findUniqueOrThrow({
+      where: { rfqId: (bare.body as RfqBody).id },
+    });
+    expect(marked.exemption).toBe('AT_CUSTOMER_REQUEST');
+    expect(
+      marked.evidenceCommunicationLogId,
+      'the exemption must be RECORDED without evidence, not silently dropped — the mark is what ' +
+        'stops a paper exemption with no proof behind it',
+    ).toBeNull();
+    expect(exemptionLacksEvidence(marked)).toBe(true);
 
     /*
      * WhatsApp: on file, INBOUND, and on THIS request's own customer — and still refused.
@@ -1132,5 +1163,146 @@ describe('OWNER DECISION 130 — a quote above the ceiling warns and does not re
         where: { exemptionId: exemption.id },
       }),
     ).toBe(0);
+  }, 300_000);
+});
+
+/**
+ * 🔴 OWNER DECISION 139 — ATTACHING THE EVIDENCE AFTERWARDS, AND WHAT STILL REFUSES.
+ *
+ * Her ruling 4: «يسجّل الموظف المراسلة في سجل المراسلات ويربطها بالطلب ⟵ يزول الوسم». Ruling 5:
+ * the evidence rules do not move — inbound, this opportunity's own customer, one of art. 22/s's
+ * four approved means, and WhatsApp never.
+ *
+ * ## AND A MEASUREMENT THE DECISION COULD NOT HAVE KNOWN
+ *
+ * `RfqArticle15DExemption` is APPEND-ONLY BY TRIGGER (decision 129, criterion 7), so attaching
+ * anything to an existing row was impossible — the mark could be applied and never removed. The
+ * trigger is NARROWED rather than dropped: it now permits exactly `evidenceCommunicationLogId`
+ * NULL ⟶ NOT NULL with every other column unchanged, and refuses everything else including
+ * clearing it again. That is criterion 6 enforced by the database rather than by a convention.
+ */
+describe('OWNER DECISION 139 — the mark clears only by attaching real evidence', () => {
+  /** An exemption-5 RFQ carrying no evidence — the state decision 139 creates. */
+  async function markedRfq(): Promise<{ rfqId: string; customerId: string }> {
+    const { opportunityId, customerId } = await opportunityOn(
+      MOTOR,
+      'Motor Comprehensive',
+    );
+    // A UNIQUE label per call: `makeInsurer` builds `legalName` from it, and `markedRfq()` is
+    // called by three tests — the same label twice is a unique violation, which surfaced as a
+    // bare PrismaClientKnownRequestError nowhere near the line that caused it.
+    const insurer = await makeInsurer(
+      `D139-${Math.random().toString(36).slice(2, 8)}`,
+    );
+    const res = await request(app!.getHttpServer())
+      .post('/rfqs')
+      .set(bearer(officer.accessToken))
+      .send({
+        opportunityId,
+        insuranceLine: 'Motor Comprehensive',
+        insurerIds: [insurer],
+        article15D: { exemption: 'AT_CUSTOMER_REQUEST' },
+      })
+      .expect(201);
+    return { rfqId: (res.body as RfqBody).id, customerId };
+  }
+
+  async function logFor(
+    customerId: string,
+    channel: string,
+    direction: string,
+  ): Promise<string> {
+    const row = await prisma.communicationLog.create({
+      data: {
+        customerId,
+        channel: channel as never,
+        direction: direction as never,
+        subject: `${FIXTURE} d139`,
+      },
+    });
+    return row.id;
+  }
+
+  it('CRITERION 3 — an inbound message on an approved means from this customer clears the mark', async () => {
+    const { rfqId, customerId } = await markedRfq();
+    const before = await prisma.rfqArticle15DExemption.findUniqueOrThrow({
+      where: { rfqId },
+    });
+    expect(exemptionLacksEvidence(before)).toBe(true);
+
+    const log = await logFor(customerId, 'WRITTEN_NOTICE', 'INBOUND');
+    await request(app!.getHttpServer())
+      .post(`/rfqs/${rfqId}/article-15-d/evidence`)
+      .set(bearer(officer.accessToken))
+      .send({ evidenceCommunicationLogId: log })
+      .expect(201);
+
+    const after = await prisma.rfqArticle15DExemption.findUniqueOrThrow({
+      where: { rfqId },
+    });
+    expect(after.evidenceCommunicationLogId).toBe(log);
+    expect(exemptionLacksEvidence(after)).toBe(false);
+  }, 300_000);
+
+  it('CRITERION 4 — WhatsApp, an OUTBOUND message and another customer are all refused, and the mark stays', async () => {
+    const { rfqId, customerId } = await markedRfq();
+    const other = await opportunityOn(MOTOR, 'Motor Comprehensive');
+
+    const cases: [string, string, string][] = [
+      ['WHATSAPP', 'INBOUND', customerId],
+      ['WRITTEN_NOTICE', 'OUTBOUND', customerId],
+      ['WRITTEN_NOTICE', 'INBOUND', other.customerId],
+    ];
+    for (const [channel, direction, owner] of cases) {
+      const log = await logFor(owner, channel, direction);
+      await request(app!.getHttpServer())
+        .post(`/rfqs/${rfqId}/article-15-d/evidence`)
+        .set(bearer(officer.accessToken))
+        .send({ evidenceCommunicationLogId: log })
+        .expect(422);
+    }
+
+    // THE MARK IS STILL THERE after all three. A refusal that left the row changed would be the
+    // worst outcome of the three: an exemption that looks proven by evidence the rules reject.
+    const row = await prisma.rfqArticle15DExemption.findUniqueOrThrow({
+      where: { rfqId },
+    });
+    expect(exemptionLacksEvidence(row)).toBe(true);
+  }, 300_000);
+
+  it('CRITERION 6 — no path removes the mark once attached, and the DATABASE is what refuses', async () => {
+    const { rfqId, customerId } = await markedRfq();
+    const log = await logFor(customerId, 'EMAIL', 'INBOUND');
+    await request(app!.getHttpServer())
+      .post(`/rfqs/${rfqId}/article-15-d/evidence`)
+      .set(bearer(officer.accessToken))
+      .send({ evidenceCommunicationLogId: log })
+      .expect(201);
+
+    // Attaching again is a 409 — recorded once, never replaced.
+    const second = await logFor(customerId, 'EMAIL', 'INBOUND');
+    await request(app!.getHttpServer())
+      .post(`/rfqs/${rfqId}/article-15-d/evidence`)
+      .set(bearer(officer.accessToken))
+      .send({ evidenceCommunicationLogId: second })
+      .expect(409);
+
+    /*
+     * AND THE REFUSAL IS THE DATABASE'S, not the service's. Driven through `prisma` — which on
+     * db-test is the OWNER and a superuser, so it bypasses RLS and every application rule. If
+     * the trigger were the thing missing, this would succeed and the mark would be removable by
+     * anyone who could reach the table.
+     */
+    await expect(
+      prisma.rfqArticle15DExemption.update({
+        where: { rfqId },
+        data: { evidenceCommunicationLogId: null },
+      }),
+    ).rejects.toThrow(/append-only/);
+
+    const row = await prisma.rfqArticle15DExemption.findUniqueOrThrow({
+      where: { rfqId },
+    });
+    expect(row.evidenceCommunicationLogId).toBe(log);
   }, 300_000);
 });

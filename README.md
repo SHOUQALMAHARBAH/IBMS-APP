@@ -946,6 +946,24 @@ exactly that point. Resume there rather than starting again, and read
 [`docs/module-1-decision-128-sizing.md`](docs/module-1-decision-128-sizing.md) first. Neither
 database holds its migration.
 
+🔴 **AND NOTHING IN THIS API STORES BYTES AT ALL — measured 2026-11-15.** `Document.storageRef` is
+supplied by the UPLOADER (`document.service.ts`, `create-document-version.dto.ts`), so **every
+`Document` row today is a pointer with no content behind it.** OWNER DECISION 142 rules that every
+issued certificate is stored as a file with a `Document` row carrying the renewal stamp, and that
+until a storage service exists **the bytes live in the database itself** — which makes it a new
+capability rather than a column. Not built; it ships with decision 128, whole or not at all.
+
+🔴 **AND `POST /auth/signup` IS CLOSED IN PRODUCTION — OWNER DECISION 140, 2026-11-15.** It was
+`@Public()` and protected only by arithmetic: `soleOrganizationIdOrThrow` refuses while the
+platform holds *more than one* brokerage office, and dev holds four. **On the one-office platform
+this product is sold as, anyone on the internet got an account inside it.** The closure is in
+`AuthService.signup()` via `selfSignupOpen()`, where it covers every caller rather than one
+handler; production is a hard override that no environment variable reopens, and
+`CLOSE_SELF_SIGNUP=true` closes it anywhere so the refusal is testable without pretending to be
+production. ⛔ **Do not remove `@Public()` from the route** — 117 api e2e files create their users
+through it, and removing the decorator would answer them 401 instead of telling them the door is
+shut.
+
 ## Deployment
 
 **Not decided.** Docker images build correctly and can run anywhere that accepts a

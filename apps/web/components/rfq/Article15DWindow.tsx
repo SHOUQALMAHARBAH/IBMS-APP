@@ -172,6 +172,21 @@ export function Article15DWindow({
             placeholder at all, so neither is needed.
           */}
           <div style={a15dEvidenceListStyle}>
+            {/*
+              🔴 OWNER DECISION 139 ruling 6 — THE EMPTY BRANCH THIS LIST NEVER HAD.
+
+              `options.evidence.map(...)` over an empty array renders NOTHING, so an employee
+              whose customer asked by telephone met a label with blank space under it — unable to
+              tell «there is no such message» from «the list has not loaded». The window's own
+              four-state rule was satisfied everywhere except here.
+
+              Her sentence says three things in her order: there is none yet · YOU MAY CARRY ON ·
+              log the request so it is documented. The middle clause is the decision: the server
+              no longer refuses this, so the screen must not read as a dead end either.
+            */}
+            {options.evidence.length === 0 ? (
+              <p data-article-15-d="evidence-none">{t('a15dEvidenceNoneYet')}</p>
+            ) : null}
             {options.evidence.map((item) => (
               <label key={item.id} style={a15dOptionStyle}>
                 <input

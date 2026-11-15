@@ -43,6 +43,32 @@ export class Article15DRepository {
     return this.prisma.client.rfqArticle15DExemption.create({ data: input });
   }
 
+  /**
+   * 🔴 OWNER DECISION 139 ruling 4 — ATTACH THE EVIDENCE, ONCE.
+   *
+   * STATUS-CONDITIONAL ON `evidenceCommunicationLogId: null`, which is what makes this race-safe
+   * rather than merely usually-right: two employees attaching different messages at the same
+   * moment both pass a read-then-write, and the second would silently replace the first. Here
+   * the second matches zero rows and the service turns that into a 409.
+   *
+   * `race-safe-invariants.md` is the rule, and the database agrees with it independently — the
+   * narrowed append-only trigger refuses NOT NULL ⟶ anything, so even a caller that bypassed
+   * this method could not overwrite an attached log.
+   *
+   * ⟶ Returns the COUNT rather than the row: "did I win" is the question, and a returned row
+   *   would invite a caller to read it as "the row as I left it" when another request may have
+   *   won first.
+   */
+  attachEvidence(
+    rfqId: string,
+    evidenceCommunicationLogId: string,
+  ): Promise<{ count: number }> {
+    return this.prisma.client.rfqArticle15DExemption.updateMany({
+      where: { rfqId, evidenceCommunicationLogId: null },
+      data: { evidenceCommunicationLogId },
+    });
+  }
+
   findExemptionForRfq(rfqId: string): Promise<RfqArticle15DExemption | null> {
     return this.prisma.client.rfqArticle15DExemption.findUnique({
       where: { rfqId },

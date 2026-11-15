@@ -44,13 +44,28 @@ import { AuthFrame } from '../../../components/ui';
  * fully localised because `/login` already is, and lands the reader exactly where the removed link
  * used to point them.
  *
- * ## WHAT THIS DOES NOT CLOSE, STATED RATHER THAN IMPLIED
+ * ## ✅ AND THE SERVER DOOR IS CLOSED TOO NOW — OWNER DECISION 140, 2026-11-15
  *
- * `POST /auth/signup` is `@Public()` and remains reachable by a direct request. Measured
- * 2026-11-07: **114 api e2e spec files call it** — it is the suite's user factory — so closing it
- * is a separate decision with a large blast radius, not a line in this batch. The property this
- * change delivers is the one the owner named: a browser navigating to `/signup` cannot create an
- * account.
+ * This section used to read *"`POST /auth/signup` is `@Public()` and remains reachable by a direct
+ * request … closing it is a separate decision with a large blast radius, not a line in this
+ * batch."* That was true when written and is **false now**: the separate decision was taken.
+ *
+ * The route is still `@Public()` — it must be, because 117 api e2e spec files create their users
+ * through it and decision 140's third criterion forbids deleting any of them — but
+ * `AuthService.signup()` refuses before it does anything, through `selfSignupOpen()`. Production
+ * is a HARD override there: no environment variable reopens it.
+ *
+ * ⟶ **So this page's redirect is no longer the only thing standing between the internet and an
+ *   account.** It remains for the reason it was built: a browser typing `/signup` lands somewhere
+ *   localised instead of on a form that would now 403.
+ *
+ * ## AND THE REDIRECT IS STILL RIGHT, FOR THE REASON RECORDED ABOVE
+ *
+ * Decision 140 §4 repeats the standing rule — if closing the door needs a sentence on the screen,
+ * it is sliced from shipping text or it is the owner's. **Measured again 2026-11-15: no shipping
+ * Arabic says «self-registration is closed».** A redirect needs no sentence at all, so it remains
+ * the only shape that closes the page without inventing a word. That is reported as an empty cell
+ * rather than filled.
  */
 const SIGNUP_ROUTE_CLOSED = true;
 

@@ -71,6 +71,30 @@ const DSR_ESCALATION_STAGES: readonly SlaEscalationStage[] = [
   { offset: { value: 0, unit: 'businessDays' }, escalateTo: 'GENERAL_MANAGER' },
 ];
 
+/*
+ * 🔴 OWNER DECISION 137 — EVERY DURATION SPLITS IN TWO, AND THIS REGISTRY IS WHAT IT LANDS ON.
+ * ⛔ MODULE 2, AND NOT BUILT IN THIS BATCH — copy only, by her own instruction.
+ *
+ * «كل مُدّة لها مادة في القانون أو التعليمات تُحفَظ برقم مادتها وصفحتها، ويراها المكتب في
+ * الجدول ولا يعدّلها ولا يحذفها؛ وكل مُدّة بلا مادة يضبطها المكتب بصلاحية، والتعديل يُضاف
+ * سلسلةً ولا يمحو القديم، والمعاملة تمشي على الرقم الذي بدأت عليه.»
+ *
+ * THREE THINGS IT WILL REQUIRE, NAMED HERE SO THEY ARE NOT DISCOVERED LATE:
+ *
+ *   1. A duration with a statutory article is READ-ONLY to the office and carries its article
+ *      and printed page — the `LegalValue` shape, not this one. Changing it is ours
+ *      (decision 135), never the office's.
+ *   2. A duration WITHOUT an article is the office's to set under a permission, and editing it
+ *      APPENDS a new row rather than overwriting — «والتعديل يُضاف سلسلةً ولا يمحو القديم».
+ *   3. ⚠️ **A transaction runs on the figure it STARTED on** — «القديم مع القديم والجديد مع
+ *      الجديد». That is a behaviour change to something already built, and she took it knowing
+ *      so: `sla-timer.service.ts:247` reads `findActiveFor` with no `at`, which is TODAY's
+ *      date, so a duration changed mid-case would move a deadline already running.
+ *
+ * AND MODULE 2 OWES A MEASUREMENT FIRST: the 12 rows here marked `REGULATORY` claim a statute,
+ * and each must be checked against the instrument's own text before it is locked read-only —
+ * locking a wrong article is worse than leaving it editable.
+ */
 export const SLA_REGISTRY: readonly SlaRegistryEntry[] = [
   {
     workflowName: 'consent_withdrawal',

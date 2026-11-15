@@ -119,10 +119,22 @@ describe('the customer-file anchor has exactly one consumer', () => {
     // is the copy that would drift (it was written three days after the detail).
     const decision = service.match(/this\.resolveCustomerReadAccess\(/g) ?? [];
     expect(decision).toHaveLength(2);
-    // Two WRITES keep the owner-only policy: `addInsurers` and `logCommunication`. If this becomes
-    // 1, a write path was moved onto the anchored policy — which no behaviour test would catch,
-    // because an owner and a whole-book reader behave identically under both policies.
-    expect(visible).toHaveLength(2);
+    // THREE WRITES keep the owner-only policy: `addInsurers`, `logCommunication` and — since
+    // OWNER DECISION 139 ruling 4 — `attachArticle15DEvidence`. If this becomes SMALLER, a
+    // write path was moved onto the anchored policy, which no behaviour test would catch:
+    // an owner and a whole-book reader behave identically under both policies.
+    //
+    // ⚠️ 2 -> 3 ON 2026-11-15, AND THE DIRECTION IS WHY IT IS SAFE TO RAISE. The new caller
+    // attaches evidence to an art. 15/d exemption — a WRITE — and it takes the OWNER-ONLY
+    // policy, which is the side this pin protects. The number rising means a new write chose
+    // the stricter read; the number falling is the thing that must never happen, and that half
+    // is untouched.
+    //
+    // ⛔ It is NOT raised by reflex: the 2026-11-10 entry records a THIRD call that was a
+    // second read inside ONE write path, and the fix there was to HOIST the read rather than
+    // raise this. The question to ask before moving it is «is this a new write path, or the
+    // same one reading twice?» — here it is a new path, with its own route and permission.
+    expect(visible).toHaveLength(3);
   });
 });
 

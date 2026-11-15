@@ -88,6 +88,27 @@ export function Article15DRecord({
           : t('a15dTaggedBySystem')}
       </p>
 
+      {/*
+        🔴 OWNER DECISION 139 ruling 2 — «بلا إثبات», ON THE REQUEST, until the message is
+        attached.
+
+        «لا إعفاء على الورق بلا دليل إلا ظاهراً، ويراه المفتّش.» This mark is what stops the
+        decision becoming a hole: the server no longer refuses exemption 5 without evidence, so
+        the only thing standing between «the customer asked» and an unproven claim on the record
+        is that the gap is VISIBLE — to the office, and to an inspector reading the same screen.
+
+        ⛔ `lacksEvidence` is DERIVED BY THE API and read here, never recomputed. Both facts it
+        rests on are in this payload, so deriving it locally would compile and would be a second
+        home for the rule.
+
+        No timer and no deadline — decision 139 ruling 3. It simply stays until evidence arrives.
+      */}
+      {exemption.lacksEvidence ? (
+        <p style={a15dProseStyle} data-article-15-d="lacks-evidence">
+          {t('a15dExemptionLacksEvidence')}
+        </p>
+      ) : null}
+
       {/* Exemption 4's declared premium, beside the ceiling it was measured against. Both are
           ON the row rather than joined, so this reads correctly even after the table moves. */}
       {exemption.declaredAnnualPremiumJod !== null ? (

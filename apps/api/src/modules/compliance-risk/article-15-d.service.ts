@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import type {
@@ -380,10 +382,27 @@ export class Article15DService {
     }
 
     if (chosen === 'AT_CUSTOMER_REQUEST') {
-      evidence = await this.resolveEvidence(
-        input.choice.evidenceCommunicationLogId,
-        input.customerId,
-      );
+      /*
+       * 🔴 OWNER DECISION 139 — THE REQUEST PROCEEDS WITHOUT EVIDENCE, MARKED «بلا إثبات».
+       *
+       * This REVERSES decision 129's fifth criterion, and she took it knowing so. Her reason
+       * is the prevent-or-warn rule: an act is blocked only when the harm is irreversible AND
+       * falls on somebody other than the office. Here it falls on the office and is repaired
+       * by attaching the message — so refusing at the last step was a punishment for an
+       * employee who forgot to log a phone call.
+       *
+       * ⛔ NOTHING ELSE IS RELAXED. When an id IS supplied it goes through the same three
+       * refusals as before — inbound, this opportunity's own customer, an approved means —
+       * because an exemption resting on the WRONG evidence is worse than one resting on none:
+       * the first looks proven to an inspector and the second is marked.
+       */
+      evidence =
+        input.choice.evidenceCommunicationLogId === undefined
+          ? null
+          : await this.resolveEvidence(
+              input.choice.evidenceCommunicationLogId,
+              input.customerId,
+            );
     } else if (input.choice.evidenceCommunicationLogId !== undefined) {
       throw new BadRequestException(
         "Evidence of the customer's request belongs only to art. 15/d/5.",
@@ -445,15 +464,87 @@ export class Article15DService {
    * and `OTHER` needs a written agreement, which nothing records today — so `OTHER` is refused
    * here rather than admitted on an assumption.
    */
-  private async resolveEvidence(
-    id: string | undefined,
-    customerId: string | null,
-  ): Promise<CommunicationLog> {
-    if (!id) {
-      throw new BadRequestException(
-        'This exemption rests on the customer having asked, so the evidence of that request is required and the record is not saved without it.',
+  /**
+   * 🔴 OWNER DECISION 139 — THE ID IS REQUIRED HERE AND OPTIONAL AT THE CALL SITE.
+   *
+   * The parameter was `string | undefined` and this method refused the undefined case. It no
+   * longer can: decision 139 makes «no evidence» a legitimate outcome, so the CALLER decides
+   * whether there is anything to resolve and this one answers only «is THIS evidence good?».
+   *
+   * Narrowing the type is what makes that split real rather than conventional — the compiler
+   * now refuses a call that passes `undefined`, so nobody can reintroduce the old refusal here
+   * by accident.
+   */
+  /**
+   * 🔴 OWNER DECISION 139 ruling 4 — ATTACH THE EVIDENCE AFTERWARDS, AND THE MARK GOES.
+   *
+   * «يسجّل الموظف المراسلة في سجل المراسلات ويربطها بالطلب ⟵ يزول الوسم.»
+   *
+   * ## IT REUSES `resolveEvidence`, WHICH IS THE POINT
+   *
+   * Criterion 4 is that WhatsApp, an outbound message and another customer's message are all
+   * refused here exactly as they are at the original choice. That is guaranteed by calling the
+   * SAME method rather than by re-listing the rules: a second copy would drift the first time
+   * decision 132's list of approved means changed, and the drift would show up as an exemption
+   * that looks proven and is not.
+   *
+   * ## AND THE CUSTOMER IS READ FROM THE RFQ, NEVER FROM THE CALLER
+   *
+   * `resolveEvidence` refuses a log belonging to a different customer — but only if it is told
+   * the right one. Taking it from the request body would let a caller name any customer and
+   * defeat the check it is passing through. It comes from the exemption's own RFQ.
+   */
+  async attachEvidence(input: {
+    rfqId: string;
+    customerId: string | null;
+    evidenceCommunicationLogId: string;
+  }): Promise<{ attached: true }> {
+    const exemption = await this.rows.findExemptionForRfq(input.rfqId);
+    if (!exemption) {
+      throw new NotFoundException(
+        `Quote request ${input.rfqId} carries no art. 15/d exemption, so there is nothing to attach evidence to.`,
       );
     }
+    if (exemption.exemption !== 'AT_CUSTOMER_REQUEST') {
+      /*
+       * Evidence belongs ONLY to art. 15/d/5 — the same rule the database's CHECK enforces, and
+       * the same one the original choice refuses. Attaching a customer's request to a
+       * low-premium motor exemption would be a fact nobody can interpret.
+       */
+      throw new UnprocessableEntityException(
+        "Evidence of the customer's request belongs only to art. 15/d/5.",
+      );
+    }
+    if (exemption.evidenceCommunicationLogId !== null) {
+      throw new ConflictException(
+        'This exemption already carries its evidence. It is recorded once and cannot be replaced — the record is append-only.',
+      );
+    }
+
+    // The three refusals, through the one implementation. Throws before anything is written.
+    await this.resolveEvidence(
+      input.evidenceCommunicationLogId,
+      input.customerId,
+    );
+
+    const { count } = await this.rows.attachEvidence(
+      input.rfqId,
+      input.evidenceCommunicationLogId,
+    );
+    if (count === 0) {
+      // Somebody else won the race between the read above and this write. Not an overwrite and
+      // not a silent success: the mark is already gone, and by somebody else's message.
+      throw new ConflictException(
+        'This exemption already carries its evidence. It is recorded once and cannot be replaced — the record is append-only.',
+      );
+    }
+    return { attached: true };
+  }
+
+  private async resolveEvidence(
+    id: string,
+    customerId: string | null,
+  ): Promise<CommunicationLog> {
     const log = await this.rows.findCommunicationLog(id);
     if (!log) {
       throw new UnprocessableEntityException(
