@@ -520,7 +520,13 @@ if _positional:
 # ⚠️ The alternative was to delete the route and let the mark clear only by granting. That would
 # drop half of decision 131 to satisfy a gate, and leave an administrator who has decided NOT to
 # grant a code with no way to say so — the mark would stay on it for ever.
-UNREACHED_BY_PATH_BUDGET = 17
+#
+# 17 -> 16 ON 2026-11-15, AND THE CREDITOR PAID. OWNER DECISION 134 ratified the label —
+# «إزالة علامة جديدة» — so the button exists and `POST /rbac/permissions/:code/dismiss` has a
+# way in from the permission matrix. The paragraph above said this number comes back to 16 the
+# day the word arrives, and the DOWN direction is what made that a commitment rather than a
+# hope: this gate FAILED on the commit that wired the button, naming the figure to lower.
+UNREACHED_BY_PATH_BUDGET = 16
 
 # The second figure. 9 here against 19 in the verb-aware pass, and the gap is the point: this pass is
 # verb-agnostic, so a route reads as addressed whenever ANY verb on its path is called live —
@@ -546,7 +552,11 @@ DEAD_ONLY_BY_PATH_BUDGET = 9
 # alone could: module 1's legal-values move added THREE routes in ONE new controller, and this adds
 # ONE route to an OLD controller that was fully reached before. Same +1 on the route count, a
 # different fact about the codebase. It comes back to 8 with the button.
-UNREACHED_CONTROLLER_BUDGET = 9
+# 9 -> 8 on 2026-11-15, with the same commit: `rbac/controllers/rbac.controller.ts` carried
+# exactly ONE unreached route and leaves the list entirely, which is why both figures move
+# together here. ⚠️ They did NOT have to: a controller keeping a second unreached route would
+# have moved the route count and left this one at 9, which is the case this pair exists for.
+UNREACHED_CONTROLLER_BUDGET = 8
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both

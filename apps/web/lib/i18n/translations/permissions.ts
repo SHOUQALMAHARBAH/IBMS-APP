@@ -128,11 +128,16 @@ export const PERMISSIONS = {
     'perm:complaint.close': 'يُغلق شكوى. يستلزم توقيع مشرف، ولا يجوز أن يكون من عالجها',
     'perm:complaint.escalate': 'يحوّل الشكوى إلى لجنة تسوية النزاعات التأمينية — خارج المكتب',
     'perm:complaint.log': 'يسجّل شكوى عميل. تُمنح لمن يلتقي العميل، حتى لا تضيع شكوى لأن مستلمها لا يملك تسجيلها',
-    // 🔴 AGENT-COMPOSED, on AWAITING_OWNER_REVIEW. Every run ships elsewhere (see the
-    // script header in this batch) but composed is not sliced, and the parity guard needs a
-    // line before the code can exist. Hers to replace.
+    // OWNER DECISION 134 — HERS, AND IT REPLACED AN AGENT-COMPOSED LINE RATHER THAN
+    // APPROVING IT. The line that shipped here on 2026-11-14 was composed, declared on
+    // `AWAITING_OWNER_REVIEW`, and reported to her as composed; she wrote this instead.
+    // Shorter, and it drops the regulatory-responsibility clause the composed line carried.
+    //
+    // SLICED byte-for-byte from `docs/decision-134-two-words-ratified.md`'s §٢ table and
+    // never retyped; `permission-descriptions.test.ts` re-slices it and compares, so one
+    // word changed here fails by name.
     'perm:declared-act.article-15-d.declare':
-      'يُعلن أن طلب عرض سعر ذاهب إلى أقل من ثلاث شركات تأمين ولا ينطبق عليه إعفاء، ويكتب سببه ويُقرّ بأن المسؤولية التنظيمية على المكتب. وهي غير صلاحية إرسال الطلب: من يرسل لا يُعلن بحكم إرساله',
+      'يُقرّ بإرسال طلب عرض سعر لأقل من ثلاث شركات تأمين بلا إعفاء، ويكتب السبب. وهي غير صلاحية إرسال الطلب.',
     'perm:compliance-calendar.manage': 'يدير تقويم الالتزام التنظيمي ومواعيد ما يجب تقديمه للجهات',
     'perm:conflict-of-interest.disclose': 'يسجّل إفصاح تضارب المصالح الإلزامي على توصية مُعلَّمة، قبل أن تُرسَل للعميل. ولا يجوز أن يكون المُفصِح هو كاتب التوصية — والنظام يمنعه',
     'perm:conflict-of-interest.register.read':

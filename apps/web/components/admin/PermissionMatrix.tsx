@@ -19,6 +19,7 @@ import {
   matrixVerbStyle,
   matrixDescriptionStyle,
   matrixNewBadgeStyle,
+  matrixDismissNewStyle,
   matrixSectionAllStyle,
 } from './admin.styles';
 
@@ -50,11 +51,22 @@ export function PermissionMatrix({
   selected,
   onChange,
   disabled = false,
+  onDismissNew,
 }: {
   catalogue: readonly PermissionCatalogueEntry[];
   selected: ReadonlySet<string>;
   onChange: (next: Set<string>) => void;
   disabled?: boolean;
+  /**
+   * OWNER DECISION 134 — clears the «جديدة» mark without granting the code.
+   *
+   * OPTIONAL, and absent means the button does not render at all rather than rendering inert.
+   * `frontend-ux-directive.md`: a control a role cannot use does not exist on their screen, and
+   * the route is gated on `role.update` — so the caller passes this only when the reader holds
+   * it. The create form passes nothing: it is reached on `role.create`, which is a different
+   * grant, and a button that 403s is worse than no button.
+   */
+  onDismissNew?: (code: string) => void | Promise<void>;
 }) {
   const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
@@ -98,6 +110,29 @@ export function PermissionMatrix({
     () => new Set(catalogue.filter((e) => e.isNew).map((e) => e.code)),
     [catalogue],
   );
+
+  /**
+   * The code whose mark is being cleared right now, so the button cannot be pressed twice.
+   *
+   * ONE code rather than a boolean: several rows can carry the mark at once, and a shared flag
+   * would disable every other row's button while one request is in flight.
+   */
+  const [dismissing, setDismissing] = useState<string | null>(null);
+
+  async function dismiss(code: string) {
+    if (!onDismissNew || dismissing !== null) return;
+    setDismissing(code);
+    try {
+      await onDismissNew(code);
+    } finally {
+      /*
+       * ALWAYS cleared, including on a refusal. A button left permanently disabled after one
+       * failed request is a dead control on a screen whose whole subject is what a person may do.
+       * The caller owns the error message; this owns only the double-press.
+       */
+      setDismissing(null);
+    }
+  }
 
   function apply(codes: string[], on: boolean) {
     const next = new Set(selected);
@@ -150,6 +185,25 @@ export function PermissionMatrix({
               >
                 {t('roleMatrixNewBadge')}
               </span>
+            ) : null}
+            {/* OWNER DECISION 134 — «إزالة علامة جديدة», and it is the OTHER half of decision 131.
+                «يعطيها لدور، أو يقرّر فيها»: the administrator either grants the code (the checkbox
+                beside this) or rules on it without granting (this). Both clear the mark; only one
+                of them hands anybody a capability, which is why the route is NOT a grant.
+
+                Rendered only beside a marked code, and only when the caller supplied the handler.
+                `type="button"` because the matrix sits inside the create <form> — a bare <button>
+                there submits it, which would create a role as a side effect of clearing a mark. */}
+            {newCodes.has(row.code) && onDismissNew ? (
+              <button
+                type="button"
+                style={matrixDismissNewStyle}
+                data-dismiss-new={row.code}
+                disabled={dismissing === row.code}
+                onClick={() => void dismiss(row.code)}
+              >
+                {t('roleMatrixDismissNew')}
+              </button>
             ) : null}
             {/* One short line BENEATH the name, not appended to it: the owner's finding is that a
                 code is not an explanation, and a description crammed onto the same line after an

@@ -103,6 +103,25 @@ export function listPermissionCatalogue(): Promise<PermissionCatalogueEntry[]> {
   return apiGet<PermissionCatalogueEntry[]>('/rbac/permissions');
 }
 
+/**
+ * OWNER DECISION 131's second way of deciding, given its control by OWNER DECISION 134.
+ *
+ * «يعطيها لدور، أو يقرّر فيها» — the office decides either by granting the code to a role, or by
+ * ruling on it without granting. The first half needs no call: the grant is the matrix checkbox.
+ * This is the second, and it clears the «جديدة» mark in THIS office and nowhere else.
+ *
+ * Gated server-side on `role.update` — the same code that gates saving the matrix, deliberately
+ * not one of its own, so an office cannot be configured where somebody may grant a code but not
+ * decline it.
+ */
+export function dismissNewPermissionMark(
+  code: string,
+): Promise<{ code: string; dismissed: boolean }> {
+  return apiPost<{ code: string; dismissed: boolean }>(
+    `/rbac/permissions/${encodeURIComponent(code)}/dismiss`,
+  );
+}
+
 export interface CreateRoleInput {
   name: string;
   nameEn: string;

@@ -13,7 +13,23 @@
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
+    // PINS WHAT TYPESCRIPT ALREADY INFERS, AND IS NOT THE BUILD'S ROOT.
+    //
+    // TypeScript 6 raises TS5011 when a program's common source directory sits outside the
+    // config's own folder, and asks for the value to be stated. This program's does: exactly
+    // one non-declaration file outside `apps/api` is in it --
+    // `packages/db/prisma/seed-data/sla-policies.ts`, reached from
+    // `src/modules/sla/sla-policy-source.config.spec.ts` by a relative path -- which makes the
+    // common ancestor the repo root. `../..` is that ancestor, so this CHANGES NOTHING; it
+    // states what was already true.
+    //
+    // Nothing emits from this config -- `typecheck` is `tsc --noEmit` -- so this value never
+    // reaches a file on disk. `tsconfig.build.json` is what `nest build` and `nest start` read,
+    // and it overrides `rootDir` back to `./` so `dist/` keeps its layout. Do not delete that
+    // override: inheriting `../..` here would emit `dist/apps/api/src/main.js` and break all
+    // three consumers of `dist/src/main.js` (the Dockerfile's CMD, `start:prod`, and the DAST
+    // step in `ci.yml`).
+    "rootDir": "../..",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,

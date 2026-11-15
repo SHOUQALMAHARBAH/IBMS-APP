@@ -599,6 +599,15 @@ export const OPERATIONS = {
     roleMatrixSummary: 'هذا الدور يملك {granted} من {total} صلاحية.',
     // OWNER DECISION 131, listed again in 133. Sliced from her own table; green is hers too.
     roleMatrixNewBadge: 'جديدة',
+    // OWNER DECISION 134 — the label on the control that clears the mark WITHOUT granting
+    // the code: «يعطيها لدور، أو يقرّر فيها» (decision 131), and this is the second way.
+    //
+    // SLICED byte-for-byte from `docs/decision-134-two-words-ratified.md`'s own §٢ table and
+    // never retyped; `permission-descriptions.test.ts` re-slices it and compares. It was an
+    // empty cell reported to her in message 38 — the matrix ships nothing meaning «the office
+    // looked at this and chose not to grant it» — and `unreachable-routes.py` carried the
+    // route as declared-unreached until this word arrived.
+    roleMatrixDismissNew: 'إزالة علامة جديدة',
     roleMatrixNeedsCatalogue:
       'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية permission.read. يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
     roleMatrixSearchLabel: 'ابحث في الصلاحيات',
@@ -1280,6 +1289,7 @@ export const OPERATIONS = {
     roleMatrixSummary: 'This role has {granted} of {total} permissions.',
     // Hers in Arabic; this mirrors it. Shown in green -- see matrixNewBadgeStyle.
     roleMatrixNewBadge: 'New',
+    roleMatrixDismissNew: 'Remove new mark',
     roleMatrixNeedsCatalogue:
       'The permission matrix cannot be shown — your account does not hold permission.read. You can still create the role, and someone who holds it can set its permissions.',
     roleMatrixSearchLabel: 'Search permissions',

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 import { PERMISSIONS } from '../i18n/translations/permissions';
+import { OPERATIONS } from '../i18n/translations/operations';
 import { codeFromPermissionKey, permissionDescriptionKey } from '../i18n/permission-key';
 import { describePermission, hasWrittenDescription } from './permission-descriptions';
 
@@ -125,7 +126,7 @@ const CARRIED_ENGLISH_BUDGET = 214;
  * balance holds at 230 = 230 + 0 -- which is what makes this an approval that was RECORDED rather
  * than a list somebody tidied.
  */
-const OWNER_REVIEWED_COUNT = 232;
+const OWNER_REVIEWED_COUNT = 233;
 
 /**
  * The four lines an agent wrote. Each is a placeholder in HER register, not a reviewed line.
@@ -190,10 +191,15 @@ const AWAITING_OWNER_REVIEW: string[] = [
    * before a code can exist at all, so the choice was to compose one and declare it, or not to
    * ship the permission.
    *
-   * ⟶ `OWNER_REVIEWED_COUNT` stays 232 and the balance is 233 = 232 + 1. The sentence goes to her
-   *   in this batch's report.
+   * ⟶ AND SHE REPLACED IT THE NEXT DAY — OWNER DECISION 134, 2026-11-14. Composed, reported,
+   *   rewritten: hers is shorter and drops the regulatory-responsibility clause the composed
+   *   line carried. `OWNER_REVIEWED_COUNT` rises by one to 233 and the balance holds at
+   *   233 = 233 + 0.
+   *
+   *   ⚠️ SO THE RUNNING TALLY IS THREE OF TEN REWRITTEN, NOT ONE OF TEN. The seven of
+   *   message 34 survived her reading unchanged; the two `legal-value.*` lines did not, and
+   *   nor did this one. A line on this list is not a line that is probably fine.
    */
-  'declared-act.article-15-d.declare',
 ];
 
 describe('whose Arabic is it — provenance, because the text cannot say', () => {
@@ -389,5 +395,76 @@ describe('OWNER DECISION 133 — the two legal-value descriptions are hers, byte
           'declared as awaiting her review.',
       ).not.toContain(code);
     }
+  });
+});
+
+/**
+ * OWNER DECISION 134 — the art. 15/d declaration's Arabic is HERS NOW, and it REPLACED a line.
+ *
+ * The line that shipped on 2026-11-14 was agent-composed and declared on `AWAITING_OWNER_REVIEW`.
+ * She did not approve it: she wrote a shorter one that drops the regulatory-responsibility clause.
+ * Same shape as the decision-133 block above, and here for the same reason — this sentence is what
+ * an office administrator reads before granting the one code in this product that closes a path.
+ *
+ * The BUTTON LABEL is asserted in the same block deliberately. Decision 134 ratified exactly two
+ * strings and they are one decision; splitting them across two files is how one gets edited and
+ * the other does not.
+ */
+describe('OWNER DECISION 134 — both ratified strings, byte for byte', () => {
+  const D134 = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'docs',
+    'decision-134-two-words-ratified.md',
+  );
+
+  /** The first «…» span of the decision-134 table row whose site cell is `site`. */
+  function ratified(site: string): string {
+    const row = readFileSync(D134, 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('|'))
+      .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()))
+      .find((cells) => cells.length >= 2 && cells[0] === site);
+    expect(row, `decision 134 has no row for «${site}» — the slice source moved`).toBeDefined();
+    const match = /«(.+?)»/.exec(row![1]);
+    expect(match, `decision 134's row for «${site}» carries no quoted string`).not.toBeNull();
+    return match![1];
+  }
+
+  it("the declaration permission says exactly what she wrote", () => {
+    expect(
+      PERMISSIONS.AR[
+        permissionDescriptionKey(
+          'declared-act.article-15-d.declare',
+        ) as keyof typeof PERMISSIONS.AR
+      ],
+      "the Arabic for declared-act.article-15-d.declare is not byte-identical to OWNER DECISION " +
+        "134's table. It is HER sentence and it replaced an agent-composed one: re-slice it from " +
+        'docs/decision-134-two-words-ratified.md rather than editing it here.',
+    ).toBe(ratified('شرح الصلاحية `declared-act.article-15-d.declare`'));
+  });
+
+  it('the dismiss button carries her label, not a word of ours', () => {
+    /*
+     * This label was an EMPTY CELL in message 38's report: the matrix shipped nothing meaning «the
+     * office looked at this and chose not to grant it», and decision 125 forbids inventing one. So
+     * the route sat declared-unreached until she wrote it. Pinning it here is what stops the next
+     * person "improving" the wording.
+     */
+    expect(
+      OPERATIONS.AR.roleMatrixDismissNew,
+      'the dismiss button label is not byte-identical to OWNER DECISION 134 — it is hers.',
+    ).toBe(ratified('زرّ في مصفوفة الصلاحيات، على الصلاحية المعلَّمة «جديدة»'));
+  });
+
+  it('and the code is no longer declared as awaiting her review', () => {
+    expect(
+      AWAITING_OWNER_REVIEW,
+      "declared-act.article-15-d.declare carries the owner's own sentence now (decision 134), so " +
+        'it must not be declared as awaiting her review.',
+    ).not.toContain('declared-act.article-15-d.declare');
   });
 });

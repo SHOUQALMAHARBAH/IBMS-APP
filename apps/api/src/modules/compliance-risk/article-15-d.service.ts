@@ -55,8 +55,32 @@ import {
  * named in the message.
  *
  * ⟶ AND AN EXEMPTED REQUEST IS NEVER AFFECTED, nor is one reaching three or more — 84.3% of
- *   them on the seeded distribution. The refusal reaches the minority of the minority, which is
- *   decision 123's own test: count the clicks added to the most frequent transaction.
+ *   them. The refusal reaches the minority of the minority, which is decision 123's own test:
+ *   count the clicks added to the most frequent transaction.
+ *
+ * ## WHERE 84.3% COMES FROM — THE DATABASE AND THE COUNTING UNIT, BOTH NAMED
+ *
+ * THIS IS THE FIGURE'S ONE HOME. The other sites that quote it point here rather than restating
+ * the derivation, because a figure whose unit is written in twelve places has twelve chances to
+ * drift from its unit.
+ *
+ * Measured 2026-11-15 on the DEV database (`ibms` on :5433), re-derived rather than inherited:
+ * of the 89 `RFQ` rows, 75 sit on an (office, insurance line) pair that THREE OR MORE insurers
+ * write — counting distinct `Insurer` rows joined through `InsurerOfferedLine` within the RFQ's
+ * own organization. 75/89 = 84.3%; the other 14 are 15.7%.
+ *
+ * ⚠️ THE UNIT IS THE REQUEST, NOT THE PAIR, AND THE TWO DISAGREE. The same dev data gives 5 of
+ * 14 (office, line) PAIRS below three — 35.7% — because a thin line carries few requests. Both
+ * are true and they answer different questions; this one is about how often the window appears
+ * in front of a person, so the request is the right denominator.
+ *
+ * ⛔ AND IT IS NOT THE SHORTLIST ACTUALLY SENT. Measured the same day, every one of dev's 89
+ * RFQs carries exactly ONE `RFQInsurer` row, and 665 of db-test's 689 carry fewer than three —
+ * because the three-insurer shortlist seeding landed after those rows were written and the demo
+ * seed has deliberately never been re-run (it re-hashes every demo password and deletes the MFA
+ * credentials). So a reader measuring `RFQInsurer` directly will get ~100% and conclude this
+ * number is wrong. It is not: it measures how many insurers the office COULD approach, which is
+ * what decides whether art. 15/d bites.
  */
 
 /** What the screen needs to ask the question. */
