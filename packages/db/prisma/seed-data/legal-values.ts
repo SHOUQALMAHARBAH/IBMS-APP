@@ -6,6 +6,30 @@
 // scanned copy — they are all readable, read off the page images on 10-11 November 2026 — so the
 // split is no longer *can we read it* but *has the Central Bank issued it*.
 //
+// ## 🔴 OWNER DECISION 135 — HOW A PROVIDER FIGURE CHANGES, AND IT IS NOT THIS FILE. NOT BUILT.
+//
+// Decision 135 (15 November 2026) completes 123 rather than contradicting it. 123 settled WHOSE
+// row a figure is; 135 settles HOW the provider's changes: **entered once from a screen of ours,
+// with its article and its effective date, taking effect for every office from that date — the
+// old value gaining an `effectiveTo` rather than being deleted — and every office administrator
+// notified. «ولا يُلمَس الكود».**
+//
+// ⛔ NOT BUILT, AND THIS FILE IS WHY IT MATTERS. Measured 2026-11-15: a provider row is written
+// ONLY by a migration and by this seed — the RLS policy refuses the application role any write to
+// a row with no office — and there is NO screen for the legal-values table, for us or for an
+// office. So until 135 is built, the Central Bank moving art. 15/d/4's ceiling means a code change
+// and a migration, which is exactly the thing that decision rules out.
+//
+// ⚠️ AND IT IS NOT MERELY A SCREEN. Decision 135's own measurement names two things that have to
+// move with it: a provider row carries the instrument, the article and the printed page but **has
+// no column for the article's TEXT**, and the adviser's art. 15/d window carries «٢٠٠٠» in his own
+// sentence — so changing the row alone would leave the screen saying one figure while the system
+// computed another. ⛔ Do not build the screen without resolving both.
+//
+// ⟶ The office's three rows are untouched by 135: they stay the office's, through
+//   `POST /legal-values` on `legal-value.declare`, and decision 123's criterion 7 (an office that
+//   tries to write a provider figure is REFUSED) stands word for word.
+//
 // ## WHY A SEPARATE TABLE AND NOT `SlaPolicy`, AND NOT THE NINTH REFERENCE TABLE
 //
 // Recorded as a departure from the intention of 12 October («التاسع من عائلة الجداول المرجعية، لا
