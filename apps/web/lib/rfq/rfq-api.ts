@@ -95,6 +95,25 @@ export interface Article15DExemptionRecord {
   recordedAt: string;
 }
 
+/**
+ * 🔴 OWNER DECISION 143 — ONE CANDIDATE THE «إرفاق المراسلة» BUTTON MAY OFFER.
+ *
+ * Named rather than written inline twice, because the creation window and the attach picker are
+ * given the SAME shape by the SAME server query, and two structural literals that happen to
+ * match are two homes for that agreement. `channel` is a string rather than the api's
+ * `InteractionChannel` for the reason every other type here is: the web cannot import the api's
+ * enums, and the screen looks the label up through a partial map with a fallback.
+ *
+ * ⛔ NO `subject` AND NO `body`, and that is the server's rule rather than this file's: a
+ * communication's text is Confidential, and the employee identifies the message by when it came
+ * and how it came.
+ */
+export interface Article15DEvidenceOption {
+  id: string;
+  channel: string;
+  sentAt: string;
+}
+
 export interface Article15DAlert {
   id: string;
   quotedPremiumJod: string;
@@ -180,7 +199,7 @@ export interface Article15DOptions {
   /** Exemption 5's candidates: this customer's inbound messages on an approved means. Carries
    *  no subject and no body — a communication's text is Confidential and this list is read by
    *  whoever may create a quote request, not by whoever may read correspondence. */
-  evidence: { id: string; channel: string; sentAt: string }[];
+  evidence: Article15DEvidenceOption[];
   /**
    * 🔴 THE ADVISER'S OWN WINDOW, FROM THE SERVER AND NEVER FROM A DICTIONARY.
    *
@@ -197,6 +216,35 @@ export interface Article15DOptions {
     acknowledgement: string;
     reasonMinLength: number;
   };
+}
+
+/**
+ * 🔴 OWNER DECISION 143 — what «إرفاق المراسلة» may offer on a request that already exists.
+ *
+ * `rfq.communication.log` on the server, the SAME code as the attach it feeds — so a caller who
+ * is shown the button is a caller the list will answer, and the screen never offers a choice the
+ * server is about to refuse.
+ */
+export function listArticle15DEvidenceOptions(
+  rfqId: string,
+): Promise<Article15DEvidenceOption[]> {
+  return apiGet(`/rfqs/${rfqId}/article-15-d/evidence-options`);
+}
+
+/**
+ * 🔴 OWNER DECISION 139 ruling 4, reached by OWNER DECISION 143's button — the mark goes.
+ *
+ * ⛔ There is no sibling that removes it. The row is append-only with exactly one permitted
+ * transition (evidence NULL ⟶ NOT NULL), so «no permission removes the mark» is the database's
+ * answer rather than this client's politeness.
+ */
+export function attachArticle15DEvidence(
+  rfqId: string,
+  evidenceCommunicationLogId: string,
+): Promise<{ attached: true }> {
+  return apiPost(`/rfqs/${rfqId}/article-15-d/evidence`, {
+    evidenceCommunicationLogId,
+  });
 }
 
 export function getArticle15DOptions(query: {

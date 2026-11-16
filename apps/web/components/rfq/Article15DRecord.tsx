@@ -1,14 +1,23 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatNumber } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
+import {
+  attachArticle15DEvidence,
+  listArticle15DEvidenceOptions,
+} from '../../lib/rfq/rfq-api';
 import type {
   Article15DAlert,
+  Article15DEvidenceOption,
   Article15DExemption,
   Article15DExemptionRecord,
 } from '../../lib/rfq/rfq-api';
 import {
+  a15dAttachButtonStyle,
+  a15dEvidenceListStyle,
   a15dOptionStyle,
   a15dProseStyle,
   a15dQuestionStyle,
@@ -16,6 +25,7 @@ import {
   a15dWindowStyle,
   a15dWindowTitleStyle,
 } from './rfq.styles';
+import { CHANNEL_LABEL_KEY } from './Article15DWindow';
 
 /**
  * WHAT THIS REQUEST RESTS ON — ART. 15/d, ON THE RECORD.
@@ -51,11 +61,102 @@ const EXEMPTION_LABEL_KEY: Record<Article15DExemption, TranslationKey> = {
 export function Article15DRecord({
   exemption,
   alerts = [],
+  rfqId,
+  canAttachEvidence = false,
+  onEvidenceAttached,
 }: {
   exemption: Article15DExemptionRecord | null | undefined;
   alerts?: Article15DAlert[];
+  /** The request this record belongs to — the attach addresses the RFQ, not the exemption row. */
+  rfqId?: string;
+  /**
+   * OWNER DECISION 143 + `frontend-ux-directive.md` — a control a role cannot use does not exist
+   * on their screen. `rfq.communication.log` is the code, the SAME one the route carries, so the
+   * button is absent for a compliance reader who may see the mark and may not clear it.
+   */
+  canAttachEvidence?: boolean;
+  /**
+   * Reload the request, so `lacksEvidence` comes back FROM THE SERVER rather than being switched
+   * off locally. The mark is DERIVED and this screen must not derive it.
+   */
+  onEvidenceAttached?: () => void;
 }) {
   const { t, language } = useLanguage();
+
+  /*
+   * 🔴 OWNER DECISION 143 — «إرفاق المراسلة», and its four states.
+   *
+   * ⚠️ THESE HOOKS RUN FOR EVERY RENDER, including the 84.3% of requests that carry no exemption
+   * at all, and they must stay ABOVE the `if (!exemption) return null` below. React's hook order
+   * is positional, so a hook placed after that early return would change order the moment a
+   * request with no exemption rendered where one with an exemption had been. The effect itself
+   * does nothing unless there is a mark to clear.
+   */
+  const [candidates, setCandidates] =
+    useState<Article15DEvidenceOption[] | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+  /*
+   * ⚠️ THE ERROR STATE HOLDS A KEY, AND BOTH KEYS ARE BORROWED — reported as an empty cell.
+   *
+   * No decision ratifies a sentence for «the attach failed», and this batch may not compose one
+   * (decision 125). So each branch takes the nearest sentence that is LITERALLY TRUE of what
+   * failed and ALREADY SHIPS ON THIS SAME SCREEN, which is decision 125's own rule for where a
+   * word may come from:
+   *
+   *   the candidate list failed to load ⟶ «تعذر تحميل سجل المراسلات», which is exactly that
+   *   the attach itself failed          ⟶ «تعذر تسجيل المراسلة», recording the correspondence
+   *
+   * ⛔ Neither is invented and neither is a translation of ours. A sentence naming the ATTACH
+   * specifically is the owner's, and until she rules one the screen says something true rather
+   * than something new.
+   */
+  const [attachError, setAttachError] = useState<TranslationKey | null>(null);
+  const [attaching, setAttaching] = useState(false);
+
+  const lacksEvidence = exemption?.lacksEvidence === true;
+  const mayAttach = lacksEvidence && canAttachEvidence && rfqId !== undefined;
+
+  useEffect(() => {
+    if (!mayAttach || rfqId === undefined) return;
+    let live = true;
+    /*
+     * ⚠️ THE ERROR IS CLEARED ON SUCCESS, NOT BEFORE THE REQUEST. A synchronous `setState` in an
+     * effect body is a cascading render (eslint names it, and it failed the gate here) — and
+     * resolving it this way is the better behaviour anyway: an optimistic clear blanks a real
+     * failure for however long the retry takes, so the screen reads as fine while it is not.
+     */
+    listArticle15DEvidenceOptions(rfqId)
+      .then((rows) => {
+        if (!live) return;
+        setCandidates(rows);
+        setAttachError(null);
+      })
+      .catch(() => {
+        if (live) setAttachError('rfqDetailCommsLoadError');
+      });
+    return () => {
+      live = false;
+    };
+  }, [mayAttach, rfqId]);
+
+  const attach = useCallback(async () => {
+    if (rfqId === undefined || chosen === null) return;
+    setAttaching(true);
+    setAttachError(null);
+    try {
+      await attachArticle15DEvidence(rfqId, chosen);
+      /*
+       * ⛔ THE MARK IS NOT SWITCHED OFF HERE. `lacksEvidence` is derived by the api and sent;
+       * clearing it locally would be a second home for the rule, and it would also lie if this
+       * write lost a race to another employee's message. The parent reloads; the server answers.
+       */
+      onEvidenceAttached?.();
+    } catch {
+      setAttachError('rfqLogExchangeError');
+    } finally {
+      setAttaching(false);
+    }
+  }, [rfqId, chosen, onEvidenceAttached]);
 
   if (!exemption) return null;
 
@@ -103,10 +204,104 @@ export function Article15DRecord({
 
         No timer and no deadline — decision 139 ruling 3. It simply stays until evidence arrives.
       */}
-      {exemption.lacksEvidence ? (
+      {lacksEvidence ? (
         <p style={a15dProseStyle} data-article-15-d="lacks-evidence">
           {t('a15dExemptionLacksEvidence')}
         </p>
+      ) : null}
+
+      {/*
+        🔴 OWNER DECISION 143 — «إرفاق المراسلة», THE WAY IN THE ROUTE DID NOT HAVE.
+
+        `POST /rfqs/:id/article-15-d/evidence` shipped built, enforced and e2e-tested on
+        2026-11-15 with no control anywhere on any screen, because the label did not exist and
+        decision 125 forbids composing one: «إرفاق» ships only on the DOCUMENTS screens and
+        «المراسلة» only in the plural here. `unreachable-routes.py` carried it as a
+        declared-unreached route with this creditor named. She ratified the proposal whole, and
+        this is the payment.
+
+        ## FOUR STATES, AND THE EMPTY ONE IS HER SENTENCE RATHER THAN OURS
+
+        loading · error, with the control still there to retry through · EMPTY, which renders
+        decision 139 ruling 6's own sentence through the SAME key the creation window uses, so
+        the employee told «يمكنك المتابعة» when the request was sent meets those same words when
+        they come back to prove it · and the candidates.
+
+        ## AND THE LIST IS NOT FILTERED HERE
+
+        What clears the mark is decided by the server — INBOUND, this customer, an approved
+        means. ⛔ A filter here would be a second answer to decision 139's conditions, and the
+        first time decision 132's list of approved means moved, the screen would offer a message
+        the server then refused: the screen contradicting the server on the one screen that must
+        not.
+
+        ## THE ATTACH IS WRITE-ONCE, WHICH IS WHY CHOOSING IS NOT ATTACHING
+
+        The row permits exactly ONE transition and no permission takes it back, so a radio that
+        attached on selection would make a misclick permanent and visible to an inspector for
+        ever. The candidate is CHOSEN, and then the button acts.
+      */}
+      {mayAttach ? (
+        <div data-article-15-d="attach">
+          {attachError !== null ? (
+            <p style={a15dProseStyle} data-article-15-d="attach-error">
+              {t(attachError)}
+            </p>
+          ) : candidates === null ? (
+            <p style={a15dProseStyle} data-article-15-d="attach-loading">
+              {t('commonLoading')}
+            </p>
+          ) : candidates.length === 0 ? (
+            <p style={a15dProseStyle} data-article-15-d="attach-none">
+              {t('a15dEvidenceNoneYet')}
+            </p>
+          ) : (
+            <div style={a15dEvidenceListStyle}>
+              {candidates.map((item) => (
+                <label key={item.id} style={a15dOptionStyle}>
+                  <input
+                    type="radio"
+                    name="article-15-d-attach-evidence"
+                    data-article-15-d="attach-candidate"
+                    data-evidence-id={item.id}
+                    checked={chosen === item.id}
+                    disabled={attaching}
+                    onChange={() => setChosen(item.id)}
+                  />
+                  <span>
+                    {new Date(item.sentAt).toLocaleDateString(
+                      language === 'AR' ? 'ar-JO' : 'en-JO',
+                    )}
+                    {' · '}
+                    {t(
+                      CHANNEL_LABEL_KEY[item.channel] ??
+                        'a15dEvidenceLabel',
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/*
+            The button stands wherever the mark does — over the candidates, over the empty list
+            and over a failed load. Pressing it with nothing chosen does nothing, and a control
+            that vanished with its list would leave an employee unable to tell «there is nothing
+            to attach» from «this screen cannot attach at all».
+
+            `type="button"` so it can never submit an ancestor form, which is the defect the
+            dismiss button records on the role matrix.
+          */}
+          <button
+            type="button"
+            style={a15dAttachButtonStyle}
+            data-article-15-d="attach-button"
+            disabled={chosen === null || attaching}
+            onClick={() => void attach()}
+          >
+            {t('a15dAttachEvidenceButton')}
+          </button>
+        </div>
       ) : null}
 
       {/* Exemption 4's declared premium, beside the ceiling it was measured against. Both are

@@ -144,6 +144,26 @@ export const a15dEvidenceListStyle: CSSProperties = {
   marginTop: '0.35rem',
 };
 
+/**
+ * OWNER DECISION 143's «إرفاق المراسلة», beneath the candidate list it acts on.
+ *
+ * `display: block` + `marginTop` rather than inline beside the mark: the attach is WRITE-ONCE —
+ * the database permits exactly one transition and no permission takes it back — so the control
+ * sits apart from the list as a deliberate step rather than reading as one more row in it.
+ */
+export const a15dAttachButtonStyle: CSSProperties = {
+  display: 'block',
+  marginTop: '0.75rem',
+  padding: '0.3rem 0.8rem',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: 'var(--radius-sm)',
+  background: 'var(--surface-card)',
+  color: 'var(--ink-primary)',
+  fontSize: '0.85rem',
+  lineHeight: 1.6,
+  cursor: 'pointer',
+};
+
 /** The written-reason box. Full width: it holds prose, and the floor is ten characters. */
 export const a15dReasonInputStyle: CSSProperties = {
   marginTop: '0.35rem',

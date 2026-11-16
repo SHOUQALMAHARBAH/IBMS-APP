@@ -16,14 +16,25 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(
+  page: Page,
+  roles: string[],
+  // OWNER DECISION 143's label is ARABIC and ratified, so one test renders the screen in Arabic
+  // and reads it off a real DOM. Defaulted to EN so every existing caller is untouched.
+  languagePreference: "AR" | "EN" = "EN",
+) {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
+      json: {
+        ...ME_BASE,
+        languagePreference,
+        roles,
+        permissions: permissionsForRoles(roles),
+      },
     }),
   );
 }
@@ -3285,3 +3296,224 @@ for (const status of [404, 403] as const) {
     ).toHaveCount(0);
   });
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+ * 🔴 OWNER DECISION 143 — «إرفاق المراسلة», THE BUTTON THAT CLEARS «بلا إثبات».
+ *
+ * ## WHY THESE ARE HERE AND NOT ONLY IN THE api e2e
+ *
+ * `POST /rfqs/:id/article-15-d/evidence` has had an api spec since 2026-11-15 proving it clears
+ * the mark, refuses WhatsApp, an outbound message and another customer's message, and that the
+ * database refuses to un-clear it. **None of that was evidence that a person could reach it** —
+ * and they could not: there was no control on any screen, because the label did not exist.
+ *
+ * So what is proven here is the half that was missing, which is decision 143's own criterion 2:
+ * «موظف يصل إلى الإرفاق بالكبس من الشاشة» — an employee gets there by clicking.
+ *
+ * ⚠️ `lacksEvidence` IS DERIVED BY THE SERVER, so each mock answers it the way the api does:
+ * marked before the attach, unmarked after. A mock that flipped nothing would let a screen which
+ * hid the mark locally pass — which is exactly the implementation this component refuses.
+ * ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+const EXEMPTION_5_UNPROVEN = {
+  id: "exm-1",
+  exemption: "AT_CUSTOMER_REQUEST",
+  basis: "CHOSEN_BY_PERSON",
+  insurerCount: 1,
+  declaredAnnualPremiumJod: null,
+  ceilingValueJod: null,
+  evidenceCommunicationLogId: null,
+  lacksEvidence: true,
+  chosenByNameShown: "Placement Officer",
+  recordedAt: "2026-03-02T00:00:00.000Z",
+};
+
+const EVIDENCE_CANDIDATES = [
+  { id: "log-1", channel: "EMAIL", sentAt: "2026-03-01T09:00:00.000Z" },
+  { id: "log-2", channel: "WRITTEN_NOTICE", sentAt: "2026-02-20T09:00:00.000Z" },
+];
+
+/**
+ * The RFQ detail endpoint answering the mark the way the api derives it, plus the candidate list
+ * and the attach. `attachedTo` is what the server would have written.
+ */
+async function mockMarkedRfq(
+  page: Page,
+  options: {
+    candidates?: typeof EVIDENCE_CANDIDATES;
+    attachStatus?: number;
+  } = {},
+) {
+  const state = { attachedTo: null as string | null };
+  await page.route("http://localhost:4000/rfqs/rfq-1", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...RFQ,
+        article15DExemption: {
+          ...EXEMPTION_5_UNPROVEN,
+          evidenceCommunicationLogId: state.attachedTo,
+          lacksEvidence: state.attachedTo === null,
+        },
+        article15DAlerts: [],
+      },
+    }),
+  );
+  await page.route("http://localhost:4000/rfqs/rfq-1/communications", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route(
+    "http://localhost:4000/rfqs/rfq-1/article-15-d/evidence-options",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        json: options.candidates ?? EVIDENCE_CANDIDATES,
+      }),
+  );
+  await page.route(
+    "http://localhost:4000/rfqs/rfq-1/article-15-d/evidence",
+    async (route) => {
+      const status = options.attachStatus ?? 201;
+      if (status >= 400) {
+        return route.fulfill({ status, json: { message: "refused" } });
+      }
+      const body = route.request().postDataJSON() as {
+        evidenceCommunicationLogId: string;
+      };
+      state.attachedTo = body.evidenceCommunicationLogId;
+      return route.fulfill({ status, json: { attached: true } });
+    },
+  );
+  return state;
+}
+
+/**
+ * CRITERION 1 and CRITERION 2 together, because they are one sentence of hers: the button appears
+ * on a marked exemption 5, it carries HER word, and pressing it clears the mark.
+ *
+ * Rendered in ARABIC deliberately. The label is the one thing decision 143 actually decided, and
+ * asserting the English rendering would prove the control exists while proving nothing about the
+ * word — which is the entire content of the ruling.
+ */
+test("OWNER DECISION 143 criteria 1+2 — the attach button stands on the marked exemption, and clicking it clears the mark", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  const state = await mockMarkedRfq(page);
+
+  await page.goto("/rfqs/rfq-1");
+
+  const record = page.locator('[data-article-15-d="record"]');
+  await expect(record).toBeVisible();
+  // THE MARK FIRST. The button is only correct BESIDE it — a control to clear a mark that is not
+  // showing would be a control for a problem nobody has.
+  await expect(
+    record.locator('[data-article-15-d="lacks-evidence"]'),
+  ).toBeVisible();
+
+  const button = record.locator('[data-article-15-d="attach-button"]');
+  await expect(button).toBeVisible();
+  // CRITERION 1 — her word, off a real render. The byte-for-byte comparison against decision 143
+  // itself lives in `lib/i18n/article-15-d.strings.test.ts`; this proves the dictionary entry
+  // actually REACHES THE SCREEN, which a dictionary test cannot.
+  await expect(button).toHaveText("إرفاق المراسلة");
+
+  // CRITERION 2 — the employee gets there by clicking. Choosing is a separate act from attaching,
+  // because the row is WRITE-ONCE and no permission takes it back.
+  await expect(button).toBeDisabled();
+  await record.locator('[data-evidence-id="log-1"]').check();
+  await expect(button).toBeEnabled();
+  await button.click();
+
+  // THE MARK IS GONE, and it is gone because the REQUEST WAS RE-READ — the mock answers
+  // `lacksEvidence: false` only after the attach landed, so a screen that hid the mark locally
+  // would pass the assertion below while `attachedTo` stayed null.
+  await expect(
+    record.locator('[data-article-15-d="lacks-evidence"]'),
+  ).toHaveCount(0);
+  expect(state.attachedTo).toBe("log-1");
+});
+
+/**
+ * CRITERION 4 — «بعد رفع الوسم لا يظهر الزرّ». Asserted as its own test rather than tacked onto
+ * the one above, because it is the property that keeps the control honest: the attach is
+ * irreversible, so a button that lingered would invite a second attempt that can only ever 409.
+ */
+test("OWNER DECISION 143 criterion 4 — the button is gone once the mark is", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockMarkedRfq(page);
+
+  await page.goto("/rfqs/rfq-1");
+  const record = page.locator('[data-article-15-d="record"]');
+  const button = record.locator('[data-article-15-d="attach-button"]');
+  await expect(button).toBeVisible();
+
+  await record.locator('[data-evidence-id="log-2"]').check();
+  await button.click();
+
+  await expect(button).toHaveCount(0);
+  // AND THE CANDIDATE LIST GOES WITH IT. A picker left standing under a cleared mark would offer
+  // a choice the server now refuses outright.
+  await expect(
+    record.locator('[data-article-15-d="attach-candidate"]'),
+  ).toHaveCount(0);
+});
+
+/**
+ * THE EMPTY OFFER SAYS WHAT SHE RATIFIED — decision 143 §4's «والقائمة الفارغة تعرض جملة القرار
+ * ١٣٩ بحرفها», which is the SAME key the creation window uses.
+ *
+ * The employee told «يمكنك المتابعة» when the request went out meets those same words when they
+ * come back to prove it. Two sentences for one fact would be the screen saying two different
+ * things about the same gap.
+ */
+test("OWNER DECISION 143 — an empty offer renders decision 139's own sentence, and the button stays", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockMarkedRfq(page, { candidates: [] });
+
+  await page.goto("/rfqs/rfq-1");
+  const record = page.locator('[data-article-15-d="record"]');
+  const none = record.locator('[data-article-15-d="attach-none"]');
+  await expect(none).toBeVisible();
+  await expect(none).toContainText("يمكنك المتابعة");
+  // ⛔ AND THE CONTROL DOES NOT VANISH WITH ITS LIST. An employee facing no button and no sentence
+  // cannot tell «there is nothing to attach» from «this screen cannot attach at all».
+  await expect(
+    record.locator('[data-article-15-d="attach-button"]'),
+  ).toBeVisible();
+  await expect(
+    record.locator('[data-article-15-d="attach-button"]'),
+  ).toBeDisabled();
+});
+
+/**
+ * 🔴 AND A READER WHO MAY SEE THE MARK AND MAY NOT CLEAR IT GETS NO CONTROL.
+ *
+ * `frontend-ux-directive.md` — a control a role cannot use does not exist on their screen — and
+ * the route carries `rfq.communication.log`, which a compliance reader need not hold. Measured
+ * 2026-11-16: exactly ONE of the twelve seeded roles holds it, `PLACEMENT_TECHNICAL_OFFICER`.
+ *
+ * ⚠️ NON-VACUOUS BY CONSTRUCTION: the mark itself is asserted VISIBLE first. A reader who could
+ * not reach the RFQ at all would see no button either, and this test would pass for the wrong
+ * reason — the defect the dismiss button's own absence test was corrected for.
+ */
+test("OWNER DECISION 143 — the mark shows without the button for a reader who cannot attach", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockMarkedRfq(page);
+
+  await page.goto("/rfqs/rfq-1");
+  const record = page.locator('[data-article-15-d="record"]');
+  await expect(
+    record.locator('[data-article-15-d="lacks-evidence"]'),
+  ).toBeVisible();
+  await expect(
+    record.locator('[data-article-15-d="attach-button"]'),
+  ).toHaveCount(0);
+  await expect(record.locator('[data-article-15-d="attach"]')).toHaveCount(0);
+});

@@ -9,6 +9,7 @@ import { Prisma } from '@ibms/db';
 import type {
   Article15DPremiumAlert,
   CommunicationLog,
+  InteractionChannel,
   OpportunityStatus,
   RfqArticle15DExemption,
 } from '@ibms/db';
@@ -269,7 +270,12 @@ export class RfqService {
    * `customer-file-anchor.service.ts` for why that is not a permission code.
    *
    * IT IS A SEPARATE METHOD RATHER THAN A FLAG, deliberately. `findVisibleRfq` has four callers and
-   * two of them are writes (`addInsurers`, `logCommunication`); a boolean parameter defaulting to
+   * THREE of them are writes (`addInsurers`, `logCommunication`, `attachArticle15DEvidence`); the
+   * fourth is OWNER DECISION 143's evidence picker, a read that takes the strict policy because it
+   * feeds one of those writes. ⚠️ CORRECTED 2026-11-16: this said «two of them are writes» and
+   * named two, which stopped being true when decision 139's attach landed on 2026-11-15 — a count
+   * in prose is a count that goes stale silently, which is why the spec beside it pins the figure.
+   * A boolean parameter defaulting to
    * "no anchors" is precisely how a write path acquires cross-owner reach from somebody being
    * helpful. Writes keep the owner-only policy by construction, not by remembering.
    *
@@ -1010,6 +1016,26 @@ export class RfqService {
    * Everything about what counts as evidence is decided in `Article15DService.attachEvidence`,
    * through the same `resolveEvidence` the original choice went through.
    */
+  /**
+   * 🔴 OWNER DECISION 143 — WHAT THE «إرفاق المراسلة» BUTTON OFFERS.
+   *
+   * THE SAME VISIBILITY RULE AS THE ATTACH ITSELF, and that is the whole reason this is here
+   * rather than on the compliance service. `findVisibleRfq` makes a request for somebody else's
+   * customer a 404 rather than an empty list — an empty list is an answer, and answering "this
+   * customer has no approved inbound correspondence" about a customer the caller may not see is
+   * a disclosure dressed as nothing.
+   *
+   * It is also where the customer comes from, for the reason the attach records: taken from the
+   * caller, a picker could be made to list ANY customer's correspondence.
+   */
+  async listArticle15DEvidenceOptions(
+    rfqId: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ id: string; channel: InteractionChannel; sentAt: Date }[]> {
+    const { opportunityCustomerId } = await this.findVisibleRfq(rfqId, actor);
+    return this.article15D.evidenceOptionsFor(opportunityCustomerId);
+  }
+
   async attachArticle15DEvidence(
     rfqId: string,
     dto: AttachArticle15DEvidenceDto,

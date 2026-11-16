@@ -226,6 +226,17 @@ export const RFQ = {
     // own guillemets as the name of the mark. So it is ratified and nothing is composed.
     // The disagreement is reported rather than resolved silently.
     a15dExemptionLacksEvidence: 'بلا إثبات',
+    // 🔴 OWNER DECISION 143 — THE NAME OF THE CONTROL THAT ATTACHES THE MESSAGE.
+    //
+    // The route shipped BUILT, ENFORCED and e2e-tested on 2026-11-15 with no way in from
+    // any screen, because the word did not exist: «إرفاق» ships only on the DOCUMENTS
+    // screens and «المراسلة» only in the plural on this one, and decision 125 forbids
+    // composing the two. `unreachable-routes.py` carried the debt with this creditor named.
+    //
+    // ⟶ She ratified the proposal whole, so it is SLICED from decision 143's own
+    //   one-sentence section and never retyped; `article-15-d.strings.test.ts` re-slices
+    //   it and compares byte for byte.
+    a15dAttachEvidenceButton: 'إرفاق المراسلة',
     a15dPremiumAlert:
       'تنبيه: قسط العرض الوارد أعلى من {ceiling} دينار، وهو حدّ الإعفاء المختار لهذا الطلب. الطلب لم يُرفَض.',
     a15dChosenBy:
@@ -589,6 +600,7 @@ export const RFQ = {
       'No inbound message from this customer by an approved means of notification yet. ' +
       'You may carry on, and log the request in Communications so it is on record.',
     a15dExemptionLacksEvidence: 'without evidence',
+    a15dAttachEvidenceButton: 'Attach the message',
     a15dPremiumAlert:
       'Notice: the premium on the quotation received is above {ceiling} dinars, which is the ceiling of the exemption chosen for this request. The request has NOT been refused.',
     a15dChosenBy:
