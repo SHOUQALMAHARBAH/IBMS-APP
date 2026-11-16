@@ -340,3 +340,90 @@ describe('OWNER DECISION 143 — the attach button says exactly what she ratifie
     expect(lookupOptional('EN', 'a15dAttachEvidenceButton')).toBeTruthy();
   });
 });
+
+/**
+ * 🔴 OWNER DECISION 145(ب) — THE SENTENCE FOR A FAILED ATTACH, RE-SLICED AND COMPARED.
+ *
+ * ## THIS FILLS AN EMPTY CELL THAT WAS REPORTED RATHER THAN GUESSED
+ *
+ * Message 42 shipped decision 143's button with no sentence for the case where the attach
+ * itself fails. No decision ratified one, and decision 125 forbids composing a word, so BOTH
+ * branches borrowed the nearest sentence already shipping on this screen and literally true of
+ * what failed — and that borrowing was reported as an empty cell. She ruled it on 2026-11-16.
+ *
+ * ## AND THE RULING KEEPS THE OTHER BORROWED SENTENCE, WHICH IS THE HALF A READER WILL GET WRONG
+ *
+ * Decision 145 §٥ says the list error «تعذر تحميل سجل المراسلات» STAYS: «هي صادقة على ما
+ * فشل». So it is not a leftover waiting to be made symmetrical, and the second test here is what
+ * stops a later tidy-up from collapsing the two into one sentence that lies about half the cases.
+ */
+describe('OWNER DECISION 145 — the failed attach says exactly what she ratified', () => {
+  const D145 = join(
+    REPO,
+    'docs',
+    'decision-145-renewal-permission-words-and-attach-failure.md',
+  );
+
+  /**
+   * The ratified cell out of decision 145's own §٣ table, whose heading says the strings are
+   * sliced from there and never typed by hand.
+   *
+   * ⚠️ THE TABLE HOLDS THREE ROWS AND TWO OF THEM ARE THE PERMISSION'S. A slice that took the
+   * first row would put the renewal declaration's DESCRIPTION on a failed attach, so the row is
+   * found by its site cell and the count is asserted.
+   */
+  function ratifiedCell(site: string): string {
+    const rows = readFileSync(D145, 'utf8')
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith('|'))
+      .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()))
+      .filter((cells) => cells.length === 2 && !/^-+$/.test(cells[0]));
+    expect(
+      rows.length,
+      'decision 145 no longer carries its heading row plus exactly three ratified rows — the slice source moved',
+    ).toBe(4);
+    const row = rows.find((cells) => cells[0] === site);
+    expect(row, `decision 145 has no ratified row for «${site}»`).toBeDefined();
+    return row![1];
+  }
+
+  it('criterion 4 — the attach-failure sentence is byte-identical to hers', () => {
+    expect(
+      lookupOptional('AR', 'a15dAttachEvidenceError'),
+      'the attach-failure sentence is not byte-identical to OWNER DECISION 145. It is HER ' +
+        'sentence: re-slice it from docs/decision-145-...md rather than editing it here.',
+    ).toBe(
+      ratifiedCell(
+        'جملة فشل الإرفاق على زرّ «إرفاق المراسلة»',
+      ),
+    );
+  });
+
+  it('and nothing is appended to it — her sentence ends at the full stop', () => {
+    /*
+     * Not decoration. Every sibling error on this screen carries a «— حاول مرة أخرى.» tail,
+     * so the natural edit is to make this one match. Hers does not have it, and a tail added for
+     * consistency would stop the string being hers.
+     */
+    const ar = lookupOptional('AR', 'a15dAttachEvidenceError') ?? '';
+    expect(ar.includes('حاول مرة أخرى')).toBe(false);
+  });
+
+  it('⛔ and the LIST error is untouched — she ruled it stays', () => {
+    /*
+     * Decision 145 §٥. The two branches say different things because different things failed,
+     * and a later edit pointing both at one sentence would make the screen report a load failure
+     * when the write failed, on the one screen an inspector reads.
+     */
+    expect(lookupOptional('AR', 'rfqDetailCommsLoadError')).toBe(
+      'تعذر تحميل سجل المراسلات — حاول مرة أخرى.',
+    );
+    expect(lookupOptional('AR', 'a15dAttachEvidenceError')).not.toBe(
+      lookupOptional('AR', 'rfqDetailCommsLoadError'),
+    );
+  });
+
+  it('and the English side exists, because the screen is bilingual', () => {
+    expect(lookupOptional('EN', 'a15dAttachEvidenceError')).toBeTruthy();
+  });
+});

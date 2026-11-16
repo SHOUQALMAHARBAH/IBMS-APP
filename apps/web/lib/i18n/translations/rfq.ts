@@ -237,6 +237,16 @@ export const RFQ = {
     //   one-sentence section and never retyped; `article-15-d.strings.test.ts` re-slices
     //   it and compares byte for byte.
     a15dAttachEvidenceButton: 'إرفاق المراسلة',
+    // 🔴 OWNER DECISION 145(ب) — THE SENTENCE FOR *THE ATTACH FAILED*, WHICH WAS AN EMPTY CELL.
+    //
+    // Until 2026-11-16 this branch borrowed «تعذر تسجيل المراسلة» — true of what failed and already
+    // shipping on this screen, which is all decision 125 allowed while no sentence existed. It
+    // was reported as an empty cell and she ruled one.
+    //
+    // ⚠️ IT IS NOT THE LOG-AN-EXCHANGE SENTENCE WITH A WORD CHANGED. `rfqLogExchangeError` still
+    // serves `rfqs/[id]/page.tsx`'s own log-an-exchange form and keeps its «— حاول مرة
+    // أخرى.» tail. Hers ends at the full stop, and nothing is appended to it.
+    a15dAttachEvidenceError: 'تعذّر إرفاق المراسلة.',
     a15dPremiumAlert:
       'تنبيه: قسط العرض الوارد أعلى من {ceiling} دينار، وهو حدّ الإعفاء المختار لهذا الطلب. الطلب لم يُرفَض.',
     a15dChosenBy:
@@ -601,6 +611,7 @@ export const RFQ = {
       'You may carry on, and log the request in Communications so it is on record.',
     a15dExemptionLacksEvidence: 'without evidence',
     a15dAttachEvidenceButton: 'Attach the message',
+    a15dAttachEvidenceError: 'Could not attach the message.',
     a15dPremiumAlert:
       'Notice: the premium on the quotation received is above {ceiling} dinars, which is the ceiling of the exemption chosen for this request. The request has NOT been refused.',
     a15dChosenBy:

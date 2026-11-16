@@ -96,19 +96,20 @@ export function Article15DRecord({
     useState<Article15DEvidenceOption[] | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   /*
-   * ⚠️ THE ERROR STATE HOLDS A KEY, AND BOTH KEYS ARE BORROWED — reported as an empty cell.
+   * THE ERROR STATE HOLDS A KEY, AND ONE OF THE TWO WAS AN EMPTY CELL UNTIL SHE RULED IT.
    *
-   * No decision ratifies a sentence for «the attach failed», and this batch may not compose one
-   * (decision 125). So each branch takes the nearest sentence that is LITERALLY TRUE of what
-   * failed and ALREADY SHIPS ON THIS SAME SCREEN, which is decision 125's own rule for where a
-   * word may come from:
+   * Message 42 reported that no decision ratified a sentence for «the attach failed», so both
+   * branches borrowed the nearest sentence LITERALLY TRUE of what failed and ALREADY SHIPPING ON
+   * THIS SAME SCREEN — decision 125's own rule for where a word may come from. OWNER DECISION
+   * 145(ب) filled the cell on 2026-11-16:
    *
-   *   the candidate list failed to load ⟶ «تعذر تحميل سجل المراسلات», which is exactly that
-   *   the attach itself failed          ⟶ «تعذر تسجيل المراسلة», recording the correspondence
+   *   the candidate list failed to load ⟶ «تعذر تحميل سجل المراسلات» — STILL BORROWED, by her
+   *       ruling: «هي صادقة على ما فشل». The list is what failed, and that sentence says so.
+   *   the attach itself failed          ⟶ «تعذّر إرفاق المراسلة.» — HERS, sliced from
+   *       decision 145 §٣ and re-sliced byte-for-byte by `article-15-d.strings.test.ts`.
    *
-   * ⛔ Neither is invented and neither is a translation of ours. A sentence naming the ATTACH
-   * specifically is the owner's, and until she rules one the screen says something true rather
-   * than something new.
+   * ⛔ Neither is invented and neither is a translation of ours. The list's sentence is NOT a
+   * leftover to be «fixed» to match: she ruled it stays.
    */
   const [attachError, setAttachError] = useState<TranslationKey | null>(null);
   const [attaching, setAttaching] = useState(false);
@@ -152,7 +153,7 @@ export function Article15DRecord({
        */
       onEvidenceAttached?.();
     } catch {
-      setAttachError('rfqLogExchangeError');
+      setAttachError('a15dAttachEvidenceError');
     } finally {
       setAttaching(false);
     }
