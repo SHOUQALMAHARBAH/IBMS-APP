@@ -39,6 +39,24 @@ const CERTIFICATE_OF_INSURANCE_TEMPLATE_TYPE = 'certificate_of_insurance';
  * engineering one: persisting certificates is a new capability (object storage, a category, a
  * classification, a retention consequence), not a column. Reported in message 40's report;
  * `docs/module-1-decision-128-sizing.md` carries the shape of the other five.
+ *
+ * ## ✅ AND SHE ANSWERED IT — OWNER DECISION 142, 2026-11-15. NOT BUILT YET.
+ *
+ * «كل شهادة تأمين تصدر تُحفَظ ملفاً في النظام بسطر في جدول الملفات، وذلك السطر يحمل ختم «صدرت
+ * والتجديد قيد الدراسة».» So the certificate IS persisted: one `Document` row per issued
+ * certificate, linked to its policy, carrying the stamp, readable back exactly as issued, and no
+ * route deletes it (`deletionLocked` stays true).
+ *
+ * 🔴 AND A SECOND MEASUREMENT MADE THE SHAPE HARDER THAN A ROW. `Document.storageRef` is supplied
+ * by the UPLOADER (`document.service.ts`, `create-document-version.dto.ts`) — **no service in
+ * this API stores bytes at all.** Every `Document` row today is a pointer with nothing behind it.
+ * ⟶ Her ruling: the bytes live in the DATABASE until a storage service exists, and move when
+ * storage is built with the hosting decision.
+ *
+ * ⛔ NOT BUILT IN THIS BATCH, and deliberately not half-built: it arrives with decision 128's
+ * stamp, which ships whole or not at all. Retention — how long a stored certificate is kept and
+ * when it is destroyed — is decision 142 §4 and belongs to module 11; nothing is deleted until
+ * she rules on it.
  */
 
 /** Built-in fallback boilerplate — used whenever no

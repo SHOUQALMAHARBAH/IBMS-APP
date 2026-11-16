@@ -526,7 +526,29 @@ if _positional:
 # way in from the permission matrix. The paragraph above said this number comes back to 16 the
 # day the word arrives, and the DOWN direction is what made that a commitment rather than a
 # hope: this gate FAILED on the commit that wired the button, naming the figure to lower.
-UNREACHED_BY_PATH_BUDGET = 16
+#
+# 🔴 16 -> 17 ON 2026-11-15, AND THE CREDITOR IS ONE ARABIC WORD AGAIN.
+#
+# `POST /rfqs/:id/article-15-d/evidence` is OWNER DECISION 139 ruling 4: «يسجّل الموظف
+# المراسلة في سجل المراسلات ويربطها بالطلب ⟵ يزول الوسم». The route is BUILT, ENFORCED on
+# `rfq.communication.log`, and e2e-tested in three directions — it clears the mark, it
+# refuses WhatsApp/outbound/another customer, and the database refuses to un-clear it.
+#
+# ⛔ WHAT IT HAS NO WAY IN FROM IS THE SCREEN, and the reason is the same one that held the
+# dismiss button for a batch: THE CONTROL NEEDS A LABEL AND NO RATIFIED ONE EXISTS.
+# Measured 2026-11-15: «إرفاق المراسلة» ships nowhere; «إرفاق» ships only on the DOCUMENTS
+# screens (`إرفاق مستند`), and decision 125's rule is that a word is sliced from text
+# already shipping ON THAT SAME SCREEN or it is the owner's. Joining «إرفاق» to «المراسلة»
+# is composing, which is the one thing that rule forbids.
+#
+# ⟶ A DEBT WITH A NAMED CREDITOR, reported as an empty cell. The day the word arrives the
+#   control lands and this comes back to 16 — and the DOWN direction failing is what makes
+#   that a commitment rather than a hope, exactly as it did for the dismiss button.
+#
+# ⚠️ The alternative was to leave the route out until the word existed. That would have left
+# the mark «بلا إثبات» permanently unclearable — decision 139's whole second half — so the
+# route ships and the control waits.
+UNREACHED_BY_PATH_BUDGET = 17
 
 # The second figure. 9 here against 19 in the verb-aware pass, and the gap is the point: this pass is
 # verb-agnostic, so a route reads as addressed whenever ANY verb on its path is called live —
@@ -556,7 +578,12 @@ DEAD_ONLY_BY_PATH_BUDGET = 9
 # exactly ONE unreached route and leaves the list entirely, which is why both figures move
 # together here. ⚠️ They did NOT have to: a controller keeping a second unreached route would
 # have moved the route count and left this one at 9, which is the case this pair exists for.
-UNREACHED_CONTROLLER_BUDGET = 8
+# 8 -> 9 on 2026-11-15: `rfq/rfq.controller.ts` joins the list with exactly ONE unreached
+# route, decision 139's evidence attachment. ⚠️ Note what the pair says that neither figure
+# alone could: ONE route arrived in an OLD controller that was fully reached before, which is
+# a different fact from three arriving in one new controller. It comes back to 8 with the
+# same commit that takes the routes back to 16.
+UNREACHED_CONTROLLER_BUDGET = 9
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both

@@ -204,6 +204,28 @@ export const RFQ = {
       'القسط السنوي المتوقَّع (دينار)',
     a15dEvidenceLabel:
       'طلب العميل، واصلاً بوسيلة تبليغ معتمدة',
+    // 🔴 OWNER DECISION 139 ruling 6 — THE EMPTY LIST'S OWN SENTENCE, RATIFIED.
+    //
+    // `Article15DWindow.tsx` mapped `options.evidence` with NO empty branch, so an employee
+    // whose customer asked by telephone met a label with blank space under it, unable to
+    // tell «there is none» from «it has not loaded».
+    //
+    // It says three things and the ORDER is hers: there is none yet · YOU MAY CARRY ON ·
+    // log the request so it is documented. It replaces a draft opening «أولاً», which read
+    // as «do this FIRST» — the opposite of decision 139.
+    //
+    // SLICED byte-for-byte from `docs/decision-139-...md`, never retyped; the spec
+    // re-slices it and compares.
+    a15dEvidenceNoneYet:
+      'لا توجد مراسلة واردة من هذا العميل بوسيلة تبليغ معتمدة بعد. يمكنك المتابعة، وسجّل طلب العميل في المراسلات ليُوثَّق في النظام.',
+    // 🔴 OWNER DECISION 139 ruling 2 — HER NAME FOR THE MARK, sliced from the ruling row.
+    //
+    // ⚠️ Message 41 §2 item 5 says this word is in neither decision 133 nor 139 and must be
+    // reported as an empty cell. MEASURED: it is in decision 139 SIX times — the title, the
+    // one-sentence section, this ruling row, the example and criterion 1 — always inside her
+    // own guillemets as the name of the mark. So it is ratified and nothing is composed.
+    // The disagreement is reported rather than resolved silently.
+    a15dExemptionLacksEvidence: 'بلا إثبات',
     a15dPremiumAlert:
       'تنبيه: قسط العرض الوارد أعلى من {ceiling} دينار، وهو حدّ الإعفاء المختار لهذا الطلب. الطلب لم يُرفَض.',
     a15dChosenBy:
@@ -563,6 +585,10 @@ export const RFQ = {
       'Expected annual premium (JOD)',
     a15dEvidenceLabel:
       "The customer's request, arriving by an approved means of notification",
+    a15dEvidenceNoneYet:
+      'No inbound message from this customer by an approved means of notification yet. ' +
+      'You may carry on, and log the request in Communications so it is on record.',
+    a15dExemptionLacksEvidence: 'without evidence',
     a15dPremiumAlert:
       'Notice: the premium on the quotation received is above {ceiling} dinars, which is the ceiling of the exemption chosen for this request. The request has NOT been refused.',
     a15dChosenBy:

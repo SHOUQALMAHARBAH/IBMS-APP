@@ -255,6 +255,52 @@ def run_gate() -> int:
 
     errors: list[str] = []
 
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # 🔴 OWNER DECISION 140 — `POST /auth/signup` IS STILL `@Public()` AND IS NO LONGER OPEN.
+    #
+    # Criterion 5 asks that the public-door count drop by one OR be DECLARED here with its reason.
+    # It does not drop, and the reason is not an oversight:
+    #
+    #   The route must stay reachable WITHOUT a session, because it is the e2e suite's user
+    #   factory — 117 spec files create their users through it, and criterion 3 forbids deleting
+    #   any of them. Removing `@Public()` would answer them 401 instead, which closes the door by
+    #   breaking the tests rather than by deciding anything.
+    #
+    # So the closure is in the SERVICE (`selfSignupOpen()`), where it is closed for every caller
+    # rather than for one handler, and `@Public()` on the route is now a statement about
+    # AUTHENTICATION only: no session is required to be told the door is shut.
+    #
+    # ⛔ AND THE DECLARATION ASSERTS THE CLOSURE RATHER THAN DESCRIBING IT. A note saying "it is
+    # closed elsewhere" is worth nothing the day somebody deletes the elsewhere. Both halves are
+    # checked, so removing the guard from the service reds this gate by name.
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    signup_cfg = os.path.join(API_SRC, "modules", "auth", "self-signup.config.ts")
+    signup_svc = os.path.join(API_SRC, "modules", "auth", "services", "auth.service.ts")
+    if not os.path.exists(signup_cfg):
+        errors.append(
+            "modules/auth/self-signup.config.ts is gone — OWNER DECISION 140 closed "
+            "`POST /auth/signup` in the service, and this gate declares that as the reason its "
+            "@Public() count did not drop. Restore it, or remove @Public() from the route."
+        )
+    else:
+        with io.open(signup_cfg, encoding="utf-8") as fh:
+            cfg = fh.read()
+        if "NODE_ENV === 'production'" not in cfg or "return false" not in cfg:
+            errors.append(
+                "self-signup.config.ts no longer closes the door in production. OWNER DECISION "
+                "140: production is a HARD override and no environment variable reopens it."
+            )
+    if os.path.exists(signup_svc):
+        with io.open(signup_svc, encoding="utf-8") as fh:
+            svc = fh.read()
+        if "selfSignupOpen()" not in svc:
+            errors.append(
+                "auth.service.ts no longer calls `selfSignupOpen()`, so `POST /auth/signup` is "
+                "open again on a platform with one office — the security fault OWNER DECISION "
+                "140 closed. This gate declares that closure as the reason its @Public() count "
+                "stayed at 12."
+            )
+
     # NON-VACUITY. A parse that found nothing would otherwise report a clean sweep.
     if len(handlers) < 400:
         errors.append(

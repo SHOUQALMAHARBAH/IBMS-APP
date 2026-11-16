@@ -220,3 +220,38 @@ export function quotationBreachesCeiling(
 ): boolean {
   return quotedPremiumJod.greaterThan(ceilingValueJod);
 }
+
+/**
+ * 🔴 OWNER DECISION 139 — IS THIS EXEMPTION MARKED «بلا إثبات»?
+ *
+ * «الإعفاء موسوم «بلا إثبات» على الطلب، وفي دفتر الأفعال المعلَنة للتفتيش، حتى تُرفَق المراسلة.»
+ *
+ * ## DERIVED, AND THAT IS THE DESIGN RATHER THAN A SHORTCUT
+ *
+ * There is NO `lacksEvidence` column and there must not be one. The row already answers the
+ * question — an art. 15/d/5 exemption with no `evidenceCommunicationLogId` is exactly the state
+ * the mark describes — so a stored flag would be a second home for one fact, free to disagree
+ * with the column the moment evidence is attached. That is the defect `BrokerLicense.status`
+ * was removed for, one module over.
+ *
+ * ## ONE HOME, BECAUSE THREE PLACES ASK
+ *
+ * The RFQ screen asks it, the declared-act ledger an inspector reads asks it, and the attach
+ * route asks it to know whether there is anything to clear. Three copies of
+ * `exemption === 'AT_CUSTOMER_REQUEST' && evidence === null` is three chances to write one of
+ * them without the first half — which would mark every exemption 1-4 as lacking evidence they
+ * are forbidden to carry.
+ *
+ * ⛔ THE FIRST HALF IS LOAD-BEARING. Exemptions 1-4 have `evidenceCommunicationLogId IS NULL` by
+ * CHECK constraint — evidence is refused on them. Without the exemption test this would report
+ * every one of them as «without evidence», which is the opposite of true.
+ */
+export function exemptionLacksEvidence(row: {
+  exemption: string;
+  evidenceCommunicationLogId: string | null;
+}): boolean {
+  return (
+    row.exemption === 'AT_CUSTOMER_REQUEST' &&
+    row.evidenceCommunicationLogId === null
+  );
+}

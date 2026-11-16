@@ -6,6 +6,7 @@ import { RfqService } from './rfq.service';
 import { CreateRfqDto } from './dto/create-rfq.dto';
 import { AddRfqInsurersDto } from './dto/add-rfq-insurers.dto';
 import { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
+import { AttachArticle15DEvidenceDto } from './dto/attach-article-15-d-evidence.dto';
 import { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
 import { Article15DOptionsQueryDto } from './dto/article-15-d-options-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
@@ -170,6 +171,29 @@ export class RfqController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.rfqs.listCommunications(id, user);
+  }
+
+  /**
+   * 🔴 OWNER DECISION 139 ruling 4 — the mark «بلا إثبات» goes when the evidence arrives.
+   *
+   * `rfq.communication.log`, NOT a code of its own and NOT `rfq.create`. The act is «I logged
+   * the customer's message and I am pointing the exemption at it» — the same person, doing the
+   * same kind of thing, as logging the correspondence itself. Minting a code would let an office
+   * be configured so somebody may log the message that clears the mark and not clear it, which
+   * leaves the mark standing on an exemption that is in fact proven.
+   *
+   * ⛔ AND THERE IS NO ROUTE THAT REMOVES IT — decision 139 criterion 6. This one only ever sets
+   * evidence that is absent; the narrowed append-only trigger refuses NOT NULL ⟶ anything, so no
+   * permission and no path can take it back off.
+   */
+  @RequirePermissions('rfq.communication.log')
+  @Post(':id/article-15-d/evidence')
+  attachArticle15DEvidence(
+    @Param('id') id: string,
+    @Body() dto: AttachArticle15DEvidenceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rfqs.attachArticle15DEvidence(id, dto, user);
   }
 
   @RequirePermissions('rfq.communication.log')

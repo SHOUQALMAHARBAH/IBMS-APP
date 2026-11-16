@@ -32,6 +32,7 @@ import type { CreateRfqDto } from './dto/create-rfq.dto';
 import type { AddRfqInsurersDto } from './dto/add-rfq-insurers.dto';
 import type { TransitionRfqInsurerDto } from './dto/transition-rfq-insurer.dto';
 import type { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
+import type { AttachArticle15DEvidenceDto } from './dto/attach-article-15-d-evidence.dto';
 import type { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
 import { assertWithinRoleScope } from '../../common/role-scope';
 import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
@@ -40,6 +41,7 @@ import {
   type CustomerFileAnchor,
 } from './customer-file-anchor.service';
 import { LicenseGateService } from '../compliance-risk/license-gate.service';
+import { exemptionLacksEvidence } from '../compliance-risk/article-15-d.config';
 import { Article15DService } from '../compliance-risk/article-15-d.service';
 import { PermissionsService } from '../rbac/services/permissions.service';
 import type { Article15DOptions } from '../compliance-risk/article-15-d.service';
@@ -920,7 +922,8 @@ export class RfqService {
   ): Promise<
     RfqWithSubmissions & {
       opportunity: { customerId: string };
-      article15DExemption: RfqArticle15DExemption | null;
+      article15DExemption:
+        (RfqArticle15DExemption & { lacksEvidence: boolean }) | null;
       article15DAlerts: Article15DPremiumAlert[];
     }
   > {
@@ -959,7 +962,25 @@ export class RfqService {
     return {
       ...rfq,
       opportunity: { customerId: opportunityCustomerId },
-      article15DExemption,
+      /*
+       * 🔴 OWNER DECISION 139 ruling 2 — THE MARK «بلا إثبات», DERIVED HERE AND SENT.
+       *
+       * «الإعفاء موسوم «بلا إثبات» على الطلب، وفي دفتر الأفعال المعلَنة للتفتيش، حتى تُرفَق
+       * المراسلة.»
+       *
+       * Computed by `exemptionLacksEvidence` and put ON THE WIRE rather than left for the
+       * screen to work out. The screen HAS the facts — `evidenceCommunicationLogId` is in
+       * this payload — so deriving it there would compile and be right today, and would be
+       * a SECOND HOME for the rule the moment either half changes. The web cannot import
+       * the api's config, so the only way to keep one home is to send the answer.
+       */
+      article15DExemption:
+        article15DExemption === null
+          ? null
+          : {
+              ...article15DExemption,
+              lacksEvidence: exemptionLacksEvidence(article15DExemption),
+            },
       article15DAlerts,
     };
   }
@@ -977,6 +998,31 @@ export class RfqService {
    * `transitionInsurer`). `customerId` is backfilled from the RFQ's
    * Opportunity so the row also surfaces on that customer's file.
    */
+  /**
+   * 🔴 OWNER DECISION 139 ruling 4 — attach the evidence to an exemption that has none.
+   *
+   * THIS METHOD'S ONLY JOB IS VISIBILITY AND THE CUSTOMER. `findVisibleRfq` is what makes a
+   * request for somebody else's customer a 404 rather than a refusal that confirms the record
+   * exists, and it is where the opportunity's OWN customer comes from — which is the fact
+   * `Article15DService` needs and must never take from the caller, or the wrong-customer refusal
+   * could be defeated by naming a different one.
+   *
+   * Everything about what counts as evidence is decided in `Article15DService.attachEvidence`,
+   * through the same `resolveEvidence` the original choice went through.
+   */
+  async attachArticle15DEvidence(
+    rfqId: string,
+    dto: AttachArticle15DEvidenceDto,
+    actor: AuthenticatedUser,
+  ): Promise<{ attached: true }> {
+    const { opportunityCustomerId } = await this.findVisibleRfq(rfqId, actor);
+    return this.article15D.attachEvidence({
+      rfqId,
+      customerId: opportunityCustomerId,
+      evidenceCommunicationLogId: dto.evidenceCommunicationLogId,
+    });
+  }
+
   async logCommunication(
     rfqId: string,
     dto: LogRfqCommunicationDto,

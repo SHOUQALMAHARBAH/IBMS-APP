@@ -452,6 +452,16 @@ export const OPERATIONS = {
     usrCouldNotLoadUsersTry: 'تعذّر تحميل المستخدمين — حاول مرة أخرى.',
     usrThatActionFailedTryAgain: 'فشل الإجراء — حاول مرة أخرى.',
     usrUsersRoles: 'المستخدمون والأدوار',
+    // 🔴 ITS FIRST SENTENCE IS STALE AND IS AN EMPTY CELL — OWNER DECISION 140, 2026-11-15.
+    //
+    // «يُنشئ التسجيل الذاتي حساباً بلا أي دور» describes something that no longer happens:
+    // `POST /auth/signup` is refused in production, so no account arrives this way at all. The
+    // REST of the line is still true and is the load-bearing half — roles are granted only here,
+    // and revoking one records a date rather than deleting the record.
+    //
+    // ⛔ NOT REWRITTEN. A corrected sentence is new Arabic, and it is in none of decisions 133,
+    // 136 or 139. Reported as an empty cell rather than composed. The line is left exactly as she
+    // approved it until she rules.
     usrSelfServiceSignupCreatesAn:
       'يُنشئ التسجيل الذاتي حساباً بلا أي دور — ومن ثمّ بلا أي صلاحية. تُمنح الأدوار من هنا فقط. إلغاء الدور يسجّل تاريخ الإلغاء ولا يحذف السجل.',
     usrFullName: 'الاسم الكامل',

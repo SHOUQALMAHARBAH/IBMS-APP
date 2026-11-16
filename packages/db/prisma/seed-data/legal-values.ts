@@ -303,6 +303,22 @@ export const LEGAL_VALUES: LegalValueCatalogueEntry[] = [
 
   // ── THE THREE THE CENTRAL BANK HAS NOT ISSUED ────────────────────────────────────────────────
   //
+  // 🔴 OWNER DECISION 138 — THESE THREE GET A SCREEN IN MODULE 1, AND IT IS NOT BUILT.
+  //
+  // «القيم الثلاث التي لم يصدرها البنك المركزي يُدخلها المكتب من شاشة واحدة في مديول ١، والنظام
+  // ينبّه المكتب بكل ما عليه أن يعبّيه أو يقرّره بيده قبل أن يبدأ العمل.»
+  //
+  // Her ruling rests on a measurement that is still true: the table and the server door are
+  // already built — this catalogue, `POST /legal-values`, and `legal-value.declare` — so what
+  // is missing is one screen, not a subsystem. ⛔ COPY ONLY in this batch, by her own
+  // instruction; nothing here changes.
+  //
+  // Its second half is the part that will be easy to forget: the screen also OWES A REMINDER
+  // listing everything the office must fill or decide before it starts work — these three AND
+  // the durations of decision 137. ⚠️ It «ينبّه ولا يمنع» (decision 126): the office works
+  // before it has filled them, which is exactly what makes an empty value DORMANT below
+  // rather than blocking.
+  //
   // Decision 123's third form: the instrument DEFERS these to a ruling that does not exist, so
   // they are the office's to supply, with its own reference and date, under its own permission.
   // They ship with their SHAPE and their GUARDS and NO VALUE, and an empty field is DORMANT —

@@ -190,3 +190,60 @@ describe('OWNER DECISION 133 — the two legal-value descriptions, in the permis
     expect(PERMISSIONS.AR['perm:legal-value.declare']).toBeTruthy();
   });
 });
+
+/**
+ * 🔴 OWNER DECISION 139 ruling 6 — THE EMPTY LIST'S SENTENCE, RE-SLICED AND COMPARED.
+ *
+ * `Article15DWindow.tsx` mapped `options.evidence` with no empty branch, so the one employee the
+ * decision is about — whose customer asked by telephone — met a label with blank space under it.
+ *
+ * The sentence is hers and its ORDER is the decision: there is none yet · YOU MAY CARRY ON · log
+ * the request. The middle clause is why it had to be ratified rather than composed — the server
+ * stopped refusing this, so a sentence that read as a dead end would contradict the ruling it is
+ * there to express. It replaces a draft opening «أولاً», which read as «do this FIRST».
+ */
+describe('OWNER DECISION 139 — the empty evidence list says what she wrote', () => {
+  const D139 = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'docs',
+    'decision-139-exemption-5-proceed-then-evidence.md',
+  );
+
+  /** The ratified sentence, re-sliced from the decision's own ruling table. */
+  function ratified(): string {
+    const line = readFileSync(D139, 'utf8')
+      .split(/\r?\n/)
+      .find((l) => l.includes('لا توجد مراسلة واردة'));
+    expect(
+      line,
+      'decision 139 no longer contains the empty-list sentence — the slice source moved',
+    ).toBeDefined();
+    const match = /«(.+?)»/.exec(line!.slice(line!.indexOf('**«')));
+    expect(match).not.toBeNull();
+    return match![1];
+  }
+
+  it('says exactly what she ratified, byte for byte', () => {
+    expect(
+      lookupOptional('AR', 'a15dEvidenceNoneYet'),
+      'the empty-evidence sentence is not byte-identical to OWNER DECISION 139 ruling 6. It is ' +
+        'HER sentence: re-slice it from docs/decision-139-...md rather than editing it here.',
+    ).toBe(ratified());
+  });
+
+  it('and it does NOT open with «أولاً» — the draft she replaced', () => {
+    /*
+     * Not decoration. The rejected draft began «أولاً», which reads as an instruction to log the
+     * message BEFORE proceeding — the exact opposite of the ruling, on the one screen where the
+     * employee is deciding whether they may proceed at all. A later edit reaching for that word
+     * would undo the decision while leaving the sentence looking right.
+     */
+    const ar = lookupOptional('AR', 'a15dEvidenceNoneYet') ?? '';
+    expect(ar.startsWith('أولاً')).toBe(false);
+    expect(ar).toContain('يمكنك المتابعة');
+  });
+});

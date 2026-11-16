@@ -45,6 +45,10 @@ import type {
   ForceChangePasswordDto,
 } from '../dto/password-change.dto';
 import { OutboundEmailService } from '../../email/outbound-email.service';
+import {
+  selfSignupOpen,
+  SELF_SIGNUP_CLOSED_MESSAGE,
+} from '../self-signup.config';
 
 /** Part II §4.3.1 — the purpose token that reaches the mandatory password
  * change and nothing else. */
@@ -101,6 +105,22 @@ export class AuthService {
   ) {}
 
   async signup(dto: SignupDto): Promise<{ id: string; email: string }> {
+    /*
+     * 🔴 OWNER DECISION 140 — THE DOOR, CLOSED IN THE SERVICE AND NOT ONLY ON THE ROUTE.
+     *
+     * In the SERVICE deliberately: the controller is the only caller today, so a decorator
+     * would be equivalent — and would stop being equivalent the first time anything else
+     * calls `signup()`. A door closed at the handler is closed for one path; closed here it
+     * is closed for every path, including one written later by somebody who never read
+     * decision 140.
+     *
+     * FIRST in the method, before the password policy runs: an unauthenticated caller must
+     * not be able to probe the policy, or time it, through a door that is shut.
+     */
+    if (!selfSignupOpen()) {
+      throw new ForbiddenException(SELF_SIGNUP_CLOSED_MESSAGE);
+    }
+
     const violations = this.passwords.validatePolicy(dto.password);
     if (violations.length > 0) throw new BadRequestException(violations);
 

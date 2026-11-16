@@ -79,6 +79,16 @@ export interface Article15DExemptionRecord {
   declaredAnnualPremiumJod: string | null;
   ceilingValueJod: string | null;
   evidenceCommunicationLogId: string | null;
+  /**
+   * 🔴 OWNER DECISION 139 ruling 2 — «بلا إثبات»: this exemption rests on a customer's
+   * request that is not on file yet.
+   *
+   * DERIVED BY THE API and sent, never worked out here. The two facts it rests on are both
+   * in this payload, so a local derivation would compile — and would be a second home for
+   * the rule. Optional because ~every spec that builds this record predates it, and absent
+   * reads as NOT marked, which is the quiet direction rather than the alarming one.
+   */
+  lacksEvidence?: boolean;
   /** The name AS IT STOOD. OWNER DECISION 48: a record that can only name a uuid is a record
    *  nobody can read. */
   chosenByNameShown: string | null;
