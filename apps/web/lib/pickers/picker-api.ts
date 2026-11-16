@@ -108,8 +108,20 @@ export function searchBranches(term: string): Promise<BranchPickerResult[]> {
 export interface DocumentPickerResult {
   id: string;
   fileName: string;
-  /** The web's single declaration of that vocabulary, reused rather than copied a second time —
-   *  `ENUM_LABEL.DocumentCategory` is total over it, so a category with no label is a type error. */
+  /**
+   * The web's single declaration of that vocabulary, reused rather than copied a second time.
+   *
+   * 🔴 CORRECTED 2026-11-16. This went on to say «`ENUM_LABEL.DocumentCategory` is total over
+   * it, so a category with no label is a TYPE ERROR». It was not, and never had been: that map
+   * is `satisfies Labels<string>`, and keying on `string` enforces nothing whatever about
+   * coverage. Measured: 13 keys for 16 members, three of which rendered a BLANK CELL on four
+   * screens.
+   *
+   * ⟶ The map IS total now, and what makes it so is a TEST rather than the type:
+   *   `declared-vocabulary.test.ts` parses the members out of `schema.prisma` and compares. A
+   *   claim that the compiler is checking something it is not is worse than no claim, because
+   *   it is exactly what a reader consults before adding the next member.
+   */
   category: DocumentCategory;
   versionNumber: number;
 }
