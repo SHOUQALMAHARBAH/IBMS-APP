@@ -53,6 +53,11 @@ datasource db {
 // SHARED ENUMS
 // ============================================================================
 
+/// OWNER DECISION 144, ruling 3: FOUR, and there was never a fifth. The module-1 paper
+/// carried an open «four or five?» against this enum; she answered «هو 4 بالأصل ما وصلني انو في 5» and the
+/// contradiction is STRUCK rather than resolved — a fifth level was never decided and never
+/// existed. Copy only in message 43: nothing of decision 144 is built yet, and this enum is
+/// the one thing its rulings govern that already exists.
 /// Part 6.1 — the single, binding four-tier classification model.
 /// Every Part 4 data entity carries one of these four labels.
 enum DataClassification {

@@ -243,6 +243,29 @@ WRAP_TOLERANT = r"decisions[\s*/]+32[\s*/]+and[\s*/]+33"
 # reason and for the same history.
 NOT_AN_INDEX_ROW: dict[int, str] = {}
 
+# A NUMBERED file that is an ANNEX to a decision rather than a decision of its own.
+#
+# ## 🔴 THIS GATE SILENTLY PICKED ONE OF TWO FILES FOR A NUMBER, AND 144 IS THE FIRST TO HAVE TWO
+#
+# `on_disk` is one file per number (`on_disk[int(n)] = name`), filled in sorted filename order,
+# so the LAST file for a number won and the earlier one vanished from every check below. Decision
+# 144 ships with an annex -- `decision-144-ratified-strings.md`, the table the engineer slices every
+# Arabic string from -- and `ratified` sorts after `answers`, so the annex became "decision 144's
+# file" and the index row was checked against a document that has no `## القرار بجملة` section at
+# all. The gate said so, loudly, which is why this is a declaration and not a surprise.
+#
+# ⛔ The fix is NOT to skip the annex through `SLUG_ONLY`: that set is for a decision file with no
+# number, its error message says exactly that, and hiding a numbered file in it would make the next
+# reader believe the annex has no number. An annex is a different fact and gets its own home.
+#
+# Checked in BOTH directions, because a declaration that cannot go stale is a comment:
+#   * a declared annex whose file is gone, or whose parent decision has no file, is STALE and fails;
+#   * a SECOND numbered file for a number that is NOT declared here fails by name -- which is the
+#     silent overwrite above, now impossible.
+ANNEXES: dict[str, int] = {
+    "decision-144-ratified-strings.md": 144,
+}
+
 SLUG_ONLY = {
     "decision-corporate-customer-identifier.md",
     "decision-correcting-a-customers-details.md",
@@ -500,21 +523,53 @@ def audit(root: str = ROOT) -> tuple[list[str], list[str]]:
 
     # ---- files on disk -------------------------------------------------------------
     on_disk: dict[int, str] = {}
+    annexes_seen: set[str] = set()
     for name in sorted(os.listdir(docs)):
         if not name.startswith("decision") or not name.endswith(".md"):
             continue
         if name in SLUG_ONLY:
+            continue
+        if name in ANNEXES:
+            annexes_seen.add(name)
             continue
         m = re.match(r"decision-(\d+)-", name)
         if not m:
             errors.append(f"docs/{name} is a decision file with no number and is not "
                           f"declared in SLUG_ONLY")
             continue
-        on_disk[int(m.group(1))] = name
+        n = int(m.group(1))
+        if n in on_disk:
+            errors.append(
+                f"decision {n} has TWO files -- docs/{on_disk[n]} and docs/{name}. One of "
+                f"them silently replaced the other in every check below. If the second is an "
+                f"ANNEX to the first, declare it in ANNEXES; otherwise one of them is misnumbered"
+            )
+            continue
+        on_disk[n] = name
+
+    # ---- a declared annex is still an annex, in both directions --------------------
+    #
+    # Guarded by `this_repo` for the same reason PHANTOMS is: a synthetic self-test tree holds
+    # none of the real documents, so asserting there would report every real annex stale on
+    # every run. The two annex plants below create the marker directory and substitute their
+    # own declaration, so the check is PROVEN live rather than switched off.
+    for name, parent in sorted(ANNEXES.items() if this_repo else []):
+        if name not in annexes_seen:
+            errors.append(
+                f"declared annex docs/{name} is not in docs/ any more -- ANNEXES is stale, "
+                f"remove the entry"
+            )
+        elif parent not in on_disk:
+            errors.append(
+                f"docs/{name} is declared an annex of decision {parent}, which has no file "
+                f"of its own -- an annex without its decision is the only file for that "
+                f"number and must not be skipped"
+            )
 
     lines.append(f"  decision numbers cited in apps/ + packages/   {len(real)}")
     lines.append(f"  declared matcher phantoms, each asserted       {len(PHANTOMS)}")
     lines.append(f"  numbered decision files in docs/              {len(on_disk)}")
+    lines.append(f"  declared annexes, each asserted                {len(ANNEXES)}")
 
     for n in sorted(real - set(on_disk)):
         if n in KNOWN_MISSING:
@@ -706,6 +761,28 @@ def _self_test() -> int:
          lambda t: open(os.path.join(t, "apps", "more.ts"), "wb").write(
              b"// per owner decision 31 this is so\n"),
          "decision 31 is cited"),
+        # THE SILENT OVERWRITE. Until 2026-11-16 a second numbered file for a number simply
+        # replaced the first in `on_disk`, so one of the two vanished from every check below
+        # and nothing said so. Decision 144 is the first decision to ship with an annex.
+        ("a second numbered file for a number, undeclared",
+         lambda t: open(os.path.join(t, "docs", "decision-7-second.md"), "wb").write(
+             b"# y\n"),
+         "has TWO files"),
+        # And the declaration cannot rot in either direction.
+        ("a declared annex whose file is gone",
+         lambda t: (os.makedirs(os.path.join(t, "apps", "api", "src", "modules"),
+                                exist_ok=True),
+                    ANNEXES.clear(),
+                    ANNEXES.__setitem__("decision-7-ghost-annex.md", 7)),
+         "is not in docs/ any more"),
+        ("a declared annex whose parent decision has no file",
+         lambda t: (os.makedirs(os.path.join(t, "apps", "api", "src", "modules"),
+                                exist_ok=True),
+                    ANNEXES.clear(),
+                    ANNEXES.__setitem__("decision-99-orphan-annex.md", 99),
+                    open(os.path.join(t, "docs", "decision-99-orphan-annex.md"), "wb").write(
+                        b"# y\n")),
+         "which has no file of its own"),
         ("a file nothing cites",
          lambda t: open(os.path.join(t, "docs", "decision-88-x.md"), "wb").write(
              b"# x\n"),
@@ -814,6 +891,11 @@ def _self_test() -> int:
                                exist_ok=True),
          "PHANTOMS is stale"),
     ]
+    # Two plants below mutate ANNEXES, a MODULE-LEVEL dict. Without this snapshot the first
+    # of them leaks its ghost entry into every later case, and the self-test stops being a set
+    # of independent cases -- which is the kind of order-dependence a self-test exists to rule
+    # out, not to acquire.
+    annexes_before = dict(ANNEXES)
     for label, mutate, needle in plants:
         tmp = tempfile.mkdtemp(prefix="dec-index-")
         try:
@@ -834,6 +916,9 @@ def _self_test() -> int:
             failed += not ok
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+            ANNEXES.clear()
+            ANNEXES.update(annexes_before)
+    assert ANNEXES == annexes_before, "the self-test left ANNEXES mutated"
     print(f"\n  self-test: {passed} passed, {failed} failed\n")
     return 1 if failed else 0
 

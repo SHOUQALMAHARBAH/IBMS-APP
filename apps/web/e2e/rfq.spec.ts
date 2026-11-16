@@ -3517,3 +3517,55 @@ test("OWNER DECISION 143 — the mark shows without the button for a reader who 
   ).toHaveCount(0);
   await expect(record.locator('[data-article-15-d="attach"]')).toHaveCount(0);
 });
+
+/**
+ * 🔴 OWNER DECISION 145(ب) CRITERION 4 — THE ATTACH FAILS AND THE SCREEN SAYS SO IN HER WORDS.
+ *
+ * Message 42 shipped this branch borrowing «تعذر تسجيل المراسلة» and reported the gap as an empty
+ * cell: no decision ratified a sentence for *the attach failed*, and decision 125 forbids
+ * composing one. She ruled it on 2026-11-16.
+ *
+ * Rendered in ARABIC, for the same reason criterion 1 is: the sentence IS the ruling, and an
+ * English render would prove an error element exists while proving nothing about the word.
+ *
+ * ⚠️ NON-VACUOUS: the button is asserted ENABLED and the click is what produces the message. An
+ * error element that rendered on load — a failed candidate list, say — would satisfy a bare
+ * toBeVisible() while the attach branch stayed untested, and those two branches carry DIFFERENT
+ * sentences by her ruling.
+ */
+test("OWNER DECISION 145 criterion 4 — a failed attach says «تعذّر إرفاق المراسلة.»", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockMarkedRfq(page, { attachStatus: 500 });
+
+  await page.goto("/rfqs/rfq-1");
+  const record = page.locator('[data-article-15-d="record"]');
+  const button = record.locator('[data-article-15-d="attach-button"]');
+
+  // The list LOADED — so nothing has failed yet, and the error element is absent rather than
+  // merely empty. This is what makes the assertion below about the ATTACH and not the load.
+  await expect(record.locator('[data-article-15-d="attach-error"]')).toHaveCount(
+    0,
+  );
+  await record.locator('[data-evidence-id="log-1"]').check();
+  await expect(button).toBeEnabled();
+  await button.click();
+
+  const failure = record.locator('[data-article-15-d="attach-error"]');
+  await expect(failure).toBeVisible();
+  await expect(failure).toHaveText("تعذّر إرفاق المراسلة.");
+
+  // ⛔ AND IT IS NOT THE LIST SENTENCE. Her ruling keeps «تعذر تحميل سجل المراسلات» for the
+  // load because it is true of what failed there; a single sentence serving both would make the
+  // screen say the list failed when the write did.
+  await expect(failure).not.toHaveText(
+    "تعذر تحميل سجل المراسلات — حاول مرة أخرى.",
+  );
+
+  // AND THE MARK SURVIVES A FAILED ATTACH. The server wrote nothing, so a screen that cleared the
+  // mark optimistically would tell an inspector the exemption is proven when it is not.
+  await expect(
+    record.locator('[data-article-15-d="lacks-evidence"]'),
+  ).toBeVisible();
+});
