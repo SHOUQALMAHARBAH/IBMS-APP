@@ -247,3 +247,96 @@ describe('OWNER DECISION 139 — the empty evidence list says what she wrote', (
     expect(ar).toContain('يمكنك المتابعة');
   });
 });
+
+/**
+ * 🔴 OWNER DECISION 143 — «إرفاق المراسلة», RE-SLICED FROM HER PAPER AND COMPARED.
+ *
+ * ## WHY THIS WORD NEEDED A DECISION AT ALL
+ *
+ * `POST /rfqs/:id/article-15-d/evidence` shipped on 2026-11-15 built, enforced and e2e-tested in
+ * three directions — and with no control on any screen, because the label did not exist.
+ * Measured that day: «إرفاق» ships only on the DOCUMENTS screens and «المراسلة» only in the
+ * plural on the request screen, and OWNER DECISION 125 forbids joining two shipped words into a
+ * third. So the route was declared unreached with the creditor named — one ratified word — and
+ * the mark «بلا إثبات» could be cleared by API and by nobody using the product.
+ *
+ * ⟶ She ratified the proposal whole («موافقة عليها»), so it is HERS and is sliced from her own
+ *   one-sentence section rather than retyped here or in the dictionary.
+ */
+describe('OWNER DECISION 143 — the attach button says exactly what she ratified', () => {
+  const D143 = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    '..',
+    'docs',
+    'decision-143-attach-communication-button-label.md',
+  );
+
+  /**
+   * The ratified label, re-sliced from decision 143's own `## ١ — القرار بجملة واحدة`.
+   *
+   * ⚠️ THE SENTENCE CARRIES TWO «…» SPANS AND THE LABEL IS THE SECOND. The first is the MARK —
+   * «بلا إثبات» — which the button is shown beside and must never be confused with: a slice
+   * taking the first span would put the mark's own name on the control that clears it, and the
+   * test would still pass against a dictionary that had made the same mistake.
+   */
+  function ratifiedLabel(): string {
+    const body = readFileSync(D143, 'utf8');
+    /*
+     * ⚠️ SLICED BY INDEX RATHER THAN BY ONE REGEX, and the reason is a defect this very test hit
+     * on its first run. The body was closed by a lookahead ending `|$` under the `m` flag — where
+     * `$` is END OF LINE, not end of string — so the section ended at the first line break, came
+     * back empty, and the test reported that her sentence carried no quoted spans. A false
+     * accusation against the decision file, raised by the instrument reading it.
+     */
+    const lines = body.split('\n');
+    const headings = lines
+      .map((line, i) => ({ line, i }))
+      .filter(({ line }) => line.startsWith('## '));
+    const start = headings.find(
+      ({ line }) => line.includes('القرار') && line.includes('بجملة'),
+    );
+    expect(
+      start,
+      'decision 143 has no one-sentence section — the slice source moved',
+    ).toBeDefined();
+    const next = headings.find(({ i }) => i > start!.i);
+    const section = lines
+      .slice(start!.i + 1, next ? next.i : undefined)
+      .join('\n');
+    const spans = [...section.matchAll(/«(.+?)»/g)].map((m) => m[1]);
+    expect(
+      spans,
+      'decision 143’s sentence no longer carries the mark and the label, in that order',
+    ).toHaveLength(2);
+    expect(spans[0], 'the first span is the MARK, not the label').toBe(
+      'بلا إثبات',
+    );
+    return spans[1];
+  }
+
+  it('is byte-identical to the label in OWNER DECISION 143', () => {
+    expect(
+      lookupOptional('AR', 'a15dAttachEvidenceButton'),
+      'the attach button label is not byte-identical to OWNER DECISION 143. It is HER word: ' +
+        're-slice it from docs/decision-143-...md rather than editing it here.',
+    ).toBe(ratifiedLabel());
+  });
+
+  it('and it is NOT the mark it clears', () => {
+    /*
+     * Not decoration. The mark and the button sit one line apart on the same screen, and a
+     * dictionary edit that put «بلا إثبات» on the control would read as plausible in review
+     * while telling the employee the button applies the mark rather than removes it.
+     */
+    expect(lookupOptional('AR', 'a15dAttachEvidenceButton')).not.toBe(
+      lookupOptional('AR', 'a15dExemptionLacksEvidence'),
+    );
+  });
+
+  it('and the English side exists, because the screen is bilingual', () => {
+    expect(lookupOptional('EN', 'a15dAttachEvidenceButton')).toBeTruthy();
+  });
+});

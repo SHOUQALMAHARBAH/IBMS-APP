@@ -174,6 +174,35 @@ export class RfqController {
   }
 
   /**
+   * 🔴 OWNER DECISION 143 — WHAT «إرفاق المراسلة» OFFERS, FOR A REQUEST THAT EXISTS.
+   *
+   * ## THE SAME GATE AS THE ATTACH, AND THAT IS THE DECISION
+   *
+   * `rfq.communication.log`, NOT the `rfq.read` + `dashboard.compliance.view` pair that the RFQ
+   * itself and its insurer correspondence carry. Two reasons, and the second is the stronger:
+   *
+   *   1. `frontend-ux-directive.md` — a control a role cannot use does not exist on their screen.
+   *      This list exists ONLY to fill the attach picker, so handing it to a reader who cannot
+   *      attach would be offering a choice that is refused the moment it is made.
+   *
+   *   2. ⛔ IT IS THE CUSTOMER'S OWN CORRESPONDENCE, which the RFQ's own gate does not cover.
+   *      `GET /rfqs/:id/communications` is the broker<->INSURER log; this is inbound mail from
+   *      the customer. Putting the customer's correspondence behind the compliance-dashboard
+   *      gate would widen who reads it, on a route added for a button.
+   *
+   * It carries no `subject` and no `body` — `sensitive-data-handling.md`; the reasoning is on
+   * `Article15DOptions.evidence`, which this returns the same shape of, from the same query.
+   */
+  @RequirePermissions('rfq.communication.log')
+  @Get(':id/article-15-d/evidence-options')
+  listArticle15DEvidenceOptions(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rfqs.listArticle15DEvidenceOptions(id, user);
+  }
+
+  /**
    * 🔴 OWNER DECISION 139 ruling 4 — the mark «بلا إثبات» goes when the evidence arrives.
    *
    * `rfq.communication.log`, NOT a code of its own and NOT `rfq.create`. The act is «I logged

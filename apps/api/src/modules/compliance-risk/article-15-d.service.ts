@@ -247,6 +247,46 @@ export class Article15DService {
   }
 
   /**
+   * 🔴 OWNER DECISION 143 — THE SAME CANDIDATE LIST, FOR A REQUEST THAT ALREADY EXISTS.
+   *
+   * «الزرّ الذي يربط مراسلة العميل بإعفاءٍ خامسٍ موسوم «بلا إثبات» اسمه «إرفاق المراسلة».»
+   *
+   * ## WHY THIS IS A SECOND ENTRY POINT AND NOT A SECOND RULE
+   *
+   * `optionsFor` answers art. 15/d for a request that does NOT exist yet, so it is reached with
+   * an opportunity and a line. The attach button is pressed on a request that DOES exist, so the
+   * customer comes off the RFQ — and there is no line, no insurer count and no exemption offer to
+   * compute, because the exemption was recorded when the request was sent.
+   *
+   * ⟶ So the two differ in HOW THEY FIND THE CUSTOMER and in nothing else. Both land on the same
+   *   `findApprovedInboundForCustomer` with the same `UNCONDITIONAL_APPROVED_CHANNELS`, which is
+   *   what makes decision 143's «شروط ما يرفع الوسم كما في القرار ١٣٩» true by construction
+   *   rather than by two lists agreeing. A second copy would drift the first time decision 132's
+   *   approved means moved, and the drift would show as a picker offering a message the attach
+   *   then refuses — the screen contradicting the server on the one screen that must not.
+   *
+   * ⛔ IT DOES NOT FILTER OUT THE ALREADY-ATTACHED LOG, and that is deliberate. The attach is
+   * refused outright once evidence is on the row (409, and the narrowed append-only trigger
+   * agrees independently), so the button is GONE by then — decision 143 criterion 4. A filter
+   * here would be a third place that knows when the mark is clear.
+   */
+  async evidenceOptionsFor(
+    customerId: string | null,
+  ): Promise<{ id: string; channel: InteractionChannel; sentAt: Date }[]> {
+    /*
+     * A customerless opportunity yields NO candidates rather than every log in the office.
+     * `findApprovedInboundForCustomer` would be handed `null` and Prisma would read it as
+     * "customerId IS NULL" — a real set of rows, belonging to nobody, offered as this
+     * customer's own request. The same guard `optionsFor` applies, for the same reason.
+     */
+    if (customerId === null) return [];
+    return this.rows.findApprovedInboundForCustomer(
+      customerId,
+      UNCONDITIONAL_APPROVED_CHANNELS,
+    );
+  }
+
+  /**
    * 🔴 EVALUATE — EVERY REFUSAL HAPPENS HERE, BEFORE THE REQUEST ROW EXISTS.
    *
    * ## WHY THIS IS SPLIT FROM THE WRITE, AND IT IS A DEFECT THE e2e FOUND

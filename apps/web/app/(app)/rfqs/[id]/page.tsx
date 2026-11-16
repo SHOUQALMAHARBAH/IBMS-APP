@@ -293,9 +293,27 @@ export default function RfqDetailPage() {
             list, not after; and the component renders nothing at all when the request reached
             three or more, which is 84.3% of them.
           */}
+          {/*
+            🔴 OWNER DECISION 143 — the «إرفاق المراسلة» button's three props, and each is a
+            decision rather than plumbing.
+
+            `rfqId` because the attach addresses the REQUEST: the exemption row has no route of
+            its own, and the server reads the customer off the RFQ precisely so a caller cannot
+            name one.
+
+            `canAttachEvidence` on `rfq.communication.log` — the SAME code the route carries, so
+            a compliance reader who may see the mark meets no control they cannot use. It is the
+            dismiss button's precedent exactly (`role.update` on the matrix).
+
+            `onEvidenceAttached={load}` and NOT a local flag: the mark is DERIVED by the api, so
+            the screen asks the server again rather than deciding the mark has gone.
+          */}
           <Article15DRecord
             exemption={rfq.article15DExemption}
             alerts={rfq.article15DAlerts}
+            rfqId={rfq.id}
+            canAttachEvidence={hasPermission(user, 'rfq.communication.log')}
+            onEvidenceAttached={() => void load()}
           />
 
           <ConsentCaptureWidget

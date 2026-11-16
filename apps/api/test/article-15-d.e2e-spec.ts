@@ -46,6 +46,15 @@ const MEDICAL = 'MEDICAL_HEALTH';
 let app: INestApplication<App> | null = null;
 /** Sends quote requests. Holds `rfq.create` and NOT the declaration code. */
 let officer: { accessToken: string; userId: string };
+/**
+ * OWNER DECISION 143 — a reader who may see the request and may NOT clear its mark.
+ *
+ * `customer-file.all-owners.read` is what lets them reach an RFQ this spec's officer owns,
+ * so the 403 on the evidence-options route is THAT ROUTE'S GATE rather than this reader
+ * being unable to find the request at all — which is the difference between a refusal test
+ * and a test that passes because nothing was there.
+ */
+let reader: { accessToken: string; userId: string };
 /** The same, plus the declaration code — the state an office reaches after its administrator
  *  grants it. */
 let declarer: { accessToken: string; userId: string };
@@ -261,7 +270,13 @@ beforeAll(async () => {
     'declared-act.article-15-d.declare',
   ]);
 
+  const readerRole = await seedRole(`${FIXTURE} Reader`, [
+    'rfq.read',
+    'customer-file.all-owners.read',
+  ]);
+
   officer = await makeUser(`a15d-officer-${RUN}`, officerRole);
+  reader = await makeUser(`a15d-reader-${RUN}`, readerRole);
   declarer = await makeUser(`a15d-declarer-${RUN}`, declarerRole);
 }, 300_000);
 
@@ -1304,5 +1319,89 @@ describe('OWNER DECISION 139 — the mark clears only by attaching real evidence
       where: { rfqId },
     });
     expect(row.evidenceCommunicationLogId).toBe(log);
+  }, 300_000);
+  /**
+   * 🔴 OWNER DECISION 143 — WHAT «إرفاق المراسلة» IS ALLOWED TO OFFER.
+   *
+   * Decision 143 §4: «شروط ما يرفع الوسم كما في القرار ١٣٩» — the attach conditions did NOT move.
+   * So the picker must not offer anything the attach then refuses, and this asserts exactly that
+   * on one customer carrying all four kinds of message at once.
+   *
+   * ⚠️ THE ASSERTION IS ON THE SET, NOT ON A COUNT. db-test is cumulative and this customer is
+   * created by `markedRfq()` for this test alone, so the ids are scoped — but asserting "4 rows"
+   * would pass on a list that offered the WRONG four. Each id is asserted present or absent by
+   * name, which is the only shape that can fail for the right reason.
+   */
+  it('DECISION 143 — the offer is inbound, this customer, approved means, and nothing else', async () => {
+    const { rfqId, customerId } = await markedRfq();
+    const other = await opportunityOn(MOTOR, 'Motor Comprehensive');
+
+    const eligible = await logFor(customerId, 'EMAIL', 'INBOUND');
+    const alsoEligible = await logFor(customerId, 'WRITTEN_NOTICE', 'INBOUND');
+    const whatsapp = await logFor(customerId, 'WHATSAPP', 'INBOUND');
+    const outbound = await logFor(customerId, 'EMAIL', 'OUTBOUND');
+    const someoneElse = await logFor(other.customerId, 'EMAIL', 'INBOUND');
+
+    const res = await request(app!.getHttpServer())
+      .get(`/rfqs/${rfqId}/article-15-d/evidence-options`)
+      .set(bearer(officer.accessToken))
+      .expect(200);
+
+    const offered = new Set(
+      (res.body as { id: string }[]).map((row) => row.id),
+    );
+    expect(offered.has(eligible)).toBe(true);
+    expect(offered.has(alsoEligible)).toBe(true);
+    // WhatsApp is excluded by OWNER DECISION 44 and is the one exclusion a reader is most likely
+    // to assume is an oversight — so it is named rather than left to the set comparison.
+    expect(offered.has(whatsapp)).toBe(false);
+    expect(offered.has(outbound)).toBe(false);
+    expect(offered.has(someoneElse)).toBe(false);
+
+    /*
+     * ⛔ AND NO `subject` AND NO `body` ON THE WIRE. `sensitive-data-handling.md` — a
+     * communication's text is Confidential, and this list is read by whoever may LOG
+     * correspondence, which is a different permission from whoever may READ it. The fixture's
+     * subjects are deliberately distinctive, so a widened `select` fails here rather than
+     * shipping the contents of the correspondence book to a picker.
+     */
+    for (const row of res.body as Record<string, unknown>[]) {
+      expect(Object.keys(row).sort()).toEqual(['channel', 'id', 'sentAt']);
+    }
+
+    /*
+     * AND EVERY ID OFFERED IS ONE THE ATTACH ACCEPTS — the property that makes decision 143 §4
+     * true by construction rather than by two lists agreeing today. Proven on the one the
+     * employee would pick first.
+     */
+    await request(app!.getHttpServer())
+      .post(`/rfqs/${rfqId}/article-15-d/evidence`)
+      .set(bearer(officer.accessToken))
+      .send({ evidenceCommunicationLogId: eligible })
+      .expect(201);
+  }, 300_000);
+
+  /**
+   * 🔴 AND THE LIST IS BEHIND THE SAME GATE AS THE ATTACH, NOT BEHIND THE RFQ's.
+   *
+   * `rfq.communication.log`. The RFQ itself is readable on `rfq.read` + `dashboard.compliance.view`
+   * — a WIDER set — and this is the CUSTOMER's own correspondence rather than the broker/insurer
+   * log that pair covers. A reader who may see the request and may not clear the mark gets no
+   * list, which is also what keeps the screen honest: the button is absent for exactly the
+   * callers this route refuses.
+   */
+  it('DECISION 143 — a reader without rfq.communication.log is refused the offer', async () => {
+    const { rfqId } = await markedRfq();
+    await request(app!.getHttpServer())
+      .get(`/rfqs/${rfqId}/article-15-d/evidence-options`)
+      .set(bearer(reader.accessToken))
+      .expect(403);
+
+    // NON-VACUOUS: the same caller CAN read the request itself, so the 403 above is this route's
+    // gate rather than that reader being unable to reach the RFQ at all.
+    await request(app!.getHttpServer())
+      .get(`/rfqs/${rfqId}`)
+      .set(bearer(reader.accessToken))
+      .expect(200);
   }, 300_000);
 });

@@ -548,7 +548,21 @@ if _positional:
 # ⚠️ The alternative was to leave the route out until the word existed. That would have left
 # the mark «بلا إثبات» permanently unclearable — decision 139's whole second half — so the
 # route ships and the control waits.
-UNREACHED_BY_PATH_BUDGET = 17
+# 17 -> 16 ON 2026-11-16, AND THE CREDITOR PAID FOR THE SECOND TIME RUNNING. OWNER DECISION 143
+# ratified «إرفاق المراسلة» — «إرفاق» off the documents screens, «المراسلة» off the plural on
+# the request screen itself, and the proposal approved whole rather than composed by us. So
+# `POST /rfqs/:id/article-15-d/evidence` has a way in: the button stands on an exemption 5
+# marked «بلا إثبات», beside the candidates the server says may clear it.
+#
+# ⟶ THE DOWN DIRECTION FAILED ON THE COMMIT THAT WIRED IT, naming both figures to lower, which
+#   is what turned the paragraph above's «this comes back to 16 the day the word arrives» from a
+#   hope into a commitment — for the dismiss button on 2026-11-15 and for this one today.
+#
+# ⚠️ AND THE SAME COMMIT ADDED A ROUTE WITHOUT ADDING TO THIS LIST:
+# `GET /rfqs/:id/article-15-d/evidence-options` is what fills the picker, and it is reached by
+# `listArticle15DEvidenceOptions` in `rfq-api.ts`. A new route that is NOT declared here is the
+# quiet direction — this gate would have caught it at 17 against a budget of 16.
+UNREACHED_BY_PATH_BUDGET = 16
 
 # The second figure. 9 here against 19 in the verb-aware pass, and the gap is the point: this pass is
 # verb-agnostic, so a route reads as addressed whenever ANY verb on its path is called live —
@@ -583,7 +597,13 @@ DEAD_ONLY_BY_PATH_BUDGET = 9
 # alone could: ONE route arrived in an OLD controller that was fully reached before, which is
 # a different fact from three arriving in one new controller. It comes back to 8 with the
 # same commit that takes the routes back to 16.
-UNREACHED_CONTROLLER_BUDGET = 9
+# 9 -> 8 on 2026-11-16, with the same commit: `rfq/rfq.controller.ts` carried exactly ONE
+# unreached route and leaves the list entirely, which is why both figures move together again.
+# ⚠️ They did NOT have to, and the pair is what says so: the new evidence-options route landed
+# in that same controller, so had it been unreached the route count would have come back to 17
+# while this one stayed at 9 — a different codebase from this one, and a single total could not
+# tell them apart.
+UNREACHED_CONTROLLER_BUDGET = 8
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both

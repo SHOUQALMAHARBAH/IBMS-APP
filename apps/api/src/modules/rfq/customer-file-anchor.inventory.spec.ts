@@ -119,10 +119,11 @@ describe('the customer-file anchor has exactly one consumer', () => {
     // is the copy that would drift (it was written three days after the detail).
     const decision = service.match(/this\.resolveCustomerReadAccess\(/g) ?? [];
     expect(decision).toHaveLength(2);
-    // THREE WRITES keep the owner-only policy: `addInsurers`, `logCommunication` and — since
-    // OWNER DECISION 139 ruling 4 — `attachArticle15DEvidence`. If this becomes SMALLER, a
-    // write path was moved onto the anchored policy, which no behaviour test would catch:
-    // an owner and a whole-book reader behave identically under both policies.
+    // FOUR CALLERS keep the owner-only policy: the three writes `addInsurers`,
+    // `logCommunication` and `attachArticle15DEvidence` (OWNER DECISION 139 ruling 4), plus the
+    // one read `listArticle15DEvidenceOptions` (OWNER DECISION 143). If this becomes SMALLER, a
+    // path was moved onto the anchored policy, which no behaviour test would catch: an owner and
+    // a whole-book reader behave identically under both policies.
     //
     // ⚠️ 2 -> 3 ON 2026-11-15, AND THE DIRECTION IS WHY IT IS SAFE TO RAISE. The new caller
     // attaches evidence to an art. 15/d exemption — a WRITE — and it takes the OWNER-ONLY
@@ -134,7 +135,18 @@ describe('the customer-file anchor has exactly one consumer', () => {
     // second read inside ONE write path, and the fix there was to HOIST the read rather than
     // raise this. The question to ask before moving it is «is this a new write path, or the
     // same one reading twice?» — here it is a new path, with its own route and permission.
-    expect(visible).toHaveLength(3);
+    //
+    // ⚠️ 3 -> 4 ON 2026-11-16, AND THIS ONE IS NOT A WRITE — which is why the sentence above
+    // had to change rather than the number alone. OWNER DECISION 143's picker
+    // (`listArticle15DEvidenceOptions`) is a READ, and it takes the OWNER-ONLY policy on
+    // purpose: it feeds the attach, and a picker admitted by the anchored policy would offer
+    // candidates on a request the attach then refuses — the screen contradicting the server.
+    //
+    // ⟶ So the count is now THREE WRITES AND ONE READ, and the invariant this pin protects is
+    //   unchanged: nothing here may move onto the anchored policy. Asked before raising it, in
+    //   the words of the 2026-11-10 entry: «a new path, or the same one reading twice?» — a new
+    //   path, with its own route and its own permission.
+    expect(visible).toHaveLength(4);
   });
 });
 

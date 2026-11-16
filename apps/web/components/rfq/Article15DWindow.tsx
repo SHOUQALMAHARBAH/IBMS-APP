@@ -72,7 +72,21 @@ const EXEMPTION_LABEL_KEY: Record<Article15DExemption, TranslationKey> = {
  * `Record` would have to name nine channels that can never appear here, each of which would
  * then look like a channel this screen accepts.
  */
-const CHANNEL_LABEL_KEY: Record<string, TranslationKey | undefined> = {
+/**
+ * How one candidate evidence message is NAMED, for both pickers.
+ *
+ * 🔴 EXPORTED FOR OWNER DECISION 143's attach picker rather than copied into it. The creation
+ * window and the attach control offer the SAME four approved means from the SAME server query,
+ * so two maps that happened to agree would be two homes for that agreement — and the first time
+ * decision 132's approved means moved, one picker would name a channel and the other would fall
+ * back to the generic label on the same screen.
+ *
+ * ⚠️ PARTIAL BY `| undefined` AND NOT A TOTAL `Record` over `InteractionChannel`: the enum has
+ * thirteen members and only these four can ever reach either list, so a total map would demand
+ * nine labels for channels the server refuses. The caller falls back to the generic evidence
+ * label — never to the raw key, which `check:rendered-identifiers` is the rule about.
+ */
+export const CHANNEL_LABEL_KEY: Record<string, TranslationKey | undefined> = {
   WRITTEN_NOTICE: 'rfqCommChannelWrittenNotice',
   EMAIL: 'rfqCommChannelEmail',
   PORTAL: 'rfqCommChannelPortal',
