@@ -201,7 +201,7 @@ say "asserting the structure"
 # counts what a database reaches FROM NOTHING. `db:divergence` cannot answer that question by
 # construction, and the four in-repo pins all read the catalogue source rather than a seeded
 # database. It is also the one that caught this change.
-check "permission codes seeded" 233 \
+check "permission codes seeded" 234 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
 check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"

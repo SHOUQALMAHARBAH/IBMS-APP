@@ -27,4 +27,29 @@ export class RecordRenewalRequestDto {
   @Transform(emptyStringToUndefined)
   @IsString()
   requestedAt?: string;
+
+  /**
+   * 🔴 OWNER DECISION 128 — THE FILING PROOF, and the reason it is optional HERE rather than
+   * required.
+   *
+   * «الإثبات يفتح، لا التاريخ». A date with no proof opens nothing at all now, so recording one is
+   * harmless — and it has to stay possible, because it is the state criterion 1 tests and the
+   * state every term recorded before today is in. Making these required would refuse a filing an
+   * office legitimately wants to note before it has scanned the stamped copy.
+   *
+   * ⛔ BUT THEY TRAVEL TOGETHER. A document with no reference number, or a reference with no
+   * document, is refused by the SERVICE and by a CHECK constraint — decision 128 §3 asks for the
+   * file, the date and the Central Bank's number as one act, and half of it proves nothing.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  proofDocumentId?: string;
+
+  /** The CBJ's inbound number, or the reference on its electronic acknowledgement. Decision 133
+   *  ratified the label: «رقم الوارد أو الرقم المرجعي». */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  referenceNumber?: string;
 }

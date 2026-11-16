@@ -763,7 +763,7 @@ export class RecommendationService {
      * customer. An office whose renewal is with the regulator may prepare its advice and may not
      * issue it — which is the narrowest reading that still blocks the act the owner named.
      */
-    await this.licenseGate.assertMayPractise(
+    const stamp = await this.licenseGate.assertMayPractise(
       'ISSUE_RECOMMENDATION',
       async () => {
         // Art. 21/b/5 — a recommendation carries no line of its own; the branch is the one behind
@@ -796,7 +796,11 @@ export class RecommendationService {
       throw new UnprocessableEntityException(blocked.join(' '));
     }
 
-    const updated = await this.recommendations.recordSent(id, actor.id);
+    const updated = await this.recommendations.recordSent(
+      id,
+      actor.id,
+      stamp.issuedUnderStudyLicenseId,
+    );
     if (updated === null) {
       throw new ConflictException(
         `Recommendation ${id} was sent concurrently.`,

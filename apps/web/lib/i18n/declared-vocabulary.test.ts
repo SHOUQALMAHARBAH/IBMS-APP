@@ -52,6 +52,83 @@ function schemaEnumMembers(name: string): string[] {
     .sort();
 }
 
+/**
+ * 🔴 `ENUM_LABEL.DocumentCategory` IS NOT TOTAL, AND THE COMMENT THAT SAYS IT IS WAS WRONG.
+ *
+ * ## MEASURED 2026-11-16, WHILE ADDING A SIXTEENTH MEMBER
+ *
+ * `picker-api.ts:112` states that «`ENUM_LABEL.DocumentCategory` is total over it, so a category
+ * with no label is a type error». It is not: the map is `satisfies Labels<string>`, and keying on
+ * `string` enforces NOTHING about coverage — the identical hole message 38 found and closed for
+ * `InteractionChannel`, which `DocumentCategory` was never added to.
+ *
+ * ⟶ Measured: **16 schema members, 13 label keys.** Three members have shipped with no label —
+ *   `BROKER_LICENSE_CERTIFICATE`, `INSURER_LICENSE_CERTIFICATE`, `REGULATORY_DECISION` — and
+ *   `translate()` returns `undefined` for a missing key, so React renders NOTHING. On dev that is
+ *   **7 of 15 `Document` rows** showing a blank category cell on `/documents`, in `PolicySection`,
+ *   in `EntitySearch` and in the audit trail.
+ *
+ * ## WHY THIS IS A DECLARED BUDGET AND NOT A FIXED BUG
+ *
+ * The repair is four Arabic words, and ⛔ they are not ours to write (decision 125, and this
+ * batch's own standing rule). None is in decision 133, 136 or 145. They are REPORTED as empty
+ * cells; this gate is what stops the set growing while they are owed, and what makes it fail the
+ * day one lands.
+ *
+ * `CERTIFICATE_OF_INSURANCE` joins the list because OWNER DECISION 142 needs the category to
+ * exist before the word does: a wrong category on a persisted certificate is unfixable without
+ * re-categorising live records, and a missing label is one line.
+ *
+ * **BOTH DIRECTIONS**, because the two failures have different fixes: a NEW unlabelled member is
+ * a word nobody has asked for, and a member that has GAINED a label means this declaration is
+ * stale and the budget must come down.
+ */
+const DOCUMENT_CATEGORIES_AWAITING_A_WORD = [
+  'BROKER_LICENSE_CERTIFICATE',
+  'CERTIFICATE_OF_INSURANCE',
+  'INSURER_LICENSE_CERTIFICATE',
+  'REGULATORY_DECISION',
+];
+
+describe('🔴 DocumentCategory is NOT fully worded, and the gap is declared rather than hidden', () => {
+  it('names exactly the members that render blank — in both directions', () => {
+    const members = schemaEnumMembers('DocumentCategory');
+    // Non-vacuity: a drifted parser would make the comparison below compare two empty sets.
+    expect(members.length, 'DocumentCategory parsed no members').toBeGreaterThan(
+      10,
+    );
+    const labelled = Object.keys(
+      ENUM_LABEL.DocumentCategory as Record<string, string>,
+    );
+    const unlabelled = members.filter((m) => !labelled.includes(m)).sort();
+    expect(
+      unlabelled,
+      'the set of DocumentCategory members with no Arabic label has MOVED. If a member was ' +
+        'added, it renders as a BLANK CELL on /documents, in PolicySection, in EntitySearch and ' +
+        'in the audit trail — the word is the owner’s (decision 125) and the member belongs on ' +
+        'DOCUMENT_CATEGORIES_AWAITING_A_WORD until she rules one. If a member GAINED a label, ' +
+        'take it off that list: a stale budget hides the next one.',
+    ).toEqual([...DOCUMENT_CATEGORIES_AWAITING_A_WORD].sort());
+  });
+
+  it('and every member that DOES have a label resolves in both languages', () => {
+    /*
+     * The half that is not a budget. A member on the list above renders blank and is declared;
+     * a member with a label key that resolves to nothing renders blank and is NOT — it looks
+     * worded to every reader of the map, which is strictly worse.
+     */
+    const map = ENUM_LABEL.DocumentCategory as Record<string, string>;
+    for (const [member, key] of Object.entries(map)) {
+      for (const language of LANGUAGES) {
+        expect(
+          lookupOptional(language, key),
+          `DocumentCategory.${member} points at ${key}, which has no ${language} value`,
+        ).toBeTruthy();
+      }
+    }
+  });
+});
+
 describe('owner decision 59: every declared vocabulary the screens render has a word', () => {
   /*
    * THE NON-VACUITY FLOOR FIRST. Every totality assertion below compares a map's keys against

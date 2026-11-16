@@ -32,6 +32,11 @@ function term(overrides: Partial<BrokerLicense> = {}): BrokerLicense {
     expiresAt: new Date('2028-12-31T00:00:00.000Z'),
     certificateDocumentId: CERT,
     renewalRequestedAt: null,
+    // OWNER DECISION 128 — explicit nulls rather than omissions. The derivation reads
+    // `undefined` as «no proof», which is the same answer, but a fixture that omits a column
+    // stops being a row of the table it stands in for.
+    renewalProofDocumentId: null,
+    renewalReferenceNumber: null,
     ...overrides,
   };
 }
@@ -152,6 +157,8 @@ function makeDeps(initial: BrokerLicense[] = []) {
       acts,
       licenseGate,
       instrumentLegalValues(),
+      // OWNER DECISION 128 — only the declaration path reads it, and nothing here declares.
+      { displayNameForUserId: () => Promise.resolve(null) } as never,
     ),
     mocks: {
       findTerms,

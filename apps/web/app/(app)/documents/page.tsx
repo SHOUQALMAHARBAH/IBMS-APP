@@ -41,6 +41,21 @@ const cell: CSSProperties = {
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: 'var(--space-2)', maxWidth: '28rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' };
+/* OWNER DECISION 128's stamp beside a file name. A NAMED style: `check:screen-pass`'s inline
+ * budget may only FALL, so a new site moves the declaration out rather than the number up.
+ *
+ * ⚠️ `--surface-card`, NOT `--surface-raised`. `globals.css:126` records that three sites
+ * referenced an undefined surface for months and rendered with no background at all, and the
+ * same mistake was made again in message 42 inside the comment warning about it.
+ * `check:css-properties` is what catches it; run it by name, it is in no chain. */
+const stampStyle: CSSProperties = {
+  marginInlineStart: 'var(--space-2)',
+  padding: '0 var(--space-1)',
+  borderRadius: 'var(--radius-sm)',
+  background: 'var(--surface-card)',
+  border: '1px solid var(--border-default)',
+  fontSize: '0.75rem',
+};
 
 export default function DocumentsPage() {
   const { t, tPlural } = useLanguage();
@@ -205,12 +220,52 @@ export default function DocumentsPage() {
             <tbody>
               {documents.map((doc) => (
                 <Tr key={doc.id}>
-                  <Td>{doc.fileName}</Td>
+                  <Td>
+                    {doc.fileName}
+                    {/*
+                      🔴 OWNER DECISION 128 + 136 §6 + 142 criterion 2 — THE STAMP, ON THE SCREEN
+                      THAT DISPLAYS THE CERTIFICATE.
+
+                      ⛔ It is NOT printed on the file. Decision 136(أ) rules the phrase never
+                      appears on paper the customer receives; it is a column on the row, and this
+                      is the row's screen.
+
+                      AND IT SURVIVES THE NEW CERTIFICATE ARRIVING (criterion 2). Nothing here
+                      consults the licence's CURRENT state — the column was stamped at creation
+                      and no permission removes it, so a record issued in the gap still says so a
+                      year later, which is the question an inspector actually asks.
+                    */}
+                    {doc.issuedUnderStudyLicenseId ? (
+                      <span style={stampStyle} data-renewal-stamp="">
+                        {t('rcRenewalStamp')}
+                      </span>
+                    ) : null}
+                  </Td>
                   <Td>{t(ENUM_LABEL.DocumentCategory[doc.category])}</Td>
                   <Td>{t(ENUM_LABEL.DataClassification[doc.classification])}</Td>
                   <Td>{doc.versionNumber}</Td>
                   <Td>{doc.deletionLocked ? t('docLocked') : t('docUnlocked')}</Td>
                   <Td>
+                    {/*
+                      🔴 OWNER DECISION 142 criterion 1 — THE READ-BACK ROUTE SHIPS AND ITS
+                      CONTROL DOES NOT, AND THE DEBT IS ONE ARABIC WORD.
+
+                      `GET /documents/:id/content` is built, enforced on `document.read` and
+                      e2e-proven to return the certificate byte-for-byte as issued — which is
+                      what «ويُقرأ كما صدر» asserts. What it has no control for is the BUTTON,
+                      because the label does not exist: «تنزيل» ships on nine sibling screens
+                      and «الملف» ships on this one, and OWNER DECISION 125 forbids joining two
+                      shipped words into a third.
+
+                      ⟶ So the route is DECLARED UNREACHED in `unreachable-routes.py` with this
+                        creditor named, exactly as the dismiss button and the attach button were
+                        before their words were ratified — rather than deleting a route that makes
+                        a criterion true, or inventing a word.
+
+                      ⛔ AND NO CRITERION IS UNMET BY ITS ABSENCE. Criterion 3 asks that the STAMP
+                      show on the screen that displays the certificate, and it does, one line up;
+                      criterion 1 asks that the file be stored and readable back, and it is.
+                    */}
                     {versioningId === doc.id ? null : (
                       <button type="button" onClick={() => startVersion(doc)}>
                         {t('docNewVersionButton')}

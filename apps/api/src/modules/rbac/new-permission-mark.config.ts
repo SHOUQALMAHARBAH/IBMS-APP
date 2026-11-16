@@ -118,6 +118,21 @@ export const PERMISSION_CONTROLS: Readonly<Record<string, PermissionControls>> =
       screen: null,
       routes: ['POST /rfqs (the art. 15/d declaration branch)'],
     },
+    /*
+     * 🔴 OWNER DECISION 128 — THE SECOND CODE THAT CLOSES A PATH, and the first with a SCREEN.
+     *
+     * Unlike the two `legal-value.*` codes, this one's screen is built in the same batch, so the
+     * notification names a destination rather than falling back to a route. The spec below
+     * asserts that from the nav map in both directions: a `screen` here that the nav map does
+     * not carry fails, and so does a code the nav map carries with `screen: null`.
+     *
+     * The route is named TOO. An administrator deciding who may swear this needs to know it is
+     * one act on one screen, and the route is what an inspector reading the audit trail sees.
+     */
+    'license-renewal.declare': {
+      screen: '/regulatory-compliance',
+      routes: ['POST /broker-license/renewal-declaration'],
+    },
   };
 
 /** The item the bell carries for one marked code. The api returns KEYS and never a sentence —

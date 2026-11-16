@@ -190,10 +190,21 @@ export class RecommendationRepository {
   async recordSent(
     id: string,
     sentByUserId: string,
+    /** 🔴 OWNER DECISION 128 — the stamp, written in the SAME statement that records the send.
+     *
+     *  ⚠️ THE ACT HERE IS SENDING, NOT DRAFTING. `ISSUE_RECOMMENDATION` gates the send — an
+     *  office under study may prepare advice and may not issue it — so the record the act
+     *  produces is the SENT recommendation, and this is the moment it comes into being. Writing
+     *  it at draft time would stamp advice that was never issued. */
+    issuedUnderStudyLicenseId: string | null,
   ): Promise<Recommendation | null> {
     const { count } = await this.prisma.client.recommendation.updateMany({
       where: { id, sentToClientAt: null },
-      data: { sentToClientAt: new Date(), sentByUserId },
+      data: {
+        sentToClientAt: new Date(),
+        sentByUserId,
+        issuedUnderStudyLicenseId,
+      },
     });
     if (count === 0) return null;
     return this.prisma.client.recommendation.findUniqueOrThrow({

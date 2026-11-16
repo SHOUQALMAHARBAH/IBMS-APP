@@ -64,6 +64,39 @@ export class DocumentService {
   }
 
   /**
+   * 🔴 OWNER DECISION 142 criterion 1 — «ويُقرأ كما صدر». The stored bytes, back.
+   *
+   * ## WHY THIS 404s RATHER THAN RETURNING EMPTY
+   *
+   * Almost every `Document` row in this product is a POINTER: `storageRef` is an object-storage
+   * key supplied by the uploader, and no service here writes object storage. So «this document
+   * has no bytes in the database» is the ordinary case, not an error state of the row — and a
+   * caller handed an empty body could not tell it from a zero-length file.
+   *
+   * ⛔ THE DIGEST TRAVELS WITH THE BYTES. It is taken from the same row in the same read, so a
+   * caller can hash what it received and compare. A digest fetched separately would be evidence
+   * about a different moment.
+   */
+  async content(id: string): Promise<{
+    bytes: Buffer;
+    contentType: string;
+    sha256: string;
+    byteSize: number;
+    fileName: string;
+  }> {
+    const document = await this.documents.findById(id);
+    if (!document) throw new NotFoundException('Document not found');
+    const stored = await this.documents.findStoredContent(id);
+    if (stored === null) {
+      throw new NotFoundException(
+        'This document has no stored content. Its bytes live wherever its storageRef points, ' +
+          'which this system does not write — only a document it ISSUED carries its own bytes.',
+      );
+    }
+    return { ...stored, fileName: document.fileName };
+  }
+
+  /**
    * OWNER DECISION 41 — the document chooser's source, so `/audit-trail`'s document-history field can
    * be filled by picking a NAME instead of pasting a uuid.
    *

@@ -29,6 +29,19 @@ const DESTINATIONS = join(
   'destinations.ts',
 );
 const API_SRC = join(REPO, 'apps', 'api', 'src');
+
+/**
+ * Codes whose guard this spec cannot read, each with the reason it cannot.
+ *
+ * `declared-act.article-15-d.declare` is NOT here — it has its own `BRANCH_GUARDED` exemption,
+ * which asserts something STRONGER (the declared text names the route AND marks it as a branch).
+ * This set is for a code gated by an ordinary decorator in a file not listed in `CONTROLLERS`,
+ * and the right answer is almost always to add the file rather than the code.
+ *
+ * EMPTY, which is the whole point of declaring it: it is the mechanism, and the mechanism is
+ * what makes the next exception a named one.
+ */
+const UNREAD_BY_THIS_SPEC = new Set<string>([]);
 const CATALOGUE = join(
   REPO,
   'packages',
@@ -161,25 +174,47 @@ describe('decision 131 — what the notification says a code controls', () => {
      * proven against the controllers, exactly as `permission-catalogue-parity.spec.ts` proves
      * the web fixture against the seed. Move a decorator and this fails by name.
      */
-    const controllers = readFileSync(
-      join(API_SRC, 'modules', 'compliance-risk', 'legal-value.controller.ts'),
-      'utf8',
-    );
-    const prefix = /@Controller\('([^']+)'\)/.exec(controllers)?.[1];
-    expect(prefix, 'the controller prefix moved').toBe('legal-values');
+    /*
+     * 🔴 WIDENED 2026-11-16 — AND THE WIDENING IS THE POINT, NOT A TIDY-UP.
+     *
+     * This read ONE controller, and the loop below skips any code it finds no decorator for
+     * («guarded somewhere this spec does not read»). That skip is right for a code genuinely
+     * outside the files listed here — and it means such a code's declaration is PROVEN BY
+     * NOTHING. OWNER DECISION 128's `license-renewal.declare` is gated on
+     * `broker-license.controller.ts`, so its route would have been accepted on trust, in the one
+     * map whose entire purpose is not being authored.
+     *
+     * ⚠️ So a controller joins this list the moment a declared code is gated there, and
+     * `UNREAD_BY_THIS_SPEC` is what stops the skip quietly covering a third one.
+     */
+    const CONTROLLERS: readonly (readonly [string, readonly string[]])[] = [
+      ['legal-values', ['compliance-risk', 'legal-value.controller.ts']],
+      ['broker-license', ['compliance-risk', 'broker-license.controller.ts']],
+    ];
 
-    // `@RequirePermissions('x')` followed by `@Get('y')` / `@Post()` — the pairs, in order.
-    const pairs = [
-      ...controllers.matchAll(
+    const pairs: { code: string; route: string }[] = [];
+    for (const [expectedPrefix, relative] of CONTROLLERS) {
+      const controllers = readFileSync(
+        join(API_SRC, 'modules', ...relative),
+        'utf8',
+      );
+      const prefix = /@Controller\('([^']+)'\)/.exec(controllers)?.[1];
+      expect(
+        prefix,
+        `the controller prefix moved on ${relative.join('/')}`,
+      ).toBe(expectedPrefix);
+
+      // `@RequirePermissions('x')` followed by `@Get('y')` / `@Post()` — the pairs, in order.
+      for (const m of controllers.matchAll(
         /@RequirePermissions\('([^']+)'\)\s*\n\s*@(Get|Post|Put|Patch|Delete)\(([^)]*)\)/g,
-      ),
-    ].map((m) => {
-      const path = m[3].replace(/'/g, '').trim();
-      return {
-        code: m[1],
-        route: `${m[2].toUpperCase()} /${prefix}${path ? `/${path}` : ''}`,
-      };
-    });
+      )) {
+        const path = m[3].replace(/'/g, '').trim();
+        pairs.push({
+          code: m[1],
+          route: `${m[2].toUpperCase()} /${prefix}${path ? `/${path}` : ''}`,
+        });
+      }
+    }
     expect(
       pairs.length,
       'parsed no routes — the matcher drifted',
@@ -188,10 +223,24 @@ describe('decision 131 — what the notification says a code controls', () => {
     for (const [code, controls] of Object.entries(PERMISSION_CONTROLS)) {
       if (BRANCH_GUARDED.has(code)) continue;
       const real = pairs.filter((p) => p.code === code).map((p) => p.route);
-      if (real.length === 0) continue; // guarded somewhere this spec does not read
+      if (real.length === 0) {
+        /*
+         * The skip, DECLARED rather than silent. A code reaching here is guarded in a file this
+         * spec does not read, so its declared routes are proven by nothing — tolerable only
+         * while the list names it and says why.
+         */
+        expect(
+          UNREAD_BY_THIS_SPEC.has(code),
+          `${code}'s declared routes are proven by NOTHING: no decorator for it exists in any ` +
+            'controller this spec reads. Add that controller to CONTROLLERS above, or declare ' +
+            'the code in UNREAD_BY_THIS_SPEC with the reason it cannot be read.',
+        ).toBe(true);
+        continue;
+      }
       expect(
         [...controls.routes].sort(),
-        `${code}'s declared routes disagree with the decorators on legal-value.controller.ts`,
+        `${code}'s declared routes disagree with the decorators on ` +
+          CONTROLLERS.map(([, r]) => r.join('/')).join(' / '),
       ).toEqual(real.sort());
     }
   });

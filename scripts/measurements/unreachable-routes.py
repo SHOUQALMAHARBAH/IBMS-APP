@@ -562,7 +562,32 @@ if _positional:
 # `GET /rfqs/:id/article-15-d/evidence-options` is what fills the picker, and it is reached by
 # `listArticle15DEvidenceOptions` in `rfq-api.ts`. A new route that is NOT declared here is the
 # quiet direction — this gate would have caught it at 17 against a budget of 16.
-UNREACHED_BY_PATH_BUDGET = 16
+# 🔴 16 -> 17 ON 2026-11-16, AND THE CREDITOR IS ONE ARABIC WORD AGAIN — THE THIRD TIME.
+#
+# `GET /documents/:id/content` is OWNER DECISION 142 criterion 1's «ويُقرأ كما صدر»: the stored
+# certificate, back, byte-for-byte as it was issued, with its sha256 in a header so a caller can
+# check rather than trust. It is built, enforced on `document.read` — the SAME code as the row
+# beside it, because the bytes are the document and a separate code would let an office be
+# configured so somebody may see that a certificate exists and not the certificate — and proven
+# by e2e.
+#
+# What it has no way in from is the SCREEN, and the reason is the familiar one. The control is a
+# download button and its label does not exist: «تنزيل» ships on NINE sibling screens
+# (`policyDownloadCertificate`, `comparisonDownloadButton`, `recDownloadReportButton` …) and
+# «الملف» ships on this very screen as `docColFile` — and decision 125's rule is that a word is
+# sliced from text already shipping ON THAT SAME SCREEN or it is the owner's. Joining «تنزيل» to
+# «الملف» is composing, which is the one thing that rule forbids.
+#
+# ⚠️ AND NO CRITERION OF HERS IS UNMET BY THE BUTTON'S ABSENCE, which is why the route ships
+# rather than waiting. Criterion 3 asks that the STAMP show on the screen that displays the
+# certificate — it does, beside the file name on `/documents`, and «صدرت والتجديد قيد الدراسة»
+# is ratified so nothing was owed for it. Criterion 1 asks that the file be stored and readable
+# back — it is, and the e2e hashes what comes back against what went in.
+#
+# ⟶ A DEBT WITH A NAMED CREDITOR, reported as an empty cell. The day the word arrives the control
+#   lands and this comes back to 16 — and the DOWN direction failing is what makes that a
+#   commitment rather than a hope, as it has been twice now.
+UNREACHED_BY_PATH_BUDGET = 17
 
 # The second figure. 9 here against 19 in the verb-aware pass, and the gap is the point: this pass is
 # verb-agnostic, so a route reads as addressed whenever ANY verb on its path is called live —
@@ -603,7 +628,9 @@ DEAD_ONLY_BY_PATH_BUDGET = 9
 # in that same controller, so had it been unreached the route count would have come back to 17
 # while this one stayed at 9 — a different codebase from this one, and a single total could not
 # tell them apart.
-UNREACHED_CONTROLLER_BUDGET = 8
+# 8 -> 9 ON 2026-11-16: `supporting-operations/document.controller.ts` joins the list, carrying
+# decision 142's read-back route. It moves with the figure above and for the same one word.
+UNREACHED_CONTROLLER_BUDGET = 9
 
 # Blank is not zero, in BOTH tables. A route parser that breaks reports zero unreached (nothing to
 # compare) and a web parser that breaks reports every route unreached — so the floor is on both

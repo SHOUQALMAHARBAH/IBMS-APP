@@ -1,7 +1,9 @@
 import {
+  deriveRenewalUnderStudy,
   isBrokerLicenseCurrentlyLapsed,
   isValidPendingRenewalDecision,
 } from './broker-license.config';
+import type { RenewalUnderStudy } from './broker-license.config';
 import type { LicenceLegalFigures } from './legal-figures.config';
 
 /**
@@ -83,7 +85,24 @@ export type DerivedLicenseStatus = (typeof DERIVED_LICENSE_STATUSES)[number];
 
 /** One row of `RegulatoryAction`, as the derivation needs it. */
 export interface RegulatoryActRow {
-  kind: 'SUSPENSION' | 'CANCELLATION' | 'REINSTATEMENT';
+  /**
+   * 🔴 FIVE KINDS SINCE OWNER DECISION 128, AND TWO OF THEM MUST NOT REACH `foldActs`.
+   *
+   * `DEFICIENCY_NOTICE` and `RENEWAL_REFUSAL` are not suspensions. They do EXACTLY ONE thing —
+   * end the renewal-under-study state — and `deriveRenewalUnderStudy` is the only reader.
+   *
+   * ⚠️ WIDENING THIS TYPE IS WHAT MADE THE HAZARD VISIBLE. `foldActs`'s loop ends with a bare
+   * `suspension = act`, so before this widening a deficiency notice arriving from the repository
+   * would have been folded AS A SUSPENSION — the office reported SUSPENDED, `mayPractise` false,
+   * and a CBJ decision reference shown for a letter that suspended nothing. The loop now names
+   * the two and skips them, and the compiler is what will ask about a sixth.
+   */
+  kind:
+    | 'SUSPENSION'
+    | 'CANCELLATION'
+    | 'REINSTATEMENT'
+    | 'DEFICIENCY_NOTICE'
+    | 'RENEWAL_REFUSAL';
   basis: 'BROKER_REQUEST' | 'SANCTION';
   effectiveFrom: Date;
   suspendedUntil: Date | null;
@@ -153,6 +172,13 @@ export interface LicenseTermRow {
   issuedAt: Date | null;
   expiresAt: Date;
   renewalRequestedAt: Date | null;
+  /** 🔴 OWNER DECISION 128 — conditions 2 and 3. The proof and the standing declaration, which
+   *  together with a timely filing and a clean record are what open issuance past expiry.
+   *  OPTIONAL so that ~every existing caller and fixture compiles unchanged and reads as «no
+   *  proof», which is the non-widening direction: absent must never mean permitted. */
+  renewalProofDocumentId?: string | null;
+  renewalReferenceNumber?: string | null;
+  hasRenewalDeclaration?: boolean;
 }
 
 export interface DerivedLicenseStanding {
@@ -185,6 +211,18 @@ export interface DerivedLicenseStanding {
    * is unchanged and costs one length check.
    */
   blockedInsuranceBranchKeys: readonly string[];
+  /**
+   * 🔴 OWNER DECISION 128 — WHERE THIS OFFICE STANDS ON ITS RENEWAL, past the printed expiry.
+   *
+   * SEPARATE FROM `status` AND FROM `mayPractise`, for the third time in this interface and for
+   * the same reason both of those are separate: a caller that needs to say WHY cannot get it from
+   * a label. Two of the six values are the office being refused for reasons it can still fix, and
+   * `AWAITING_DECLARATION` in particular is the one the refusal sentence exists for.
+   *
+   * `NOT_PAST_EXPIRY` on every office inside its dates, which is almost all of them, so the common
+   * path carries one discriminant and no behaviour.
+   */
+  renewalUnderStudy: RenewalUnderStudy;
 }
 
 /** Two calendar years after `from`, by year arithmetic rather than by adding 730 days — a leap year
@@ -258,6 +296,23 @@ function foldActs(
   let suspension: RegulatoryActRow | null = null;
   let cancellation: RegulatoryActRow | null = null;
   for (const act of inForce) {
+    /*
+     * 🔴 OWNER DECISION 128 — THE TWO RENEWAL KINDS ARE NOT FOLDED HERE, AND SKIPPING THEM IS A
+     * REFUSAL RATHER THAN AN OMISSION.
+     *
+     * «إشعار نقص» and «رفض تجديد» each do exactly one thing: they end the renewal-under-study
+     * state, which `deriveRenewalUnderStudy` reads and nothing else does. On a term still inside
+     * its printed dates they move NOTHING — no status, no `mayPractise`, no branch block.
+     *
+     * ⛔ This `continue` is load-bearing. The loop ends with a bare `suspension = act`, so without
+     * it a deficiency notice would fold AS A SUSPENSION: the office reported SUSPENDED, refused
+     * every gated act, and showing a CBJ decision reference for a letter that suspended nothing.
+     * The Central Bank asking for a missing attachment is not the Central Bank stopping the
+     * office, and the distance between those two is the whole of decision 128.
+     */
+    if (act.kind === 'DEFICIENCY_NOTICE' || act.kind === 'RENEWAL_REFUSAL') {
+      continue;
+    }
     if (act.kind === 'CANCELLATION') {
       cancellation = act;
       suspension = null;
@@ -410,6 +465,8 @@ function deriveOfficeWideStanding(
       mayPractise: false,
       standingActDecisionRef: null,
       deemedCancelledUnderArticle14C: false,
+      // No term at all, so there is no printed expiry to be past of.
+      renewalUnderStudy: { state: 'NOT_PAST_EXPIRY' },
     };
   }
 
@@ -421,6 +478,8 @@ function deriveOfficeWideStanding(
       mayPractise: false,
       standingActDecisionRef: cancellation.decisionRef,
       deemedCancelledUnderArticle14C: false,
+      // A standing act outranks the renewal question — precedence rule 1.
+      renewalUnderStudy: { state: 'NOT_PAST_EXPIRY' },
     };
   }
 
@@ -437,6 +496,8 @@ function deriveOfficeWideStanding(
       mayPractise: false,
       standingActDecisionRef: suspension.decisionRef,
       deemedCancelledUnderArticle14C: deemedCancelled,
+      // A standing act outranks the renewal question — precedence rule 1.
+      renewalUnderStudy: { state: 'NOT_PAST_EXPIRY' },
     };
   }
 
@@ -467,36 +528,125 @@ function deriveOfficeWideStanding(
    * is true in both, so the wider reading costs nothing and the narrower one would report an office
    * ACTIVE while its renewal sits with the regulator — a fact Compliance wants on the screen.
    */
+  /*
+   * 🔴 CORRECTED 2026-11-16, AND IT IS THE SHARPEST DEFECT OF THIS BUILD: THIS BRANCH USED TO
+   * SWALLOW DECISION 128 ENTIRELY.
+   *
+   * Its guard was `!isBrokerLicenseCurrentlyLapsed(term, now, figures)` — and PAST EXPIRY that
+   * function returns `!renewalFiledOnTime(...)`, which is the OLD, DATE-ONLY rule. So an office
+   * past its printed expiry that had typed a filing date was "not lapsed", this branch returned
+   * `mayPractise: true` with `NOT_PAST_EXPIRY`, and `deriveRenewalUnderStudy` BELOW WAS NEVER
+   * REACHED. ⟶ A date in a field still opened all six issuance acts, which is precisely the
+   * defect decision 128 exists to correct, while every comment in this file claimed it was fixed.
+   *
+   * Found by `renewal-under-study.criteria.spec.ts` on its FIRST RUN — nine of fifteen cases red,
+   * including the baseline. Nothing else would have found it: the four conditions are all true in
+   * the happy path, so the office could still practise and every e2e stayed green.
+   *
+   * ⟶ The guard is now what the comment below always said it was: INSIDE the printed dates.
+   */
   if (
     term.renewalRequestedAt !== null &&
-    !isBrokerLicenseCurrentlyLapsed(term, now, figures)
+    term.expiresAt.getTime() > now.getTime()
   ) {
     return {
       status: 'RENEWAL_PENDING',
       mayPractise: true,
       standingActDecisionRef: null,
       deemedCancelledUnderArticle14C: false,
+      // Filed EARLY and still inside the printed dates. Decision 128 governs what
+      // happens PAST the expiry, so it has nothing to say here — and this is the
+      // branch its first rule («before the printed expiry nothing changes») protects.
+      renewalUnderStudy: { state: 'NOT_PAST_EXPIRY' },
     };
   }
 
-  if (isValidPendingRenewalDecision(term, now, figures)) {
-    // Past the printed expiry, a timely application pending a decision. Kept as its own branch
-    // rather than folded above, because this one is reachable only through the owner's
-    // renewal-pending rule and a reader has to be able to find it from that rule's name.
+  /*
+   * 🔴 PAST THE PRINTED EXPIRY — OWNER DECISION 128, AND THIS IS THE BRANCH THAT CHANGED.
+   *
+   * It used to return `mayPractise: true` on `isValidPendingRenewalDecision` alone, which reads a
+   * DATE. «الإثبات يفتح، لا التاريخ»: all four conditions now have to hold, and the status word
+   * stays «قيد التجديد» — `RENEWAL_PENDING` — in the one case where they do.
+   *
+   * ⛔ PRECEDENCE, STATED HERE BECAUSE THIS IS WHERE IT IS DECIDED:
+   *
+   *   1. A standing SUSPENSION or CANCELLATION outranks everything and was already decided above
+   *      — this branch is unreachable while one stands. An office the CBJ has suspended does not
+   *      become able to practise by filing a renewal.
+   *   2. Past expiry, the four conditions decide. `DEFICIENCY_NOTICE` and `RENEWAL_REFUSAL` are
+   *      read ONLY here: they end the under-study state and do NOTHING else. On a term still
+   *      inside its printed dates they move nothing at all, which is why they are not in
+   *      `foldActs` and must never be added to it — they are not suspensions.
+   *   3. Only a NEW CERTIFICATE lifts a refusal, and it lifts it by being a new TERM: the
+   *      derivation is asked about the latest term, so a fresh one is simply inside its dates.
+   *      There is no cured state and no timer anywhere in this file.
+   */
+  const study = deriveRenewalUnderStudy(
+    {
+      expiresAt: term.expiresAt,
+      renewalRequestedAt: term.renewalRequestedAt,
+      renewalProofDocumentId: term.renewalProofDocumentId ?? null,
+      renewalReferenceNumber: term.renewalReferenceNumber ?? null,
+      hasRenewalDeclaration: term.hasRenewalDeclaration ?? false,
+    },
+    acts,
+    now,
+    figures,
+  );
+  if (study.state === 'UNDER_STUDY') {
     return {
       status: 'RENEWAL_PENDING',
       mayPractise: true,
       standingActDecisionRef: null,
       deemedCancelledUnderArticle14C: false,
+      renewalUnderStudy: study,
     };
   }
-
-  if (isBrokerLicenseCurrentlyLapsed(term, now, figures)) {
+  if (study.state === 'AWAITING_DECLARATION') {
+    /*
+     * EVERYTHING IS IN ORDER EXCEPT THE DECLARATION — and `mayPractise` is FALSE.
+     *
+     * The office genuinely may not issue yet, so the gate must refuse; but the refusal is
+     * OWNER DECISION 136(ب)'s sentence, which sends the employee to their administrator rather
+     * than telling them the licence has expired. `EXPIRED` is the honest status word — the term
+     * IS past its printed date — and `renewalUnderStudy` is what lets the refusal be specific.
+     */
     return {
       status: 'EXPIRED',
       mayPractise: false,
       standingActDecisionRef: null,
       deemedCancelledUnderArticle14C: false,
+      renewalUnderStudy: study,
+    };
+  }
+
+  /*
+   * 🔴 AND THE SECOND HALF OF THE SAME DEFECT, WHICH WAS WORSE THAN THE FIRST.
+   *
+   * This branch asked `isBrokerLicenseCurrentlyLapsed`, whose past-expiry answer is the DATE-ONLY
+   * rule. So an office past expiry that filed ON TIME and attached NO PROOF read as "not lapsed",
+   * fell through this branch, and reached the `ACTIVE` return below — reported ACTIVE, allowed to
+   * practise, with `renewalUnderStudy: NO_PROOF` sitting on the same object saying the opposite.
+   *
+   * ⟶ PAST THE PRINTED EXPIRY, THE FOUR CONDITIONS DECIDE, IN EVERY DIRECTION. `study` is
+   *   `NOT_PAST_EXPIRY` exactly when the term is inside its dates, so this one test replaces the
+   *   old call and cannot disagree with the state it reports. `AWAITING_DECLARATION` returned
+   *   above; everything left here — NOT_FILED_ON_TIME, NO_PROOF, ENDED_BY_ACT — is an office that
+   *   genuinely may not practise, and the state is what lets a screen say WHICH.
+   *
+   * ⛔ Do not reinstate `isBrokerLicenseCurrentlyLapsed` here. It is still correct for what it
+   *   answers — «is this term past its printed expiry with no timely filing» — and that is a
+   *   narrower question than this branch asks.
+   */
+  if (study.state !== 'NOT_PAST_EXPIRY') {
+    return {
+      status: 'EXPIRED',
+      mayPractise: false,
+      standingActDecisionRef: null,
+      deemedCancelledUnderArticle14C: false,
+      // The MEASURED reason, not a literal: past expiry this is NOT_FILED_ON_TIME,
+      // NO_PROOF or ENDED_BY_ACT, and a screen has to be able to say which.
+      renewalUnderStudy: study,
     };
   }
 
@@ -505,5 +655,7 @@ function deriveOfficeWideStanding(
     mayPractise: true,
     standingActDecisionRef: null,
     deemedCancelledUnderArticle14C: false,
+    // `NOT_PAST_EXPIRY` by elimination — the lapsed branch above returned otherwise.
+    renewalUnderStudy: study,
   };
 }

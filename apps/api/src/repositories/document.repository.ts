@@ -37,6 +37,111 @@ export class DocumentRepository {
     return this.prisma.client.document.findUnique({ where: { id } });
   }
 
+  /**
+   * 🔴 OWNER DECISION 142 — STORE AN ISSUED INSURANCE CERTIFICATE: the row AND its bytes, in one
+   * transaction.
+   *
+   * «كل شهادة تأمين تصدر تُحفَظ ملفاً في النظام بسطر في جدول الملفات.»
+   *
+   * ## WHY ONE TRANSACTION AND NOT TWO WRITES
+   *
+   * The two halves mean nothing apart. A `Document` with no `DocumentContent` is exactly what
+   * every row in this product already is — a pointer with nothing behind it — so a half-written
+   * certificate would be indistinguishable from an uploaded one, and the screen would offer a
+   * download that 404s. `DocumentContent` is append-only by trigger, so the failed half cannot be
+   * repaired afterwards either: there is no UPDATE path to fill the bytes in later.
+   *
+   * ## THE STAMP IS PASSED IN, NEVER DERIVED HERE
+   *
+   * OWNER DECISION 128 + 136 §6. `issuedUnderStudyLicenseId` is decided ONCE, by the licence gate,
+   * at the instant the act was permitted — see `LicenseGateService.assertMayPractise`. Deriving it
+   * here would read the licence at a second instant, and an office whose new certificate landed
+   * between the two reads would store a certificate stamped with a term it was no longer under.
+   *
+   * ## `storageRef` CARRIES THE ROW'S OWN ID, AND THAT IS NOT A PLACEHOLDER
+   *
+   * The column is NOT NULL and is an object-storage key supplied by the uploader everywhere else.
+   * Nothing uploaded this, so there is no key. It carries `db:documentContent/<id>` — which says
+   * truthfully where the bytes are, and is the string a storage migration (§3) will rewrite when
+   * the hosting decision lands. ⛔ An empty string would have read as «uploaded, key unknown».
+   */
+  async storeIssuedCertificate(input: {
+    policyId: string;
+    fileName: string;
+    uploadedByUserId: string;
+    bytes: Buffer;
+    contentType: string;
+    sha256: string;
+    issuedUnderStudyLicenseId: string | null;
+  }): Promise<Document> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const document = await tx.document.create({
+        data: {
+          policyId: input.policyId,
+          category: 'CERTIFICATE_OF_INSURANCE',
+          /*
+           * A certificate names the customer, the insurer, the line and the sums insured. It is
+           * handed to a third party on purpose, which is NOT the same as being public: the stored
+           * copy sits in the office's own file. CONFIDENTIAL is the same level the policy
+           * documents beside it carry, and `sensitive-data-handling.md` is what forbids reaching
+           * lower.
+           */
+          classification: 'CONFIDENTIAL',
+          fileName: input.fileName,
+          storageRef: 'db:documentContent/pending',
+          uploadedByUserId: input.uploadedByUserId,
+          /* ⛔ NOT set to false anywhere. Decision 142 §5 criterion 5 — no route deletes a
+           * certificate — and retention is module 11's question (§4), unanswered, so nothing is
+           * destroyed until she rules. The column defaults to true; it is stated here because a
+           * default is a fact about the schema and this is a fact about the decision. */
+          deletionLocked: true,
+          issuedUnderStudyLicenseId: input.issuedUnderStudyLicenseId,
+        },
+      });
+      await tx.documentContent.create({
+        data: {
+          documentId: document.id,
+          /*
+           * ⚠️ `Uint8Array`, NOT `Buffer`. Prisma maps `Bytes` to `Uint8Array`, and a `Buffer`
+           * is only structurally assignable when its backing store is an `ArrayBuffer` — the
+           * compiler refuses it because a `Buffer` may sit on a `SharedArrayBuffer`. Copying the
+           * view is also the honest thing here: the row must not alias a pooled buffer the
+           * renderer may reuse.
+           */
+          bytes: new Uint8Array(input.bytes),
+          byteSize: input.bytes.byteLength,
+          contentType: input.contentType,
+          sha256: input.sha256,
+        },
+      });
+      return tx.document.update({
+        where: { id: document.id },
+        data: { storageRef: `db:documentContent/${document.id}` },
+      });
+    });
+  }
+
+  /**
+   * 🔴 OWNER DECISION 142 criterion 1 — «ويُقرأ كما صدر». The bytes back, with their digest.
+   *
+   * Returned together DELIBERATELY: the digest is only evidence if it travels with the bytes it
+   * was taken over. A caller handed the bytes from here and the digest from a second read could
+   * compare two different moments and call it proof.
+   */
+  async findStoredContent(documentId: string): Promise<{
+    bytes: Buffer;
+    contentType: string;
+    sha256: string;
+    byteSize: number;
+  } | null> {
+    const row = await this.prisma.client.documentContent.findUnique({
+      where: { documentId },
+      select: { bytes: true, contentType: true, sha256: true, byteSize: true },
+    });
+    if (row === null) return null;
+    return { ...row, bytes: Buffer.from(row.bytes) };
+  }
+
   findMany(filter: DocumentFilter): Promise<Document[]> {
     return this.prisma.client.document.findMany({
       where: {

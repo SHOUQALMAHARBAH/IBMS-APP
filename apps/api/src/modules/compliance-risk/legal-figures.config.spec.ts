@@ -135,10 +135,22 @@ describe('CRITERION 3 — an old transaction computes at the value in force on I
    * was in force in March gives March's answer today. The repository half — that the right row is
    * SELECTED for a given date — is `legal-value.e2e-spec.ts`'s.
    */
+  /*
+   * 🔴 THE LAST THREE FIELDS ARRIVED WITH OWNER DECISION 128, AND THEY ARE WHAT KEEPS THE
+   * STANDING TEST BELOW ABOUT THE FIGURE.
+   *
+   * Filing on time is now condition 1 of FOUR («الإثبات يفتح، لا التاريخ»). Without
+   * them the 30-day case would be refused for a MISSING PROOF rather than for the deadline, and
+   * the test would still go green on one of the two assertions — proving nothing about the figure
+   * it is named for. With them, the deadline is the only thing that differs between the two runs.
+   */
   const term = {
     expiresAt: new Date('2026-12-31T00:00:00.000Z'),
     renewalRequestedAt: new Date('2026-11-20T00:00:00.000Z'),
     issuedAt: new Date('2024-01-01T00:00:00.000Z'),
+    renewalProofDocumentId: 'doc-proof-1',
+    renewalReferenceNumber: 'CBJ/IN/2026/4471',
+    hasRenewalDeclaration: true,
   };
 
   it('a renewal filed on 20 November is TIMELY under a 45-day rule and LATE under a 60-day one', () => {

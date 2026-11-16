@@ -45,6 +45,16 @@ export interface DocumentRecord {
   deletionLocked: boolean;
   deletionOverrideByUserId: string | null;
   createdAt: string;
+  /**
+   * 🔴 OWNER DECISION 128 + 136 §6 — the term this document was issued under, while the office
+   * was past its printed expiry with a renewal under study. NULL on almost every row.
+   *
+   * ⛔ The web NEVER derives this and never clears it. It is stamped by the server at creation
+   * from what the licence gate decided at that instant (decision 124's principle), and no
+   * permission removes it — so a row that carries it carries it for ever, including after the
+   * new certificate arrives.
+   */
+  issuedUnderStudyLicenseId: string | null;
 }
 
 export interface PolicyFileClassificationSummary {

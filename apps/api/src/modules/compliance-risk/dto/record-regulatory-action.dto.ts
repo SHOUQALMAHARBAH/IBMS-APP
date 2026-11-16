@@ -38,9 +38,32 @@ import { IsCalendarDate } from '../../../common/is-calendar-date.validator';
  * not the regulator acting, and nothing here grants the regulator an account or a screen.
  */
 export class RecordRegulatoryActionDto {
-  /** A closed three — the database's own enum, so a fourth is a 400 at the boundary. */
-  @IsIn(['SUSPENSION', 'CANCELLATION', 'REINSTATEMENT'])
-  kind!: 'SUSPENSION' | 'CANCELLATION' | 'REINSTATEMENT';
+  /**
+   * A closed FIVE — the database's own enum, so a sixth is a 400 at the boundary.
+   *
+   * 🔴 THREE BECAME FIVE WITH OWNER DECISION 128. «إشعار نقص» and «رفض تجديد» are letters the
+   * office receives about its RENEWAL APPLICATION, not about its licence: each does exactly one
+   * thing — ends the renewal-under-study state — and on a term still inside its printed dates
+   * neither moves anything at all.
+   *
+   * ⛔ THEY ARE NOT SUSPENSIONS and must never be treated as such. `foldActs` skips them by name,
+   * and `basis`/`suspendedUntil` below are about suspensions: a deficiency notice is recorded as
+   * a `SANCTION` basis only because the enum has no third member, and art. 14/c cannot reach it
+   * because 14/c applies to a `BROKER_REQUEST` suspension alone.
+   */
+  @IsIn([
+    'SUSPENSION',
+    'CANCELLATION',
+    'REINSTATEMENT',
+    'DEFICIENCY_NOTICE',
+    'RENEWAL_REFUSAL',
+  ])
+  kind!:
+    | 'SUSPENSION'
+    | 'CANCELLATION'
+    | 'REINSTATEMENT'
+    | 'DEFICIENCY_NOTICE'
+    | 'RENEWAL_REFUSAL';
 
   /**
    * On what basis. `BROKER_REQUEST` is the office's own application; `SANCTION` is imposed.
