@@ -50,11 +50,18 @@ describe("every enum member a person can choose carries an Arabic description", 
   it("covers FOUR enums — pinned so a fifth is a deliberate edit here", () => {
     /*
      * The figure that moved three times in this close, so it is derived where it can be and pinned
-     * where it cannot. Four enums, eleven members: a fifth enum added without a description table
-     * fails HERE by name rather than appearing as an empty column on a screen.
+     * where it cannot. A fifth ENUM added without a description table fails HERE by name rather
+     * than appearing as an empty column on a screen.
+     *
+     * 🔴 11 -> 13 ON 2026-11-16, AND THIS IS THE COUNT FOLLOWING ITS MEMBERS RATHER THAN A
+     * WIDENING. OWNER DECISION 128 adds `DEFICIENCY_NOTICE` and `RENEWAL_REFUSAL` to
+     * `RegulatoryActionKind`; OWNER DECISION 147 ratified a description for each. Nothing here
+     * was relaxed and nothing was exempted — the per-enum totality assertion below still demands
+     * an EXACT member set, and the 40-character floor still applies to both new rows. The enum
+     * count stays FOUR, which is the half of this test that guards against a new table.
      */
     expect(CASES).toHaveLength(4);
-    expect(CASES.reduce((n, [, , rows]) => n + rows.length, 0)).toBe(11);
+    expect(CASES.reduce((n, [, , rows]) => n + rows.length, 0)).toBe(13);
   });
 
   describe.each(CASES)("%s", (name, members, rows) => {

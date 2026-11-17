@@ -620,6 +620,10 @@ model Organization {
   /// Batch 5 group 7d — this company's own licence terms, when it is an INSURANCE_COMPANY.
   insuranceCompanyLicenseTerms        InsuranceCompanyLicenseTerm[]     @relation("OrganizationInsuranceCompanyLicenseTerms")
   declaredActs                        DeclaredAct[]
+  /// OWNER DECISION 128 — this office's standing renewal declarations, one per term.
+  licenseRenewalDeclarations          LicenseRenewalDeclaration[]
+  /// OWNER DECISION 142 — the bytes of the documents this system issued for this office.
+  documentContents                    DocumentContent[]
   rfqArticle15DExemptions             RfqArticle15DExemption[]
   article15DPremiumAlerts             Article15DPremiumAlert[]
   permissionDismissals                OfficePermissionDismissal[]
@@ -970,6 +974,8 @@ model User {
   /// which is why the FK is nullable rather than defaulted to the caller.
   reportedIncidents                 IncidentReport[]                  @relation("IncidentReportedBy")
   declaredActs                      DeclaredAct[]
+  /// OWNER DECISION 128 — the renewal declarations this person made.
+  licenseRenewalDeclarations        LicenseRenewalDeclaration[]
   rfqArticle15DExemptions           RfqArticle15DExemption[]
   permissionDismissals              OfficePermissionDismissal[]
 
@@ -2579,14 +2585,30 @@ model Opportunity {
 /// Process 11 — RFQ / Market Submission per product/line to a shortlist of
 /// insurers.
 model RFQ {
-  id                    String               @id @default(uuid())
+  id                        String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId        String               @default(dbgenerated())
-  organization          Organization         @relation(fields: [organizationId], references: [id])
-  opportunityId         String
-  opportunity           Opportunity          @relation(fields: [opportunityId], references: [id])
-  insuranceLine         String
+  organizationId            String               @default(dbgenerated())
+  organization              Organization         @relation(fields: [organizationId], references: [id])
+  opportunityId             String
+  /// 🔴 OWNER DECISION 128 — THE TERM THAT WAS UNDER STUDY WHEN THIS WAS ISSUED.
+  ///
+  /// NULL is the ordinary case and means «issued under a licence that was simply in force».
+  /// A value means the office was PAST ITS PRINTED EXPIRY with a renewal under study, and it
+  /// names the term the act was performed under — decision 128 §4's «ما صدر بين الترخيصَين
+  /// يحمل وسمه».
+  ///
+  /// STAMPED AT CREATION AND NEVER DERIVED LATER — decision 124's principle, and the reason
+  /// is the one that decision gives: derive it from the licence's CURRENT state and the new
+  /// certificate arriving would silently un-stamp every record issued in the gap, so an
+  /// inspector asking what was issued under study would be told «nothing».
+  ///
+  /// ⛔ NO PERMISSION REMOVES IT. There is no update path for this column anywhere, and
+  /// `onDelete: Restrict` keeps the term it points at.
+  issuedUnderStudyLicenseId String?
+  issuedUnderStudyLicense   BrokerLicense?       @relation("RfqIssuedUnderRenewalStudy", fields: [issuedUnderStudyLicenseId], references: [id], onDelete: Restrict)
+  opportunity               Opportunity          @relation(fields: [opportunityId], references: [id])
+  insuranceLine             String
   /// The managed line, replacing the free-text `insuranceLine` beside it.
   ///
   /// BOTH FKs, exactly one set (CHECK `RFQ_line_exactly_one`), because this model is
@@ -2599,15 +2621,15 @@ model RFQ {
   /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
   /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
   /// unmapped rows, not when we believe there are none.
-  insuranceLineId       String?
-  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
-  officeInsuranceLineId String?
-  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
-  issuedAt              DateTime             @default(now())
-  followUpThresholdDays Int                  @default(9) // Part 3.7-style configurable follow-up
+  insuranceLineId           String?
+  insuranceLine_managed     InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId     String?
+  officeInsuranceLine       OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  issuedAt                  DateTime             @default(now())
+  followUpThresholdDays     Int                  @default(9) // Part 3.7-style configurable follow-up
   // Process 11 (backlog Part C #11) provenance — the Placement Officer who
   // issued this RFQ. Bare scalar; the AuditLogEntry CREATE row is authoritative.
-  issuedByUserId        String?
+  issuedByUserId            String?
 
   insurerSubmissions     RFQInsurer[]
   quotations             Quotation[]
@@ -2819,30 +2841,46 @@ model ComparisonMatrixRow {
 /// a configured band) carried a materially lower commission rate.
 /// `coiCompetingQuotationId` / `coiCommissionDiffPercent` explain the flag.
 model Recommendation {
-  id                        String       @id @default(uuid())
+  id                        String         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId            String       @default(dbgenerated())
-  organization              Organization @relation(fields: [organizationId], references: [id])
+  organizationId            String         @default(dbgenerated())
+  organization              Organization   @relation(fields: [organizationId], references: [id])
+  /// 🔴 OWNER DECISION 128 — THE TERM THAT WAS UNDER STUDY WHEN THIS WAS ISSUED.
+  ///
+  /// NULL is the ordinary case and means «issued under a licence that was simply in force».
+  /// A value means the office was PAST ITS PRINTED EXPIRY with a renewal under study, and it
+  /// names the term the act was performed under — decision 128 §4's «ما صدر بين الترخيصَين
+  /// يحمل وسمه».
+  ///
+  /// STAMPED AT CREATION AND NEVER DERIVED LATER — decision 124's principle, and the reason
+  /// is the one that decision gives: derive it from the licence's CURRENT state and the new
+  /// certificate arriving would silently un-stamp every record issued in the gap, so an
+  /// inspector asking what was issued under study would be told «nothing».
+  ///
+  /// ⛔ NO PERMISSION REMOVES IT. There is no update path for this column anywhere, and
+  /// `onDelete: Restrict` keeps the term it points at.
+  issuedUnderStudyLicenseId String?
+  issuedUnderStudyLicense   BrokerLicense? @relation("RecommendationIssuedUnderRenewalStudy", fields: [issuedUnderStudyLicenseId], references: [id], onDelete: Restrict)
   /// NOT `@unique`: a PARTIAL unique index, live rows only — `WHERE "discardedAt" IS NULL`. Prisma
   /// cannot express a partial index, so it lives in migration 20261027100000 and asserts itself there.
   /// One LIVE recommendation per opportunity is the invariant that matters; discarded ones stay beside it
   /// with their author, timestamp and reason.
   opportunityId             String
-  opportunity               Opportunity  @relation(fields: [opportunityId], references: [id])
+  opportunity               Opportunity    @relation(fields: [opportunityId], references: [id])
   /// Partial unique for the same reason, in the same migration: discarding a recommendation must not
   /// block re-recommending the quotation it named.
   recommendedQuotationId    String
-  recommendedQuotation      Quotation    @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
+  recommendedQuotation      Quotation      @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
   rationale                 String // free-text overall summary
   rationaleFactors          Json // { coverage, price, financialStrength, claimsService, deductible, policyConditions } — a non-empty note each
   draftedByUserId           String
   // Snapshot at draft: recommendedQuotation.premium > Opportunity.targetPremiumThreshold
-  approvalRequired          Boolean      @default(false)
+  approvalRequired          Boolean        @default(false)
   // Snapshot at draft: COI heuristic (comparable competing quote, materially lower commission)
-  conflictOfInterestFlagged Boolean      @default(false)
+  conflictOfInterestFlagged Boolean        @default(false)
   coiCompetingQuotationId   String?
-  coiCommissionDiffPercent  Decimal?     @db.Decimal(5, 2)
+  coiCommissionDiffPercent  Decimal?       @db.Decimal(5, 2)
   // Maker/checker: senior-officer approval required above a configurable premium threshold
   approvedByUserId          String?
   approvedAt                DateTime?
@@ -2862,7 +2900,7 @@ model Recommendation {
   discardedAt               DateTime?
   discardedByUserId         String?
   discardedReason           String?
-  createdAt                 DateTime     @default(now())
+  createdAt                 DateTime       @default(now())
 
   conflictOfInterestDisclosure ConflictOfInterestDisclosure?
   /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
@@ -3020,24 +3058,40 @@ enum PolicyStatus {
 
 /// Part 4.1 core entity — the bound insurance contract.
 model Policy {
-  id                    String               @id @default(uuid())
+  id                        String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId        String               @default(dbgenerated())
-  organization          Organization         @relation(fields: [organizationId], references: [id])
-  opportunityId         String               @unique
-  opportunity           Opportunity          @relation(fields: [opportunityId], references: [id])
-  customerId            String
-  customer              Customer             @relation(fields: [customerId], references: [id])
-  insurerId             String
-  insurer               Insurer              @relation(fields: [insurerId], references: [id])
+  organizationId            String               @default(dbgenerated())
+  organization              Organization         @relation(fields: [organizationId], references: [id])
+  opportunityId             String               @unique
+  /// 🔴 OWNER DECISION 128 — THE TERM THAT WAS UNDER STUDY WHEN THIS WAS ISSUED.
+  ///
+  /// NULL is the ordinary case and means «issued under a licence that was simply in force».
+  /// A value means the office was PAST ITS PRINTED EXPIRY with a renewal under study, and it
+  /// names the term the act was performed under — decision 128 §4's «ما صدر بين الترخيصَين
+  /// يحمل وسمه».
+  ///
+  /// STAMPED AT CREATION AND NEVER DERIVED LATER — decision 124's principle, and the reason
+  /// is the one that decision gives: derive it from the licence's CURRENT state and the new
+  /// certificate arriving would silently un-stamp every record issued in the gap, so an
+  /// inspector asking what was issued under study would be told «nothing».
+  ///
+  /// ⛔ NO PERMISSION REMOVES IT. There is no update path for this column anywhere, and
+  /// `onDelete: Restrict` keeps the term it points at.
+  issuedUnderStudyLicenseId String?
+  issuedUnderStudyLicense   BrokerLicense?       @relation("PolicyIssuedUnderRenewalStudy", fields: [issuedUnderStudyLicenseId], references: [id], onDelete: Restrict)
+  opportunity               Opportunity          @relation(fields: [opportunityId], references: [id])
+  customerId                String
+  customer                  Customer             @relation(fields: [customerId], references: [id])
+  insurerId                 String
+  insurer                   Insurer              @relation(fields: [insurerId], references: [id])
   /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
   /// the platform. A bare @unique here is not only a functional bug (two
   /// offices legitimately produce the same value); it leaks across tenants on
   /// its own — a uniqueness-violation error confirms the value already exists
   /// for SOMEONE, with no row ever returned. See @@unique below.
-  policyNumber          String?
-  insuranceLine         String
+  policyNumber              String?
+  insuranceLine             String
   /// The managed line, replacing the free-text `insuranceLine` beside it.
   ///
   /// BOTH FKs, exactly one set (CHECK `Policy_line_exactly_one`), because this model is
@@ -3050,35 +3104,35 @@ model Policy {
   /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
   /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
   /// unmapped rows, not when we believe there are none.
-  insuranceLineId       String?
-  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
-  officeInsuranceLineId String?
-  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
-  status                PolicyStatus         @default(PLACEMENT_CONFIRMED)
-  inceptionDate         DateTime?
-  expiryDate            DateTime?
-  requestedPremium      Decimal              @db.Decimal(18, 3)
-  issuedPremium         Decimal?             @db.Decimal(18, 3)
-  currency              String               @default("JOD")
+  insuranceLineId           String?
+  insuranceLine_managed     InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId     String?
+  officeInsuranceLine       OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  status                    PolicyStatus         @default(PLACEMENT_CONFIRMED)
+  inceptionDate             DateTime?
+  expiryDate                DateTime?
+  requestedPremium          Decimal              @db.Decimal(18, 3)
+  issuedPremium             Decimal?             @db.Decimal(18, 3)
+  currency                  String               @default("JOD")
   // Process 18-19 (backlog Part C #18-19) provenance — bare scalars, no
   // relation. placedByUserId is the Placement Officer who bound the cover;
   // issuedByUserId is stamped on the PLACEMENT_CONFIRMED -> ISSUED
   // transition. The AuditLogEntry CREATE / TRANSITION rows are the
   // authoritative trail (same pattern as Opportunity.createdByUserId /
   // RFQ.issuedByUserId).
-  placedByUserId        String?
-  issuedByUserId        String?
+  placedByUserId            String?
+  issuedByUserId            String?
   /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
   ///
   /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
   /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
   /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
   /// stays visible, marked.
-  discardedAt           DateTime?
-  discardedByUserId     String?
-  discardedReason       String?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  discardedAt               DateTime?
+  discardedByUserId         String?
+  discardedReason           String?
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
 
   schedules               PolicySchedule[]
   coverNote               CoverNote?
@@ -3230,6 +3284,22 @@ model Endorsement {
   organizationId                  String            @default(dbgenerated())
   organization                    Organization      @relation(fields: [organizationId], references: [id])
   policyId                        String
+  /// 🔴 OWNER DECISION 128 — THE TERM THAT WAS UNDER STUDY WHEN THIS WAS ISSUED.
+  ///
+  /// NULL is the ordinary case and means «issued under a licence that was simply in force».
+  /// A value means the office was PAST ITS PRINTED EXPIRY with a renewal under study, and it
+  /// names the term the act was performed under — decision 128 §4's «ما صدر بين الترخيصَين
+  /// يحمل وسمه».
+  ///
+  /// STAMPED AT CREATION AND NEVER DERIVED LATER — decision 124's principle, and the reason
+  /// is the one that decision gives: derive it from the licence's CURRENT state and the new
+  /// certificate arriving would silently un-stamp every record issued in the gap, so an
+  /// inspector asking what was issued under study would be told «nothing».
+  ///
+  /// ⛔ NO PERMISSION REMOVES IT. There is no update path for this column anywhere, and
+  /// `onDelete: Restrict` keeps the term it points at.
+  issuedUnderStudyLicenseId       String?
+  issuedUnderStudyLicense         BrokerLicense?    @relation("EndorsementIssuedUnderRenewalStudy", fields: [issuedUnderStudyLicenseId], references: [id], onDelete: Restrict)
   policy                          Policy            @relation(fields: [policyId], references: [id])
   type                            EndorsementType
   changeType                      String // add_vehicle | remove_vehicle | add_employee | remove_employee | address_change | sum_insured_increase | add_location | change_beneficiary | coverage_amendment | cancellation
@@ -4348,28 +4418,67 @@ model RenewalRecommendation {
 /// The shipped status word is «قيد التجديد» (`rcStandingRenewalPending`); «ساري» is
 /// `rcStandingActive` and belongs to a term inside its printed dates.
 model BrokerLicense {
-  id                    String       @id @default(uuid())
+  id                     String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId        String       @default(dbgenerated())
-  organization          Organization @relation(fields: [organizationId], references: [id])
-  licenseNumber         String
-  scopeOfAuthorization  String?
-  issuedAt              DateTime?
-  expiresAt             DateTime
+  organizationId         String       @default(dbgenerated())
+  organization           Organization @relation(fields: [organizationId], references: [id])
+  licenseNumber          String
+  scopeOfAuthorization   String?
+  issuedAt               DateTime?
+  expiresAt              DateTime
   /// The licence certificate as issued by the CBJ — MANDATORY, and NOT NULL is what makes it so.
   /// A term is the broker's evidence that it may practise; recording one with no certificate
   /// behind it is recording a claim rather than a fact. `onDelete: Restrict` because the document
   /// IS the evidence — the same reasoning as `CustomerIdentifierCorrection`'s prior-result FK.
-  certificateDocumentId String
-  certificateDocument   Document     @relation(fields: [certificateDocumentId], references: [id], onDelete: Restrict)
+  certificateDocumentId  String
+  /// NAMED as of OWNER DECISION 128, and the name is the only thing that changed: a second
+  /// relation to `Document` (the renewal PROOF, below) now exists, and Prisma cannot tell two
+  /// relations between one pair apart without names. No column and no foreign key moved.
+  certificateDocument    Document     @relation("BrokerLicenseCertificate", fields: [certificateDocumentId], references: [id], onDelete: Restrict)
   /// When the RENEWAL APPLICATION for the term that follows this one was filed, or NULL if none has
   /// been. Art. 11 requires it 45 days before expiry; art. 10/b sets the term at three calendar
   /// years ending 31 December. Item (d) is what reads this column — after expiry, an office that
   /// filed on time stays valid by operation of law until the decision issues, and one that filed
   /// nothing expires. Stored here rather than derived because "did we apply, and when" is a fact
   /// about this term that nothing else records.
-  renewalRequestedAt    DateTime?
+  /// 🔴 CORRECTED BY OWNER DECISION 128 — the comment above described what this column USED to
+  /// open, and it was the defect that decision names: *«الإثبات يفتح، لا التاريخ»*. A date typed
+  /// into a field opens nothing now. The four conditions are in `deriveLicenseStanding`.
+  renewalRequestedAt     DateTime?
+  /// 🔴 OWNER DECISION 128 — THE FILING PROOF, and it is what opens issuance past expiry.
+  ///
+  /// The stamped copy of the application, or the Central Bank's electronic acknowledgement. NULL
+  /// means no proof has been attached, which past expiry means the office is `EXPIRED` whatever
+  /// `renewalRequestedAt` says. `onDelete: Restrict` because the document IS the evidence — the
+  /// same treatment `certificateDocumentId` gets one field up.
+  ///
+  /// A NAMED relation: `Document` already relates to `BrokerLicense` as the term's CERTIFICATE,
+  /// and Prisma cannot tell two relations between one pair apart without names.
+  renewalProofDocumentId String?
+  renewalProofDocument   Document?    @relation("BrokerLicenseRenewalProof", fields: [renewalProofDocumentId], references: [id], onDelete: Restrict)
+  /// 🔴 OWNER DECISION 128 — the Central Bank's inbound number, or the reference on its electronic
+  /// acknowledgement. Decision 133 ratified its label: «رقم الوارد أو الرقم المرجعي».
+  ///
+  /// Beside the document rather than inside it: an inspector asking «which application is this?»
+  /// is asking for a number, and reading it out of a scanned PDF is not something the system can
+  /// do. A CHECK ties the three together — see the migration.
+  renewalReferenceNumber String?
+
+  /// 🔴 OWNER DECISION 128 — the standing declaration for THIS term, made once. NULL until a
+  /// holder of `license-renewal.declare` makes it.
+  renewalDeclaration LicenseRenewalDeclaration?
+
+  /// 🔴 OWNER DECISION 128 — the records ISSUED while this term was past expiry and under study.
+  ///
+  /// Decision 124's principle: stamped at creation, never derived later. These back-relations
+  /// exist so an inspector can ask the TERM what was issued under it, which is the question
+  /// «ما صدر بين الترخيصَين» actually is.
+  issuedUnderStudyPolicies        Policy[]         @relation("PolicyIssuedUnderRenewalStudy")
+  issuedUnderStudyRfqs            RFQ[]            @relation("RfqIssuedUnderRenewalStudy")
+  issuedUnderStudyRecommendations Recommendation[] @relation("RecommendationIssuedUnderRenewalStudy")
+  issuedUnderStudyEndorsements    Endorsement[]    @relation("EndorsementIssuedUnderRenewalStudy")
+  issuedUnderStudyDocuments       Document[]       @relation("DocumentIssuedUnderRenewalStudy")
 
   /// The BRANCHES this term is licensed for — Module 0 item (e). The TYPES (life / general) are
   /// NOT stored: every line already carries a `category` of exactly GENERAL or LIFE, which is the
@@ -4384,6 +4493,68 @@ model BrokerLicense {
   @@index([organizationId])
   /// "The office's latest term" is the hot read — the new-business gate asks it on every placement.
   @@index([organizationId, expiresAt(sort: Desc)])
+}
+
+/// 🔴 OWNER DECISION 128 — THE STANDING DECLARATION THAT NO REFUSAL AND NO DEFICIENCY NOTICE HAS
+/// ARRIVED. One per term, made once, by a holder of `license-renewal.declare`.
+///
+/// ## WHY THIS IS NOT A `DeclaredAct` ROW
+///
+/// Measured on 2026-11-15 with `pg_get_constraintdef`, not read off this file: `DeclaredAct`
+/// REFUSES this record on four counts, and all four are load-bearing rather than incidental.
+///
+///   1. `DeclaredAct_reason_meets_the_shared_floor` demands `reason >= 10`. This declaration has
+///      NO free-text reason — nothing is being excused, so there is nothing to explain.
+///   2. `DeclaredAct_identifies_what_it_declares` demands a non-blank `articleRef`, `entity`,
+///      `entityId` and `transactionRef`. No article is being breached, and this governs every
+///      future issuance act on the term rather than one transaction.
+///   3. `DeclaredAct_articleTextShown_is_prose` demands 20 characters of ARTICLE text. There is
+///      no article text, for the same reason.
+///   4. `DeclaredActSite` is decision 126's SEVEN sites. This is not one of them.
+///
+/// ⛔ They are not bent. `DeclaredAct` is a register of ADMITTED REGULATORY BREACHES, and this is
+/// the opposite kind of record: a statement that nothing has gone wrong. Widening the site enum
+/// would place «we have heard nothing from the Central Bank» inside a table whose every other row
+/// admits a breach — which is what an inspector reading that table would be told.
+///
+/// ## WHAT IT COPIES, AND IT IS THE HARDENING RATHER THAN THE SHAPE
+///
+/// The four hardening elements `DeclaredAct` already carries (module-1 paper §٨, OWNER DECISION
+/// 126): the text AS DISPLAYED (verbatim, never a foreign key to editable text, so
+/// the record testifies to what the person actually saw), the actor's id AND the name as it stood,
+/// the timestamp, and the network address. Plus `DeclaredAct`'s two append-only triggers and its
+/// FORCED row-level security — this is the third table in the product to be FORCED, after
+/// `LegalValue` and `DeclaredAct`, because a register of who swore the regulator had refused
+/// nothing is the wrong place to leave the table's owner exempt.
+model LicenseRenewalDeclaration {
+  id              String        @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never passed by hand.
+  organizationId  String        @default(dbgenerated())
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  /// THE TERM, and `@unique` is «مرة واحدة» expressed where it cannot be forgotten. A second
+  /// declaration on one term is a 409, not an overwrite: the record is append-only, so an
+  /// overwrite is impossible by trigger anyway and the unique is what makes the refusal legible.
+  brokerLicenseId String        @unique
+  brokerLicense   BrokerLicense @relation(fields: [brokerLicenseId], references: [id], onDelete: Restrict)
+
+  /// ELEMENT 1 — the ratified sentence AS IT WAS DISPLAYED. Decision 133 ratified it; decision 128
+  /// requires the declaration be made «in the ratified sentence». Stored verbatim because the
+  /// dictionary may change and this record testifies to what was on the screen that day.
+  declarationTextShown String
+  /// The permission actually used — a CODE, never a role name (decision 127, and the standing rule
+  /// that authorisation resolves from permissions).
+  permissionCode       String
+  /// ELEMENT 5 — who. The id for joining, the NAME AS IT STOOD, through `displayNameForUserId`
+  /// (decision 48) so an `Employee`'s real four-part name wins over free-text `User.fullName`.
+  actorUserId          String
+  actor                User     @relation(fields: [actorUserId], references: [id])
+  actorNameShown       String
+  declaredAt           DateTime @default(now())
+  /// NULLABLE, through `clientIpForRecord` — a record must not claim an address it does not have,
+  /// which is exactly where that helper differs from the rate limiter's `clientIpOf`.
+  networkAddress       String?
+
+  @@index([organizationId])
 }
 
 /// Part 7.1 — the broker's own Professional Indemnity insurance — a broker
@@ -6980,6 +7151,17 @@ enum DocumentCategory {
   /// NOT the licence CERTIFICATE, which already has `BROKER_LICENSE_CERTIFICATE` and already hangs
   /// off the TERM — so three renewals are three certificates, each known by the period it covers.
   REGULATORY_DECISION
+  /// 🔴 OWNER DECISION 142 — AN INSURANCE CERTIFICATE THIS SYSTEM ISSUED AND STORED.
+  ///
+  /// Its own value, for the same reason `BROKER_LICENSE_CERTIFICATE` has one: «show me the
+  /// certificates we issued» has to be a query. `POLICY` would bury them among the policy
+  /// documents the office uploaded, and `OTHER` is, by this enum's own comment, where a document
+  /// goes to be lost.
+  ///
+  /// ⚠️ AND IT IS THE ONLY CATEGORY WHOSE ROWS CARRY THEIR OWN BYTES. Every other row is a
+  /// pointer: `storageRef` is supplied by the uploader and no service here writes object storage.
+  /// A `DocumentContent` row beside this one is what «stored» means.
+  CERTIFICATE_OF_INSURANCE
   OTHER
 }
 
@@ -7013,9 +7195,34 @@ model Document {
   deletionOverrideByUserId String? // privileged, logged override only
   createdAt                DateTime           @default(now())
 
+  /// 🔴 OWNER DECISION 128 + 136(٦) — THE TERM THAT WAS UNDER STUDY WHEN THIS DOCUMENT WAS MADE.
+  ///
+  /// NULL on every document that is not an insurance certificate issued in that state, which is
+  /// almost all of them — so no other document kind is touched by this column existing. It is
+  /// here rather than on a certificate model because THERE IS NO CERTIFICATE MODEL: the act
+  /// `ISSUE_CERTIFICATE` creates a `Document` row and nothing else, and decision 136 §6 settles
+  /// that the row the act creates is the row that carries the stamp.
+  ///
+  /// ⛔ The stamp is NOT the file's contents. Decision 136(أ) rules that the phrase is never
+  /// printed on paper the customer receives; this column is what the SCREEN and the record read.
+  /// Stamped at creation, never derived later, and no permission removes it — decision 124's
+  /// principle, which is why there is no update path for it anywhere.
+  issuedUnderStudyLicenseId String?
+  issuedUnderStudyLicense   BrokerLicense? @relation("DocumentIssuedUnderRenewalStudy", fields: [issuedUnderStudyLicenseId], references: [id], onDelete: Restrict)
+
+  /// 🔴 OWNER DECISION 142 — the BYTES, when this system stored them itself.
+  ///
+  /// NULL for every row uploaded through `document.service.ts`, which is all of them today:
+  /// `storageRef` is supplied by the UPLOADER and no service here writes object storage, so
+  /// every such row is a pointer with nothing behind it. A row with content is one this system
+  /// GENERATED and persisted — today only an insurance certificate.
+  content DocumentContent?
+
   claimDocuments               ClaimDocument[]
   /// Module 0 item (c) — the terms whose certificate this document is.
-  brokerLicenses               BrokerLicense[]
+  brokerLicenses               BrokerLicense[]    @relation("BrokerLicenseCertificate")
+  /// 🔴 OWNER DECISION 128 — the terms whose renewal-application PROOF this document is.
+  renewalProofForLicenses      BrokerLicense[]    @relation("BrokerLicenseRenewalProof")
   regulatoryActions            RegulatoryAction[]
   /// MODULE 0-ب ITEM (e) — the organizations whose INSURER licence certificate this document is.
   /// A NAMED relation, because `Document` already relates to `Organization` as its tenant and Prisma
@@ -7030,6 +7237,65 @@ model Document {
   @@index([policyId])
   @@index([customerId])
   @@index([classification])
+  @@index([organizationId])
+}
+
+/// 🔴 OWNER DECISION 142 — THE BYTES OF A DOCUMENT THIS SYSTEM ISSUED ITSELF.
+///
+/// «كل شهادة تأمين تصدر تُحفَظ ملفاً في النظام بسطر في جدول الملفات.»
+///
+/// ## WHY A SEPARATE TABLE AND NOT A COLUMN ON `Document`
+///
+/// Measured 2026-11-15 and restated here because it is the reason this table exists at all:
+/// `Document.storageRef` is an object-storage key supplied by the UPLOADER
+/// (`document.service.ts`, `create-document-version.dto.ts`), and **no service in this API
+/// stores bytes**. Every `Document` row in the product today is a pointer with nothing behind
+/// it, and that is true of 15 rows on dev across four categories.
+///
+/// So the bytes are a NEW capability, and three things follow:
+///
+///   1. ⛔ **IT MUST TOUCH NO OTHER DOCUMENT KIND.** A `bytea` column on `Document` would appear
+///      on every uploaded row as NULL and invite the next writer to fill it — one table with two
+///      meanings for where a file lives. A separate row exists only where this system stored
+///      something, so «did we store this?» is a row's existence rather than a column's nullness.
+///   2. **A `bytea` is loaded whenever its row is.** `Document` is read by lists, by the policy
+///      file, by the claim file; Postgres TOASTs large values out of line, but a column on
+///      `Document` would still make every such read able to drag a megabyte in by accident.
+///   3. **It is TEMPORARY BY DECISION.** §3: the bytes live in the database until a storage
+///      service is built with the hosting decision, and then move. A table lifts out; a column
+///      woven into `Document` does not.
+///
+/// ## IT IS FORCED, AND APPEND-ONLY
+///
+/// RLS ENABLED **and FORCED** — the fourth table in this product to be forced, after
+/// `LegalValue`, `DeclaredAct` and `LicenseRenewalDeclaration`. Criterion 4 is «another office
+/// sees neither the certificate nor its row», and a certificate names a customer, an insurer and
+/// a sum insured; the table's owner is the wrong person to leave exempt from that.
+///
+/// Append-only by trigger, which is criterion 1's «ويُقرأ كما صدر» made structural rather than
+/// promised: a certificate that could be UPDATED is not the certificate that was issued, and the
+/// `sha256` beside it would then be a hash of something nobody ever received.
+model DocumentContent {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  /// ONE row per document, and `onDelete: Restrict` because the bytes ARE the document:
+  /// criterion 5 is «no route deletes the certificate», and a cascade here would make the
+  /// file removable by removing its record.
+  documentId     String       @unique
+  document       Document     @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  /// The file itself. `Bytes` is Postgres `bytea`.
+  bytes          Bytes
+  /// The length, DECLARED beside the bytes and tied to them by CHECK — so the cap is enforced on
+  /// the real thing rather than on a number a caller supplied.
+  byteSize       Int
+  contentType    String
+  /// 64 lowercase hex characters. Criterion 1's «يُقرأ كما صدر» is checkable rather than
+  /// asserted: hash what comes back and compare.
+  sha256         String
+  createdAt      DateTime     @default(now())
+
   @@index([organizationId])
 }
 
@@ -8255,4 +8521,18 @@ enum RegulatoryActionKind {
   SUSPENSION
   CANCELLATION
   REINSTATEMENT
+  /// 🔴 OWNER DECISION 128 — «إشعار نقص». The Central Bank has written back asking the office to
+  /// complete something in its renewal application.
+  ///
+  /// IT DOES EXACTLY ONE THING: it ends the renewal-under-study state. It is NOT a suspension and
+  /// NOT a cancellation — the licence is not withdrawn, the application is simply not yet whole —
+  /// so it must never move `status` or `mayPractise` on a term still inside its printed dates.
+  /// `deriveLicenseStanding`'s header states the precedence.
+  DEFICIENCY_NOTICE
+  /// 🔴 OWNER DECISION 128 — «رفض تجديد». The Central Bank has refused the renewal application.
+  ///
+  /// Same single effect as `DEFICIENCY_NOTICE` and the same limit: on a term still inside its
+  /// printed dates it moves nothing. The office is past expiry or it is not, and only a NEW
+  /// CERTIFICATE lifts the refusal that follows — there is no cured state and no timer.
+  RENEWAL_REFUSAL
 }

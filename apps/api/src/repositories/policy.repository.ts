@@ -155,6 +155,9 @@ export interface CreatePolicyInput {
   requestedPremium: Prisma.Decimal;
   currency: string;
   placedByUserId: string;
+  /** 🔴 OWNER DECISION 128 — the term the office was past the expiry of when this was placed,
+   *  or null (the ordinary case). Stamped at creation; there is no update path for it. */
+  issuedUnderStudyLicenseId: string | null;
 }
 
 export interface PolicyScheduleInput {

@@ -251,6 +251,19 @@ export const PERMISSIONS = {
     'perm:legal-value.read':
       'يقرأ الأرقام القانونية التي يحسب بها النظام، ومع كل رقم مادته وتاريخ العمل به.',
     'perm:license.manage': 'يدير سجل رخصة الوسيط التنظيمية وتواريخها',
+    // 🔴 OWNER DECISION 145 — HERS, AND IT NEVER SAT ON `AWAITING_OWNER_REVIEW`.
+    //
+    // Message 42's measurement found decision 128's new code had NO Arabic description and no
+    // name, and the parity guard refuses a permission that exists in one language — so the code
+    // could not ship at all. The usual repair is to COMPOSE a line, declare it awaiting her, and
+    // report it; three of the ten lines composed that way were later REWRITTEN rather than
+    // approved. Here she ruled first, so nothing was composed and nothing is owed.
+    //
+    // SLICED byte-for-byte from `docs/decision-145-...md` §٣ and never retyped;
+    // `permission-descriptions.test.ts` re-slices it and compares, so one word changed here
+    // fails by name.
+    'perm:license-renewal.declare':
+      'يُقرّ بأن ترخيص المكتب قيد التجديد، وأنه لم يصله من البنك المركزي رفض ولا إشعار نقص، فيُفتح إصدار الوثائق. وهي غير صلاحية الإصدار.',
     'perm:needs-assessment.approve': 'يعتمد تقييم حاجات العميل قبل ربطه بفرصة أو طلب تسعير. رقابة على جودة التقييم، وليست تعبئته',
     'perm:needs-assessment.create': 'يعبّئ استبيان تقييم حاجات العميل — أساس كل ما يُبنى بعده',
     'perm:needs-assessment.read': 'يقرأ تقييمات حاجات العملاء — ما سُئل عنه العميل وما أجاب، وهو الأساس الذي تُبنى عليه التوصية',
@@ -501,6 +514,12 @@ export const PERMISSIONS = {
     'perm:legal-value.read':
       'Read the legal values the system computes with — each with its article and the page it was read on — and the whole dated history, not only the figure in force today',
     'perm:license.manage': "Manage the broker's regulatory license record",
+    'perm:license-renewal.declare':
+      'Declare, once for a licence term, that the office has received no renewal refusal and no '
+      + 'deficiency notice from the Central Bank — which, with a timely filing and its attached '
+      + 'proof, lets the office keep issuing past the printed expiry while the renewal is under '
+      + 'study. Separate from the permission to maintain the licence record: attaching the filing '
+      + 'proof records a fact, and this swears to one',
     'perm:needs-assessment.approve': 'Review and approve a Needs Assessment before linking to an Opportunity/RFQ',
     'perm:needs-assessment.create': 'Capture a Needs Assessment questionnaire',
     'perm:needs-assessment.read': 'List/read Needs Assessments',

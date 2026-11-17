@@ -15,14 +15,25 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(
+  page: Page,
+  roles: string[],
+  // OWNER DECISION 128 criterion 8 is about the word «ساري», so two tests render this screen in
+  // ARABIC. Defaulted, so every existing caller is untouched.
+  languagePreference: 'AR' | 'EN' = 'EN',
+) {
   await page.route('**/auth/refresh', (route) =>
     route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
   await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) },
+      json: {
+        ...ME_BASE,
+        languagePreference,
+        roles,
+        permissions: permissionsForRoles(roles),
+      },
     }),
   );
 }
@@ -834,4 +845,84 @@ test('the renewal notice is SILENT while the expiry is far off', async ({
   // absence and the test passes proving nothing.
   await expect(page.getByTestId('rc-standing')).toContainText('Current');
   await expect(page.locator('[data-renewal-notice]')).toHaveCount(0);
+});
+
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+ * 🔴 OWNER DECISION 128 §٧ CRITERION 8 — «الشاشة لا تعرض «ساري» لمكتب في هذه الحالة».
+ *
+ * `renewal-under-study.criteria.spec.ts` proves the DERIVATION never returns `ACTIVE` for an
+ * office past its printed expiry, and names this file as the other half: what a derivation
+ * returns and what a screen renders are different claims, and the status word is rendered from a
+ * map the derivation knows nothing about.
+ *
+ * ⚠️ RENDERED IN ARABIC. «ساري» is the word her criterion forbids, and the English screen says
+ * «Current» — so an English render would assert the absence of a word that was never going to
+ * appear, which is the vacuous shape this repository has paid for before.
+ * ───────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** Past the printed expiry with the renewal genuinely under study: all four conditions hold. */
+const STANDING_UNDER_STUDY = {
+  status: 'RENEWAL_PENDING',
+  mayPractise: true,
+  standingActDecisionRef: null,
+  deemedCancelledUnderArticle14C: false,
+  renewalUnderStudy: { state: 'UNDER_STUDY' },
+};
+
+/** Everything in order EXCEPT the declaration — decision 136(ب)'s sentence belongs here. */
+const STANDING_AWAITING_DECLARATION = {
+  status: 'EXPIRED',
+  mayPractise: false,
+  standingActDecisionRef: null,
+  deemedCancelledUnderArticle14C: false,
+  renewalUnderStudy: { state: 'AWAITING_DECLARATION' },
+};
+
+test('OWNER DECISION 128 criterion 8 — an office under study is «قيدَ التجديد», never «ساري»', async ({
+  page,
+}) => {
+  await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      ...LICENSE_SERIES,
+      standing: STANDING_UNDER_STUDY,
+    },
+  });
+
+  await page.goto('/regulatory-compliance');
+  const standing = page.getByTestId('rc-standing');
+  // POSITIVE FIRST. Anchored on something from the SAME render, or an unhydrated page satisfies
+  // the absence below and the test passes proving nothing.
+  await expect(standing).toBeVisible();
+  await expect(standing).toContainText('قيدَ التجديد');
+  // ⛔ And her forbidden word is not there.
+  await expect(standing).not.toContainText('ساري');
+});
+
+test('OWNER DECISION 136(ب) — the office awaiting a declaration is told what is missing', async ({
+  page,
+}) => {
+  /*
+   * The sentence sends the employee to their own administrator, not to the Central Bank. It is
+   * shown to EVERY reader of this screen rather than only to a declarer: the person who met this
+   * refusal on a policy needs to see the same words here.
+   */
+  await mockAuth(page, ['COMPLIANCE_OFFICER'], 'AR');
+  await mockRegulatoryCompliance(page, {
+    licenseSeries: {
+      ...LICENSE_SERIES,
+      standing: STANDING_AWAITING_DECLARATION,
+    },
+  });
+
+  await page.goto('/regulatory-compliance');
+  const note = page.locator('[data-renewal-awaiting-declaration]');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('ولم يُسجَّل الإقرار بعد');
+  await expect(note).toContainText('راجع مسؤول النظام');
+  // ⛔ It does NOT say the licence has expired — that would send them to the regulator.
+  await expect(note).not.toContainText('منتهٍ');
+  // And criterion 8 holds here too: this office is past its printed expiry.
+  await expect(page.getByTestId('rc-standing')).not.toContainText('ساري');
 });

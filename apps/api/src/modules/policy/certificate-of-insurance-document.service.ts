@@ -8,6 +8,8 @@ import { buildCertificateOfInsuranceHtml } from './certificate-of-insurance.temp
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { insurerName } from '../../repositories/insurer-identity';
 import { LicenseGateService } from '../compliance-risk/license-gate.service';
+import { createHash } from 'node:crypto';
+import { DocumentRepository } from '../../repositories/document.repository';
 
 const CERTIFICATE_OF_INSURANCE_TEMPLATE_TYPE = 'certificate_of_insurance';
 
@@ -53,10 +55,18 @@ const CERTIFICATE_OF_INSURANCE_TEMPLATE_TYPE = 'certificate_of_insurance';
  * ⟶ Her ruling: the bytes live in the DATABASE until a storage service exists, and move when
  * storage is built with the hosting decision.
  *
- * ⛔ NOT BUILT IN THIS BATCH, and deliberately not half-built: it arrives with decision 128's
- * stamp, which ships whole or not at all. Retention — how long a stored certificate is kept and
- * when it is destroyed — is decision 142 §4 and belongs to module 11; nothing is deleted until
- * she rules on it.
+ * ✅ BUILT 2026-11-16, WITH decision 128's stamp, because it ships whole or not at all.
+ *
+ * Issuing a certificate now writes ONE `Document` row (`CERTIFICATE_OF_INSURANCE`, linked to its
+ * policy, `deletionLocked`) and ONE `DocumentContent` row holding the bytes and their sha256, in
+ * one transaction — see `DocumentRepository.storeIssuedCertificate` for why the two halves mean
+ * nothing apart. The row carries `issuedUnderStudyLicenseId` exactly as the licence gate decided
+ * it at the moment the act was permitted, so the stamp is STAMPED rather than derived, and it
+ * survives the new certificate arriving.
+ *
+ * ⛔ Retention — how long a stored certificate is kept and when it is destroyed — is decision 142
+ * §4 and belongs to module 11. Unanswered, so NOTHING IS DELETED: no route removes a certificate
+ * and `deletionLocked` is never cleared on one.
  */
 
 /** Built-in fallback boilerplate — used whenever no
@@ -78,6 +88,9 @@ const FALLBACK_BODY_AR =
 export interface GeneratedDocument {
   buffer: Buffer;
   fileName: string;
+  /** OWNER DECISION 142 — the `Document` row this issuance created. Present only on the
+   *  certificate, which is the only generated document this product stores. */
+  documentId?: string;
 }
 
 @Injectable()
@@ -87,6 +100,8 @@ export class CertificateOfInsuranceDocumentService {
     private readonly templates: DocumentTemplateRepository,
     private readonly pdfRenderer: PdfRendererService,
     private readonly licenseGate: LicenseGateService,
+    /** OWNER DECISION 142 — where the issued certificate is stored. */
+    private readonly documents: DocumentRepository,
   ) {}
 
   async generate(
@@ -110,15 +125,27 @@ export class CertificateOfInsuranceDocumentService {
      * what it placed, which ز.٢ protects as work on existing business. The certificate is an
      * assertion to a third party; the summary is a statement to the customer about their own file.
      */
-    await this.licenseGate.assertMayPractise('ISSUE_CERTIFICATE', async () => {
-      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
-      // reads and costs no extra query unless the office actually has a partial suspension.
-      const { policy } = await this.policies.getByIdWithCustomer(
-        policyId,
-        actor,
-      );
-      return policy;
-    });
+    /*
+     * 🔴 THE RETURN VALUE IS THE STAMP — OWNER DECISION 128 + 136 §6, and it is decided HERE
+     * rather than read again below.
+     *
+     * `assertMayPractise` answers «may this office act?» and «under what term?» in ONE read at
+     * ONE instant. Re-reading the licence after the PDF renders would ask at a second instant, and
+     * a certificate that landed in between would be stored under a term the office had already
+     * left — the exact un-stamping decision 124's «stamped at creation, never derived» forbids.
+     */
+    const stamp = await this.licenseGate.assertMayPractise(
+      'ISSUE_CERTIFICATE',
+      async () => {
+        // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+        // reads and costs no extra query unless the office actually has a partial suspension.
+        const { policy } = await this.policies.getByIdWithCustomer(
+          policyId,
+          actor,
+        );
+        return policy;
+      },
+    );
 
     // The SAME visibility read + data-availability gate the
     // policy-schedule-summary slice already established — see that
@@ -184,9 +211,48 @@ export class CertificateOfInsuranceDocumentService {
     );
 
     const buffer = await this.pdfRenderer.renderHtmlToPdf(html);
-    return {
-      buffer,
-      fileName: `certificate-of-insurance-${policy.id}.pdf`,
-    };
+    /*
+     * 🔴 THE LANGUAGE IS IN THE FILE NAME, and it is load-bearing rather than cosmetic.
+     *
+     * It is what makes the stored row identifiable: `storeIssuedCertificate` keys on (policy, file
+     * name), because the rendered PDF is NOT byte-stable — Chromium stamps a creation date, so a
+     * digest identifies the render and not the document. Without the language in the name, the
+     * Arabic and English certificates of one policy would collide into a single row and the second
+     * language would silently return the first.
+     *
+     * It is also simply truer: both downloads used to arrive called the same thing.
+     */
+    const fileName = `certificate-of-insurance-${policy.id}-${language}.pdf`;
+
+    /*
+     * 🔴 OWNER DECISION 142 — STORED, AND STORED BEFORE IT IS HANDED OVER.
+     *
+     * The order is the decision. A certificate that reached the customer and failed to store
+     * would be a document in the world with no record of it ever having been issued — which is
+     * precisely the state this decision exists to end, and the state an inspector asking «what
+     * did you issue while your renewal was under study?» would be misled by.
+     *
+     * ⟶ So a storage failure PROPAGATES. It is not caught and logged: the act has not happened.
+     *
+     * ⛔ AND THE STAMP IS NOT PRINTED ON THE BUFFER. Decision 136(أ) — the phrase never appears on
+     * paper the customer receives. It is a column on the row, read by the screen that displays
+     * the certificate, and nothing here touches the rendered bytes.
+     */
+    const document = await this.documents.storeIssuedCertificate({
+      policyId: policy.id,
+      fileName,
+      uploadedByUserId: actor.id,
+      bytes: buffer,
+      contentType: 'application/pdf',
+      /*
+       * The digest of the bytes AS ISSUED — criterion 1's «ويُقرأ كما صدر» made checkable rather
+       * than asserted. Taken over the same buffer that is returned below, so the two cannot be of
+       * different things.
+       */
+      sha256: createHash('sha256').update(buffer).digest('hex'),
+      issuedUnderStudyLicenseId: stamp.issuedUnderStudyLicenseId,
+    });
+
+    return { buffer, fileName, documentId: document.id };
   }
 }

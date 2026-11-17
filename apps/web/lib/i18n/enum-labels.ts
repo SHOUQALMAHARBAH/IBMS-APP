@@ -152,7 +152,21 @@ export const ENUM_LABEL = {
     EXECUTED: 'rdStatusExecuted',
     CLOSED: 'rdStatusClosed',
   } satisfies Labels<string>,
+  /**
+   * 🔴 TOTAL OVER THE SCHEMA SINCE 2026-11-16, AND IT WAS NOT BEFORE.
+   *
+   * `satisfies Labels<string>` keys on `string`, so it enforces NOTHING about coverage — the
+   * identical hole message 38 found and closed for `InteractionChannel`. This map carried 13
+   * keys for 16 members, and a member with no key renders a BLANK CELL rather than failing.
+   *
+   * `declared-vocabulary.test.ts` now parses the members out of `schema.prisma` and compares
+   * them to these keys, so a 17th member fails BY NAME on the commit that adds it.
+   */
   DocumentCategory: {
+    CERTIFICATE_OF_INSURANCE: 'docCategoryCertificateOfInsurance',
+    BROKER_LICENSE_CERTIFICATE: 'docCategoryBrokerLicenseCertificate',
+    INSURER_LICENSE_CERTIFICATE: 'docCategoryInsurerLicenseCertificate',
+    REGULATORY_DECISION: 'docCategoryRegulatoryDecision',
     APPLICATION_PROPOSAL: 'docCategoryApplicationProposal',
     RISK_SURVEY: 'docCategoryRiskSurvey',
     QUOTATION: 'docCategoryQuotation',

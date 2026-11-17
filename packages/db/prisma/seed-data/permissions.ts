@@ -1341,6 +1341,38 @@ const complianceRisk: PermissionSeed[] = [
      *  mark and the notification are the whole of how an office learns it exists. */
     introducedAt: "2026-11-14",
   },
+  /**
+   * 🔴 OWNER DECISION 128 — THE STANDING DECLARATION THAT OPENS ISSUANCE PAST EXPIRY.
+   *
+   * Past the printed expiry of its latest term, an office that filed its renewal on time and
+   * attached the proof may still practise — but ONLY once a holder of this code has declared,
+   * ONCE for that term, that no refusal and no deficiency notice has arrived from the Central
+   * Bank. The declaration is the fourth of decision 128's four conditions.
+   *
+   * ⛔ `roles: []` — OWNER DECISION 131, and here it has a consequence worth stating plainly. An
+   * office that is past expiry and under study ISSUES NOTHING until its administrator grants this
+   * and a holder declares. **That is the decision working as intended**: the mark «جديدة» and the
+   * live notification are how the administrator learns the code exists, and the refusal names
+   * them — «راجع مسؤول النظام في مكتبك.» ⛔ Do NOT pre-grant it to keep the path open.
+   *
+   * SEPARATE FROM `license.manage`, deliberately. That code already governs the licence term and
+   * is what attaches the filing proof — no code is minted for the proof. But attaching a document
+   * is recording a fact; declaring that the regulator has sent nothing is swearing to one, and
+   * decision 128 §3 requires the declaration be made by «حامل الصلاحية» rather than by whoever
+   * can edit the licence record.
+   */
+  {
+    code: "license-renewal.declare",
+    module: "compliance-risk",
+    description:
+      "Declare, once for a licence term, that the office has received no renewal refusal and no deficiency notice from the Central Bank — the standing declaration that, together with a timely filing and its attached proof, lets the office keep issuing past the printed expiry while the renewal is under study. SEPARATE from the permission to maintain the licence record, deliberately: attaching the filing proof records a fact, and this swears to one. It does not permit editing or deleting a declaration once made, which no permission does",
+    // OWNER DECISION 131: no role. See the note above.
+    roles: [],
+    /** The day it ships. Like `declared-act.article-15-d.declare`, it arrives ungranted AND
+     *  closes a path, so the mark and the notification are the whole of how an office learns it
+     *  exists before it needs it. */
+    introducedAt: "2026-11-16",
+  },
   {
     code: "compliance-calendar.manage",
     module: "compliance-risk",

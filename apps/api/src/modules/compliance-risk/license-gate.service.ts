@@ -107,6 +107,23 @@ export const LICENCE_UNGATED_ACTS = [
   'compliance and data-protection work',
 ] as const;
 
+/**
+ * 🔴 OWNER DECISION 128 — WHAT A PERMITTED ISSUANCE CARRIES WITH IT.
+ *
+ * An OBJECT rather than a bare `string | null`, and the reason is the one `InsuranceBranchRef`
+ * records one type up: a bare nullable string at five call sites is five chances to store it
+ * in the wrong column or to forget which way round null means. A named field cannot be
+ * mistaken for anything else.
+ *
+ * Callers that do not create a record ignore it, which is why `assertMayPractise` returning a
+ * value breaks nothing: the five that DO create one spread it into their `data`.
+ */
+export interface IssuanceStamp {
+  /** The term the office was PAST THE EXPIRY OF when this was issued, or null — which is the
+   *  ordinary case and means «issued under a licence that was simply in force». */
+  issuedUnderStudyLicenseId: string | null;
+}
+
 @Injectable()
 export class LicenseGateService {
   constructor(
@@ -124,6 +141,26 @@ export class LicenseGateService {
    * correctness.
    */
   async standing(now: Date = new Date()): Promise<DerivedLicenseStanding> {
+    return (await this.standingWithTerm(now)).standing;
+  }
+
+  /**
+   * 🔴 OWNER DECISION 128 — THE STANDING **AND** THE TERM IT WAS DERIVED FROM, in one pass.
+   *
+   * The stamp names the term a record was issued under, and `DerivedLicenseStanding` has no
+   * id on it — deliberately: `deriveLicenseStanding` is PURE and is shared with a provider
+   * dashboard that must never learn an office's row ids.
+   *
+   * ⛔ SO THE ID IS CARRIED HERE RATHER THAN RE-READ. The obvious alternative — ask the gate
+   * for the standing, then read the licence again for its id — doubles the three reads on
+   * the hot path (every placement) and, worse, reads the licence at a second instant: an
+   * office whose certificate landed between the two calls would be stamped with a term it
+   * was no longer under. One read, one instant, one answer.
+   */
+  private async standingWithTerm(now: Date = new Date()): Promise<{
+    standing: DerivedLicenseStanding;
+    currentTermId: string | null;
+  }> {
     // THREE READS, ONE ROUND TRIP, ONE INSTANT. The legal figures join the terms and the acts
     // rather than being fetched inside the derivation: OWNER DECISION 123 made art. 11's span and
     // art. 14/c's limit rows, and `deriveLicenseStanding` must stay PURE — its whole value is that
@@ -133,8 +170,24 @@ export class LicenseGateService {
       this.acts.findAll(),
       this.legalValues.licenceFigures(now),
     ]);
-    return deriveLicenseStanding(
-      pickCurrentTerm(terms),
+    /*
+     * 🔴 OWNER DECISION 128 — THE RELATION BECOMES A BOOLEAN HERE, at the one boundary between the
+     * database's row and the pure derivation, exactly as the scope lines become branch keys below.
+     *
+     * ⚠️ IT MUST BE MAPPED EXPLICITLY. `LicenseTermRow.hasRenewalDeclaration` is OPTIONAL so that
+     * every existing fixture compiles, which means forgetting this line would leave it `undefined`
+     * — read as «nobody declared» — and an office that HAD declared would be refused for ever,
+     * silently and with the wrong sentence. Optional-reads-as-absent is the safe direction for a
+     * fixture and the dangerous one for the real path, so the real path states it.
+     */
+    const current = pickCurrentTerm(terms);
+    const standing = deriveLicenseStanding(
+      current === null
+        ? null
+        : {
+            ...current,
+            hasRenewalDeclaration: current.renewalDeclaration !== null,
+          },
       /*
        * Art. 21/b/5 — the scope lines become `insuranceBranchKey`s HERE, at the one boundary
        * between the database's two nullable columns and the derivation's single key. The derivation
@@ -150,6 +203,7 @@ export class LicenseGateService {
       now,
       figures,
     );
+    return { standing, currentTermId: current?.id ?? null };
   }
 
   /**
@@ -172,12 +226,32 @@ export class LicenseGateService {
     act: LicenceGatedAct,
     branch: InsuranceBranchSource,
     now: Date = new Date(),
-  ): Promise<void> {
-    const standing = await this.standing(now);
+  ): Promise<IssuanceStamp> {
+    const { standing, currentTermId } = await this.standingWithTerm(now);
     if (!standing.mayPractise) {
       throw new UnprocessableEntityException(refusal(act, standing));
     }
-    if (standing.blockedInsuranceBranchKeys.length === 0) return;
+    /*
+     * 🔴 OWNER DECISION 128 — THE STAMP, decided ONCE, HERE, at the moment the act is
+     * permitted.
+     *
+     * It is `null` on every ordinary issuance, which is almost all of them. It names the term
+     * only while the office is PAST its printed expiry with all four conditions met — the
+     * `UNDER_STUDY` state and no other, so a record issued in an ordinary RENEWAL_PENDING
+     * window (filed 45 days early, licence still in force) is NOT stamped. The gap decision
+     * 128 §4 records is the gap BETWEEN two licences, not the run-up to one.
+     *
+     * ⛔ Computed at CREATION and handed to the caller to store. Never derived later: the new
+     * certificate arriving would otherwise silently un-stamp every record issued in the gap,
+     * and an inspector asking what was issued under study would be told «nothing».
+     */
+    const stamp: IssuanceStamp = {
+      issuedUnderStudyLicenseId:
+        standing.renewalUnderStudy.state === 'UNDER_STUDY'
+          ? currentTermId
+          : null,
+    };
+    if (standing.blockedInsuranceBranchKeys.length === 0) return stamp;
 
     /*
      * ART. 21/b/5 — THE OFFICE IS STOPPED IN SOME BRANCHES AND TRADING IN THE REST.
@@ -214,6 +288,7 @@ export class LicenseGateService {
           `business in this one — collection, claims, cancellations, reporting and compliance.`,
       );
     }
+    return stamp;
   }
 }
 
@@ -242,10 +317,51 @@ export type InsuranceBranchSource =
  * what lifts the block: recording the new term WITH its certificate. A refusal that does not say
  * the way out gets escalated as a system fault.
  */
+/**
+ * 🔴 OWNER DECISION 136(ب) — THE SENTENCE SHOWN WHEN THE OFFICE IS UNDER STUDY AND NOBODY HAS
+ * DECLARED YET. The one Arabic string the api serves on this path, and it is served rather than
+ * translated in the web for a measured reason: every screen that attempts an issuance renders
+ * `err.message` RAW from the api (`rfqs/new/page.tsx:156` and four siblings), so a sentence kept
+ * only in a dictionary would never reach the person being refused.
+ *
+ * ## WHERE ITS WORDS COME FROM — decision 136 §5, and two of the three already ship
+ *
+ *   «قيدَ التجديد»                    — `compliance-risk.ts`, `rcStandingRenewalPending`
+ *   «راجع مسؤول النظام في مكتبك.»     — `operations.ts`, the no-screen-assigned line
+ *   «ولم يُسجَّل الإقرار بعد»          — NEW, ratified by the owner in decision 136
+ *
+ * ⛔ SLICED BYTE-FOR-BYTE from `docs/decision-136-...md` and never retyped.
+ * `license-renewal.spec.ts` re-slices it from that file and compares, AND asserts both shipping
+ * fragments appear inside it — so changing the wording here, or drifting from either dictionary,
+ * fails by name.
+ *
+ * ⛔ AND IT NEVER SAYS «ساري» OR «حكماً». Decision 128 §4: the licence IS expired, the state word
+ * is «قيد التجديد», and claiming the licence is in force would be the system asserting something
+ * the instrument's art. 21/a/9 contradicts.
+ */
+export const RENEWAL_AWAITING_DECLARATION_REFUSAL_AR =
+  'الترخيص قيدَ التجديد، ولم يُسجَّل الإقرار بعد. راجع مسؤول النظام في مكتبك.';
+
 export function refusal(
   act: LicenceGatedAct,
   standing: DerivedLicenseStanding,
 ): string {
+  /*
+   * 🔴 OWNER DECISION 136(ب) — AND IT RETURNS EARLY, BEFORE THE ENGLISH SENTENCE IS BUILT.
+   *
+   * The office filed on time, attached its proof, and has had no deficiency notice and no
+   * refusal. The ONLY thing missing is the standing declaration — which its own administrator
+   * can enable in one grant. So the person attempting the issuance is not told their licence has
+   * expired (true, but useless to them); they are told what is missing and who to see.
+   *
+   * ⚠️ `status` is `EXPIRED` in this state, deliberately — the term IS past its printed date and
+   * the derivation must not claim otherwise. That is exactly why the refusal reads
+   * `renewalUnderStudy` and not `status`: a label cannot carry the difference between «your
+   * licence ran out» and «your office has one click left to make».
+   */
+  if (standing.renewalUnderStudy.state === 'AWAITING_DECLARATION') {
+    return RENEWAL_AWAITING_DECLARATION_REFUSAL_AR;
+  }
   const what = LICENCE_GATED_ACTS[act];
   const because = (() => {
     switch (standing.status) {

@@ -98,6 +98,21 @@ function cleanLicence() {
   return new LicenseGateService(licenses, acts, instrumentLegalValues());
 }
 
+/**
+ * 🔴 OWNER DECISION 128 — WHAT A PERMITTED ACT NOW RETURNS, and why these three assertions
+ * changed from `toBeUndefined()`.
+ *
+ * `assertMayPractise` used to return `void`, so «it did not refuse» was spelled as «it resolved to
+ * undefined». It now returns the ISSUANCE STAMP — the term the office was past the expiry of, or
+ * null — because five callers write that onto the record they create.
+ *
+ * ⚠️ ASSERTING THE SHAPE RATHER THAN DROPPING THE ASSERTION. `.resolves.toBeDefined()` or a bare
+ * await would say only that nothing threw; this says the act was permitted AND that it carries NO
+ * stamp — which is the correct answer for an office inside its printed dates, and the answer that
+ * would be wrong if the stamp ever leaked onto an ordinary issuance.
+ */
+const UNSTAMPED = { issuedUnderStudyLicenseId: null };
+
 describe('art. 21/b/5 at the licence gate', () => {
   it('permits an act in a branch the office is still licensed for', async () => {
     await expect(
@@ -106,7 +121,7 @@ describe('art. 21/b/5 at the licence gate', () => {
         { insuranceLineId: MEDICAL, officeInsuranceLineId: null },
         d('2026-07-01'),
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(UNSTAMPED);
   });
 
   it('refuses the same act in the suspended branch, naming art. 21/b/5', async () => {
@@ -154,7 +169,7 @@ describe('art. 21/b/5 at the licence gate', () => {
         resolver,
         d('2026-07-01'),
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(UNSTAMPED);
     expect(resolver).not.toHaveBeenCalled();
   });
 
@@ -186,7 +201,7 @@ describe('art. 21/b/5 at the licence gate', () => {
         { insuranceLineId: MOTOR, officeInsuranceLineId: null },
         d('2026-07-01'),
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(UNSTAMPED);
     await expect(
       officeLineSuspended.assertMayPractise(
         'PLACE_POLICY',

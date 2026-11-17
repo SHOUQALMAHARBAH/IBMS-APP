@@ -108,6 +108,17 @@ interface Opts {
     // The term's own issue date. `foldActs` ignores an act that predates it — which is how a
     // re-licensed office is expressible at all — so a test about a recorded act has to set it.
     issuedAt?: Date | null;
+    /*
+     * 🔴 OWNER DECISION 128's conditions 2 and 3. Past the printed expiry a filing DATE
+     * opens nothing on its own — «الإثبات يفتح، لا التاريخ» — so a test that expects an
+     * expired office to PROCEED has to state the proof and the declaration too.
+     *
+     * ⚠️ OPTIONAL, so every fixture that predates the decision compiles unchanged and reads as
+     * «no proof». That is the non-widening direction: absent must never mean permitted.
+     */
+    renewalProofDocumentId?: string | null;
+    renewalReferenceNumber?: string | null;
+    renewalDeclaration?: { id: string } | null;
   } | null;
   /**
    * Recorded `RegulatoryAction` rows, defaulting to NONE — the state every test here but two is
@@ -578,20 +589,45 @@ describe('PolicyService', () => {
     // Module 0 item (d) — the renewal-pending rule. The OWNER'S DECISION, not art. 11: that
     // article is one sentence about a 45-day filing deadline and contains no extension.
     // See `RENEWAL_PENDING_RULE_BASIS` in broker-license.config.ts.
-    it('PROCEEDS past expiry when the renewal application was filed on time (pending the decision)', async () => {
-      // After 31 December an office that applied on time stays valid until the decision issues.
-      // Blocking it would refuse business the regulation permits — an error running against the
-      // brokerage, the same direction as the empty holiday calendar.
+    /*
+     * 🔴 REWRITTEN BY OWNER DECISION 128, 2026-11-16. The old fixture carried a filing DATE and
+     * nothing else, and asserted the placement proceeded — which is exactly the defect that
+     * decision names: «الإثبات يفتح، لا التاريخ». Four conditions now open issuance past expiry,
+     * and this fixture states all four.
+     */
+    it('PROCEEDS past expiry when the renewal is genuinely under study (all four conditions)', async () => {
+      // After the printed expiry an office whose renewal is under study stays valid until the
+      // decision issues. Blocking it would refuse business the regulation permits — an error
+      // running against the brokerage, the same direction as the empty holiday calendar.
       const { service, mocks } = makeDeps({
         brokerLicense: {
           licenseNumber: 'CBJ-TEST-001',
           expiresAt: new Date('2020-12-31T00:00:00.000Z'),
           // 45 calendar days before that expiry, i.e. exactly on art. 11's deadline.
           renewalRequestedAt: new Date('2020-11-16T00:00:00.000Z'),
+          renewalProofDocumentId: 'doc-proof-1',
+          renewalReferenceNumber: 'CBJ/IN/2020/1180',
+          renewalDeclaration: { id: 'decl-1' },
         },
       });
       await service.place(PLACE_DTO, placement());
       expect(mocks.create).toHaveBeenCalled();
+    });
+
+    it('🔴 and BLOCKS past expiry when only the DATE is there — OWNER DECISION 128', async () => {
+      /*
+       * The half that makes the test above mean something, and it is the decision itself: before
+       * 2026-11-16 this case PROCEEDED. A placement is one of the six gated issuance acts, so an
+       * office with a date in a field and no proof was placing business on an expired licence.
+       */
+      const { service } = makeDeps({
+        brokerLicense: {
+          licenseNumber: 'CBJ-TEST-001',
+          expiresAt: new Date('2020-12-31T00:00:00.000Z'),
+          renewalRequestedAt: new Date('2020-11-16T00:00:00.000Z'),
+        },
+      });
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow();
     });
 
     it('still BLOCKS past expiry when the application was filed LATE', async () => {

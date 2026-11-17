@@ -75,19 +75,28 @@ import type { LicenceLegalFigures } from './legal-figures.config';
  * behind it. The account lives on the MODEL rather than here, because it is a statement about what a
  * licence term MEANS, and this file answers questions about one term by arithmetic.
  *
- * ## 🔴 AND THE ANALOGY ABOVE IS VOID BY OWNER DECISION 82, WHICH IS WHY THIS STRING STILL SAYS SO
+ * ## ✅ THE ANALOGY IS GONE — DECISION 82(ب) IS DISCHARGED, 2026-11-15
  *
- * ⚠️ READ THE TWO 82s APART. `arts. 82 and 109 of that law` in the sentence below are ARTICLES of
- * Law No. 12 of 2021. OWNER DECISION 82 is a decision of hers, and this paragraph is its citation:
- * `docs/decision-82-grace-period-history-and-status.md`.
+ * ⚠️ READ THE TWO 82s APART. `arts. 82 and 109 of that law` in the struck sentence above are
+ * ARTICLES of Law No. 12 of 2021. OWNER DECISION 82 is a decision of hers, and this paragraph is
+ * its citation: `docs/decision-82-grace-period-history-and-status.md`.
  *
  * Decision 82 ruling (ب), 13 October 2026: resting on art. 8/d BY ANALOGY is **void**, and the
- * citation is to be removed from the code and from every document. It has not been, and that is
- * deliberate rather than overlooked — the file records it as still outstanding, measured 10
- * November. ⟶ It goes when decision 128 is built, because 128 replaces the whole rule this basis
- * explains, and deleting the basis BEFORE its replacement lands would leave the rule standing with
- * no account of where it came from at all. That is strictly worse than an account the file itself
- * marks as void.
+ * citation is to be removed from the code and from every document. For a month it was NOT removed,
+ * deliberately — the standing rule was that it goes when decision 128 is built, because deleting
+ * the basis before its replacement landed would have left the rule with no account of where it
+ * came from at all, which is strictly worse than an account marked void.
+ *
+ * ⟶ **128 IS BUILT, SO THE BASIS IS REPLACED IN THE SAME COMMIT.** The string below no longer
+ *   mentions art. 8/d, deemed approval, or arts. 82 and 109. What replaces it is not a weaker
+ *   claim but a HONEST one: the rule rests on the adviser's written opinion and an administrative
+ *   principle, and the instrument's own art. 21/a/9 is cited AGAINST it rather than for it,
+ *   because that article names expiry on its own as a ground for sanction.
+ *
+ * ⛔ AND NO ARABIC MOVED. Measured 2026-11-15: this constant is imported by NOTHING — `git grep`
+ *   over `apps` and `packages`, excluding comments, finds only its own declaration — so it reaches
+ *   no response and no screen, and replacing it changes no sentence anybody reads. «ساري» and
+ *   «حكماً» describe this state nowhere, which is decision 128 §4's third rule.
  *
  * ⛔ AND MOST OF DECISION 82 IS NOT LAW ANY MORE. Its ruling (و) — issuance during the period is
  * PERMITTED behind a warning window — was dropped in October and then replaced outright by OWNER
@@ -102,10 +111,16 @@ import type { LicenceLegalFigures } from './legal-figures.config';
  * attribution, and leave writing the missing file to the owner.
  */
 export const RENEWAL_PENDING_RULE_BASIS =
-  "Owner's decision. No provision in Instructions No. 9 of 2026. Supported by analogy only with " +
-  'art. 8/d of Law No. 12 of 2021 (deemed approval for insurance companies), which does not ' +
-  'extend to brokers by its terms. Pending arts. 82 and 109 of that law and the CBJ renewal ' +
-  'application form.';
+  "Owner's decision 128. No provision of CBJ Instructions No. 9 of 2026 grants continuation past " +
+  'expiry: art. 11 is one sentence requiring the application 45 days before expiry (printed page ' +
+  '15), and art. 21/a/9 names EXPIRY ON ITS OWN — separately from suspension and cancellation — ' +
+  'as a ground for administrative sanction (printed page 25). The basis is instead the legal ' +
+  "adviser's written opinion of 13 October 2026 and the administrative principle it states, that " +
+  "an applicant is not prejudiced by the administration's own delay, together with the Central " +
+  "Bank's practice toward an office that filed on time. The customer is protected on the premium " +
+  'by a provision that IS in force: art. 19/c deems the insurer to have received premiums once ' +
+  'they are paid to the broker, with art. 16/y/8 as its exception (printed page 24). What opens ' +
+  'issuance is the PROOF and the declaration, never the date — see `deriveRenewalUnderStudy`.';
 
 /*
  * ART. 11's 45 DAYS IS A ROW NOW, NOT A CONSTANT — OWNER DECISION 123, module 1.
@@ -311,6 +326,118 @@ export function isValidPendingRenewalDecision(
   // before it ever asks about a pending renewal.
   if (license.expiresAt.getTime() > now.getTime()) return false;
   return renewalFiledOnTime(license, figures);
+}
+
+/**
+ * 🔴 OWNER DECISION 128 — THE FOUR CONDITIONS, AND WHY THIS RETURNS A REASON RATHER THAN A BOOLEAN.
+ *
+ * «المكتب اللي خلص ترخيصه وقدّم التجديد بوقته ورفع إثبات التقديم بكمّل يصدر ويجدّد.»
+ *
+ * Past the printed expiry of the latest term, the office may practise only if ALL FOUR hold:
+ *
+ *   1. filed by art. 11's deadline — the 45 days read from `LegalValue`, never from source;
+ *   2. a filing PROOF attached to that term, with its date and the Central Bank's reference;
+ *   3. a standing DECLARATION for that term, made once by a holder of its own permission;
+ *   4. no «إشعار نقص» and no «رفض تجديد» recorded since the filing.
+ *
+ * ⛔ THE PROOF OPENS IT, NOT THE DATE. «الإثبات يفتح، لا التاريخ.» Before this, `renewalFiledOnTime`
+ * compared a DATE with a deadline and `mayPractise` came back true — so a date typed into a field
+ * opened all six issuance acts. That is the defect decision 128 §8 recorded and this corrects.
+ *
+ * ## WHY A DISCRIMINATED REASON AND NOT `boolean`
+ *
+ * Because two of the failures are different ACTS for the office, and the refusal has to say which.
+ * `AWAITING_DECLARATION` means everything is in order except that nobody has declared yet, and
+ * OWNER DECISION 136(ب) ratifies the sentence for exactly that state — it sends the employee to
+ * their administrator. Every other failure means the office genuinely may not issue. A boolean
+ * would have collapsed «you need one more click from your manager» into «your licence has
+ * expired».
+ *
+ * ## A STATE, NOT A PERIOD — «حالة لا مدة»
+ *
+ * There is no counter and no number of days anywhere in here. The state changes by PAPER: a new
+ * certificate ends it (by replacing the term this is asked about), and a deficiency notice or a
+ * refusal ends it the other way. ⟶ **Advance the clock a year and nothing changes**, which is
+ * criterion 7 and is a property of this function having no `now`-dependent branch beyond the
+ * expiry comparison itself.
+ */
+export type RenewalUnderStudy =
+  /** Still inside the printed dates. Nothing in decision 128 applies; the ordinary rules do. */
+  | { state: 'NOT_PAST_EXPIRY' }
+  /** No application, or one filed after art. 11's deadline. Condition 1 fails. */
+  | { state: 'NOT_FILED_ON_TIME' }
+  /** Filed on time, but no proof document — or a proof with no reference number. Condition 2. */
+  | { state: 'NO_PROOF' }
+  /** The Central Bank wrote back. Condition 4 fails, and ONLY a new certificate lifts it. */
+  | { state: 'ENDED_BY_ACT'; kind: 'DEFICIENCY_NOTICE' | 'RENEWAL_REFUSAL' }
+  /** Conditions 1, 2 and 4 hold; nobody has declared yet. Decision 136(ب)'s sentence. */
+  | { state: 'AWAITING_DECLARATION' }
+  /** All four hold. The office issues, and every record is stamped. */
+  | { state: 'UNDER_STUDY' };
+
+export function deriveRenewalUnderStudy(
+  license: {
+    expiresAt: Date;
+    renewalRequestedAt: Date | null;
+    renewalProofDocumentId: string | null;
+    renewalReferenceNumber: string | null;
+    hasRenewalDeclaration: boolean;
+  },
+  /** Every regulatory act on this office, in any order. Only the two renewal kinds are read. */
+  acts: readonly {
+    kind: string;
+    effectiveFrom: Date;
+  }[],
+  now: Date,
+  figures: LicenceLegalFigures,
+): RenewalUnderStudy {
+  if (license.expiresAt.getTime() > now.getTime()) {
+    return { state: 'NOT_PAST_EXPIRY' };
+  }
+  if (!renewalFiledOnTime(license, figures)) {
+    return { state: 'NOT_FILED_ON_TIME' };
+  }
+  /*
+   * CONDITION 2 — and the reference is part of the proof rather than beside it. A CHECK already
+   * refuses a proof row with no date and no reference, so this re-reads what the database
+   * guarantees; that is deliberate, because the derivation must be decidable from the row it is
+   * handed without trusting that a caller built it correctly.
+   */
+  if (
+    license.renewalProofDocumentId === null ||
+    (license.renewalReferenceNumber ?? '').trim() === ''
+  ) {
+    return { state: 'NO_PROOF' };
+  }
+  /*
+   * CONDITION 4, AND IT IS CHECKED BEFORE THE DECLARATION DELIBERATELY.
+   *
+   * A deficiency notice ends the state outright, so an office that has one must be told THAT and
+   * not «go and declare» — which would be the system inviting a person to swear to something the
+   * record already contradicts. The declaration is the last question asked, because it is the only
+   * one whose answer is still the office's to give.
+   *
+   * SINCE THE FILING: an act dated before the application was filed is about a previous cycle and
+   * says nothing about this one. `renewalRequestedAt` is non-null here — `renewalFiledOnTime`
+   * returned true — so the comparison is total.
+   */
+  const filedAt = license.renewalRequestedAt!.getTime();
+  const ending = acts
+    .filter(
+      (a) => a.kind === 'DEFICIENCY_NOTICE' || a.kind === 'RENEWAL_REFUSAL',
+    )
+    .filter((a) => a.effectiveFrom.getTime() >= filedAt)
+    .sort((a, b) => b.effectiveFrom.getTime() - a.effectiveFrom.getTime())[0];
+  if (ending) {
+    return {
+      state: 'ENDED_BY_ACT',
+      kind: ending.kind as 'DEFICIENCY_NOTICE' | 'RENEWAL_REFUSAL',
+    };
+  }
+  if (!license.hasRenewalDeclaration) {
+    return { state: 'AWAITING_DECLARATION' };
+  }
+  return { state: 'UNDER_STUDY' };
 }
 
 /** ONE TERM as stored. */

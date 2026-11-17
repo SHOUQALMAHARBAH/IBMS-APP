@@ -5,6 +5,7 @@ import { PolicyCheckingService } from './policy-checking.service';
 import { PolicyDeliveryService } from './policy-delivery.service';
 import { PolicyScheduleSummaryDocumentService } from './policy-schedule-summary-document.service';
 import { CertificateOfInsuranceDocumentService } from './certificate-of-insurance-document.service';
+import { DocumentRepository } from '../../repositories/document.repository';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
 import { PolicyDeliveryRepository } from '../../repositories/policy-delivery.repository';
@@ -82,6 +83,9 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
     PolicyDeliveryRepository,
     PolicyScheduleSummaryDocumentService,
     CertificateOfInsuranceDocumentService,
+    // OWNER DECISION 142 — the certificate service stores what it issues. Landed in the
+    // SAME commit as its constructor dependency, which is what the note above asks for.
+    DocumentRepository,
     PiPolicyRepository,
   ],
   exports: [PolicyRepository],

@@ -78,6 +78,22 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
        * and this is not a ratchet on a broken state.
        */
       ['InteractionChannel', 13],
+      /*
+       * 🔴 ADDED 2026-11-16, AND IT WAS A LIVE DEFECT RATHER THAN A PRECAUTION.
+       *
+       * `ENUM_LABEL.DocumentCategory` was `satisfies Labels<string>` — keyed on `string`, so it
+       * enforced NOTHING about coverage, the identical hole `InteractionChannel` had. Measured
+       * before adding it: **13 keys for 16 members**, and `translate()` returns `undefined` for a
+       * missing key, so React rendered NOTHING. **7 of 15 `Document` rows on dev showed a BLANK
+       * category cell** — on `/documents`, `/audit-trail`, `PolicySection` and `EntitySearch`.
+       *
+       * ⚠️ So this is NOT a ratchet on a healthy parity: it goes in together with OWNER DECISION
+       * 148's three words, which are what make it passable at all.
+       */
+      /* 16 -> 17: OWNER DECISION 142 stores an issued certificate, so `DocumentCategory`
+       * gains `CERTIFICATE_OF_INSURANCE`, and OWNER DECISION 148 gives it its word. The
+       * floor follows the schema; the totality assertion below is what proves coverage. */
+      ['DocumentCategory', 17],
     ] as const) {
       const members = schemaEnumMembers(name);
       expect(members.length, `${name} parsed ${members.length} member(s)`).toBe(
@@ -92,6 +108,7 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
     ['SlaDurationUnit', 'SlaDurationUnit'],
     ['SlaSourceType', 'SlaSourceType'],
     ['InteractionChannel', 'InteractionChannel'],
+    ['DocumentCategory', 'DocumentCategory'],
   ])(
     'ENUM_LABEL.%s is total over the database enum, and every key resolves in both languages',
     (mapName, enumName) => {

@@ -506,7 +506,21 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
       {
         href: '/regulatory-compliance',
         labelKey: 'navRegulatoryCompliance',
-        permissions: ['compliance-calendar.manage', 'license.manage'],
+        /*
+         * 🔴 `license-renewal.declare` IS HERE BY NECESSITY, not for symmetry — OWNER DECISION 128.
+         *
+         * This list is an OR: it decides who SEES the link. The declaration is made on this screen
+         * and on no other, and its code is held by NO role until an office grants it (decision
+         * 131). A holder granted ONLY that code — which is exactly what an office cautious about
+         * `license.manage` would grant — would otherwise have a permission whose single act sits
+         * behind a link they cannot see: a route built, enforced and unreachable, which is the
+         * defect this repository has now recorded three times.
+         */
+        permissions: [
+          'compliance-calendar.manage',
+          'license.manage',
+          'license-renewal.declare',
+        ],
       },
       {
         href: '/operational-pi-risk',

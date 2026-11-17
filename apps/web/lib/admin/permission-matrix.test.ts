@@ -214,7 +214,7 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * OFFICE-scoped, both: a value this office declared is the office's, and the figures the
      * instrument states are read by every office rather than being a platform capability.
      */
-    expect(PERMISSION_CATALOGUE.length).toBe(233);
+    expect(PERMISSION_CATALOGUE.length).toBe(234);
     expect(crud.length).toBe(21);
     expect(crud.flatMap(codesOfRow).length).toBe(59);
     // 160, not 161: `provider.office-state.read` is PLATFORM-scoped since item (j)'s gap closure
@@ -239,7 +239,9 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
      * unlike a PLATFORM code it DOES reach this matrix, which is the whole point of decision 131
      * marking it «جديدة» there.
      */
-    expect(toggles.length).toBe(169);
+    // 169 -> 170 on 2026-11-16: OWNER DECISION 128's `license-renewal.declare` is a single
+    // code, not a CRUD family, so it renders as a toggle like the other 169.
+    expect(toggles.length).toBe(170);
     // Against the OFFICE-SCOPED count, which is what the matrix covers.
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(
       PERMISSION_CATALOGUE.filter((p) => p.scope !== 'PLATFORM').length,

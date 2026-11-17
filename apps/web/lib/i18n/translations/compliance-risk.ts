@@ -274,6 +274,43 @@ export const COMPLIANCE_RISK = {
       'ساري',
     rcStandingRenewalPending:
       'قيدَ التجديد',
+    /*
+     * 🔴 OWNER DECISION 133's «القرار ١٢٨» TABLE — SEVEN STRINGS, SLICED AND NEVER RETYPED.
+     *
+     * Six of the seven are below; the seventh is «قيدَ التجديد» directly above, which was
+     * already shipping when she ratified the table and is marked «شغّالة أصلاً» on her own row.
+     * `license-renewal.strings.test.ts` re-slices all of them from her table and compares byte
+     * for byte, so one word changed here fails by name.
+     *
+     * ⚠️ THE STAMP'S CELL CARRIES THREE «…» SPANS AND THE STAMP IS THE FIRST. The other two are
+     * the words she FORBIDS on this state — «ساري» and «حكماً» — so a slice taking the last span
+     * would put a forbidden word on the record as its stamp, and would still pass against a
+     * dictionary that had made the same mistake. The test asserts all three by position.
+     */
+    rcRenewalStamp: 'صدرت والتجديد قيد الدراسة',
+    rcRenewalProofLabel: 'إثبات تقديم طلب التجديد',
+    rcRenewalRequestedAtLabel: 'تاريخ تقديم الطلب',
+    rcRenewalReferenceLabel: 'رقم الوارد أو الرقم المرجعي',
+    rcRenewalDeclarationSentence:
+      'أُقرّ بأنه لم يصل المكتبَ من البنك المركزي رفضٌ لطلب التجديد ولا إشعارُ نقص.',
+    /*
+     * OWNER DECISION 128's two new `RegulatoryActionKind` members. They are NOT suspensions:
+     * each ends the renewal-under-study state and does nothing else, which is why
+     * `deriveLicenseStanding` reads them in one place and `foldActs` skips them by name.
+     */
+    rcActKindDeficiencyNotice: 'إشعار نقص',
+    rcActKindRenewalRefusal: 'رفض تجديد',
+    /*
+     * 🔴 OWNER DECISION 136(ب) — the sentence shown when issuance is refused because nobody has
+     * declared yet. Two of its three parts already ship («قيدَ التجديد» above, and «راجع مسؤول
+     * النظام في مكتبك.» at `operations.ts:440`); «ولم يُسجَّل الإقرار بعد» is new and HERS.
+     *
+     * ⛔ It does NOT say the licence has expired. The office genuinely may not issue — but what
+     * is missing is one act by their own administrator, and a sentence that read as «your licence
+     * is gone» would send an employee to the Central Bank instead of down the corridor.
+     */
+    rcRenewalAwaitingDeclaration:
+      'الترخيص قيدَ التجديد، ولم يُسجَّل الإقرار بعد. راجع مسؤول النظام في مكتبك.',
     rcStandingExpired:
       'منتهي',
     rcStandingSuspended:
@@ -855,6 +892,21 @@ export const COMPLIANCE_RISK = {
       'Current',
     rcStandingRenewalPending:
       'Renewal pending',
+    /* OWNER DECISION 128 + 133 + 136(ب) — the English mirror. The ARABIC is hers and is sliced
+     * from her table; these are ours, and they are mirrors rather than translations of record:
+     * where a word of hers is the ruling, the Arabic is what the test pins. */
+    rcRenewalStamp: 'Issued while the renewal was under study',
+    rcRenewalProofLabel: 'Proof the renewal application was filed',
+    rcRenewalRequestedAtLabel: 'Date the application was filed',
+    rcRenewalReferenceLabel: 'Inbound number or reference',
+    rcRenewalDeclarationSentence:
+      'I declare that the office has received no refusal of the renewal application and no ' +
+      'deficiency notice from the Central Bank.',
+    rcActKindDeficiencyNotice: 'Deficiency notice',
+    rcActKindRenewalRefusal: 'Renewal refusal',
+    rcRenewalAwaitingDeclaration:
+      'The licence is under renewal and the declaration has not been recorded yet. Speak to ' +
+      'your system administrator.',
     rcStandingExpired:
       'Expired',
     rcStandingSuspended:

@@ -43,6 +43,7 @@ import {
 } from './customer-file-anchor.service';
 import { LicenseGateService } from '../compliance-risk/license-gate.service';
 import { exemptionLacksEvidence } from '../compliance-risk/article-15-d.config';
+import type { IssuanceStamp } from '../compliance-risk/license-gate.service';
 import { Article15DService } from '../compliance-risk/article-15-d.service';
 import { PermissionsService } from '../rbac/services/permissions.service';
 import type { Article15DOptions } from '../compliance-risk/article-15-d.service';
@@ -502,6 +503,10 @@ export class RfqService {
       insuranceLineId: string | null;
       officeInsuranceLineId: string | null;
     },
+    /** 🔴 OWNER DECISION 128 — the stamp the gate returned when it permitted this request.
+     *  Passed IN rather than re-derived here: the gate ran before the row existed, and asking
+     *  the licence again now would read it at a second instant. */
+    stamp: IssuanceStamp,
   ): Promise<RfqWithSubmissions> {
     try {
       const created = await this.rfqs.createRfq({
@@ -512,6 +517,7 @@ export class RfqService {
         officeInsuranceLineId: inheritedLine.officeInsuranceLineId,
         followUpThresholdDays: dto.followUpThresholdDays,
         issuedByUserId: actorId,
+        issuedUnderStudyLicenseId: stamp.issuedUnderStudyLicenseId,
       });
       return await this.mustFindRfq(created.id);
     } catch (err) {
@@ -567,19 +573,22 @@ export class RfqService {
      * licence is the thing the caller cannot change by editing the request — art. 3/a's own
      * ordering argument, reused.
      */
-    await this.licenseGate.assertMayPractise('REQUEST_QUOTES', async () => {
-      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
-      // reads and costs no extra query unless the office actually has a partial suspension.
-      const scoped = await this.assertOpportunityVisible(
-        dto.opportunityId,
-        actor,
-        'Opportunity not found',
-      );
-      return this.assertLineInProgramme(
-        scoped.insuranceProgramId,
-        dto.insuranceLine,
-      );
-    });
+    const stamp = await this.licenseGate.assertMayPractise(
+      'REQUEST_QUOTES',
+      async () => {
+        // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+        // reads and costs no extra query unless the office actually has a partial suspension.
+        const scoped = await this.assertOpportunityVisible(
+          dto.opportunityId,
+          actor,
+          'Opportunity not found',
+        );
+        return this.assertLineInProgramme(
+          scoped.insuranceProgramId,
+          dto.insuranceLine,
+        );
+      },
+    );
     const opportunity = await this.assertOpportunityVisible(
       dto.opportunityId,
       actor,
@@ -665,7 +674,7 @@ export class RfqService {
       at: new Date(),
     });
 
-    const rfq = await this.insertRfqRow(dto, actor.id, inheritedLine);
+    const rfq = await this.insertRfqRow(dto, actor.id, inheritedLine, stamp);
 
     await this.article15D.apply(article15DPlan, rfq.id);
 

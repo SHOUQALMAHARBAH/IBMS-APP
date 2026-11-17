@@ -97,6 +97,25 @@ export interface BrokerLicenseSeries {
     mayPractise: boolean;
     standingActDecisionRef: string | null;
     deemedCancelledUnderArticle14C: boolean;
+    /**
+     * 🔴 OWNER DECISION 128 — WHERE THIS OFFICE STANDS ON ITS RENEWAL, past the printed expiry.
+     *
+     * A DISCRIMINATED UNION rather than a boolean, mirroring the api's own `RenewalUnderStudy`.
+     * Two of the states are the office being refused for reasons it can still fix, and the
+     * screen has to say WHICH — `AWAITING_DECLARATION` in particular is the one decision 136(ب)'s
+     * sentence exists for. A boolean would collapse «one more act by your administrator» into
+     * «your licence has expired».
+     *
+     * ⛔ The web NEVER derives this. It is computed once by `deriveRenewalUnderStudy` from four
+     * conditions, one of which is a regulatory act the screen cannot see.
+     */
+    renewalUnderStudy:
+      | { state: 'NOT_PAST_EXPIRY' }
+      | { state: 'NOT_FILED_ON_TIME' }
+      | { state: 'NO_PROOF' }
+      | { state: 'ENDED_BY_ACT'; kind: 'DEFICIENCY_NOTICE' | 'RENEWAL_REFUSAL' }
+      | { state: 'AWAITING_DECLARATION' }
+      | { state: 'UNDER_STUDY' };
   };
 }
 
@@ -129,8 +148,33 @@ export function renewBrokerLicense(
 
 /** Records that the renewal application has been filed. Write-once: art. 11 measures lateness from
  *  this date, so the API refuses a second call rather than moving it. Omit the date for today. */
+/**
+ * 🔴 OWNER DECISION 128 — the standing declaration, once per licence term.
+ *
+ * No body: the sentence, the permission code, the actor's name as it stands and the network
+ * address are all decided by the SERVER. A caller that could pass its own wording could record a
+ * sentence nobody was shown, which is exactly what `declared-act.config.ts` refuses for the same
+ * reason.
+ */
+export function declareRenewalStanding(): Promise<{
+  declaredAt: string;
+  actorNameShown: string;
+}> {
+  return apiPost('/broker-license/renewal-declaration', {});
+}
+
 export function recordRenewalRequest(input: {
   requestedAt?: string;
+  /**
+   * 🔴 OWNER DECISION 128 condition 2 — the proof and its reference, and they travel TOGETHER.
+   *
+   * Both optional here because a filing may still be recorded with neither (the old behaviour,
+   * which is what an office that has not yet scanned its stamped copy needs). The api refuses
+   * ONE without the other with a 422, and a CHECK makes the half-state unreachable — so the
+   * pairing is enforced where it cannot be forgotten rather than by this type.
+   */
+  proofDocumentId?: string;
+  referenceNumber?: string;
 }): Promise<BrokerLicense> {
   return apiPost('/broker-license/renewal-requested', input);
 }

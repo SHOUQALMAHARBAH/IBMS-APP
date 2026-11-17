@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import type { BrokerLicense } from '@ibms/db';
@@ -24,6 +25,7 @@ import { RegulatoryActionRepository } from '../../repositories/regulatory-action
 import { RecordRegulatoryActionDto } from './dto/record-regulatory-action.dto';
 import { LicenseGateService } from './license-gate.service';
 import { LegalValueService } from './legal-value.service';
+import { UserRepository } from '../../repositories/user.repository';
 import type { DerivedLicenseStanding } from './license-standing.config';
 import {
   deriveRenewalNotice,
@@ -79,6 +81,24 @@ export interface BrokerLicenseSeriesView {
  * erased: the office could not show a regulator what it had been licensed for in a previous period.
  * A renewal now writes a new term and leaves the old one, with its own certificate and dates.
  */
+/**
+ * 🔴 OWNER DECISION 133 — THE RATIFIED DECLARATION SENTENCE, SLICED AND NEVER RETYPED.
+ *
+ * «إقرار المدير (مرة لكل فترة ترخيص)» in her own strings table. Stored verbatim on every
+ * declaration, because the hardening `DeclaredAct` already carries (module-1 paper §٨, OWNER
+ * DECISION 126) is that the record testifies to what the person was SHOWN — a foreign key to a
+ * dictionary that can be edited would destroy exactly that.
+ *
+ * `license-renewal.spec.ts` re-slices it from `docs/decision-133-strings-ratified.md` and compares
+ * byte for byte, so one word changed here fails by name.
+ */
+export const RENEWAL_DECLARATION_SENTENCE_AR =
+  'أُقرّ بأنه لم يصل المكتبَ من البنك المركزي رفضٌ لطلب التجديد ولا إشعارُ نقص.';
+
+/** The code the declaration is made under. Recorded ON the row — decision 127's rule that
+ *  authorisation resolves from a permission and never from a role name. */
+export const RENEWAL_DECLARATION_PERMISSION = 'license-renewal.declare';
+
 @Injectable()
 export class BrokerLicenseService {
   private readonly logger = new Logger(BrokerLicenseService.name);
@@ -90,6 +110,9 @@ export class BrokerLicenseService {
     private readonly licenseGate: LicenseGateService,
     /** OWNER DECISION 123 — art. 11's filing span is a `LegalValue` row. */
     private readonly legalValues: LegalValueService,
+    /** OWNER DECISION 48 — the name AS IT STANDS on a declaration, through
+     *  `displayNameForUserId` and never `User.fullName`. */
+    private readonly users: UserRepository,
   ) {}
 
   /** This office's FIRST term. 409 if it already holds one — per office now, where the old 409 was
@@ -130,7 +153,35 @@ export class BrokerLicenseService {
       ? parseCalendarDate(dto.requestedAt as string, 'requestedAt')
       : new Date();
 
-    const res = await this.repo.recordRenewalRequest(current.id, requestedAt);
+    /*
+     * 🔴 OWNER DECISION 128 — THE PROOF AND ITS REFERENCE TRAVEL TOGETHER, OR NEITHER DOES.
+     *
+     * Decision 128 §3 asks for the file, the filing date and the Central Bank's number as ONE act.
+     * Half of it proves nothing: a document nobody can cite is not evidence an inspector can
+     * follow, and a number with no document behind it is the very "a date in a field" this
+     * decision exists to stop being sufficient.
+     *
+     * Refused HERE as well as by a CHECK constraint, deliberately: the CHECK is what makes the
+     * state unreachable, and this is what makes the refusal legible to the person who typed it.
+     */
+    const proofDocumentId = dto.proofDocumentId;
+    const referenceNumber = dto.referenceNumber;
+    if ((proofDocumentId === undefined) !== (referenceNumber === undefined)) {
+      throw new UnprocessableEntityException(
+        'A filing proof needs BOTH the document and the Central Bank reference number ' +
+          '(art. 11 / owner decision 128): one without the other is not evidence of a filing.',
+      );
+    }
+    const proof =
+      proofDocumentId !== undefined && referenceNumber !== undefined
+        ? { documentId: proofDocumentId, referenceNumber }
+        : undefined;
+
+    const res = await this.repo.recordRenewalRequest(
+      current.id,
+      requestedAt,
+      proof,
+    );
     if (res.count === 0) {
       // Already recorded. Deliberately not an error and deliberately not an overwrite: this date is
       // what art. 11 lateness is measured against, so a second call must not be able to move it.
@@ -360,6 +411,87 @@ export class BrokerLicenseService {
       );
     }
     return current;
+  }
+
+  /**
+   * 🔴 OWNER DECISION 128 — THE STANDING DECLARATION. Made ONCE for a term, by a holder of
+   * `license-renewal.declare`, in the ratified sentence.
+   *
+   * ## WHAT IT IS NOT
+   *
+   * It is not a tick and it is not an excuse. Nothing is being declared about a breach: the office
+   * states that no refusal and no deficiency notice has arrived from the Central Bank. That is why
+   * it is not a `DeclaredAct` row — see `LicenseRenewalDeclaration`'s model comment for the four
+   * measured reasons its CHECKs refuse this record.
+   *
+   * ## THE SENTENCE COMES FROM HERE, NEVER FROM THE CALLER
+   *
+   * Same rule as `declared-act.config.ts`'s article texts: a caller that could pass its own
+   * wording could record a sentence nobody was shown. The constant is SLICED byte-for-byte from
+   * decision 133 and `license-renewal.spec.ts` re-slices it.
+   *
+   * ## ONE PER TERM, ENFORCED BY THE DATABASE
+   *
+   * `@unique` on `brokerLicenseId`, so a second attempt raises P2002 and becomes a 409. ⛔ Not a
+   * read-then-write — that is `race-safe-invariants.md`'s subject exactly, and two administrators
+   * declaring at once would both pass the read.
+   */
+  async declareRenewalStanding(
+    /** Only the id is read. The PERMISSION is recorded as a constant, because the route's own
+     *  guard is what proved it — re-reading the caller's set here would be a second answer. */
+    actor: { id: string },
+    networkAddress: string | null,
+  ): Promise<{ declaredAt: Date; actorNameShown: string }> {
+    const current = await this.mustFindCurrentTerm();
+
+    /*
+     * THE NAME THROUGH `displayNameForUserId`, NEVER `User.fullName` — OWNER DECISION 48.
+     *
+     * `Employee.fullName` is composed from the four Jordanian name parts and is the real identity;
+     * `User.fullName` is free text and only the fallback for an account with no HR record. In the
+     * demo data all sixteen linked accounts disagree, the user row holding an English ROLE LABEL.
+     * This is a register of who swore the regulator had sent nothing, so a role label here would
+     * be a record naming nobody.
+     */
+    const actorNameShown =
+      (await this.users.displayNameForUserId(actor.id)) ?? actor.id;
+
+    try {
+      const row = await this.repo.createRenewalDeclaration({
+        brokerLicenseId: current.id,
+        declarationTextShown: RENEWAL_DECLARATION_SENTENCE_AR,
+        permissionCode: RENEWAL_DECLARATION_PERMISSION,
+        actorUserId: actor.id,
+        actorNameShown,
+        networkAddress,
+      });
+      await this.safeAudit({
+        userId: actor.id,
+        action: 'CREATE',
+        entityType: 'LicenseRenewalDeclaration',
+        entityId: row.id,
+        afterValue: {
+          brokerLicenseId: current.id,
+          actorNameShown,
+          // ⛔ The sentence is NOT repeated into the audit row. It is already stored verbatim on
+          // the record itself, which is append-only; a second copy in a second table is a second
+          // thing to disagree.
+          declaredAt: row.declaredAt.toISOString(),
+        },
+      });
+      return { declaredAt: row.declaredAt, actorNameShown };
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'A renewal declaration is already recorded for the current licence term. It is made ' +
+            'once per term and cannot be replaced — the record is append-only.',
+        );
+      }
+      throw err;
+    }
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {
