@@ -37,7 +37,7 @@ export const POLICY = {
     policyIntro: 'تُحدَّد الوثيقة بعد قبول العميل؛ يسجل الإصدار رقم الوثيقة الصادر من المؤمِّن والقسط وجدول التغطية والمستندات.',
     policyInceptionDateLabel: 'تاريخ بدء التغطية',
     policyExpiryDateLabel: 'تاريخ الانتهاء (اختياري)',
-    policyPlaceButton: 'إحلال الوثيقة',
+    policyPlaceButton: 'تنسيب الوثيقة',
     policyPlacingButton: 'جارٍ التحديد…',
     policyPolicyNumberLabel: 'رقم الوثيقة',
     policyIssuedPremiumLabel: 'القسط الصادر',
@@ -58,7 +58,7 @@ export const POLICY = {
 
     // EndorsementSection.tsx
     endorsementSectionHeading: 'الملحقات',
-    endorsementIntro: 'العملية 22 — تعديل الوثيقة بعد الإصدار: إضافة خطوط، زيادة الحدود، تغيير المؤمِّن.',
+    endorsementIntro: 'تعديل الوثيقة بعد الإصدار: إضافة فروع تأمين، زيادة الحدود، تغيير المؤمِّن.',
     endorsementLoadError: 'تعذر تحميل الملحقات — حاول مرة أخرى.',
     endorsementNoneYet: 'لم يُسجَّل ملحق بعد.',
     endorsementCreateButton: 'طلب ملحق',
@@ -88,7 +88,7 @@ export const POLICY = {
 
     // ClaimSection.tsx
     claimSectionHeading: 'المطالبات',
-    claimIntro: 'العمليات 23-30 — إشعار المطالبة → التسجيل → التوثيق → التقييم → المتابعة → التسوية → الإغلاق.',
+    claimIntro: 'إشعار المطالبة → التسجيل → التوثيق → التقييم → المتابعة → التسوية → الإغلاق.',
     claimLoadError: 'تعذر تحميل المطالبات — حاول مرة أخرى.',
     claimNotifyButton: 'إشعار بمطالبة',
     claimLossDueDateLabel: 'تاريخ تقديم الخسارة',
@@ -229,7 +229,7 @@ export const POLICY = {
 
     // CommissionSection.tsx
     commissionSectionHeading: 'العمولة',
-    commissionIntro: 'العملية 35 — حساب عمولة الوسيط من القسط المُحصَّل.',
+    commissionIntro: 'حساب عمولة الوسيط من القسط المُحصَّل.',
     commissionLoadError: 'تعذر تحميل بيانات العمولة — حاول مرة أخرى.',
     commissionNoneYet: 'لا يوجد إدخال عمولة لهذه الوثيقة بعد.',
     commissionAmountLabel: 'المبلغ',

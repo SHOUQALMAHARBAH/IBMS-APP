@@ -65,12 +65,12 @@ export const INSURERS = {
     insFilterActive: 'المتعامل معها',
     insFilterInactive: 'غير المتعامل معها',
     insRegisterButton: 'سجّل شركة تأمين',
-    insLinesLabel: 'الخطوط التأمينية',
-    insLinesNone: 'لم تُحدَّد خطوط بعد',
+    insLinesLabel: 'فروع التأمين',
+    insLinesNone: 'لم تُحدَّد فروع تأمين بعد',
     insOfficeLocalBadge: 'مُسجَّلة محلياً',
     insOfficeLocalExplain:
       'سجّل مكتبك هذه الشركة بنفسه؛ فهي ليست في الدليل العام، واسمها يمكن لمكتبك تصحيحه.',
-    insOfficeLineBadge: 'خط أضافه مكتبك',
+    insOfficeLineBadge: 'فرع تأمين أضافه مكتبك',
     // The three company structures. Not in enums.ts because they had no UI until this screen —
     // and a `t()` call built by string concatenation would have hidden that from the compiler.
     insStructureConventional: 'تقليدي',
@@ -175,17 +175,16 @@ export const INSURERS = {
     insDirRefusalAct: 'البحث في دليل شركات التأمين المشترك بين المكاتب',
     insDirLoadError: 'تعذر تحميل الدليل — حاول مرة أخرى.',
     insDirSearchLabel: 'ابحث باسم الشركة',
-    insDirLineLabel: 'الخط التأميني',
-    insDirLineAny: 'أي خط',
+    insDirLineLabel: 'فرع التأمين',
+    insDirLineAny: 'أي فرع تأمين',
     insDirSearchButton: 'ابحث',
     insDirEmpty: 'لا توجد شركة مطابقة.',
-    insDirEmptyForLine: 'لم يسجّل أي مكتب شركة تكتب هذا الخط.',
+    insDirEmptyForLine: 'لم يسجّل أي مكتب شركة تكتب فرع التأمين هذا.',
     insDirLoading: 'جارٍ التحميل…',
     insDirTotal: '{count} شركة',
     insDirNoContact: 'لم تُسجَّل بيانات اتصال.',
     insDirUnknownLine:
-      'رفض الدليل هذا الخط لأنه ليس في الفهرس المُدار. هذا ليس نتيجة فارغة: ' +
-      'اختر خطاً من القائمة.',
+      'رفض الدليل فرع التأمين هذا لأنه ليس في الفهرس المُدار. هذا ليس نتيجة فارغة: اختر فرع تأمين من القائمة.',
   },
   EN: {
     // /settings/insurance-lines — the office's own additions to the line vocabulary.

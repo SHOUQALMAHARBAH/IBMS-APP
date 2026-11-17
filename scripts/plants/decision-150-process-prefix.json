@@ -1,0 +1,8 @@
+{
+  "put-the-process-number-back": {
+    "file": "apps/web/lib/i18n/translations/rfq.ts",
+    "from": "      'إنشاء طلب عرض أسعار واحد لفرع تأمين واحد وإرساله إلى قائمة مختصرة من شركات التأمين. يبدأ كل مؤمِّن بحالة \"أُرسل\".',",
+    "to": "      'العملية 11 — إنشاء طلب عرض أسعار واحد لفرع تأمين واحد وإرساله إلى قائمة مختصرة من شركات التأمين. يبدأ كل مؤمِّن بحالة \"أُرسل\".',",
+    "why": "Owner decision 150 ruling 3-أ deletes the «العملية N —» prefix from all twenty-five descriptions: the backlog's own index means nothing to the person reading the screen. Budget zero, because there is no correct instance. ⚠️ The anchor is the whole AR VALUE, not the key: `rfqNewIntro:` occurs twice (AR and EN) and the plant harness refused the ambiguous form, rightly -- a plant that hits several sites cannot say which guard it is testing."
+  }
+}
