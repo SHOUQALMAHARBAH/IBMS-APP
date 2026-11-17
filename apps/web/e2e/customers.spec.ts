@@ -1145,3 +1145,76 @@ test("offers no identifier correction on a CORPORATE customer, while the contact
     page.getByTestId("customer-correct-identifiers-open"),
   ).toHaveCount(0);
 });
+
+test("🔴 §P2 — a customer's own opportunities are reachable by CLICKING, not by typing a URL", async ({
+  page,
+}) => {
+  /*
+   * ## What the owner's walk found, 2026-11-17
+   *
+   * The customer page carried SIX controls and not this one, so a customer's opportunities —
+   * the thing the whole placement path runs on — could only be reached by typing a URL.
+   *
+   * ⛔ EVERY STRING HERE ALREADY SHIPS. The heading and paragraph are the destination's own,
+   * the button is the bare «View» `/employees` already uses, and the refusal names the act in
+   * its own shipped words. «فتح الفرص» would be two shipped words joined into a third, which
+   * decision 125 forbids — so that label is reported as an empty cell, not invented.
+   */
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/customers/cust-1", (route) =>
+    route.fulfill({ status: 200, json: CUSTOMER }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/opportunities**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+
+  await page.goto("/customers/cust-1");
+
+  const card = page
+    .locator("section, div")
+    .filter({ hasText: "RFQ / market" })
+    .last();
+  await expect(card).toBeVisible();
+
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await expect(page).toHaveURL("/opportunities?customerId=cust-1");
+});
+
+test("§P2 — and a caller without opportunity.read is told, rather than shown a dead control", async ({
+  page,
+}) => {
+  /*
+   * The other direction, and it is the frontend directive's own rule: a control a role cannot
+   * use does not exist on their screen. Without this the test above would pass against a button
+   * rendered unconditionally.
+   *
+   * `COMPLIANCE_OFFICER` holds `customer.360-view.read` (so the page opens) and NOT
+   * `opportunity.read` — measured on the seeded fixture, which is why that role is the one used
+   * here rather than an invented permission set.
+   */
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("http://localhost:4000/customers/cust-1", (route) =>
+    route.fulfill({ status: 200, json: CUSTOMER }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+
+  await page.goto("/customers/cust-1");
+
+  // The card is there and says why — ANCHORED on the heading first, so this is not an absence
+  // assertion against an unrendered page.
+  await expect(page.getByText("RFQ / market").first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "View", exact: true }),
+  ).toHaveCount(0);
+});

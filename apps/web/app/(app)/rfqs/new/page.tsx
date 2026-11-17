@@ -36,6 +36,10 @@ import {
   insurerDisplayName,
   lineDisplayName,
 } from '../../../../lib/i18n/names';
+import {
+  loadIndependently,
+  namedFailures,
+} from '../../../../lib/load-independently';
 
 function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   const router = useRouter();
@@ -121,13 +125,37 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   useEffect(() => {
     void (async () => {
       try {
-        const [fetchedInsurers, fetchedLines] = await Promise.all([
-          listSelectableInsurers(),
-          listAvailableLines(opportunityId),
+        /*
+         * 🔴 `loadIndependently`, NOT `Promise.all` — and `check:loaders` refused the first
+         * version by name, rightly.
+         *
+         * With `Promise.all`, a 403 on EITHER list discarded the other: a caller who could
+         * read insurers but not the available lines (or the reverse) got an empty form and one
+         * sentence about neither. Keep what arrived, and NAME what did not.
+         *
+         * Both labels already ship: the shortlist's own legend and the line field's own label.
+         * ⛔ Nothing composed.
+         */
+        const { values, failures } = await loadIndependently([
+          {
+            key: 'insurers',
+            label: t('rfqNewShortlistLegend'),
+            load: listSelectableInsurers,
+          },
+          {
+            key: 'lines',
+            label: t('rfqNewLineLabel'),
+            load: () => listAvailableLines(opportunityId),
+          },
         ]);
-        setInsurers(fetchedInsurers);
-        setLines(fetchedLines);
-        setLoadError(null);
+        if (values.insurers) setInsurers(values.insurers as SelectableInsurer[]);
+        if (values.lines) setLines(values.lines as AvailableLine[]);
+        setLoadError(
+          failures.length === 0
+            ? null
+            : `${t('commonListsMissing')} ${namedFailures(failures)}`,
+        );
+        return;
       } catch (err) {
         setLoadError(
           err instanceof ApiError && err.status === 403

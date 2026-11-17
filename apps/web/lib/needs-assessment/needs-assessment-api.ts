@@ -66,6 +66,8 @@ export interface NeedsAssessment {
    * (needs & risk assessment) needs it for the detail page's
    * consent-capture control. */
   customerId: string;
+  /** §W4 — identity only, so a list card can say WHICH client. Never the Customer row. */
+  customer: { id: string; legalName: string } | null;
 }
 
 export interface ListNeedsAssessmentsFilter {

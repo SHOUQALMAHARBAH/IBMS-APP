@@ -485,16 +485,38 @@ describe('NeedsAssessmentService', () => {
 
   describe('get', () => {
     it("resolves customerId off the parent Risk Profile (Part D §5.1 touchpoint #3's consent-capture control needs it)", async () => {
+      /*
+       * 🔴 CHANGED 2026-11-17 (§W4) — THE SECOND READ IS GONE, AND THAT IS THE FIX.
+       *
+       * This used to assert `findRiskProfileById` was called: `get()` fetched the risk profile
+       * AGAIN to graft `customerId` on. That is exactly why the DETAIL route had a customerId
+       * and the LIST route did not — every list item carried `undefined` behind a web type
+       * promising a string, which is the same declared-but-not-sent class as §W3's blank
+       * insurer column.
+       *
+       * ⟶ The join is in the repository's include now, so both routes answer from ONE read.
+       *   The assertion is therefore on the ANSWER rather than on the second query, and it
+       *   would fail if the include were removed — which the old one would not have.
+       */
       const { service, mocks } = makeDeps();
       mocks.findAssessmentById.mockResolvedValue({
         id: 'na-1',
         riskProfileId: 'rp-1',
         createdByUserId: 'sales-1',
         status: 'DRAFT',
+        riskProfile: {
+          customerId: 'cust-1',
+          customer: { id: 'cust-1', legalName: 'Acme Trading Co' },
+        },
       });
       const result = await service.get('na-1', makeUser({ id: 'sales-1' }));
       expect(result.customerId).toBe('cust-1');
-      expect(mocks.findRiskProfileById).toHaveBeenCalledWith('rp-1');
+      // §W4 — and the NAME travels with it, which is what the list card renders.
+      expect(result.customer?.legalName).toBe('Acme Trading Co');
+      // ⛔ And the raw join is NOT on the wire beside the two flat fields.
+      expect(Object.keys(result)).not.toContain('riskProfile');
+      // The second read is gone: one query answers both routes.
+      expect(mocks.findRiskProfileById).not.toHaveBeenCalled();
     });
   });
 });

@@ -12,6 +12,10 @@ import {
   type NeedsAssessment,
   type NeedsAssessmentQuestion,
 } from '../../../../lib/needs-assessment/needs-assessment-api';
+import {
+  listInsurancePrograms,
+  type InsuranceProgram,
+} from '../../../../lib/insurance-program/insurance-program-api';
 import { NeedsAssessmentForm } from '../../../../components/needs-assessment/NeedsAssessmentForm';
 import { NeedsAssessmentReviewPanel } from '../../../../components/needs-assessment/NeedsAssessmentReviewPanel';
 import { ApiError } from '../../../../lib/auth/api-client';
@@ -42,6 +46,9 @@ import {
 } from '../../../../lib/load-independently';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
 
+/** One declaration for the two branches of §P2's control — see `check:screen-pass`. */
+const programButtonStyle = { ...buttonStyle, marginTop: '1.5rem' };
+
 export default function NeedsAssessmentDetailPage() {
   const { t, language } = useLanguage();
   const router = useRouter();
@@ -49,6 +56,13 @@ export default function NeedsAssessmentDetailPage() {
   const { user, isLoading } = useAuth();
 
   const [assessment, setAssessment] = useState<NeedsAssessment | null>(null);
+  /*
+   * §P2 — the programme this assessment already produced, if any. `null` means «none, or not
+   * known yet, or this caller may not read programmes», and all three render the same control,
+   * so the screen never claims something it has not established.
+   */
+  const [existingProgram, setExistingProgram] =
+    useState<InsuranceProgram | null>(null);
   const [questions, setQuestions] = useState<NeedsAssessmentQuestion[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -98,6 +112,31 @@ export default function NeedsAssessmentDetailPage() {
         : `${t('commonListsMissing')} ${namedFailures(failures)}`,
     );
   }, [params.id, t]);
+
+  /*
+   * The programme is found through the CUSTOMER's list and matched on `needsAssessmentId`,
+   * because there is no route from an assessment to its programme — which is itself part of
+   * what §P2 found. A refusal is swallowed: this is a NAVIGATION convenience, and a caller
+   * without `program.read` simply sees the control they saw before.
+   */
+  useEffect(() => {
+    if (!assessment || assessment.status !== 'APPROVED') return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const programs = await listInsurancePrograms(assessment.customerId);
+        if (cancelled) return;
+        setExistingProgram(
+          programs.find((p) => p.needsAssessmentId === assessment.id) ?? null,
+        );
+      } catch {
+        /* see above — no programme link, and nothing said about it */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [assessment]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -262,18 +301,46 @@ export default function NeedsAssessmentDetailPage() {
             </p>
           ) : null}
 
+          {/*
+            🔴 §P2 — THE BUTTON USED TO OFFER A SECOND PROGRAMME THE SERVER REFUSES.
+
+            It always pushed to `/insurance-programs/new`, and the server allows ONE live
+            programme per risk profile — so on every assessment that already produced one, the
+            only control on the screen led to a refusal. The owner's walk found exactly that:
+            a placement officer with no way through.
+
+            ⟶ When a programme exists, the control OPENS IT. The label is that screen's own
+              heading (`iprogdHeading`), because a link named after where it goes needs no new
+              Arabic — ⛔ and decision 125 forbids composing one.
+
+            `existingProgram` is null while the list is loading AND when the caller cannot read
+            programmes (`program.read`, which the placement and sales officers both hold). In
+            both cases the assemble button is what shows, which is what showed before.
+          */}
           {assessment.status === 'APPROVED' && isPlacement ? (
-            <button
-              type="button"
-              style={{ ...buttonStyle, marginTop: '1.5rem' }}
-              onClick={() =>
-                router.push(
-                  `/insurance-programs/new?needsAssessmentId=${assessment.id}`,
-                )
-              }
-            >
-              {t('nadAssembleProgramButton')}
-            </button>
+            existingProgram ? (
+              <button
+                type="button"
+                style={programButtonStyle}
+                onClick={() =>
+                  router.push(`/insurance-programs/${existingProgram.id}`)
+                }
+              >
+                {t('iprogdHeading')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                style={programButtonStyle}
+                onClick={() =>
+                  router.push(
+                    `/insurance-programs/new?needsAssessmentId=${assessment.id}`,
+                  )
+                }
+              >
+                {t('nadAssembleProgramButton')}
+              </button>
+            )
           ) : null}
 
           {assessment.status === 'APPROVED' && !isPlacement ? (

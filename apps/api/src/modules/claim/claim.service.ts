@@ -114,6 +114,8 @@ export interface ClaimView {
   id: string;
   policyId: string;
   customerId: string;
+  /** §W4 — whose claim this is. Gated by this record's own read permission. */
+  customerLegalName: string | null;
   policyNumber: string | null;
   insuranceLine: string;
   claimNumber: string | null;
@@ -369,6 +371,16 @@ export class ClaimService {
       policyId: claim.policyId,
       discard: discardView(claim),
       customerId: claim.customerId,
+      /*
+       * §W4 — WHOSE CLAIM THIS IS, by name. `/claims` rendered a list of cards a reader could
+       * not tell apart, because `customerId` is a uuid.
+       *
+       * Gated by THIS RECORD'S own read permission rather than a second one: a reader admitted
+       * to a claim is already admitted to knowing whose claim it is — the record means nothing
+       * otherwise, and its policy number and loss details are far more than a name. That is the
+       * same answer the policy list gives, and its comment is the precedent.
+       */
+      customerLegalName: claim.policy.customer?.legalName ?? null,
       policyNumber: claim.policy.policyNumber,
       insuranceLine: claim.policy.insuranceLine,
       claimNumber: claim.claimNumber,

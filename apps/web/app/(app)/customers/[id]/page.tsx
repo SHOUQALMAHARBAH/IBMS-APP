@@ -30,7 +30,10 @@ import {
   profileFieldValueStyle,
   profileGridStyle,
 } from '../../../../components/prospect/prospect.styles';
-import { repeatableRowStyle } from '../../../../components/customer/customer.styles';
+import {
+  cardIntroStyle,
+  repeatableRowStyle,
+} from '../../../../components/customer/customer.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
@@ -196,6 +199,7 @@ export default function CustomerProfilePage() {
   const canStartNeedsAssessment = hasPermission(user, 'needs-assessment.create');
   const canOpenRiskSurvey = hasPermission(user, 'risk-profile.create');
   const canOpenInsuranceProgram = hasPermission(user, 'program.read');
+  const canOpenOpportunities = hasPermission(user, 'opportunity.read');
   const canOpenCrossSell = hasPermission(user, 'cross-sell.read');
   const canOpenUpSell = canOpenCrossSell;
   const canOpenCrm = hasPermission(user, 'customer.360-view.read');
@@ -223,7 +227,7 @@ export default function CustomerProfilePage() {
           <p style={{ margin: '0 0 1rem' }}>
             <WorkflowHistoryLink entityType='Customer' entityId={customer.id} />
           </p>
-          <p style={{ color: 'var(--ink-secondary)' }}>
+          <p style={cardIntroStyle}>
             {t('customerProfileTypeStatusLine', {
               type: t(TYPE_LABEL_KEY[customer.customerType]),
               status: t(STATUS_LABEL_KEY[customer.status]),
@@ -235,7 +239,7 @@ export default function CustomerProfilePage() {
               why. A reader seeing the first and not the second is the state the defect describes —
               including the officer who has just pressed "submit for review" and is sent here. */}
           {canReadKyc ? (
-            <p data-kyc-stage={kyc?.status ?? 'none'} style={{ color: 'var(--ink-secondary)' }}>
+            <p data-kyc-stage={kyc?.status ?? 'none'} style={cardIntroStyle}>
               {kyc ? (
                 <>
                   {t('customerKycStageLine', {
@@ -462,7 +466,7 @@ export default function CustomerProfilePage() {
           </Card>
 
           <Card title={t('customerNeedsAssessmentHeading')}>
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerNeedsAssessmentIntro')}</p>
+            <p style={cardIntroStyle}>{t('customerNeedsAssessmentIntro')}</p>
             {canStartNeedsAssessment ? (
               <Button
                 onClick={() =>
@@ -472,12 +476,12 @@ export default function CustomerProfilePage() {
                 {t('customerNeedsAssessmentStartButton')}
               </Button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerNeedsAssessmentRefusalAct', 'needs-assessment.create')}</p>
+              <p style={cardIntroStyle}>{permissionRefusal(t, 'customerNeedsAssessmentRefusalAct', 'needs-assessment.create')}</p>
             )}
           </Card>
 
           <Card title={t('customerRiskSurveyHeading')}>
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerRiskSurveyIntro')}</p>
+            <p style={cardIntroStyle}>{t('customerRiskSurveyIntro')}</p>
             {canOpenRiskSurvey ? (
               <Button
                 onClick={() =>
@@ -487,12 +491,12 @@ export default function CustomerProfilePage() {
                 {t('customerRiskSurveyOpenButton')}
               </Button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerRiskSurveyRefusalAct', 'risk-profile.read')}</p>
+              <p style={cardIntroStyle}>{permissionRefusal(t, 'customerRiskSurveyRefusalAct', 'risk-profile.read')}</p>
             )}
           </Card>
 
           <Card title={t('customerInsuranceProgramHeading')}>
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerInsuranceProgramIntro')}</p>
+            <p style={cardIntroStyle}>{t('customerInsuranceProgramIntro')}</p>
             {canOpenInsuranceProgram ? (
               <Button
                 onClick={() =>
@@ -502,12 +506,47 @@ export default function CustomerProfilePage() {
                 {t('customerInsuranceProgramOpenButton')}
               </Button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerInsuranceProgramRefusalAct', 'program.read')}</p>
+              <p style={cardIntroStyle}>{permissionRefusal(t, 'customerInsuranceProgramRefusalAct', 'program.read')}</p>
+            )}
+          </Card>
+
+          {/*
+            🔴 §P2 — THE SEVENTH CONTROL, AND ITS ABSENCE IS WHAT THE WALK FOUND.
+
+            Six controls stood here and not this one, so a customer's own OPPORTUNITIES — the
+            thing the placement path runs on — were reachable only by typing a URL.
+
+            ⛔ EVERY STRING IS ALREADY SHIPPING AND NOTHING IS COMPOSED. The heading and the
+            paragraph are the DESTINATION's own (`oppListHeading`, `oppListIntro`), the refusal
+            names the act in its own shipped words (`oppListRefusalAct`), and the button is the
+            bare «عرض» that `/employees` already uses to open a row. Decision 125 forbids
+            joining two shipped words into a third, which is exactly what «فتح الفرص» would be
+            — so that word is REPORTED as an empty cell rather than invented, and this control
+            ships working in the meantime.
+
+            Gated on `opportunity.read` — measured on the seeded fixture: the manager, the
+            executive, the placement officer and the sales officer hold it. ⛔ No role was
+            granted anything to make this appear.
+          */}
+          <Card title={t('oppListHeading')}>
+            <p style={cardIntroStyle}>{t('oppListIntro')}</p>
+            {canOpenOpportunities ? (
+              <Button
+                onClick={() =>
+                  router.push(`/opportunities?customerId=${customer.id}`)
+                }
+              >
+                {t('empViewButton')}
+              </Button>
+            ) : (
+              <p style={cardIntroStyle}>
+                {permissionRefusal(t, 'oppListRefusalAct', 'opportunity.read')}
+              </p>
             )}
           </Card>
 
           <Card title={t('customerCrossSellHeading')}>
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrossSellIntro')}</p>
+            <p style={cardIntroStyle}>{t('customerCrossSellIntro')}</p>
             {canOpenCrossSell ? (
               <Button
                 onClick={() =>
@@ -517,12 +556,12 @@ export default function CustomerProfilePage() {
                 {t('customerCrossSellOpenButton')}
               </Button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerCrossSellRefusalAct', 'cross-sell.read')}</p>
+              <p style={cardIntroStyle}>{permissionRefusal(t, 'customerCrossSellRefusalAct', 'cross-sell.read')}</p>
             )}
           </Card>
 
           <Card title={t('customerUpSellHeading')}>
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUpSellIntro')}</p>
+            <p style={cardIntroStyle}>{t('customerUpSellIntro')}</p>
             {canOpenUpSell ? (
               <Button
                 onClick={() =>
@@ -532,12 +571,12 @@ export default function CustomerProfilePage() {
                 {t('customerUpSellOpenButton')}
               </Button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerUpSellRefusalAct', 'up-sell.read')}</p>
+              <p style={cardIntroStyle}>{permissionRefusal(t, 'customerUpSellRefusalAct', 'up-sell.read')}</p>
             )}
           </Card>
 
           <Card title={t('customerCrmHeading')}>
-            <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrmIntro')}</p>
+            <p style={cardIntroStyle}>{t('customerCrmIntro')}</p>
             {canOpenCrm ? (
               <Button
                 onClick={() => router.push(`/crm?customerId=${customer.id}`)}
@@ -545,7 +584,7 @@ export default function CustomerProfilePage() {
                 {t('customerCrmOpenButton')}
               </Button>
             ) : (
-              <p style={{ color: 'var(--ink-secondary)' }}>{permissionRefusal(t, 'customerCrmRefusalAct', 'customer.360-view.read')}</p>
+              <p style={cardIntroStyle}>{permissionRefusal(t, 'customerCrmRefusalAct', 'customer.360-view.read')}</p>
             )}
           </Card>
         </>
