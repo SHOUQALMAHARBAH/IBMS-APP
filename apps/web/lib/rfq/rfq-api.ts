@@ -45,6 +45,8 @@ export interface Rfq {
   id: string;
   opportunityId: string;
   insuranceLine: string;
+  /** §P4 — the line's Arabic name, sent by the server. null when none is known. */
+  insuranceLineAr: string | null;
   issuedAt: string;
   followUpThresholdDays: number;
   issuedByUserId: string | null;

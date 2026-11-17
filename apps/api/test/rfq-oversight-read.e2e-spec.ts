@@ -274,6 +274,30 @@ describe('door four: an anchored oversight read of an RFQ', () => {
       // and a missing KEY and an explicit null are different things to a reader of the payload.
       expect(Object.keys(s.insurer)).toContain('nameAr');
     }
+
+    /*
+     * §P4 — AND THE INSURANCE LINE CARRIES ITS OWN ARABIC NAME.
+     *
+     * Sent with the record rather than looked up by the screen, because `GET /insurance-lines` is
+     * gated on five codes and `policy.read` is not one of them — `CLAIMS_OFFICER` and
+     * `POLICY_CHECKING_OFFICER` may read these records and could not resolve a line name.
+     *
+     * ⚠️ The ASSERTION IS THE KEY, not a non-empty value. `insuranceLineAr` is legitimately null
+     * for a row whose catalogue FK was never back-filled (migration `20261019100000` «mapped what
+     * it could»), and db-test holds such rows. Demanding Arabic here would fail on history rather
+     * than on a defect; demanding the KEY proves the server answered the question at all, which
+     * is what a missing field would not.
+     */
+    const wire = rfq.body as { insuranceLineAr?: string | null };
+    expect(
+      Object.keys(rfq.body as object),
+      'the RFQ reached the wire with no insuranceLineAr — the screen has nothing to render in Arabic',
+    ).toContain('insuranceLineAr');
+    if (wire.insuranceLineAr !== null) {
+      expect(wire.insuranceLineAr).toMatch(/[؀-ۿ]/);
+    }
+    // ⛔ And the raw join is NOT on the wire beside it, for the same reason as the insurer above.
+    expect(Object.keys(rfq.body as object)).not.toContain('insuranceLine_managed');
   }, 300_000);
 
   it('7 — the CLAIMS_OFFICER is refused at the ROUTE with 403, not told the record is missing', async () => {

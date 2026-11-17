@@ -20,6 +20,7 @@ import {
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { lineDisplayName } from '../../../lib/i18n/names';
 
 function RfqList({
   scope,
@@ -89,7 +90,7 @@ function RfqList({
             }}
           >
             <strong>
-              <bdi>{rfq.insuranceLine}</bdi>
+              <bdi>{lineDisplayName(rfq, language)}</bdi>
             </strong>
             <span style={rfqBadgeStyle}>
               {t(

@@ -22,6 +22,7 @@ import {
   type SelectableInsurer,
 } from '../../repositories/rfq.repository';
 import { insurerIdentity } from '../../repositories/insurer-identity';
+import { insuranceLineNameAr } from '../../repositories/insurance-line-names';
 import { OpportunityRepository } from '../../repositories/opportunity.repository';
 import { InsuranceProgramRepository } from '../../repositories/insurance-program.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
@@ -96,14 +97,39 @@ export type RfqInsurerForWire = Omit<RfqInsurerWithInsurer, 'insurer'> & {
   insurer: ResolvedInsurer;
 };
 
-/** An RFQ as it leaves this service: every submission's insurer resolved to its name pair. */
-export type RfqForWire = Omit<RfqWithSubmissions, 'insurerSubmissions'> & {
+/**
+ * An RFQ as it leaves this service: every submission's insurer resolved to its name pair, and
+ * the insurance line carrying its own Arabic name.
+ *
+ * 🔴 `insuranceLineAr` IS SENT RATHER THAN LOOKED UP ON THE SCREEN, and the reason is a
+ * permission the web cannot have: `GET /insurance-lines` is gated on five codes and `policy.read`
+ * is not one of them, so two roles that may read these records could not resolve a line name.
+ * See `insurance-line-names.ts` for the measurement. ⛔ Widening that gate was not the answer.
+ */
+export type RfqForWire = Omit<
+  RfqWithSubmissions,
+  'insurerSubmissions' | 'insuranceLine_managed' | 'officeInsuranceLine'
+> & {
   insurerSubmissions: RfqInsurerForWire[];
+  insuranceLineAr: string | null;
 };
 
 function rfqForWire(rfq: RfqWithSubmissions): RfqForWire {
+  /*
+   * ⛔ THE TWO JOINED ROWS ARE STRIPPED, NOT MERELY SUPPLEMENTED — and this batch's own new
+   * assertion caught its author not doing it. Spreading `...rfq` put `insuranceLine_managed`
+   * and `officeInsuranceLine` on the wire beside the resolved `insuranceLineAr`: two ways to
+   * answer one question, which is the raw-join-as-payload shape that left the insurer column
+   * blank in the first place.
+   */
+  const {
+    insuranceLine_managed: _managed,
+    officeInsuranceLine: _office,
+    ...rest
+  } = rfq;
   return {
-    ...rfq,
+    ...rest,
+    insuranceLineAr: insuranceLineNameAr(rfq),
     /*
      * `s` is ANNOTATED, and it has to be: `RfqWithSubmissions` is an INTERSECTION of the plain
      * Prisma payload with `{ insurerSubmissions: RfqInsurerWithInsurer[] }`, so the inferred

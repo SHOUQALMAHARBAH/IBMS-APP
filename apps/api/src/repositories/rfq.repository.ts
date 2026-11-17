@@ -9,6 +9,10 @@ import type {
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { INSURER_IDENTITY_SELECT, insurerIdentity } from './insurer-identity';
+import {
+  INSURANCE_LINE_NAME_INCLUDE,
+  type InsuranceLineNameSources,
+} from './insurance-line-names';
 
 export interface CreateRfqInput {
   opportunityId: string;
@@ -47,7 +51,7 @@ export type RfqInsurerWithInsurer = Prisma.RFQInsurerGetPayload<{
  * identity), newest submission first. */
 export type RfqWithSubmissions = Prisma.RFQGetPayload<{
   include: { insurerSubmissions: true };
-}> & { insurerSubmissions: RfqInsurerWithInsurer[] };
+}> & { insurerSubmissions: RfqInsurerWithInsurer[] } & InsuranceLineNameSources;
 
 /** One submission plus the parent RFQ and its Opportunity — visibility for a
  * per-insurer status change is resolved against `rfq.opportunity.customerId`. */
@@ -121,6 +125,7 @@ export class RfqRepository {
     return this.prisma.client.rFQ.findUnique({
       where: { id },
       include: {
+        ...INSURANCE_LINE_NAME_INCLUDE,
         insurerSubmissions: {
           include: { insurer: { select: INSURER_IDENTITY_SELECT } },
           orderBy: { sentAt: 'asc' },
@@ -135,6 +140,7 @@ export class RfqRepository {
     return this.prisma.client.rFQ.findMany({
       where: { opportunityId },
       include: {
+        ...INSURANCE_LINE_NAME_INCLUDE,
         insurerSubmissions: {
           include: { insurer: { select: INSURER_IDENTITY_SELECT } },
           orderBy: { sentAt: 'asc' },
@@ -148,6 +154,7 @@ export class RfqRepository {
     return this.prisma.client.rFQ.findMany({
       where: { opportunity: { customerId } },
       include: {
+        ...INSURANCE_LINE_NAME_INCLUDE,
         insurerSubmissions: {
           include: { insurer: { select: INSURER_IDENTITY_SELECT } },
           orderBy: { sentAt: 'asc' },

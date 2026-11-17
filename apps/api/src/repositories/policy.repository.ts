@@ -10,6 +10,7 @@ import type {
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { INSURER_IDENTITY_SELECT } from './insurer-identity';
+import { INSURANCE_LINE_NAME_INCLUDE } from './insurance-line-names';
 
 /**
  * The two ways a policy can still matter to an insurer — SEPARATE named sets, because
@@ -82,6 +83,9 @@ const POLICY_INCLUDE = {
   checking: { include: { combinedDutyAct: true } },
   // Process 21 — the one delivery record (or null).
   deliveryRecord: true,
+  // §P4 — the insurance line's own Arabic name, so the screen does not have to look it up
+  // through a route two policy-reading roles cannot reach. See `insurance-line-names.ts`.
+  ...INSURANCE_LINE_NAME_INCLUDE,
 } as const;
 
 /** A policy with its insurer identity, its coverage-schedule versions and its

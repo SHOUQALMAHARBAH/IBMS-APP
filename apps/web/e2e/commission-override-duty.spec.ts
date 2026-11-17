@@ -123,6 +123,7 @@ const POLICY: Policy = {
   insurer: { id: "ins-1", name: "Union Insurance", nameAr: "الاتحاد للتأمين" },
   policyNumber: "POL-2026-0451",
   insuranceLine: "Property All Risks",
+  insuranceLineAr: null,
   status: "ACTIVE",
   inceptionDate: "2026-10-01",
   expiryDate: "2027-10-01",

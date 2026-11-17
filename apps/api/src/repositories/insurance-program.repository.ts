@@ -5,6 +5,10 @@ import {
   type InsuranceProgramLine,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  INSURANCE_LINE_NAME_INCLUDE,
+  type InsuranceLineNameSources,
+} from './insurance-line-names';
 
 export interface CreateInsuranceProgramInput {
   riskProfileId: string;
@@ -30,8 +34,12 @@ export interface InsuranceProgramLineInput {
 }
 
 /** An InsuranceProgram with its assembled lines (Part C #7). */
+/** A programme line with the two name sources joined — see `insurance-line-names.ts`. */
+export type InsuranceProgramLineWithNames = InsuranceProgramLine &
+  InsuranceLineNameSources;
+
 export interface InsuranceProgramWithLines extends InsuranceProgram {
-  lines: InsuranceProgramLine[];
+  lines: InsuranceProgramLineWithNames[];
 }
 
 /** Process 7 — Product Recommendation / Program Design. Same "one repository
@@ -50,7 +58,12 @@ export class InsuranceProgramRepository {
   findById(id: string): Promise<InsuranceProgramWithLines | null> {
     return this.prisma.client.insuranceProgram.findUnique({
       where: { id },
-      include: { lines: { orderBy: { insuranceLine: 'asc' } } },
+      include: {
+        lines: {
+          include: INSURANCE_LINE_NAME_INCLUDE,
+          orderBy: { insuranceLine: 'asc' },
+        },
+      },
     });
   }
 
@@ -59,7 +72,12 @@ export class InsuranceProgramRepository {
   ): Promise<InsuranceProgramWithLines[]> {
     return this.prisma.client.insuranceProgram.findMany({
       where: { riskProfile: { customerId } },
-      include: { lines: { orderBy: { insuranceLine: 'asc' } } },
+      include: {
+        lines: {
+          include: INSURANCE_LINE_NAME_INCLUDE,
+          orderBy: { insuranceLine: 'asc' },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

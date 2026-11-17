@@ -31,7 +31,7 @@ import {
   DiscardControl,
   DiscardedNotice,
 } from '../ui/DiscardControl';
-import { insurerDisplayName } from '../../lib/i18n/names';
+import { insurerDisplayName, lineDisplayName } from '../../lib/i18n/names';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
@@ -395,7 +395,7 @@ export function PolicySection({
             onDiscarded={load}
           />
           <p style={{ margin: '0.4rem 0' }}>
-            <bdi>{policy.insuranceLine}</bdi>
+            <bdi>{lineDisplayName(policy, language)}</bdi>
             {policy.policyNumber ? (
               <>
                 {' · '}

@@ -71,6 +71,34 @@ export function referenceDisplayName(
   return row.nameEn;
 }
 
+/**
+ * THE INSURANCE LINE, in the reader's language.
+ *
+ * ⚠️ `insuranceLineAr` COMES FROM THE SERVER AND IS NEVER LOOKED UP HERE. The 32-row catalogue
+ * that holds the Arabic names is behind `GET /insurance-lines`, which is gated on five
+ * permissions — and `policy.read` is not one of them, so `CLAIMS_OFFICER` and
+ * `POLICY_CHECKING_OFFICER` may read a policy and could not resolve its line name. Measured
+ * 2026-11-17; ⛔ the answer was not to widen that gate or grant anybody a code.
+ *
+ * `null` means no Arabic name is known for that row, and the English string it stored is shown.
+ * ⛔ That is not a cue to invent one.
+ */
+export interface BilingualLineName {
+  insuranceLine: string;
+  insuranceLineAr?: string | null;
+}
+
+export function lineDisplayName(
+  row: BilingualLineName,
+  language: Language,
+): string {
+  if (language === 'AR') {
+    const ar = row.insuranceLineAr?.trim();
+    if (ar) return ar;
+  }
+  return row.insuranceLine;
+}
+
 /** And for a row that has not been through `insurerIdentity()` — the global `InsurerMaster`
  *  catalogue, which the «register an insurer» picker reads directly and which carries its names
  *  under their database column names. Same rule, same one-way fallback. */

@@ -35,6 +35,7 @@ import { formatDate } from '../../../../lib/i18n/format';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
+import { lineDisplayName } from '../../../../lib/i18n/names';
 
 
 const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
@@ -263,7 +264,7 @@ export default function OpportunityDetailPage() {
                     }}
                   >
                     <strong>
-                      <bdi>{rfq.insuranceLine}</bdi>
+                      <bdi>{lineDisplayName(rfq, language)}</bdi>
                     </strong>
                     <span style={rfqBadgeStyle}>
                       {t(
