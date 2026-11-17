@@ -29,6 +29,7 @@ import {
   profileGridStyle,
 } from '../../../../components/prospect/prospect.styles';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
+import { insurerDisplayName } from '../../../../lib/i18n/names';
 
 /**
  * DERIVED from the API client's own `Policy`, not re-declared beside it.
@@ -316,7 +317,7 @@ export default function PolicyDetailPage() {
                 <div style={profileFieldLabelStyle}>{t('poldInsurer')}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>
-                    {policy.recommendation.recommendedQuotation.insurer.name}
+                    {insurerDisplayName(policy.recommendation.recommendedQuotation.insurer, language)}
                   </bdi>
                 </div>
               </div>

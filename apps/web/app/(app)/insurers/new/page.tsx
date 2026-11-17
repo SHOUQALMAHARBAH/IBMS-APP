@@ -31,6 +31,7 @@ import {
 } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { legalDisplayName } from '../../../../lib/i18n/names';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
 
 const STRUCTURES: readonly InsurerStructure[] = [
@@ -224,7 +225,7 @@ export default function RegisterInsurerPage() {
                 <option value="">{t('insNewMasterChoose')}</option>
                 {(masters ?? []).map((m) => (
                   <option key={m.id} value={m.id}>
-                    {language === 'AR' ? (m.legalNameAr ?? m.legalName) : m.legalName}
+                    {legalDisplayName(m, language)}
                   </option>
                 ))}
               </select>

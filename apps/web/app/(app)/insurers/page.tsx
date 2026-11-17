@@ -26,6 +26,7 @@ import { DeactivatedInsurerBadge } from '../../../components/insurer/Deactivated
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../lib/i18n/permission-refusal';
+import { insurerDisplayName } from '../../../lib/i18n/names';
 
 /**
  * The office's own insurer list.
@@ -158,7 +159,7 @@ export default function InsurersPage() {
                   <Link href={`/insurers/${ins.id}`}>
                     {/* `bdi` because an Arabic company name beside Latin text reorders the
                         whole line otherwise — the same treatment every name gets in this app. */}
-                    <bdi>{language === 'AR' ? (ins.nameAr ?? ins.name) : ins.name}</bdi>
+                    <bdi>{insurerDisplayName(ins, language)}</bdi>
                   </Link>
                   <DeactivatedInsurerBadge isActive={ins.isActive} />
                 </h2>

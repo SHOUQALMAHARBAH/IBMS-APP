@@ -30,10 +30,11 @@ import {
 import { insurerPickerStyle } from '../../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
+import { insurerDisplayName } from '../../../../lib/i18n/names';
 
 function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [insurers, setInsurers] = useState<SelectableInsurer[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -209,7 +210,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
                   onChange={() => toggle(insurer.id)}
                 />
                 <span>
-                  <bdi>{insurer.name}</bdi>
+                  <bdi>{insurerDisplayName(insurer, language)}</bdi>
                   {insurer.financialStrengthRating
                     ? ` · ${insurer.financialStrengthRating}`
                     : ''}

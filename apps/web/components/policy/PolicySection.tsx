@@ -31,6 +31,7 @@ import {
   DiscardControl,
   DiscardedNotice,
 } from '../ui/DiscardControl';
+import { insurerDisplayName } from '../../lib/i18n/names';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
@@ -374,7 +375,7 @@ export function PolicySection({
             }}
           >
             <strong>
-              <bdi>{policy.insurer?.name ?? policy.insurerId}</bdi>
+              <bdi>{policy.insurer ? insurerDisplayName(policy.insurer, language) : policy.insurerId}</bdi>
             </strong>
             <span style={rfqBadgeStyle}>
               {policy.discard

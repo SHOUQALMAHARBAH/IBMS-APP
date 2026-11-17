@@ -225,6 +225,57 @@ describe('door four: an anchored oversight read of an RFQ', () => {
     expect(Array.isArray(comms.body)).toBe(true);
   }, 300_000);
 
+  it('🔴 the shortlist must NAME its insurers — the fourth site of a defect fixed three times', async () => {
+    /*
+     * ## What this is, measured on the owner's demo-path walk of 2026-11-17 (§W3)
+     *
+     * The submissions table on `/rfqs/[id]` showed three rows with an EMPTY insurer column. The
+     * cell reads `submission.insurer.name`; `GET /rfqs/:id` returned the raw Prisma join, whose
+     * insurer carries `legalName` / `legalNameAr` and no `name` at all. `undefined` renders as
+     * NOTHING in React, so the screen printed a blank cell rather than failing.
+     *
+     * 🔴 AND THIS EXACT DEFECT HAD ALREADY BEEN FOUND AND FIXED THREE TIMES. `comparison`,
+     * `quotation` and `recommendation` each pass through `insurerIdentity()` and each carries an
+     * API-side assertion on its own wire shape — `quotation.e2e-spec.ts` even says why: *"no API
+     * test read this field, and the web e2e mocks the endpoint with the flattened shape it wishes
+     * for"*. The RFQ's own three reads were never added to that set, so the fourth site of a
+     * known defect shipped with nothing checking it, under a fixture comment stating the problem
+     * had been solved.
+     *
+     * ⟶ So this is that assertion for the fourth endpoint. The web mock can no longer be the
+     *   authority on a shape the API does not send.
+     */
+    const rfq = await read(manager, target.rfqId).expect(200);
+    interface Submission {
+      insurerId: string;
+      insurer: { name?: string; nameAr?: string | null; legalName?: unknown };
+    }
+    const body = rfq.body as { insurerSubmissions: Submission[] };
+    expect(
+      body.insurerSubmissions.length,
+      'this RFQ has no shortlisted insurers, so the assertion below would be vacuous',
+    ).toBeGreaterThan(0);
+    for (const s of body.insurerSubmissions) {
+      expect(
+        s.insurer.name,
+        'a shortlisted insurer reached the wire with no name — the submissions table renders a blank cell',
+      ).toBeTruthy();
+      /*
+       * AND THE RAW ROW IS GONE, not merely accompanied. `legalName` surviving beside `name`
+       * would mean the identity row is still being handed to the web, so the next consumer could
+       * read the unresolved field and skip the name precedence — which is the drift
+       * `insurerIdentity`'s own comment records.
+       */
+      expect(
+        s.insurer.legalName,
+        'the unresolved identity row is still on the wire beside the resolved pair',
+      ).toBeUndefined();
+      // The Arabic half is part of the contract even when null: the screen decides by language,
+      // and a missing KEY and an explicit null are different things to a reader of the payload.
+      expect(Object.keys(s.insurer)).toContain('nameAr');
+    }
+  }, 300_000);
+
   it('7 — the CLAIMS_OFFICER is refused at the ROUTE with 403, not told the record is missing', async () => {
     // Unchanged by door four, deliberately: its anchor is not expressible, so it is not admitted.
     for (const suffix of ['', '/communications']) {

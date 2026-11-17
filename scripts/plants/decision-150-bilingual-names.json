@@ -1,0 +1,14 @@
+{
+  "render-the-insurer-name-by-hand": {
+    "file": "apps/web/app/(app)/rfqs/[id]/page.tsx",
+    "from": "<bdi>{insurerDisplayName(submission.insurer, language)}</bdi>",
+    "to": "<bdi>{submission.insurer.name}</bdi>",
+    "why": "The exact line the owner's walk found blank (§W3). With the wire fixed it would now render the LATIN name to an Arabic reader instead of nothing -- a quieter defect than the blank cell, and the one `check:bilingual-names` exists to refuse at budget zero."
+  },
+  "unresolve-the-insurer-on-the-wire": {
+    "file": "apps/api/src/modules/rfq/rfq.service.ts",
+    "from": "      ...rfqForWire(rfq),",
+    "to": "      ...(rfq as unknown as RfqForWire),",
+    "why": "Restores the shape that produced the blank column: the raw identity row handed to a web type that declares `{ name, nameAr }`. The cast is what a hurried fix for the resulting compiler error would look like, which is why this is the plant rather than deleting the call. ⚠️ IT MUST TARGET `get()`: the first version planted `addInsurers` and `rfq-oversight-read.e2e-spec.ts` passed 12/12, because that spec reads `GET /rfqs/:id`. A plant that kills nothing proves nothing — and it reads exactly like a guard that works."
+  }
+}

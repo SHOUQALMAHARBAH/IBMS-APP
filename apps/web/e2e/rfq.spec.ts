@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
-import { expectAbsentWithin } from "./support/anchored";
+import { anchoredCount, expectAbsentWithin } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -52,11 +52,25 @@ const OPPORTUNITY = {
   context: { insuranceProgramId: "prog-1", customerId: "cust-1" },
 };
 
+/*
+ * The shortlist picker's list AND the insurer on every submission row (`RFQ` below reads
+ * `INSURERS[0]`). It is a SECOND mirror of `insurerIdentity()`'s return beside
+ * `INSURER_IDENTITY` — keep both aligned with the wire.
+ *
+ * ⚠️ `ins-1` CARRIES AN ARABIC NAME AND `ins-2` DELIBERATELY DOES NOT. Both halves are load
+ * bearing: with `nameAr: null` on ins-1 an Arabic render falls back to the Latin name, so the
+ * by-language test would have passed against the very defect it exists to catch — measured, it
+ * did, on the first run. ins-2 keeps `null` so the FALLBACK direction stays exercised, because
+ * an insurer with no Arabic name must still render something rather than a blank cell.
+ *
+ * ⛔ The Arabic is COPIED from `apps/api/test/insurer-crud.e2e-spec.ts`, which has shipped it as
+ * an insurer fixture name since that suite was written. No Arabic is invented here.
+ */
 const INSURERS = [
   {
     id: "ins-1",
     name: "Jordan Insurance Co",
-    nameAr: null,
+    nameAr: "وادي رم التعاونية",
     financialStrengthRating: "A-",
   },
   {
@@ -100,14 +114,35 @@ const RFQ = {
  * own wire shape, so this is a mirror of a checked contract rather than the
  * authority on an unchecked one.
  *
+ * 🔴 CORRECTED 2026-11-17 — IT WAS FOUR ENDPOINTS, NOT THREE, AND THE FOURTH WAS
+ * STILL BROKEN UNDER THIS PARAGRAPH. The owner's demo-path walk (§W3) found the
+ * submissions table on `/rfqs/[id]` rendering an EMPTY insurer column: `GET
+ * /rfqs/:id` was never added to the set this comment describes, so the same
+ * defect survived in a fourth place while the text above said it had been dealt
+ * with — and this mock supplied the wished-for shape there too, exactly as it
+ * once did for the other three. The RFQ's reads flatten now, and
+ * `rfq-oversight-read.e2e-spec.ts` carries the matching wire-shape assertion.
+ *
+ * ⟶ A fixture that supplies a shape the API does not send is not a neutral
+ *   convenience: it is the thing that keeps a whole suite green over a blank
+ *   screen. When this mirror and the wire disagree, the WIRE is the defect.
+ *
  * Keep it aligned with `insurerIdentity()`'s return. `isActive` is part of that
  * contract because a deactivated insurer's quote stays comparable and has to be
  * marked wherever it can be chosen.
+ *
+ * ⚠️ `nameAr` CARRIES AN ARABIC NAME, AND IT IS NOT A NEW ONE. With `null` there
+ * an Arabic render falls back to the Latin name and the by-language test below
+ * would pass against the very defect it exists to catch. The string is COPIED
+ * from `apps/api/test/insurer-crud.e2e-spec.ts`, which has shipped it as an
+ * insurer fixture name since that suite was written — ⛔ no Arabic is invented
+ * here, not even for test data, because a name nobody ratified is a name that
+ * can escape a fixture into a screen.
  */
 const INSURER_IDENTITY = {
   id: "ins-1",
   name: "Jordan Insurance Co",
-  nameAr: null,
+  nameAr: "وادي رم التعاونية",
   financialStrengthRating: "A-",
   isActive: true,
 };
@@ -1734,6 +1769,57 @@ test("records an insurer response status from the RFQ detail screen", async ({
     .selectOption("QUOTED");
 
   await expect.poll(() => transitionedTo).toBe("QUOTED");
+});
+
+test("🔴 §W3/§P4 — every submissions row names its insurer, in Arabic, on the table a reader sees", async ({
+  page,
+}) => {
+  /*
+   * ## The defect this is the acceptance test for (owner's demo-path walk, 2026-11-17)
+   *
+   * The submissions table showed three rows with an EMPTY insurer column. `GET /rfqs/:id`
+   * returned the raw Prisma join — `legalName` / `legalNameAr`, no `name` — against a web type
+   * declaring `{ name, nameAr }`, so the cell read `undefined` and React rendered nothing.
+   *
+   * ⚠️ AND THE SIBLING TEST ABOVE COULD NOT HAVE CAUGHT IT, which is the point of this one.
+   * It asserts a cell named "Jordan Insurance Co" is visible — true against the MOCK, which has
+   * always supplied the flattened shape the API did not send. That is the fixture-as-authority
+   * failure the `INSURER_IDENTITY` comment now records for the fourth time.
+   *
+   * ⟶ So this test asserts a property of EVERY ROW rather than one expected string: the cell is
+   *   non-empty, and in Arabic it is the ARABIC name. A row that lost its name fails here by
+   *   count, however the fixture is edited.
+   */
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"], "AR");
+  await mockRfqApi(page);
+
+  await page.goto("/rfqs/rfq-1");
+
+  // The table must be ON SCREEN first. Asserting cell text while the block is collapsed or still
+  // loading would pass for the wrong reason — the recorded non-vacuity shape.
+  const rows = page.locator("table tbody tr").filter({
+    has: page.locator("select, span"),
+  });
+  await expect(rows.first()).toBeVisible();
+
+  const arabicName = INSURERS[0].nameAr as string;
+  const insurerCells = page.getByRole("cell", { name: arabicName });
+  await expect(insurerCells.first()).toBeVisible();
+
+  // EVERY submission row, not merely one: the walk found THREE blank rows, so a test satisfied by
+  // the first row naming its insurer would have passed against the screen she was looking at.
+  // `anchoredCount`, not `.count()`: a bare count does not auto-wait and answers 0 before the
+  // table renders, so it could agree with a blank screen. `test/e2e-anchored-reads.test.ts`
+  // refused the first version of this line by name, which is the guard working.
+  const count = await anchoredCount(insurerCells);
+  expect(count).toBe(RFQ.insurerSubmissions.length);
+
+  // ⛔ And the Latin name is NOT also on the screen in Arabic. Without this the test would pass
+  // against a by-language helper that fell back to `name` whenever `nameAr` was present — which
+  // is precisely the behaviour the four screens had before this change.
+  await expect(
+    page.getByRole("cell", { name: INSURERS[0].name, exact: true }),
+  ).toHaveCount(0);
 });
 
 test("logs a broker<->insurer exchange on the RFQ detail screen", async ({
