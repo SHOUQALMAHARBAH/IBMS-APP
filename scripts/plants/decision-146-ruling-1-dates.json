@@ -1,0 +1,8 @@
+{
+  "format-a-date-by-hand": {
+    "file": "apps/web/app/(app)/policies/[id]/page.tsx",
+    "from": "                {formatDate(policy.createdAt, language)}",
+    "to": "                {new Date(policy.createdAt).toLocaleDateString('ar-JO')}",
+    "why": "Owner decision 146 ruling 1 -- every figure the system writes is in Western digits. `'ar-JO'` switches to Eastern Arabic-Indic numerals, so this one date would print ٠١٢٣ beside money that prints 0123, on one screen in one language. The gate's budget is ZERO, not a ratchet: every one of the seven sites was the same mistake."
+  }
+}

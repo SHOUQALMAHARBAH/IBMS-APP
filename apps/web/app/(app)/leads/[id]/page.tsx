@@ -21,6 +21,7 @@ import type { LeadSource, LeadStatus } from '../../../../lib/lead/lead-api';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { leadStatusLabelKey } from '../../../../lib/lead/lead-status';
 import { WorkflowHistoryLink } from '../../../../components/ui/WorkflowHistoryLink';
+import { formatDate } from '../../../../lib/i18n/format';
 
 // Typed, not `string`: these two are printed to a person, so they go through
 // ENUM_LABEL, and that lookup only compiles against the real vocabulary.
@@ -40,7 +41,7 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -218,7 +219,7 @@ export default function LeadDetailPage() {
             <div style={profileFieldLabelStyle}>{t('leaddCreated')}</div>
             <div style={profileFieldValueStyle}>
               <bdi>
-                {new Date(lead.createdAt).toLocaleDateString(t('leaddEnUs'))}
+                {formatDate(lead.createdAt, language)}
               </bdi>
             </div>
           </div>
@@ -227,7 +228,7 @@ export default function LeadDetailPage() {
             <div style={profileFieldLabelStyle}>{t('leaddUpdated')}</div>
             <div style={profileFieldValueStyle}>
               <bdi>
-                {new Date(lead.updatedAt).toLocaleDateString(t('leaddEnUs2'))}
+                {formatDate(lead.updatedAt, language)}
               </bdi>
             </div>
           </div>
