@@ -122,11 +122,12 @@ function rfqForWire(rfq: RfqWithSubmissions): RfqForWire {
    * answer one question, which is the raw-join-as-payload shape that left the insurer column
    * blank in the first place.
    */
-  const {
-    insuranceLine_managed: _managed,
-    officeInsuranceLine: _office,
-    ...rest
-  } = rfq;
+  const { insuranceLine_managed, officeInsuranceLine, ...rest } = rfq;
+  // `void` because this project's eslint has no `varsIgnorePattern`, so an `_`-prefixed binding
+  // is still an unused variable. Naming them plainly and discarding them says what is happening
+  // more clearly than a prefix convention the linter does not share.
+  void insuranceLine_managed;
+  void officeInsuranceLine;
   return {
     ...rest,
     insuranceLineAr: insuranceLineNameAr(rfq),
@@ -135,10 +136,12 @@ function rfqForWire(rfq: RfqWithSubmissions): RfqForWire {
      * Prisma payload with `{ insurerSubmissions: RfqInsurerWithInsurer[] }`, so the inferred
      * element type is the plain row — which has `insurerId` and no `insurer` at all.
      */
-    insurerSubmissions: rfq.insurerSubmissions.map((s: RfqInsurerWithInsurer) => ({
-      ...s,
-      insurer: insurerIdentity(s.insurer),
-    })),
+    insurerSubmissions: rfq.insurerSubmissions.map(
+      (s: RfqInsurerWithInsurer) => ({
+        ...s,
+        insurer: insurerIdentity(s.insurer),
+      }),
+    ),
   };
 }
 
@@ -836,6 +839,66 @@ export class RfqService {
       grantedCodes: await this.permissions.getCodesForRoles(actor.roleIds),
       at: new Date(),
     });
+  }
+
+  /**
+   * 🔴 THE LINES THIS OPPORTUNITY CAN STILL BE TAKEN TO MARKET ON — §P3.
+   *
+   * ## What was measured on the owner's demo-path walk, 2026-11-17
+   *
+   * `insuranceLine` was a FREE-TEXT box. The server matches it byte-for-byte against the
+   * programme's own line strings (`assertLineInProgramme`), which are the English programme
+   * vocabulary — and the form's own hint offered two ARABIC examples, so a placement officer who
+   * followed the screen's advice was refused by the server every time. The placeholder did the
+   * same thing. ⟶ There is exactly one correct value per line and the system knows all of them,
+   * which makes this a CHOICE rather than a field.
+   *
+   * ## The two things it excludes, and why each is the server's to decide
+   *
+   * 1. **A line not on the programme** — `assertLineInProgramme` refuses it, so offering it would
+   *    be a screen contradicting its own server.
+   * 2. **A line that already has an RFQ** — `@@unique([opportunityId, insuranceLine])` refuses
+   *    the second one with a 409, and the walk found exactly that: an employee told a request they
+   *    could not see already existed.
+   *
+   * ⛔ The SERVER's checks are NOT removed. This narrows what can be asked for; it does not
+   * become the thing that enforces it. A directly-posted request still meets both.
+   *
+   * ⚠️ VISIBILITY FIRST, on the same `assertOpportunityVisible` every other RFQ route uses:
+   * otherwise this would enumerate another owner's designed programme to anybody who guessed an
+   * opportunity id.
+   */
+  async availableLines(
+    opportunityId: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ insuranceLine: string; insuranceLineAr: string | null }[]> {
+    const opportunity = await this.assertOpportunityVisible(
+      opportunityId,
+      actor,
+      'Opportunity not found',
+    );
+    if (!opportunity.insuranceProgramId) return [];
+    const programme = await this.programs.findById(
+      opportunity.insuranceProgramId,
+    );
+    if (!programme) return [];
+
+    /*
+     * The lines already taken to market, read from the RFQs themselves rather than from any
+     * cached flag — the unique constraint is on this exact pair, so this is the same question
+     * the database will be asked.
+     */
+    const taken = new Set(
+      (await this.rfqs.findRfqsByOpportunityId(opportunityId)).map(
+        (r) => r.insuranceLine,
+      ),
+    );
+    return programme.lines
+      .filter((l) => !taken.has(l.insuranceLine))
+      .map((l) => ({
+        insuranceLine: l.insuranceLine,
+        insuranceLineAr: insuranceLineNameAr(l),
+      }));
   }
 
   async addInsurers(

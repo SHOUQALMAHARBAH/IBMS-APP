@@ -1251,7 +1251,10 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       where: { policyId },
       orderBy: { effectiveFrom: 'desc' },
     });
-    expect(schedule, 'the issued policy has no schedule to change').not.toBeNull();
+    expect(
+      schedule,
+      'the issued policy has no schedule to change',
+    ).not.toBeNull();
     await prisma.policySchedule.update({
       where: { id: schedule!.id },
       data: { sumsInsured: { total: '9900000.000' } },
@@ -1275,11 +1278,15 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       first.content!.issuedFactsSha256,
     );
     expect(
-      createHash('sha256').update(Buffer.from(second.content!.bytes)).digest('hex'),
+      createHash('sha256')
+        .update(Buffer.from(second.content!.bytes))
+        .digest('hex'),
       'the second copy’s stored digest is not a digest of its own stored bytes',
     ).toBe(second.content!.sha256);
     expect(
-      createHash('sha256').update(afterChange.body as Buffer).digest('hex'),
+      createHash('sha256')
+        .update(afterChange.body as Buffer)
+        .digest('hex'),
       'the bytes handed to the customer are not the bytes stored for them',
     ).toBe(second.content!.sha256);
 
@@ -1317,7 +1324,11 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
      */
     const stampedAtIssuance = await prisma.document.findMany({
       where: { policyId, category: 'CERTIFICATE_OF_INSURANCE' },
-      select: { id: true, issuedUnderStudyLicenseId: true, versionNumber: true },
+      select: {
+        id: true,
+        issuedUnderStudyLicenseId: true,
+        versionNumber: true,
+      },
       orderBy: { versionNumber: 'asc' },
     });
     expect(stampedAtIssuance).toHaveLength(2);

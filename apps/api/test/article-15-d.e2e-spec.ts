@@ -396,6 +396,107 @@ describe('OWNER DECISION 130 — the window appears on the minority alone', () =
     ).toBe(0);
   }, 300_000);
 
+  it('🔴 §P3 — the line field is a CHOICE, and a line already taken to market leaves it', async () => {
+    /*
+     * ## What the owner's walk found, 2026-11-17
+     *
+     * `insuranceLine` was free text. The server matches it byte-for-byte against the programme's
+     * own line strings, and the form's own hint offered two ARABIC examples — so a placement
+     * officer who followed the screen's advice was refused every time. There is exactly one
+     * correct value per line and the system knows all of them.
+     *
+     * `GET /rfqs/available-lines` is that list. It carries `rfq.create`, the same code as the
+     * request it feeds, on the precedent `article-15-d/options` set: asking what a request COULD
+     * be made for is part of making one. ⛔ No permission was minted and no role was granted
+     * anything.
+     *
+     * ## Both directions, because an offer list is only useful if it SHRINKS
+     *
+     * A line that already has an RFQ must leave the list — `@@unique([opportunityId,
+     * insuranceLine])` refuses the second one with a 409, and the walk found exactly that: an
+     * employee told a request they could not see already existed. A list that kept offering it
+     * would be a screen walking its reader into that refusal.
+     */
+    const { opportunityId } = await opportunityOn(MOTOR, 'Motor Comprehensive');
+
+    interface AvailableLine {
+      insuranceLine: string;
+      insuranceLineAr: string | null;
+    }
+    const readLines = async (): Promise<AvailableLine[]> => {
+      const res = await request(app!.getHttpServer())
+        .get('/rfqs/available-lines')
+        .query({ opportunityId })
+        .set(bearer(officer.accessToken))
+        .expect(200);
+      return res.body as AvailableLine[];
+    };
+
+    const before = await readLines();
+    expect(
+      before.map((l) => l.insuranceLine),
+      'the designed line is not offered, so the chooser would be empty where the server accepts a value',
+    ).toContain('Motor Comprehensive');
+    // Every entry answers in both scripts — the key is asserted, not a non-empty Arabic value,
+    // because a row whose catalogue FK predates the column legitimately has none.
+    for (const l of before) {
+      expect(Object.keys(l)).toContain('insuranceLineAr');
+    }
+
+    const insurers = await Promise.all([
+      makeInsurer('P3a'),
+      makeInsurer('P3b'),
+      makeInsurer('P3c'),
+    ]);
+    await request(app!.getHttpServer())
+      .post('/rfqs')
+      .set(bearer(officer.accessToken))
+      .send({
+        opportunityId,
+        insuranceLine: 'Motor Comprehensive',
+        insurerIds: insurers,
+      })
+      .expect(201);
+
+    const after = await readLines();
+    expect(
+      after.map((l) => l.insuranceLine),
+      'a line already taken to market is still being offered — the chooser walks the employee into the 409',
+    ).not.toContain('Motor Comprehensive');
+
+    /*
+     * ⛔ AND THE SERVER'S OWN CHECK IS UNCHANGED. Narrowing what can be ASKED FOR must not become
+     * the thing that enforces it: a request posted directly, past any screen, still meets the
+     * programme check and the unique constraint. Asserted here so a later "the chooser already
+     * prevents this" cannot quietly remove either.
+     */
+    const second = await request(app!.getHttpServer())
+      .post('/rfqs')
+      .set(bearer(officer.accessToken))
+      .send({
+        opportunityId,
+        insuranceLine: 'Motor Comprehensive',
+        insurerIds: insurers,
+      });
+    expect(
+      second.status,
+      'a directly-posted duplicate was accepted — the chooser became the enforcement',
+    ).toBe(409);
+
+    const notOnProgramme = await request(app!.getHttpServer())
+      .post('/rfqs')
+      .set(bearer(officer.accessToken))
+      .send({
+        opportunityId,
+        insuranceLine: 'Cyber',
+        insurerIds: insurers,
+      });
+    expect(
+      notOnProgramme.status,
+      'a line that is not on the programme was accepted — assertLineInProgramme is gone',
+    ).toBe(422);
+  }, 300_000);
+
   it('DECISION 130 — and a request reaching three REFUSES an exemption it cannot need', async () => {
     // There is nothing to be exempt FROM. Accepting one would inflate the share of requests that
     // "needed" an exemption, which is the figure an inspector would read.

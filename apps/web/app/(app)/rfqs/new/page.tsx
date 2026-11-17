@@ -7,7 +7,9 @@ import { hasPermission } from '../../../../lib/auth/permissions';
 import {
   createRfq,
   getArticle15DOptions,
+  listAvailableLines,
   listSelectableInsurers,
+  type AvailableLine,
   type Article15DChoice,
   type Article15DOptions,
   type SelectableInsurer,
@@ -30,13 +32,22 @@ import {
 import { insurerPickerStyle } from '../../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { permissionRefusal } from '../../../../lib/i18n/permission-refusal';
-import { insurerDisplayName } from '../../../../lib/i18n/names';
+import {
+  insurerDisplayName,
+  lineDisplayName,
+} from '../../../../lib/i18n/names';
 
 function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   const router = useRouter();
   const { language, t } = useLanguage();
 
   const [insurers, setInsurers] = useState<SelectableInsurer[] | null>(null);
+  /*
+   * §P3 — the lines this opportunity can still be taken to market on. `null` while loading, so
+   * the chooser can say «nothing to choose» only once it KNOWS, rather than during the first
+   * render of every visit.
+   */
+  const [lines, setLines] = useState<AvailableLine[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [insuranceLine, setInsuranceLine] = useState('');
@@ -110,7 +121,12 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   useEffect(() => {
     void (async () => {
       try {
-        setInsurers(await listSelectableInsurers());
+        const [fetchedInsurers, fetchedLines] = await Promise.all([
+          listSelectableInsurers(),
+          listAvailableLines(opportunityId),
+        ]);
+        setInsurers(fetchedInsurers);
+        setLines(fetchedLines);
         setLoadError(null);
       } catch (err) {
         setLoadError(
@@ -122,7 +138,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         );
       }
     })();
-  }, [t]);
+  }, [opportunityId, t]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -178,15 +194,46 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       >
         {t('rfqNewLineLabel')}
       </label>
-      <div style={cardMetaStyle}>{t('rfqNewLineHint')}</div>
-      <input
+      {/*
+        §P3 — A CHOICE, NOT FREE TEXT.
+
+        The server matches this byte-for-byte against the programme's own line strings, so there
+        is exactly one correct value per line and the system knows all of them. The old free-text
+        box could not be typed correctly by a reader of this screen: its hint gave two ARABIC
+        examples and the server only accepts the English programme vocabulary.
+
+        ⛔ `rfqNewLineHint` and `rfqLinePlaceholder` are GONE rather than reworded. Both described
+        how to type a value into a box that no longer exists, and decision 125 forbids composing a
+        replacement sentence out of words that ship elsewhere. If this chooser needs a sentence,
+        it is the owner's to write.
+      */}
+      <select
         id="insuranceLine"
-        dir="auto"
         value={insuranceLine}
         onChange={(e) => setInsuranceLine(e.target.value)}
-        placeholder={t('rfqLinePlaceholder')}
+        disabled={lines !== null && lines.length === 0}
         style={{ minWidth: '20rem', marginTop: '0.35rem' }}
-      />
+      >
+        {/*
+          ⚠️ `crateLineChoose` IS BORROWED FROM THE COMMISSION DICTIONARY, DELIBERATELY.
+
+          It already ships as «اختر فرع تأمين…» — "select an insurance line…" — on
+          `/commission`'s own line chooser, which is the identical control asking the identical
+          question. The standing rule permits a string already shipping FOR THE SAME THING, and
+          ⛔ forbids composing a new one; minting a second key would put one sentence in two
+          homes, which is how they drift apart.
+
+          ⟶ It also already says «فرع تأمين», which is the vocabulary decision 150 ruling 5
+            settles — so this control is born saying the right word rather than needing §6 to
+            come back for it.
+        */}
+        <option value="">{t('crateLineChoose')}</option>
+        {(lines ?? []).map((l) => (
+          <option key={l.insuranceLine} value={l.insuranceLine}>
+            {lineDisplayName(l, language)}
+          </option>
+        ))}
+      </select>
 
       <fieldset style={{ border: 'none', padding: 0, marginTop: '1.5rem' }}>
         <legend style={{ fontWeight: 600 }}>

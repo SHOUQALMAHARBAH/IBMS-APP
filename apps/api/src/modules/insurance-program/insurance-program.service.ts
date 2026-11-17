@@ -71,8 +71,10 @@ export type InsuranceProgramViewLine = Omit<
   'insuranceLine_managed' | 'officeInsuranceLine'
 > & { insuranceLineAr: string | null };
 
-export interface InsuranceProgramView
-  extends Omit<InsuranceProgramWithLines, 'lines'> {
+export interface InsuranceProgramView extends Omit<
+  InsuranceProgramWithLines,
+  'lines'
+> {
   lines: InsuranceProgramViewLine[];
   context: InsuranceProgramContext;
 }
@@ -277,11 +279,11 @@ export class InsuranceProgramService {
     return {
       ...program,
       lines: program.lines.map((line) => {
-        const {
-          insuranceLine_managed: _managed,
-          officeInsuranceLine: _office,
-          ...rest
-        } = line;
+        const { insuranceLine_managed, officeInsuranceLine, ...rest } = line;
+        // See `rfqForWire` — eslint has no `varsIgnorePattern` here, so the two joins are
+        // named and discarded rather than prefixed.
+        void insuranceLine_managed;
+        void officeInsuranceLine;
         return { ...rest, insuranceLineAr: insuranceLineNameAr(line) };
       }),
       context,

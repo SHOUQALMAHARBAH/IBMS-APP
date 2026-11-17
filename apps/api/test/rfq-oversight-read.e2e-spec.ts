@@ -297,7 +297,9 @@ describe('door four: an anchored oversight read of an RFQ', () => {
       expect(wire.insuranceLineAr).toMatch(/[؀-ۿ]/);
     }
     // ⛔ And the raw join is NOT on the wire beside it, for the same reason as the insurer above.
-    expect(Object.keys(rfq.body as object)).not.toContain('insuranceLine_managed');
+    expect(Object.keys(rfq.body as object)).not.toContain(
+      'insuranceLine_managed',
+    );
   }, 300_000);
 
   it('7 — the CLAIMS_OFFICER is refused at the ROUTE with 403, not told the record is missing', async () => {

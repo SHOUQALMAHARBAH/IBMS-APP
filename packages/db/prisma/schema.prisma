@@ -7312,7 +7312,7 @@ model DocumentContent {
   /// NULL means «stored before decision 149». Those rows cannot be back-filled, because
   /// recomputing their HTML needs the policy as it stood at their issuance.
   issuedFactsSha256 String?
-  createdAt      DateTime     @default(now())
+  createdAt         DateTime @default(now())
 
   @@index([organizationId])
   @@index([issuedFactsSha256])

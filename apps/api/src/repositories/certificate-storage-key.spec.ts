@@ -36,6 +36,25 @@ type Built = {
 };
 
 /**
+ * The first argument a mock was called with, as a typed record.
+ *
+ * `vi.fn().mock.calls` is `any[][]`, and reading `.where` / `.data` straight off it is member
+ * access on `any` — which this project's eslint refuses, rightly: an `any` here would let a
+ * renamed field pass as `undefined` and every assertion below would quietly test nothing.
+ */
+function firstArg<K extends string>(
+  fn: ReturnType<typeof vi.fn>,
+  key: K,
+): Record<string, unknown> {
+  const calls = fn.mock.calls as unknown as Record<string, unknown>[][];
+  expect(calls.length, 'the mock was never called').toBeGreaterThan(0);
+  const arg = calls[0][0];
+  const value = arg[key];
+  expect(value, `the call carried no ${key}`).toBeDefined();
+  return value as Record<string, unknown>;
+}
+
+/**
  * `findFirst` answers the IDENTITY lookup first and the «latest copy» lookup second, in the order
  * the repository asks them. A queue rather than one value, so a test can say «no match, but there
  * IS a previous copy» — which is the whole subject below.
@@ -50,9 +69,10 @@ function built(findFirstResults: unknown[]): Built {
     .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: 'new-doc', ...data }),
     );
-  const documentUpdate = vi
-    .fn()
-    .mockResolvedValue({ id: 'new-doc', storageRef: 'db:documentContent/new-doc' });
+  const documentUpdate = vi.fn().mockResolvedValue({
+    id: 'new-doc',
+    storageRef: 'db:documentContent/new-doc',
+  });
   const contentCreate = vi.fn().mockResolvedValue({});
 
   const tx = {
@@ -91,7 +111,7 @@ describe('OWNER DECISION 149 — the key that decides whether a certificate is a
     const b = built([]);
     await b.repository.storeIssuedCertificate(INPUT);
 
-    const where = b.findFirst.mock.calls[0][0].where as Record<string, unknown>;
+    const where = firstArg(b.findFirst, 'where');
     expect(where.policyId).toBe('policy-1');
     expect(where.category).toBe('CERTIFICATE_OF_INSURANCE');
     expect(where.fileName).toBe(INPUT.fileName);
@@ -139,8 +159,11 @@ describe('OWNER DECISION 149 — the key that decides whether a certificate is a
 
     await b.repository.storeIssuedCertificate(INPUT);
 
-    const data = b.documentCreate.mock.calls[0][0].data as Record<string, unknown>;
-    expect(data.versionNumber, 'the second copy did not advance the version').toBe(2);
+    const data = firstArg(b.documentCreate, 'data');
+    expect(
+      data.versionNumber,
+      'the second copy did not advance the version',
+    ).toBe(2);
     expect(
       data.previousVersionId,
       '«بجانب القديمة» is not recorded — the two copies are unrelated rows a reader must order by date',
@@ -153,7 +176,7 @@ describe('OWNER DECISION 149 — the key that decides whether a certificate is a
 
     await b.repository.storeIssuedCertificate(INPUT);
 
-    const data = b.documentCreate.mock.calls[0][0].data as Record<string, unknown>;
+    const data = firstArg(b.documentCreate, 'data');
     expect(data.versionNumber).toBe(1);
     expect(data.previousVersionId).toBeNull();
   });
@@ -169,7 +192,11 @@ describe('OWNER DECISION 149 — the key that decides whether a certificate is a
      */
     const b = built([
       null,
-      { id: 'first-copy', versionNumber: 1, issuedUnderStudyLicenseId: 'lic-under-study' },
+      {
+        id: 'first-copy',
+        versionNumber: 1,
+        issuedUnderStudyLicenseId: 'lic-under-study',
+      },
     ]);
 
     await b.repository.storeIssuedCertificate({
@@ -177,7 +204,7 @@ describe('OWNER DECISION 149 — the key that decides whether a certificate is a
       issuedUnderStudyLicenseId: null,
     });
 
-    const data = b.documentCreate.mock.calls[0][0].data as Record<string, unknown>;
+    const data = firstArg(b.documentCreate, 'data');
     expect(
       data.issuedUnderStudyLicenseId,
       'the new certificate INHERITED the previous copy’s renewal stamp — decision 149 §٥ ' +
@@ -187,14 +214,17 @@ describe('OWNER DECISION 149 — the key that decides whether a certificate is a
 
   it('🔴 criterion 4, the other direction — a stamp earned at THIS issuance is written', async () => {
     // Non-vacuity: the test above passes trivially if the column is never written at all.
-    const b = built([null, { id: 'first-copy', versionNumber: 1, issuedUnderStudyLicenseId: null }]);
+    const b = built([
+      null,
+      { id: 'first-copy', versionNumber: 1, issuedUnderStudyLicenseId: null },
+    ]);
 
     await b.repository.storeIssuedCertificate({
       ...INPUT,
       issuedUnderStudyLicenseId: 'lic-under-study-now',
     });
 
-    const data = b.documentCreate.mock.calls[0][0].data as Record<string, unknown>;
+    const data = firstArg(b.documentCreate, 'data');
     expect(
       data.issuedUnderStudyLicenseId,
       'a certificate issued while the renewal was under study was stored WITHOUT its stamp',
@@ -206,7 +236,7 @@ describe('OWNER DECISION 149 — the key that decides whether a certificate is a
 
     await b.repository.storeIssuedCertificate(INPUT);
 
-    const data = b.contentCreate.mock.calls[0][0].data as Record<string, unknown>;
+    const data = firstArg(b.contentCreate, 'data');
     expect(data.issuedFactsSha256).toBe(INPUT.issuedFactsSha256);
     expect(data.sha256).toBe(INPUT.sha256);
     expect(

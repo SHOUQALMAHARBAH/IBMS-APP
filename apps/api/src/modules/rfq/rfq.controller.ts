@@ -64,6 +64,26 @@ export class RfqController {
    * Declared BEFORE `:id` so "article-15-d" is never parsed as an RFQ id — the same reason
    * `selectable-insurers` is.
    */
+  /**
+   * §P3 — the lines this opportunity can still be taken to market on.
+   *
+   * GATED ON `rfq.create`, the same code as the request itself and for the same reason the
+   * art. 15/d options route below carries it: asking what a request COULD be made for is part of
+   * making one, and a separate code would be a checkbox that hides the choice from somebody who
+   * can still send the request. ⛔ No permission is minted and no role is granted anything.
+   *
+   * Declared BEFORE `:id` so "available-lines" is never parsed as an RFQ id — the same reason
+   * `article-15-d/options` and `selectable-insurers` are.
+   */
+  @RequirePermissions('rfq.create')
+  @Get('available-lines')
+  availableLines(
+    @Query('opportunityId') opportunityId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rfqs.availableLines(opportunityId, user);
+  }
+
   @RequirePermissions('rfq.create')
   @Get('article-15-d/options')
   article15DOptions(

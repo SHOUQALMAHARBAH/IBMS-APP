@@ -85,9 +85,6 @@ export const RFQ = {
       'الإعلان بأن طلب عرض السعر ذاهب إلى أقل من ثلاث شركات تأمين بلا إعفاء',
     rfqNewInsurerListLoadError: 'تعذر تحميل قائمة شركات التأمين — حاول مرة أخرى.',
     rfqNewLineLabel: 'الخط التأميني',
-    rfqNewLineHint:
-      'طلب عرض أسعار واحد لكل خط (مثال: "التأمين الشامل على الممتلكات"، "تعطل ' +
-      'الأعمال"). يُرفض الخط إذا كان له طلب عرض أسعار سابق على هذه الفرصة.',
     rfqNewShortlistLegend: 'القائمة المختصرة لشركات التأمين',
     rfqNewShortlistHint: 'اختر شركة تأمين واحدة على الأقل.',
     rfqNewNoInsurersOnFile: 'لا يوجد شركات تأمين مسجلة.',
@@ -152,7 +149,6 @@ export const RFQ = {
     rfqLogExchangeError: 'تعذر تسجيل المراسلة — حاول مرة أخرى.',
     rfqDirectionLabel: 'الاتجاه',
     rfqChannelLabel: 'القناة',
-    rfqLinePlaceholder: 'التأمين على الممتلكات ضد جميع الأخطار',
     rfqNegotiationNotesPlaceholder: 'مثال: طُلب خصم ٥٪ وشطب استثناء الفيضان',
     rfqCommInsurerLabel: 'المؤمِّن (اختياري)',
     rfqCommInsurerWholePanel: 'كل القائمة',
@@ -507,9 +503,6 @@ export const RFQ = {
       'declare that this quote request is going to fewer than three insurance companies with no exemption',
     rfqNewInsurerListLoadError: 'Could not load the insurer list — try again.',
     rfqNewLineLabel: 'Insurance line',
-    rfqNewLineHint:
-      'One RFQ per line (e.g. "Property All Risks", "Business Interruption"). ' +
-      'A line already covered by an RFQ on this opportunity is rejected.',
     rfqNewShortlistLegend: 'Insurer shortlist',
     rfqNewShortlistHint: 'Select at least one insurer.',
     rfqNewNoInsurersOnFile: 'No insurers on file.',
@@ -565,7 +558,6 @@ export const RFQ = {
     rfqLogExchangeError: 'Could not log the exchange — try again.',
     rfqDirectionLabel: 'Direction',
     rfqChannelLabel: 'Channel',
-    rfqLinePlaceholder: 'Property All Risks',
     rfqNegotiationNotesPlaceholder: 'e.g. asked for 5% off and the flood exclusion struck',
     rfqCommInsurerLabel: 'Insurer (optional)',
     rfqCommInsurerWholePanel: 'Whole panel',

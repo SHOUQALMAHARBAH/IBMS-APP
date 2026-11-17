@@ -81,6 +81,21 @@ const INSURERS = [
   },
 ];
 
+/**
+ * §P3 — what `GET /rfqs/available-lines` returns for `opp-1`.
+ *
+ * ⚠️ The Arabic is the CATALOGUE's own, carried on the wire by the server — see
+ * `insurance-line-names.ts` for why the screen cannot look it up. Copied from the seeded
+ * `InsuranceLine` row for PROPERTY_ALL_RISKS; ⛔ no Arabic is invented here.
+ */
+const AVAILABLE_LINES = [
+  {
+    insuranceLine: "Property All Risks",
+    insuranceLineAr: "تأمين جميع أخطار الممتلكات",
+  },
+  { insuranceLine: "Business Interruption", insuranceLineAr: null },
+];
+
 const RFQ = {
   id: "rfq-1",
   opportunityId: "opp-1",
@@ -1541,6 +1556,14 @@ async function mockRfqApi(
     if (/\/rfqs\/selectable-insurers(\?|$)/.test(url)) {
       return route.fulfill({ status: 200, json: INSURERS });
     }
+    /*
+     * §P3 — the lines this opportunity can still be taken to market on. The server decides
+     * which they are (on the programme, and not already carrying an RFQ); the form only
+     * renders what it is given, which is why this mock is a flat list and not a filter.
+     */
+    if (/\/rfqs\/available-lines(\?|$)/.test(url)) {
+      return route.fulfill({ status: 200, json: AVAILABLE_LINES });
+    }
     if (/\/rfqs\/rfq-1\/communications(\?|$)/.test(url)) {
       if (method === "POST") {
         const b = route.request().postDataJSON() as {
@@ -1738,7 +1761,11 @@ test("creates an RFQ with an insurer shortlist", async ({ page }) => {
 
   await page.goto("/rfqs/new?opportunityId=opp-1");
   await expect(page.getByRole("heading", { name: "New RFQ" })).toBeVisible();
-  await page.getByLabel("Insurance line").fill("Property All Risks");
+  // §P3 — a CHOICE now, not free text. The old `.fill()` typed a value the server happened to
+  // accept; the walk found that a reader following the screen's own Arabic hint was refused.
+  await page
+    .getByLabel("Insurance line")
+    .selectOption({ value: "Property All Risks" });
   await page.getByLabel("Jordan Insurance Co · A-").check();
   await page.getByRole("button", { name: "Create RFQ" }).click();
 

@@ -270,6 +270,28 @@ export function listSelectableInsurers(): Promise<SelectableInsurer[]> {
   return apiGet('/rfqs/selectable-insurers');
 }
 
+/** One line this opportunity can still be taken to market on — §P3. */
+export interface AvailableLine {
+  insuranceLine: string;
+  insuranceLineAr: string | null;
+}
+
+/**
+ * The lines of this opportunity's programme that have no RFQ yet.
+ *
+ * ⛔ THE SCREEN DOES NOT FILTER THIS. Which lines are offerable is decided by the server — on
+ * the programme, and on the `@@unique([opportunityId, insuranceLine])` the second RFQ would hit
+ * — and a second filter here would disagree with it the first time either rule moved. Gated on
+ * `rfq.create`, the same code as the request this feeds.
+ */
+export function listAvailableLines(
+  opportunityId: string,
+): Promise<AvailableLine[]> {
+  return apiGet(
+    `/rfqs/available-lines?opportunityId=${encodeURIComponent(opportunityId)}`,
+  );
+}
+
 export function listRfqs(
   scope: { opportunityId: string } | { customerId: string },
 ): Promise<Rfq[]> {
