@@ -79,13 +79,38 @@ async function openAt(
   await page.goto(path);
 }
 
+/*
+ * 🔴 THE ARABIC ANCHORS USED TO BE «العملية N», AND OWNER DECISION 150 RULING 3-أ DELETED THEM.
+ *
+ * Five of these screens were anchored on the backlog's own process number — «العملية 8»,
+ * «العملية 9», … — which is exactly the prefix she ruled out of all twenty-five descriptions:
+ * «يُحذَف من الخمسة والعشرين». So this spec was asserting the PRESENCE of a string the owner had
+ * ruled against, and it went red on the commit that obeyed her. CI caught it; my local sweep did
+ * not, because I did not run this file.
+ *
+ * ⟶ Each Arabic anchor is now a DISTINCTIVE PHRASE THAT SURVIVES the ruling, taken from the
+ *   post-150 text in `docs/decision-150-ratified-strings.md` §٥. The full strings are pinned
+ *   byte-for-byte against that annex by `lib/i18n/decision-150.strings.test.ts`; what this file
+ *   needs is only something stable to prove the prose REACHED THE SCREEN before it screenshots.
+ *
+ * ⚠️ THE ENGLISH ANCHORS ARE UNCHANGED, AND THAT IS MEASURED RATHER THAN ASSUMED. Ruling 3-أ and
+ * the annex are about the ARABIC — every row of the annex's §١ table names an Arabic span, and
+ * §٥ gives Arabic text only. The English descriptions still open «Process N — », so they still
+ * anchor here. Whether the English should lose its prefix too is an empty cell: she has not
+ * ruled on it, and ⛔ removing it because the Arabic lost it would be deciding for her.
+ */
 // screen -> [path, a phrase that must be on it in AR, and in EN]
 const SCREENS: Array<[string, string, string, string]> = [
-  ["cross-sell", "/cross-sell", "العملية 8", "Process 8"],
-  ["up-sell", "/up-sell", "العملية 9", "Process 9"],
-  ["crm", "/crm", "العملية 10", "Process 10"],
-  ["needs-assessments", "/needs-assessments", "العملية 5", "Process 5"],
-  ["insurance-programs", "/insurance-programs", "العملية 7", "Process 7"],
+  ["cross-sell", "/cross-sell", "بقائمة فروع تأمين مرجعية", "Process 8"],
+  ["up-sell", "/up-sell", "مبلغ التأمين المصمم للممتلكات", "Process 9"],
+  ["crm", "/crm", "تسجيل كل نقطة تواصل مع العميل", "Process 10"],
+  ["needs-assessments", "/needs-assessments", "استبيان مخاطر منظّم", "Process 5"],
+  [
+    "insurance-programs",
+    "/insurance-programs",
+    "برنامج تأمين متعدد فروع التأمين",
+    "Process 7",
+  ],
   ["access-recertification", "/access-recertification", "البند 5.1", "Part 5.1"],
   ["claims-analytics", "/claims-analytics", "معدّل الخسارة", "Loss Ratio"],
 ];
