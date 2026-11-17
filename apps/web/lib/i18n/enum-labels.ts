@@ -163,6 +163,7 @@ export const ENUM_LABEL = {
    * them to these keys, so a 17th member fails BY NAME on the commit that adds it.
    */
   DocumentCategory: {
+    CERTIFICATE_OF_INSURANCE: 'docCategoryCertificateOfInsurance',
     BROKER_LICENSE_CERTIFICATE: 'docCategoryBrokerLicenseCertificate',
     INSURER_LICENSE_CERTIFICATE: 'docCategoryInsurerLicenseCertificate',
     REGULATORY_DECISION: 'docCategoryRegulatoryDecision',

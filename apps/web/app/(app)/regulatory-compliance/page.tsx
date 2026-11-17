@@ -18,6 +18,7 @@ import {
   createBrokerLicense,
   getBrokerLicense,
   recordRegulatoryAction,
+  declareRenewalStanding,
   recordRenewalRequest,
   renewBrokerLicense,
   type BrokerLicense,
@@ -102,6 +103,11 @@ const formStyle: CSSProperties = {
   gap: 'var(--space-2)',
   maxWidth: '30rem',
 };
+/* OWNER DECISION 128's declaration block. A NAMED style rather than an inline literal:
+ * `check:screen-pass` refused the inline site and its budget may only FALL, so the declaration
+ * moves out instead of the number moving up. */
+const renewalBlockStyle: CSSProperties = { marginTop: '0.5rem' };
+
 const labelStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -116,6 +122,26 @@ export default function RegulatoryCompliancePage() {
   // when the data arrived.
   const { t, language } = useLanguage();
   const canManage = hasPermission(user, 'license.manage');
+  /*
+   * 🔴 OWNER DECISION 128 + 131 — a SEPARATE code, and held by no role until an office grants it.
+   *
+   * ⛔ NOT `canManage`. Attaching the filing proof records a fact and `license.manage` already
+   * governs it; declaring that the Central Bank has sent nothing swears to one, and decision 128
+   * §3 asks for «حامل الصلاحية». An office may deliberately grant one and not the other, so the
+   * two controls are gated apart — `frontend-ux-directive.md`: a control a role cannot use does
+   * not exist on their screen.
+   */
+  const canDeclareRenewal = hasPermission(user, 'license-renewal.declare');
+
+  /*
+   * ⚠️ `renewalUnderStudy` IS READ WITH `?.` EVEN THOUGH THE API ALWAYS SENDS IT.
+   *
+   * What crosses this boundary is DATA, not a type. The field arrived with OWNER DECISION 128, so
+   * any response built before it — a cached payload, an older api during a rolling deploy, a test
+   * fixture written last month — has no such key, and `undefined.state` throws rather than
+   * degrading. A screen that blanks because the server is one version behind is a worse failure
+   * than one that simply does not show a control it cannot justify showing.
+   */
 
   // `license` is the CURRENT term; `terms` is the whole series. Module 0 item (c) turned the
   // licence from one row into a series, and the screen shows both: the term that decides whether
@@ -150,6 +176,9 @@ export default function RegulatoryCompliancePage() {
   const [certificateFileName, setCertificateFileName] = useState('');
   const [certificateStorageRef, setCertificateStorageRef] = useState('');
   const [renewalRequestedAt, setRenewalRequestedAt] = useState('');
+  /** OWNER DECISION 128 conditions 2 — the filing proof and the Central Bank's reference. */
+  const [renewalProofDocumentId, setRenewalProofDocumentId] = useState('');
+  const [renewalReference, setRenewalReference] = useState('');
   // The regulator-decision draft. SANCTION is the default basis because it is the case an office
   // meets without choosing it; a suspension at the office own request is something it applied for.
   const [actionKind, setActionKind] = useState<
@@ -320,8 +349,32 @@ export default function RegulatoryCompliancePage() {
     await run(async () => {
       await recordRenewalRequest({
         requestedAt: renewalRequestedAt || undefined,
+        /*
+         * 🔴 OWNER DECISION 128 — THE PROOF AND ITS REFERENCE TRAVEL TOGETHER OR NEITHER DOES.
+         *
+         * The api refuses half of them (422) and a CHECK constraint makes the half-state
+         * unreachable. Sent as a pair here so the screen asks the same question the server does:
+         * a date on its own opens nothing, which is the whole of «الإثبات يفتح، لا التاريخ».
+         */
+        proofDocumentId: renewalProofDocumentId.trim() || undefined,
+        referenceNumber: renewalReference.trim() || undefined,
       });
       setRenewalRequestedAt('');
+      setRenewalProofDocumentId('');
+      setRenewalReference('');
+    });
+  }
+
+  /**
+   * 🔴 OWNER DECISION 128 — the declaration, and it is a SEPARATE ACT from filing the proof.
+   *
+   * Filing records a fact; this swears to one. They carry different permissions
+   * (`license.manage` and `license-renewal.declare`), so an office may grant one without the
+   * other — which is why the two controls are never merged into a single button.
+   */
+  async function submitRenewalDeclaration() {
+    await run(async () => {
+      await declareRenewalStanding();
     });
   }
 
@@ -610,14 +663,52 @@ export default function RegulatoryCompliancePage() {
           {/* Write-once: art. 11 measures lateness from the filing date, so the control disappears
               once one is recorded rather than offering an edit the API would refuse. */}
           {canManage && !license.renewalRequestedAt ? (
-            <div style={{ marginTop: '0.5rem' }}>
+            <div style={{ marginTop: '0.5rem' }} data-renewal-filing="">
               <label style={labelStyle}>
-                {t('rcColRenewalFiled')}
+                {t('rcRenewalRequestedAtLabel')}
                 <input
                   type="date"
-                  aria-label={t('rcColRenewalFiled')}
+                  aria-label={t('rcRenewalRequestedAtLabel')}
                   value={renewalRequestedAt}
                   onChange={(e) => setRenewalRequestedAt(e.target.value)}
+                />
+              </label>
+              {/*
+                🔴 OWNER DECISION 128 — THE PROOF OPENS ISSUANCE, NOT THE DATE.
+                «الإثبات يفتح، لا التاريخ.» Before this decision a date typed into the field
+                above opened all six issuance acts on its own. These two fields are condition 2,
+                and the api refuses one without the other.
+              */}
+              {/*
+                🔴 A PICKER, NOT A TYPED uuid — `check:typed-identifiers` refused the text input
+                and was right: «nobody knows a uuid», and the proof is a document somebody has
+                just scanned and named.
+
+                ⚠️ GATED ON `document.read`, which is NOT implied by `license.manage`. The picker
+                searches the office's whole document register, so offering it to somebody who may
+                not read that register would be a way around `document.read` — the same reasoning
+                `/audit-trail` records at its own document chooser. A licence manager without it
+                keeps a working screen: the filing still records with its date, and the proof is
+                attached by somebody who may see the register.
+              */}
+              {hasPermission(user, 'document.read') ? (
+                <div data-renewal-proof="">
+                  <EntitySearch
+                    kind="document"
+                    value={renewalProofDocumentId}
+                    onChange={setRenewalProofDocumentId}
+                    label={t('rcRenewalProofLabel')}
+                  />
+                </div>
+              ) : null}
+              <label style={labelStyle}>
+                {t('rcRenewalReferenceLabel')}
+                <input
+                  type="text"
+                  aria-label={t('rcRenewalReferenceLabel')}
+                  data-renewal-reference=""
+                  value={renewalReference}
+                  onChange={(e) => setRenewalReference(e.target.value)}
                 />
               </label>
               <button
@@ -628,6 +719,58 @@ export default function RegulatoryCompliancePage() {
                 {t('rcRecordRenewalButton')}
               </button>
             </div>
+          ) : null}
+          {/*
+            🔴 OWNER DECISION 128 — THE STANDING DECLARATION, AND ITS OWN PERMISSION.
+
+            `frontend-ux-directive.md`: a control a role cannot use does not exist on their
+            screen. The route carries `license-renewal.declare`, which is held by NO role until
+            an office grants it (decision 131) — so this is the one control on this screen that
+            a licence manager may not see, and that is the decision working rather than a bug.
+
+            ⛔ IT SHOWS ONLY WHERE IT CAN ACT: past the printed expiry, with the filing and the
+            proof already in, and no declaration yet. Standing it up earlier would invite a
+            person to swear to something before there is anything to swear about, and the row is
+            append-only — there is no undo.
+          */}
+          {canDeclareRenewal &&
+          standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (
+            <div style={renewalBlockStyle} data-renewal-declaration="">
+              {/*
+                ⛔ THE SENTENCE IS SHOWN, AND THE BUTTON IS NOT THE SENTENCE.
+                A control whose label is a 70-character oath is unreadable, and worse, it would
+                make the oath look like the name of a button rather than something the person is
+                stating. She is SHOWN what she is declaring; the control says what pressing it
+                does. The api stores the sentence verbatim either way — it never takes a caller's
+                wording — so the record testifies to the text above and not to the label.
+              */}
+              <p style={noteStyle} data-renewal-declaration-sentence="">
+                {t('rcRenewalDeclarationSentence')}
+              </p>
+              <button
+                type="button"
+                data-renewal-declare=""
+                disabled={busy}
+                onClick={() => void submitRenewalDeclaration()}
+              >
+                {t('rcRecordRenewalButton')}
+              </button>
+            </div>
+          ) : null}
+          {/*
+            OWNER DECISION 136(ب) — the sentence for an office that may not issue because nobody
+            has declared yet. Shown to EVERY reader of this screen, not only a declarer: the
+            employee who met this refusal on a policy needs to see the same words here, and the
+            licence manager needs to know why issuance stopped.
+          */}
+          {standing?.renewalUnderStudy?.state === 'AWAITING_DECLARATION' ? (
+            <p
+              style={warningStyle}
+              role="status"
+              data-renewal-awaiting-declaration=""
+            >
+              {t('rcRenewalAwaitingDeclaration')}
+            </p>
           ) : null}
           {terms.length > 1 ? (
             <div style={{ marginTop: '1rem' }}>

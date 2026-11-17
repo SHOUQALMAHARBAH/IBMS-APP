@@ -41,6 +41,11 @@ export interface CreateEndorsementInput {
   effectiveFrom: Date;
   requestedByUserId: string;
   targetCoverage: Prisma.InputJsonValue | null;
+  /** 🔴 OWNER DECISION 128 — the term the office was past the expiry of when a COVER-INCREASING
+   *  endorsement was raised, or null. Always null on a NEGATIVE one: reducing cover is work on
+   *  existing business and continues in all three states, so it is not an issuance act and
+   *  there is nothing to stamp. */
+  issuedUnderStudyLicenseId: string | null;
 }
 
 export interface CreateCancellationInput {

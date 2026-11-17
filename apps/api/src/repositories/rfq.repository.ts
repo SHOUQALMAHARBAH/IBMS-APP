@@ -30,6 +30,9 @@ export interface CreateRfqInput {
   officeInsuranceLineId: string | null;
   followUpThresholdDays?: number;
   issuedByUserId: string;
+  /** 🔴 OWNER DECISION 128 — the term the office was past the expiry of when this request was
+   *  sent, or null (the ordinary case). Stamped at creation; no update path exists for it. */
+  issuedUnderStudyLicenseId: string | null;
 }
 
 /** An insurer submission row with the insurer's identity attached — the

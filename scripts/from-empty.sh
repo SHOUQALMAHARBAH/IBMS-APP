@@ -201,7 +201,7 @@ say "asserting the structure"
 # counts what a database reaches FROM NOTHING. `db:divergence` cannot answer that question by
 # construction, and the four in-repo pins all read the catalogue source rather than a seeded
 # database. It is also the one that caught this change.
-check "permission codes seeded" 233 \
+check "permission codes seeded" 234 \
   "$(psql_scratch 'SELECT count(*) FROM "Permission"')"
 check "PLATFORM-scoped codes" 5 \
   "$(psql_scratch $'SELECT count(*) FROM "Permission" WHERE scope = \'PLATFORM\'')"
@@ -294,7 +294,11 @@ check "zero RegulatoryAction rows — no migration invents a regulator's act" 0 
 # database nobody reseeds, so a from-empty run is the only place both halves are observed together.
 # A count, not a set — the SET is pinned against the GENERATED Prisma enums by
 # `enum-descriptions.spec.ts`, which is the only place that can see a member added without a line.
-check "enum member descriptions across the four new enums" 11 \
+# 11 -> 13 ON 2026-11-16: OWNER DECISION 128 adds `DEFICIENCY_NOTICE` and `RENEWAL_REFUSAL`
+# to `RegulatoryActionKind`, and OWNER DECISION 147 ratified a description for each. The
+# ENUM count stays FOUR; only the member count moves, which is this figure following its
+# members rather than a budget being raised.
+check "enum member descriptions across the four new enums" 13 \
   "$(psql_scratch 'SELECT (SELECT count(*) FROM "BrokerageKindDescription") + (SELECT count(*) FROM "RegulatoryActionKindDescription") + (SELECT count(*) FROM "RegulatoryActionBasisDescription") + (SELECT count(*) FROM "IntegrationMethodDescription")')"
 # EIGHT, not two. `descriptionAr` was required on `LegalForm` and `BusinessModel` alone until the
 # owner reversed that: where a value carries NO consequence the description must SAY so, because a

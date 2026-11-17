@@ -126,7 +126,7 @@ const CARRIED_ENGLISH_BUDGET = 214;
  * balance holds at 230 = 230 + 0 -- which is what makes this an approval that was RECORDED rather
  * than a list somebody tidied.
  */
-const OWNER_REVIEWED_COUNT = 233;
+const OWNER_REVIEWED_COUNT = 234;
 
 /**
  * The four lines an agent wrote. Each is a placeholder in HER register, not a reviewed line.
@@ -199,6 +199,22 @@ const AWAITING_OWNER_REVIEW: string[] = [
    *   ⚠️ SO THE RUNNING TALLY IS THREE OF TEN REWRITTEN, NOT ONE OF TEN. The seven of
    *   message 34 survived her reading unchanged; the two `legal-value.*` lines did not, and
    *   nor did this one. A line on this list is not a line that is probably fine.
+   *
+   * ✅ AND IT DID **NOT** REFILL ON 2026-11-16, WHICH IS THE FIRST TIME THAT HAS HAPPENED.
+   *
+   * OWNER DECISION 128 mints `license-renewal.declare`, and every previous code arrived here
+   * for one mechanical reason: the parity guard requires both languages, so a code cannot exist
+   * without an Arabic line, and whoever ships it writes one. Message 42's measurement found this
+   * code had NO Arabic description and reported it as a blocker rather than composing a line —
+   * and OWNER DECISION 145 then RATIFIED one before it shipped.
+   *
+   * ⟶ So its description is HERS from the first commit it exists in, it is SLICED from decision
+   *   145 §٣ and never retyped, and it belongs in `OWNER_REVIEWED_COUNT` rather than here.
+   *   The count rises by one to 234 and the balance holds at **234 = 234 + 0**.
+   *
+   *   ⛔ This is not the list being tidied. Adding the code here would claim she has yet to read
+   *   a sentence she wrote, and the running tally above — three of ten rewritten — is exactly
+   *   why that distinction is kept: the list measures what she has NOT seen.
    */
 ];
 

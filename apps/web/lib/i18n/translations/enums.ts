@@ -105,6 +105,9 @@ export const ENUMS = {
     // NOTHING. **7 of 15 `Document` rows on dev showed a BLANK category cell**, on four
     // screens. The three words are HERS, sliced from decision 148 §٣ and never retyped;
     // `document-category.strings.test.ts` re-slices them and compares byte for byte.
+    // OWNER DECISION 148 — the certificate OWNER DECISION 142 stores. It is the only
+    // category whose rows carry their own bytes; every other `Document` row is a pointer.
+    docCategoryCertificateOfInsurance: 'شهادة تأمين',
     docCategoryBrokerLicenseCertificate: 'شهادة ترخيص الوسيط',
     docCategoryInsurerLicenseCertificate: 'شهادة ترخيص شركة التأمين',
     docCategoryRegulatoryDecision: 'قرار من البنك المركزي',
@@ -446,6 +449,7 @@ export const ENUMS = {
      * «شهادة الترخيص» already ships, and «الوسيط» / «شركة التأمين» are her additions that tell
      * the two licence certificates apart — they are DIFFERENT INSTRUMENTS (Law No. 12 of 2021
      * art. 82), which is why the schema gives each its own category rather than sharing one. */
+    docCategoryCertificateOfInsurance: 'Certificate of insurance',
     docCategoryBrokerLicenseCertificate: "Broker's licence certificate",
     docCategoryInsurerLicenseCertificate: "Insurance company's licence certificate",
     docCategoryRegulatoryDecision: 'Central Bank decision',

@@ -125,6 +125,7 @@ function standing(
     standingActDecisionRef: null,
     deemedCancelledUnderArticle14C: false,
     blockedInsuranceBranchKeys: [],
+    renewalUnderStudy: { state: 'NOT_PAST_EXPIRY' as const },
     ...over,
   };
 }
@@ -155,10 +156,49 @@ describe('the licence standing has ONE answer', () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * 🔴 ONE DECLARED SITE, ADDED 2026-11-15 WITH OWNER DECISION 128, AND IT IS NOT A SECOND
+   * REFUSAL SENTENCE.
+   *
+   * `RENEWAL_PENDING_RULE_BASIS` cites art. 21/a/9 **against** the rule it explains: decision 128
+   * replaced a basis that rested on an analogy decision 82(ب) had declared void, and the honest
+   * replacement has to say that the instrument names expiry on its own as a ground for sanction.
+   * Removing the citation to satisfy this guard would make the documentation worse to keep a
+   * check green, which is the one trade this repository has already decided it will not make.
+   *
+   * SAFE BECAUSE IT REACHES NOBODY — measured 2026-11-15, `git grep` over `apps` and `packages`
+   * excluding comments finds only its own declaration: nothing imports it, so it is in no
+   * response and on no screen. It cannot be a second refusal sentence because it is not a
+   * sentence anybody is shown.
+   *
+   * ⛔ AND THE DECLARATION CANNOT GO STALE. The assertion below requires this file to still cite
+   * the article; the day the basis stops doing so, the exemption is reported as dead rather than
+   * sitting here forever.
+   */
+  const DECLARED_BASIS_CITATION =
+    'modules/compliance-risk/broker-license.config.ts';
+
+  it('the declared basis citation is still there — the exemption cannot go stale', () => {
+    const file = productionSources().find(
+      (s) => s.path === DECLARED_BASIS_CITATION,
+    );
+    expect(
+      file,
+      `${DECLARED_BASIS_CITATION} is declared as the one place outside the gate that cites ` +
+        'art. 21/a/9, and it no longer exists — delete the declaration.',
+    ).toBeDefined();
+    expect(
+      /21\s*\/\s*a\s*\/\s*9/.test(file!.code),
+      `${DECLARED_BASIS_CITATION} no longer cites art. 21/a/9, so its exemption below is dead ` +
+        'and must be removed rather than left standing.',
+    ).toBe(true);
+  });
+
   it('the article is cited by the gate, not re-argued at a call site', () => {
     const offenders: string[] = [];
     for (const { path, code } of productionSources()) {
       if (path === 'modules/compliance-risk/license-gate.service.ts') continue;
+      if (path === DECLARED_BASIS_CITATION) continue;
       // `21/a/9` anywhere else in CODE (comments are stripped) means a second refusal sentence.
       // The provider dashboard's wording is a TRANSLATION KEY in the web workspace, which this
       // sweep does not reach, and that is the right place for it: it DISPLAYS a standing rather
@@ -299,10 +339,39 @@ describe('what is NOT gated, declared', () => {
     expect(LICENCE_UNGATED_ACTS.join(' | ')).toMatch(/cancellation/i);
   });
 
-  it('the gate exposes exactly two methods, so a caller cannot ask it a third question', () => {
+  it('the gate exposes exactly two PUBLIC methods, so a caller cannot ask it a third question', () => {
+    /*
+     * 🔴 WIDENED BY OWNER DECISION 128, AND THE CLAIM IS NARROWED TO WHAT IS ACTUALLY TRUE.
+     *
+     * The prototype carries THREE names now: `standingWithTerm` arrived with the issuance stamp,
+     * because the stamp names the term a record was issued under and `DerivedLicenseStanding` has
+     * no id on it (deliberately — the derivation is pure and is shared with a provider dashboard
+     * that must never learn an office's row ids).
+     *
+     * ⚠️ TypeScript's `private` is ERASED AT RUNTIME, so `getOwnPropertyNames` sees it and this
+     * assertion cannot be left as it was. The claim that matters is about the PUBLIC surface, and
+     * the source is where that is decided — so the source is what is read.
+     */
     const methods = Object.getOwnPropertyNames(
       LicenseGateService.prototype,
     ).filter((m) => m !== 'constructor');
-    expect(methods.sort()).toEqual(['assertMayPractise', 'standing']);
+    expect(methods.sort()).toEqual([
+      'assertMayPractise',
+      'standing',
+      'standingWithTerm',
+    ]);
+
+    const source = readFileSync(
+      join(__dirname, 'license-gate.service.ts'),
+      'utf8',
+    );
+    expect(
+      source,
+      'standingWithTerm is no longer private, so the gate has a third PUBLIC question — which ' +
+        'is the thing this test exists to refuse',
+    ).toContain('private async standingWithTerm(');
+    for (const open of ['assertMayPractise', 'standing']) {
+      expect(source).not.toContain(`private async ${open}(`);
+    }
   });
 });

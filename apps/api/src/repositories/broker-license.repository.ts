@@ -2,6 +2,19 @@ import { Injectable } from '@nestjs/common';
 import type { BrokerLicense, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * 🔴 OWNER DECISION 128 — a term AS THE DERIVATION NEEDS IT: the row, plus whether anyone has
+ * declared on it.
+ *
+ * The declaration is a RELATION and the derivation wants a boolean, so the shape is named here
+ * rather than inferred at each call site. `null` means nobody has declared, which past the printed
+ * expiry means the office may not issue yet — the non-widening direction, and the one decision
+ * 136(ب)'s sentence exists for.
+ */
+export type BrokerLicenseTermRow = BrokerLicense & {
+  renewalDeclaration: { id: string } | null;
+};
+
 export interface CreateBrokerLicenseTermInput {
   licenseNumber: string;
   scopeOfAuthorization: string | null;
@@ -50,9 +63,22 @@ export class BrokerLicenseRepository {
    * row keeps that decision in `pickCurrentTerm`, where it is tested, instead of in an `orderBy`
    * nobody reads.
    */
-  findTerms(): Promise<BrokerLicense[]> {
+  findTerms(): Promise<BrokerLicenseTermRow[]> {
     return this.prisma.client.brokerLicense.findMany({
       orderBy: [{ expiresAt: 'desc' }, { id: 'asc' }],
+      /*
+       * 🔴 OWNER DECISION 128 — the standing declaration comes back WITH the term, as an id only.
+       *
+       * One `include` rather than a second query per term: `standing()` is on the hot path (the
+       * gate asks it on every placement) and its own comment promises THREE READS, ONE ROUND TRIP.
+       * A fourth read here would have broken that quietly.
+       *
+       * `select: { id: true }` because the derivation needs a BOOLEAN — whether anyone declared —
+       * and nothing else. Pulling the declaration's text into every licence read would put the
+       * sentence, the actor's name and their network address on a query that answers «may this
+       * office place business», which is more personal data than the question needs.
+       */
+      include: { renewalDeclaration: { select: { id: true } } },
     });
   }
 
@@ -103,10 +129,54 @@ export class BrokerLicenseRepository {
   recordRenewalRequest(
     id: string,
     requestedAt: Date,
+    /** 🔴 OWNER DECISION 128 — the PROOF, written in the same statement as the date it belongs to.
+     *  Optional at this boundary only so the existing date-only path keeps compiling; the SERVICE
+     *  is what refuses a date with no proof, because that is a rule about what the office may do
+     *  rather than about what the table may hold. */
+    proof?: { documentId: string; referenceNumber: string },
   ): Promise<Prisma.BatchPayload> {
     return this.prisma.client.brokerLicense.updateMany({
       where: { id, renewalRequestedAt: null },
-      data: { renewalRequestedAt: requestedAt },
+      data: {
+        renewalRequestedAt: requestedAt,
+        ...(proof
+          ? {
+              renewalProofDocumentId: proof.documentId,
+              renewalReferenceNumber: proof.referenceNumber,
+            }
+          : {}),
+      },
+    });
+  }
+
+  /**
+   * 🔴 OWNER DECISION 128 — THE STANDING DECLARATION, written once for a term.
+   *
+   * A plain `create`. The uniqueness is the database's («مرة واحدة»), so a second attempt raises
+   * P2002 and the service turns it into a 409 — rather than this reading first and racing, which
+   * is `race-safe-invariants.md`'s whole subject.
+   *
+   * ⛔ There is no update and no delete here, and there must never be: the table's triggers refuse
+   * both under every permission, so a method offering one would be a lie that fails at runtime.
+   */
+  createRenewalDeclaration(input: {
+    brokerLicenseId: string;
+    declarationTextShown: string;
+    permissionCode: string;
+    actorUserId: string;
+    actorNameShown: string;
+    networkAddress: string | null;
+  }) {
+    return this.prisma.client.licenseRenewalDeclaration.create({
+      data: input,
+    });
+  }
+
+  /** The declaration on a term, or null. Used by the screen, never by the gate — the gate gets its
+   *  boolean from `findTerms`'s `include` without a second round trip. */
+  findRenewalDeclaration(brokerLicenseId: string) {
+    return this.prisma.client.licenseRenewalDeclaration.findUnique({
+      where: { brokerLicenseId },
     });
   }
 

@@ -570,7 +570,16 @@ describe('RecommendationService', () => {
         }),
       );
       await service.send('rec-1', placement());
-      expect(mocks.recordSent).toHaveBeenCalledWith('rec-1', 'plc-1');
+      /*
+       * 🔴 OWNER DECISION 128 — THE THIRD ARGUMENT IS THE ISSUANCE STAMP, and `null` is asserted
+       * rather than skipped with `expect.anything()`.
+       *
+       * This office is inside its printed dates, so the correct stamp is NO stamp. Accepting any
+       * value here would pass just as happily against a defect that stamped every ordinary
+       * recommendation with a term — and an inspector asking «what was issued under study» would
+       * then be handed the whole book.
+       */
+      expect(mocks.recordSent).toHaveBeenCalledWith('rec-1', 'plc-1', null);
       expect(mocks.transition).toHaveBeenCalledWith(
         expect.objectContaining({ toStatus: 'SENT_TO_CLIENT' }),
       );

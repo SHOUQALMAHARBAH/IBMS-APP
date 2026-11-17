@@ -59,6 +59,32 @@ export const REGULATORY_ACTION_KIND_DESCRIPTIONS: EnumDescriptionSeed[] = [
     descriptionAr:
       "إعادةُ العمل بالرخصة بعد وقف. يُسجَّل بتاريخه ومستنده، ولا يمحو الوقفَ الذي سبقه.",
   },
+  /*
+   * 🔴 OWNER DECISION 147 — THE TWO NEW KINDS, AND THEY ARE WHY MESSAGE 43 STOPPED.
+   *
+   * OWNER DECISION 128 adds two members to `RegulatoryActionKind`, and this guard demands an
+   * Arabic description over 40 characters for EVERY member. Decision 133 had ratified only their
+   * NAMES, so there was nothing to put here and nothing that could be composed — message 43
+   * stopped at the guard rather than writing Arabic, and the guard was the report.
+   *
+   * ⛔ NEITHER IS A SUSPENSION, AND BOTH DESCRIPTIONS SAY SO. That distinction is the whole of
+   * decision 128: the Central Bank asking for a missing attachment is not the Central Bank
+   * stopping the office. `foldActs` skips both by name for the same reason, and a reader who took
+   * either for a suspension would expect `status` to move, which it never does.
+   *
+   * SLICED from `docs/decision-147-...md` §٣ and never retyped; `enum-descriptions.spec.ts` holds
+   * the floor and `regulatory-action-kind.strings.test.ts` re-slices and compares byte for byte.
+   */
+  {
+    member: "DEFICIENCY_NOTICE",
+    descriptionAr:
+      "إشعار من البنك المركزي بنقص في طلب تجديد الرخصة. يُسجَّل بتاريخه ومستنده، ويمنع أفعال الإصدار الستة حتى تُرفَع الشهادة الجديدة. وليس وقفاً للرخصة ولا إلغاءً لها.",
+  },
+  {
+    member: "RENEWAL_REFUSAL",
+    descriptionAr:
+      "رفض البنك المركزي طلب تجديد الرخصة. يُسجَّل بتاريخه ومستنده، ويمنع أفعال الإصدار الستة حتى تُرفَع شهادة جديدة. ولا يُعدَّل ولا يُحذَف بعد تسجيله.",
+  },
 ];
 
 export const REGULATORY_ACTION_BASIS_DESCRIPTIONS: EnumDescriptionSeed[] = [

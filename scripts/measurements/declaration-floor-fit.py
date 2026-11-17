@@ -112,6 +112,21 @@ OTHER_LENGTH_FLOORS = {
         "The acknowledgement as displayed, including the developing company's release and its "
         "limit (elements 4 and 9). The same concept as the article text above.",
     ),
+    # 🔴 OWNER DECISION 128's standing declaration, 2026-11-16. The FOURTH shown-text floor, and
+    # this gate is what demanded it be classified rather than left to look like a reason floor.
+    #
+    # ⛔ NOT `DB_FLOORS`. That set is the DECLARATION REASON — free text a person writes to excuse
+    # an act. This column holds the ratified SENTENCE THE PERSON WAS SHOWN (decision 133), which
+    # nobody composes and which the server supplies from a constant. Putting it in `DB_FLOORS`
+    # would make the shared ten govern a concept it has nothing to do with, which is precisely
+    # the conflation this second list exists to prevent.
+    ("LicenseRenewalDeclaration", "declarationTextShown"): (
+        SHOWN_TEXT_CONST,
+        "The renewal declaration AS DISPLAYED, stored verbatim so the record testifies to what "
+        "the person actually saw. The same concept as the three above: a dictionary that can be "
+        "edited would otherwise rewrite history, and a foreign key to one would make the record "
+        "describe today's wording rather than the day's.",
+    ),
     ("DeclaredAct", "responsibilitySentence"): (
         SHOWN_TEXT_CONST,
         "The responsibility written as a SENTENCE rather than inferred (element 6). The owner's "

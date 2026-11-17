@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -975,6 +976,116 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     expect(arDefault.headers['content-type']).toContain('application/pdf');
     const arBuffer = arDefault.body as Buffer;
     expect(arBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    /*
+     * ─────────────────────────────────────────────────────────────────────────────────────
+     * 🔴 OWNER DECISION 142 §٥ — AN ISSUED CERTIFICATE IS STORED. Its criteria are asserted
+     * HERE, beside the act that performs them, rather than in a spec of their own: a separate
+     * file would need a second copy of this suite's whole auth-and-opportunity chain, and a
+     * second copy is a second thing to drift.
+     *
+     * Criterion 4 («another office sees neither the certificate nor its row») is NOT here and
+     * cannot be: it is an RLS refusal, and `tenantScopeExtension` filters before the database
+     * is ever asked. It is `certificate-stored.e2e-spec.ts`, over `APP_DATABASE_URL`.
+     * ───────────────────────────────────────────────────────────────────────────────────── */
+
+    // CRITERION 1 — one row in the documents table, linked to its policy, and the bytes stored.
+    const stored = await prisma.document.findMany({
+      where: { policyId: arPolicyId, category: 'CERTIFICATE_OF_INSURANCE' },
+      include: { content: true },
+    });
+    expect(
+      stored,
+      'issuing a certificate did not create exactly one Document row — OWNER DECISION 142 §٥ criterion 1',
+    ).toHaveLength(1);
+    const certRow = stored[0];
+    expect(certRow.policyId).toBe(arPolicyId);
+    expect(certRow.content, 'the row has no stored bytes').not.toBeNull();
+
+    /*
+     * CRITERION 1, THE HALF THAT MATTERS — «ويُقرأ كما صدر».
+     *
+     * The digest is recomputed over what came BACK, and compared with the one stored beside the
+     * bytes. A length check would pass against a truncation that happened to keep the length,
+     * and comparing the stored digest to itself would prove nothing at all.
+     */
+    const storedBytes = Buffer.from(certRow.content!.bytes);
+    expect(storedBytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(certRow.content!.byteSize).toBe(storedBytes.byteLength);
+    expect(
+      createHash('sha256').update(storedBytes).digest('hex'),
+      'the stored digest is not a digest of the stored bytes — «يُقرأ كما صدر» is not checkable',
+    ).toBe(certRow.content!.sha256);
+
+    // AND THE CAP IS HEADROOM THAT WAS MEASURED, not asserted: a real rendered certificate sits
+    // well under 2 MiB, which is why that figure was chosen rather than inherited.
+    expect(storedBytes.byteLength).toBeLessThan(2 * 1024 * 1024);
+
+    /*
+     * 🔴 OWNER DECISION 148 §٦ CRITERION 3 — A HUMAN REACHES THE FILE BY CLICKING, and what
+     * comes back is byte-for-byte what was stored.
+     *
+     * `GET /documents/:id/content` is the route the screen's «تنزيل الملف» button calls. The
+     * digest is computed over the DOWNLOADED body and compared with the stored one — so this
+     * asserts the read path, not merely that a row exists.
+     */
+    const downloaded = await request(app.getHttpServer())
+      .get(`/documents/${certRow.id}/content`)
+      .set(bearer(placement.accessToken))
+      .expect(200);
+    expect(downloaded.headers['content-type']).toContain('application/pdf');
+    const downloadedBytes = downloaded.body as Buffer;
+    expect(
+      createHash('sha256').update(downloadedBytes).digest('hex'),
+      'the downloaded certificate is not byte-identical to the stored one',
+    ).toBe(certRow.content!.sha256);
+    expect(downloaded.headers['x-content-sha256']).toBe(certRow.content!.sha256);
+
+    // And an UPLOADED document has no bytes here — every other `Document` row is a pointer, and
+    // 404 is what distinguishes «nothing stored» from «a zero-length file».
+    const pointerRow = await prisma.document.findFirst({
+      where: { policyId: arPolicyId, category: { not: 'CERTIFICATE_OF_INSURANCE' } },
+    });
+    if (pointerRow) {
+      await request(app.getHttpServer())
+        .get(`/documents/${pointerRow.id}/content`)
+        .set(bearer(placement.accessToken))
+        .expect(404);
+    }
+
+    /*
+     * CRITERION 2 — this office is INSIDE its printed dates, so the correct stamp is NO stamp.
+     * Asserted rather than skipped: a defect that stamped every certificate would otherwise
+     * leave an inspector asking «what did you issue under study?» and being handed the whole
+     * book. The stamped case is `renewal-under-study.criteria.spec.ts`'s subject.
+     */
+    expect(
+      certRow.issuedUnderStudyLicenseId,
+      'an ordinary issuance was stamped as issued-under-study',
+    ).toBeNull();
+
+    /*
+     * CRITERION 5 — «لا مسار يحذف الشهادة». `deletionLocked` is true, and the delete route
+     * refuses while it is. ⛔ The lock is never cleared on a certificate: retention is module
+     * 11's question (decision 142 §٤) and until she rules it, nothing is destroyed.
+     */
+    expect(certRow.deletionLocked).toBe(true);
+    /*
+     * ⚠️ THE CALLER HOLDS `document.delete-override`, DELIBERATELY. `noPerm` is this test's
+     * DATA_PROTECTION_OFFICER — named for lacking `policy.read`, which is irrelevant on a
+     * document route — and the DPO is one of the two roles that may delete. So the 409 below
+     * comes from THE LOCK and not from a missing permission, which a caller without the code
+     * would have produced as a 403 while proving nothing about decision 142 §٥ criterion 5.
+     */
+    const refused = await request(app.getHttpServer())
+      .delete(`/documents/${certRow.id}`)
+      .set(bearer(noPerm.accessToken))
+      .expect(409);
+    expect((refused.body as { message: string }).message).toMatch(/locked/i);
+    expect(
+      await prisma.document.count({ where: { id: certRow.id } }),
+      'the certificate was deleted',
+    ).toBe(1);
 
     // explicit override: AR customer, ask for EN anyway
     const overridden = await request(app.getHttpServer())

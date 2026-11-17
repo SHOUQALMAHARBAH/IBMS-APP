@@ -90,7 +90,10 @@ describe('owner decision 59: every declared vocabulary the screens render has a 
        * ⚠️ So this is NOT a ratchet on a healthy parity: it goes in together with OWNER DECISION
        * 148's three words, which are what make it passable at all.
        */
-      ['DocumentCategory', 16],
+      /* 16 -> 17: OWNER DECISION 142 stores an issued certificate, so `DocumentCategory`
+       * gains `CERTIFICATE_OF_INSURANCE`, and OWNER DECISION 148 gives it its word. The
+       * floor follows the schema; the totality assertion below is what proves coverage. */
+      ['DocumentCategory', 17],
     ] as const) {
       const members = schemaEnumMembers(name);
       expect(members.length, `${name} parsed ${members.length} member(s)`).toBe(

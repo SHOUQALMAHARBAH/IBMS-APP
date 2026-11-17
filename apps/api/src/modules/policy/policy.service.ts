@@ -518,14 +518,17 @@ export class PolicyService {
     dto: PlacePolicyDto,
     actor: AuthenticatedUser,
   ): Promise<PolicyView> {
-    await this.licenseGate.assertMayPractise('PLACE_POLICY', async () => {
+    const stamp = await this.licenseGate.assertMayPractise(
+      'PLACE_POLICY',
+      async () => {
       // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
       // reads and costs no extra query unless the office actually has a partial suspension.
       const sent = await this.recommendations.findByOpportunityId(
         dto.opportunityId,
       );
-      return sent?.recommendedQuotation.rfq ?? null;
-    });
+        return sent?.recommendedQuotation.rfq ?? null;
+      },
+    );
 
     const opportunity = await this.loadVisibleOpportunity(
       dto.opportunityId,
@@ -640,6 +643,11 @@ export class PolicyService {
         requestedPremium: quantizeMoney(quote.premium),
         currency: quote.currency,
         placedByUserId: actor.id,
+        /* 🔴 OWNER DECISION 128 — THE STAMP, from the gate that just permitted this act.
+           `null` on every ordinary issuance; the term's id only while the office is past its
+           printed expiry with its renewal under study. Written AT CREATION and never derived
+           later, because the new certificate arriving would otherwise un-stamp the gap. */
+        issuedUnderStudyLicenseId: stamp.issuedUnderStudyLicenseId,
       });
     } catch (err) {
       if (isUniqueViolation(err)) {

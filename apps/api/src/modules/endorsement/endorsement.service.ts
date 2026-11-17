@@ -61,6 +61,7 @@ import type {
   CalculateAdjustmentDto,
 } from './dto/endorsement-step.dto';
 import { LicenseGateService } from '../compliance-risk/license-gate.service';
+import type { IssuanceStamp } from '../compliance-risk/license-gate.service';
 
 export interface EndorsementView {
   id: string;
@@ -324,8 +325,12 @@ export class EndorsementService {
      * cannot complete; `apply` is gated too, because a POSITIVE endorsement raised while licensed
      * must not increase cover after the licence ends.
      */
+    /* 🔴 OWNER DECISION 128 — the stamp, and it is null for a NEGATIVE endorsement by
+       construction: the gate does not run on one, because reducing cover continues in all
+       three states and is not an issuance act. */
+    let stamp: IssuanceStamp = { issuedUnderStudyLicenseId: null };
     if (dto.type === 'POSITIVE') {
-      await this.licenseGate.assertMayPractise('INCREASE_COVER', () =>
+      stamp = await this.licenseGate.assertMayPractise('INCREASE_COVER', () =>
         // Art. 21/b/5 — LAZY, so it costs no extra query unless the office has a partial
         // suspension. `loadVisiblePolicy` returns a narrow projection that does not carry
         // the line, so this reads the branch directly rather than widening it.
@@ -365,6 +370,7 @@ export class EndorsementService {
       effectiveFrom,
       requestedByUserId: actor.id,
       targetCoverage,
+      issuedUnderStudyLicenseId: stamp.issuedUnderStudyLicenseId,
     });
 
     await this.safeAudit({
@@ -470,6 +476,11 @@ export class EndorsementService {
           effectiveFrom: cancellationDate,
           requestedByUserId: actor.id,
           targetCoverage: null,
+          /* 🔴 OWNER DECISION 128 — ALWAYS NULL, and the compiler asked for it rather than
+             letting it default. Cancelling a policy is work on existing business: it is in
+             `LICENCE_UNGATED_ACTS`, it continues in all three states, and it is not an
+             issuance act — so there is no gap for it to have been issued in. */
+          issuedUnderStudyLicenseId: null,
         },
         {
           reason: dto.reason,

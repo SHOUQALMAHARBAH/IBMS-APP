@@ -106,14 +106,45 @@ describe('the term alone decides, when the regulator has done nothing', () => {
     expect(s.mayPractise).toBe(false);
   });
 
-  it('past the expiry with a TIMELY application is RENEWAL_PENDING and MAY practise', () => {
+  /*
+   * 🔴 REWRITTEN BY OWNER DECISION 128, 2026-11-16 — AND THE OLD VERSION OF THIS TEST PINNED THE
+   * DEFECT THAT DECISION EXISTS TO REMOVE.
+   *
+   * It passed `renewalRequestedAt` alone and asserted `mayPractise: true`. That IS the date-only
+   * rule: «الإثبات يفتح، لا التاريخ» — a date typed into a field opened all six issuance acts.
+   * Filing on time is now condition 1 of FOUR.
+   *
+   * ⛔ The test is not deleted and its subject does not change. What it asserts — past the printed
+   * expiry, an office whose renewal is genuinely under study may practise — is still true and is
+   * still worth pinning; the fixture now has to say what «genuinely» means.
+   */
+  it('past the expiry with ALL FOUR conditions met is RENEWAL_PENDING and MAY practise', () => {
     const s = standing(
-      term({ renewalRequestedAt: d('2026-11-01') }),
+      term({
+        renewalRequestedAt: d('2026-11-01'),
+        renewalProofDocumentId: 'doc-proof-1',
+        renewalReferenceNumber: 'CBJ/IN/2026/4471',
+        hasRenewalDeclaration: true,
+      }),
       [],
       d('2027-02-01'),
     );
     expect(s.status).toBe('RENEWAL_PENDING');
     expect(s.mayPractise).toBe(true);
+  });
+
+  it('🔴 and the DATE ALONE no longer suffices — OWNER DECISION 128', () => {
+    /*
+     * The half that makes the test above mean something. Without it, the fixture's three extra
+     * fields would read as decoration and an implementation that ignored them entirely would pass.
+     */
+    const s = standing(
+      term({ renewalRequestedAt: d('2026-11-01') }),
+      [],
+      d('2027-02-01'),
+    );
+    expect(s.mayPractise).toBe(false);
+    expect(s.renewalUnderStudy.state).toBe('NO_PROOF');
   });
 
   it('INSIDE the term with an application already filed is ALSO renewal-pending', () => {

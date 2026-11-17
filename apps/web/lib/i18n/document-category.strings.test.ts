@@ -81,10 +81,32 @@ describe('OWNER DECISION 148 — the document-category labels are hers, byte for
     ).toHaveLength(4);
   });
 
+  it('🔴 and the DOWNLOAD BUTTON is hers too — the fifth string in that table', () => {
+    /*
+     * `GET /documents/:id/content` shipped built, enforced and e2e-proven with NO control, because
+     * «تنزيل» ships on seven sibling buttons and «الملف» on the documents screen itself — and
+     * joining two shipped words into a third is the one thing decision 125 forbids. She ruled it.
+     *
+     * ⚠️ FOUND BY ITS SITE CELL, not by position: four of the five rows are CATEGORIES, and a
+     * slice taking «the last row» would survive a reordering of her table while silently
+     * swapping a category label onto a button.
+     */
+    const rows = ratified();
+    const site = Object.keys(rows).find((k) => k.startsWith('زرّ تنزيل'));
+    expect(site, 'decision 148 no longer carries the download-button row').toBeTruthy();
+    expect(
+      ar('docDownloadStoredButton'),
+      'the stored-file download label is not byte-identical to OWNER DECISION 148',
+    ).toBe(rows[site!]);
+    expect(lookupOptional('EN', 'docDownloadStoredButton')).toBeTruthy();
+  });
+
   it.each([
     ['BROKER_LICENSE_CERTIFICATE', 'docCategoryBrokerLicenseCertificate'],
     ['INSURER_LICENSE_CERTIFICATE', 'docCategoryInsurerLicenseCertificate'],
     ['REGULATORY_DECISION', 'docCategoryRegulatoryDecision'],
+    // OWNER DECISION 142's stored certificate, worded by the same decision 148.
+    ['CERTIFICATE_OF_INSURANCE', 'docCategoryCertificateOfInsurance'],
   ])('%s carries exactly what she ratified', (member, key) => {
     expect(
       ar(key),

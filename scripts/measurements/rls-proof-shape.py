@@ -132,6 +132,18 @@ BYPASS_ATTRS = re.compile(r"rolbypassrls", re.IGNORECASE)
 # opening that connection, its entry must be deleted.
 # ---------------------------------------------------------------------------
 DECLARED_PROVES_SOMETHING_ELSE = {
+    "policy": (
+        "PROVES OWNER DECISION 142's STORAGE over real HTTP -- that issuing a certificate creates "
+        "one `Document` row with its bytes, that the bytes read back byte-for-byte as issued, and "
+        "that the delete route refuses while `deletionLocked` holds. It asserts NO RLS refusal. "
+        "The sentence this gate matched is the one that SENDS THE READER ELSEWHERE: it says "
+        "criterion 4 is NOT provable here, because `tenantScopeExtension` filters before the "
+        "database is asked, and names `certificate-stored.e2e-spec.ts` -- which does open "
+        "`APP_DATABASE_URL` -- as the file that proves it. "
+        "AND THAT SENTENCE IS KEPT RATHER THAN REWORDED. Dodging the vocabulary would satisfy "
+        "this gate by deleting the one pointer a reader needs, which is batch 6b's recorded "
+        "lesson and the same shape `company-record-shape` below was earned by."
+    ),
     "provider-self-administration": (
         "PROVES `tenantScopeExtension`, NOT RLS, and its own header now says so. Its refusals are "
         "asserted over real HTTP -- which is right, and which structurally cannot reach layer 2, "

@@ -7,7 +7,10 @@ import {
   Param,
   Post,
   Query,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { DocumentService } from './document.service';
 import { CreateDocumentVersionDto } from './dto/create-document-version.dto';
@@ -78,6 +81,33 @@ export class DocumentController {
   @Get(':id')
   get(@Param('id') id: string) {
     return this.documents.get(id);
+  }
+
+  /**
+   * 🔴 OWNER DECISION 142 criterion 1 — the stored certificate, read back exactly as issued.
+   *
+   * `document.read`, the SAME code as the row beside it: the bytes are the document, and a
+   * separate code would let an office be configured so somebody may see that a certificate
+   * exists and not the certificate. ⛔ No new permission is minted for a read of something the
+   * caller may already read.
+   *
+   * The sha256 is returned in a header rather than a body field because the body IS the file —
+   * so a caller can verify what it received without parsing it.
+   */
+  @RequirePermissions('document.read')
+  @Get(':id/content')
+  async content(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    const stored = await this.documents.content(id);
+    response.set({
+      'Content-Type': stored.contentType,
+      'Content-Length': String(stored.byteSize),
+      'Content-Disposition': `attachment; filename="${stored.fileName}"`,
+      'X-Content-Sha256': stored.sha256,
+    });
+    return new StreamableFile(stored.bytes);
   }
 
   @RequirePermissions('document.create')

@@ -6,7 +6,10 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { clientIpForRecord } from '../../common/client-ip';
 import { ApiTags } from '@nestjs/swagger';
 import { BrokerLicenseService } from './broker-license.service';
 import { CreateBrokerLicenseDto } from './dto/create-broker-license.dto';
@@ -115,6 +118,40 @@ export class BrokerLicenseController {
    *
    * Returns the STANDING after the act, so the caller sees what it changed to.
    */
+  /**
+   * 🔴 OWNER DECISION 128 — THE STANDING DECLARATION. Once per term, and the ONE route on this
+   * controller that is NOT `license.manage`.
+   *
+   * `license-renewal.declare`, minted for this and held by NO role (decision 131). So an office
+   * past its printed expiry issues nothing until its administrator grants the code and a holder
+   * calls this once. **That is the decision working as intended** — the «جديدة» mark and the live
+   * notification are how the administrator learns the code exists, and the refusal on every
+   * issuance attempt names them.
+   *
+   * NOT `license.manage`, deliberately. That code already attaches the filing proof and no code
+   * was minted for it — recording a document is recording a fact. This swears to one, and
+   * decision 128 §3 asks for «حامل الصلاحية» rather than whoever may edit the licence record.
+   */
+  @RequirePermissions('license-renewal.declare')
+  @Post('renewal-declaration')
+  declareRenewalStanding(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    /*
+     * THE NETWORK ADDRESS IS THREADED FROM THE REQUEST, never resolved deeper — the fourth of
+     * the hardening elements `DeclaredAct` already carries (module-1 paper §٨, OWNER DECISION
+     * 126), copied here because this record answers the same question: who swore what, when,
+     * and from where. Only a controller holds the `Request`, and `clientIpForRecord` returns
+     * NULL rather than the string 'unknown', because a RECORD must not claim an address it does
+     * not have.
+     */
+    return this.licenses.declareRenewalStanding(
+      user,
+      clientIpForRecord(request),
+    );
+  }
+
   @RequirePermissions('license.manage')
   @Post('regulatory-actions')
   recordRegulatoryAction(

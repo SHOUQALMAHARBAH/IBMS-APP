@@ -4,7 +4,12 @@
 // gates the general surface; document.delete-override (narrower, ADMIN/DPO)
 // gates the two deletion routes.
 
-import { apiDelete, apiGet, apiPost } from '../auth/api-client';
+import {
+  apiDelete,
+  apiFetchBlob,
+  apiGet,
+  apiPost,
+} from '../auth/api-client';
 
 export const DOCUMENT_CATEGORIES = [
   'APPLICATION_PROPOSAL',
@@ -45,6 +50,16 @@ export interface DocumentRecord {
   deletionLocked: boolean;
   deletionOverrideByUserId: string | null;
   createdAt: string;
+  /**
+   * 🔴 OWNER DECISION 128 + 136 §6 — the term this document was issued under, while the office
+   * was past its printed expiry with a renewal under study. NULL on almost every row.
+   *
+   * ⛔ The web NEVER derives this and never clears it. It is stamped by the server at creation
+   * from what the licence gate decided at that instant (decision 124's principle), and no
+   * permission removes it — so a row that carries it carries it for ever, including after the
+   * new certificate arrives.
+   */
+  issuedUnderStudyLicenseId: string | null;
 }
 
 export interface PolicyFileClassificationSummary {
@@ -73,6 +88,20 @@ export function createDocumentVersion(
 
 export function overrideDeletionLock(id: string): Promise<DocumentRecord> {
   return apiPost(`/documents/${id}/deletion-override`);
+}
+
+/**
+ * 🔴 OWNER DECISION 142 criterion 1 — «ويُقرأ كما صدر». The stored file, back.
+ *
+ * ONLY a document this system ISSUED has bytes here; every uploaded row is a pointer whose
+ * `storageRef` names object storage this product does not write, and the api answers 404 for
+ * those rather than an empty body — the two are indistinguishable to a caller otherwise.
+ *
+ * `apiFetchBlob` is the established precedent (the certificate PDF on the policy screen goes the
+ * same way): a binary body needs the auth headers an `<a href>` cannot carry.
+ */
+export function downloadStoredDocument(id: string): Promise<Blob> {
+  return apiFetchBlob(`/documents/${encodeURIComponent(id)}/content`);
 }
 
 export function deleteDocument(id: string): Promise<void> {

@@ -129,7 +129,17 @@ describe("permission grid — every code is independent and traceable", () => {
      * product's life to be marked «جديدة» in a real office.
      *
      * 🔴 `declared-act.article-15-d.declare` is the third and it is the sharper one: it is the
-     * first code that actually CLOSES a path. Until an administrator grants it, a quote request
+     * first code that actually CLOSES a path.
+     *
+     * 🔴 AND `license-renewal.declare` IS THE FOURTH — OWNER DECISION 128, 2026-11-16 — WHICH
+     * CLOSES A PATH TOO, AND A WIDER ONE. Past its printed expiry an office with its filing and
+     * proof in ISSUES NOTHING until an administrator grants this code and a holder declares
+     * once. That is the decision working as intended: the mark «جديدة» and the live
+     * notification are how the administrator learns it exists, and the refusal names them in
+     * decision 136(ب)'s own sentence. ⛔ Do not pre-grant it.
+     *
+     * Its `introducedAt` is the day it SHIPS, not the day it was written — the WIP branch carried
+     * 2026-11-15 for a batch and that would have been a lie about when offices could first see it. Until an administrator grants it, a quote request
      * to fewer than three insurers with NO exemption cannot be declared — which is OWNER
      * DECISION 131 working as intended, and is safe only because the notification names what the
      * code guards. ⛔ Do not pre-grant it.
@@ -144,6 +154,7 @@ describe("permission grid — every code is independent and traceable", () => {
       "declared-act.article-15-d.declare",
       "legal-value.declare",
       "legal-value.read",
+      "license-renewal.declare",
     ]);
 
     /*

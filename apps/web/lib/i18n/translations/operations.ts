@@ -152,6 +152,18 @@ export const OPERATIONS = {
     docIntro:
       'ملف التأمين الإلكتروني وفق الجزء 4.2 — ضبط الإصدارات وتجاوز قفل الحذف لمستندات وثيقة واحدة.',
     docLookUp: 'استعراض المستندات',
+    /*
+     * 🔴 OWNER DECISION 148 — THE CONTROL THAT READS A STORED FILE BACK.
+     *
+     * `GET /documents/:id/content` shipped built and enforced with NO way in from any screen,
+     * because the label did not exist: «تنزيل» ships on seven sibling buttons and «الملف» on
+     * this very screen, and OWNER DECISION 125 forbids joining two shipped words into a third.
+     * It was declared unreached with the creditor named — one ratified word — and she ruled it.
+     *
+     * SLICED from decision 148 §٣ and never retyped; `document-category.strings.test.ts`
+     * re-slices it and compares byte for byte.
+     */
+    docDownloadStoredButton: 'تنزيل الملف',
     docNone: 'لا توجد مستندات مسجّلة لهذه الوثيقة.',
     docColFile: 'الملف',
     docColCategory: 'الفئة',
@@ -876,6 +888,7 @@ export const OPERATIONS = {
     docIntro:
       'The Part 4.2 electronic Insurance File — version control and the deletion lock override for one policy’s documents.',
     docLookUp: 'Look up documents',
+    docDownloadStoredButton: 'Download the file',
     docNone: 'No documents recorded for this policy.',
     docColFile: 'File',
     docColCategory: 'Category',
