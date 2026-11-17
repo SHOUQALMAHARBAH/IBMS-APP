@@ -64,6 +64,18 @@ export const RFQ = {
     rfqNewIntro:
       'العملية 11 — إنشاء طلب عرض أسعار واحد لخط تأميني واحد وإرساله إلى قائمة مختصرة ' +
       'من شركات التأمين. يبدأ كل مؤمِّن بحالة "أُرسل".',
+    /*
+     * ⛔ OWNER DECISION 150 — «سعر» STAYS HERE, AND IT IS A STRUCK EXCEPTION, NOT AN OVERSIGHT.
+     *
+     * Decision 144 ruling 8-أ settles «طلب عرض أسعار» everywhere else, and the heading two lines
+     * above this one already says «طلب عرض أسعار جديد» — so this sentence disagrees with the
+     * screen it is printed on. The owner was shown exactly that, in those words, and ruled:
+     * «بتضل «سعر» كاستثناء لهالجملة لحالها» — it stays, as an exception for this one string.
+     *
+     * ⛔ So do NOT "align" it, now or when decision 144 is built. Decision 150's own addendum
+     * records the conflict and strikes it knowing: «شطبته الإدارة وهي تعرف التعارض». Changing it
+     * would be overruling a decision taken with the contradiction on the table.
+     */
     rfqNewRefusalAct: 'إنشاء طلب عرض سعر',
     // ART. 15/d's declaration, as an ACT in the language of the work -- which is what the
     // standing refusal vocabulary requires: «the act is described in the language of the work,

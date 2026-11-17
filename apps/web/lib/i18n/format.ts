@@ -18,7 +18,13 @@ import type { Language } from './translations';
 /** Bare `'ar'`, not `'ar-JO'` — a full region tag switches to Eastern
  *  Arabic-Indic numerals (٠١٢٣...), a real visual change from the Western
  *  digits this app uses everywhere else (reference numbers, policy numbers).
- *  Both give Gregorian-calendar dates; neither defaults to Hijri. */
+ *  Both give Gregorian-calendar dates; neither defaults to Hijri.
+ *
+ *  🔴 OWNER DECISION 146 RULING 1 RATIFIES THIS, AND MAKES IT THE ONLY ANSWER.
+ *  «كل رقم مكتوب في نصوص النظام غربي» — every figure the system writes is in Western digits.
+ *  What was a defensible choice is now a ruling, so a site that passes `'ar-JO'` of its own is
+ *  not a stylistic difference: it prints digits the owner has ruled against, on the same screen
+ *  as digits that obey her. ⛔ Do not "restore" the region tag here. */
 const AR_LOCALE = 'ar';
 
 /** `'en-GB'`, not `'en'`/`'en-US'` — gives DD/MM/YYYY dates, matching this
