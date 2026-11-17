@@ -113,7 +113,7 @@ import type { LicenceLegalFigures } from './legal-figures.config';
 export const RENEWAL_PENDING_RULE_BASIS =
   "Owner's decision 128. No provision of CBJ Instructions No. 9 of 2026 grants continuation past " +
   'expiry: art. 11 is one sentence requiring the application 45 days before expiry (printed page ' +
-  "15), and art. 21/a/9 names EXPIRY ON ITS OWN — separately from suspension and cancellation — " +
+  '15), and art. 21/a/9 names EXPIRY ON ITS OWN — separately from suspension and cancellation — ' +
   'as a ground for administrative sanction (printed page 25). The basis is instead the legal ' +
   "adviser's written opinion of 13 October 2026 and the administrative principle it states, that " +
   "an applicant is not prejudiced by the administration's own delay, together with the Central " +

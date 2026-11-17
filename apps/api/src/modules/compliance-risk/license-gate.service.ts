@@ -157,9 +157,10 @@ export class LicenseGateService {
    * office whose certificate landed between the two calls would be stamped with a term it
    * was no longer under. One read, one instant, one answer.
    */
-  private async standingWithTerm(
-    now: Date = new Date(),
-  ): Promise<{ standing: DerivedLicenseStanding; currentTermId: string | null }> {
+  private async standingWithTerm(now: Date = new Date()): Promise<{
+    standing: DerivedLicenseStanding;
+    currentTermId: string | null;
+  }> {
     // THREE READS, ONE ROUND TRIP, ONE INSTANT. The legal figures join the terms and the acts
     // rather than being fetched inside the derivation: OWNER DECISION 123 made art. 11's span and
     // art. 14/c's limit rows, and `deriveLicenseStanding` must stay PURE — its whole value is that
@@ -246,7 +247,9 @@ export class LicenseGateService {
      */
     const stamp: IssuanceStamp = {
       issuedUnderStudyLicenseId:
-        standing.renewalUnderStudy.state === 'UNDER_STUDY' ? currentTermId : null,
+        standing.renewalUnderStudy.state === 'UNDER_STUDY'
+          ? currentTermId
+          : null,
     };
     if (standing.blockedInsuranceBranchKeys.length === 0) return stamp;
 

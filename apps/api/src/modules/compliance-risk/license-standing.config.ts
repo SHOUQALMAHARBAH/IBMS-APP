@@ -1,8 +1,19 @@
-import {
-  deriveRenewalUnderStudy,
-  isBrokerLicenseCurrentlyLapsed,
-  isValidPendingRenewalDecision,
-} from './broker-license.config';
+/*
+ * 🔴 TWO IMPORTS LEFT THIS FILE WHEN DECISION 128 WAS ACTUALLY ENFORCED, AND THAT IS A FINDING
+ * RATHER THAN A TIDY-UP.
+ *
+ * `isBrokerLicenseCurrentlyLapsed` and `isValidPendingRenewalDecision` are the DATE-ONLY rule. Both
+ * were read here, and both answers were wrong for the question this file asks past the printed
+ * expiry — which is exactly how decision 128 came to be unenforced under comments saying it was.
+ * The two branches now test `term.expiresAt` and `study.state` instead.
+ *
+ * ⚠️ MEASURED 2026-11-16: with these imports gone, NEITHER function has a production caller left
+ * anywhere in `apps/api/src` — only their own spec. ⛔ They are NOT deleted here: they are tested,
+ * documented, and `insurance-company-license.config.ts` cites one by name as a deliberate
+ * non-reuse. Removing a tested rule is a decision of its own, and it is reported rather than taken
+ * inside a batch about something else.
+ */
+import { deriveRenewalUnderStudy } from './broker-license.config';
 import type { RenewalUnderStudy } from './broker-license.config';
 import type { LicenceLegalFigures } from './legal-figures.config';
 

@@ -127,7 +127,10 @@ afterAll(async () => {
   const leftovers = await prisma.documentContent.count({
     where: { id: { startsWith: 'probe-' } },
   });
-  expect(leftovers, 'a probe row survived — DocumentContent is append-only').toBe(0);
+  expect(
+    leftovers,
+    'a probe row survived — DocumentContent is append-only',
+  ).toBe(0);
 });
 
 describe('OWNER DECISION 142 §٥ criterion 4 / DECISION 128 §٧ criterion 9 — tenant isolation', () => {
@@ -153,7 +156,10 @@ describe('OWNER DECISION 142 §٥ criterion 4 / DECISION 128 §٧ criterion 9 �
          FROM pg_roles WHERE rolname = current_user`,
     ]);
     expect(who).toHaveLength(1);
-    expect(who[0].super, 'this connection is a SUPERUSER — RLS does not apply').toBe(false);
+    expect(
+      who[0].super,
+      'this connection is a SUPERUSER — RLS does not apply',
+    ).toBe(false);
     expect(who[0].bypass, 'this connection has BYPASSRLS').toBe(false);
     expect(
       Number(who[0].owned),
@@ -183,7 +189,10 @@ describe('OWNER DECISION 142 §٥ criterion 4 / DECISION 128 §٧ criterion 9 �
     ]);
     for (const row of rls) {
       expect(row.enabled, `${row.name} does not have RLS enabled`).toBe(true);
-      expect(row.forced, `${row.name} is not FORCED, so its owner is exempt`).toBe(true);
+      expect(
+        row.forced,
+        `${row.name} is not FORCED, so its owner is exempt`,
+      ).toBe(true);
     }
   });
 
@@ -195,8 +204,7 @@ describe('OWNER DECISION 142 §٥ criterion 4 / DECISION 128 §٧ criterion 9 �
       );
     }
 
-    const insert =
-      `INSERT INTO "DocumentContent"
+    const insert = `INSERT INTO "DocumentContent"
          ("id","organizationId","documentId","bytes","byteSize","contentType","sha256")
        VALUES ('probe-cert', '${officeId}', '${documentId}', '\\x255044462d'::bytea, 5,
                'application/pdf', repeat('a', 64))`;
@@ -205,25 +213,36 @@ describe('OWNER DECISION 142 §٥ criterion 4 / DECISION 128 §٧ criterion 9 �
     // The office that owns it SEES it — the non-vacuity half. Without this, a policy that hid the
     // row from everybody would satisfy every refusal below and look like perfect isolation.
     const own = await asAppRole<{ n: number }>(officeId, [insert, countOwn]);
-    expect(own[0].n, 'the owning office cannot see its own stored certificate').toBe(1);
+    expect(
+      own[0].n,
+      'the owning office cannot see its own stored certificate',
+    ).toBe(1);
 
     // ANOTHER office sees nothing...
     const other = await asAppRole<{ n: number }>(otherOrgId, [
       `SELECT count(*)::int AS n FROM "DocumentContent" WHERE "documentId" = '${documentId}'`,
     ]);
-    expect(other[0].n, 'another office can see this office’s stored certificate').toBe(0);
+    expect(
+      other[0].n,
+      'another office can see this office’s stored certificate',
+    ).toBe(0);
 
     // ...and nor does a connection with NO tenant context, which is what a forgotten
     // `set_config` looks like in production.
     const none = await asAppRole<{ n: number }>(null, [
       `SELECT count(*)::int AS n FROM "DocumentContent" WHERE "documentId" = '${documentId}'`,
     ]);
-    expect(none[0].n, 'a connection with no tenant context can read stored certificates').toBe(0);
+    expect(
+      none[0].n,
+      'a connection with no tenant context can read stored certificates',
+    ).toBe(0);
   });
 
   it('🔴 criterion 9 — another office sees neither the renewal PROOF nor the DECLARATION', async () => {
     if (!officeId || !otherOrgId || !licenseId) {
-      throw new Error('db-test does not hold a brokerage office with a licence term');
+      throw new Error(
+        'db-test does not hold a brokerage office with a licence term',
+      );
     }
 
     /*
@@ -231,8 +250,7 @@ describe('OWNER DECISION 142 §٥ criterion 4 / DECISION 128 §٧ criterion 9 �
      * asserted, because decision 128 criterion 9 names both and they live in different places —
      * a test of one would read as covering the pair.
      */
-    const insert =
-      `INSERT INTO "LicenseRenewalDeclaration"
+    const insert = `INSERT INTO "LicenseRenewalDeclaration"
          ("id","organizationId","brokerLicenseId","declarationTextShown","permissionCode",
           "actorUserId","actorNameShown")
        SELECT 'probe-decl', '${officeId}', '${licenseId}',
@@ -254,7 +272,10 @@ describe('OWNER DECISION 142 §٥ criterion 4 / DECISION 128 §٧ criterion 9 �
       `SELECT count(*)::int AS n FROM "LicenseRenewalDeclaration"
          WHERE "brokerLicenseId" = '${licenseId}'`,
     ]);
-    expect(other[0].n, 'another office can see this office’s renewal declaration').toBe(0);
+    expect(
+      other[0].n,
+      'another office can see this office’s renewal declaration',
+    ).toBe(0);
 
     // And the PROOF, which is a column on the term rather than a row of its own.
     const proofOther = await asAppRole<{ n: number }>(otherOrgId, [

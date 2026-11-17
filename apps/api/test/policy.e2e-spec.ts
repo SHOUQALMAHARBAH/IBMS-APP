@@ -1039,12 +1039,17 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       createHash('sha256').update(downloadedBytes).digest('hex'),
       'the downloaded certificate is not byte-identical to the stored one',
     ).toBe(certRow.content!.sha256);
-    expect(downloaded.headers['x-content-sha256']).toBe(certRow.content!.sha256);
+    expect(downloaded.headers['x-content-sha256']).toBe(
+      certRow.content!.sha256,
+    );
 
     // And an UPLOADED document has no bytes here — every other `Document` row is a pointer, and
     // 404 is what distinguishes «nothing stored» from «a zero-length file».
     const pointerRow = await prisma.document.findFirst({
-      where: { policyId: arPolicyId, category: { not: 'CERTIFICATE_OF_INSURANCE' } },
+      where: {
+        policyId: arPolicyId,
+        category: { not: 'CERTIFICATE_OF_INSURANCE' },
+      },
     });
     if (pointerRow) {
       await request(app.getHttpServer())

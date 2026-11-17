@@ -59,7 +59,11 @@ function act(over: Partial<RegulatoryActRow> = {}): RegulatoryActRow {
 /** AFTER the printed expiry, so decision 128 is the rule in force. */
 const AFTER_EXPIRY = d('2027-02-01');
 
-function standing(t: LicenseTermRow, acts: RegulatoryActRow[] = [], now = AFTER_EXPIRY) {
+function standing(
+  t: LicenseTermRow,
+  acts: RegulatoryActRow[] = [],
+  now = AFTER_EXPIRY,
+) {
   return deriveLicenseStanding(t, acts, now, INSTRUMENT_LICENCE_FIGURES);
 }
 
@@ -93,12 +97,12 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
      * is this?» is asking for a number, and reading one out of a scanned PDF is not something
      * the system can do. Blank-but-present must fail exactly as absent does.
      */
-    expect(standing(term({ renewalReferenceNumber: null })).renewalUnderStudy.state).toBe(
-      'NO_PROOF',
-    );
-    expect(standing(term({ renewalReferenceNumber: '   ' })).renewalUnderStudy.state).toBe(
-      'NO_PROOF',
-    );
+    expect(
+      standing(term({ renewalReferenceNumber: null })).renewalUnderStudy.state,
+    ).toBe('NO_PROOF');
+    expect(
+      standing(term({ renewalReferenceNumber: '   ' })).renewalUnderStudy.state,
+    ).toBe('NO_PROOF');
   });
 
   it('criterion 2 — «تاريخ تقديم بعد المهلة، ومعه ملف ⟵ يُمنَع»', () => {
@@ -113,15 +117,12 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
   });
 
   it('criterion 2 (the other half) — no application at all is NOT_FILED_ON_TIME', () => {
-    expect(standing(term({ renewalRequestedAt: null })).renewalUnderStudy.state).toBe(
-      'NOT_FILED_ON_TIME',
-    );
+    expect(
+      standing(term({ renewalRequestedAt: null })).renewalUnderStudy.state,
+    ).toBe('NOT_FILED_ON_TIME');
   });
 
-  it.each([
-    ['DEFICIENCY_NOTICE' as const],
-    ['RENEWAL_REFUSAL' as const],
-  ])(
+  it.each([['DEFICIENCY_NOTICE' as const], ['RENEWAL_REFUSAL' as const]])(
     'criterion 3 — «سجِّل %s ⟵ يُمنَع فوراً», and the state names which arrived',
     (kind) => {
       const s = standing(term(), [act({ kind })]);
@@ -143,7 +144,9 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
      */
     const inside = d('2026-06-01');
     const withoutAnyAct = standing(term(), [], inside);
-    expect(withoutAnyAct.mayPractise, 'the control case already refused').toBe(true);
+    expect(withoutAnyAct.mayPractise, 'the control case already refused').toBe(
+      true,
+    );
     for (const kind of ['DEFICIENCY_NOTICE', 'RENEWAL_REFUSAL'] as const) {
       /*
        * Compared against the SAME term with no act at all, rather than against a hard-coded
@@ -152,7 +155,11 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
        * still passing if both answers moved together, which is the thing it must catch.
        */
       expect(
-        standing(term(), [act({ kind, effectiveFrom: d('2026-05-01') })], inside),
+        standing(
+          term(),
+          [act({ kind, effectiveFrom: d('2026-05-01') })],
+          inside,
+        ),
         `${kind} changed the standing of a term inside its printed dates`,
       ).toEqual(withoutAnyAct);
     }
@@ -197,7 +204,11 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
      * conditions all hold here, so this case can only pass if precedence is real.
      */
     const s = standing(term(), [
-      act({ kind: 'SUSPENSION', basis: 'SANCTION', effectiveFrom: d('2026-06-01') }),
+      act({
+        kind: 'SUSPENSION',
+        basis: 'SANCTION',
+        effectiveFrom: d('2026-06-01'),
+      }),
     ]);
     expect(s.status).toBe('SUSPENDED');
     expect(s.mayPractise).toBe(false);
@@ -221,7 +232,9 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
   it('criterion 7 — and that holds for a REFUSED office too: no timer cures a refusal', () => {
     const t = term();
     const acts = [act({ kind: 'RENEWAL_REFUSAL' })];
-    expect(standing(t, acts, d('2028-01-02'))).toEqual(standing(t, acts, d('2027-01-02')));
+    expect(standing(t, acts, d('2028-01-02'))).toEqual(
+      standing(t, acts, d('2027-01-02')),
+    );
   });
 
   it('OWNER DECISION 136(ب) — everything but the declaration gives AWAITING_DECLARATION', () => {
@@ -251,13 +264,14 @@ describe('OWNER DECISION 128 §٧ — the nine criteria', () => {
       term({ renewalProofDocumentId: null }),
       term({ renewalRequestedAt: null }),
     ]) {
-      expect(standing(t).status, 'an office past expiry reached ACTIVE').not.toBe(
-        'ACTIVE',
-      );
+      expect(
+        standing(t).status,
+        'an office past expiry reached ACTIVE',
+      ).not.toBe('ACTIVE');
     }
-    expect(standing(term(), [act({ kind: 'RENEWAL_REFUSAL' })]).status).not.toBe(
-      'ACTIVE',
-    );
+    expect(
+      standing(term(), [act({ kind: 'RENEWAL_REFUSAL' })]).status,
+    ).not.toBe('ACTIVE');
   });
 });
 

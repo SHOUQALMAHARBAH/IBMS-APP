@@ -576,18 +576,19 @@ export class RfqService {
     const stamp = await this.licenseGate.assertMayPractise(
       'REQUEST_QUOTES',
       async () => {
-      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
-      // reads and costs no extra query unless the office actually has a partial suspension.
-      const scoped = await this.assertOpportunityVisible(
-        dto.opportunityId,
-        actor,
-        'Opportunity not found',
-      );
-      return this.assertLineInProgramme(
-        scoped.insuranceProgramId,
-        dto.insuranceLine,
-      );
-    });
+        // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+        // reads and costs no extra query unless the office actually has a partial suspension.
+        const scoped = await this.assertOpportunityVisible(
+          dto.opportunityId,
+          actor,
+          'Opportunity not found',
+        );
+        return this.assertLineInProgramme(
+          scoped.insuranceProgramId,
+          dto.insuranceLine,
+        );
+      },
+    );
     const opportunity = await this.assertOpportunityVisible(
       dto.opportunityId,
       actor,

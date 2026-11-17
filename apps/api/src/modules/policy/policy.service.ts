@@ -521,11 +521,11 @@ export class PolicyService {
     const stamp = await this.licenseGate.assertMayPractise(
       'PLACE_POLICY',
       async () => {
-      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
-      // reads and costs no extra query unless the office actually has a partial suspension.
-      const sent = await this.recommendations.findByOpportunityId(
-        dto.opportunityId,
-      );
+        // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+        // reads and costs no extra query unless the office actually has a partial suspension.
+        const sent = await this.recommendations.findByOpportunityId(
+          dto.opportunityId,
+        );
         return sent?.recommendedQuotation.rfq ?? null;
       },
     );

@@ -137,8 +137,8 @@ export class CertificateOfInsuranceDocumentService {
     const stamp = await this.licenseGate.assertMayPractise(
       'ISSUE_CERTIFICATE',
       async () => {
-      // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
-      // reads and costs no extra query unless the office actually has a partial suspension.
+        // Art. 21/b/5 — LAZY, so the licence check keeps its documented place ahead of the
+        // reads and costs no extra query unless the office actually has a partial suspension.
         const { policy } = await this.policies.getByIdWithCustomer(
           policyId,
           actor,
